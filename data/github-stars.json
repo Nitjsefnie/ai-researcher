@@ -1,0 +1,35 @@
+{
+  "source": "https://api.github.com/search/repositories?q=stars:>1000&sort=stars&order=desc&per_page=30",
+  "models": [
+    {
+      "full_name": "codecrafters-io/build-your-own-x"
+    },
+    {
+      "full_name": "sindresorhus/awesome"
+    },
+    {
+      "full_name": "freeCodeCamp/freeCodeCamp"
+    },
+    {
+      "full_name": "public-apis/public-apis"
+    },
+    {
+      "full_name": "EbookFoundation/free-programming-books"
+    },
+    {
+      "full_name": "nilbuild/developer-roadmap"
+    },
+    {
+      "full_name": "openclaw/openclaw"
+    },
+    {
+      "full_name": "donnemartin/system-design-primer"
+    },
+    {
+      "full_name": "jwasham/coding-interview-university"
+    },
+    {
+      "full_name": "vinta/awesome-python"
+    }
+  ]
+}
