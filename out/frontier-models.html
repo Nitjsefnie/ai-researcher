@@ -366,9 +366,10 @@ const DATA = {"rows":[{"name":"Claude Opus 5 (Adaptive Reasoning, Max Effort)","
       for(const k in a) e.setAttribute(k,a[k]); return e;};
 
     W=Math.max(720,Math.round(svg.parentElement.getBoundingClientRect().width));
-    // Fit the plot to the viewport less the docs-hub header (measured at 110px),
-    // so the whole chart is on screen without scrolling.
-    H=Math.max(380,(window.innerHeight||900)-110);
+    // Fit the plot to the viewport less the docs-hub header (measured at 110px)
+    // and 50px of breathing room, so the whole chart is on screen without
+    // scrolling and does not butt against the edge.
+    H=Math.max(380,(window.innerHeight||900)-160);
     svg.setAttribute("viewBox","0 0 "+W+" "+H);
     const px=W-L-Rr, py=H-T-B;
 
