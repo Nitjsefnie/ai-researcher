@@ -87,12 +87,11 @@
   .card{overflow:visible}
   svg{display:block;width:100%;height:auto}
   svg text{font-family:var(--mono);font-size:10.5px;fill:var(--muted)}
-  /* Halo: glyphs paint over a surface-coloured outline of themselves, so the
-     hairline gridlines never run through the lettering. Collision detection
-     handles dots, the frontier line and other labels; this handles the grid,
-     which is unavoidable background and designed to be sat on. */
-  svg text.lbl{font-size:10px;fill:var(--text-secondary);paint-order:stroke;
-    stroke:var(--surface-1);stroke-width:3px;stroke-linejoin:round}
+  /* Boxed labels: the filled box hides the gridlines behind the lettering (so
+     no halo is needed), and the leader line ties the text to its own dot. */
+  svg text.lbl{font-size:10px;fill:var(--text-secondary)}
+  svg rect.lblbox{fill:var(--surface-1);stroke:var(--border);stroke-width:1}
+  svg line.lead{stroke:var(--muted);stroke-width:1}
   .pt{cursor:pointer}
   .pt.fade{opacity:.18}
 
@@ -344,7 +343,7 @@ const DATA = {"rows":[{"name":"Claude Opus 5 (Adaptive Reasoning, Max Effort)","
   // the container in CSS pixels while the height stays fixed, so a wide monitor
   // buys a WIDER chart rather than a proportionally taller one -- and the extra
   // horizontal room is exactly what the label placer needs.
-  let W=980; const H=560, L=62, Rr=22, T=20, B=52;
+  let W=980, H=560; const L=62, Rr=22, T=20, B=52;
 
   // The single definition of the undominated layer, shared by the chart line,
   // the frontier table, the table tag and the Hide-superseded chip -- so they
@@ -367,6 +366,9 @@ const DATA = {"rows":[{"name":"Claude Opus 5 (Adaptive Reasoning, Max Effort)","
       for(const k in a) e.setAttribute(k,a[k]); return e;};
 
     W=Math.max(720,Math.round(svg.parentElement.getBoundingClientRect().width));
+    // Fit the plot to the viewport less the docs-hub header (measured at 110px),
+    // so the whole chart is on screen without scrolling.
+    H=Math.max(380,(window.innerHeight||900)-110);
     svg.setAttribute("viewBox","0 0 "+W+" "+H);
     const px=W-L-Rr, py=H-T-B;
 
@@ -468,16 +470,33 @@ const DATA = {"rows":[{"name":"Claude Opus 5 (Adaptive Reasoning, Max Effort)","
     // smarter, so up-and-left of the curve is vacant -- are what make room for
     // long names. Labels may use the plot margins, but never leave the canvas.
     const full = st.sup;
+    const PADX=4, PADY=2, leaders=[];
     const clear = a =>
       a.x>=4 && a.x+a.w<=W-4 && a.y>=T && a.y+a.h<=T+py &&
       !boxes.some(b=>hitsBox(a,b)) &&
       !pts.some(p=>hitsDot(a,p)) &&
-      !segs.some(s=>hitsSeg(a,s));
+      !segs.some(s=>hitsSeg(a,s)) &&
+      !leaders.some(s=>hitsSeg(a,s));
+
+    // A leader must not graze another dot or another label on its way across,
+    // or the line appears to point at the wrong model -- which is exactly the
+    // ambiguity the leaders exist to remove.
+    const leaderClear=(x1,y1,x2,y2,own)=>{
+      const n=Math.max(2,Math.ceil(Math.hypot(x2-x1,y2-y1)/3));
+      for(let i=0;i<=n;i++){
+        const t=i/n, sx=x1+(x2-x1)*t, sy=y1+(y2-y1)*t;
+        for(const p of pts){
+          if(p===own) continue;
+          if((sx-p.x)**2+(sy-p.y)**2 < 56) return false;
+        }
+      }
+      return !boxes.some(b=>hitsSeg(b,[x1,y1,x2,y2]));
+    };
 
     // smartest first, so the models people look for get first claim on space
     let dropped=0;
     for(const r of [...fr].sort((a,b)=> b.ii-a.ii)){
-      const cx=X(r.cost), cy=Y(r.ii);
+      const cx=X(r.cost), cy=Y(r.ii), own=pts.find(p=>p.r===r);
       const t=el("text",{class:"lbl"});
       t.textContent = full ? r.name
                      : (r.name.length>34 ? r.name.slice(0,33)+"…" : r.name);
@@ -486,28 +505,43 @@ const DATA = {"rows":[{"name":"Claude Opus 5 (Adaptive Reasoning, Max Effort)","
 
       // Candidates ordered by how far they sit from the dot, so a label only
       // drifts when its neighbourhood is genuinely occupied.
+      // Offsets on both sides at several distances, then sorted so the nearest
+      // clear slot wins -- a leader only gets long when everything closer is
+      // genuinely occupied. The wide reach is what lets the frontier view name
+      // all 21 points at narrower window sizes.
       const cands=[];
-      const spread = full ? [0,-13,13,-26,26,-39,39,-52,52,-65,65,-78,78,-91,91,-104,104]
-                          : [0,-13,13,-26,26];
-      for(const dy of spread){
-        cands.push([cx+11,   cy-h/2+dy]);      // to the right
-        cands.push([cx-11-w, cy-h/2+dy]);      // to the left
-      }
-      for(const dy of [-14,14,-27,27]) cands.push([cx-w/2, cy-h/2+dy]);
+      const dyMax = full ? 240 : 32;
+      const dxs   = full ? [18,70,130] : [18];
+      for(let dy=-dyMax; dy<=dyMax; dy+=16)
+        for(const dx of dxs){
+          const d=Math.hypot(dx,dy);
+          cands.push([cx+dx,   cy-h/2+dy, d]);   // to the right
+          cands.push([cx-dx-w, cy-h/2+dy, d]);   // to the left
+        }
+      for(const dy of [-20,20,-34,34]) cands.push([cx-w/2, cy-h/2+dy, Math.abs(dy)]);
+      cands.sort((a,b)=> a[2]-b[2]);
 
-      let placed=false;
+      let put=null;
       for(const [bx,by] of cands){
-        // Inflate by the halo stroke. paint-order:stroke paints a 3px outline
-        // around the glyphs, so the box that lands on screen is wider and taller
-        // than the advance width -- testing the un-inflated box let a label clip
-        // the frontier line at narrow widths.
-        const box={x:bx-2,y:by-2,w:w+4,h:h+4};
+        const box={x:bx-PADX, y:by-PADY, w:w+2*PADX, h:h+2*PADY};
         if(!clear(box)) continue;
-        t.setAttribute("x",bx);
-        t.setAttribute("y",by+h-2.5);          // y is the baseline
-        boxes.push(box); placed=true; break;
+        // leader runs from the dot's edge to the nearest point on the box
+        const nx=Math.max(box.x,Math.min(cx,box.x+box.w));
+        const ny=Math.max(box.y,Math.min(cy,box.y+box.h));
+        const d=Math.hypot(nx-cx,ny-cy)||1;
+        const sx=cx+(nx-cx)/d*7, sy=cy+(ny-cy)/d*7;
+        if(!leaderClear(sx,sy,nx,ny,own)) continue;
+        put={bx,by,box,sx,sy,nx,ny}; break;
       }
-      if(!placed){ svg.removeChild(t); dropped++; }
+      if(!put){ svg.removeChild(t); dropped++; continue; }
+
+      // leader and box go behind the text, which was appended to measure it
+      svg.insertBefore(el("line",{x1:put.sx,y1:put.sy,x2:put.nx,y2:put.ny,class:"lead"}),t);
+      svg.insertBefore(el("rect",{x:put.box.x,y:put.box.y,width:put.box.w,
+        height:put.box.h,rx:3,class:"lblbox"}),t);
+      t.setAttribute("x",put.bx);
+      t.setAttribute("y",put.by+h-2.5);        // y is the baseline
+      boxes.push(put.box); leaders.push([put.sx,put.sy,put.nx,put.ny]);
     }
     if(dropped) console.warn("labels dropped for want of clear space:",dropped);
   }
