@@ -382,6 +382,7 @@ TEMPLATE = r"""<!DOCTYPE html>
     <button class="chip" id="fReas" aria-pressed="false">Reasoning only</button>
     <select id="fLab" aria-label="Filter by lab"><option value="">All labs</option></select>
     <input type="search" id="fQ" placeholder="search model&hellip;" aria-label="Search model name">
+    <button class="chip" id="fOnly" aria-pressed="false" hidden>Only pinned</button>
     <button class="chip" id="fClear" hidden>Clear pinned names</button>
     <span class="count" id="count">&mdash;</span>
   </div>
@@ -478,8 +479,8 @@ const DATA = __DATA__;
     o.value = l; o.textContent = l; $("fLab").appendChild(o);
   }
 
-  const st = { prop:true, open:true, sup:false, eff:false, reas:false, lab:"", q:"",
-               sortK:"ii", sortDir:-1 };
+  const st = { prop:true, open:true, sup:false, eff:false, reas:false, only:false,
+               lab:"", q:"", sortK:"ii", sortDir:-1 };
   // Names whose labels the reader has stuck down by clicking. Keyed by name so
   // a pin survives filtering and resizing, and returns when the model does.
   const pins = new Set();
@@ -488,6 +489,7 @@ const DATA = __DATA__;
     const q = st.q.trim().toLowerCase();
     return R.filter(r =>
       (r.open ? st.open : st.prop) &&
+      (!st.only || pins.has(r.name)) &&
       (!st.reas || r.reas) &&
       (!st.lab || r.creator === st.lab) &&
       (!q || r.name.toLowerCase().includes(q) || r.creator.toLowerCase().includes(q)));
@@ -898,6 +900,11 @@ const DATA = __DATA__;
 
   /* ---------- wiring ---------- */
   function render(){
+    // Unpinning the last model would leave "Only pinned" showing an empty plot
+    // with no visible way out, since the chip itself hides with the pins.
+    if(!pins.size && st.only){
+      st.only=false; $("fOnly").setAttribute("aria-pressed","false");
+    }
     const base=baseSlice();
     const coll=st.eff ? collapse(base) : base;
     const rows=st.sup ? frontierOf(coll) : coll;
@@ -912,6 +919,7 @@ const DATA = __DATA__;
       bits.push(pins.size+" pinned"+(shown<pins.size ? " ("+shown+" in view)" : ""));
     }
     $("fClear").hidden = pins.size===0;
+    $("fOnly").hidden  = pins.size===0;
     $("count").textContent=bits.join(" · ");
     draw(rows); fillFrontier(rows); fillTable(rows); hideTip();
   }
@@ -919,6 +927,7 @@ const DATA = __DATA__;
     st[key]=!st[key]; $(id).setAttribute("aria-pressed",String(st[key])); render();});
   toggle("fProp","prop"); toggle("fOpen","open");
   toggle("fSup","sup");   toggle("fEff","eff");   toggle("fReas","reas");
+  toggle("fOnly","only");
   $("fClear").addEventListener("click",()=>{ pins.clear(); render(); });
   $("fLab").addEventListener("change",e=>{st.lab=e.target.value; render();});
   $("fQ").addEventListener("input",e=>{st.q=e.target.value; render();});
