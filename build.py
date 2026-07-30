@@ -240,6 +240,10 @@ TEMPLATE = r"""<!DOCTYPE html>
   .chip{font-family:var(--mono);font-size:12px;padding:6px 13px;border-radius:999px;
     border:1px solid var(--border);background:var(--surface-1);color:var(--text-secondary);
     cursor:pointer;user-select:none;display:inline-flex;align-items:center;gap:7px}
+  /* .chip sets display:inline-flex, and an author rule beats the UA sheet's
+     [hidden]{display:none} -- so without this the pin chips render even when
+     the hidden attribute is set. */
+  .chip[hidden]{display:none}
   .chip:hover{border-color:var(--accent)}
   .chip[aria-pressed="true"]{border-color:var(--accent);color:var(--text-primary);
     box-shadow:0 0 0 1px var(--accent) inset}
@@ -640,15 +644,30 @@ const DATA = __DATA__;
       const ny=Math.max(a.y,Math.min(p.y,a.y+a.h));
       return (p.x-nx)**2 + (p.y-ny)**2 < 81;
     };
+    // Exact segment-vs-rectangle (Liang-Barsky). This was point-sampling along
+    // the segment, which aliases: a line clipping a box corner between two
+    // samples reads as clear, and one did at 1280px wide. Sampling cannot be
+    // made safe by shrinking the step -- only by not sampling.
     const hitsSeg=(a,[x1,y1,x2,y2])=>{
-      if(Math.max(x1,x2)<a.x || Math.min(x1,x2)>a.x+a.w ||
-         Math.max(y1,y2)<a.y || Math.min(y1,y2)>a.y+a.h) return false;
-      const n=Math.max(2,Math.ceil(Math.hypot(x2-x1,y2-y1)/2));
-      for(let i=0;i<=n;i++){
-        const t=i/n, sx=x1+(x2-x1)*t, sy=y1+(y2-y1)*t;
-        if(sx>=a.x && sx<=a.x+a.w && sy>=a.y && sy<=a.y+a.h) return true;
+      let t0=0, t1=1;
+      const dx=x2-x1, dy=y2-y1;
+      const p=[-dx,dx,-dy,dy];
+      const q=[x1-a.x, a.x+a.w-x1, y1-a.y, a.y+a.h-y1];
+      for(let i=0;i<4;i++){
+        if(p[i]===0){ if(q[i]<0) return false; continue; }
+        const r=q[i]/p[i];
+        if(p[i]<0){ if(r>t1) return false; if(r>t0) t0=r; }
+        else       { if(r<t0) return false; if(r<t1) t1=r; }
       }
-      return false;
+      return true;
+    };
+    // exact squared distance from a point to a segment
+    const segDist2=(x1,y1,x2,y2,px,py)=>{
+      const dx=x2-x1, dy=y2-y1, L=dx*dx+dy*dy;
+      let t = L ? ((px-x1)*dx+(py-y1)*dy)/L : 0;
+      t = t<0 ? 0 : t>1 ? 1 : t;
+      const qx=x1+t*dx, qy=y1+t*dy;
+      return (px-qx)**2 + (py-qy)**2;
     };
     // Showing only the frontier means few enough points to name every one in
     // full. The empty regions a Pareto curve creates -- nothing is cheaper AND
@@ -667,13 +686,9 @@ const DATA = __DATA__;
     // or the line appears to point at the wrong model -- which is exactly the
     // ambiguity the leaders exist to remove.
     const leaderClear=(x1,y1,x2,y2,own)=>{
-      const n=Math.max(2,Math.ceil(Math.hypot(x2-x1,y2-y1)/3));
-      for(let i=0;i<=n;i++){
-        const t=i/n, sx=x1+(x2-x1)*t, sy=y1+(y2-y1)*t;
-        for(const p of pts){
-          if(p===own) continue;
-          if((sx-p.x)**2+(sy-p.y)**2 < 56) return false;
-        }
+      for(const p of pts){
+        if(p===own) continue;
+        if(segDist2(x1,y1,x2,y2,p.x,p.y) < 56) return false;
       }
       return !boxes.some(b=>hitsSeg(b,[x1,y1,x2,y2]));
     };
