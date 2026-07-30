@@ -3984,15 +3984,15 @@
   "itbenchSre": null,
   "gdpvalNormalized": 0.32705499999999993,
   "mmmuPro": 0.739884393063584,
-  "price1mBlended0To3To1": 2.25,
-  "price1mBlended7To2To1": 0.8699999999999999,
-  "price1mBlended0To1To1": 3.5,
-  "price1mBlended100To1To1": 0.16666666666666666,
-  "price1mBlended0To100To1": 1.0495049504950495,
-  "price1mInputTokens": 1,
-  "price1mOutputTokens": 6,
-  "cacheHitPrice": 0.1,
-  "cacheWritePrice": 1.25,
+  "price1mBlended0To3To1": 0.45,
+  "price1mBlended7To2To1": 0.174,
+  "price1mBlended0To1To1": 0.7,
+  "price1mBlended100To1To1": 0.03333333333333334,
+  "price1mBlended0To100To1": 0.2099009900990099,
+  "price1mInputTokens": 0.2,
+  "price1mOutputTokens": 1.2,
+  "cacheHitPrice": 0.02,
+  "cacheWritePrice": 0.25,
   "cacheHitDiscountPercent": 0.9,
   "medianOutputTokensPerSecond": 174.330130656365,
   "medianTimeToFirstTokenSeconds": 1.60584825400008,
@@ -4010,7 +4010,7 @@
   "quartile75TimeToFirstTokenSeconds": 2.19070277249996,
   "contextWindowTokens": 1000000,
   "totalParameters": null,
-  "sizeClass": "large",
+  "sizeClass": "medium",
   "paramClass": null,
   "priceClass": "medium",
   "activeParameters": null,
@@ -4028,58 +4028,58 @@
   "licenseUrl": null,
   "huggingfaceUrl": null,
   "openrouterApiId": null,
-  "intelligenceIndexCostTotal": 80.09899371135336,
-  "intelligenceIndexCostInput": 38.27061171135337,
-  "intelligenceIndexCostOutput": 41.828382,
-  "intelligenceIndexCostReasoning": 28.985087999999998,
-  "intelligenceIndexCostAnswer": 12.843294,
+  "intelligenceIndexCostTotal": 16.019798742270673,
+  "intelligenceIndexCostInput": 7.654122342270674,
+  "intelligenceIndexCostOutput": 8.3656764,
+  "intelligenceIndexCostReasoning": 5.797017599999999,
+  "intelligenceIndexCostAnswer": 2.5686588,
   "intelligenceIndexCostPerTask": {
    "cost": {
-    "total": 0.057478646852988834,
-    "input": 0.04369097440073119,
-    "nonCacheInput": 0.0063720849907329125,
-    "cacheRead": 0.012483201862859401,
-    "cacheWrite": 0.024835687547138875,
-    "output": 0.013787672452257638,
-    "reasoning": 0.0036018009601235194,
-    "answer": 0.010185871492134123
+    "total": 0.011495729370597764,
+    "input": 0.008738194880146238,
+    "nonCacheInput": 0.0012744169981465825,
+    "cacheRead": 0.00249664037257188,
+    "cacheWrite": 0.004967137509427775,
+    "output": 0.0027575344904515278,
+    "reasoning": 0.0007203601920247037,
+    "answer": 0.0020371742984268237
    },
    "evaluations": [
     {
      "slug": "gdpval-aa",
-     "weightedCostPerTask": 0.0068467254224338645
+     "weightedCostPerTask": 0.0013693450844867727
     },
     {
      "slug": "tau3-banking",
-     "weightedCostPerTask": 0.007829614807924332
+     "weightedCostPerTask": 0.0015659229615848662
     },
     {
      "slug": "terminalbench-v2-1",
-     "weightedCostPerTask": 0.033611866137297275
+     "weightedCostPerTask": 0.006722373227459454
     },
     {
      "slug": "scicode",
-     "weightedCostPerTask": 0.0006114114583333333
+     "weightedCostPerTask": 0.00012228229166666665
     },
     {
      "slug": "humanitys-last-exam",
-     "weightedCostPerTask": 0.0009000554911955513
+     "weightedCostPerTask": 0.00018001109823911026
     },
     {
      "slug": "gpqa-diamond",
-     "weightedCostPerTask": 0.00023969286616161618
+     "weightedCostPerTask": 4.793857323232323e-05
     },
     {
      "slug": "critpt",
-     "weightedCostPerTask": 0.0011481553571428573
+     "weightedCostPerTask": 0.00022963107142857147
     },
     {
      "slug": "omniscience",
-     "weightedCostPerTask": 0.0003068153125
+     "weightedCostPerTask": 6.13630625e-05
     },
     {
      "slug": "artificial-analysis-long-context-reasoning",
-     "weightedCostPerTask": 0.0059843100000000005
+     "weightedCostPerTask": 0.0011968620000000001
     }
    ]
   },
@@ -11570,13 +11570,13 @@
   "itbenchSre": null,
   "gdpvalNormalized": null,
   "mmmuPro": null,
-  "price1mBlended0To3To1": 0.10250000000000001,
-  "price1mBlended7To2To1": 0.083,
-  "price1mBlended0To1To1": 0.135,
-  "price1mBlended100To1To1": 0.07127450980392158,
-  "price1mBlended0To100To1": 0.0712871287128713,
+  "price1mBlended0To3To1": 0.10875000000000001,
+  "price1mBlended7To2To1": 0.0855,
+  "price1mBlended0To1To1": 0.14750000000000002,
+  "price1mBlended100To1To1": 0.07151960784313727,
+  "price1mBlended0To100To1": 0.07153465346534654,
   "price1mInputTokens": 0.07,
-  "price1mOutputTokens": 0.2,
+  "price1mOutputTokens": 0.225,
   "cacheHitPrice": null,
   "cacheWritePrice": null,
   "cacheHitDiscountPercent": null,
@@ -19387,15 +19387,15 @@
   "itbenchSre": null,
   "gdpvalNormalized": 0.451375,
   "mmmuPro": 0.767630057803468,
-  "price1mBlended0To3To1": 5.625,
-  "price1mBlended7To2To1": 2.175,
-  "price1mBlended0To1To1": 8.75,
-  "price1mBlended100To1To1": 0.4166666666666667,
-  "price1mBlended0To100To1": 2.623762376237624,
-  "price1mInputTokens": 2.5,
-  "price1mOutputTokens": 15,
-  "cacheHitPrice": 0.25,
-  "cacheWritePrice": 3.125,
+  "price1mBlended0To3To1": 4.5,
+  "price1mBlended7To2To1": 1.7399999999999998,
+  "price1mBlended0To1To1": 7,
+  "price1mBlended100To1To1": 0.3333333333333333,
+  "price1mBlended0To100To1": 2.099009900990099,
+  "price1mInputTokens": 2,
+  "price1mOutputTokens": 12,
+  "cacheHitPrice": 0.2,
+  "cacheWritePrice": 2.5,
   "cacheHitDiscountPercent": 0.9,
   "medianOutputTokensPerSecond": 117.645126387747,
   "medianTimeToFirstTokenSeconds": 1.74009593650015,
@@ -19431,58 +19431,58 @@
   "licenseUrl": null,
   "huggingfaceUrl": null,
   "openrouterApiId": null,
-  "intelligenceIndexCostTotal": 278.3879946442812,
-  "intelligenceIndexCostInput": 122.04764464428123,
-  "intelligenceIndexCostOutput": 156.34035,
-  "intelligenceIndexCostReasoning": 112.251045,
-  "intelligenceIndexCostAnswer": 44.089305,
+  "intelligenceIndexCostTotal": 222.710395715425,
+  "intelligenceIndexCostInput": 97.63811571542499,
+  "intelligenceIndexCostOutput": 125.07228,
+  "intelligenceIndexCostReasoning": 89.800836,
+  "intelligenceIndexCostAnswer": 35.271444,
   "intelligenceIndexCostPerTask": {
    "cost": {
-    "total": 0.16736405954815578,
-    "input": 0.1108277629389672,
-    "nonCacheInput": 0.01596181809968082,
-    "cacheRead": 0.025653560323382597,
-    "cacheWrite": 0.06921238451590381,
-    "output": 0.05653629660918855,
-    "reasoning": 0.021642154342575264,
-    "answer": 0.03489414226661329
+    "total": 0.1338912476385246,
+    "input": 0.08866221035117379,
+    "nonCacheInput": 0.012769454479744653,
+    "cacheRead": 0.02052284825870608,
+    "cacheWrite": 0.05536990761272305,
+    "output": 0.045229037287350844,
+    "reasoning": 0.017313723474060218,
+    "answer": 0.02791531381329064
    },
    "evaluations": [
     {
      "slug": "gdpval-aa",
-     "weightedCostPerTask": 0.04849282281223975
+     "weightedCostPerTask": 0.038794258249791796
     },
     {
      "slug": "tau3-banking",
-     "weightedCostPerTask": 0.03811209109645876
+     "weightedCostPerTask": 0.030489672877167005
     },
     {
      "slug": "terminalbench-v2-1",
-     "weightedCostPerTask": 0.05336828089109883
+     "weightedCostPerTask": 0.04269462471287906
     },
     {
      "slug": "scicode",
-     "weightedCostPerTask": 0.0015573936631944443
+     "weightedCostPerTask": 0.0012459149305555554
     },
     {
      "slug": "humanitys-last-exam",
-     "weightedCostPerTask": 0.003987514915430954
+     "weightedCostPerTask": 0.003190011932344764
     },
     {
      "slug": "gpqa-diamond",
-     "weightedCostPerTask": 0.0007262918244949495
+     "weightedCostPerTask": 0.0005810334595959596
     },
     {
      "slug": "critpt",
-     "weightedCostPerTask": 0.005440602678571429
+     "weightedCostPerTask": 0.004352482142857143
     },
     {
      "slug": "omniscience",
-     "weightedCostPerTask": 0.0007287210416666665
+     "weightedCostPerTask": 0.0005829768333333334
     },
     {
      "slug": "artificial-analysis-long-context-reasoning",
-     "weightedCostPerTask": 0.014950340625000001
+     "weightedCostPerTask": 0.0119602725
     }
    ]
   },
@@ -27841,12 +27841,12 @@
   "itbenchSre": null,
   "gdpvalNormalized": 0.03360500000000002,
   "mmmuPro": null,
-  "price1mBlended0To3To1": 0.095,
-  "price1mBlended7To2To1": 0.074,
-  "price1mBlended0To1To1": 0.13,
-  "price1mBlended100To1To1": 0.06137254901960785,
-  "price1mBlended0To100To1": 0.0613861386138614,
-  "price1mInputTokens": 0.060000000000000005,
+  "price1mBlended0To3To1": 0.10250000000000001,
+  "price1mBlended7To2To1": 0.083,
+  "price1mBlended0To1To1": 0.135,
+  "price1mBlended100To1To1": 0.07127450980392158,
+  "price1mBlended0To100To1": 0.0712871287128713,
+  "price1mInputTokens": 0.07,
   "price1mOutputTokens": 0.2,
   "cacheHitPrice": null,
   "cacheWritePrice": null,
@@ -27885,18 +27885,18 @@
   "licenseUrl": "https://www.apache.org/licenses/LICENSE-2.0",
   "huggingfaceUrl": "https://huggingface.co/openai/gpt-oss-20b",
   "openrouterApiId": "openai/gpt-oss-20b",
-  "intelligenceIndexCostTotal": 33.15268208,
-  "intelligenceIndexCostInput": 19.685721479999998,
+  "intelligenceIndexCostTotal": 36.43363566000001,
+  "intelligenceIndexCostInput": 22.966675060000004,
   "intelligenceIndexCostOutput": 13.466960600000002,
   "intelligenceIndexCostReasoning": 12.672229600000001,
   "intelligenceIndexCostAnswer": 0.7947310000000001,
   "intelligenceIndexCostPerTask": {
    "cost": {
-    "total": 0.020517196822833886,
-    "input": 0.01604651090791352,
-    "nonCacheInput": 0.0003837694678421244,
+    "total": 0.023191615307486143,
+    "input": 0.018720929392565772,
+    "nonCacheInput": 0.00044773104581581185,
     "cacheRead": 0,
-    "cacheWrite": 0.015662741440071397,
+    "cacheWrite": 0.018273198346749963,
     "output": 0.004470685914920368,
     "reasoning": 0.0039160444356494085,
     "answer": 0.0005546414792709588
@@ -27904,39 +27904,39 @@
    "evaluations": [
     {
      "slug": "gdpval-aa",
-     "weightedCostPerTask": 0.012012652227272729
+     "weightedCostPerTask": 0.013809139340909094
     },
     {
      "slug": "tau3-banking",
-     "weightedCostPerTask": 0.0036620837800687284
+     "weightedCostPerTask": 0.00422770441580756
     },
     {
      "slug": "terminalbench-v2-1",
-     "weightedCostPerTask": 0.003301164606741573
+     "weightedCostPerTask": 0.0035495137640449434
     },
     {
      "slug": "scicode",
-     "weightedCostPerTask": 7.526585648148149e-05
+     "weightedCostPerTask": 7.73955150462963e-05
     },
     {
      "slug": "humanitys-last-exam",
-     "weightedCostPerTask": 0.00039333555027803524
+     "weightedCostPerTask": 0.00039371423945783136
     },
     {
      "slug": "gpqa-diamond",
-     "weightedCostPerTask": 0.0001419822348484849
+     "weightedCostPerTask": 0.00014213732323232328
     },
     {
      "slug": "critpt",
-     "weightedCostPerTask": 0.00048315398214285717
+     "weightedCostPerTask": 0.00048533711607142864
     },
     {
      "slug": "omniscience",
-     "weightedCostPerTask": 5.415526e-05
+     "weightedCostPerTask": 5.4309817916666665e-05
     },
     {
      "slug": "artificial-analysis-long-context-reasoning",
-     "weightedCostPerTask": 0.000393403325
+     "weightedCostPerTask": 0.000452363775
     }
    ]
   },
@@ -32258,15 +32258,15 @@
   "itbenchSre": 0.403201506591337,
   "gdpvalNormalized": 0.5409700000000001,
   "mmmuPro": 0.785549132947977,
-  "price1mBlended0To3To1": 2.25,
-  "price1mBlended7To2To1": 0.8699999999999999,
-  "price1mBlended0To1To1": 3.5,
-  "price1mBlended100To1To1": 0.16666666666666666,
-  "price1mBlended0To100To1": 1.0495049504950495,
-  "price1mInputTokens": 1,
-  "price1mOutputTokens": 6,
-  "cacheHitPrice": 0.1,
-  "cacheWritePrice": 1.25,
+  "price1mBlended0To3To1": 0.45,
+  "price1mBlended7To2To1": 0.174,
+  "price1mBlended0To1To1": 0.7,
+  "price1mBlended100To1To1": 0.03333333333333334,
+  "price1mBlended0To100To1": 0.2099009900990099,
+  "price1mInputTokens": 0.2,
+  "price1mOutputTokens": 1.2,
+  "cacheHitPrice": 0.02,
+  "cacheWritePrice": 0.25,
   "cacheHitDiscountPercent": 0.9,
   "medianOutputTokensPerSecond": 194.969459715807,
   "medianTimeToFirstTokenSeconds": 117.0231703705,
@@ -32284,7 +32284,7 @@
   "quartile75TimeToFirstTokenSeconds": 156.912168689,
   "contextWindowTokens": 1000000,
   "totalParameters": null,
-  "sizeClass": "large",
+  "sizeClass": "medium",
   "paramClass": null,
   "priceClass": "medium",
   "activeParameters": null,
@@ -32302,58 +32302,58 @@
   "licenseUrl": null,
   "huggingfaceUrl": null,
   "openrouterApiId": "openai/gpt-5.6-luna",
-  "intelligenceIndexCostTotal": 954.365185029643,
-  "intelligenceIndexCostInput": 204.29807502964303,
-  "intelligenceIndexCostOutput": 750.06711,
-  "intelligenceIndexCostReasoning": 714.989334,
-  "intelligenceIndexCostAnswer": 35.077776,
+  "intelligenceIndexCostTotal": 190.8730370059286,
+  "intelligenceIndexCostInput": 40.8596150059286,
+  "intelligenceIndexCostOutput": 150.013422,
+  "intelligenceIndexCostReasoning": 142.9978668,
+  "intelligenceIndexCostAnswer": 7.0155552,
   "intelligenceIndexCostPerTask": {
    "cost": {
-    "total": 0.28535212794875897,
-    "input": 0.171880096404062,
-    "nonCacheInput": 0.008057825371244023,
-    "cacheRead": 0.05568622128843058,
-    "cacheWrite": 0.10813604974438738,
-    "output": 0.11347203154469693,
-    "reasoning": 0.08343309665608682,
-    "answer": 0.030038934888610133
+    "total": 0.057070425589751776,
+    "input": 0.034376019280812395,
+    "nonCacheInput": 0.0016115650742488047,
+    "cacheRead": 0.011137244257686117,
+    "cacheWrite": 0.021627209948877475,
+    "output": 0.022694406308939388,
+    "reasoning": 0.01668661933121736,
+    "answer": 0.006007786977722026
    },
    "evaluations": [
     {
      "slug": "gdpval-aa",
-     "weightedCostPerTask": 0.1316647913630255
+     "weightedCostPerTask": 0.026332958272605102
     },
     {
      "slug": "tau3-banking",
-     "weightedCostPerTask": 0.03229508850403071
+     "weightedCostPerTask": 0.0064590177008061415
     },
     {
      "slug": "terminalbench-v2-1",
-     "weightedCostPerTask": 0.06247746706321653
+     "weightedCostPerTask": 0.012495493412643305
     },
     {
      "slug": "scicode",
-     "weightedCostPerTask": 0.0038628796296296293
+     "weightedCostPerTask": 0.0007725759259259258
     },
     {
      "slug": "humanitys-last-exam",
-     "weightedCostPerTask": 0.01875303515987025
+     "weightedCostPerTask": 0.0037506070319740497
     },
     {
      "slug": "gpqa-diamond",
-     "weightedCostPerTask": 0.0030966871843434345
+     "weightedCostPerTask": 0.0006193374368686869
     },
     {
      "slug": "critpt",
-     "weightedCostPerTask": 0.019788399107142855
+     "weightedCostPerTask": 0.0039576798214285705
     },
     {
      "slug": "omniscience",
-     "weightedCostPerTask": 0.006876623687500001
+     "weightedCostPerTask": 0.0013753247375
     },
     {
      "slug": "artificial-analysis-long-context-reasoning",
-     "weightedCostPerTask": 0.00653715625
+     "weightedCostPerTask": 0.0013074312500000003
     }
    ]
   },
@@ -42806,15 +42806,15 @@
   "itbenchSre": null,
   "gdpvalNormalized": 0.38763,
   "mmmuPro": 0.758381502890173,
-  "price1mBlended0To3To1": 2.25,
-  "price1mBlended7To2To1": 0.8699999999999999,
-  "price1mBlended0To1To1": 3.5,
-  "price1mBlended100To1To1": 0.16666666666666666,
-  "price1mBlended0To100To1": 1.0495049504950495,
-  "price1mInputTokens": 1,
-  "price1mOutputTokens": 6,
-  "cacheHitPrice": 0.1,
-  "cacheWritePrice": 1.25,
+  "price1mBlended0To3To1": 0.45,
+  "price1mBlended7To2To1": 0.174,
+  "price1mBlended0To1To1": 0.7,
+  "price1mBlended100To1To1": 0.03333333333333334,
+  "price1mBlended0To100To1": 0.2099009900990099,
+  "price1mInputTokens": 0.2,
+  "price1mOutputTokens": 1.2,
+  "cacheHitPrice": 0.02,
+  "cacheWritePrice": 0.25,
   "cacheHitDiscountPercent": 0.9,
   "medianOutputTokensPerSecond": 168.707192761867,
   "medianTimeToFirstTokenSeconds": 1.95030898799996,
@@ -42832,7 +42832,7 @@
   "quartile75TimeToFirstTokenSeconds": 3.86597437799998,
   "contextWindowTokens": 1000000,
   "totalParameters": null,
-  "sizeClass": "large",
+  "sizeClass": "medium",
   "paramClass": null,
   "priceClass": "medium",
   "activeParameters": null,
@@ -42850,58 +42850,58 @@
   "licenseUrl": null,
   "huggingfaceUrl": null,
   "openrouterApiId": null,
-  "intelligenceIndexCostTotal": 118.86037591436659,
-  "intelligenceIndexCostInput": 43.98121591436657,
-  "intelligenceIndexCostOutput": 74.87916000000001,
-  "intelligenceIndexCostReasoning": 58.07412600000001,
-  "intelligenceIndexCostAnswer": 16.805034,
+  "intelligenceIndexCostTotal": 23.772075182873316,
+  "intelligenceIndexCostInput": 8.796243182873315,
+  "intelligenceIndexCostOutput": 14.975832,
+  "intelligenceIndexCostReasoning": 11.6148252,
+  "intelligenceIndexCostAnswer": 3.3610067999999997,
   "intelligenceIndexCostPerTask": {
    "cost": {
-    "total": 0.06693735420412296,
-    "input": 0.044960099365865466,
-    "nonCacheInput": 0.006388943637680649,
-    "cacheRead": 0.012114459185725776,
-    "cacheWrite": 0.026456696542459034,
-    "output": 0.021977254838257503,
-    "reasoning": 0.008163640005740472,
-    "answer": 0.013813614832517026
+    "total": 0.013387470840824589,
+    "input": 0.008992019873173093,
+    "nonCacheInput": 0.0012777887275361298,
+    "cacheRead": 0.002422891837145155,
+    "cacheWrite": 0.0052913393084918076,
+    "output": 0.0043954509676515,
+    "reasoning": 0.0016327280011480944,
+    "answer": 0.0027627229665034055
    },
    "evaluations": [
     {
      "slug": "gdpval-aa",
-     "weightedCostPerTask": 0.013401264450666342
+     "weightedCostPerTask": 0.002680252890133268
     },
     {
      "slug": "tau3-banking",
-     "weightedCostPerTask": 0.011305421746196448
+     "weightedCostPerTask": 0.0022610843492392894
     },
     {
      "slug": "terminalbench-v2-1",
-     "weightedCostPerTask": 0.030669690874371422
+     "weightedCostPerTask": 0.006133938174874284
     },
     {
      "slug": "scicode",
-     "weightedCostPerTask": 0.0007482633101851851
+     "weightedCostPerTask": 0.00014965266203703702
     },
     {
      "slug": "humanitys-last-exam",
-     "weightedCostPerTask": 0.001812058097775718
+     "weightedCostPerTask": 0.00036241161955514366
     },
     {
      "slug": "gpqa-diamond",
-     "weightedCostPerTask": 0.0004143727904040405
+     "weightedCostPerTask": 8.287455808080808e-05
     },
     {
      "slug": "critpt",
-     "weightedCostPerTask": 0.0020594633928571427
+     "weightedCostPerTask": 0.00041189267857142856
     },
     {
      "slug": "omniscience",
-     "weightedCostPerTask": 0.0005108182916666666
+     "weightedCostPerTask": 0.00010216365833333331
     },
     {
      "slug": "artificial-analysis-long-context-reasoning",
-     "weightedCostPerTask": 0.006016001250000001
+     "weightedCostPerTask": 0.0012032002500000003
     }
    ]
   },
@@ -65714,15 +65714,15 @@
   "itbenchSre": null,
   "gdpvalNormalized": 0.50491,
   "mmmuPro": 0.790751445086705,
-  "price1mBlended0To3To1": 5.625,
-  "price1mBlended7To2To1": 2.175,
-  "price1mBlended0To1To1": 8.75,
-  "price1mBlended100To1To1": 0.4166666666666667,
-  "price1mBlended0To100To1": 2.623762376237624,
-  "price1mInputTokens": 2.5,
-  "price1mOutputTokens": 15,
-  "cacheHitPrice": 0.25,
-  "cacheWritePrice": 3.125,
+  "price1mBlended0To3To1": 4.5,
+  "price1mBlended7To2To1": 1.7399999999999998,
+  "price1mBlended0To1To1": 7,
+  "price1mBlended100To1To1": 0.3333333333333333,
+  "price1mBlended0To100To1": 2.099009900990099,
+  "price1mInputTokens": 2,
+  "price1mOutputTokens": 12,
+  "cacheHitPrice": 0.2,
+  "cacheWritePrice": 2.5,
   "cacheHitDiscountPercent": 0.9,
   "medianOutputTokensPerSecond": 109.384886693176,
   "medianTimeToFirstTokenSeconds": 1.90558706599995,
@@ -65758,58 +65758,58 @@
   "licenseUrl": null,
   "huggingfaceUrl": null,
   "openrouterApiId": null,
-  "intelligenceIndexCostTotal": 586.7973136605106,
-  "intelligenceIndexCostInput": 232.26976366051056,
-  "intelligenceIndexCostOutput": 354.52754999999996,
-  "intelligenceIndexCostReasoning": 288.50906999999995,
-  "intelligenceIndexCostAnswer": 66.01848000000001,
+  "intelligenceIndexCostTotal": 469.4378509284084,
+  "intelligenceIndexCostInput": 185.81581092840844,
+  "intelligenceIndexCostOutput": 283.62203999999997,
+  "intelligenceIndexCostReasoning": 230.807256,
+  "intelligenceIndexCostAnswer": 52.814784,
   "intelligenceIndexCostPerTask": {
    "cost": {
-    "total": 0.31978654061795725,
-    "input": 0.2037117094928248,
-    "nonCacheInput": 0.015998302207231706,
-    "cacheRead": 0.054169517994675974,
-    "cacheWrite": 0.1335438892909171,
-    "output": 0.11607483112513248,
-    "reasoning": 0.06341885989600403,
-    "answer": 0.052655971229128434
+    "total": 0.2558292324943658,
+    "input": 0.1629693675942598,
+    "nonCacheInput": 0.012798641765785365,
+    "cacheRead": 0.04333561439574078,
+    "cacheWrite": 0.10683511143273366,
+    "output": 0.09285986490010595,
+    "reasoning": 0.05073508791680323,
+    "answer": 0.04212477698330274
    },
    "evaluations": [
     {
      "slug": "gdpval-aa",
-     "weightedCostPerTask": 0.14422538449170286
+     "weightedCostPerTask": 0.11538030759336226
     },
     {
      "slug": "tau3-banking",
-     "weightedCostPerTask": 0.05355104612853665
+     "weightedCostPerTask": 0.04284083690282931
     },
     {
      "slug": "terminalbench-v2-1",
-     "weightedCostPerTask": 0.07829442123192162
+     "weightedCostPerTask": 0.0626355369855373
     },
     {
      "slug": "scicode",
-     "weightedCostPerTask": 0.0024162355324074073
+     "weightedCostPerTask": 0.0019329884259259259
     },
     {
      "slug": "humanitys-last-exam",
-     "weightedCostPerTask": 0.009668303261121409
+     "weightedCostPerTask": 0.007734642608897127
     },
     {
      "slug": "gpqa-diamond",
-     "weightedCostPerTask": 0.0014413707386363636
+     "weightedCostPerTask": 0.0011530965909090911
     },
     {
      "slug": "critpt",
-     "weightedCostPerTask": 0.013598933035714286
+     "weightedCostPerTask": 0.010879146428571428
     },
     {
      "slug": "omniscience",
-     "weightedCostPerTask": 0.0015230743229166666
+     "weightedCostPerTask": 0.0012184594583333334
     },
     {
      "slug": "artificial-analysis-long-context-reasoning",
-     "weightedCostPerTask": 0.015067771875000002
+     "weightedCostPerTask": 0.012054217500000002
     }
    ]
   },
@@ -68611,15 +68611,15 @@
   "itbenchSre": null,
   "gdpvalNormalized": 0.514865,
   "mmmuPro": 0.785549132947977,
-  "price1mBlended0To3To1": 2.25,
-  "price1mBlended7To2To1": 0.8699999999999999,
-  "price1mBlended0To1To1": 3.5,
-  "price1mBlended100To1To1": 0.16666666666666666,
-  "price1mBlended0To100To1": 1.0495049504950495,
-  "price1mInputTokens": 1,
-  "price1mOutputTokens": 6,
-  "cacheHitPrice": 0.1,
-  "cacheWritePrice": 1.25,
+  "price1mBlended0To3To1": 0.45,
+  "price1mBlended7To2To1": 0.174,
+  "price1mBlended0To1To1": 0.7,
+  "price1mBlended100To1To1": 0.03333333333333334,
+  "price1mBlended0To100To1": 0.2099009900990099,
+  "price1mInputTokens": 0.2,
+  "price1mOutputTokens": 1.2,
+  "cacheHitPrice": 0.02,
+  "cacheWritePrice": 0.25,
   "cacheHitDiscountPercent": 0.9,
   "medianOutputTokensPerSecond": 188.873216976204,
   "medianTimeToFirstTokenSeconds": 40.239249049,
@@ -68637,7 +68637,7 @@
   "quartile75TimeToFirstTokenSeconds": 73.4472170992499,
   "contextWindowTokens": 1000000,
   "totalParameters": null,
-  "sizeClass": "large",
+  "sizeClass": "medium",
   "paramClass": null,
   "priceClass": "medium",
   "activeParameters": null,
@@ -68655,58 +68655,58 @@
   "licenseUrl": null,
   "huggingfaceUrl": null,
   "openrouterApiId": null,
-  "intelligenceIndexCostTotal": 530.4034927250614,
-  "intelligenceIndexCostInput": 129.99090672506145,
-  "intelligenceIndexCostOutput": 400.412586,
-  "intelligenceIndexCostReasoning": 370.76097,
-  "intelligenceIndexCostAnswer": 29.651616,
+  "intelligenceIndexCostTotal": 106.0806985450123,
+  "intelligenceIndexCostInput": 25.99818134501229,
+  "intelligenceIndexCostOutput": 80.0825172,
+  "intelligenceIndexCostReasoning": 74.152194,
+  "intelligenceIndexCostAnswer": 5.9303232,
   "intelligenceIndexCostPerTask": {
    "cost": {
-    "total": 0.18540794307113265,
-    "input": 0.11045411917931007,
-    "nonCacheInput": 0.006744005052822875,
-    "cacheRead": 0.03405694652837152,
-    "cacheWrite": 0.0696531675981157,
-    "output": 0.07495382389182256,
-    "reasoning": 0.050494680040582496,
-    "answer": 0.024459143851240085
+    "total": 0.03708158861422652,
+    "input": 0.02209082383586202,
+    "nonCacheInput": 0.001348801010564575,
+    "cacheRead": 0.006811389305674304,
+    "cacheWrite": 0.01393063351962314,
+    "output": 0.014990764778364515,
+    "reasoning": 0.010098936008116498,
+    "answer": 0.004891828770248016
    },
    "evaluations": [
     {
      "slug": "gdpval-aa",
-     "weightedCostPerTask": 0.082185063336506
+     "weightedCostPerTask": 0.0164370126673012
     },
     {
      "slug": "tau3-banking",
-     "weightedCostPerTask": 0.02459785497710259
+     "weightedCostPerTask": 0.004919570995420517
     },
     {
      "slug": "terminalbench-v2-1",
-     "weightedCostPerTask": 0.04255340810398145
+     "weightedCostPerTask": 0.008510681620796292
     },
     {
      "slug": "scicode",
-     "weightedCostPerTask": 0.0018621082175925927
+     "weightedCostPerTask": 0.00037242164351851853
     },
     {
      "slug": "humanitys-last-exam",
-     "weightedCostPerTask": 0.010658899559777573
+     "weightedCostPerTask": 0.002131779911955514
     },
     {
      "slug": "gpqa-diamond",
-     "weightedCostPerTask": 0.0018452364267676766
+     "weightedCostPerTask": 0.0003690472853535353
     },
     {
      "slug": "critpt",
-     "weightedCostPerTask": 0.012345608928571427
+     "weightedCostPerTask": 0.002469121785714285
     },
     {
      "slug": "omniscience",
-     "weightedCostPerTask": 0.003135014770833333
+     "weightedCostPerTask": 0.0006270029541666666
     },
     {
      "slug": "artificial-analysis-long-context-reasoning",
-     "weightedCostPerTask": 0.00622474875
+     "weightedCostPerTask": 0.0012449497500000002
     }
    ]
   },
@@ -77374,15 +77374,15 @@
   "itbenchSre": null,
   "gdpvalNormalized": 0.371295,
   "mmmuPro": 0.667052023121387,
-  "price1mBlended0To3To1": 5.625,
-  "price1mBlended7To2To1": 2.175,
-  "price1mBlended0To1To1": 8.75,
-  "price1mBlended100To1To1": 0.4166666666666667,
-  "price1mBlended0To100To1": 2.623762376237624,
-  "price1mInputTokens": 2.5,
-  "price1mOutputTokens": 15,
-  "cacheHitPrice": 0.25,
-  "cacheWritePrice": 3.125,
+  "price1mBlended0To3To1": 4.5,
+  "price1mBlended7To2To1": 1.7399999999999998,
+  "price1mBlended0To1To1": 7,
+  "price1mBlended100To1To1": 0.3333333333333333,
+  "price1mBlended0To100To1": 2.099009900990099,
+  "price1mInputTokens": 2,
+  "price1mOutputTokens": 12,
+  "cacheHitPrice": 0.2,
+  "cacheWritePrice": 2.5,
   "cacheHitDiscountPercent": 0.9,
   "medianOutputTokensPerSecond": 112.024080894877,
   "medianTimeToFirstTokenSeconds": 0.713345206500023,
@@ -77418,58 +77418,58 @@
   "licenseUrl": null,
   "huggingfaceUrl": null,
   "openrouterApiId": null,
-  "intelligenceIndexCostTotal": 164.32875656233023,
-  "intelligenceIndexCostInput": 125.70033656233024,
-  "intelligenceIndexCostOutput": 38.62842,
+  "intelligenceIndexCostTotal": 131.46300524986418,
+  "intelligenceIndexCostInput": 100.56026924986418,
+  "intelligenceIndexCostOutput": 30.902736,
   "intelligenceIndexCostReasoning": 0,
-  "intelligenceIndexCostAnswer": 38.62842,
+  "intelligenceIndexCostAnswer": 30.902736,
   "intelligenceIndexCostPerTask": {
    "cost": {
-    "total": 0.16804295142822095,
-    "input": 0.1357338340089395,
-    "nonCacheInput": 0.015936329281063092,
-    "cacheRead": 0.034551426438102634,
-    "cacheWrite": 0.08524607828977379,
-    "output": 0.03230911741928141,
+    "total": 0.13443436114257676,
+    "input": 0.10858706720715164,
+    "nonCacheInput": 0.012749063424850474,
+    "cacheRead": 0.027641141150482103,
+    "cacheWrite": 0.06819686263181904,
+    "output": 0.025847293935425127,
     "reasoning": 0,
-    "answer": 0.03230911741928141
+    "answer": 0.025847293935425127
    },
    "evaluations": [
     {
      "slug": "gdpval-aa",
-     "weightedCostPerTask": 0.03419766972404303
+     "weightedCostPerTask": 0.02735813577923442
     },
     {
      "slug": "tau3-banking",
-     "weightedCostPerTask": 0.026332170359799758
+     "weightedCostPerTask": 0.02106573628783981
     },
     {
      "slug": "terminalbench-v2-1",
-     "weightedCostPerTask": 0.088961069714956
+     "weightedCostPerTask": 0.0711688557719648
     },
     {
      "slug": "scicode",
-     "weightedCostPerTask": 0.0010373451967592593
+     "weightedCostPerTask": 0.0008298761574074074
     },
     {
      "slug": "humanitys-last-exam",
-     "weightedCostPerTask": 0.00047126781163114005
+     "weightedCostPerTask": 0.000377014249304912
     },
     {
      "slug": "gpqa-diamond",
-     "weightedCostPerTask": 0.00017386284722222225
+     "weightedCostPerTask": 0.00013909027777777777
     },
     {
      "slug": "critpt",
-     "weightedCostPerTask": 0.001994486607142857
+     "weightedCostPerTask": 0.0015955892857142855
     },
     {
      "slug": "omniscience",
-     "weightedCostPerTask": 5.875416666666667e-05
+     "weightedCostPerTask": 4.700333333333334e-05
     },
     {
      "slug": "artificial-analysis-long-context-reasoning",
-     "weightedCostPerTask": 0.014816325000000002
+     "weightedCostPerTask": 0.01185306
     }
    ]
   },
@@ -78548,15 +78548,15 @@
   "itbenchSre": null,
   "gdpvalNormalized": 0.5366150000000001,
   "mmmuPro": 0.794797687861272,
-  "price1mBlended0To3To1": 5.625,
-  "price1mBlended7To2To1": 2.175,
-  "price1mBlended0To1To1": 8.75,
-  "price1mBlended100To1To1": 0.4166666666666667,
-  "price1mBlended0To100To1": 2.623762376237624,
-  "price1mInputTokens": 2.5,
-  "price1mOutputTokens": 15,
-  "cacheHitPrice": 0.25,
-  "cacheWritePrice": 3.125,
+  "price1mBlended0To3To1": 4.5,
+  "price1mBlended7To2To1": 1.7399999999999998,
+  "price1mBlended0To1To1": 7,
+  "price1mBlended100To1To1": 0.3333333333333333,
+  "price1mBlended0To100To1": 2.099009900990099,
+  "price1mInputTokens": 2,
+  "price1mOutputTokens": 12,
+  "cacheHitPrice": 0.2,
+  "cacheWritePrice": 2.5,
   "cacheHitDiscountPercent": 0.9,
   "medianOutputTokensPerSecond": 115.162657306403,
   "medianTimeToFirstTokenSeconds": 11.8371361275,
@@ -78592,58 +78592,58 @@
   "licenseUrl": null,
   "huggingfaceUrl": null,
   "openrouterApiId": null,
-  "intelligenceIndexCostTotal": 881.7048709347127,
-  "intelligenceIndexCostInput": 336.21655093471276,
-  "intelligenceIndexCostOutput": 545.48832,
-  "intelligenceIndexCostReasoning": 466.70544,
-  "intelligenceIndexCostAnswer": 78.78288,
+  "intelligenceIndexCostTotal": 705.3638967477702,
+  "intelligenceIndexCostInput": 268.9732407477702,
+  "intelligenceIndexCostOutput": 436.390656,
+  "intelligenceIndexCostReasoning": 373.364352,
+  "intelligenceIndexCostAnswer": 63.026303999999996,
   "intelligenceIndexCostPerTask": {
    "cost": {
-    "total": 0.45222441817835185,
-    "input": 0.28668847986386553,
-    "nonCacheInput": 0.016205361093234495,
-    "cacheRead": 0.0807160726480525,
-    "cacheWrite": 0.18976704612257853,
-    "output": 0.16553593831448635,
-    "reasoning": 0.1023817943539,
-    "answer": 0.06315414396058631
+    "total": 0.3617795345426814,
+    "input": 0.22935078389109242,
+    "nonCacheInput": 0.012964288874587596,
+    "cacheRead": 0.06457285811844199,
+    "cacheWrite": 0.15181363689806282,
+    "output": 0.1324287506515891,
+    "reasoning": 0.08190543548312,
+    "answer": 0.05052331516846907
    },
    "evaluations": [
     {
      "slug": "gdpval-aa",
-     "weightedCostPerTask": 0.2291945069239248
+     "weightedCostPerTask": 0.18335560553913982
     },
     {
      "slug": "tau3-banking",
-     "weightedCostPerTask": 0.06714201188596314
+     "weightedCostPerTask": 0.053713609508770514
     },
     {
      "slug": "terminalbench-v2-1",
-     "weightedCostPerTask": 0.09491223775256727
+     "weightedCostPerTask": 0.07592979020205382
     },
     {
      "slug": "scicode",
-     "weightedCostPerTask": 0.0033887109374999996
+     "weightedCostPerTask": 0.0027109687499999994
     },
     {
      "slug": "humanitys-last-exam",
-     "weightedCostPerTask": 0.015118658480074145
+     "weightedCostPerTask": 0.012094926784059316
     },
     {
      "slug": "gpqa-diamond",
-     "weightedCostPerTask": 0.002004992897727273
+     "weightedCostPerTask": 0.0016039943181818182
     },
     {
      "slug": "critpt",
-     "weightedCostPerTask": 0.02271244419642857
+     "weightedCostPerTask": 0.01816995535714286
     },
     {
      "slug": "omniscience",
-     "weightedCostPerTask": 0.0025306176041666665
+     "weightedCostPerTask": 0.0020244940833333332
     },
     {
      "slug": "artificial-analysis-long-context-reasoning",
-     "weightedCostPerTask": 0.015220237500000003
+     "weightedCostPerTask": 0.01217619
     }
    ]
   },
@@ -84636,15 +84636,15 @@
   "itbenchSre": null,
   "gdpvalNormalized": 0.483715,
   "mmmuPro": 0.775722543352601,
-  "price1mBlended0To3To1": 2.25,
-  "price1mBlended7To2To1": 0.8699999999999999,
-  "price1mBlended0To1To1": 3.5,
-  "price1mBlended100To1To1": 0.16666666666666666,
-  "price1mBlended0To100To1": 1.0495049504950495,
-  "price1mInputTokens": 1,
-  "price1mOutputTokens": 6,
-  "cacheHitPrice": 0.1,
-  "cacheWritePrice": 1.25,
+  "price1mBlended0To3To1": 0.45,
+  "price1mBlended7To2To1": 0.174,
+  "price1mBlended0To1To1": 0.7,
+  "price1mBlended100To1To1": 0.03333333333333334,
+  "price1mBlended0To100To1": 0.2099009900990099,
+  "price1mInputTokens": 0.2,
+  "price1mOutputTokens": 1.2,
+  "cacheHitPrice": 0.02,
+  "cacheWritePrice": 0.25,
   "cacheHitDiscountPercent": 0.9,
   "medianOutputTokensPerSecond": 178.758791563098,
   "medianTimeToFirstTokenSeconds": 8.63046156250005,
@@ -84662,7 +84662,7 @@
   "quartile75TimeToFirstTokenSeconds": 21.448866254,
   "contextWindowTokens": 1000000,
   "totalParameters": null,
-  "sizeClass": "large",
+  "sizeClass": "medium",
   "paramClass": null,
   "priceClass": "medium",
   "activeParameters": null,
@@ -84680,58 +84680,58 @@
   "licenseUrl": null,
   "huggingfaceUrl": null,
   "openrouterApiId": null,
-  "intelligenceIndexCostTotal": 305.6721318253842,
-  "intelligenceIndexCostInput": 83.46426782538418,
-  "intelligenceIndexCostOutput": 222.20786400000003,
-  "intelligenceIndexCostReasoning": 197.21515800000003,
-  "intelligenceIndexCostAnswer": 24.992706,
+  "intelligenceIndexCostTotal": 61.134426365076834,
+  "intelligenceIndexCostInput": 16.692853565076835,
+  "intelligenceIndexCostOutput": 44.4415728,
+  "intelligenceIndexCostReasoning": 39.443031600000005,
+  "intelligenceIndexCostAnswer": 4.9985412,
   "intelligenceIndexCostPerTask": {
    "cost": {
-    "total": 0.12510268486233647,
-    "input": 0.07639415601100605,
-    "nonCacheInput": 0.006393420294229337,
-    "cacheRead": 0.022247041285952625,
-    "cacheWrite": 0.0477536944308241,
-    "output": 0.048708528851330396,
-    "reasoning": 0.028001270554687145,
-    "answer": 0.02070725829664325
+    "total": 0.02502053697246729,
+    "input": 0.015278831202201214,
+    "nonCacheInput": 0.0012786840588458676,
+    "cacheRead": 0.004449408257190524,
+    "cacheWrite": 0.00955073888616482,
+    "output": 0.009741705770266078,
+    "reasoning": 0.005600254110937428,
+    "answer": 0.00414145165932865
    },
    "evaluations": [
     {
      "slug": "gdpval-aa",
-     "weightedCostPerTask": 0.04776375989441896
+     "weightedCostPerTask": 0.00955275197888379
     },
     {
      "slug": "tau3-banking",
-     "weightedCostPerTask": 0.018060274234060963
+     "weightedCostPerTask": 0.003612054846812193
     },
     {
      "slug": "terminalbench-v2-1",
-     "weightedCostPerTask": 0.03744582126648725
+     "weightedCostPerTask": 0.00748916425329745
     },
     {
      "slug": "scicode",
-     "weightedCostPerTask": 0.0012191617476851853
+     "weightedCostPerTask": 0.00024383234953703702
     },
     {
      "slug": "humanitys-last-exam",
-     "weightedCostPerTask": 0.005943034986098239
+     "weightedCostPerTask": 0.0011886069972196478
     },
     {
      "slug": "gpqa-diamond",
-     "weightedCostPerTask": 0.0010631796085858586
+     "weightedCostPerTask": 0.00021263592171717177
     },
     {
      "slug": "critpt",
-     "weightedCostPerTask": 0.00593175625
+     "weightedCostPerTask": 0.00118635125
     },
     {
      "slug": "omniscience",
-     "weightedCostPerTask": 0.0015624768750000001
+     "weightedCostPerTask": 0.000312495375
     },
     {
      "slug": "artificial-analysis-long-context-reasoning",
-     "weightedCostPerTask": 0.006113220000000001
+     "weightedCostPerTask": 0.0012226440000000002
     }
    ]
   },
@@ -94054,15 +94054,15 @@
   "itbenchSre": 0.510357815442561,
   "gdpvalNormalized": 0.54135,
   "mmmuPro": 0.806936416184971,
-  "price1mBlended0To3To1": 5.625,
-  "price1mBlended7To2To1": 2.175,
-  "price1mBlended0To1To1": 8.75,
-  "price1mBlended100To1To1": 0.4166666666666667,
-  "price1mBlended0To100To1": 2.623762376237624,
-  "price1mInputTokens": 2.5,
-  "price1mOutputTokens": 15,
-  "cacheHitPrice": 0.25,
-  "cacheWritePrice": 3.125,
+  "price1mBlended0To3To1": 4.5,
+  "price1mBlended7To2To1": 1.7399999999999998,
+  "price1mBlended0To1To1": 7,
+  "price1mBlended100To1To1": 0.3333333333333333,
+  "price1mBlended0To100To1": 2.099009900990099,
+  "price1mInputTokens": 2,
+  "price1mOutputTokens": 12,
+  "cacheHitPrice": 0.2,
+  "cacheWritePrice": 2.5,
   "cacheHitDiscountPercent": 0.9,
   "medianOutputTokensPerSecond": 135.472178764792,
   "medianTimeToFirstTokenSeconds": 145.083900017,
@@ -94098,58 +94098,58 @@
   "licenseUrl": null,
   "huggingfaceUrl": null,
   "openrouterApiId": "openai/gpt-5.6-terra",
-  "intelligenceIndexCostTotal": 2009.9162186176445,
-  "intelligenceIndexCostInput": 577.2764336176446,
-  "intelligenceIndexCostOutput": 1432.639785,
-  "intelligenceIndexCostReasoning": 1340.054355,
-  "intelligenceIndexCostAnswer": 92.58543,
+  "intelligenceIndexCostTotal": 1607.9329748941157,
+  "intelligenceIndexCostInput": 461.8211468941156,
+  "intelligenceIndexCostOutput": 1146.111828,
+  "intelligenceIndexCostReasoning": 1072.043484,
+  "intelligenceIndexCostAnswer": 74.068344,
   "intelligenceIndexCostPerTask": {
    "cost": {
-    "total": 0.7801090377773322,
-    "input": 0.48956210989352433,
-    "nonCacheInput": 0.01888942270065116,
-    "cacheRead": 0.14572282137970655,
-    "cacheWrite": 0.32494986581316665,
-    "output": 0.29054692788380787,
-    "reasoning": 0.21275887641723704,
-    "answer": 0.07778805146657078
+    "total": 0.6240872302218656,
+    "input": 0.3916496879148195,
+    "nonCacheInput": 0.015111538160520927,
+    "cacheRead": 0.11657825710376525,
+    "cacheWrite": 0.2599598926505333,
+    "output": 0.23243754230704625,
+    "reasoning": 0.17020710113378965,
+    "answer": 0.06223044117325663
    },
    "evaluations": [
     {
      "slug": "gdpval-aa",
-     "weightedCostPerTask": 0.3807531812648839
+     "weightedCostPerTask": 0.3046025450119071
     },
     {
      "slug": "tau3-banking",
-     "weightedCostPerTask": 0.10516919546559225
+     "weightedCostPerTask": 0.08413535637247381
     },
     {
      "slug": "terminalbench-v2-1",
-     "weightedCostPerTask": 0.16490496877537164
+     "weightedCostPerTask": 0.13192397502029732
     },
     {
      "slug": "scicode",
-     "weightedCostPerTask": 0.011915960648148146
+     "weightedCostPerTask": 0.009532768518518519
     },
     {
      "slug": "humanitys-last-exam",
-     "weightedCostPerTask": 0.03650495945319741
+     "weightedCostPerTask": 0.02920396756255792
     },
     {
      "slug": "gpqa-diamond",
-     "weightedCostPerTask": 0.00570076388888889
+     "weightedCostPerTask": 0.004560611111111112
     },
     {
      "slug": "critpt",
-     "weightedCostPerTask": 0.04753184375
+     "weightedCostPerTask": 0.038025474999999996
     },
     {
      "slug": "omniscience",
-     "weightedCostPerTask": 0.010990127031250001
+     "weightedCostPerTask": 0.008792101625
     },
     {
      "slug": "artificial-analysis-long-context-reasoning",
-     "weightedCostPerTask": 0.0166380375
+     "weightedCostPerTask": 0.01331043
     }
    ]
   },
@@ -99189,13 +99189,13 @@
   "itbenchSre": null,
   "gdpvalNormalized": 0,
   "mmmuPro": null,
-  "price1mBlended0To3To1": 0.26249999999999996,
-  "price1mBlended7To2To1": 0.195,
-  "price1mBlended0To1To1": 0.375,
-  "price1mBlended100To1To1": 0.15441176470588236,
-  "price1mBlended0To100To1": 0.15445544554455445,
+  "price1mBlended0To3To1": 0.26125,
+  "price1mBlended7To2To1": 0.1945,
+  "price1mBlended0To1To1": 0.3725,
+  "price1mBlended100To1To1": 0.15436274509803924,
+  "price1mBlended0To100To1": 0.1544059405940594,
   "price1mInputTokens": 0.15,
-  "price1mOutputTokens": 0.6,
+  "price1mOutputTokens": 0.595,
   "cacheHitPrice": 0.15,
   "cacheWritePrice": null,
   "cacheHitDiscountPercent": 0.6333333333333333,
@@ -99233,58 +99233,58 @@
   "licenseUrl": "https://www.apache.org/licenses/LICENSE-2.0",
   "huggingfaceUrl": "https://huggingface.co/openai/gpt-oss-120b",
   "openrouterApiId": "openai/gpt-oss-120b",
-  "intelligenceIndexCostTotal": 24.2340651,
+  "intelligenceIndexCostTotal": 24.198467315,
   "intelligenceIndexCostInput": 19.962330899999998,
-  "intelligenceIndexCostOutput": 4.2717342,
-  "intelligenceIndexCostReasoning": 2.487807,
-  "intelligenceIndexCostAnswer": 1.7839272000000002,
+  "intelligenceIndexCostOutput": 4.236136415,
+  "intelligenceIndexCostReasoning": 2.467075275,
+  "intelligenceIndexCostAnswer": 1.76906114,
   "intelligenceIndexCostPerTask": {
    "cost": {
-    "total": 0.01718128902932679,
+    "total": 0.017168916361070118,
     "input": 0.015696568838525337,
     "nonCacheInput": 0.0009633564252169977,
     "cacheRead": 0,
     "cacheWrite": 0.01473321241330834,
-    "output": 0.0014847201908014579,
-    "reasoning": 0.0003162061670510088,
-    "answer": 0.001168514023750449
+    "output": 0.0014723475225447793,
+    "reasoning": 0.0003135711156589171,
+    "answer": 0.001158776406885862
    },
    "evaluations": [
     {
      "slug": "gdpval-aa",
-     "weightedCostPerTask": 0.013287392045454543
+     "weightedCostPerTask": 0.013280920386363634
     },
     {
      "slug": "tau3-banking",
-     "weightedCostPerTask": 0.000813467912371134
+     "weightedCostPerTask": 0.0008129233419243985
     },
     {
      "slug": "terminalbench-v2-1",
-     "weightedCostPerTask": 0.0018002044943820222
+     "weightedCostPerTask": 0.0017974886235955054
     },
     {
      "slug": "scicode",
-     "weightedCostPerTask": 8.40093315972222e-05
+     "weightedCostPerTask": 8.359262876157405e-05
     },
     {
      "slug": "humanitys-last-exam",
-     "weightedCostPerTask": 7.318161492122336e-05
+     "weightedCostPerTask": 7.262003156858201e-05
     },
     {
      "slug": "gpqa-diamond",
-     "weightedCostPerTask": 2.9748863636363637e-05
+     "weightedCostPerTask": 2.9520342487373733e-05
     },
     {
      "slug": "critpt",
-     "weightedCostPerTask": 0.0001488624107142857
+     "weightedCostPerTask": 0.00014790715178571428
     },
     {
      "slug": "omniscience",
-     "weightedCostPerTask": 3.148129375e-05
+     "weightedCostPerTask": 3.123827020833333e-05
     },
     {
      "slug": "artificial-analysis-long-context-reasoning",
-     "weightedCostPerTask": 0.0009129410625
+     "weightedCostPerTask": 0.000912705584375
     }
    ]
   },
@@ -100161,15 +100161,15 @@
   "itbenchSre": null,
   "gdpvalNormalized": 0.37661500000000003,
   "mmmuPro": 0.761271676300578,
-  "price1mBlended0To3To1": 5.625,
-  "price1mBlended7To2To1": 2.175,
-  "price1mBlended0To1To1": 8.75,
-  "price1mBlended100To1To1": 0.4166666666666667,
-  "price1mBlended0To100To1": 2.623762376237624,
-  "price1mInputTokens": 2.5,
-  "price1mOutputTokens": 15,
-  "cacheHitPrice": 0.25,
-  "cacheWritePrice": 3.125,
+  "price1mBlended0To3To1": 4.5,
+  "price1mBlended7To2To1": 1.7399999999999998,
+  "price1mBlended0To1To1": 7,
+  "price1mBlended100To1To1": 0.3333333333333333,
+  "price1mBlended0To100To1": 2.099009900990099,
+  "price1mInputTokens": 2,
+  "price1mOutputTokens": 12,
+  "cacheHitPrice": 0.2,
+  "cacheWritePrice": 2.5,
   "cacheHitDiscountPercent": 0.9,
   "medianOutputTokensPerSecond": 111.14352798313,
   "medianTimeToFirstTokenSeconds": 1.36218632100002,
@@ -100205,58 +100205,58 @@
   "licenseUrl": null,
   "huggingfaceUrl": null,
   "openrouterApiId": null,
-  "intelligenceIndexCostTotal": 193.4849374014424,
-  "intelligenceIndexCostInput": 104.4091324014424,
-  "intelligenceIndexCostOutput": 89.075805,
-  "intelligenceIndexCostReasoning": 56.383559999999996,
-  "intelligenceIndexCostAnswer": 32.692245,
+  "intelligenceIndexCostTotal": 154.78794992115394,
+  "intelligenceIndexCostInput": 83.52730592115392,
+  "intelligenceIndexCostOutput": 71.260644,
+  "intelligenceIndexCostReasoning": 45.106848,
+  "intelligenceIndexCostAnswer": 26.153796,
   "intelligenceIndexCostPerTask": {
    "cost": {
-    "total": 0.14543872364332616,
-    "input": 0.11156293391501765,
-    "nonCacheInput": 0.015938583592072394,
-    "cacheRead": 0.02859624416403221,
-    "cacheWrite": 0.06702810615891305,
-    "output": 0.0338757897283085,
-    "reasoning": 0.008767694531921923,
-    "answer": 0.025108095196386584
+    "total": 0.11635097891466094,
+    "input": 0.08925034713201413,
+    "nonCacheInput": 0.012750866873657913,
+    "cacheRead": 0.022876995331225766,
+    "cacheWrite": 0.05362248492713044,
+    "output": 0.0271006317826468,
+    "reasoning": 0.0070141556255375395,
+    "answer": 0.02008647615710926
    },
    "evaluations": [
     {
      "slug": "gdpval-aa",
-     "weightedCostPerTask": 0.02247639705758153
+     "weightedCostPerTask": 0.017981117646065223
     },
     {
      "slug": "tau3-banking",
-     "weightedCostPerTask": 0.02738455338090254
+     "weightedCostPerTask": 0.02190764270472203
     },
     {
      "slug": "terminalbench-v2-1",
-     "weightedCostPerTask": 0.07291387762184312
+     "weightedCostPerTask": 0.05833110209747449
     },
     {
      "slug": "scicode",
-     "weightedCostPerTask": 0.0012401765046296297
+     "weightedCostPerTask": 0.0009921412037037036
     },
     {
      "slug": "humanitys-last-exam",
-     "weightedCostPerTask": 0.002215193031742354
+     "weightedCostPerTask": 0.001772154425393883
     },
     {
      "slug": "gpqa-diamond",
-     "weightedCostPerTask": 0.0004719357638888889
+     "weightedCostPerTask": 0.00037754861111111116
     },
     {
      "slug": "critpt",
-     "weightedCostPerTask": 0.0033926808035714285
+     "weightedCostPerTask": 0.002714144642857143
     },
     {
      "slug": "omniscience",
-     "weightedCostPerTask": 0.00044461572916666665
+     "weightedCostPerTask": 0.00035569258333333336
     },
     {
      "slug": "artificial-analysis-long-context-reasoning",
-     "weightedCostPerTask": 0.014899293750000002
+     "weightedCostPerTask": 0.011919435
     }
    ]
   },
@@ -107921,15 +107921,15 @@
   "itbenchSre": null,
   "gdpvalNormalized": 0.28631500000000004,
   "mmmuPro": 0.603468208092486,
-  "price1mBlended0To3To1": 2.25,
-  "price1mBlended7To2To1": 0.8699999999999999,
-  "price1mBlended0To1To1": 3.5,
-  "price1mBlended100To1To1": 0.16666666666666666,
-  "price1mBlended0To100To1": 1.0495049504950495,
-  "price1mInputTokens": 1,
-  "price1mOutputTokens": 6,
-  "cacheHitPrice": 0.1,
-  "cacheWritePrice": 1.25,
+  "price1mBlended0To3To1": 0.45,
+  "price1mBlended7To2To1": 0.174,
+  "price1mBlended0To1To1": 0.7,
+  "price1mBlended100To1To1": 0.03333333333333334,
+  "price1mBlended0To100To1": 0.2099009900990099,
+  "price1mInputTokens": 0.2,
+  "price1mOutputTokens": 1.2,
+  "cacheHitPrice": 0.02,
+  "cacheWritePrice": 0.25,
   "cacheHitDiscountPercent": 0.9,
   "medianOutputTokensPerSecond": 176.624215096191,
   "medianTimeToFirstTokenSeconds": 0.717848902000014,
@@ -107947,7 +107947,7 @@
   "quartile75TimeToFirstTokenSeconds": 0.802944632000006,
   "contextWindowTokens": 1000000,
   "totalParameters": null,
-  "sizeClass": "large",
+  "sizeClass": "medium",
   "paramClass": null,
   "priceClass": "medium",
   "activeParameters": null,
@@ -107965,58 +107965,58 @@
   "licenseUrl": null,
   "huggingfaceUrl": null,
   "openrouterApiId": null,
-  "intelligenceIndexCostTotal": 70.81255111378076,
-  "intelligenceIndexCostInput": 56.66828311378076,
-  "intelligenceIndexCostOutput": 14.144268,
+  "intelligenceIndexCostTotal": 14.162510222756152,
+  "intelligenceIndexCostInput": 11.333656622756152,
+  "intelligenceIndexCostOutput": 2.8288536,
   "intelligenceIndexCostReasoning": 0,
-  "intelligenceIndexCostAnswer": 14.144268,
+  "intelligenceIndexCostAnswer": 2.8288536,
   "intelligenceIndexCostPerTask": {
    "cost": {
-    "total": 0.08478816309079974,
-    "input": 0.072127307261083,
-    "nonCacheInput": 0.006370217773933174,
-    "cacheRead": 0.022061907571353227,
-    "cacheWrite": 0.043695181915796605,
-    "output": 0.012660855829716744,
+    "total": 0.01695763261815995,
+    "input": 0.014425461452216603,
+    "nonCacheInput": 0.0012740435547866347,
+    "cacheRead": 0.004412381514270645,
+    "cacheWrite": 0.008739036383159322,
+    "output": 0.002532171165943348,
     "reasoning": 0,
-    "answer": 0.012660855829716744
+    "answer": 0.002532171165943348
    },
    "evaluations": [
     {
      "slug": "gdpval-aa",
-     "weightedCostPerTask": 0.007595978626441438
+     "weightedCostPerTask": 0.0015191957252882879
     },
     {
      "slug": "tau3-banking",
-     "weightedCostPerTask": 0.011014959703792244
+     "weightedCostPerTask": 0.002202991940758449
     },
     {
      "slug": "terminalbench-v2-1",
-     "weightedCostPerTask": 0.058810307549932384
+     "weightedCostPerTask": 0.011762061509986477
     },
     {
      "slug": "scicode",
-     "weightedCostPerTask": 0.0004336099537037037
+     "weightedCostPerTask": 8.672199074074072e-05
     },
     {
      "slug": "humanitys-last-exam",
-     "weightedCostPerTask": 0.00019156933503243747
+     "weightedCostPerTask": 3.831386700648749e-05
     },
     {
      "slug": "gpqa-diamond",
-     "weightedCostPerTask": 6.584248737373737e-05
+     "weightedCostPerTask": 1.3168497474747475e-05
     },
     {
      "slug": "critpt",
-     "weightedCostPerTask": 0.0007230196428571427
+     "weightedCostPerTask": 0.00014460392857142855
     },
     {
      "slug": "omniscience",
-     "weightedCostPerTask": 2.6098291666666665e-05
+     "weightedCostPerTask": 5.2196583333333334e-06
     },
     {
      "slug": "artificial-analysis-long-context-reasoning",
-     "weightedCostPerTask": 0.0059267775
+     "weightedCostPerTask": 0.0011853555000000003
     }
    ]
   },
@@ -118291,17 +118291,17 @@
   "licenseUrl": "https://opensource.org/license/mit",
   "huggingfaceUrl": "https://huggingface.co/zai-org/GLM-5.2",
   "openrouterApiId": "z-ai/glm-5.2",
-  "intelligenceIndexCostTotal": 712.4495253166092,
-  "intelligenceIndexCostInput": 93.29062451660923,
+  "intelligenceIndexCostTotal": 710.1480137577612,
+  "intelligenceIndexCostInput": 90.98911295776124,
   "intelligenceIndexCostOutput": 619.1589008,
   "intelligenceIndexCostReasoning": 586.2232948,
   "intelligenceIndexCostAnswer": 32.935606,
   "intelligenceIndexCostPerTask": {
    "cost": {
-    "total": 0.2692114739449313,
-    "input": 0.08093155279740807,
+    "total": 0.2670450943778371,
+    "input": 0.0787651732303139,
     "nonCacheInput": 0.009786523802333615,
-    "cacheRead": 0.07114502899507448,
+    "cacheRead": 0.06897864942798031,
     "cacheWrite": 0,
     "output": 0.18827992114752315,
     "reasoning": 0.16148805597970656,
@@ -118310,15 +118310,15 @@
    "evaluations": [
     {
      "slug": "gdpval-aa",
-     "weightedCostPerTask": 0.09595310675097997
+     "weightedCostPerTask": 0.09478996038698728
     },
     {
      "slug": "tau3-banking",
-     "weightedCostPerTask": 0.019150773708656733
+     "weightedCostPerTask": 0.018785008902432218
     },
     {
      "slug": "terminalbench-v2-1",
-     "weightedCostPerTask": 0.08078579289969895
+     "weightedCostPerTask": 0.08014832450282197
     },
     {
      "slug": "scicode",
