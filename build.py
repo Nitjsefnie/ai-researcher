@@ -11,6 +11,7 @@ from __future__ import annotations
 import datetime as dt
 import json
 import pathlib
+import re
 
 ROOT = pathlib.Path(__file__).resolve().parent
 RAW = ROOT / "data" / "aa-raw-models.json"
@@ -21,6 +22,34 @@ INDEX_EVALS = [
     "GDPval-AA v2", "τ³-Banking", "Terminal-Bench v2.1", "SciCode",
     "Humanity's Last Exam", "GPQA Diamond", "CritPt", "AA-Omniscience", "AA-LCR",
 ]
+
+
+# AA encodes the effort knob in the model name; there is no field for it. The
+# trailing parenthetical is one of three things -- a bare effort level "(high)",
+# an effort clause inside a config list "(Adaptive Reasoning, Max Effort)", or
+# something that is not effort at all "(Reasoning)", "(Non-reasoning)",
+# "(Jan '25)". Only the effort component is stripped; the rest identifies a
+# genuinely different configuration and must survive.
+EFFORT = re.compile(r"^(minimal|low|medium|high|xhigh|max)(\s+effort)?$", re.I)
+
+
+def split_effort(name):
+    """-> (base name without the effort knob, effort label or None)"""
+    found = []
+
+    def fix(m):
+        kept = []
+        for part in m.group(1).split(","):
+            part = part.strip()
+            if EFFORT.match(part):
+                found.append(part)
+            else:
+                kept.append(part)
+        return " (" + ", ".join(kept) + ")" if kept else ""
+
+    base = re.sub(r"\s*\(([^)]*)\)", fix, name).strip()
+    label = found[0].lower().replace(" effort", "") if found else None
+    return base, label
 
 
 def num(v):
@@ -44,8 +73,11 @@ def build_rows(models):
         ii, ct = num(m.get("intelligenceIndex")), cost_per_task(m)
         if ii is None or ct is None or ct <= 0:
             continue
+        base, eff = split_effort(m.get("name") or "")
         rows.append({
             "name": m.get("name") or "",
+            "base": base,
+            "eff": eff,
             "creator": m.get("modelCreatorName") or "",
             "country": m.get("modelCreatorCountry") or "",
             "ii": round(ii, 2),
@@ -66,44 +98,77 @@ def build_rows(models):
     return rows
 
 
-def pareto(rows):
-    """Names on the efficient frontier: nothing cheaper scores at least as high."""
-    best, front = -1.0, set()
-    for r in sorted(rows, key=lambda x: (x["cost"], -x["ii"])):
-        if r["ii"] > best:
-            best = r["ii"]
-            front.add(r["name"])
-    return front
+def undominated(rows):
+    """The single Pareto layer -- the page's one and only definition of
+    'superseded'. A model is superseded when some other model is at least as
+    smart AND at least as cheap (strictly better on one of the two). Exact ties
+    survive together: neither strictly beats the other."""
+    return [
+        r for r in rows
+        if not any(
+            o is not r
+            and o["ii"] >= r["ii"] and o["cost"] <= r["cost"]
+            and (o["ii"] > r["ii"] or o["cost"] < r["cost"])
+            for o in rows
+        )
+    ]
 
 
 def main():
     models = json.loads(RAW.read_text(encoding="utf-8"))
     rows = build_rows(models)
-    live = [r for r in rows if not r["dep"]]
-    front = pareto(live)
+
+    # Reported only -- the page recomputes this layer against whatever the
+    # filters leave, so nothing is baked into the data.
+    front = undominated(rows)
+    kept = {r["name"] for r in front}
+    retired_and_beaten = sum(1 for r in rows if r["dep"] and r["name"] not in kept)
+
+    # What collapsing effort levels actually costs, measured rather than assumed.
+    # Turning a model down makes it cheaper AND dumber, so a low-effort variant is
+    # NOT dominated by its high-effort twin -- effort levels are real operating
+    # points and collapsing them deletes genuine frontier positions.
+    ceiling = {}
     for r in rows:
-        r["front"] = r["name"] in front and not r["dep"]
+        c = ceiling.get(r["base"])
+        if not c or r["ii"] > c["ii"] or (r["ii"] == c["ii"] and r["cost"] < c["cost"]):
+            ceiling[r["base"]] = r
+    sib_beaten = sum(
+        1 for r in rows
+        if any(o is not r and o["base"] == r["base"]
+               and o["ii"] >= r["ii"] and o["cost"] <= r["cost"]
+               and (o["ii"] > r["ii"] or o["cost"] < r["cost"])
+               for o in rows)
+    )
+    front_collapsed = undominated(list(ceiling.values()))
 
     captured = dt.date.today().isoformat()
     stats = {
         "total": len(models),
         "plotted": len(rows),
-        "live": len(live),
-        "creators": len({r["creator"] for r in live}),
-        "open": sum(1 for r in live if r["open"]),
-        "prop": sum(1 for r in live if not r["open"]),
+        "creators": len({r["creator"] for r in rows}),
+        "open": sum(1 for r in rows if r["open"]),
+        "prop": sum(1 for r in rows if not r["open"]),
         "captured": captured,
         "evals": INDEX_EVALS,
+        "bases": len(ceiling),
+        "sibBeaten": sib_beaten,
+        "frontFull": len(front),
+        "frontCollapsed": len(front_collapsed),
     }
     payload = json.dumps({"rows": rows, "stats": stats}, separators=(",", ":"))
 
     OUT.parent.mkdir(parents=True, exist_ok=True)
     OUT.write_text(TEMPLATE.replace("__DATA__", payload).replace("__CAPTURED__", captured),
                    encoding="utf-8")
+    dep = sum(1 for r in rows if r["dep"])
     print(f"wrote {OUT.relative_to(ROOT)}")
-    print(f"  {stats['plotted']} models plotted ({stats['live']} current, "
-          f"{stats['prop']} proprietary / {stats['open']} open-weights, "
-          f"{stats['creators']} labs), {len(front)} on the frontier")
+    print(f"  {stats['plotted']} models plotted "
+          f"({stats['prop']} proprietary / {stats['open']} open-weights, "
+          f"{stats['creators']} labs)")
+    print(f"  {len(front)} undominated, {len(rows) - len(front)} superseded by metric")
+    print(f"  of {dep} vendor-retired models, {retired_and_beaten} are also beaten on the "
+          f"numbers ({'metric filter subsumes the vendor flag' if retired_and_beaten == dep else 'MISMATCH -- some retired model is still undominated'})")
 
 
 TEMPLATE = r"""<!DOCTYPE html>
@@ -188,7 +253,9 @@ TEMPLATE = r"""<!DOCTYPE html>
     border-radius:var(--radius);padding:20px;margin-bottom:34px}
   .cap{font-family:var(--mono);font-size:10.5px;color:var(--muted);text-transform:uppercase;
     letter-spacing:.06em;margin-bottom:6px}
-  .plotwrap{position:relative}
+  /* explicit: the tooltip is allowed to hang outside the plot and the card */
+  .plotwrap{position:relative;overflow:visible}
+  .card{overflow:visible}
   svg{display:block;width:100%;height:auto}
   svg text{font-family:var(--mono);font-size:10.5px;fill:var(--muted)}
   svg text.lbl{font-size:10px;fill:var(--text-secondary)}
@@ -204,7 +271,7 @@ TEMPLATE = r"""<!DOCTYPE html>
   .tip{position:absolute;pointer-events:none;opacity:0;transition:opacity 120ms ease;
     background:var(--surface-1);border:1px solid var(--border);border-radius:9px;
     padding:9px 12px;font-size:12.5px;min-width:190px;max-width:280px;
-    box-shadow:0 6px 22px rgba(0,0,0,.18);z-index:5}
+    box-shadow:0 6px 22px rgba(0,0,0,.18);z-index:50}
   .tip.on{opacity:1}
   .tip .tname{color:var(--text-primary);font-weight:600;font-size:13px;margin-bottom:5px}
   .tip .trow{display:flex;justify-content:space-between;gap:14px;font-family:var(--mono);font-size:11.5px}
@@ -273,6 +340,23 @@ TEMPLATE = r"""<!DOCTYPE html>
     Everything else is genuinely unmeasured here, so it is absent rather than estimated.
   </div>
 
+  <div class="callout">
+    <b>Two chips do the real work.</b> <em>Hide superseded</em> drops every model that another model beats
+    on both axes at once &mdash; the metric's verdict, not the vendor's retirement flag, and recomputed
+    against whatever else you have filtered to. <em>Dump effort levels</em> collapses each model's effort
+    settings to a single row at its highest index, applied before the superseded test so the frontier is
+    then drawn between models rather than between knobs.
+    <br><br>
+    Worth knowing what collapsing costs, because it is not free: effort levels are genuine operating
+    points, not redundancy. Turning a model down makes it cheaper <em>and</em> dumber, so it is not beaten
+    by its own high-effort twin &mdash; only <b><span id="cSib">&mdash;</span></b> of the
+    <span id="cPlot2">&mdash;</span> variants here are beaten by another setting of the same model.
+    Collapsing therefore deletes real frontier points (<b><span id="cF1">&mdash;</span> drops to
+    <span id="cF2">&mdash;</span></b>), including cheap ones worth knowing about. Expanded answers &ldquo;which
+    configuration should I run&rdquo;; collapsed answers &ldquo;which model is best&rdquo;. Vendor-retired
+    models stay visible and tagged either way &mdash; the metric decides what is worth looking at.
+  </div>
+
   <nav class="toc">
     <a href="#chart">1 &middot; The chart</a>
     <a href="#frontier">2 &middot; Efficient frontier</a>
@@ -282,7 +366,10 @@ TEMPLATE = r"""<!DOCTYPE html>
   <div class="filters" role="group" aria-label="Filters">
     <button class="chip" id="fProp" aria-pressed="true"><span class="dot prop"></span>Proprietary</button>
     <button class="chip" id="fOpen" aria-pressed="true"><span class="dot open"></span>Open-weights</button>
-    <button class="chip" id="fDep" aria-pressed="false">Include superseded</button>
+    <button class="chip" id="fSup" aria-pressed="false"
+            title="Drop every model that some other model beats on both axes at once">Hide superseded</button>
+    <button class="chip" id="fEff" aria-pressed="false"
+            title="Collapse each model's effort settings to one row — its highest index">Dump effort levels</button>
     <button class="chip" id="fReas" aria-pressed="false">Reasoning only</button>
     <select id="fLab" aria-label="Filter by lab"><option value="">All labs</option></select>
     <input type="search" id="fQ" placeholder="search model&hellip;" aria-label="Search model name">
@@ -300,7 +387,6 @@ TEMPLATE = r"""<!DOCTYPE html>
       <div class="legend">
         <span class="item"><span class="swatch" style="background:var(--series-prop)"></span>Proprietary</span>
         <span class="item"><span class="swatch" style="background:var(--series-open)"></span>Open-weights</span>
-        <span class="item"><span class="swatch" style="background:var(--dim)"></span>Superseded</span>
         <span class="item"><span class="line"></span>Efficient frontier</span>
       </div>
     </div>
@@ -308,9 +394,12 @@ TEMPLATE = r"""<!DOCTYPE html>
 
   <section id="frontier">
     <h2>2 &middot; The efficient frontier</h2>
-    <p class="sub">The models where nothing cheaper is any smarter. Every model off this list is beaten
-      outright by something on it &mdash; same intelligence or better, for less. Read down until the
-      intelligence is enough for the job, then stop; paying past that buys nothing on this metric.</p>
+    <p class="sub">The models nothing else beats on both axes at once &mdash; no other model is
+      simultaneously at least as smart <em>and</em> at least as cheap. Anything missing from this list is
+      <b>superseded</b>: strictly beaten, so there is no budget at which it is the right pick. Read down
+      until the intelligence is enough for the job, then stop &mdash; paying past that buys nothing on
+      this metric. This layer recomputes against the filters above, so selecting one lab gives you that
+      lab's frontier, and the <em>Hide superseded</em> chip collapses every view to exactly this set.</p>
     <div class="card" style="padding:0;overflow:hidden">
       <table id="fTable"><thead><tr>
         <th>Model</th><th>Lab</th><th style="text-align:right">Index</th>
@@ -366,6 +455,10 @@ const DATA = __DATA__;
   $("mStat").textContent = S.plotted + " of " + S.total;
   $("cTotal").textContent = S.total;
   $("cPlot").textContent  = S.plotted;
+  $("cPlot2").textContent = S.plotted;
+  $("cSib").textContent   = S.sibBeaten;
+  $("cF1").textContent    = S.frontFull;
+  $("cF2").textContent    = S.frontCollapsed;
   $("evals").textContent  = S.evals.join(", ");
 
   const labs = [...new Set(R.map(r => r.creator))].sort((a,b)=>a.localeCompare(b));
@@ -374,35 +467,61 @@ const DATA = __DATA__;
     o.value = l; o.textContent = l; $("fLab").appendChild(o);
   }
 
-  const st = { prop:true, open:true, dep:false, reas:false, lab:"", q:"",
+  const st = { prop:true, open:true, sup:false, eff:false, reas:false, lab:"", q:"",
                sortK:"ii", sortDir:-1 };
 
-  function slice(){
+  function baseSlice(){
     const q = st.q.trim().toLowerCase();
     return R.filter(r =>
       (r.open ? st.open : st.prop) &&
-      (st.dep || !r.dep) &&
       (!st.reas || r.reas) &&
       (!st.lab || r.creator === st.lab) &&
       (!q || r.name.toLowerCase().includes(q) || r.creator.toLowerCase().includes(q)));
   }
 
+  // "Superseded" is decided by the metric, evaluated against whatever the other
+  // filters left -- so it always means "beaten inside the view you are looking
+  // at", never "retired by its vendor".
+  // Collapse a model's effort settings to one row: its ceiling (highest index,
+  // cheapest variant if two tie there). Deliberately runs BEFORE the dominance
+  // test, so "superseded" is judged between models rather than between a model
+  // and its own turned-down settings -- otherwise every low-effort variant is
+  // trivially beaten by its high-effort twin and the frontier says nothing.
+  function collapse(rows){
+    const by=new Map();
+    for(const r of rows){
+      const cur=by.get(r.base);
+      if(!cur || r.ii>cur.ii || (r.ii===cur.ii && r.cost<cur.cost)) by.set(r.base,r);
+    }
+    return [...by.values()];
+  }
+
+  function slice(){
+    let b = baseSlice();
+    if(st.eff) b = collapse(b);
+    return st.sup ? frontierOf(b) : b;
+  }
+
   // colour follows the entity, never its rank or row order
-  const colourOf = r => r.dep ? "var(--dim)"
-                    : r.open ? "var(--series-open)" : "var(--series-prop)";
+  const colourOf = r => r.open ? "var(--series-open)" : "var(--series-prop)";
 
   /* ---------- scatter ---------- */
   const W=980, H=560, L=62, Rr=22, T=20, B=52;
   const px = W-L-Rr, py = H-T-B;
 
+  // The single definition of the undominated layer, shared by the chart line,
+  // the frontier table, the table tag and the Hide-superseded chip -- so they
+  // cannot disagree the way a separately precomputed flag could. A model is
+  // superseded when another is at least as smart AND at least as cheap, strictly
+  // better on one of the two; exact ties survive together.
   function frontierOf(rows){
-    let best=-1; const out=[];
-    for (const r of [...rows].sort((a,b)=> a.cost-b.cost || b.ii-a.ii))
-      if (r.ii > best){ best=r.ii; out.push(r); }
-    return out;
+    return rows
+      .filter(r => !rows.some(o => o !== r &&
+        o.ii >= r.ii && o.cost <= r.cost && (o.ii > r.ii || o.cost < r.cost)))
+      .sort((a,b) => a.cost - b.cost || b.ii - a.ii);
   }
 
-  let pts=[];
+  let pts=[], frontSet=new Set();
   function draw(rows){
     const svg = $("svg");
     while (svg.firstChild) svg.removeChild(svg.firstChild);
@@ -412,7 +531,8 @@ const DATA = __DATA__;
 
     if(!rows.length){
       const t=el("text",{x:W/2,y:H/2,"text-anchor":"middle"});
-      t.textContent="No models match these filters."; svg.appendChild(t); pts=[]; return;
+      t.textContent="No models match these filters.";
+      svg.appendChild(t); pts=[]; frontSet=new Set(); return;
     }
 
     const costs=rows.map(r=>r.cost), iis=rows.map(r=>r.ii);
@@ -452,6 +572,7 @@ const DATA = __DATA__;
 
     // frontier: a stepped guide, dashed so it never reads as data
     const fr=frontierOf(rows);
+    frontSet=new Set(fr);
     if(fr.length>1){
       let d="M "+X(fr[0].cost)+" "+Y(fr[0].ii);
       for(let i=1;i<fr.length;i++)
@@ -463,7 +584,7 @@ const DATA = __DATA__;
     // marks: r=5 (10px), 2px surface ring so overlaps stay separable
     pts=[];
     for(const r of rows){
-      const cx=X(r.cost), cy=Y(r.ii), on=fr.includes(r);
+      const cx=X(r.cost), cy=Y(r.ii), on=frontSet.has(r);
       const c=el("circle",{cx:cx,cy:cy,r:on?6:5,fill:colourOf(r),
         stroke:"var(--surface-1)","stroke-width":2,class:"pt"});
       svg.appendChild(c);
@@ -507,7 +628,8 @@ const DATA = __DATA__;
                 ["Weights",r.open?(r.lic||"open"):"proprietary"],
                 ["Output speed",r.tps==null?"—":r.tps+" tok/s"],
                 ["Context",fmtCtx(r.ctx)]];
-    if(r.dep) rows.push(["Status","superseded"]);
+    rows.push(["On frontier", frontSet.has(r) ? "yes" : "no — superseded"]);
+    if(r.dep) rows.push(["Vendor status","retired"]);
     for(const [k,v] of rows){
       const d=document.createElement("div"); d.className="trow";
       const a=document.createElement("span"); a.textContent=k;
@@ -515,9 +637,16 @@ const DATA = __DATA__;
       d.appendChild(a); d.appendChild(c); tip.appendChild(d);
     }
     tip.classList.add("on");
-    const lx=best.x/sx, ly=best.y/sy;
-    tip.style.left=Math.min(Math.max(lx+14,0),b.width-tip.offsetWidth-4)+"px";
-    tip.style.top=Math.max(ly-tip.offsetHeight/2,0)+"px";
+    // Snap to the quadrant furthest from the pointer. The box therefore never
+    // sits under the cursor, and its position depends only on which half of the
+    // plot the pointer is in -- so it parks in a corner instead of jittering
+    // along with every mouse move. Deliberately unclamped: it may hang outside
+    // the plot rather than be squeezed back inside it.
+    const M=14;
+    const farRight=(ev.clientX-b.left) < b.width/2;
+    const farDown =(ev.clientY-b.top)  < b.height/2;
+    tip.style.left=(farRight ? b.width -tip.offsetWidth -M : M)+"px";
+    tip.style.top =(farDown  ? b.height-tip.offsetHeight-M : M)+"px";
   }
   function hideTip(){
     tip.classList.remove("on");
@@ -546,6 +675,9 @@ const DATA = __DATA__;
   }
 
   function fillTable(rows){
+    // same frontier function the chart uses, over the same slice -- the tag and
+    // the drawn line cannot disagree
+    const fset=new Set(frontierOf(rows));
     const k=st.sortK, dir=st.sortDir;
     const sorted=[...rows].sort((a,b)=>{
       let x=a[k], y=b[k];
@@ -564,10 +696,10 @@ const DATA = __DATA__;
       const nameTd=document.createElement("td");
       nameTd.className="name";
       nameTd.appendChild(document.createTextNode(r.name+" "));
-      if(r.front){const s=document.createElement("span");
+      if(fset.has(r)){const s=document.createElement("span");
         s.className="tag f"; s.textContent="frontier"; nameTd.appendChild(s);}
       if(r.dep){const s=document.createElement("span");
-        s.className="tag"; s.textContent="superseded"; nameTd.appendChild(s);}
+        s.className="tag"; s.textContent="vendor-retired"; nameTd.appendChild(s);}
       tr.appendChild(nameTd);
       add(r.creator);
       add(r.ii.toFixed(1),"n"); add(fmtCost(r.cost),"n");
@@ -621,14 +753,19 @@ const DATA = __DATA__;
 
   /* ---------- wiring ---------- */
   function render(){
-    const rows=slice();
-    $("count").textContent=rows.length+" model"+(rows.length===1?"":"s");
+    const base=baseSlice();
+    const coll=st.eff ? collapse(base) : base;
+    const rows=st.sup ? frontierOf(coll) : coll;
+    const bits=[rows.length+" model"+(rows.length===1?"":"s")];
+    if(st.eff) bits.push((base.length-coll.length)+" effort variants dumped");
+    if(st.sup) bits.push((coll.length-rows.length)+" superseded hidden");
+    $("count").textContent=bits.join(" · ");
     draw(rows); fillFrontier(rows); fillTable(rows); hideTip();
   }
   const toggle=(id,key)=>$(id).addEventListener("click",()=>{
     st[key]=!st[key]; $(id).setAttribute("aria-pressed",String(st[key])); render();});
   toggle("fProp","prop"); toggle("fOpen","open");
-  toggle("fDep","dep");   toggle("fReas","reas");
+  toggle("fSup","sup");   toggle("fEff","eff");   toggle("fReas","reas");
   $("fLab").addEventListener("change",e=>{st.lab=e.target.value; render();});
   $("fQ").addEventListener("input",e=>{st.q=e.target.value; render();});
   window.addEventListener("resize",()=>hideTip());

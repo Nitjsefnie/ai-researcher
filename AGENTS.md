@@ -87,9 +87,42 @@ follow the `dataviz` skill — that means the procedure, not just the vibe:
 - Dark mode is selected from the same ramps and declared under both the media
   query and the `data-theme` scope.
 
-Interactive affordances: filter chips (proprietary / open-weights / superseded
-/ reasoning), lab select, search, sortable table, copy-as-Markdown and
-copy-as-JSON of the current filtered slice, TOC.
+Interactive affordances: filter chips, lab select, search, sortable table,
+copy-as-Markdown and copy-as-JSON of the current filtered slice, TOC.
+
+### "Superseded" means beaten on the metric
+
+Not the vendor's deprecation flag. A model is superseded when another model is
+at least as smart **and** at least as cheap (strictly better on one). Vendor-
+retired models stay visible and tagged; as of the 2026-07-30 capture all 31 of
+them are also metric-beaten, so the metric subsumes the flag.
+
+**One function computes this layer** — the chart's dashed line, the frontier
+table, the table's frontier tag and the Hide-superseded chip all call it, over
+the same slice. Never precompute it into the data: a build-time flag silently
+disagreed with the live chart under a lab filter (the chart marked 6 Anthropic
+models, the table tagged 4).
+
+### Effort levels
+
+AA encodes the effort knob in the model name; there is no field for it. Only
+the effort component is stripped — `(Adaptive Reasoning, Max Effort)` →
+`(Adaptive Reasoning)`, while `(Reasoning)`, `(Non-reasoning)` and date
+snapshots like `(Jan '25)` identify genuinely different models and must survive.
+
+*Dump effort levels* collapses each model to its ceiling, and is applied
+**before** the superseded test so the frontier is drawn between models. Say
+what it costs rather than hiding it: turning a model down makes it cheaper *and*
+dumber, so a low-effort variant is **not** dominated by its high-effort twin —
+only 2 of 125 variants are beaten by another setting of the same model.
+Collapsing therefore deletes real frontier points (21 → 14). Expanded answers
+"which configuration", collapsed answers "which model".
+
+### Tooltip
+
+Snaps to the quadrant furthest from the pointer, so it never sits under the
+cursor and parks in a corner instead of jittering with the mouse. Deliberately
+unclamped and allowed to hang outside the plot rather than be squeezed inside.
 
 ## Update cadence
 
