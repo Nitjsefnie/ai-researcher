@@ -1,0 +1,26 @@
+Source: Anthropic — Introducing Claude Opus 4.7
+Page URL: https://www.anthropic.com/news/claude-opus-4-7
+Original CDN: https://www-cdn.anthropic.com/images/4zrzovbb/website/d434d15757c6abac1122af483617741776d5a114-2600x2638.png
+Downloaded via: Next.js image optimizer (served as WebP, 2600x2638)
+Date downloaded: 2026-05-23
+Date of image (publication): 2026-04-16 (Opus 4.7 launch)
+
+Content: Cross-lab benchmark comparison table.
+Columns: Opus 4.7 | Opus 4.6 | GPT-5.4 | Gemini 3.1 Pro | Mythos Preview
+Rows (12 benchmarks):
+  - SWE-bench Pro (agentic coding)
+  - SWE-bench Verified (agentic coding)
+  - Terminal-Bench 2.0 (agentic terminal coding)
+  - Humanity's Last Exam (multidisciplinary reasoning, no-tools / with-tools)
+  - BrowseComp (agentic search)
+  - MCP-Atlas (scaled tool use)
+  - OSWorld-Verified (agentic computer use)
+  - Finance Agent v1.1 (agentic financial analysis)
+  - CyberGym (cybersecurity vulnerability reproduction)
+  - GPQA Diamond (graduate-level reasoning)
+  - CharXiv Reasoning (visual reasoning, no-tools / with-tools)
+  - MMMLU (multilingual Q&A)
+
+Notes:
+  - GPT-5.4 Terminal-Bench number is tagged "self-reported harness" (footnote in image)
+  - GPT-5.4 BrowseComp / Finance / GPQA tagged "Pro" variants
