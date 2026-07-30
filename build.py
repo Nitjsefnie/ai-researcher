@@ -267,6 +267,9 @@ TEMPLATE = r"""<!DOCTYPE html>
   svg line.lead{stroke:var(--muted);stroke-width:1}
   .pt{cursor:pointer}
   .pt.fade{opacity:.18}
+  /* a pinned point keeps a dark ring so you can see what you have stuck down */
+  .pt.pinned{stroke:var(--text-primary);stroke-width:2}
+  svg rect.lblbox.pinned{stroke:var(--accent)}
 
   .legend{display:flex;gap:18px;flex-wrap:wrap;font-size:12.5px;margin:14px 0 2px;
     font-family:var(--mono);color:var(--text-secondary)}
@@ -379,12 +382,14 @@ TEMPLATE = r"""<!DOCTYPE html>
     <button class="chip" id="fReas" aria-pressed="false">Reasoning only</button>
     <select id="fLab" aria-label="Filter by lab"><option value="">All labs</option></select>
     <input type="search" id="fQ" placeholder="search model&hellip;" aria-label="Search model name">
+    <button class="chip" id="fClear" hidden>Clear pinned names</button>
     <span class="count" id="count">&mdash;</span>
   </div>
 
   <section id="chart">
     <div class="card">
-      <div class="cap">Intelligence Index vs cost per task &middot; log cost axis &middot; up-and-left is better</div>
+      <div class="cap">Intelligence Index vs cost per task &middot; log cost axis &middot; up-and-left is better
+        &middot; click any point to pin its name</div>
       <div class="plotwrap">
         <svg id="svg" viewBox="0 0 980 560" role="img"
              aria-label="Scatter plot of Artificial Analysis Intelligence Index against cost per task in US dollars"></svg>
@@ -475,6 +480,9 @@ const DATA = __DATA__;
 
   const st = { prop:true, open:true, sup:false, eff:false, reas:false, lab:"", q:"",
                sortK:"ii", sortDir:-1 };
+  // Names whose labels the reader has stuck down by clicking. Keyed by name so
+  // a pin survives filtering and resizing, and returns when the model does.
+  const pins = new Set();
 
   function baseSlice(){
     const q = st.q.trim().toLowerCase();
@@ -611,7 +619,8 @@ const DATA = __DATA__;
     for(const r of rows){
       const cx=X(r.cost), cy=Y(r.ii), on=frontSet.has(r);
       const c=el("circle",{cx:cx,cy:cy,r:on?6:5,fill:colourOf(r),
-        stroke:"var(--surface-1)","stroke-width":2,class:"pt"});
+        stroke:"var(--surface-1)","stroke-width":2,
+        class:"pt"+(pins.has(r.name)?" pinned":"")});
       svg.appendChild(c);
       pts.push({r:r,x:cx,y:cy,el:c});
     }
@@ -667,12 +676,19 @@ const DATA = __DATA__;
       return !boxes.some(b=>hitsSeg(b,[x1,y1,x2,y2]));
     };
 
-    // smartest first, so the models people look for get first claim on space
+    // Pinned names first -- the reader asked for those explicitly, so they get
+    // first claim on space; then the frontier, smartest first.
+    const queue=[
+      ...rows.filter(r=>pins.has(r.name)).map(r=>({r,pin:true})),
+      ...[...fr].sort((a,b)=> b.ii-a.ii)
+                .filter(r=>!pins.has(r.name)).map(r=>({r,pin:false})),
+    ];
     let dropped=0;
-    for(const r of [...fr].sort((a,b)=> b.ii-a.ii)){
+    for(const {r,pin} of queue){
       const cx=X(r.cost), cy=Y(r.ii), own=pts.find(p=>p.r===r);
+      const wide=pin||full;                    // pinned names are never clipped
       const t=el("text",{class:"lbl"});
-      t.textContent = full ? r.name
+      t.textContent = wide ? r.name
                      : (r.name.length>34 ? r.name.slice(0,33)+"…" : r.name);
       svg.appendChild(t);
       const w=t.getComputedTextLength(), h=11;
@@ -684,8 +700,8 @@ const DATA = __DATA__;
       // genuinely occupied. The wide reach is what lets the frontier view name
       // all 21 points at narrower window sizes.
       const cands=[];
-      const dyMax = full ? 240 : 32;
-      const dxs   = full ? [18,70,130] : [18];
+      const dyMax = wide ? 240 : 32;
+      const dxs   = wide ? [18,70,130] : [18];
       for(let dy=-dyMax; dy<=dyMax; dy+=16)
         for(const dx of dxs){
           const d=Math.hypot(dx,dy);
@@ -712,7 +728,7 @@ const DATA = __DATA__;
       // leader and box go behind the text, which was appended to measure it
       svg.insertBefore(el("line",{x1:put.sx,y1:put.sy,x2:put.nx,y2:put.ny,class:"lead"}),t);
       svg.insertBefore(el("rect",{x:put.box.x,y:put.box.y,width:put.box.w,
-        height:put.box.h,rx:3,class:"lblbox"}),t);
+        height:put.box.h,rx:3,class:"lblbox"+(pin?" pinned":"")}),t);
       t.setAttribute("x",put.bx);
       t.setAttribute("y",put.by+h-2.5);        // y is the baseline
       boxes.push(put.box); leaders.push([put.sx,put.sy,put.nx,put.ny]);
@@ -722,8 +738,10 @@ const DATA = __DATA__;
 
   /* ---------- nearest-point hover (no pinpoint targets) ---------- */
   const tip=$("tip"), svg=$("svg");
-  function moveTip(ev){
-    if(!pts.length) return;
+  // nearest mark to the pointer, in viewBox units -- shared by hover and click
+  // so both are as forgiving as each other
+  function nearestAt(ev){
+    if(!pts.length) return null;
     const b=svg.getBoundingClientRect(), sx=W/b.width, sy=H/b.height;
     const mx=(ev.clientX-b.left)*sx, my=(ev.clientY-b.top)*sy;
     let best=null, bd=Infinity;
@@ -731,7 +749,12 @@ const DATA = __DATA__;
       const d=(p.x-mx)**2+(p.y-my)**2;
       if(d<bd){ bd=d; best=p; }
     }
-    if(!best || bd>60**2){ hideTip(); return; }
+    return (best && bd<=60**2) ? best : null;
+  }
+  function moveTip(ev){
+    const best=nearestAt(ev);
+    if(!best){ hideTip(); return; }
+    const b=svg.getBoundingClientRect();
     for(const p of pts) p.el.classList.toggle("fade", p!==best);
     const r=best.r;
     tip.innerHTML="";
@@ -769,6 +792,13 @@ const DATA = __DATA__;
   }
   svg.addEventListener("pointermove",moveTip);
   svg.addEventListener("pointerleave",hideTip);
+  // click a point to stick its name on permanently; click again to release
+  svg.addEventListener("click",ev=>{
+    const hit=nearestAt(ev);
+    if(!hit) return;
+    if(pins.has(hit.r.name)) pins.delete(hit.r.name); else pins.add(hit.r.name);
+    render();
+  });
 
   /* ---------- tables ---------- */
   function fillFrontier(rows){
@@ -874,6 +904,14 @@ const DATA = __DATA__;
     const bits=[rows.length+" model"+(rows.length===1?"":"s")];
     if(st.eff) bits.push((base.length-coll.length)+" effort variants dumped");
     if(st.sup) bits.push((coll.length-rows.length)+" superseded hidden");
+    // Pins are never cleared by filtering or searching -- they are keyed by
+    // name, so a model that is filtered out keeps its pin and gets its label
+    // back the moment it returns to the view. Only the button clears them.
+    if(pins.size){
+      const shown=rows.filter(r=>pins.has(r.name)).length;
+      bits.push(pins.size+" pinned"+(shown<pins.size ? " ("+shown+" in view)" : ""));
+    }
+    $("fClear").hidden = pins.size===0;
     $("count").textContent=bits.join(" · ");
     draw(rows); fillFrontier(rows); fillTable(rows); hideTip();
   }
@@ -881,6 +919,7 @@ const DATA = __DATA__;
     st[key]=!st[key]; $(id).setAttribute("aria-pressed",String(st[key])); render();});
   toggle("fProp","prop"); toggle("fOpen","open");
   toggle("fSup","sup");   toggle("fEff","eff");   toggle("fReas","reas");
+  $("fClear").addEventListener("click",()=>{ pins.clear(); render(); });
   $("fLab").addEventListener("change",e=>{st.lab=e.target.value; render();});
   $("fQ").addEventListener("input",e=>{st.q=e.target.value; render();});
   // re-render on resize so the plot re-fits and labels re-place for the new width
