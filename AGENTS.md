@@ -56,7 +56,7 @@ JSON API. The extractor reassembles it.
 ```
 python3 scripts/fetch_aa.py     # → data/aa-raw-models.json   (the source of truth)
 python3 build.py                # → out/frontier-models.html
-python3 ~/.claude/scripts/docs_hub.py publish ./out/frontier-models.html \
+python3 ~/.agent-bundle/scripts/docs_hub.py publish ./out/frontier-models.html \
   --slug ai-researcher/frontier-models \
   --title "Frontier models — intelligence vs cost per task" \
   --from ai-researcher --tags benchmarks,comparison,interactive,ai \
