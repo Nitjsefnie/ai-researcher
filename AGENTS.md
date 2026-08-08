@@ -94,8 +94,11 @@ copy-as-Markdown and copy-as-JSON of the current filtered slice, TOC.
 
 Not the vendor's deprecation flag. A model is superseded when another model is
 at least as smart **and** at least as cheap (strictly better on one). Vendor-
-retired models stay visible and tagged; as of the 2026-07-30 capture all 31 of
-them are also metric-beaten, so the metric subsumes the flag.
+retired models stay visible and tagged. The two verdicts are genuinely
+independent: as of the 2026-08-08 capture, 40 of 41 vendor-retired models are
+also metric-beaten, but **Muse Spark 1.1 (xhigh)** was retired by Meta while
+still sitting on the efficient frontier. `build.py` prints `MISMATCH` when this
+happens — that is a finding to report, not a bug to fix.
 
 **One function computes this layer** — the chart's dashed line, the frontier
 table, the table's frontier tag and the Hide-superseded chip all call it, over
