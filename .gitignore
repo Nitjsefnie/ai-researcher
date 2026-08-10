@@ -1,0 +1,3 @@
+# scripts/diff_aa.py imports build.py, so running it byte-compiles the module.
+__pycache__/
+*.py[cod]
