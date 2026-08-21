@@ -19,12 +19,11 @@ what the page says:
                Discarded unless --derived
   cosmetic     lab branding (colour, logo) -- always discarded, counted only
 
-It also recomputes both of the page's Pareto layers on either side with
-build.py's own `undominated` -- the cost frontier (intelligence against measured
-$/task) and the parameter-efficiency frontier (intelligence against total
-parameters) -- so "who entered / left the frontier" is answered by the same
-function the page uses rather than a second implementation of the rule. The two
-move independently: a model can join one without touching the other.
+It also recomputes every Pareto layer the page draws -- one per scatter, in page order:
+coding, intelligence, agentic and parameter-efficiency -- on either side, using build.py's
+own `undominated`, so "who entered / left the frontier" is answered by the same
+function the page uses rather than a second implementation of the rule. The four
+move independently: a model can join one while sitting dominated on the rest.
 
 Usage:
     python3 scripts/diff_aa.py                    # HEAD's capture vs the working tree
@@ -166,24 +165,38 @@ def frontier_names(models, collapse=False):
     return {r["name"]: r for r in undominated(rows)}, rows
 
 
+# The page draws four scatters (sections 1-4), each with its own Pareto layer,
+# and they move independently -- a model can join one while sitting dominated on
+# the others. Diffing only the headline left three of the four unreviewed.
+# label -> (metric key, x-axis formatter)
+CHART_FRONTIERS = (
+    ("coding", "coding", lambda v: f"${v:.2f}/task"),
+    ("agentic", "agentic", lambda v: f"${v:.2f}/task"),
+    ("parameter-efficiency", "parameters", lambda v: fmt_params(v)),
+)
+
+
 def fmt_params(b):
     return f"{b / 1000:.1f}T".replace(".0T", "T") if b >= 1000 else f"{b:g}B"
 
 
-def param_frontier(models):
-    """The page's section-3 layer: Intelligence Index against total parameters.
+def chart_frontier(models, metric):
+    """One chart's Pareto layer, via build.py's own `undominated`.
 
-    build_rows() carries both numbers but only seats metrics entries for the
-    three cost-based charts, so stand size in for cost and hand the result to
-    the same undominated() the page uses -- never a second spelling of the
-    dominance rule. Only models AA discloses a size for are eligible, which is
-    why this layer is drawn over a much smaller set than the cost frontier.
+    build_rows() seats metrics entries for the three cost-based scatters but not
+    for the parameter one, so size stands in for cost there. Either way the
+    dominance rule itself is never spelled a second time. Eligibility differs per
+    chart -- the parameter layer only sees models AA discloses a size for, so it
+    is drawn over a much smaller set than the cost layers.
     """
-    rows = [r for r in build_rows(models)
-            if r.get("params") and r.get("ii") is not None]
-    for r in rows:
-        r["metrics"]["parameters"] = {"score": r["ii"], "cost": r["params"]}
-    return {r["name"]: r for r in undominated(rows, "parameters")}, rows
+    rows = build_rows(models)
+    if metric == "parameters":
+        rows = [r for r in rows if r.get("params") and r.get("ii") is not None]
+        for r in rows:
+            r["metrics"]["parameters"] = {"score": r["ii"], "cost": r["params"]}
+    else:
+        rows = [r for r in rows if r["metrics"].get(metric)]
+    return {r["name"]: r for r in undominated(rows, metric)}, rows
 
 
 def main():
@@ -299,23 +312,19 @@ def main():
         if not entered and not left:
             print("  (unchanged)")
 
-    # Section 3 of the page draws its own Pareto layer over a different axis, so
-    # a model can enter it without touching the cost frontier at all -- Qwen3.8
-    # 27B did exactly that on the 2026-08-21 capture and went unreported.
-    fo, rows_o = param_frontier(old)
-    fn, rows_n = param_frontier(new)
-    entered = [n for n in fn if n not in fo]
-    left = [n for n in fo if n not in fn]
-    print(f"\n== parameter-efficiency frontier: {len(fo)} -> {len(fn)} "
-          f"of {len(rows_o)} -> {len(rows_n)} with a disclosed size")
-    for n in sorted(entered, key=lambda n: -fn[n]["ii"]):
-        r = fn[n]
-        print(f"  + {n}  II {r['ii']:.1f}  {fmt_params(r['params'])}")
-    for n in sorted(left, key=lambda n: -fo[n]["ii"]):
-        r = fo[n]
-        print(f"  - {n}  II {r['ii']:.1f}  {fmt_params(r['params'])}")
-    if not entered and not left:
-        print("  (unchanged)")
+    for label, metric, fmt_x in CHART_FRONTIERS:
+        fo, rows_o = chart_frontier(old, metric)
+        fn, rows_n = chart_frontier(new, metric)
+        entered = [n for n in fn if n not in fo]
+        left = [n for n in fo if n not in fn]
+        print(f"\n== {label} frontier: {len(fo)} -> {len(fn)} "
+              f"of {len(rows_o)} -> {len(rows_n)} plotted")
+        for sign, names, side in (("+", entered, fn), ("-", left, fo)):
+            for n in sorted(names, key=lambda n: -side[n]["metrics"][metric]["score"]):
+                m = side[n]["metrics"][metric]
+                print(f"  {sign} {n}  {m['score']:.1f}  {fmt_x(m['cost'])}")
+        if not entered and not left:
+            print("  (unchanged)")
 
     if not args.all:
         print(f"\ndiscarded: {suppressed['jitter-unused']} re-sampled speed/latency "

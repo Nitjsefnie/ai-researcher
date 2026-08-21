@@ -6,13 +6,15 @@ inside the RSC flight payload embedded in the HTML rather than via a public JSON
 API. This pulls the page, reassembles the flight chunks, and picks out the rich
 model array (the one carrying intelligenceIndex, not the lightweight filter list).
 
-Writes data/aa-raw-models.json -- the single source of truth for this repo.
+Writes data/aa-raw-models.json -- the single source of truth for this repo --
+alongside data/captured-at.txt, the date the capture was taken.
 
 Usage:  python3 scripts/fetch_aa.py [--html CACHED.html]
 """
 from __future__ import annotations
 
 import argparse
+import datetime as dt
 import json
 import pathlib
 import re
@@ -26,6 +28,10 @@ UA = (
 )
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 OUT = ROOT / "data" / "aa-raw-models.json"
+# When the capture happened. build.py stamps this on the page, so it cannot be
+# derived at build time: rebuilding an old capture tomorrow would relabel it with
+# tomorrow's date, and the page's copy-as-JSON export would carry the lie too.
+STAMP = ROOT / "data" / "captured-at.txt"
 
 # The flight payload escapes the model array into JS string chunks.
 CHUNK_RE = re.compile(r'self\.__next_f\.push\(\[1,("(?:[^"\\]|\\.)*")\]\)')
@@ -101,6 +107,7 @@ def main() -> None:
     models = richest_models_array(flight_payload(fetch_html(args.html)))
     OUT.parent.mkdir(parents=True, exist_ok=True)
     OUT.write_text(json.dumps(models, indent=1), encoding="utf-8")
+    STAMP.write_text(dt.date.today().isoformat() + "\n", encoding="utf-8")
 
     scored = sum(1 for m in models if isinstance(m.get("intelligenceIndex"), (int, float)))
     print(f"wrote {OUT.relative_to(ROOT)}: {len(models)} models, {scored} with an intelligence index")

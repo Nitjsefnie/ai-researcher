@@ -212,7 +212,12 @@ def main():
     )
     front_collapsed = undominated(list(ceiling.values()))
 
-    captured = dt.date.today().isoformat()
+    # Written by fetch_aa.py when the capture was taken. Falling back to today
+    # only covers a checkout predating the stamp; a rebuild must never relabel
+    # an existing capture with the day it happened to be rebuilt.
+    stamp = RAW.parent / "captured-at.txt"
+    captured = (stamp.read_text(encoding="utf-8").strip()
+                if stamp.exists() else dt.date.today().isoformat())
     stats = {
         "total": len(models),
         "plotted": len(intelligence_rows),
@@ -412,9 +417,10 @@ TEMPLATE = r"""<!DOCTYPE html>
     <h1>Frontier models &mdash; capability vs cost and size</h1>
     <p class="lede">Every number on this page comes from
       <a href="https://artificialanalysis.ai/leaderboards/models">artificialanalysis.ai</a> and nowhere else.
-      Three charts pair an AA capability index with AA's measured cost to complete one task in that same
-      index; a fourth pairs broad intelligence with AA's reported total parameter count. Together they show
-      both economic and parameter efficiency without stitching numbers from different sources.</p>
+      The first three charts pair an AA capability index with AA's measured cost to complete one task in
+      that same index, so they share an axis and read against each other; the fourth swaps that axis for
+      AA's reported total parameter count and so sits apart, last. Together they show both economic and
+      parameter efficiency without stitching numbers from different sources.</p>
   </header>
 
   <div class="method">
@@ -450,8 +456,8 @@ TEMPLATE = r"""<!DOCTYPE html>
   <nav class="toc">
     <a href="#coding">1 &middot; Coding</a>
     <a href="#intelligence">2 &middot; Intelligence</a>
-    <a href="#parameters">3 &middot; Parameter efficiency</a>
-    <a href="#agentic">4 &middot; Agentic</a>
+    <a href="#agentic">3 &middot; Agentic</a>
+    <a href="#parameters">4 &middot; Parameter efficiency</a>
     <a href="#frontier">5 &middot; Efficient frontiers</a>
     <a href="#table">6 &middot; Full table</a>
   </nav>
@@ -510,8 +516,28 @@ TEMPLATE = r"""<!DOCTYPE html>
     </div>
   </section>
 
+  <section id="agentic">
+    <h2>3 &middot; Agentic Index</h2>
+    <p class="sub">GDPval-AA v2 and τ³-Banking, equally weighted. It measures tool use, planning and
+      multi-step execution rather than coding specifically.</p>
+    <div class="card">
+      <div class="cap">Agentic Index vs Agentic Index cost per task &middot; log cost axis &middot; up-and-left is better
+        &middot; click any point to pin its name</div>
+      <div class="plotwrap">
+        <svg id="svg-agentic" viewBox="0 0 980 560" role="img"
+             aria-label="Scatter plot of Artificial Analysis Agentic Index against Agentic Index cost per task in US dollars"></svg>
+        <div class="tip" id="tip-agentic" role="status"></div>
+      </div>
+      <div class="legend">
+        <span class="item"><span class="swatch" style="background:var(--series-prop)"></span>Proprietary</span>
+        <span class="item"><span class="swatch" style="background:var(--series-open)"></span>Open-weights</span>
+        <span class="item"><span class="line"></span>Efficient frontier</span>
+      </div>
+    </div>
+  </section>
+
   <section id="parameters">
-    <h2>3 &middot; Parameter efficiency</h2>
+    <h2>4 &middot; Parameter efficiency</h2>
     <p class="sub">AA Intelligence Index against AA's reported total parameter count. The logarithmic
       x-axis measures model size, not active parameters or inference compute; models missing either value
       are absent rather than estimated.</p>
@@ -528,26 +554,6 @@ TEMPLATE = r"""<!DOCTYPE html>
         <span class="item"><span class="swatch" style="background:var(--series-open)"></span>Open-weights frontier</span>
         <span class="item"><span class="swatch" style="background:var(--muted)"></span>Superseded</span>
         <span class="item"><span class="line"></span>Parameter-efficiency frontier</span>
-      </div>
-    </div>
-  </section>
-
-  <section id="agentic">
-    <h2>4 &middot; Agentic Index</h2>
-    <p class="sub">GDPval-AA v2 and τ³-Banking, equally weighted. It measures tool use, planning and
-      multi-step execution rather than coding specifically.</p>
-    <div class="card">
-      <div class="cap">Agentic Index vs Agentic Index cost per task &middot; log cost axis &middot; up-and-left is better
-        &middot; click any point to pin its name</div>
-      <div class="plotwrap">
-        <svg id="svg-agentic" viewBox="0 0 980 560" role="img"
-             aria-label="Scatter plot of Artificial Analysis Agentic Index against Agentic Index cost per task in US dollars"></svg>
-        <div class="tip" id="tip-agentic" role="status"></div>
-      </div>
-      <div class="legend">
-        <span class="item"><span class="swatch" style="background:var(--series-prop)"></span>Proprietary</span>
-        <span class="item"><span class="swatch" style="background:var(--series-open)"></span>Open-weights</span>
-        <span class="item"><span class="line"></span>Efficient frontier</span>
       </div>
     </div>
   </section>
@@ -1182,7 +1188,7 @@ const DATA = __DATA__;
     popup.style.top=(down?box.height-popup.offsetHeight-margin:margin)+"px";
   }
 
-  for(const key of ["coding","parameters","agentic"]){
+  for(const key of ["coding","agentic","parameters"]){
     const chart=$(PLOTS[key].svg);
     chart.addEventListener("pointermove",ev=>moveCapabilityTip(key,ev));
     chart.addEventListener("pointerleave",()=>hideCapabilityTip(key));

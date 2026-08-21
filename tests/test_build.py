@@ -122,9 +122,11 @@ class GeneratedArtifactTests(unittest.TestCase):
         parser = ArtifactParser()
         parser.feed(html)
 
+        # The three cost-axis scatters group first and read against each other;
+        # the parameter scatter swaps that axis for model size, so it sits last.
         self.assertEqual(
             parser.svg_ids,
-            ["svg-coding", "svg-intelligence", "svg-parameters", "svg-agentic"],
+            ["svg-coding", "svg-intelligence", "svg-agentic", "svg-parameters"],
         )
         self.assertEqual(parser.scroll_tables, ["fTable", "tbl"])
         for header in (
