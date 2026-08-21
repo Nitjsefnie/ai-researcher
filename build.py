@@ -2,7 +2,8 @@
 """Build out/frontier-models.html from data/aa-raw-models.json.
 
 Single deliverable: AA Coding, Intelligence, and Agentic indices against their
-matched measured cost per task, sourced exclusively from artificialanalysis.ai.
+matched measured cost per task, plus total parameter count against Intelligence
+Index, sourced exclusively from artificialanalysis.ai.
 
 Usage:  python3 build.py
 """
@@ -127,6 +128,7 @@ def build_rows(models):
             continue
         base, eff = split_effort(m.get("name") or "")
         intelligence = metrics["intelligence"]
+        parameters = num(m.get("totalParameters"))
         rows.append({
             "name": m.get("name") or "",
             "base": base,
@@ -137,6 +139,7 @@ def build_rows(models):
             "ii": intelligence["score"] if intelligence else None,
             "cost": intelligence["cost"] if intelligence else None,
             "metrics": metrics,
+            "params": parameters if parameters is not None and parameters > 0 else None,
             "open": bool(m.get("isOpenWeights")),
             "dep": bool(m.get("deprecated")),
             "est": bool(m.get("intelligenceIndexIsEstimated")),
@@ -229,6 +232,10 @@ def main():
         "metricFrontiers": {
             metric: len(undominated(rows, metric)) for metric in METRIC_ORDER
         },
+        "parameterCount": sum(
+            1 for r in rows
+            if r["params"] is not None and r["metrics"]["intelligence"] is not None
+        ),
     }
     payload = json.dumps({"rows": rows, "stats": stats}, separators=(",", ":"))
 
@@ -402,12 +409,12 @@ TEMPLATE = r"""<!DOCTYPE html>
 
   <header>
     <div class="eyebrow">ai-researcher &middot; single-source &middot; captured __CAPTURED__</div>
-    <h1>Frontier models &mdash; capability vs cost per task</h1>
+    <h1>Frontier models &mdash; capability vs cost and size</h1>
     <p class="lede">Every number on this page comes from
       <a href="https://artificialanalysis.ai/leaderboards/models">artificialanalysis.ai</a> and nowhere else.
-      Each chart pairs one AA capability index with AA's measured cost to complete one task in that same
-      index. Coding, broad intelligence and agentic work therefore answer three distinct questions without
-      stitching benchmark scores to a quoted token price.</p>
+      Three charts pair an AA capability index with AA's measured cost to complete one task in that same
+      index; a fourth pairs broad intelligence with AA's reported total parameter count. Together they show
+      both economic and parameter efficiency without stitching numbers from different sources.</p>
   </header>
 
   <div class="method">
@@ -415,7 +422,7 @@ TEMPLATE = r"""<!DOCTYPE html>
     <div class="mgrid">
       <div><div class="k">Source</div><div class="v">Artificial Analysis</div></div>
       <div><div class="k">Metric &middot; y</div><div class="v">Coding &middot; Intelligence &middot; Agentic</div></div>
-      <div><div class="k">Metric &middot; x</div><div class="v">Matched index cost / task</div></div>
+      <div><div class="k">Metric &middot; x</div><div class="v">Matched $ / task &middot; total parameters</div></div>
       <div><div class="k">Models plotted</div><div class="v" id="mStat">&mdash;</div></div>
       <div><div class="k">Captured</div><div class="v">__CAPTURED__</div></div>
     </div>
@@ -427,8 +434,8 @@ TEMPLATE = r"""<!DOCTYPE html>
     verbose reasoning model costs more than its per-token price suggests. That is also why the plot is
     smaller than the full catalogue: AA lists <span id="cTotal">&mdash;</span> models, while complete
     score-and-cost pairs cover <span id="cCoding">&mdash;</span> for Coding, <span id="cPlot">&mdash;</span>
-    for Intelligence and <span id="cAgentic">&mdash;</span> for Agentic. Everything else is absent rather
-    than estimated.
+    for Intelligence and <span id="cAgentic">&mdash;</span> for Agentic; <span id="cParams">&mdash;</span>
+    models have both Intelligence Index and total parameters. Everything else is absent rather than estimated.
   </div>
 
   <div class="callout">
@@ -437,15 +444,16 @@ TEMPLATE = r"""<!DOCTYPE html>
     against whatever else you have filtered to. <em>Dump effort levels</em> collapses each model's effort
     settings to a single row at its highest score for each chart, applied before that chart's superseded
     test so every frontier is drawn between models rather than knobs. Because a configuration can peak on
-    one capability but not another, the three charts collapse and judge dominance independently.
+    one capability but not another, all four charts collapse and judge dominance independently.
   </div>
 
   <nav class="toc">
     <a href="#coding">1 &middot; Coding</a>
     <a href="#intelligence">2 &middot; Intelligence</a>
-    <a href="#agentic">3 &middot; Agentic</a>
-    <a href="#frontier">4 &middot; Efficient frontiers</a>
-    <a href="#table">5 &middot; Full table</a>
+    <a href="#parameters">3 &middot; Parameter efficiency</a>
+    <a href="#agentic">4 &middot; Agentic</a>
+    <a href="#frontier">5 &middot; Efficient frontiers</a>
+    <a href="#table">6 &middot; Full table</a>
   </nav>
 
   <div class="filters" role="group" aria-label="Filters">
@@ -502,8 +510,30 @@ TEMPLATE = r"""<!DOCTYPE html>
     </div>
   </section>
 
+  <section id="parameters">
+    <h2>3 &middot; Parameter efficiency</h2>
+    <p class="sub">AA Intelligence Index against AA's reported total parameter count. The logarithmic
+      x-axis measures model size, not active parameters or inference compute; models missing either value
+      are absent rather than estimated.</p>
+    <div class="card">
+      <div class="cap">Intelligence Index vs total parameters &middot; log parameter axis &middot; up-and-left is better
+        &middot; click any point to pin its name</div>
+      <div class="plotwrap">
+        <svg id="svg-parameters" viewBox="0 0 980 560" role="img"
+             aria-label="Scatter plot of Artificial Analysis Intelligence Index against total parameter count in billions"></svg>
+        <div class="tip" id="tip-parameters" role="status"></div>
+      </div>
+      <div class="legend">
+        <span class="item"><span class="swatch" style="background:var(--series-prop)"></span>Proprietary frontier</span>
+        <span class="item"><span class="swatch" style="background:var(--series-open)"></span>Open-weights frontier</span>
+        <span class="item"><span class="swatch" style="background:var(--muted)"></span>Superseded</span>
+        <span class="item"><span class="line"></span>Parameter-efficiency frontier</span>
+      </div>
+    </div>
+  </section>
+
   <section id="agentic">
-    <h2>3 &middot; Agentic Index</h2>
+    <h2>4 &middot; Agentic Index</h2>
     <p class="sub">GDPval-AA v2 and τ³-Banking, equally weighted. It measures tool use, planning and
       multi-step execution rather than coding specifically.</p>
     <div class="card">
@@ -523,7 +553,7 @@ TEMPLATE = r"""<!DOCTYPE html>
   </section>
 
   <section id="frontier">
-    <h2>4 &middot; The efficient frontiers</h2>
+    <h2>5 &middot; The cost-efficient frontiers</h2>
     <p class="sub">The models nothing else beats on both axes at once for each capability &mdash; no other model is
       simultaneously at least as smart <em>and</em> at least as cheap. Anything missing from this list is
       <b>superseded on that metric</b>. Each layer recomputes against the filters above.</p>
@@ -536,9 +566,9 @@ TEMPLATE = r"""<!DOCTYPE html>
   </section>
 
   <section id="table">
-    <h2>5 &middot; Full table</h2>
-    <p class="sub">The union of the three filtered slices, as numbers &mdash; click any header to sort.
-      This is the accessible twin of all three plots: nothing is reachable only by hovering.</p>
+    <h2>6 &middot; Full table</h2>
+    <p class="sub">The union of the four filtered slices, as numbers &mdash; click any header to sort.
+      This is the accessible twin of all four plots: nothing is reachable only by hovering.</p>
     <div style="margin-bottom:12px">
       <button class="action" id="copyMd">Copy as Markdown</button>
       <button class="action" id="copyJson">Copy as JSON</button>
@@ -552,6 +582,7 @@ TEMPLATE = r"""<!DOCTYPE html>
         <th data-k="codingCost" style="text-align:right">Coding $ / task <span class="ar" aria-hidden="true">&#8597;</span></th>
         <th data-k="ii" style="text-align:right">Intelligence Index <span class="ar" aria-hidden="true">&#8597;</span></th>
         <th data-k="cost" style="text-align:right">Intelligence $ / task <span class="ar" aria-hidden="true">&#8597;</span></th>
+        <th data-k="params" style="text-align:right">Parameters <span class="ar" aria-hidden="true">&#8597;</span></th>
         <th data-k="agenticScore" style="text-align:right">Agentic Index <span class="ar" aria-hidden="true">&#8597;</span></th>
         <th data-k="agenticCost" style="text-align:right">Agentic $ / task <span class="ar" aria-hidden="true">&#8597;</span></th>
         <th data-k="pin" style="text-align:right">$ / 1M in <span class="ar" aria-hidden="true">&#8597;</span></th>
@@ -579,6 +610,9 @@ const DATA = __DATA__;
   const R = DATA.rows, S = DATA.stats;
   const $ = id => document.getElementById(id);
   const fmtCost = v => v >= 1 ? "$" + v.toFixed(2) : "$" + v.toFixed(3);
+  const fmtParams = v => v == null ? "—" : v >= 1000 ? (v/1000).toFixed(v%1000?1:0)+"T"
+                                              : v >= 1 ? v.toFixed(v<10?1:0)+"B"
+                                              : Math.round(v*1000)+"M";
   const fmtCtx  = v => v == null ? "—" : v >= 1e6 ? (v/1e6).toFixed(v%1e6?1:0)+"M"
                                             : v >= 1e3 ? Math.round(v/1e3)+"K" : String(v);
   const show = v => (v == null || v === "") ? "—" : String(v);
@@ -588,6 +622,7 @@ const DATA = __DATA__;
   $("cPlot").textContent  = S.plotted;
   $("cCoding").textContent = S.metricCounts.coding;
   $("cAgentic").textContent = S.metricCounts.agentic;
+  $("cParams").textContent = S.parameterCount;
   $("evals").textContent  = S.evals.join(", ");
 
   const labs = [...new Set(R.map(r => r.creator))].sort((a,b)=>a.localeCompare(b));
@@ -645,7 +680,14 @@ const DATA = __DATA__;
     intelligence:{label:"Intelligence Index",svg:"svg-intelligence",tip:"tip-intelligence"},
     agentic:{label:"Agentic Index",svg:"svg-agentic",tip:"tip-agentic"},
   };
-  const metricOf=(r,key)=>r.metrics[key];
+  const PLOTS={
+    coding:METRICS.coding,
+    parameters:{label:"Parameter efficiency",svg:"svg-parameters",tip:"tip-parameters"},
+    agentic:METRICS.agentic,
+  };
+  const metricOf=(r,key)=>key==="parameters"
+    ? (r.params!=null && r.ii!=null ? {score:r.ii,cost:r.params} : null)
+    : r.metrics[key];
 
   function collapseMetric(rows,key){
     const by=new Map();
@@ -670,7 +712,9 @@ const DATA = __DATA__;
   }
 
   function metricSlice(key){
-    let rows=baseSlice(key);
+    let rows=key==="parameters"
+      ? filteredBase().filter(r=>metricOf(r,key))
+      : baseSlice(key);
     if(st.eff) rows=collapseMetric(rows,key);
     return st.sup ? frontierMetric(rows,key) : rows;
   }
@@ -977,10 +1021,10 @@ const DATA = __DATA__;
     render();
   });
 
-  /* ---------- coding + agentic scatters ---------- */
+  /* ---------- coding, parameter-efficiency + agentic scatters ---------- */
   const extraPlots={};
   function drawCapability(key,rows){
-    const cfg=METRICS[key], chart=$(cfg.svg), NS="http://www.w3.org/2000/svg";
+    const cfg=PLOTS[key], chart=$(cfg.svg), NS="http://www.w3.org/2000/svg";
     while(chart.firstChild) chart.removeChild(chart.firstChild);
     const el=(n,a)=>{const e=document.createElementNS(NS,n);
       for(const k in a) e.setAttribute(k,a[k]); return e;};
@@ -1009,19 +1053,24 @@ const DATA = __DATA__;
     }
     const ylabel=el("text",{x:14,y:t+py/2,"text-anchor":"middle",
       transform:"rotate(-90 14 "+(t+py/2)+")"});
-    ylabel.textContent=cfg.label+" →"; chart.appendChild(ylabel);
+    ylabel.textContent=(key==="parameters"?"Intelligence Index":cfg.label)+" →";
+    chart.appendChild(ylabel);
     for(let e=Math.floor(x0);e<=Math.ceil(x1);e++) for(const mult of [1,2,5]){
       const c=mult*Math.pow(10,e), lx=Math.log10(c);
       if(lx<x0||lx>x1) continue;
       chart.appendChild(el("line",{x1:X(c),y1:t,x2:X(c),y2:t+py,
         stroke:"var(--grid)","stroke-width":1}));
       const tick=el("text",{x:X(c),y:t+py+17,"text-anchor":"middle"});
-      tick.textContent=c>=1?"$"+c:"$"+c.toFixed(c<.01?3:2); chart.appendChild(tick);
+      tick.textContent=key==="parameters"?fmtParams(c)
+        :(c>=1?"$"+c:"$"+c.toFixed(c<.01?3:2));
+      chart.appendChild(tick);
     }
     chart.appendChild(el("line",{x1:l,y1:t+py,x2:l+px,y2:t+py,
       stroke:"var(--axis)","stroke-width":1}));
     const xlabel=el("text",{x:l+px/2,y:h-13,"text-anchor":"middle"});
-    xlabel.textContent="Cost per "+cfg.label+" task (USD, log scale) →";
+    xlabel.textContent=key==="parameters"
+      ? "Total parameters (billions, log scale) →"
+      : "Cost per "+cfg.label+" task (USD, log scale) →";
     chart.appendChild(xlabel);
 
     const frontier=frontierMetric(rows,key), front=new Set(frontier);
@@ -1036,7 +1085,8 @@ const DATA = __DATA__;
     const pts=[];
     for(const r of rows){
       const m=metricOf(r,key), x=X(m.cost), y=Y(m.score), on=front.has(r);
-      const mark=el("circle",{cx:x,cy:y,r:on?6:5,fill:colourOf(r),
+      const fill=key==="parameters"&&!on?"var(--muted)":colourOf(r);
+      const mark=el("circle",{cx:x,cy:y,r:on?6:5,fill:fill,
         stroke:"var(--surface-1)","stroke-width":2,
         class:"pt"+(pins.has(r.name)?" pinned":""),role:"button",tabindex:0,
         "aria-label":"Pin "+r.name+" on the "+cfg.label+" chart",
@@ -1088,7 +1138,7 @@ const DATA = __DATA__;
   }
 
   function nearestCapability(key,ev){
-    const plot=extraPlots[key], chart=$(METRICS[key].svg);
+    const plot=extraPlots[key], chart=$(PLOTS[key].svg);
     if(!plot||!plot.pts.length) return null;
     const box=chart.getBoundingClientRect(), sx=plot.w/box.width, sy=plot.h/box.height;
     const mx=(ev.clientX-box.left)*sx, my=(ev.clientY-box.top)*sy;
@@ -1101,20 +1151,24 @@ const DATA = __DATA__;
   }
 
   function hideCapabilityTip(key){
-    $(METRICS[key].tip).classList.remove("on");
+    $(PLOTS[key].tip).classList.remove("on");
     const plot=extraPlots[key]; if(plot) for(const p of plot.pts) p.el.classList.remove("fade");
   }
 
   function moveCapabilityTip(key,ev){
-    const hit=nearestCapability(key,ev), cfg=METRICS[key], chart=$(cfg.svg), box=chart.getBoundingClientRect();
+    const hit=nearestCapability(key,ev), cfg=PLOTS[key], chart=$(cfg.svg), box=chart.getBoundingClientRect();
     if(!hit){hideCapabilityTip(key);return;}
     const plot=extraPlots[key], m=metricOf(hit.r,key), popup=$(cfg.tip);
     for(const p of plot.pts) p.el.classList.toggle("fade",p!==hit);
     popup.innerHTML="";
     const name=document.createElement("div"); name.className="tname"; name.textContent=hit.r.name; popup.appendChild(name);
-    const lines=[[cfg.label,m.score.toFixed(1)],["Cost per task",fmtCost(m.cost)],
-      ["Lab",hit.r.creator],["Weights",hit.r.open?(hit.r.lic||"open"):"proprietary"],
-      ["On frontier",plot.front.has(hit.r)?"yes":"no — superseded"]];
+    const lines=key==="parameters"
+      ? [["Intelligence Index",m.score.toFixed(1)],["Parameters",fmtParams(m.cost)],
+         ["Lab",hit.r.creator],["Weights",hit.r.open?(hit.r.lic||"open"):"proprietary"],
+         ["On parameter frontier",plot.front.has(hit.r)?"yes":"no — superseded"]]
+      : [[cfg.label,m.score.toFixed(1)],["Cost per task",fmtCost(m.cost)],
+         ["Lab",hit.r.creator],["Weights",hit.r.open?(hit.r.lic||"open"):"proprietary"],
+         ["On frontier",plot.front.has(hit.r)?"yes":"no — superseded"]];
     if(hit.r.dep) lines.push(["Vendor status","retired"]);
     for(const [k,v] of lines){
       const row=document.createElement("div"); row.className="trow";
@@ -1128,8 +1182,8 @@ const DATA = __DATA__;
     popup.style.top=(down?box.height-popup.offsetHeight-margin:margin)+"px";
   }
 
-  for(const key of ["coding","agentic"]){
-    const chart=$(METRICS[key].svg);
+  for(const key of ["coding","parameters","agentic"]){
+    const chart=$(PLOTS[key].svg);
     chart.addEventListener("pointermove",ev=>moveCapabilityTip(key,ev));
     chart.addEventListener("pointerleave",()=>hideCapabilityTip(key));
     chart.addEventListener("click",ev=>{
@@ -1178,12 +1232,14 @@ const DATA = __DATA__;
       const [metric,field]=fields[key], m=metricOf(r,metric);
       return m?m[field]:null;
     }
+    if(key==="params") return r.params;
     return r[key];
   }
 
   function fillTable(metricRows){
     const frontSets={};
     for(const key of Object.keys(METRICS)) frontSets[key]=new Set(frontierMetric(metricRows[key],key));
+    frontSets.parameters=new Set(frontierMetric(metricRows.parameters,"parameters"));
     const rows=[...new Set(Object.values(metricRows).flat())];
     const k=st.sortK, dir=st.sortDir;
     $("tbl").querySelectorAll("th[data-k]").forEach(th=>
@@ -1220,6 +1276,16 @@ const DATA = __DATA__;
           tag.textContent="frontier"; score.appendChild(tag);
         }
         tr.appendChild(score); tr.appendChild(cost);
+        if(key==="intelligence"){
+          const parameters=document.createElement("td");
+          parameters.className="n"; parameters.textContent=fmtParams(r.params);
+          if(metricOf(r,"parameters")&&frontSets.parameters.has(r)){
+            parameters.appendChild(document.createTextNode(" "));
+            const tag=document.createElement("span"); tag.className="tag f";
+            tag.textContent="parameter frontier"; parameters.appendChild(tag);
+          }
+          tr.appendChild(parameters);
+        }
       }
       add(r.pin==null?"—":"$"+r.pin,"n");
       add(r.pout==null?"—":"$"+r.pout,"n");
@@ -1263,11 +1329,12 @@ const DATA = __DATA__;
   $("copyMd").addEventListener("click",()=>{
     const views=metricViews(), rows=[...new Set(Object.values(views).flat())];
     const val=(r,key,field)=>metricOf(r,key)?(field==="score"?metricOf(r,key).score.toFixed(1):fmtCost(metricOf(r,key).cost)):"—";
-    const head="| Model | Lab | Coding | Coding $/task | Intelligence | Intelligence $/task | Agentic | Agentic $/task | $/1M in | $/1M out | Context | Weights |\n"
-              +"|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|\n";
+    const head="| Model | Lab | Coding | Coding $/task | Intelligence | Intelligence $/task | Parameters | Agentic | Agentic $/task | $/1M in | $/1M out | Context | Weights |\n"
+              +"|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|\n";
     const body=rows.map(r=>"| "+[r.name,r.creator,
       val(r,"coding","score"),val(r,"coding","cost"),
       val(r,"intelligence","score"),val(r,"intelligence","cost"),
+      fmtParams(r.params),
       val(r,"agentic","score"),val(r,"agentic","cost"),
       r.pin==null?"—":"$"+r.pin, r.pout==null?"—":"$"+r.pout,
       fmtCtx(r.ctx), r.open?(r.lic||"open"):"proprietary"].join(" | ")+" |").join("\n");
@@ -1285,6 +1352,7 @@ const DATA = __DATA__;
     return {
       coding:metricSlice("coding"),
       intelligence:metricSlice("intelligence"),
+      parameters:metricSlice("parameters"),
       agentic:metricSlice("agentic"),
     };
   }
@@ -1297,7 +1365,7 @@ const DATA = __DATA__;
     }
     const views=metricViews(), union=[...new Set(Object.values(views).flat())];
     const bits=[views.coding.length+" coding",views.intelligence.length+" intelligence",
-      views.agentic.length+" agentic"];
+      views.parameters.length+" parameter",views.agentic.length+" agentic"];
     if(st.eff) bits.push("effort levels dumped per metric");
     if(st.sup) bits.push("frontiers only");
     // Pins are never cleared by filtering or searching -- they are keyed by
@@ -1312,9 +1380,10 @@ const DATA = __DATA__;
     $("count").textContent=bits.join(" · ");
     drawCapability("coding",views.coding);
     draw(views.intelligence);
+    drawCapability("parameters",views.parameters);
     drawCapability("agentic",views.agentic);
     fillFrontiers(views); fillTable(views); hideTip();
-    hideCapabilityTip("coding"); hideCapabilityTip("agentic");
+    hideCapabilityTip("coding"); hideCapabilityTip("parameters"); hideCapabilityTip("agentic");
     if(focusAfterRender){
       const request=focusAfterRender;
       focusAfterRender=null;
@@ -1334,7 +1403,7 @@ const DATA = __DATA__;
   // re-render on resize so the plot re-fits and labels re-place for the new width
   let rzT=null;
   window.addEventListener("resize",()=>{
-    hideTip(); hideCapabilityTip("coding"); hideCapabilityTip("agentic");
+    hideTip(); hideCapabilityTip("coding"); hideCapabilityTip("parameters"); hideCapabilityTip("agentic");
     clearTimeout(rzT); rzT=setTimeout(render,150);
   });
   render();

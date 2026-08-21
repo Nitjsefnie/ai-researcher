@@ -76,6 +76,46 @@ class BrowserInteractionTests(unittest.TestCase):
         self.assertEqual(header.get_attribute("aria-sort"), "ascending")
         page.close()
 
+    def test_parameter_chart_has_shared_interactions_and_parameter_tooltip(self):
+        page = self.browser.new_page(viewport={"width": 1280, "height": 900})
+        page.goto(build.OUT.as_uri())
+
+        point = page.locator("#svg-parameters circle.pt").first
+        point.hover()
+        model_name = page.locator("#tip-parameters .tname").inner_text()
+        tooltip = page.locator("#tip-parameters").inner_text()
+        self.assertIn("Parameters", tooltip)
+        self.assertIn("Intelligence Index", tooltip)
+
+        accessible_name = f"Pin {model_name} on the Parameter efficiency chart"
+        point.focus()
+        point.press("Enter")
+        pinned = page.get_by_role("button", name=accessible_name)
+        self.assertEqual(pinned.get_attribute("aria-pressed"), "true")
+        self.assertIn(
+            model_name,
+            page.locator("#svg-parameters text.lbl").all_text_contents(),
+        )
+
+        page.locator("#fQ").fill(model_name)
+        self.assertEqual(page.locator("#svg-parameters circle.pt").count(), 1)
+        page.close()
+
+    def test_parameter_frontier_is_exposed_in_accessible_table(self):
+        page = self.browser.new_page(viewport={"width": 1280, "height": 900})
+        page.goto(build.OUT.as_uri())
+
+        frontier_point = page.locator("#svg-parameters circle.pt[r='6']").first
+        frontier_point.hover()
+        model_name = page.locator("#tip-parameters .tname").inner_text()
+        row = page.locator("#tbl tbody tr").filter(has_text=model_name)
+
+        self.assertEqual(
+            row.locator("td").nth(6).locator(".tag.f").inner_text(),
+            "parameter frontier",
+        )
+        page.close()
+
 
 if __name__ == "__main__":
     unittest.main()

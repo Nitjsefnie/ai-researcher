@@ -45,13 +45,16 @@ class ArtifactParser(HTMLParser):
             self._in_th = False
 
 
-def model_fixture(*, coding=62, intelligence=51, agentic=47, evaluations=None):
+def model_fixture(
+    *, coding=62, intelligence=51, agentic=47, evaluations=None, parameters=27
+):
     return {
         "name": "Fixture Model (high)",
         "modelCreatorName": "Fixture Lab",
         "intelligenceIndex": intelligence,
         "codingIndex": coding,
         "agenticIndex": agentic,
+        "totalParameters": parameters,
         "intelligenceIndexCostPerTask": {
             "cost": {"total": 0.75},
             "evaluations": evaluations
@@ -100,9 +103,19 @@ class CapabilityCostTests(unittest.TestCase):
         self.assertIsNone(rows[0]["metrics"]["intelligence"])
         self.assertIsNone(rows[0]["metrics"]["agentic"])
 
+    def test_total_parameter_count_is_carried_for_parameter_efficiency_plot(self):
+        rows = build.build_rows([model_fixture(parameters=1.25)])
+
+        self.assertEqual(rows[0]["params"], 1.25)
+
+    def test_nonpositive_parameter_count_is_treated_as_missing(self):
+        rows = build.build_rows([model_fixture(parameters=0)])
+
+        self.assertIsNone(rows[0]["params"])
+
 
 class GeneratedArtifactTests(unittest.TestCase):
-    def test_contains_three_metric_charts_in_requested_order_and_accessible_columns(self):
+    def test_contains_parameter_chart_in_requested_order_and_accessible_columns(self):
         with contextlib.redirect_stdout(io.StringIO()):
             build.main()
         html = build.OUT.read_text(encoding="utf-8")
@@ -111,7 +124,7 @@ class GeneratedArtifactTests(unittest.TestCase):
 
         self.assertEqual(
             parser.svg_ids,
-            ["svg-coding", "svg-intelligence", "svg-agentic"],
+            ["svg-coding", "svg-intelligence", "svg-parameters", "svg-agentic"],
         )
         self.assertEqual(parser.scroll_tables, ["fTable", "tbl"])
         for header in (
@@ -121,6 +134,7 @@ class GeneratedArtifactTests(unittest.TestCase):
             "Intelligence $ / task",
             "Agentic Index",
             "Agentic $ / task",
+            "Parameters",
         ):
             self.assertIn(header, parser.headers)
 
@@ -131,6 +145,14 @@ class GeneratedArtifactTests(unittest.TestCase):
         self.assertEqual(set(payload["stats"]["metricCounts"]), {"coding", "intelligence", "agentic"})
         self.assertTrue(any(row["metrics"]["coding"] for row in payload["rows"]))
         self.assertTrue(any(row["metrics"]["agentic"] for row in payload["rows"]))
+        self.assertTrue(any(row["params"] for row in payload["rows"]))
+        self.assertEqual(
+            payload["stats"]["parameterCount"],
+            sum(
+                row["params"] is not None and row["metrics"]["intelligence"] is not None
+                for row in payload["rows"]
+            ),
+        )
 
 
 if __name__ == "__main__":
