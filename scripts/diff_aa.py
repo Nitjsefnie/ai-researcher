@@ -19,9 +19,12 @@ what the page says:
                Discarded unless --derived
   cosmetic     lab branding (colour, logo) -- always discarded, counted only
 
-It also recomputes the efficient frontier on both sides with build.py's own
-`undominated`, so "who entered / left the frontier" is answered by the same
-function the page uses rather than a second implementation of the rule.
+It also recomputes both of the page's Pareto layers on either side with
+build.py's own `undominated` -- the cost frontier (intelligence against measured
+$/task) and the parameter-efficiency frontier (intelligence against total
+parameters) -- so "who entered / left the frontier" is answered by the same
+function the page uses rather than a second implementation of the rule. The two
+move independently: a model can join one without touching the other.
 
 Usage:
     python3 scripts/diff_aa.py                    # HEAD's capture vs the working tree
@@ -163,6 +166,26 @@ def frontier_names(models, collapse=False):
     return {r["name"]: r for r in undominated(rows)}, rows
 
 
+def fmt_params(b):
+    return f"{b / 1000:.1f}T".replace(".0T", "T") if b >= 1000 else f"{b:g}B"
+
+
+def param_frontier(models):
+    """The page's section-3 layer: Intelligence Index against total parameters.
+
+    build_rows() carries both numbers but only seats metrics entries for the
+    three cost-based charts, so stand size in for cost and hand the result to
+    the same undominated() the page uses -- never a second spelling of the
+    dominance rule. Only models AA discloses a size for are eligible, which is
+    why this layer is drawn over a much smaller set than the cost frontier.
+    """
+    rows = [r for r in build_rows(models)
+            if r.get("params") and r.get("ii") is not None]
+    for r in rows:
+        r["metrics"]["parameters"] = {"score": r["ii"], "cost": r["params"]}
+    return {r["name"]: r for r in undominated(rows, "parameters")}, rows
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -275,6 +298,24 @@ def main():
             print(f"  - {n}  II {r['ii']:.1f}  ${r['cost']:.2f}/task")
         if not entered and not left:
             print("  (unchanged)")
+
+    # Section 3 of the page draws its own Pareto layer over a different axis, so
+    # a model can enter it without touching the cost frontier at all -- Qwen3.8
+    # 27B did exactly that on the 2026-08-21 capture and went unreported.
+    fo, rows_o = param_frontier(old)
+    fn, rows_n = param_frontier(new)
+    entered = [n for n in fn if n not in fo]
+    left = [n for n in fo if n not in fn]
+    print(f"\n== parameter-efficiency frontier: {len(fo)} -> {len(fn)} "
+          f"of {len(rows_o)} -> {len(rows_n)} with a disclosed size")
+    for n in sorted(entered, key=lambda n: -fn[n]["ii"]):
+        r = fn[n]
+        print(f"  + {n}  II {r['ii']:.1f}  {fmt_params(r['params'])}")
+    for n in sorted(left, key=lambda n: -fo[n]["ii"]):
+        r = fo[n]
+        print(f"  - {n}  II {r['ii']:.1f}  {fmt_params(r['params'])}")
+    if not entered and not left:
+        print("  (unchanged)")
 
     if not args.all:
         print(f"\ndiscarded: {suppressed['jitter-unused']} re-sampled speed/latency "
