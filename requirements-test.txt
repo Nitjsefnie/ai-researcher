@@ -13,6 +13,6 @@
 #   playwright — tests/test_browser.py drives the built page in a real
 #   headless Chromium. The browser binary itself is not a pip package;
 #   CI installs it with `python3 -m playwright install --with-deps chromium`.
-coverage==7.13.2
+coverage==7.15.4
 playwright==1.62.0
 pytest==9.0.3
