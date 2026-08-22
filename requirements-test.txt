@@ -14,5 +14,5 @@
 #   headless Chromium. The browser binary itself is not a pip package;
 #   CI installs it with `python3 -m playwright install --with-deps chromium`.
 coverage==7.13.2
-playwright==1.61.0
+playwright==1.62.0
 pytest==9.0.3
