@@ -33,6 +33,8 @@ Usage:
     python3 scripts/diff_aa.py --all              # show every class, no filtering
 """
 import argparse
+import contextlib
+import io
 import json
 import re
 import subprocess
@@ -105,14 +107,28 @@ def load(spec):
     return json.loads(Path(spec).read_text(encoding="utf-8"))
 
 
+# The RSC flight format writes JavaScript `undefined` as this string. AA
+# started emitting it on 2026-08-22 for fields it had previously just omitted:
+# one capture went from zero occurrences to 12,918, and every one of them
+# diffed as a change from absent to a value. It is the ENCODING of absence, so
+# treating it as a value makes a re-encoding look like 615 models moving.
+UNDEFINED = "$undefined"
+
+
 def flatten(value, prefix=""):
-    """Dotted leaf paths. Lists stay whole -- their order is AA's, not ours."""
+    """Dotted leaf paths. Lists stay whole -- their order is AA's, not ours.
+
+    A leaf whose value is the undefined sentinel is dropped rather than
+    recorded, which makes it identical to the key being absent -- because that
+    is what it means. An absent -> sentinel transition then produces no hit at
+    all, while sentinel -> real value still reads as an appearance.
+    """
     if isinstance(value, dict):
         flat = {}
         for k, v in value.items():
             flat.update(flatten(v, f"{prefix}.{k}" if prefix else k))
         return flat
-    return {prefix: value}
+    return {} if value == UNDEFINED else {prefix: value}
 
 
 def classify(path):
@@ -199,6 +215,64 @@ def chart_frontier(models, metric):
     return {r["name"]: r for r in undominated(rows, metric)}, rows
 
 
+SPEED_SECTION = "== rendered speed re-sampled"
+
+
+def as_commit_message(report: str) -> str:
+    """Render a full diff report as a commit message: significant moves only.
+
+    WHAT IS DROPPED AND WHY. The re-sampled-speed section is jitter by
+    definition — AA measures throughput on every crawl, so it lists hundreds of
+    models on a day when nothing happened, and it sits BEFORE the frontier
+    sections in the report, so a message truncated from the front keeps the
+    noise and loses the frontier. It goes. The `discarded:` footer stays: one
+    line saying how much was suppressed is how you notice the filter drifting.
+
+    What survives is what a reader wants from a capture: which models appeared
+    or vanished, which fields genuinely moved, and how the four frontiers
+    responded — in full, however long that is, because on the day it IS long
+    that is the news.
+
+    The subject names what moved rather than the model total, which reads the
+    same on a busy day and a dead one.
+
+    Everything is derived by reading the report back rather than by re-running
+    the analysis, so the message can never disagree with the report it
+    summarises.
+    """
+    lines = report.splitlines()
+
+    models = added = removed = 0
+    frontier = ""
+    for line in lines:
+        if line.startswith("new: ") and "(" in line:
+            models = int(line.rsplit("(", 1)[1].split()[0])
+        elif line.startswith("== models added: "):
+            added = int(line.split(": ")[1])
+        elif line.startswith("== models removed: "):
+            removed = int(line.split(": ")[1])
+        elif line.startswith("== efficient frontier (expanded): ") and not frontier:
+            frontier = line.split(": ", 1)[1].split(" of ")[0].strip()
+
+    moved = []
+    if added or removed:
+        moved.append(f"+{added}/-{removed} models")
+    if frontier and frontier.split(" -> ")[0] != frontier.split(" -> ")[-1]:
+        moved.append(f"frontier {frontier}")
+    subject = (f"Refresh capture: {models} models"
+               + (", " + ", ".join(moved) if moved else ", no material change"))
+
+    body: list[str] = []
+    dropping = False
+    for line in lines:
+        if line.startswith("== "):
+            dropping = line.startswith(SPEED_SECTION)
+        if not dropping:
+            body.append(line)
+
+    return subject + "\n\n" + "\n".join(body).strip() + "\n"
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -218,7 +292,23 @@ def main():
                     help="also show breakdowns beneath a reported headline")
     ap.add_argument("--all", action="store_true",
                     help="no filtering at all -- every changed field, every class")
+    ap.add_argument("--commit-msg", action="store_true",
+                    help="render the report as a commit message: a subject line "
+                         "naming what moved, and a body with the field-change "
+                         "listing replaced by a count so the frontier sections "
+                         "survive")
     args = ap.parse_args()
+
+    if args.commit_msg:
+        buffer = io.StringIO()
+        with contextlib.redirect_stdout(buffer):
+            print_report(args)
+        print(as_commit_message(buffer.getvalue()), end="")
+        return
+    print_report(args)
+
+
+def print_report(args):
 
     old, new = load(args.old), load(args.new)
     old_by_id = {m["id"]: m for m in old}

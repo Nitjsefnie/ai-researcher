@@ -80,12 +80,19 @@ jobs:
 
       - name: Summarise what changed
         if: steps.capture.outputs.changed == 'true'
-        # diff_aa.py defaults to comparing git:HEAD against the working file,
-        # which is exactly the committed-vs-just-fetched question. It separates
-        # real movement from re-sampled speed jitter, so the summary says which
-        # kind of change this was.
+        # Both paths compare the committed capture against the one just
+        # fetched. The paths are passed EXPLICITLY AND RELATIVELY: the defaults
+        # are absolute, and an absolute runner path (/home/runner/work/...)
+        # baked into a commit message is permanent noise.
+        #
+        # The run log gets the full report; the commit gets the significant
+        # part of it. --commit-msg drops the re-sampled-speed section, which is
+        # jitter by definition and hundreds of lines on a quiet day, and keeps
+        # the frontier sections, which are what the diff is for.
         run: |
-          python3 scripts/diff_aa.py > diff.txt
+          python3 scripts/diff_aa.py git:HEAD data/aa-raw-models.json > diff.txt
+          python3 scripts/diff_aa.py git:HEAD data/aa-raw-models.json \
+            --commit-msg > commit-msg.txt
           {
             echo '### What moved'
             echo
@@ -108,18 +115,14 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
         run: |
-          models=$(python3 -c 'import json;print(len(json.load(open("data/aa-raw-models.json"))))')
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add data/aa-raw-models.json data/captured-at.txt out/frontier-models.html
-          {
-            echo "Refresh capture: $models models (automated)"
-            echo
-            echo "Captured by .github/workflows/refresh.yml. Full diff in the run"
-            echo "summary; the first 4000 bytes of it follow."
-            echo
-            head -c 4000 diff.txt
-          } > commit-msg.txt
+          # The message is diff_aa.py's own rendering, subject line included —
+          # not truncated here. A long one means a lot genuinely moved, and
+          # that is the day you want the detail.
+          printf '\n%s\n' 'Captured by .github/workflows/refresh.yml.' \
+            >> commit-msg.txt
           git commit -F commit-msg.txt
           # No co-author trailer: no model authored this commit. A refresh that
           # a person or an agent drives by hand still carries one.
