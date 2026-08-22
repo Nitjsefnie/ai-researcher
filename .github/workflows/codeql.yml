@@ -5,11 +5,14 @@ name: codeql
 # other gate). Findings land in the Security tab rather than turning the build
 # red, so a new query shipping upstream cannot block an unrelated push.
 #
-# NOTE FOR A PRIVATE REPOSITORY: code scanning is free on public repositories
-# but needs GitHub Code Security (Advanced Security) on private ones. If the
-# analyze step fails with "Advanced Security must be enabled", that is a
-# billing decision, not a bug in this file — either enable it in repository
-# settings or delete this workflow. Do not leave it failing.
+# THE JOB IS GATED ON VISIBILITY. Code scanning is free on public repositories
+# and needs GitHub Code Security on private ones — while this repo was private
+# the upload failed with "Code scanning is not enabled for this repository"
+# (run 32600213123). A gate that is red on every push for a reason no commit
+# can fix is one people learn to ignore, so the job skips itself instead of
+# failing. It runs today because the repository is public; a private fork gets
+# a skip rather than a red X, and enabling Code Security there is what turns
+# it back on.
 #
 # The weekly cron is not redundant with push: CodeQL's query packs are updated
 # continuously, and a new query only ever runs against code that has changed
@@ -39,6 +42,8 @@ jobs:
   analyze:
     name: analyze (${{ matrix.language }})
     runs-on: ubuntu-latest
+    # See the header: private repositories cannot upload the results.
+    if: ${{ github.repository_visibility == 'public' }}
 
     permissions:
       # Writing the analysis results is the whole point; everything else stays

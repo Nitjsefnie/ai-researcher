@@ -21,6 +21,8 @@
 !/.pylintrc
 !/AGENTS.md
 !/CLAUDE.md
+!/CONTRIBUTING.md
+!/LICENSE
 !/README.md
 !/build.py
 !/pyrightconfig.json
