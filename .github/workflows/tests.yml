@@ -71,8 +71,7 @@ jobs:
         id: pytest
         # Under coverage, and with the repo root as cwd — see the header.
         run: |
-          python3 -m coverage run --source=. --omit='tests/*,scripts/*' \
-            -m pytest -q -ra
+          python3 -m coverage run --source=. --omit='tests/*' -m pytest -q -ra
 
       - name: Coverage summary
         # Renders whether or not the gate below passes — a coverage regression
@@ -98,11 +97,20 @@ jobs:
 
       - name: Coverage gate
         if: ${{ !cancelled() && steps.pytest.conclusion != 'skipped' }}
-        # A RATCHET, not a target. 95 sits under the 97.1% measured when this
-        # landed, so ordinary churn stays green and a real regression goes
-        # red. Raise the floor by hand as coverage climbs — never lower it to
-        # make a red build green. Note what is counted: build.py is 1400 lines
+        # A RATCHET, not a target. 88 sits under the 91.2% measured when
+        # scripts/ joined the gate, so ordinary churn stays green and a real
+        # regression goes red. Raise the floor by hand as coverage climbs —
+        # never lower it to make a red build green.
+        #
+        # SCRIPTS ARE COUNTED, and that is a deliberate reversal. They were
+        # omitted while they were operator tooling a human ran and eyeballed.
+        # That stopped being true when diff_aa.py started writing the commit
+        # messages refresh.yml produces and publish_docs.py started talking to
+        # the hub with a credential: nobody is watching either at 01:11 UTC.
+        # Omitting them was measuring the half that a person checks anyway.
+        #
+        # Note what the number can and cannot speak to: build.py is 1400 lines
         # but only ~100 statements, because most of it is HTML/JS/SVG string
-        # literals that no line-coverage number can speak to. The browser
-        # tests are what actually exercise those.
-        run: python3 -m coverage report --fail-under=95 --precision=1
+        # literals no line-coverage number reaches. The browser tests are what
+        # actually exercise those.
+        run: python3 -m coverage report --fail-under=88 --precision=1
