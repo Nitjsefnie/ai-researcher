@@ -15,4 +15,4 @@
 #   CI installs it with `python3 -m playwright install --with-deps chromium`.
 coverage==7.13.2
 playwright==1.62.0
-pytest==9.0.3
+pytest==9.1.1
