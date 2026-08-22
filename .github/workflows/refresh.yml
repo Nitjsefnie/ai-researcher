@@ -1,0 +1,138 @@
+name: refresh
+
+# The automated capture: fetch AA's leaderboard every six hours, and when the
+# numbers actually moved, commit the new capture and publish the rebuilt page
+# to docs-hub.
+#
+# WHAT COUNTS AS "MOVED" IS data/aa-raw-models.json, NOT data/. The stamp file
+# beside it records today's date on every fetch, so gating on the directory
+# would commit and publish a date-only change every calendar day whether or not
+# AA measured anything new. Gating on the capture itself means the stamp moves
+# when the data moves, and a quiet day is silent.
+#
+# THE SUITE RUNS BEFORE THE COMMIT, NOT AFTER. A capture can break the page —
+# a new field shape, a model with a null AA never emitted before — and the
+# whole point of a scheduled publish is that nobody is watching it happen. A
+# red build here leaves the last good capture committed and the last good page
+# live, which is the correct failure.
+#
+# fetch_aa.py exits nonzero when the flight payload or the model schema changes
+# shape. That is the designed signal to go re-read the leaderboard by hand; a
+# red run here means read it, not retry it.
+
+on:
+  schedule:
+    # 6-hourly, off the hour: the top of the hour is when every cron on GitHub
+    # fires at once and jobs queue.
+    - cron: '11 1,7,13,19 * * *'
+  workflow_dispatch:
+
+permissions:
+  # This job commits the capture it takes. Everything else stays read-only.
+  contents: write
+
+concurrency:
+  # Never cancel in progress: a cancelled run can land between the commit and
+  # the publish, leaving the repo and the hub disagreeing.
+  group: refresh
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # The push at the end uses an explicit remote URL instead, so the
+          # token never sits in .git/config for later steps to reuse.
+          persist-credentials: false
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: requirements-*.txt
+
+      - name: Install the test toolchain
+        run: |
+          python3 -m pip install --upgrade pip
+          python3 -m pip install -r requirements-test.txt
+
+      - name: Install Chromium for playwright
+        run: python3 -m playwright install --with-deps chromium
+
+      - name: Capture the leaderboard
+        run: python3 scripts/fetch_aa.py
+
+      - name: Did anything move?
+        id: capture
+        run: |
+          if git diff --quiet -- data/aa-raw-models.json; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            # Drop the date-only stamp change so the tree is clean.
+            git checkout -- data/captured-at.txt
+            echo 'AA capture unchanged — nothing committed, nothing published.' \
+              >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Summarise what changed
+        if: steps.capture.outputs.changed == 'true'
+        # diff_aa.py defaults to comparing git:HEAD against the working file,
+        # which is exactly the committed-vs-just-fetched question. It separates
+        # real movement from re-sampled speed jitter, so the summary says which
+        # kind of change this was.
+        run: |
+          python3 scripts/diff_aa.py > diff.txt
+          {
+            echo '### What moved'
+            echo
+            echo '```'
+            cat diff.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Rebuild the page
+        if: steps.capture.outputs.changed == 'true'
+        run: python3 build.py
+
+      - name: Run the suite against the new capture
+        if: steps.capture.outputs.changed == 'true'
+        run: python3 -m pytest -q -ra
+
+      - name: Commit the capture
+        if: steps.capture.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          models=$(python3 -c 'import json;print(len(json.load(open("data/aa-raw-models.json"))))')
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add data/aa-raw-models.json data/captured-at.txt out/frontier-models.html
+          {
+            echo "Refresh capture: $models models (automated)"
+            echo
+            echo "Captured by .github/workflows/refresh.yml. Full diff in the run"
+            echo "summary; the first 4000 bytes of it follow."
+            echo
+            head -c 4000 diff.txt
+          } > commit-msg.txt
+          git commit -F commit-msg.txt
+          # No co-author trailer: no model authored this commit. A refresh that
+          # a person or an agent drives by hand still carries one.
+          git push "https://x-access-token:${GH_TOKEN}@github.com/${REPO}" HEAD:main
+
+      - name: Publish to docs-hub
+        if: steps.capture.outputs.changed == 'true'
+        env:
+          DOCS_HUB_API_KEY: ${{ secrets.DOCS_HUB_API_KEY }}
+        run: |
+          python3 scripts/publish_docs.py out/frontier-models.html \
+            --slug ai-researcher/frontier-models \
+            --title "Frontier models — intelligence vs cost per task" \
+            --from ai-researcher \
+            --tags benchmarks,comparison,interactive,ai \
+            --project ai-researcher

@@ -63,6 +63,12 @@ python3 ~/.agent-bundle/scripts/docs_hub.py publish ./out/frontier-models.html \
   --project ai-researcher
 ```
 
+In CI the publish step is `scripts/publish_docs.py` instead of the canonical
+CLI: `docs_hub.py` lives in a private bundle repo and imports a module from
+beside it, so a runner cannot reach it. That script implements the one endpoint
+(`POST /api/publish`) and nothing else — on a workstation, keep using the
+canonical CLI.
+
 `fetch_aa.py` exits nonzero if the flight payload or the model schema changes
 shape — treat that as the signal to re-read the page, not to hand-fix JSON.
 Never hand-edit `data/aa-raw-models.json`; it is a captured artifact.
@@ -129,10 +135,27 @@ unclamped and allowed to hang outside the plot rather than be squeezed inside.
 
 ## Update cadence
 
+- **Automated, every six hours** — `.github/workflows/refresh.yml` captures the
+  leaderboard, and when `data/aa-raw-models.json` actually changed it rebuilds,
+  runs the suite, commits the capture with `diff_aa.py`'s summary in the message
+  body, and publishes to docs-hub. A capture that returns identical data is
+  silent: no commit, no version, no notification. The stamp file therefore moves
+  when the DATA moves, not every calendar day.
 - **On-demand refresh** when asked ("update the table", "did GPT-6 land yet").
+  Run the same three commands by hand; the workflow is not the only route.
 - **Drift check** at session start: re-run `fetch_aa.py`, diff the model count
   and the frontier against the published version, surface the diff before
   publishing.
+
+The scheduled commits are authored by `github-actions[bot]` and carry **no**
+model co-author trailer, because no model wrote them. A refresh a person or an
+agent drives by hand still carries one.
+
+Two failure modes are deliberate. `fetch_aa.py` exiting nonzero on a schema
+change turns the scheduled run red rather than committing a mangled capture —
+that is the signal to go re-read the leaderboard by hand. And the suite runs
+BEFORE the commit, so a capture that breaks the page leaves the last good
+capture committed and the last good page live.
 
 ## Commit / co-author trailer
 
@@ -147,7 +170,10 @@ Use whichever model drives the session. One primary-author trailer per commit.
 ## What this repo is NOT
 
 - Not a benchmark harness — we collect AA's numbers, we don't rerun evals.
-- Not a live-scraping dashboard — refreshes are deliberate and diffed.
+- Not a live-scraping dashboard. The page never fetches anything when a browser
+  opens it; it is a static artifact built from a captured file. Capture is
+  scheduled (every six hours) but each one is still diffed, tested and gated —
+  scheduled is not the same as live.
 - Not a model directory — if AA hasn't measured cost per task for it, it isn't
   on the chart.
 - Not multi-source. See above; this is the whole point.
