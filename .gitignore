@@ -16,11 +16,17 @@
 
 *
 
-# ---- repository root — the builder and the instruction files --------------
+# ---- repository root — the builder, the instruction files, the toolchain --
 !/.gitignore
+!/.pylintrc
 !/AGENTS.md
 !/CLAUDE.md
+!/README.md
 !/build.py
+!/pyrightconfig.json
+!/requirements-dev.txt
+!/requirements-test.txt
+!/setup.cfg
 
 # ---- data/ — the captured AA artifact; never hand-edited -------------------
 !/data/

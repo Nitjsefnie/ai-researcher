@@ -104,12 +104,13 @@ def capability_cost_per_task(m, metric):
         e.get("slug"): num(e.get("weightedCostPerTask"))
         for e in evaluations if isinstance(e, dict)
     }
-    if any(measured.get(slug) is None for slug, _, _ in components):
-        return None
-    return sum(
-        measured[slug] / intelligence_weight * capability_weight
-        for slug, intelligence_weight, capability_weight in components
-    )
+    total = 0.0
+    for slug, intelligence_weight, capability_weight in components:
+        value = measured.get(slug)
+        if value is None:
+            return None
+        total += value / intelligence_weight * capability_weight
+    return total
 
 
 def metric_record(m, metric):

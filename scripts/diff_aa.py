@@ -42,7 +42,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-from build import build_rows, undominated  # noqa: E402
+from build import build_rows, undominated  # noqa: E402  # pylint: disable=wrong-import-position
 
 RAW = ROOT / "data" / "aa-raw-models.json"
 
@@ -97,7 +97,7 @@ def load(spec):
         rev = spec[4:]
         out = subprocess.run(
             ["git", "-C", str(ROOT), "show", f"{rev}:data/aa-raw-models.json"],
-            capture_output=True, text=True,
+            capture_output=True, text=True, check=False,
         )
         if out.returncode != 0:
             sys.exit(f"cannot read {spec}: {out.stderr.strip()}")
@@ -165,6 +165,10 @@ def frontier_names(models, collapse=False):
     return {r["name"]: r for r in undominated(rows)}, rows
 
 
+def fmt_params(b):
+    return f"{b / 1000:.1f}T".replace(".0T", "T") if b >= 1000 else f"{b:g}B"
+
+
 # The page draws four scatters (sections 1-4), each with its own Pareto layer,
 # and they move independently -- a model can join one while sitting dominated on
 # the others. Diffing only the headline left three of the four unreviewed.
@@ -172,12 +176,8 @@ def frontier_names(models, collapse=False):
 CHART_FRONTIERS = (
     ("coding", "coding", lambda v: f"${v:.2f}/task"),
     ("agentic", "agentic", lambda v: f"${v:.2f}/task"),
-    ("parameter-efficiency", "parameters", lambda v: fmt_params(v)),
+    ("parameter-efficiency", "parameters", fmt_params),
 )
-
-
-def fmt_params(b):
-    return f"{b / 1000:.1f}T".replace(".0T", "T") if b >= 1000 else f"{b:g}B"
 
 
 def chart_frontier(models, metric):
@@ -207,10 +207,10 @@ def main():
     ap.add_argument("new", nargs="?", default=str(RAW),
                     help=f"new capture (default {RAW.relative_to(ROOT)})")
     ap.add_argument("--speed-tol", type=float, default=0.25, metavar="X",
-                    help="report a rendered speed field (%s) only when it moved by "
+                    help=f"report a rendered speed field "
+                         f"({', '.join(sorted(SPEED_SHOWN))}) only when it moved by "
                          "more than X relative (default 0.25 = 25%%; 0 shows all). "
-                         "Speed fields the page never renders are dropped regardless."
-                         % ", ".join(sorted(SPEED_SHOWN)))
+                         "Speed fields the page never renders are dropped regardless.")
     ap.add_argument("--tol", type=float, default=0.0, metavar="X",
                     help="same threshold for significant numeric fields (default 0 = "
                          "report any change)")
@@ -221,14 +221,14 @@ def main():
     args = ap.parse_args()
 
     old, new = load(args.old), load(args.new)
-    O = {m["id"]: m for m in old}
-    N = {m["id"]: m for m in new}
+    old_by_id = {m["id"]: m for m in old}
+    new_by_id = {m["id"]: m for m in new}
 
     print(f"old: {args.old}  ({len(old)} models)")
     print(f"new: {args.new}  ({len(new)} models)")
 
-    added = [N[i] for i in N if i not in O]
-    removed = [O[i] for i in O if i not in N]
+    added = [new_by_id[i] for i in new_by_id if i not in old_by_id]
+    removed = [old_by_id[i] for i in old_by_id if i not in new_by_id]
 
     def line(m):
         rows = {r["name"]: r for r in build_rows([m])}
@@ -252,10 +252,10 @@ def main():
     changed_models = 0
     speed_moves = []
     print("\n== field changes")
-    for i in sorted(N, key=lambda i: -(N[i].get("intelligenceIndex") or 0)):
-        if i not in O:
+    for i in sorted(new_by_id, key=lambda i: -(new_by_id[i].get("intelligenceIndex") or 0)):
+        if i not in old_by_id:
             continue
-        fa, fb = flatten(O[i]), flatten(N[i])
+        fa, fb = flatten(old_by_id[i]), flatten(new_by_id[i])
         hits = []
         for path in sorted(set(fa) | set(fb)):
             a, b = fa.get(path), fb.get(path)
@@ -275,13 +275,13 @@ def main():
                 # A surviving speed re-sample is still a different KIND of news
                 # from a price or score move -- report it apart, not interleaved.
                 if cls == "jitter":
-                    speed_moves.append((N[i], path, a, b))
+                    speed_moves.append((new_by_id[i], path, a, b))
                     continue
             hits.append((path, cls, a, b))
         if not hits:
             continue
         changed_models += 1
-        print(f"\n  {N[i].get('name')}  [{N[i].get('modelCreatorName')}]")
+        print(f"\n  {new_by_id[i].get('name')}  [{new_by_id[i].get('modelCreatorName')}]")
         for path, cls, a, b in hits:
             tag = "" if cls == "significant" else f" <{cls}>"
             print(f"    {path}{tag}: {fmt(a)} -> {fmt(b)}{delta_note(a, b)}")
@@ -303,10 +303,10 @@ def main():
         left = [n for n in fo if n not in fn]
         print(f"\n== efficient frontier ({label}): {len(fo)} -> {len(fn)} "
               f"of {len(rows_o)} -> {len(rows_n)} plotted")
-        for n in sorted(entered, key=lambda n: -fn[n]["ii"]):
+        for n in sorted(entered, key=lambda n, d=fn: -d[n]["ii"]):
             r = fn[n]
             print(f"  + {n}  II {r['ii']:.1f}  ${r['cost']:.2f}/task")
-        for n in sorted(left, key=lambda n: -fo[n]["ii"]):
+        for n in sorted(left, key=lambda n, d=fo: -d[n]["ii"]):
             r = fo[n]
             print(f"  - {n}  II {r['ii']:.1f}  ${r['cost']:.2f}/task")
         if not entered and not left:
@@ -320,7 +320,9 @@ def main():
         print(f"\n== {label} frontier: {len(fo)} -> {len(fn)} "
               f"of {len(rows_o)} -> {len(rows_n)} plotted")
         for sign, names, side in (("+", entered, fn), ("-", left, fo)):
-            for n in sorted(names, key=lambda n: -side[n]["metrics"][metric]["score"]):
+            for n in sorted(names,
+                            key=lambda n, d=side, k=metric:
+                            -d[n]["metrics"][k]["score"]):
                 m = side[n]["metrics"][metric]
                 print(f"  {sign} {n}  {m['score']:.1f}  {fmt_x(m['cost'])}")
         if not entered and not left:

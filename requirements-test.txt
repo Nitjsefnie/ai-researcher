@@ -1,0 +1,18 @@
+# Test-only toolchain, pinned for the same reason as requirements-dev.txt.
+#
+#   pytest — the runner. NOT interchangeable with `unittest discover` here:
+#   tests/ has no __init__.py and the tests do `import build` from the repo
+#   root, so discovery must come from a runner invoked as `python3 -m pytest`
+#   at the root, where `-m` puts the cwd on sys.path. The bare `pytest`
+#   binary fails for exactly that reason — see .github/workflows/tests.yml.
+#
+#   coverage — measures the suite; the workflow calls `coverage report` and
+#   `--fail-under` as separate steps so the summary still renders when the
+#   gate is red.
+#
+#   playwright — tests/test_browser.py drives the built page in a real
+#   headless Chromium. The browser binary itself is not a pip package;
+#   CI installs it with `python3 -m playwright install --with-deps chromium`.
+coverage==7.13.2
+playwright==1.61.0
+pytest==9.0.3

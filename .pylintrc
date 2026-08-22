@@ -1,0 +1,29 @@
+[MASTER]
+
+[MESSAGES CONTROL]
+disable=
+    line-too-long,
+    missing-function-docstring,
+    missing-module-docstring,
+    missing-class-docstring,
+    unused-argument,
+    invalid-name,
+    import-error,
+    no-name-in-module,
+    broad-exception-caught,
+    too-few-public-methods
+
+[DESIGN]
+# Raised, not disabled: the shape below is what a page generator and a capture
+# differ actually look like — build.py is one long HTML/SVG emitter and
+# diff_aa.main() walks every field class in sequence. A limit set below the
+# real code teaches people to add a disable comment, which is worse than a
+# limit that flags only genuine sprawl.
+max-args=10
+max-positional-arguments=10
+max-attributes=30
+max-locals=40
+max-branches=30
+max-statements=90
+max-module-lines=2000
+min-similarity-lines=15

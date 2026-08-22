@@ -22,7 +22,7 @@ class ArtifactParser(HTMLParser):
         if tag == "svg":
             self.svg_ids.append(attrs.get("id"))
         elif tag == "div":
-            self._scroll_divs.append("scroll" in attrs.get("class", "").split())
+            self._scroll_divs.append("scroll" in (attrs.get("class") or "").split())
         elif tag == "table" and any(self._scroll_divs):
             self.scroll_tables.append(attrs.get("id"))
         elif tag == "th":
@@ -46,7 +46,12 @@ class ArtifactParser(HTMLParser):
 
 
 def model_fixture(
-    *, coding=62, intelligence=51, agentic=47, evaluations=None, parameters=27
+    *,
+    coding: float | None = 62,
+    intelligence: float | None = 51,
+    agentic: float | None = 47,
+    evaluations: list | None = None,
+    parameters: float | None = 27,
 ):
     return {
         "name": "Fixture Model (high)",
@@ -69,13 +74,25 @@ def model_fixture(
     }
 
 
+def measured_cost(model, metric) -> float:
+    """`capability_cost_per_task` returns None when a component is unmeasured.
+
+    Asserting that first turns "the model dropped off this chart" into a clear
+    failure instead of a comparison against None, and narrows the type so the
+    assertion below type-checks.
+    """
+    cost = build.capability_cost_per_task(model, metric)
+    assert cost is not None, f"no measured {metric} cost for the fixture"
+    return cost
+
+
 class CapabilityCostTests(unittest.TestCase):
     def test_reweights_measured_component_costs_for_each_capability(self):
         model = model_fixture()
 
-        self.assertAlmostEqual(build.capability_cost_per_task(model, "coding"), 2.5)
-        self.assertAlmostEqual(build.capability_cost_per_task(model, "agentic"), 3.5)
-        self.assertAlmostEqual(build.capability_cost_per_task(model, "intelligence"), 0.75)
+        self.assertAlmostEqual(measured_cost(model, "coding"), 2.5)
+        self.assertAlmostEqual(measured_cost(model, "agentic"), 3.5)
+        self.assertAlmostEqual(measured_cost(model, "intelligence"), 0.75)
 
     def test_missing_component_cost_excludes_only_that_metric(self):
         model = model_fixture(

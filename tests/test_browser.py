@@ -1,10 +1,19 @@
 import contextlib
 import io
+import os
+import pathlib
 import unittest
 
 from playwright.sync_api import sync_playwright
 
 import build
+
+# This box has a system Chromium and no playwright-managed browser; CI has the
+# reverse (`playwright install chromium`). Prefer whatever is actually present
+# rather than hard-coding one of them — passing executable_path=None makes
+# playwright use its own download. CHROMIUM_PATH overrides both.
+CHROMIUM = os.environ.get("CHROMIUM_PATH") or "/usr/bin/chromium"
+CHROMIUM_EXECUTABLE = CHROMIUM if pathlib.Path(CHROMIUM).exists() else None
 
 
 class BrowserInteractionTests(unittest.TestCase):
@@ -14,7 +23,7 @@ class BrowserInteractionTests(unittest.TestCase):
             build.main()
         cls.playwright = sync_playwright().start()
         cls.browser = cls.playwright.chromium.launch(
-            executable_path="/usr/bin/chromium",
+            executable_path=CHROMIUM_EXECUTABLE,
             headless=True,
             args=["--no-sandbox"],
         )

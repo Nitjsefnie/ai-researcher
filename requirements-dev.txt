@@ -1,0 +1,11 @@
+# Lint / type-check toolchain. Versions pinned so a tool release cannot turn
+# CI red on an unchanged commit — this repo's own code changes rarely, and a
+# gate that goes red for reasons unrelated to the commit is one people learn
+# to ignore.
+#
+# The runtime is pure stdlib: build.py, scripts/fetch_aa.py and
+# scripts/diff_aa.py import nothing off PyPI. So these pins plus
+# requirements-test.txt ARE the entire third-party surface of this repo.
+pycodestyle==2.14.0
+pylint==4.0.6
+pyright==1.1.411
