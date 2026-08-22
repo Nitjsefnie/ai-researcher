@@ -1,0 +1,95 @@
+name: actionlint
+
+# The gate on the gates. Everything else in .github/workflows is unreviewed
+# code that runs with a repository token, and a mistake in it fails in ways
+# the other gates structurally cannot catch: a workflow with a typo in an
+# `if:` expression does not go red, it silently stops running.
+#
+# Two tools, because they answer different questions:
+#
+#   actionlint — is this workflow WELL-FORMED? Schema, expression syntax,
+#   context availability, `runs-on` labels, and shellcheck over every `run:`
+#   block, which is where most real bugs live.
+#
+#   zizmor — is this workflow SAFE? Script injection through `${{ }}` in a
+#   `run:` block, over-broad `permissions:`, credential persistence after
+#   checkout, unpinned action references.
+#
+# Both tools are pinned. actionlint is verified by checksum rather than
+# trusted from the release page, because a linter that runs before every other
+# gate is a supply-chain position worth defending.
+#
+# Suppressions belong at the offending line as a `# zizmor: ignore[rule]`
+# comment WITH a justification, never as a raised --min-severity here: a
+# threshold silences the next finding too, and the next one is the one nobody
+# has thought about yet.
+
+on:
+  push:
+    paths:
+      - '.github/workflows/**'
+      - '.github/dependabot.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: actionlint-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  actionlint:
+    runs-on: ubuntu-latest
+
+    env:
+      ACTIONLINT_VERSION: 1.7.12
+      # sha256 of actionlint_1.7.12_linux_amd64.tar.gz, from the release's own
+      # checksums file. Bump both together.
+      ACTIONLINT_SHA256: 8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: requirements-*.txt
+
+      - name: Install actionlint
+        # Downloaded and checksum-verified rather than piped from the install
+        # script: `curl | bash` would make this job trust whatever that URL
+        # serves at run time. Explicit timeouts so a hung connection fails the
+        # step in two minutes instead of holding a runner for six hours.
+        run: |
+          tarball="actionlint_${ACTIONLINT_VERSION}_linux_amd64.tar.gz"
+          curl -fsSL --retry 3 --connect-timeout 10 --max-time 120 -o "$tarball" \
+            "https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}/${tarball}"
+          echo "${ACTIONLINT_SHA256}  ${tarball}" | sha256sum -c -
+          tar -xzf "$tarball" actionlint
+          ./actionlint --version
+
+      - name: Install zizmor
+        id: install_zizmor
+        run: |
+          python3 -m pip install --upgrade pip
+          python3 -m pip install zizmor==1.29.0
+
+      - name: actionlint
+        id: actionlint
+        run: ./actionlint -color .github/workflows/*.yml
+
+      - name: zizmor
+        # Runs even when actionlint is red, so one push reports both gates.
+        # Not when the install itself failed, which would report a tool bug as
+        # a clean audit.
+        if: ${{ !cancelled() && steps.install_zizmor.outcome == 'success' }}
+        env:
+          # Enables the online audits (resolving action refs, checking for
+          # known-vulnerable action versions). Read-only, and this workflow
+          # declares contents: read.
+          GH_TOKEN: ${{ github.token }}
+        run: zizmor --no-progress .github/workflows/

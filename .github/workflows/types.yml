@@ -1,0 +1,47 @@
+name: types
+
+# Type gate: pyright at `basic` — strict on an existing codebase produces
+# noise that gets ignored, which is worse than no check. Config is checked in
+# (pyrightconfig.json) so CI and every editor use the same settings.
+
+on:
+  push:
+    paths-ignore:
+      - '**/*.md'
+      - 'LICENSE'
+      - '.gitignore'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: types-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  pyright:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: requirements-*.txt
+
+      - name: Install pyright
+        run: |
+          python3 -m pip install --upgrade pip
+          # requirements-test.txt too, or pyright cannot resolve playwright in
+          # tests/test_browser.py and reports it as an error. The runtime is
+          # stdlib, so these two files ARE the whole set of third-party names
+          # pyright needs to know about.
+          python3 -m pip install -r requirements-dev.txt -r requirements-test.txt
+
+      - name: pyright
+        run: python3 -m pyright

@@ -1,0 +1,42 @@
+# Every dependency in this repo is pinned to an exact version, deliberately: a
+# tool release must never turn CI red on an unchanged commit. The cost of that
+# choice is that pins go stale silently, and a stale pin is how a fixed CVE
+# stays exploitable. Dependabot pays that cost back — it is the counterpart to
+# audit.yml, which detects the problem but cannot fix it.
+
+version: 2
+updates:
+  # requirements-dev.txt (lint/type toolchain) and requirements-test.txt
+  # (pytest, coverage, playwright). There is no runtime entry: build.py and
+  # the scripts import nothing off PyPI, so these tool pins are the entire pip
+  # surface.
+  - package-ecosystem: pip
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: wednesday
+      time: "04:30"
+      timezone: Etc/UTC
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "deps"
+    labels:
+      - dependencies
+
+  # The workflows pin every action to a commit SHA with the version in a
+  # trailing comment. A SHA pin does not move at all — which is the point,
+  # since these jobs run with a repository token — and it is also why this
+  # entry is not optional: without Dependabot a SHA pin is frozen forever. It
+  # rewrites both the SHA and the comment.
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: wednesday
+      time: "04:30"
+      timezone: Etc/UTC
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "ci"
+    labels:
+      - dependencies

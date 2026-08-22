@@ -1,0 +1,108 @@
+name: tests
+
+# The suite that guards the published page: 10 unittest TestCases, half of
+# them driving the built HTML in a real headless Chromium through playwright.
+#
+# THE RUNNER IS `python3 -m pytest`, NOT `pytest`, AND NOT `unittest
+# discover`. tests/ has no __init__.py and the tests `import build` from the
+# repo root, so the root has to be on sys.path. Only the `-m` form puts the
+# cwd there — the bare `pytest` binary collects the same files and every test
+# errors on the import. `unittest discover -t .` refuses outright ("start
+# directory is not importable"). pytest is the runner here purely because it
+# tolerates that layout; nothing in the suite is written against pytest.
+
+on:
+  push:
+    # Deny-list rather than an allow-list: a new top-level code directory
+    # would silently stop being tested under an allow-list, whereas an
+    # unlisted path here just runs CI needlessly.
+    paths-ignore:
+      - '**/*.md'
+      - 'LICENSE'
+      - '.gitignore'
+  workflow_dispatch:
+
+# Least privilege: this job only reads the tree. Without an explicit block it
+# inherits the repository default, which can be read/write for the whole token.
+permissions:
+  contents: read
+
+concurrency:
+  # A push that supersedes an in-flight run for the same ref cancels it —
+  # nothing is learned from CI for a commit that is already history.
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  pytest:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # Nothing in this workflow pushes. Leaving the job token in
+          # .git/config lets any later step — or anything a dependency pulls
+          # in — reuse it.
+          persist-credentials: false
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.13"
+          cache: pip
+          # There is no requirements.txt here (the runtime is pure stdlib), so
+          # the cache must be keyed off the pins that do exist or setup-python
+          # fails the job looking for one.
+          cache-dependency-path: requirements-*.txt
+
+      - name: Install the test toolchain
+        id: install
+        run: |
+          python3 -m pip install --upgrade pip
+          python3 -m pip install -r requirements-test.txt
+
+      - name: Install Chromium for playwright
+        # The browser binary is not a pip package. --with-deps pulls the
+        # shared libraries headless Chromium needs on a bare runner; without
+        # it the launch fails with a missing-library error that reads like a
+        # test failure.
+        run: python3 -m playwright install --with-deps chromium
+
+      - name: Run tests
+        id: pytest
+        # Under coverage, and with the repo root as cwd — see the header.
+        run: |
+          python3 -m coverage run --source=. --omit='tests/*,scripts/*' \
+            -m pytest -q -ra
+
+      - name: Coverage summary
+        # Renders whether or not the gate below passes — a coverage regression
+        # is only actionable if you can see WHICH file lost lines, and
+        # re-reading a scrolled CI log to find that is exactly the friction
+        # that gets a gate disabled.
+        if: ${{ !cancelled() && steps.pytest.conclusion != 'skipped' }}
+        run: |
+          {
+            echo '### Coverage'
+            echo
+            python3 -m coverage report --format=markdown --precision=1
+          } >> "$GITHUB_STEP_SUMMARY"
+          python3 -m coverage xml -o coverage.xml
+
+      - name: Upload coverage.xml
+        if: ${{ !cancelled() && steps.pytest.conclusion != 'skipped' }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: coverage-xml
+          path: coverage.xml
+          if-no-files-found: error
+
+      - name: Coverage gate
+        if: ${{ !cancelled() && steps.pytest.conclusion != 'skipped' }}
+        # A RATCHET, not a target. 95 sits under the 97.1% measured when this
+        # landed, so ordinary churn stays green and a real regression goes
+        # red. Raise the floor by hand as coverage climbs — never lower it to
+        # make a red build green. Note what is counted: build.py is 1400 lines
+        # but only ~100 statements, because most of it is HTML/JS/SVG string
+        # literals that no line-coverage number can speak to. The browser
+        # tests are what actually exercise those.
+        run: python3 -m coverage report --fail-under=95 --precision=1

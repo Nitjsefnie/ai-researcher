@@ -1,0 +1,105 @@
+name: audit
+
+# Dependency vulnerability gate: pip-audit resolves each requirements file to
+# its full transitive tree and checks every resolved version against the PyPI
+# advisory database and OSV.
+#
+# There is no requirements.txt here: the runtime is pure stdlib, with zero
+# third-party imports. So this gate covers the toolchain — the lint, type,
+# coverage and playwright pins — which is a smaller surface than the sibling
+# repos have but not an empty one: those tools run in CI with the repository
+# token, and a compromised one is a supply-chain problem even though it never
+# ships. Resolution is still the point rather than reading the pinned lines: a
+# linter drags in a dependency tree of its own, and that is where an advisory
+# lands.
+#
+# WHY THE CRON IS THE IMPORTANT TRIGGER. Every other gate here answers "did
+# this commit break something", so push is the natural trigger. This one
+# answers "is a version we froze months ago still safe", and that answer
+# changes when a stranger publishes an advisory, with no commit here to hang
+# it on. This repo goes weeks between pushes — a push-only audit would report
+# clean the whole time.
+#
+# This gate FAILS the build rather than filing an advisory, the same stance as
+# lint and types: a red gate a human must look at beats a notification that
+# accumulates unread. When a fix genuinely is not available yet, add the
+# advisory to --ignore-vuln WITH a comment saying why and what would clear it
+# — never silence the whole gate.
+
+on:
+  push:
+    paths-ignore:
+      - '**/*.md'
+      - 'LICENSE'
+      - '.gitignore'
+  schedule:
+    - cron: '12 4 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: audit-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  pip-audit:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: requirements-*.txt
+
+      - name: Install pip-audit
+        run: |
+          python3 -m pip install --upgrade pip
+          python3 -m pip install pip-audit==2.10.1
+
+      - name: Audit dependencies
+        # Both requirements files in one invocation so a package constrained
+        # by two of them is resolved once, consistently — the same way an
+        # install would see it.
+        #
+        # No --ignore-vuln entries at present.
+        #
+        # THE RETRY IS NARROW ON PURPOSE. pip-audit resolves against PyPI and
+        # the advisory database over the network, and a reset connection
+        # produces the same exit status as a real finding. A blanket retry
+        # would re-run a genuine vulnerability three times before reporting
+        # it, and a gate that goes red for reasons unrelated to its subject is
+        # one people learn to ignore. So this retries ONLY when the output
+        # carries a transport error, and reports anything else verbatim.
+        run: |
+          for attempt in 1 2 3; do
+            if pip-audit \
+                 --progress-spinner off \
+                 --requirement requirements-dev.txt \
+                 --requirement requirements-test.txt \
+                 > audit.out 2>&1; then
+              cat audit.out
+              exit 0
+            fi
+
+            if grep -qiE 'connection (aborted|reset|error)|read timed out|temporary failure in name resolution' audit.out; then
+              echo "attempt $attempt: transport failure talking to PyPI, retrying"
+              tail -n 5 audit.out
+              sleep $(( attempt * 15 ))
+              continue
+            fi
+
+            echo "pip-audit reported findings:" >&2
+            cat audit.out >&2
+            exit 1
+          done
+
+          echo "pip-audit could not reach PyPI after 3 attempts:" >&2
+          cat audit.out >&2
+          exit 1

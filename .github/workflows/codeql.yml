@@ -1,0 +1,82 @@
+name: codeql
+
+# Static security analysis (advanced setup, not the repo-settings "default
+# setup" — the config lives here so it is reviewable in a diff like every
+# other gate). Findings land in the Security tab rather than turning the build
+# red, so a new query shipping upstream cannot block an unrelated push.
+#
+# NOTE FOR A PRIVATE REPOSITORY: code scanning is free on public repositories
+# but needs GitHub Code Security (Advanced Security) on private ones. If the
+# analyze step fails with "Advanced Security must be enabled", that is a
+# billing decision, not a bug in this file — either enable it in repository
+# settings or delete this workflow. Do not leave it failing.
+#
+# The weekly cron is not redundant with push: CodeQL's query packs are updated
+# continuously, and a new query only ever runs against code that has changed
+# since it shipped. Without the cron, a rule published today would never be
+# applied to a file last touched last year — which, in a repo that goes weeks
+# between pushes, is most of it.
+
+on:
+  push:
+    # Same deny-list as tests.yml — an allow-list would silently stop scanning
+    # a new top-level code directory.
+    paths-ignore:
+      - '**/*.md'
+      - 'LICENSE'
+      - '.gitignore'
+  schedule:
+    # Wednesday 03:47 UTC. Off the hour and off Monday deliberately: the top
+    # of the hour is when every cron on GitHub fires at once and jobs queue.
+    - cron: '47 3 * * 3'
+  workflow_dispatch:
+
+concurrency:
+  group: codeql-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  analyze:
+    name: analyze (${{ matrix.language }})
+    runs-on: ubuntu-latest
+
+    permissions:
+      # Writing the analysis results is the whole point; everything else stays
+      # read-only.
+      security-events: write
+      actions: read
+      contents: read
+
+    strategy:
+      # Only one language here — this repo has no JS of its own. (build.py
+      # EMITS JavaScript into the page as string literals, which CodeQL cannot
+      # see and which no gate in this repo checks; the browser tests are what
+      # exercise it.) The matrix stays a matrix so adding a language later is
+      # a one-line change rather than a restructure.
+      fail-fast: false
+      matrix:
+        include:
+          - language: python
+            build-mode: none
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # No `ref:` here: CodeQL must analyse exactly the commit it will
+          # file alerts against, which is the event's own SHA.
+          persist-credentials: false
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@ff2f1c621b7f889edc0d3c761ac2e6a3f8cdb0dd # v4.37.7
+        with:
+          languages: ${{ matrix.language }}
+          build-mode: ${{ matrix.build-mode }}
+          # `security-extended` over the default `security` pack: fetch_aa.py
+          # pulls an untrusted payload off the network and parses it, which is
+          # what the extra precision-medium queries are good at.
+          queries: security-extended
+
+      - name: Analyze
+        uses: github/codeql-action/analyze@ff2f1c621b7f889edc0d3c761ac2e6a3f8cdb0dd # v4.37.7
+        with:
+          category: /language:${{ matrix.language }}
