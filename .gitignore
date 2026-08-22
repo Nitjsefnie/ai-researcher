@@ -1,3 +1,44 @@
-# scripts/diff_aa.py imports build.py, so running it byte-compiles the module.
-__pycache__/
-*.py[cod]
+# Deny-by-default. `*` ignores everything; each rule below names back exactly
+# what ai-researcher ships. An unlisted file is invisible to git and can never
+# be committed by accident — which is the point, because this working tree also
+# holds pytest/benchmark caches, byte-compiled modules (scripts/diff_aa.py
+# imports build.py, so running it writes __pycache__/) and scratch captures.
+#
+# The mechanic, because the pattern fails silently without it: git does not
+# look inside a directory it has already ignored. So every kept directory is
+# re-opened (`!dir/`), its contents denied again (`dir/*`), and its files are
+# named back by a glob SCOPED to that directory. That scoping is what stops a
+# `!*.py` from reaching into `__pycache__/`.
+#
+# Adding a file whose type is not already named back for its directory means
+# adding a rule here. `git status` will NOT tell you the file is missing; it
+# simply never appears. `git check-ignore -v <path>` names the rule hiding it.
+
+*
+
+# ---- repository root — the builder and the instruction files --------------
+!/.gitignore
+!/AGENTS.md
+!/CLAUDE.md
+!/build.py
+
+# ---- data/ — the captured AA artifact; never hand-edited -------------------
+!/data/
+/data/*
+!/data/aa-raw-models.json
+!/data/captured-at.txt
+
+# ---- out/ — the published page --------------------------------------------
+!/out/
+/out/*
+!/out/frontier-models.html
+
+# ---- scripts/ — fetch and diff tooling -------------------------------------
+!/scripts/
+/scripts/*
+!/scripts/*.py
+
+# ---- tests/ ----------------------------------------------------------------
+!/tests/
+/tests/*
+!/tests/*.py
