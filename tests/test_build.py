@@ -177,23 +177,24 @@ class GeneratedArtifactTests(unittest.TestCase):
 
     def test_remote_strings_are_inert_in_the_inline_json_script(self):
         lower = "</script><script>document.documentElement.dataset.auditLower=1</script> __CAPTURED__"
-        mixed = "</ScRiPt><ScRiPt>document.documentElement.dataset.auditMixed=1</sCrIpT> __CAPTURED__"
-        upper = "</SCRIPT><SCRIPT>document.documentElement.dataset.auditUpper=1</SCRIPT> __CAPTURED__"
+        mixed = "</ScRiPt><ScRiPt>document.documentElement.dataset.auditMixed=1</sCrIpT> __DATA__ / __DATA__"
+        upper = "</SCRIPT><SCRIPT>document.documentElement.dataset.auditUpper=1</SCRIPT> __CAPTURED____DATA__"
         ordinary = "".join([
             "ordinary <tag> & 'quotes' \"slashes",
             "\\",
             "\" \n",
             "\u2028",
             "\u2029",
-            " __CAPTURED__",
+            " __DATA____CAPTURED__",
         ])
+        exact = "__DATA__"
         model = model_fixture()
         model.update({
             "name": lower,
             "modelCreatorName": mixed,
             "modelCreatorCountry": upper,
             "licenseName": ordinary,
-            "releaseDate": ordinary,
+            "releaseDate": exact,
         })
 
         with tempfile.TemporaryDirectory(prefix=".issue-6-build-", dir=build.ROOT) as tmp:
@@ -216,13 +217,16 @@ class GeneratedArtifactTests(unittest.TestCase):
         embedded = html[start:end]
         self.assertNotRegex(embedded, r"(?i)</script")
 
-        payload = json.loads(embedded)
+        try:
+            payload = json.loads(embedded)
+        except json.JSONDecodeError as exc:
+            self.fail(f"embedded JSON is invalid: {exc}")
         row = payload["rows"][0]
         self.assertEqual(row["name"], lower)
         self.assertEqual(row["creator"], mixed)
         self.assertEqual(row["country"], upper)
         self.assertEqual(row["lic"], ordinary)
-        self.assertEqual(row["rel"], ordinary)
+        self.assertEqual(row["rel"], exact)
 
 
 if __name__ == "__main__":
