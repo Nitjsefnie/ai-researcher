@@ -248,7 +248,7 @@ def main():
     )
 
     OUT.parent.mkdir(parents=True, exist_ok=True)
-    OUT.write_text(TEMPLATE.replace("__DATA__", payload).replace("__CAPTURED__", captured),
+    OUT.write_text(TEMPLATE.replace("__CAPTURED__", captured).replace("__DATA__", payload),
                    encoding="utf-8")
     dep = sum(1 for r in intelligence_rows if r["dep"])
     print(f"wrote {OUT.relative_to(ROOT)}")

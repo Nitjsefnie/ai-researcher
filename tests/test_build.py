@@ -176,15 +176,16 @@ class GeneratedArtifactTests(unittest.TestCase):
         )
 
     def test_remote_strings_are_inert_in_the_inline_json_script(self):
-        lower = "</script><script>document.documentElement.dataset.auditLower=1</script>"
-        mixed = "</ScRiPt><ScRiPt>document.documentElement.dataset.auditMixed=1</sCrIpT>"
-        upper = "</SCRIPT><SCRIPT>document.documentElement.dataset.auditUpper=1</SCRIPT>"
+        lower = "</script><script>document.documentElement.dataset.auditLower=1</script> __CAPTURED__"
+        mixed = "</ScRiPt><ScRiPt>document.documentElement.dataset.auditMixed=1</sCrIpT> __CAPTURED__"
+        upper = "</SCRIPT><SCRIPT>document.documentElement.dataset.auditUpper=1</SCRIPT> __CAPTURED__"
         ordinary = "".join([
             "ordinary <tag> & 'quotes' \"slashes",
             "\\",
             "\" \n",
             "\u2028",
             "\u2029",
+            " __CAPTURED__",
         ])
         model = model_fixture()
         model.update({
