@@ -1,7 +1,9 @@
 import contextlib
 import io
+import json
 import os
 import pathlib
+import tempfile
 import unittest
 
 from playwright.sync_api import sync_playwright
@@ -124,6 +126,60 @@ class BrowserInteractionTests(unittest.TestCase):
             "parameter frontier",
         )
         page.close()
+
+    def test_script_terminators_in_remote_strings_cannot_execute(self):
+        lower = "</script><script>document.documentElement.dataset.auditLower=1</script>"
+        mixed = "</ScRiPt><ScRiPt>document.documentElement.dataset.auditMixed=1</sCrIpT>"
+        upper = "</SCRIPT><SCRIPT>document.documentElement.dataset.auditUpper=1</SCRIPT>"
+        ordinary = "".join([
+            "ordinary <tag> & 'quotes' \"slashes",
+            "\\",
+            "\" \n",
+            "\u2028",
+            "\u2029",
+        ])
+        model = {
+            "name": lower,
+            "modelCreatorName": mixed,
+            "modelCreatorCountry": upper,
+            "licenseName": ordinary,
+            "releaseDate": ordinary,
+            "isOpenWeights": True,
+            "intelligenceIndex": 51,
+            "codingIndex": 62,
+            "agenticIndex": 47,
+            "totalParameters": 27,
+            "intelligenceIndexCostPerTask": {
+                "cost": {"total": 0.75},
+                "evaluations": [
+                    {"slug": "terminalbench-v2-1", "weightedCostPerTask": 0.32},
+                    {"slug": "scicode", "weightedCostPerTask": 0.24},
+                    {"slug": "gdpval-aa", "weightedCostPerTask": 0.80},
+                    {"slug": "tau3-banking", "weightedCostPerTask": 0.42},
+                ],
+            },
+        }
+
+        with tempfile.TemporaryDirectory(prefix=".issue-6-browser-", dir=build.ROOT) as tmp:
+            root = pathlib.Path(tmp)
+            raw = root / "models.json"
+            output = root / "frontier-models.html"
+            raw.write_text(json.dumps([model]), encoding="utf-8")
+            old_raw, old_out = build.RAW, build.OUT
+            try:
+                build.RAW, build.OUT = raw, output
+                with contextlib.redirect_stdout(io.StringIO()):
+                    build.main()
+                page = self.browser.new_page(viewport={"width": 1280, "height": 900})
+                page.goto(output.as_uri())
+                self.assertIsNone(page.evaluate("document.documentElement.dataset.auditLower"))
+                self.assertIsNone(page.evaluate("document.documentElement.dataset.auditMixed"))
+                self.assertIsNone(page.evaluate("document.documentElement.dataset.auditUpper"))
+                self.assertIn(lower, page.locator("body").inner_text())
+                self.assertIn("ordinary <tag>", page.locator("body").inner_text())
+                page.close()
+            finally:
+                build.RAW, build.OUT = old_raw, old_out
 
 
 if __name__ == "__main__":

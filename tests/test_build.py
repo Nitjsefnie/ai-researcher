@@ -1,6 +1,8 @@
 import contextlib
 import io
 import json
+import pathlib
+import tempfile
 import unittest
 from html.parser import HTMLParser
 import build
@@ -172,6 +174,54 @@ class GeneratedArtifactTests(unittest.TestCase):
                 for row in payload["rows"]
             ),
         )
+
+    def test_remote_strings_are_inert_in_the_inline_json_script(self):
+        lower = "</script><script>document.documentElement.dataset.auditLower=1</script>"
+        mixed = "</ScRiPt><ScRiPt>document.documentElement.dataset.auditMixed=1</sCrIpT>"
+        upper = "</SCRIPT><SCRIPT>document.documentElement.dataset.auditUpper=1</SCRIPT>"
+        ordinary = "".join([
+            "ordinary <tag> & 'quotes' \"slashes",
+            "\\",
+            "\" \n",
+            "\u2028",
+            "\u2029",
+        ])
+        model = model_fixture()
+        model.update({
+            "name": lower,
+            "modelCreatorName": mixed,
+            "modelCreatorCountry": upper,
+            "licenseName": ordinary,
+            "releaseDate": ordinary,
+        })
+
+        with tempfile.TemporaryDirectory(prefix=".issue-6-build-", dir=build.ROOT) as tmp:
+            root = pathlib.Path(tmp)
+            raw = root / "models.json"
+            output = root / "frontier-models.html"
+            raw.write_text(json.dumps([model]), encoding="utf-8")
+            old_raw, old_out = build.RAW, build.OUT
+            try:
+                build.RAW, build.OUT = raw, output
+                with contextlib.redirect_stdout(io.StringIO()):
+                    build.main()
+                html = output.read_text(encoding="utf-8")
+            finally:
+                build.RAW, build.OUT = old_raw, old_out
+
+        marker = "const DATA = "
+        start = html.index(marker) + len(marker)
+        end = html.index(";\n(function(){", start)
+        embedded = html[start:end]
+        self.assertNotRegex(embedded, r"(?i)</script")
+
+        payload = json.loads(embedded)
+        row = payload["rows"][0]
+        self.assertEqual(row["name"], lower)
+        self.assertEqual(row["creator"], mixed)
+        self.assertEqual(row["country"], upper)
+        self.assertEqual(row["lic"], ordinary)
+        self.assertEqual(row["rel"], ordinary)
 
 
 if __name__ == "__main__":

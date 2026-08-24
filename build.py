@@ -243,7 +243,9 @@ def main():
             if r["params"] is not None and r["metrics"]["intelligence"] is not None
         ),
     }
-    payload = json.dumps({"rows": rows, "stats": stats}, separators=(",", ":"))
+    payload = json.dumps({"rows": rows, "stats": stats}, separators=(",", ":")).replace(
+        "<", "\\u003c"
+    )
 
     OUT.parent.mkdir(parents=True, exist_ok=True)
     OUT.write_text(TEMPLATE.replace("__DATA__", payload).replace("__CAPTURED__", captured),
