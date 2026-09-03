@@ -1,6 +1,6 @@
 name: refresh
 
-# The automated capture: fetch AA's leaderboard every six hours, and when the
+# The automated capture: fetch AA's leaderboard every hour, and when the
 # numbers actually moved, commit the new capture and publish the rebuilt page
 # to docs-hub.
 #
@@ -22,9 +22,9 @@ name: refresh
 
 on:
   schedule:
-    # 6-hourly, off the hour: the top of the hour is when every cron on GitHub
+    # Hourly, off the hour: the top of the hour is when every cron on GitHub
     # fires at once and jobs queue.
-    - cron: '11 1,7,13,19 * * *'
+    - cron: '11 * * * *'
   workflow_dispatch:
 
 permissions:

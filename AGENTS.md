@@ -135,7 +135,7 @@ unclamped and allowed to hang outside the plot rather than be squeezed inside.
 
 ## Update cadence
 
-- **Automated, every six hours** — `.github/workflows/refresh.yml` captures the
+- **Automated, every hour** — `.github/workflows/refresh.yml` captures the
   leaderboard, and when `data/aa-raw-models.json` actually changed it rebuilds,
   runs the suite, commits the capture with `diff_aa.py`'s summary in the message
   body, and publishes to docs-hub. A capture that returns identical data is
@@ -172,7 +172,7 @@ Use whichever model drives the session. One primary-author trailer per commit.
 - Not a benchmark harness — we collect AA's numbers, we don't rerun evals.
 - Not a live-scraping dashboard. The page never fetches anything when a browser
   opens it; it is a static artifact built from a captured file. Capture is
-  scheduled (every six hours) but each one is still diffed, tested and gated —
+  scheduled (hourly) but each one is still diffed, tested and gated —
   scheduled is not the same as live.
 - Not a model directory — if AA hasn't measured cost per task for it, it isn't
   on the chart.
