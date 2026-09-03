@@ -2,7 +2,7 @@
 
 Tracks frontier AI models and publishes one comparison artifact: **intelligence
 against cost per task**, live at
-[`docs.nitjsefni.eu/#/d/ai-researcher/frontier-models`](https://docs.nitjsefni.eu/#/d/ai-researcher/frontier-models).
+[`docs.nitjsefni.eu/d/ai-researcher/frontier-models`](https://docs.nitjsefni.eu/d/ai-researcher/frontier-models).
 
 Every number comes from [artificialanalysis.ai](https://artificialanalysis.ai/)
 and nowhere else. A model AA has not measured is absent from the page, not
