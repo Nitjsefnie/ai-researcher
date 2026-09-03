@@ -85,10 +85,10 @@ jobs:
         # are absolute, and an absolute runner path (/home/runner/work/...)
         # baked into a commit message is permanent noise.
         #
-        # The run log gets the full report; the commit gets the significant
-        # part of it. --commit-msg drops the re-sampled-speed section, which is
-        # jitter by definition and hundreds of lines on a quiet day, and keeps
-        # the frontier sections, which are what the diff is for.
+        # The run log gets the full report; the commit gets the same report
+        # under a subject line naming what moved. The speed section is already
+        # threshold-filtered and unchanged frontier sections are omitted at
+        # the source, so the commit carries everything that is news.
         run: |
           python3 scripts/diff_aa.py git:HEAD data/aa-raw-models.json > diff.txt
           python3 scripts/diff_aa.py git:HEAD data/aa-raw-models.json \

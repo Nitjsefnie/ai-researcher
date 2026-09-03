@@ -215,34 +215,23 @@ def chart_frontier(models, metric):
     return {r["name"]: r for r in undominated(rows, metric)}, rows
 
 
-SPEED_SECTION = "== rendered speed re-sampled"
-
-
 def as_commit_message(report: str) -> str:
-    """Render a full diff report as a commit message: significant moves only.
-
-    WHAT IS DROPPED AND WHY. The re-sampled-speed section is jitter by
-    definition — AA measures throughput on every crawl, so it lists hundreds of
-    models on a day when nothing happened, and it sits BEFORE the frontier
-    sections in the report, so a message truncated from the front keeps the
-    noise and loses the frontier. It goes. The `discarded:` footer stays: one
-    line saying how much was suppressed is how you notice the filter drifting.
-
-    What survives is what a reader wants from a capture: which models appeared
-    or vanished, which fields genuinely moved, and how the four frontiers
-    responded — in full, however long that is, because on the day it IS long
-    that is the news.
-
-    The subject names what moved rather than the model total, which reads the
-    same on a busy day and a dead one.
+    """Render a full diff report as a commit message.
 
     Everything is derived by reading the report back rather than by re-running
     the analysis, so the message can never disagree with the report it
-    summarises.
+    summarises. The body is the report itself: the speed section it contains
+    is already filtered to moves past --speed-tol, and unchanged frontier
+    sections never reach it (print_report omits them), so whatever survived
+    the report's own filters is news the commit carries in full.
+
+    The subject names what moved — models, the already-thresholded rendered-
+    speed section, the frontier — rather than just the model total, which
+    reads the same on a busy day and a dead one.
     """
     lines = report.splitlines()
 
-    models = added = removed = 0
+    models = added = removed = speed = 0
     frontier = ""
     for line in lines:
         if line.startswith("new: ") and "(" in line:
@@ -251,26 +240,22 @@ def as_commit_message(report: str) -> str:
             added = int(line.split(": ")[1])
         elif line.startswith("== models removed: "):
             removed = int(line.split(": ")[1])
+        elif line.startswith("== rendered speed re-sampled by more than"):
+            speed = int(line.split(": ")[1].split()[0])
         elif line.startswith("== efficient frontier (expanded): ") and not frontier:
             frontier = line.split(": ", 1)[1].split(" of ")[0].strip()
 
     moved = []
     if added or removed:
         moved.append(f"+{added}/-{removed} models")
+    if speed:
+        moved.append(f"{speed} rendered speed moves")
     if frontier and frontier.split(" -> ")[0] != frontier.split(" -> ")[-1]:
         moved.append(f"frontier {frontier}")
     subject = (f"Refresh capture: {models} models"
                + (", " + ", ".join(moved) if moved else ", no material change"))
 
-    body: list[str] = []
-    dropping = False
-    for line in lines:
-        if line.startswith("== "):
-            dropping = line.startswith(SPEED_SECTION)
-        if not dropping:
-            body.append(line)
-
-    return subject + "\n\n" + "\n".join(body).strip() + "\n"
+    return subject + "\n\n" + "\n".join(lines).strip() + "\n"
 
 
 def main():
@@ -294,9 +279,7 @@ def main():
                     help="no filtering at all -- every changed field, every class")
     ap.add_argument("--commit-msg", action="store_true",
                     help="render the report as a commit message: a subject line "
-                         "naming what moved, and a body with the field-change "
-                         "listing replaced by a count so the frontier sections "
-                         "survive")
+                         "naming what moved, over the full report body")
     args = ap.parse_args()
 
     if args.commit_msg:

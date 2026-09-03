@@ -39,26 +39,54 @@ discarded: 7199 re-sampled speed/latency values the page never renders
 
 
 class CommitMessageTests(unittest.TestCase):
+    @staticmethod
+    def without_speed(report: str) -> str:
+        """A report with the rendered-speed section stripped, standing in for
+        a capture where no rendered speed moved past the tolerance."""
+        out, dropping = [], False
+        for line in report.splitlines():
+            if line.startswith("== "):
+                dropping = line.startswith("== rendered speed")
+            if not dropping:
+                out.append(line)
+        return "\n".join(out)
+
+    def quiet(self) -> str:
+        """REPORT with every material mover removed."""
+        text = self.without_speed(REPORT)
+        return (text.replace("== models added: 6", "== models added: 0")
+                    .replace("16 -> 17 of 136 -> 142", "17 -> 17 of 142 -> 142"))
+
     def test_subject_names_what_moved(self):
         subject = diff_aa.as_commit_message(REPORT).splitlines()[0]
 
         self.assertEqual(
             subject,
-            "Refresh capture: 616 models, +6/-0 models, frontier 16 -> 17")
+            "Refresh capture: 616 models, +6/-0 models, "
+            "769 rendered speed moves, frontier 16 -> 17")
 
     def test_subject_says_so_when_nothing_material_moved(self):
-        quiet = REPORT.replace("== models added: 6", "== models added: 0") \
-                      .replace("16 -> 17 of 136 -> 142", "17 -> 17 of 142 -> 142")
-
-        self.assertEqual(diff_aa.as_commit_message(quiet).splitlines()[0],
+        self.assertEqual(diff_aa.as_commit_message(self.quiet()).splitlines()[0],
                          "Refresh capture: 616 models, no material change")
 
-    def test_drops_the_jitter_section_and_keeps_the_significant_one(self):
+    def test_speed_moves_alone_count_as_material(self):
+        # Issue 9: a run whose only movement was rendered speed past the
+        # tolerance was committed as "no material change" — and the moves
+        # were dropped from the body. The section is already threshold-
+        # filtered and the page renders those numbers, so it is material.
+        speed_only = (REPORT
+                      .replace("== models added: 6", "== models added: 0")
+                      .replace("16 -> 17 of 136 -> 142", "17 -> 17 of 142 -> 142"))
+
+        self.assertEqual(
+            diff_aa.as_commit_message(speed_only).splitlines()[0],
+            "Refresh capture: 616 models, 769 rendered speed moves")
+
+    def test_keeps_the_thresholded_speed_section(self):
         body = diff_aa.as_commit_message(REPORT)
 
-        # Jitter is re-measured every crawl and would bury everything else.
-        self.assertNotIn("rendered speed re-sampled", body)
-        self.assertNotIn("Muse Spark", body)
+        self.assertIn("== rendered speed re-sampled by more than 25%", body)
+        self.assertIn("Muse Spark 1.2 (xhigh)", body)
         # The significant move, the new model and the moved frontier survive.
         self.assertIn("mlcrOverall: — -> 0.555556", body)
         self.assertIn("+ Grok 4.6 (xhigh)  [SpaceXAI]", body)
