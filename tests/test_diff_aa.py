@@ -34,9 +34,6 @@ new: data/aa-raw-models.json  (616 models)
 == efficient frontier (expanded): 16 -> 17 of 136 -> 142 plotted
   + Grok 4.6 (xhigh)  II 60.0  $1.04/task
 
-== coding frontier: 11 -> 11 of 136 -> 142 plotted
-  (unchanged)
-
 discarded: 7199 re-sampled speed/latency values the page never renders
 """
 
@@ -62,11 +59,10 @@ class CommitMessageTests(unittest.TestCase):
         # Jitter is re-measured every crawl and would bury everything else.
         self.assertNotIn("rendered speed re-sampled", body)
         self.assertNotIn("Muse Spark", body)
-        # The significant move, the new model and every frontier survive.
+        # The significant move, the new model and the moved frontier survive.
         self.assertIn("mlcrOverall: — -> 0.555556", body)
         self.assertIn("+ Grok 4.6 (xhigh)  [SpaceXAI]", body)
         self.assertIn("== efficient frontier (expanded): 16 -> 17", body)
-        self.assertIn("== coding frontier", body)
         self.assertIn("discarded: 7199", body)
 
     def test_undefined_sentinel_is_absence_not_a_value(self):
@@ -278,6 +274,21 @@ class ReportTests(unittest.TestCase):
 
         self.assertIn("(none)", report)
         self.assertIn("no material change", diff_aa.as_commit_message(report))
+
+    def test_unchanged_frontier_sections_are_omitted(self):
+        # A quiet capture used to spend most of its summary on five frontier
+        # sections whose only content was "(unchanged)".
+        old = [capture("Incumbent", intelligence=50, cost=1.0)]
+        new = [capture("Incumbent", intelligence=50, cost=1.0)]
+
+        report = self.render(old, new)
+
+        for label in ("efficient frontier (expanded)",
+                      "efficient frontier (effort-collapsed)",
+                      "coding frontier", "agentic frontier",
+                      "parameter-efficiency frontier"):
+            self.assertNotIn(label, report)
+        self.assertNotIn("(unchanged)", report)
 
     def test_a_frontier_entry_is_reported_for_every_chart(self):
         old = [capture("Incumbent", intelligence=50, cost=1.0)]

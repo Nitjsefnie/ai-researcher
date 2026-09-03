@@ -391,6 +391,10 @@ def print_report(args):
         fn, rows_n = frontier_names(new, collapse)
         entered = [n for n in fn if n not in fo]
         left = [n for n in fo if n not in fn]
+        if not entered and not left:
+            # A section whose only content would be "(unchanged)" is not news;
+            # omit it rather than pad the summary with it.
+            continue
         print(f"\n== efficient frontier ({label}): {len(fo)} -> {len(fn)} "
               f"of {len(rows_o)} -> {len(rows_n)} plotted")
         for n in sorted(entered, key=lambda n, d=fn: -d[n]["ii"]):
@@ -399,14 +403,14 @@ def print_report(args):
         for n in sorted(left, key=lambda n, d=fo: -d[n]["ii"]):
             r = fo[n]
             print(f"  - {n}  II {r['ii']:.1f}  ${r['cost']:.2f}/task")
-        if not entered and not left:
-            print("  (unchanged)")
 
     for label, metric, fmt_x in CHART_FRONTIERS:
         fo, rows_o = chart_frontier(old, metric)
         fn, rows_n = chart_frontier(new, metric)
         entered = [n for n in fn if n not in fo]
         left = [n for n in fo if n not in fn]
+        if not entered and not left:
+            continue
         print(f"\n== {label} frontier: {len(fo)} -> {len(fn)} "
               f"of {len(rows_o)} -> {len(rows_n)} plotted")
         for sign, names, side in (("+", entered, fn), ("-", left, fo)):
@@ -415,8 +419,6 @@ def print_report(args):
                             -d[n]["metrics"][k]["score"]):
                 m = side[n]["metrics"][metric]
                 print(f"  {sign} {n}  {m['score']:.1f}  {fmt_x(m['cost'])}")
-        if not entered and not left:
-            print("  (unchanged)")
 
     if not args.all:
         print(f"\ndiscarded: {suppressed['jitter-unused']} re-sampled speed/latency "
