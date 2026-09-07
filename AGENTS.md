@@ -3,7 +3,7 @@
 ## Role
 
 You are **the AI researcher**. You track frontier AI models and publish one
-comparison artifact: **intelligence against cost per task**.
+comparison artifact: **capability against cost per task**.
 
 Primary deliverable: an HTML page published and kept up to date on
 `docs.nitjsefni.eu` via the docs-hub CLI. Slug:
@@ -29,15 +29,46 @@ states its source once, prominently, and links the leaderboard.
 
 ## The metric
 
-Two axes, both AA's own measurements, both read off the same run:
+Capability against cost, on three axes. **Every axis pairs a score with a cost
+AA measured on the same run**, and that constraint decides which AA number each
+axis may use — never the other way round. `x` is always cost per task in USD on
+a log scale: AA's *measured* spend (input, cached reads, output, reasoning
+tokens), **not** a quoted per-token price. A verbose reasoning model therefore
+costs more than its sticker price implies, which is the point of using it.
 
-- **y — Artificial Analysis Intelligence Index** (v4.1 at time of writing).
-  Composite of GDPval-AA v2, τ³-Banking, Terminal-Bench v2.1, SciCode,
-  Humanity's Last Exam, GPQA Diamond, CritPt, AA-Omniscience, AA-LCR.
-- **x — cost per task (USD)**, log scale. AA's *measured* spend to run the
-  model through the index (input, cached reads, output, reasoning tokens) —
-  **not** a quoted per-token price. A verbose reasoning model therefore costs
-  more than its sticker price implies, which is the point of using it.
+| axis | y | source | unit |
+|---|---|---|---|
+| coding | Coding Agent Index v1.4 | `/agents/coding-agents` | agent + model |
+| intelligence | Intelligence Index v4.3 | `/leaderboards/models` | model |
+| agentic | GDPval-AA v2 | `/leaderboards/models` | model |
+| parameters | Intelligence Index vs total parameters | `/leaderboards/models` | model |
+
+- **Coding Agent Index** — DeepSWE, Terminal-Bench v2.1 and SWE-Atlas-QnA at
+  equal weight. Its rows carry `indexScore` and `mean.costUsd` on ONE record,
+  so nothing is reweighted. Its unit is an agent+model+harness combination
+  (Claude Code on Opus 5 (xhigh) ≠ Codex on the same model), because the
+  harness is part of what AA measured.
+- **Intelligence Index v4.3** — AA-Briefcase, GDPval-AA v2, AutomationBench-AA,
+  Terminal-Bench v4.0, SciCode, AA-Omniscience, GDP.pdf, AA-LCR v1.1,
+  Humanity's Last Exam, CritPt. Cost is AA's own `cost.total`.
+- **GDPval-AA v2** — a single evaluation, not a composite. Cost is AA's figure
+  for it with its 10% index weight divided back out; the per-evaluation costs
+  sum exactly to the published total, so the recovery is checkable.
+
+**`codingIndex` and `agenticIndex` are deliberately NOT used.** AA scores both
+from Terminal-Bench v2.1 and τ³-Banking, and v4.3 removed both from the cost
+breakdown — the scores are still published, the costs are not. A score with no
+cost cannot go on a cost axis, and estimating the missing half is forbidden by
+the single-source rule above. This is why the coding axis moved to a different
+AA product rather than being dropped.
+
+**Two captures means two row universes in one table.** Rows carry a `kind`;
+`model` rows have the intelligence, agentic and parameter axes, `agent` rows
+have coding, and neither has the other's columns. Weights status belongs to a
+model, so an agent row inherits it by matching `hostModelSlug` against the
+leaderboard's `slug`; runs on models AA has no row for (unreleased codenames)
+are **unknown**, drawn hollow — never defaulted to proprietary, which would
+assert something AA never said.
 
 Secondary columns carried through from the same record: per-1M input/output
 price, output tokens/sec, context window, release date, weights license,
@@ -54,7 +85,7 @@ AA ships the leaderboard as a Next.js RSC flight payload; there is no public
 JSON API. The extractor reassembles it.
 
 ```
-python3 scripts/fetch_aa.py     # → data/aa-raw-models.json   (the source of truth)
+python3 scripts/fetch_aa.py     # → data/aa-raw-models.json + data/aa-raw-coding-agents.json
 python3 build.py                # → out/frontier-models.html
 python3 ~/.agent-bundle/scripts/docs_hub.py publish ./out/frontier-models.html \
   --slug ai-researcher/frontier-models \
@@ -69,9 +100,24 @@ beside it, so a runner cannot reach it. That script implements the one endpoint
 (`POST /api/publish`) and nothing else — on a workstation, keep using the
 canonical CLI.
 
-`fetch_aa.py` exits nonzero if the flight payload or the model schema changes
-shape — treat that as the signal to re-read the page, not to hand-fix JSON.
-Never hand-edit `data/aa-raw-models.json`; it is a captured artifact.
+`fetch_aa.py` exits nonzero — the signal to go re-read AA by hand, never to
+retry or to hand-fix JSON — when any of these move:
+
+- the flight payload or the model schema changes shape;
+- **AA bumps the Intelligence Index version** past the `INDEX_VERSION` pin in
+  `build.py`. This one matters most and is the least obvious: AA publishes the
+  per-evaluation weights on its *methodology page* and never in the payload, so
+  a rebalance leaves every field name and every value well-formed. v4.2 changed
+  four weights that way and the page silently shipped costs that were wrong by
+  factors of 2–3 for a day. The pin is the only place that can be caught;
+- the cost breakdown drops a slug `build.py` reads, or the per-evaluation costs
+  stop summing to the published total;
+- the Coding Agent Index table collapses below 20 paired rows.
+
+`build.py` additionally refuses to write a page where a rendered axis has no
+rows, so an emptied chart is a build failure rather than a published blank.
+
+Never hand-edit either capture; both are captured artifacts.
 
 Re-publishing the same slug adds a version and never destroys history.
 
@@ -101,10 +147,10 @@ copy-as-Markdown and copy-as-JSON of the current filtered slice, TOC.
 Not the vendor's deprecation flag. A model is superseded when another model is
 at least as smart **and** at least as cheap (strictly better on one). Vendor-
 retired models stay visible and tagged. The two verdicts are genuinely
-independent: as of the 2026-08-08 capture, 40 of 41 vendor-retired models are
-also metric-beaten, but **Muse Spark 1.1 (xhigh)** was retired by Meta while
-still sitting on the efficient frontier. `build.py` prints `MISMATCH` when this
-happens — that is a finding to report, not a bug to fix.
+independent: a vendor can retire a model that still sits on the efficient
+frontier, and the frontier can drop a model the vendor still sells.
+`build.py` prints `MISMATCH` when a retired model is still undominated — that
+is a finding to report, not a bug to fix.
 
 **One function computes this layer** — the chart's dashed line, the frontier
 table, the table's frontier tag and the Hide-superseded chip all call it, over
@@ -123,8 +169,9 @@ snapshots like `(Jan '25)` identify genuinely different models and must survive.
 **before** the superseded test so the frontier is drawn between models. Say
 what it costs rather than hiding it: turning a model down makes it cheaper *and*
 dumber, so a low-effort variant is **not** dominated by its high-effort twin —
-only 2 of 125 variants are beaten by another setting of the same model.
-Collapsing therefore deletes real frontier points (21 → 14). Expanded answers
+in practice only a handful of variants are beaten by another setting of the
+same model. Collapsing therefore deletes real frontier points, and `build.py`
+prints both counts so the loss is visible rather than assumed. Expanded answers
 "which configuration", collapsed answers "which model".
 
 ### Tooltip
@@ -136,8 +183,9 @@ unclamped and allowed to hang outside the plot rather than be squeezed inside.
 ## Update cadence
 
 - **Automated, every hour** — `.github/workflows/refresh.yml` captures the
-  leaderboard, and when `data/aa-raw-models.json` actually changed it rebuilds,
-  runs the suite, commits the capture with `diff_aa.py`'s summary in the message
+  leaderboard and the Coding Agent Index, and when either capture actually
+  changed it rebuilds, runs the suite, commits both with `diff_aa.py`'s summary
+  in the message
   body, and publishes to docs-hub. A capture that returns identical data is
   silent: no commit, no version, no notification. The stamp file therefore moves
   when the DATA moves, not every calendar day.

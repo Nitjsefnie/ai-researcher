@@ -1,6 +1,6 @@
 # ai-researcher
 
-Tracks frontier AI models and publishes one comparison artifact: **intelligence
+Tracks frontier AI models and publishes one comparison artifact: **capability
 against cost per task**, live at
 [`docs.nitjsefni.eu/d/ai-researcher/frontier-models`](https://docs.nitjsefni.eu/d/ai-researcher/frontier-models).
 
@@ -11,15 +11,24 @@ estimated from a lab blog or a pricing page. That is a standing decision, and
 
 ## What the page plots
 
-- **y** — Artificial Analysis Intelligence Index (v4.1), AA's composite of
-  GDPval-AA v2, τ³-Banking, Terminal-Bench v2.1, SciCode, Humanity's Last Exam,
-  GPQA Diamond, CritPt, AA-Omniscience and AA-LCR.
-- **x** — cost per task in USD, log scale. AA's *measured* spend to run the
-  model through the index, not a quoted per-token price. A verbose reasoning
-  model therefore costs more than its sticker price implies, which is the whole
-  reason for using the measured figure.
+Four scatters. **x** is always cost per task in USD on a log scale — AA's
+*measured* spend, not a quoted per-token price, so a verbose reasoning model
+costs more than its sticker price implies. **y** differs per chart, and every
+pair is a score and a cost AA measured on the same run:
 
-The **efficient frontier** — models nothing cheaper matches or beats — is the
+| chart | y | AA source | one row is |
+|---|---|---|---|
+| Coding agents | Coding Agent Index v1.4 | `/agents/coding-agents` | an agent + a model |
+| Intelligence | Intelligence Index v4.3 | `/leaderboards/models` | a model |
+| GDPval-AA | GDPval-AA v2 | `/leaderboards/models` | a model |
+| Parameter efficiency | Intelligence Index vs parameters | `/leaderboards/models` | a model |
+
+The coding chart measures an agent *with* a model, because that is what AA
+benchmarks there: Claude Code on Opus 5 (xhigh) is a different row from Codex
+on the same model. Its rows carry their score and their cost on one record, so
+nothing is reweighted to line the two axes up.
+
+The **efficient frontier** — nothing cheaper matches or beats it — is the
 analytical payload. Everything off it is strictly dominated.
 
 ## Pipeline
@@ -28,7 +37,7 @@ AA ships the leaderboard as a Next.js RSC flight payload; there is no public
 JSON API, so the extractor reassembles it.
 
 ```sh
-python3 scripts/fetch_aa.py     # → data/aa-raw-models.json  (captured artifact)
+python3 scripts/fetch_aa.py     # → data/aa-raw-models.json + data/aa-raw-coding-agents.json
 python3 scripts/diff_aa.py      # what moved since the last capture
 python3 build.py                # → out/frontier-models.html
 
@@ -40,8 +49,12 @@ python3 ~/.agent-bundle/scripts/docs_hub.py publish ./out/frontier-models.html \
 ```
 
 `fetch_aa.py` exits nonzero when the flight payload or the model schema changes
-shape. That is the signal to re-read the page, not to hand-fix JSON — never
-hand-edit `data/aa-raw-models.json`.
+shape, when AA bumps the Intelligence Index version `build.py` is pinned to,
+when the cost breakdown drops a slug the build reads or stops summing to the
+published total, or when the Coding Agent Index table collapses. `build.py`
+refuses to write a page with an empty chart on it. All of those are signals to
+re-read AA by hand, not to retry or to hand-fix JSON — never hand-edit either
+capture.
 
 Re-publishing the same slug adds a version and never destroys history.
 
