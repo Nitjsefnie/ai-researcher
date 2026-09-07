@@ -6,10 +6,18 @@ inside the RSC flight payload embedded in the HTML rather than via a public JSON
 API. This pulls the page, reassembles the flight chunks, and picks out the rich
 model array (the one carrying intelligenceIndex, not the lightweight filter list).
 
-Writes data/aa-raw-models.json -- the single source of truth for this repo --
+Writes two captures, both from artificialanalysis.ai and nothing else:
+
+  data/aa-raw-models.json         the model leaderboard -- intelligence index,
+                                  its measured cost breakdown, GDPval-AA, price,
+                                  parameters, context, licence
+  data/aa-raw-coding-agents.json  the Coding Agent Index -- agent+model rows
+                                  carrying indexScore and mean.costUsd on the
+                                  SAME record, so no reweighting is needed
+
 alongside data/captured-at.txt, the date the capture was taken.
 
-Usage:  python3 scripts/fetch_aa.py [--html CACHED.html]
+Usage:  python3 scripts/fetch_aa.py [--html CACHED.html] [--agents-html CACHED.html]
 """
 from __future__ import annotations
 
@@ -22,12 +30,20 @@ import sys
 import urllib.request
 
 URL = "https://artificialanalysis.ai/leaderboards/models"
+# The Coding Agent Index. This is a DIFFERENT AA product from the leaderboard's
+# `codingIndex` field: it scores agent+model+harness combinations (Claude Code -
+# Opus 5 (xhigh), Codex - GPT-6 Astra (max)) rather than bare models, and it is
+# the index AA means when the methodology page says Terminal-Bench v2.1 "remains
+# part of the Coding Index". It is the only /agents/* route carrying a benchmark;
+# the other six are marketing comparison pages with no index and no cost.
+AGENTS_URL = "https://artificialanalysis.ai/agents/coding-agents"
 UA = (
     "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
     "(KHTML, like Gecko) Chrome/126 Safari/537.36"
 )
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 OUT = ROOT / "data" / "aa-raw-models.json"
+AGENTS_OUT = ROOT / "data" / "aa-raw-coding-agents.json"
 # When the capture happened. build.py stamps this on the page, so it cannot be
 # derived at build time: rebuilding an old capture tomorrow would relabel it with
 # tomorrow's date, and the page's copy-as-JSON export would carry the lie too.
@@ -37,10 +53,10 @@ STAMP = ROOT / "data" / "captured-at.txt"
 CHUNK_RE = re.compile(r'self\.__next_f\.push\(\[1,("(?:[^"\\]|\\.)*")\]\)')
 
 
-def fetch_html(cached: str | None) -> str:
+def fetch_html(cached: str | None, url: str = URL) -> str:
     if cached:
         return pathlib.Path(cached).read_text(encoding="utf-8", errors="replace")
-    req = urllib.request.Request(URL, headers={"User-Agent": UA})
+    req = urllib.request.Request(url, headers={"User-Agent": UA})
     with urllib.request.urlopen(req, timeout=90) as r:
         return r.read().decode("utf-8", errors="replace")
 
@@ -99,18 +115,63 @@ def richest_models_array(payload: str) -> list[dict]:
     return best
 
 
+def coding_agent_rows(payload: str) -> list[dict]:
+    """The Coding Agent Index table, server-rendered inside the flight payload.
+
+    The page embeds it twice -- once as the ten highlighted rows behind the
+    summary charts, once in full -- so this takes the largest array whose
+    entries carry an `indexScore`. Entries interleave with RSC marker strings,
+    hence the isinstance filter.
+    """
+    best: list[dict] = []
+    for m in re.finditer(r'\[\{"id":"', payload):
+        raw = balanced_array(payload, m.start())
+        if not raw:
+            continue
+        try:
+            arr = json.loads(raw)
+        except json.JSONDecodeError:
+            continue
+        scored = [r for r in arr if isinstance(r, dict) and "indexScore" in r]
+        if len(scored) > len(best):
+            best = scored
+    priced = [
+        r for r in best
+        if isinstance(r.get("indexScore"), (int, float))
+        and isinstance(r.get("mean"), dict)
+        and isinstance(r["mean"].get("costUsd"), (int, float))
+    ]
+    # AA has shipped 58 rows here; a collapse to a handful means the page moved
+    # its data client-side or renamed the pair, which is a hand-read signal and
+    # not something to publish a half-empty chart from.
+    if len(priced) < 20:
+        sys.exit(
+            f"coding agent index: only {len(priced)} rows carry indexScore and "
+            f"mean.costUsd -- schema changed"
+        )
+    return priced
+
+
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--html", help="use a cached copy of the leaderboard HTML")
+    ap.add_argument("--agents-html", help="use a cached copy of the coding-agents HTML")
     args = ap.parse_args()
 
     models = richest_models_array(flight_payload(fetch_html(args.html)))
+    agents = coding_agent_rows(
+        flight_payload(fetch_html(args.agents_html, AGENTS_URL))
+    )
+
     OUT.parent.mkdir(parents=True, exist_ok=True)
     OUT.write_text(json.dumps(models, indent=1), encoding="utf-8")
+    AGENTS_OUT.write_text(json.dumps(agents, indent=1), encoding="utf-8")
     STAMP.write_text(dt.date.today().isoformat() + "\n", encoding="utf-8")
 
     scored = sum(1 for m in models if isinstance(m.get("intelligenceIndex"), (int, float)))
     print(f"wrote {OUT.relative_to(ROOT)}: {len(models)} models, {scored} with an intelligence index")
+    print(f"wrote {AGENTS_OUT.relative_to(ROOT)}: {len(agents)} agent+model rows "
+          f"with a paired index score and cost per task")
 
 
 if __name__ == "__main__":
