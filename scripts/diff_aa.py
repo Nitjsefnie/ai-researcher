@@ -20,7 +20,7 @@ what the page says:
   cosmetic     lab branding (colour, logo) -- always discarded, counted only
 
 It also recomputes every Pareto layer the page draws -- one per scatter, in page order:
-coding, intelligence, agentic and parameter-efficiency -- on either side, using build.py's
+coding-agent, intelligence, GDPval-AA and parameter-efficiency -- on either side, using build.py's
 own `undominated`, so "who entered / left the frontier" is answered by the same
 function the page uses rather than a second implementation of the rule. The four
 move independently: a model can join one while sitting dominated on the rest.
@@ -44,7 +44,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-from build import build_rows, undominated  # noqa: E402  # pylint: disable=wrong-import-position
+from build import build_agent_rows, build_rows, undominated  # noqa: E402  # pylint: disable=wrong-import-position
 
 RAW = ROOT / "data" / "aa-raw-models.json"
 
@@ -93,18 +93,38 @@ def is_derived(path):
     return False
 
 
-def load(spec):
-    """A path, or `git:REV` for a blob out of history."""
+def load(spec, name="aa-raw-models.json", missing_ok=False):
+    """A path, or `git:REV` for a blob out of history.
+
+    `name` selects which capture to read; a path spec resolves its sibling, so
+    `diff_aa.py OLD.json NEW.json` still finds the agent captures beside them.
+    `missing_ok` covers revisions predating a capture -- the coding-agents file
+    only exists from the v4.3 rebuild onward, and a diff against an older commit
+    should report an empty side rather than dying.
+    """
     if spec.startswith("git:"):
         rev = spec[4:]
         out = subprocess.run(
-            ["git", "-C", str(ROOT), "show", f"{rev}:data/aa-raw-models.json"],
+            ["git", "-C", str(ROOT), "show", f"{rev}:data/{name}"],
             capture_output=True, text=True, check=False,
         )
         if out.returncode != 0:
+            if missing_ok:
+                return []
             sys.exit(f"cannot read {spec}: {out.stderr.strip()}")
         return json.loads(out.stdout)
-    return json.loads(Path(spec).read_text(encoding="utf-8"))
+    path = Path(spec)
+    if name != "aa-raw-models.json":
+        # Sibling by NAME, not by directory: two captures being compared often
+        # live in one directory, so `parent / name` would hand both sides the
+        # same agent file. A path with no "models" in it has no agent sibling
+        # to find, which missing_ok turns into an empty side.
+        if "models" not in path.name:
+            return [] if missing_ok else sys.exit(f"no agent capture beside {spec}")
+        path = path.with_name(path.name.replace("models", "coding-agents"))
+    if missing_ok and not path.exists():
+        return []
+    return json.loads(path.read_text(encoding="utf-8"))
 
 
 # The RSC flight format writes JavaScript `undefined` as this string. AA
@@ -190,13 +210,13 @@ def fmt_params(b):
 # the others. Diffing only the headline left three of the four unreviewed.
 # label -> (metric key, x-axis formatter)
 CHART_FRONTIERS = (
-    ("coding", "coding", lambda v: f"${v:.2f}/task"),
-    ("agentic", "agentic", lambda v: f"${v:.2f}/task"),
+    ("coding agent", "coding", lambda v: f"${v:.2f}/task"),
+    ("GDPval-AA", "agentic", lambda v: f"${v:.2f}/task"),
     ("parameter-efficiency", "parameters", fmt_params),
 )
 
 
-def chart_frontier(models, metric):
+def chart_frontier(models, agents, metric):
     """One chart's Pareto layer, via build.py's own `undominated`.
 
     build_rows() seats metrics entries for the three cost-based scatters but not
@@ -205,6 +225,12 @@ def chart_frontier(models, metric):
     chart -- the parameter layer only sees models AA discloses a size for, so it
     is drawn over a much smaller set than the cost layers.
     """
+    # Coding is the only axis drawn over the agent capture; the rest are model
+    # rows. Both go through build.py's own row builders so the eligibility rule
+    # is never spelled a second time here.
+    if metric == "coding":
+        rows = build_agent_rows(agents, models)
+        return {r["name"]: r for r in undominated(rows, metric)}, rows
     rows = build_rows(models)
     if metric == "parameters":
         rows = [r for r in rows if r.get("params") and r.get("ii") is not None]
@@ -265,6 +291,12 @@ def main():
                     help="old capture: a path, or git:REV (default git:HEAD)")
     ap.add_argument("new", nargs="?", default=str(RAW),
                     help=f"new capture (default {RAW.relative_to(ROOT)})")
+    ap.add_argument("--old-agents", metavar="SPEC",
+                    help="coding-agents capture for the old side "
+                         "(default: the sibling of `old`)")
+    ap.add_argument("--new-agents", metavar="SPEC",
+                    help="coding-agents capture for the new side "
+                         "(default: the sibling of `new`)")
     ap.add_argument("--speed-tol", type=float, default=0.25, metavar="X",
                     help=f"report a rendered speed field "
                          f"({', '.join(sorted(SPEED_SHOWN))}) only when it moved by "
@@ -294,6 +326,10 @@ def main():
 def print_report(args):
 
     old, new = load(args.old), load(args.new)
+    old_agents = load(getattr(args, "old_agents", None) or args.old,
+                      "aa-raw-coding-agents.json", missing_ok=True)
+    new_agents = load(getattr(args, "new_agents", None) or args.new,
+                      "aa-raw-coding-agents.json", missing_ok=True)
     old_by_id = {m["id"]: m for m in old}
     new_by_id = {m["id"]: m for m in new}
 
@@ -388,8 +424,8 @@ def print_report(args):
             print(f"  - {n}  II {r['ii']:.1f}  ${r['cost']:.2f}/task")
 
     for label, metric, fmt_x in CHART_FRONTIERS:
-        fo, rows_o = chart_frontier(old, metric)
-        fn, rows_n = chart_frontier(new, metric)
+        fo, rows_o = chart_frontier(old, old_agents, metric)
+        fn, rows_n = chart_frontier(new, new_agents, metric)
         entered = [n for n in fn if n not in fo]
         left = [n for n in fo if n not in fn]
         if not entered and not left:

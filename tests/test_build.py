@@ -49,30 +49,50 @@ class ArtifactParser(HTMLParser):
 
 def model_fixture(
     *,
-    coding: float | None = 62,
     intelligence: float | None = 51,
-    agentic: float | None = 47,
+    gdpval: float | None = 0.47,
     evaluations: list | None = None,
     parameters: float | None = 27,
+    slug: str = "fixture-model",
+    open_weights: bool = False,
 ):
     return {
         "name": "Fixture Model (high)",
+        "slug": slug,
         "modelCreatorName": "Fixture Lab",
+        "isOpenWeights": open_weights,
         "intelligenceIndex": intelligence,
-        "codingIndex": coding,
-        "agenticIndex": agentic,
+        # AA reports GDPval as a 0-1 fraction; the page shows it out of 100.
+        "gdpvalNormalized": gdpval,
         "totalParameters": parameters,
         "intelligenceIndexCostPerTask": {
             "cost": {"total": 0.75},
             "evaluations": evaluations
             if evaluations is not None
             else [
-                {"slug": "terminalbench-v2-1", "weightedCostPerTask": 0.32},
-                {"slug": "scicode", "weightedCostPerTask": 0.24},
                 {"slug": "gdpval-aa", "weightedCostPerTask": 0.80},
-                {"slug": "tau3-banking", "weightedCostPerTask": 0.42},
+                {"slug": "scicode", "weightedCostPerTask": 0.24},
             ],
         },
+    }
+
+
+def agent_fixture(
+    *,
+    label: str = "Fixture Agent - Fixture Model (high)",
+    score: float | None = 0.64,
+    cost: float | None = 2.5,
+    host_slug: str | None = "fixturelab_fixture-model",
+    wall_time: float | None = 900.0,
+):
+    return {
+        "id": label,
+        "displayLabel": label,
+        "agentName": label.split(" - ")[0],
+        "hostModelSlug": host_slug,
+        "display": {"creator": {"agent": "Fixture Agents", "model": "Fixture Lab"}},
+        "indexScore": score,
+        "mean": {"costUsd": cost, "agentWallTimeSec": wall_time},
     }
 
 
@@ -89,38 +109,39 @@ def measured_cost(model, metric) -> float:
 
 
 class CapabilityCostTests(unittest.TestCase):
-    def test_reweights_measured_component_costs_for_each_capability(self):
+    def test_gdpval_cost_divides_out_the_index_weight_aa_applied(self):
+        # AA reports each component's task cost with its Intelligence Index
+        # weight already multiplied in, and the components sum to cost.total.
+        # 0.80 at a 10% weight is $8.00 of actual measured spend per task.
         model = model_fixture()
 
-        self.assertAlmostEqual(measured_cost(model, "coding"), 2.5)
-        self.assertAlmostEqual(measured_cost(model, "agentic"), 3.5)
+        self.assertAlmostEqual(measured_cost(model, "agentic"), 8.0)
         self.assertAlmostEqual(measured_cost(model, "intelligence"), 0.75)
 
-    def test_missing_component_cost_excludes_only_that_metric(self):
+    def test_model_rows_carry_no_coding_pair(self):
+        # Coding is the Coding Agent Index now; AA publishes no cost for the
+        # leaderboard's codingIndex, so a model row must not claim one.
+        self.assertIsNone(build.capability_cost_per_task(model_fixture(), "coding"))
+        self.assertIsNone(build.capability_score(model_fixture(), "coding"))
+
+    def test_gdpval_score_is_scaled_to_the_shared_hundred_point_axis(self):
+        rows = build.build_rows([model_fixture(gdpval=0.4712)])
+
+        self.assertEqual(rows[0]["metrics"]["agentic"], {"score": 47.12, "cost": 8.0})
+
+    def test_a_missing_gdpval_cost_excludes_only_that_metric(self):
         model = model_fixture(
-            evaluations=[
-                {"slug": "terminalbench-v2-1", "weightedCostPerTask": 0.32},
-                {"slug": "gdpval-aa", "weightedCostPerTask": 0.80},
-                {"slug": "tau3-banking", "weightedCostPerTask": 0.42},
-            ]
-        )
+            evaluations=[{"slug": "scicode", "weightedCostPerTask": 0.24}])
 
         rows = build.build_rows([model])
 
         self.assertEqual(len(rows), 1)
-        self.assertIsNone(rows[0]["metrics"]["coding"])
-        self.assertEqual(rows[0]["metrics"]["intelligence"], {"score": 51, "cost": 0.75})
-        self.assertEqual(rows[0]["metrics"]["agentic"], {"score": 47, "cost": 3.5})
-
-    def test_model_with_only_a_complete_coding_pair_is_retained(self):
-        model = model_fixture(intelligence=None, agentic=None)
-
-        rows = build.build_rows([model])
-
-        self.assertEqual(len(rows), 1)
-        self.assertEqual(rows[0]["metrics"]["coding"], {"score": 62, "cost": 2.5})
-        self.assertIsNone(rows[0]["metrics"]["intelligence"])
         self.assertIsNone(rows[0]["metrics"]["agentic"])
+        self.assertEqual(rows[0]["metrics"]["intelligence"], {"score": 51, "cost": 0.75})
+
+    def test_an_unknown_metric_is_a_programming_error_not_a_silent_none(self):
+        with self.assertRaises(ValueError):
+            build.capability_cost_per_task(model_fixture(), "nonsense")
 
     def test_total_parameter_count_is_carried_for_parameter_efficiency_plot(self):
         rows = build.build_rows([model_fixture(parameters=1.25)])
@@ -131,6 +152,62 @@ class CapabilityCostTests(unittest.TestCase):
         rows = build.build_rows([model_fixture(parameters=0)])
 
         self.assertIsNone(rows[0]["params"])
+
+
+class AgentRowTests(unittest.TestCase):
+    def test_score_and_cost_are_taken_from_one_record_without_reweighting(self):
+        rows = build.build_agent_rows([agent_fixture()], [model_fixture()])
+
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["metrics"]["coding"], {"score": 64.0, "cost": 2.5})
+        self.assertEqual(rows[0]["kind"], "agent")
+        self.assertEqual(rows[0]["agent"], "Fixture Agent")
+
+    def test_agent_rows_carry_no_model_only_axis(self):
+        rows = build.build_agent_rows([agent_fixture()], [model_fixture()])
+
+        self.assertIsNone(rows[0]["metrics"]["intelligence"])
+        self.assertIsNone(rows[0]["metrics"]["agentic"])
+        self.assertIsNone(rows[0]["params"])
+
+    def test_the_lab_is_the_model_maker_not_the_harness_vendor(self):
+        # A Claude Code run on GLM-5.2 files under Z.ai; the lab filter groups
+        # by who made the model being measured.
+        rows = build.build_agent_rows([agent_fixture()], [model_fixture()])
+
+        self.assertEqual(rows[0]["creator"], "Fixture Lab")
+
+    def test_weights_status_is_inherited_from_the_model_by_slug(self):
+        models = [model_fixture(slug="fixture-model", open_weights=True)]
+
+        rows = build.build_agent_rows([agent_fixture()], models)
+
+        self.assertIs(rows[0]["open"], True)
+
+    def test_a_two_segment_provider_prefix_still_resolves(self):
+        models = [model_fixture(slug="qwen3-7-plus", open_weights=True)]
+        agent = agent_fixture(host_slug="alibaba_cloud_qwen3-7-plus")
+
+        self.assertIs(build.build_agent_rows([agent], models)[0]["open"], True)
+
+    def test_a_model_absent_from_the_leaderboard_is_unknown_not_proprietary(self):
+        # Unreleased codenames ("spiffy-blimp350") have no leaderboard row.
+        # Defaulting them to proprietary would assert something AA never said.
+        agent = agent_fixture(host_slug="meta_spiffy-blimp350")
+
+        self.assertIsNone(build.build_agent_rows([agent], [model_fixture()])[0]["open"])
+
+    def test_a_run_without_a_cost_is_dropped_rather_than_plotted_at_zero(self):
+        self.assertEqual(
+            build.build_agent_rows([agent_fixture(cost=None)], [model_fixture()]), [])
+        self.assertEqual(
+            build.build_agent_rows([agent_fixture(cost=0)], [model_fixture()]), [])
+
+    def test_effort_is_split_off_the_label_as_for_models(self):
+        rows = build.build_agent_rows([agent_fixture()], [model_fixture()])
+
+        self.assertEqual(rows[0]["base"], "Fixture Agent - Fixture Model")
+        self.assertEqual(rows[0]["eff"], "high")
 
 
 class GeneratedArtifactTests(unittest.TestCase):
@@ -149,12 +226,12 @@ class GeneratedArtifactTests(unittest.TestCase):
         )
         self.assertEqual(parser.scroll_tables, ["fTable", "tbl"])
         for header in (
-            "Coding Index",
-            "Coding $ / task",
+            "Coding Agent Index",
+            "Coding Agent $ / task",
             "Intelligence Index",
             "Intelligence $ / task",
-            "Agentic Index",
-            "Agentic $ / task",
+            "GDPval-AA v2",
+            "GDPval $ / task",
             "Parameters",
         ):
             self.assertIn(header, parser.headers)
@@ -167,6 +244,17 @@ class GeneratedArtifactTests(unittest.TestCase):
         self.assertTrue(any(row["metrics"]["coding"] for row in payload["rows"]))
         self.assertTrue(any(row["metrics"]["agentic"] for row in payload["rows"]))
         self.assertTrue(any(row["params"] for row in payload["rows"]))
+
+        # The two captures are different universes sharing one table: coding
+        # comes only from agent rows, everything else only from model rows.
+        kinds = {row["kind"] for row in payload["rows"]}
+        self.assertEqual(kinds, {"model", "agent"})
+        for row in payload["rows"]:
+            if row["kind"] == "agent":
+                self.assertIsNone(row["metrics"]["intelligence"])
+                self.assertIsNone(row["metrics"]["agentic"])
+            else:
+                self.assertIsNone(row["metrics"]["coding"])
         self.assertEqual(
             payload["stats"]["parameterCount"],
             sum(
@@ -200,16 +288,27 @@ class GeneratedArtifactTests(unittest.TestCase):
         with tempfile.TemporaryDirectory(prefix=".issue-6-build-", dir=build.ROOT) as tmp:
             root = pathlib.Path(tmp)
             raw = root / "models.json"
+            agents_raw = root / "coding-agents.json"
             output = root / "frontier-models.html"
             raw.write_text(json.dumps([model]), encoding="utf-8")
-            old_raw, old_out = build.RAW, build.OUT
+            # Hermetic: without its own agent capture this would build against
+            # the committed one, so the escaping check would silently stop
+            # covering the half of the payload that comes from agent rows.
+            agents_raw.write_text(json.dumps([{
+                "id": "audit-agent", "displayLabel": lower, "agentName": mixed,
+                "hostModelSlug": "vendor_fixture-model",
+                "display": {"creator": {"agent": upper, "model": mixed}},
+                "indexScore": 0.64,
+                "mean": {"costUsd": 2.5, "agentWallTimeSec": 900.0},
+            }]), encoding="utf-8")
+            old_raw, old_agents, old_out = build.RAW, build.AGENTS_RAW, build.OUT
             try:
-                build.RAW, build.OUT = raw, output
+                build.RAW, build.AGENTS_RAW, build.OUT = raw, agents_raw, output
                 with contextlib.redirect_stdout(io.StringIO()):
                     build.main()
                 html = output.read_text(encoding="utf-8")
             finally:
-                build.RAW, build.OUT = old_raw, old_out
+                build.RAW, build.AGENTS_RAW, build.OUT = old_raw, old_agents, old_out
 
         marker = "const DATA = "
         start = html.index(marker) + len(marker)

@@ -46,6 +46,7 @@
 !/data/
 /data/*
 !/data/aa-raw-models.json
+!/data/aa-raw-coding-agents.json
 !/data/captured-at.txt
 
 # ---- out/ — the published page --------------------------------------------

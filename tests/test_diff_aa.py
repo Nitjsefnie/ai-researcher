@@ -110,22 +110,33 @@ def capture(name, *, ident=None, intelligence: float | None = 51,
         "id": ident or name.lower().replace(" ", "-"),
         "name": name,
         "modelCreatorName": creator,
+        "slug": (ident or name.lower().replace(" ", "-")),
         "intelligenceIndex": intelligence,
-        "codingIndex": intelligence,
-        "agenticIndex": intelligence,
+        "gdpvalNormalized": None if intelligence is None else intelligence / 100,
         "totalParameters": params,
         "intelligenceIndexCostPerTask": {
             "cost": {"total": cost},
             "evaluations": [
-                {"slug": "terminalbench-v2-1", "weightedCostPerTask": cost / 2},
+                {"slug": "gdpval-aa", "weightedCostPerTask": cost / 10},
                 {"slug": "scicode", "weightedCostPerTask": cost / 4},
-                {"slug": "gdpval-aa", "weightedCostPerTask": cost},
-                {"slug": "tau3-banking", "weightedCostPerTask": cost / 2},
             ],
         },
     }
     model.update(extra)
     return model
+
+
+def agent_capture(name, *, score=0.6, cost=2.0, host="fixturelab_incumbent"):
+    """One Coding Agent Index row, in AA's own shape."""
+    return {
+        "id": name.lower().replace(" ", "-"),
+        "displayLabel": name,
+        "agentName": name.split(" - ")[0],
+        "hostModelSlug": host,
+        "display": {"creator": {"agent": "Fixture Agents", "model": "Fixture Lab"}},
+        "indexScore": score,
+        "mean": {"costUsd": cost, "agentWallTimeSec": 900.0},
+    }
 
 
 class ClassifyTests(unittest.TestCase):
@@ -216,17 +227,32 @@ class FrontierTests(unittest.TestCase):
             capture("Closed", ident="closed", intelligence=55, params=None),
         ]
 
-        names, rows = diff_aa.chart_frontier(models, "parameters")
+        names, rows = diff_aa.chart_frontier(models, [], "parameters")
 
         self.assertEqual([r["name"] for r in rows], ["Open"])
         self.assertIn("Open", names)
 
     def test_a_cost_chart_drops_models_with_no_measurement_for_it(self):
-        models = [capture("Measured", intelligence=50)]
+        models = [capture("Measured", intelligence=50),
+                  capture("Unmeasured", ident="unmeasured", intelligence=50,
+                          intelligenceIndexCostPerTask=None)]
 
-        _, rows = diff_aa.chart_frontier(models, "coding")
+        _, rows = diff_aa.chart_frontier(models, [], "agentic")
 
         self.assertEqual([r["name"] for r in rows], ["Measured"])
+
+    def test_the_coding_frontier_is_drawn_over_the_agent_capture(self):
+        # Coding rows come from a different AA product entirely, so feeding it
+        # the model capture must not silently produce a model-shaped frontier.
+        models = [capture("Incumbent", intelligence=50)]
+        agents = [agent_capture("Agent - Incumbent", score=0.6, cost=2.0),
+                  agent_capture("Agent - Dominated", score=0.5, cost=4.0)]
+
+        names, rows = diff_aa.chart_frontier(models, agents, "coding")
+
+        self.assertEqual(sorted(r["name"] for r in rows),
+                         ["Agent - Dominated", "Agent - Incumbent"])
+        self.assertEqual(list(names), ["Agent - Incumbent"])
 
 
 class ReportTests(unittest.TestCase):
@@ -313,7 +339,7 @@ class ReportTests(unittest.TestCase):
 
         for label in ("efficient frontier (expanded)",
                       "efficient frontier (effort-collapsed)",
-                      "coding frontier", "agentic frontier",
+                      "coding agent frontier", "GDPval-AA frontier",
                       "parameter-efficiency frontier"):
             self.assertNotIn(label, report)
         self.assertNotIn("(unchanged)", report)
@@ -324,8 +350,8 @@ class ReportTests(unittest.TestCase):
 
         report = self.render(old, new)
 
-        for label in ("efficient frontier (expanded)", "coding frontier",
-                      "agentic frontier", "parameter-efficiency frontier"):
+        for label in ("efficient frontier (expanded)", "GDPval-AA frontier",
+                      "parameter-efficiency frontier"):
             self.assertIn(f"== {label}", report)
         self.assertIn("+ Cheaper", report)
 

@@ -57,7 +57,7 @@ class BrowserInteractionTests(unittest.TestCase):
         point = page.locator("#svg-coding circle.pt[r='5']").first
         point.hover()
         model_name = page.locator("#tip-coding .tname").inner_text()
-        accessible_name = f"Pin {model_name} on the Coding Index chart"
+        accessible_name = f"Pin {model_name} on the Coding Agent Index chart"
         point.focus()
         point.press("Enter")
         point = page.get_by_role("button", name=accessible_name)
@@ -145,29 +145,40 @@ class BrowserInteractionTests(unittest.TestCase):
             "licenseName": ordinary,
             "releaseDate": ordinary,
             "isOpenWeights": True,
+            "slug": "audit-model",
             "intelligenceIndex": 51,
-            "codingIndex": 62,
-            "agenticIndex": 47,
+            "gdpvalNormalized": 0.47,
             "totalParameters": 27,
             "intelligenceIndexCostPerTask": {
                 "cost": {"total": 0.75},
                 "evaluations": [
-                    {"slug": "terminalbench-v2-1", "weightedCostPerTask": 0.32},
-                    {"slug": "scicode", "weightedCostPerTask": 0.24},
                     {"slug": "gdpval-aa", "weightedCostPerTask": 0.80},
-                    {"slug": "tau3-banking", "weightedCostPerTask": 0.42},
+                    {"slug": "scicode", "weightedCostPerTask": 0.24},
                 ],
             },
+        }
+        # The agent capture carries AA strings too -- an agent's display label
+        # reaches the same inline JSON -- so it gets the same hostile input.
+        agent = {
+            "id": "audit-agent",
+            "displayLabel": lower,
+            "agentName": mixed,
+            "hostModelSlug": "vendor_audit-model",
+            "display": {"creator": {"agent": upper, "model": mixed}},
+            "indexScore": 0.64,
+            "mean": {"costUsd": 2.5, "agentWallTimeSec": 900.0},
         }
 
         with tempfile.TemporaryDirectory(prefix=".issue-6-browser-", dir=build.ROOT) as tmp:
             root = pathlib.Path(tmp)
             raw = root / "models.json"
+            agents_raw = root / "coding-agents.json"
             output = root / "frontier-models.html"
             raw.write_text(json.dumps([model]), encoding="utf-8")
-            old_raw, old_out = build.RAW, build.OUT
+            agents_raw.write_text(json.dumps([agent]), encoding="utf-8")
+            old_raw, old_agents, old_out = build.RAW, build.AGENTS_RAW, build.OUT
             try:
-                build.RAW, build.OUT = raw, output
+                build.RAW, build.AGENTS_RAW, build.OUT = raw, agents_raw, output
                 with contextlib.redirect_stdout(io.StringIO()):
                     build.main()
                 page = self.browser.new_page(viewport={"width": 1280, "height": 900})
@@ -179,7 +190,7 @@ class BrowserInteractionTests(unittest.TestCase):
                 self.assertIn("ordinary <tag>", page.locator("body").inner_text())
                 page.close()
             finally:
-                build.RAW, build.OUT = old_raw, old_out
+                build.RAW, build.AGENTS_RAW, build.OUT = old_raw, old_agents, old_out
 
 
 if __name__ == "__main__":

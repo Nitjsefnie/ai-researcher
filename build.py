@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Build out/frontier-models.html from data/aa-raw-models.json.
 
-Single deliverable: AA Coding, Intelligence, and Agentic indices against their
+Single deliverable: AA's Coding Agent, Intelligence and GDPval-AA indices against their
 matched measured cost per task, plus total parameter count against Intelligence
 Index, sourced exclusively from artificialanalysis.ai.
 
@@ -16,34 +16,46 @@ import re
 
 ROOT = pathlib.Path(__file__).resolve().parent
 RAW = ROOT / "data" / "aa-raw-models.json"
+AGENTS_RAW = ROOT / "data" / "aa-raw-coding-agents.json"
 OUT = ROOT / "out" / "frontier-models.html"
 
-# AA Intelligence Index v4.1 component evals, as listed on the source site.
+# The AA Intelligence Index version this file's weights and field names are
+# written against. AA bumps it every few weeks and a bump can rename or drop a
+# cost-breakdown slug -- v4.3 replaced tau3-banking with automationbench-aa and
+# Terminal-Bench v2.1 with v4.0. The weights are published on AA's methodology
+# page and are NOT in the payload, so nothing can detect a rebalance for us;
+# fetch_aa.py refuses a version this file was not written against instead.
+INDEX_VERSION = "4.3"
+
+# AA Intelligence Index v4.3 component evals, as listed on the source site.
 INDEX_EVALS = [
-    "GDPval-AA v2", "τ³-Banking", "Terminal-Bench v2.1", "SciCode",
-    "Humanity's Last Exam", "GPQA Diamond", "CritPt", "AA-Omniscience", "AA-LCR",
+    "AA-Briefcase", "GDPval-AA v2", "AutomationBench-AA", "Terminal-Bench v4.0",
+    "SciCode", "AA-Omniscience", "GDP.pdf", "AA-LCR v1.1",
+    "Humanity's Last Exam", "CritPt",
 ]
 
 METRIC_ORDER = ("coding", "intelligence", "agentic")
-METRIC_SCORE_FIELDS = {
-    "coding": "codingIndex",
-    "intelligence": "intelligenceIndex",
-    "agentic": "agenticIndex",
-}
 
-# AA publishes per-evaluation task cost after applying each evaluation's
-# Intelligence Index weight. Undo that weight, then apply the capability
-# index's own 50/50 weights. This keeps every score/cost pair on one AA run.
-CAPABILITY_COMPONENTS = {
-    "coding": (
-        ("terminalbench-v2-1", 0.16, 0.50),
-        ("scicode", 0.08, 0.50),
-    ),
-    "agentic": (
-        ("gdpval-aa", 0.20, 0.50),
-        ("tau3-banking", 0.14, 0.50),
-    ),
-}
+# Every axis is now a score and a cost AA measured on the same run, and each
+# comes from the source that publishes them together:
+#
+#   coding        the Coding Agent Index (data/aa-raw-coding-agents.json), whose
+#                 rows carry indexScore and mean.costUsd on ONE record. Its unit
+#                 is an agent+model+harness combination, not a bare model.
+#   intelligence  the model leaderboard's intelligenceIndex against its own
+#                 measured intelligenceIndexCostPerTask.cost.total.
+#   agentic       GDPval-AA v2 -- gdpvalNormalized against the cost AA measured
+#                 running it, recovered from the weighted breakdown below.
+#
+# The leaderboard's `codingIndex` and `agenticIndex` fields are deliberately NOT
+# used: AA scores both from Terminal-Bench v2.1 and tau3-banking, whose per-task
+# cost it stopped publishing in v4.3. A score with no cost cannot go on a
+# cost axis, and estimating the missing half is off the table.
+GDPVAL_SLUG = "gdpval-aa"
+# GDPval-AA v2's weight inside Intelligence Index v4.3. AA reports each eval's
+# task cost with this already applied; dividing it back out recovers the
+# evaluation's own measured cost per task.
+GDPVAL_INDEX_WEIGHT = 0.10
 
 
 # AA encodes the effort knob in the model name; there is no field for it. The
@@ -89,32 +101,54 @@ def cost_per_task(m):
     return num(inner.get("total"))
 
 
-def capability_cost_per_task(m, metric):
-    """AA's measured average task cost for one displayed capability index."""
-    if metric == "intelligence":
-        return cost_per_task(m)
-    components = CAPABILITY_COMPONENTS.get(metric)
-    if not components:
-        raise ValueError(f"unknown metric: {metric}")
+def evaluation_cost_per_task(m, slug, index_weight):
+    """One evaluation's own measured cost per task, in USD.
+
+    AA reports `weightedCostPerTask` with the evaluation's Intelligence Index
+    weight already multiplied in -- the per-eval figures sum exactly to
+    `cost.total`. Dividing the weight back out recovers what AA actually spent
+    per task on that evaluation.
+    """
     outer = m.get("intelligenceIndexCostPerTask")
     evaluations = outer.get("evaluations") if isinstance(outer, dict) else None
     if not isinstance(evaluations, list):
         return None
-    measured = {
-        e.get("slug"): num(e.get("weightedCostPerTask"))
-        for e in evaluations if isinstance(e, dict)
-    }
-    total = 0.0
-    for slug, intelligence_weight, capability_weight in components:
-        value = measured.get(slug)
-        if value is None:
-            return None
-        total += value / intelligence_weight * capability_weight
-    return total
+    for e in evaluations:
+        if isinstance(e, dict) and e.get("slug") == slug:
+            weighted = num(e.get("weightedCostPerTask"))
+            return None if weighted is None else weighted / index_weight
+    return None
+
+
+def capability_cost_per_task(m, metric):
+    """AA's measured average task cost for one displayed axis of a model row."""
+    if metric == "intelligence":
+        return cost_per_task(m)
+    if metric == "agentic":
+        return evaluation_cost_per_task(m, GDPVAL_SLUG, GDPVAL_INDEX_WEIGHT)
+    if metric == "coding":
+        # Model rows have no coding pair; coding lives on the agent capture.
+        return None
+    raise ValueError(f"unknown metric: {metric}")
+
+
+def capability_score(m, metric):
+    """The score AA publishes for one axis, on a 0-100 scale.
+
+    intelligenceIndex already is; gdpvalNormalized is a 0-1 fraction.
+    """
+    if metric == "intelligence":
+        return num(m.get("intelligenceIndex"))
+    if metric == "agentic":
+        raw = num(m.get("gdpvalNormalized"))
+        return None if raw is None else raw * 100
+    if metric == "coding":
+        return None
+    raise ValueError(f"unknown metric: {metric}")
 
 
 def metric_record(m, metric):
-    score = num(m.get(METRIC_SCORE_FIELDS[metric]))
+    score = capability_score(m, metric)
     cost = capability_cost_per_task(m, metric)
     if score is None or cost is None or cost <= 0:
         return None
@@ -134,6 +168,12 @@ def build_rows(models):
             "name": m.get("name") or "",
             "base": base,
             "eff": eff,
+            # Which capture the row came from. Model rows carry the
+            # intelligence, agentic and parameter axes; agent rows carry
+            # coding. Neither universe has the other's columns, and the page
+            # renders an absent column as an em-dash, not a blank.
+            "kind": "model",
+            "agent": None,
             "creator": m.get("modelCreatorName") or "",
             "country": m.get("modelCreatorCountry") or "",
             # Compatibility aliases used by diff_aa.py and historical callers.
@@ -161,6 +201,83 @@ def build_rows(models):
     return rows
 
 
+def build_agent_rows(agents, models):
+    """Rows for the Coding Agent Index capture.
+
+    Unlike the leaderboard, this source pairs the score and the cost itself --
+    `indexScore` and `mean.costUsd` sit on one record, measured on one run --
+    so there is no weight to undo and no way for the two halves to drift apart.
+    """
+    # Weights status is a property of the MODEL a run used, and the agent
+    # capture does not carry it. `hostModelSlug` is provider-prefixed
+    # ("anthropic_claude-sonnet-4-6"), so match on the slug with and without
+    # that prefix. Fourteen of the runs use models the leaderboard has no row
+    # for at all -- unreleased codenames like "spiffy-blimp350" -- and those
+    # stay None rather than being defaulted to proprietary, which would be a
+    # claim AA never made.
+    weights = {m["slug"]: bool(m.get("isOpenWeights"))
+               for m in models if isinstance(m.get("slug"), str)}
+
+    def open_weights(host_slug):
+        if not isinstance(host_slug, str):
+            return None
+        parts = host_slug.split("_")
+        # Provider prefixes are one OR two segments ("openai_gpt-5-6-sol",
+        # "alibaba_cloud_qwen3-7-plus"), so try every suffix rather than
+        # assuming a fixed depth.
+        for i in range(len(parts)):
+            candidate = "_".join(parts[i:])
+            if candidate in weights:
+                return weights[candidate]
+        return None
+
+    rows = []
+    for a in agents:
+        score = num(a.get("indexScore"))
+        mean = a.get("mean") if isinstance(a.get("mean"), dict) else {}
+        cost = num(mean.get("costUsd"))
+        if score is None or cost is None or cost <= 0:
+            continue
+        label = a.get("displayLabel") or ""
+        base, eff = split_effort(label)
+        display = a.get("display") if isinstance(a.get("display"), dict) else {}
+        creators = display.get("creator") if isinstance(display.get("creator"), dict) else {}
+        rows.append({
+            "name": label,
+            "base": base,
+            "eff": eff,
+            "kind": "agent",
+            "agent": a.get("agentName") or None,
+            # The LAB filter groups by who made the MODEL, so a Claude Code run
+            # on GLM-5.2 files under Z.ai rather than Anthropic -- the harness
+            # is named separately in the row and the tooltip.
+            "creator": creators.get("model") or "",
+            "country": "",
+            "ii": None,
+            "cost": None,
+            "metrics": {
+                "coding": {"score": round(score * 100, 2), "cost": round(cost, 4)},
+                "intelligence": None,
+                "agentic": None,
+            },
+            "params": None,
+            "open": open_weights(a.get("hostModelSlug")),
+            "dep": bool(a.get("isUnavailable")),
+            "est": False,
+            "reas": False,
+            "lic": None,
+            "ctx": None,
+            "rel": None,
+            "tps": None,
+            "secs": round(mean["agentWallTimeSec"], 1) if num(mean.get("agentWallTimeSec")) else None,
+            "pin": None,
+            "pout": None,
+        })
+    rows.sort(key=lambda r: (-r["metrics"]["coding"]["score"],
+                             r["metrics"]["coding"]["cost"], r["name"]))
+    return rows
+
+
 def undominated(rows, metric="intelligence"):
     """The single Pareto layer -- the page's one and only definition of
     'superseded'. A model is superseded when some other model is at least as
@@ -184,7 +301,8 @@ def undominated(rows, metric="intelligence"):
 
 def main():
     models = json.loads(RAW.read_text(encoding="utf-8"))
-    rows = build_rows(models)
+    agents = json.loads(AGENTS_RAW.read_text(encoding="utf-8"))
+    rows = build_rows(models) + build_agent_rows(agents, models)
     intelligence_rows = [r for r in rows if r["metrics"]["intelligence"]]
 
     # Reported only -- the page recomputes this layer against whatever the
@@ -243,6 +361,19 @@ def main():
             if r["params"] is not None and r["metrics"]["intelligence"] is not None
         ),
     }
+    # A rendered axis with nothing on it means the capture moved under us --
+    # a renamed field, a dropped cost slug. The page must not be published in
+    # that state: an empty scatter reads as "nothing qualifies" rather than
+    # "the pipeline broke", and the browser tests can only report it as an
+    # opaque locator timeout.
+    empty = [metric for metric, n in stats["metricCounts"].items() if not n]
+    if empty:
+        raise SystemExit(
+            "no rows carry a score/cost pair for: " + ", ".join(sorted(empty))
+            + " -- the AA capture changed shape; re-read the leaderboard rather "
+            "than publishing an empty chart"
+        )
+
     payload = json.dumps({"rows": rows, "stats": stats}, separators=(",", ":")).replace(
         "<", "\\u003c"
     )
@@ -340,6 +471,8 @@ TEMPLATE = r"""<!DOCTYPE html>
   .chip .dot{width:9px;height:9px;border-radius:50%;display:inline-block}
   .chip .dot.prop{background:var(--series-prop)}
   .chip .dot.open{background:var(--series-open)}
+  /* Hollow, matching how these points draw: an absent value, not a third category. */
+  .chip .dot.unk{background:none;border:2px solid var(--series-prop);box-sizing:border-box}
   select,input[type=search]{font-family:var(--mono);font-size:12px;padding:6px 11px;
     border-radius:999px;border:1px solid var(--border);background:var(--surface-1);
     color:var(--text-primary)}
@@ -371,6 +504,7 @@ TEMPLATE = r"""<!DOCTYPE html>
     font-family:var(--mono);color:var(--text-secondary)}
   .legend .item{display:inline-flex;align-items:center;gap:7px}
   .legend .swatch{width:11px;height:11px;border-radius:50%;display:inline-block}
+  .legend .swatch.hollow{background:none !important;border:2px solid var(--series-prop);box-sizing:border-box}
   .legend .line{width:20px;height:0;border-top:2px dashed var(--muted);display:inline-block}
 
   .tip{position:absolute;pointer-events:none;opacity:0;transition:opacity 120ms ease;
@@ -419,7 +553,9 @@ TEMPLATE = r"""<!DOCTYPE html>
     <div class="eyebrow">ai-researcher &middot; single-source &middot; captured __CAPTURED__</div>
     <h1>Frontier models &mdash; capability vs cost and size</h1>
     <p class="lede">Every number on this page comes from
-      <a href="https://artificialanalysis.ai/leaderboards/models">artificialanalysis.ai</a> and nowhere else.
+      <a href="https://artificialanalysis.ai/leaderboards/models">artificialanalysis.ai</a> and nowhere else &mdash;
+      the <a href="https://artificialanalysis.ai/leaderboards/models">model leaderboard</a> and the
+      <a href="https://artificialanalysis.ai/agents/coding-agents">Coding Agent Index</a>.
       The first three charts pair an AA capability index with AA's measured cost to complete one task in
       that same index, so they share an axis and read against each other; the fourth swaps that axis for
       AA's reported total parameter count and so sits apart, last. Together they show both economic and
@@ -430,7 +566,7 @@ TEMPLATE = r"""<!DOCTYPE html>
     <div class="label">Method</div>
     <div class="mgrid">
       <div><div class="k">Source</div><div class="v">Artificial Analysis</div></div>
-      <div><div class="k">Metric &middot; y</div><div class="v">Coding &middot; Intelligence &middot; Agentic</div></div>
+      <div><div class="k">Metric &middot; y</div><div class="v">Coding Agent &middot; Intelligence &middot; GDPval-AA</div></div>
       <div><div class="k">Metric &middot; x</div><div class="v">Matched $ / task &middot; total parameters</div></div>
       <div><div class="k">Models plotted</div><div class="v" id="mStat">&mdash;</div></div>
       <div><div class="k">Captured</div><div class="v">__CAPTURED__</div></div>
@@ -442,8 +578,8 @@ TEMPLATE = r"""<!DOCTYPE html>
     model through each index &mdash; input, cached reads, output and reasoning tokens included &mdash; so a
     verbose reasoning model costs more than its per-token price suggests. That is also why the plot is
     smaller than the full catalogue: AA lists <span id="cTotal">&mdash;</span> models, while complete
-    score-and-cost pairs cover <span id="cCoding">&mdash;</span> for Coding, <span id="cPlot">&mdash;</span>
-    for Intelligence and <span id="cAgentic">&mdash;</span> for Agentic; <span id="cParams">&mdash;</span>
+    score-and-cost pairs cover <span id="cCoding">&mdash;</span> agent runs for Coding, <span id="cPlot">&mdash;</span>
+    models for Intelligence and <span id="cAgentic">&mdash;</span> for GDPval-AA; <span id="cParams">&mdash;</span>
     models have both Intelligence Index and total parameters. Everything else is absent rather than estimated.
   </div>
 
@@ -457,9 +593,9 @@ TEMPLATE = r"""<!DOCTYPE html>
   </div>
 
   <nav class="toc">
-    <a href="#coding">1 &middot; Coding</a>
+    <a href="#coding">1 &middot; Coding agents</a>
     <a href="#intelligence">2 &middot; Intelligence</a>
-    <a href="#agentic">3 &middot; Agentic</a>
+    <a href="#agentic">3 &middot; GDPval-AA</a>
     <a href="#parameters">4 &middot; Parameter efficiency</a>
     <a href="#frontier">5 &middot; Efficient frontiers</a>
     <a href="#table">6 &middot; Full table</a>
@@ -468,6 +604,8 @@ TEMPLATE = r"""<!DOCTYPE html>
   <div class="filters" role="group" aria-label="Filters">
     <button class="chip" id="fProp" aria-pressed="true"><span class="dot prop"></span>Proprietary</button>
     <button class="chip" id="fOpen" aria-pressed="true"><span class="dot open"></span>Open-weights</button>
+    <button class="chip" id="fUnk" aria-pressed="true"
+      title="Coding-agent runs on a model AA's leaderboard does not carry, so its weights status is unpublished"><span class="dot unk"></span>Weights unpublished</button>
     <button class="chip" id="fSup" aria-pressed="false"
             title="Drop every model that some other model beats on both axes at once">Hide superseded</button>
     <button class="chip" id="fEff" aria-pressed="false"
@@ -481,20 +619,23 @@ TEMPLATE = r"""<!DOCTYPE html>
   </div>
 
   <section id="coding">
-    <h2>1 &middot; Coding Index</h2>
-    <p class="sub">Terminal-Bench v2.1 and SciCode, equally weighted. Cost is the measured average task
-      cost across those same two evaluations.</p>
+    <h2>1 &middot; Coding Agent Index</h2>
+    <p class="sub">DeepSWE, Terminal-Bench v2.1 and SWE-Atlas-QnA, equally weighted. The unit here is an
+      <b>agent plus a model</b> &mdash; Claude Code on Opus 5 (xhigh) is a different row from Codex on the
+      same model &mdash; because the harness is part of what is being measured. Score and cost are both
+      AA's, read off one run, so nothing is reweighted to put them on the same axis.</p>
     <div class="card">
-      <div class="cap">Coding Index vs Coding Index cost per task &middot; log cost axis &middot; up-and-left is better
+      <div class="cap">Coding Agent Index vs measured cost per task &middot; log cost axis &middot; up-and-left is better
         &middot; click any point to pin its name</div>
       <div class="plotwrap">
         <svg id="svg-coding" viewBox="0 0 980 560" role="img"
-             aria-label="Scatter plot of Artificial Analysis Coding Index against Coding Index cost per task in US dollars"></svg>
+             aria-label="Scatter plot of Artificial Analysis Coding Agent Index against measured cost per task in US dollars"></svg>
         <div class="tip" id="tip-coding" role="status"></div>
       </div>
       <div class="legend">
         <span class="item"><span class="swatch" style="background:var(--series-prop)"></span>Proprietary</span>
         <span class="item"><span class="swatch" style="background:var(--series-open)"></span>Open-weights</span>
+        <span class="item"><span class="swatch hollow"></span>Weights unpublished</span>
         <span class="item"><span class="line"></span>Efficient frontier</span>
       </div>
     </div>
@@ -502,7 +643,7 @@ TEMPLATE = r"""<!DOCTYPE html>
 
   <section id="intelligence">
     <h2>2 &middot; Intelligence Index</h2>
-    <p class="sub">AA's broad v4.1 synthesis across agentic work, coding, scientific reasoning and general capability.</p>
+    <p class="sub">AA's broad v4.3 synthesis across agentic work, coding, scientific reasoning and general capability.</p>
     <div class="card">
       <div class="cap">Intelligence Index vs cost per task &middot; log cost axis &middot; up-and-left is better
         &middot; click any point to pin its name</div>
@@ -520,15 +661,16 @@ TEMPLATE = r"""<!DOCTYPE html>
   </section>
 
   <section id="agentic">
-    <h2>3 &middot; Agentic Index</h2>
-    <p class="sub">GDPval-AA v2 and τ³-Banking, equally weighted. It measures tool use, planning and
-      multi-step execution rather than coding specifically.</p>
+    <h2>3 &middot; GDPval-AA v2</h2>
+    <p class="sub">Agentic real-world work tasks, scored by a judge panel against human experts and
+      anchored at an Elo of 1000. A single evaluation rather than a composite: AA publishes its score and
+      the cost it measured running it, and both come off the same run.</p>
     <div class="card">
-      <div class="cap">Agentic Index vs Agentic Index cost per task &middot; log cost axis &middot; up-and-left is better
+      <div class="cap">GDPval-AA v2 vs its measured cost per task &middot; log cost axis &middot; up-and-left is better
         &middot; click any point to pin its name</div>
       <div class="plotwrap">
         <svg id="svg-agentic" viewBox="0 0 980 560" role="img"
-             aria-label="Scatter plot of Artificial Analysis Agentic Index against Agentic Index cost per task in US dollars"></svg>
+             aria-label="Scatter plot of GDPval-AA v2 against its measured cost per task in US dollars"></svg>
         <div class="tip" id="tip-agentic" role="status"></div>
       </div>
       <div class="legend">
@@ -587,13 +729,13 @@ TEMPLATE = r"""<!DOCTYPE html>
       <table id="tbl"><thead><tr>
         <th data-k="name">Model <span class="ar" aria-hidden="true">&#8597;</span></th>
         <th data-k="creator">Lab <span class="ar" aria-hidden="true">&#8597;</span></th>
-        <th data-k="codingScore" style="text-align:right">Coding Index <span class="ar" aria-hidden="true">&#8597;</span></th>
-        <th data-k="codingCost" style="text-align:right">Coding $ / task <span class="ar" aria-hidden="true">&#8597;</span></th>
+        <th data-k="codingScore" style="text-align:right">Coding Agent Index <span class="ar" aria-hidden="true">&#8597;</span></th>
+        <th data-k="codingCost" style="text-align:right">Coding Agent $ / task <span class="ar" aria-hidden="true">&#8597;</span></th>
         <th data-k="ii" style="text-align:right">Intelligence Index <span class="ar" aria-hidden="true">&#8597;</span></th>
         <th data-k="cost" style="text-align:right">Intelligence $ / task <span class="ar" aria-hidden="true">&#8597;</span></th>
         <th data-k="params" style="text-align:right">Parameters <span class="ar" aria-hidden="true">&#8597;</span></th>
-        <th data-k="agenticScore" style="text-align:right">Agentic Index <span class="ar" aria-hidden="true">&#8597;</span></th>
-        <th data-k="agenticCost" style="text-align:right">Agentic $ / task <span class="ar" aria-hidden="true">&#8597;</span></th>
+        <th data-k="agenticScore" style="text-align:right">GDPval-AA v2 <span class="ar" aria-hidden="true">&#8597;</span></th>
+        <th data-k="agenticCost" style="text-align:right">GDPval $ / task <span class="ar" aria-hidden="true">&#8597;</span></th>
         <th data-k="pin" style="text-align:right">$ / 1M in <span class="ar" aria-hidden="true">&#8597;</span></th>
         <th data-k="pout" style="text-align:right">$ / 1M out <span class="ar" aria-hidden="true">&#8597;</span></th>
         <th data-k="tps" style="text-align:right">tok/s <span class="ar" aria-hidden="true">&#8597;</span></th>
@@ -605,9 +747,12 @@ TEMPLATE = r"""<!DOCTYPE html>
   </section>
 
   <div class="foot">
-    <p>Sourced entirely from Artificial Analysis. Intelligence Index v4.1 comprises
-      <span id="evals"></span>. Coding and Agentic costs reweight AA's measured component-task costs using
-      AA's published capability-index weights; no score, token price or task measurement is estimated. Rebuild with
+    <p>Sourced entirely from Artificial Analysis. Intelligence Index v4.3 comprises
+      <span id="evals"></span>. The Coding Agent Index carries its own measured cost per task, and the
+      Intelligence Index cost is AA's own total. GDPval-AA's cost is AA's figure for that evaluation with
+      its 10% index weight divided back out &mdash; AA reports each component's task cost pre-weighted, and
+      the components sum exactly to the published total. No score, token price or task measurement is
+      estimated, and nothing is filled in from another source. Rebuild with
       <code>python3 scripts/fetch_aa.py &amp;&amp; python3 build.py</code>.</p>
   </div>
 </div>
@@ -640,7 +785,7 @@ const DATA = __DATA__;
     o.value = l; o.textContent = l; $("fLab").appendChild(o);
   }
 
-  const st = { prop:true, open:true, sup:false, eff:false, reas:false, only:false,
+  const st = { prop:true, open:true, unk:true, sup:false, eff:false, reas:false, only:false,
                lab:"", q:"", sortK:"ii", sortDir:-1 };
   // Names whose labels the reader has stuck down by clicking. Keyed by name so
   // a pin survives filtering and resizing, and returns when the model does.
@@ -650,7 +795,7 @@ const DATA = __DATA__;
   function filteredBase(){
     const q = st.q.trim().toLowerCase();
     return R.filter(r =>
-      (r.open ? st.open : st.prop) &&
+      (unknownWeights(r) ? st.unk : (r.open ? st.open : st.prop)) &&
       (!st.only || pins.has(r.name)) &&
       (!st.reas || r.reas) &&
       (!st.lab || r.creator === st.lab) &&
@@ -685,9 +830,9 @@ const DATA = __DATA__;
   }
 
   const METRICS={
-    coding:{label:"Coding Index",svg:"svg-coding",tip:"tip-coding"},
+    coding:{label:"Coding Agent Index",svg:"svg-coding",tip:"tip-coding"},
     intelligence:{label:"Intelligence Index",svg:"svg-intelligence",tip:"tip-intelligence"},
-    agentic:{label:"Agentic Index",svg:"svg-agentic",tip:"tip-agentic"},
+    agentic:{label:"GDPval-AA v2",svg:"svg-agentic",tip:"tip-agentic"},
   };
   const PLOTS={
     coding:METRICS.coding,
@@ -730,6 +875,16 @@ const DATA = __DATA__;
 
   // colour follows the entity, never its rank or row order
   const colourOf = r => r.open ? "var(--series-open)" : "var(--series-prop)";
+  // Weights status belongs to a MODEL. A coding-agent row inherits it from the
+  // model that run used, and some of those models are not on AA's leaderboard
+  // at all (unreleased codenames), so the honest value is "unknown" rather than
+  // "proprietary". Unknown draws HOLLOW -- same hue, no fill -- because the
+  // palette has no room for a third categorical colour on an all-pairs form.
+  const unknownWeights = r => r.open === null || r.open === undefined;
+  const fillOf   = r => unknownWeights(r) ? "var(--surface-1)" : colourOf(r);
+  const strokeOf = r => unknownWeights(r) ? colourOf(r) : "var(--surface-1)";
+  const weightsOf = r => unknownWeights(r) ? "not published"
+                       : (r.open ? (r.lic || "open") : "proprietary");
 
   /* ---------- scatter ---------- */
   // The plot fills whatever width the page gives it. The viewBox width tracks
@@ -827,8 +982,8 @@ const DATA = __DATA__;
     pts=[];
     for(const r of rows){
       const cx=X(r.cost), cy=Y(r.ii), on=frontSet.has(r);
-      const c=el("circle",{cx:cx,cy:cy,r:on?6:5,fill:colourOf(r),
-        stroke:"var(--surface-1)","stroke-width":2,
+      const c=el("circle",{cx:cx,cy:cy,r:on?6:5,fill:fillOf(r),
+        stroke:strokeOf(r),"stroke-width":2,
         class:"pt"+(pins.has(r.name)?" pinned":""),role:"button",tabindex:0,
         "aria-label":"Pin "+r.name+" on the Intelligence Index chart",
         "aria-pressed":String(pins.has(r.name))});
@@ -985,7 +1140,7 @@ const DATA = __DATA__;
     const rows=[["Intelligence Index",r.ii.toFixed(1)],
                 ["Cost per task",fmtCost(r.cost)],
                 ["Lab",r.creator],
-                ["Weights",r.open?(r.lic||"open"):"proprietary"],
+                ["Weights",weightsOf(r)],
                 ["Output speed",r.tps==null?"—":r.tps+" tok/s"],
                 ["Context",fmtCtx(r.ctx)]];
     rows.push(["On frontier", frontSet.has(r) ? "yes" : "no — superseded"]);
@@ -1094,9 +1249,9 @@ const DATA = __DATA__;
     const pts=[];
     for(const r of rows){
       const m=metricOf(r,key), x=X(m.cost), y=Y(m.score), on=front.has(r);
-      const fill=key==="parameters"&&!on?"var(--muted)":colourOf(r);
+      const fill=key==="parameters"&&!on?"var(--muted)":fillOf(r);
       const mark=el("circle",{cx:x,cy:y,r:on?6:5,fill:fill,
-        stroke:"var(--surface-1)","stroke-width":2,
+        stroke:strokeOf(r),"stroke-width":2,
         class:"pt"+(pins.has(r.name)?" pinned":""),role:"button",tabindex:0,
         "aria-label":"Pin "+r.name+" on the "+cfg.label+" chart",
         "aria-pressed":String(pins.has(r.name))});
@@ -1173,10 +1328,10 @@ const DATA = __DATA__;
     const name=document.createElement("div"); name.className="tname"; name.textContent=hit.r.name; popup.appendChild(name);
     const lines=key==="parameters"
       ? [["Intelligence Index",m.score.toFixed(1)],["Parameters",fmtParams(m.cost)],
-         ["Lab",hit.r.creator],["Weights",hit.r.open?(hit.r.lic||"open"):"proprietary"],
+         ["Lab",hit.r.creator],["Weights",weightsOf(hit.r)],
          ["On parameter frontier",plot.front.has(hit.r)?"yes":"no — superseded"]]
       : [[cfg.label,m.score.toFixed(1)],["Cost per task",fmtCost(m.cost)],
-         ["Lab",hit.r.creator],["Weights",hit.r.open?(hit.r.lic||"open"):"proprietary"],
+         ["Lab",hit.r.creator],["Weights",weightsOf(hit.r)],
          ["On frontier",plot.front.has(hit.r)?"yes":"no — superseded"]];
     if(hit.r.dep) lines.push(["Vendor status","retired"]);
     for(const [k,v] of lines){
@@ -1225,7 +1380,7 @@ const DATA = __DATA__;
         add("$"+(m.cost/m.score).toFixed(4),"n");
         const td=document.createElement("td");
         const sp=document.createElement("span"); sp.className="tag";
-        sp.textContent=r.open?(r.lic||"open"):"proprietary";
+        sp.textContent=weightsOf(r);
         td.appendChild(sp); tr.appendChild(td); tb.appendChild(tr);
       }
     }
@@ -1301,7 +1456,7 @@ const DATA = __DATA__;
       add(r.tps==null?"—":String(r.tps),"n");
       add(fmtCtx(r.ctx),"n");
       add(show(r.rel));
-      add(r.open?(r.lic||"open"):"proprietary");
+      add(weightsOf(r));
       tb.appendChild(tr);
     }
   }
@@ -1338,7 +1493,7 @@ const DATA = __DATA__;
   $("copyMd").addEventListener("click",()=>{
     const views=metricViews(), rows=[...new Set(Object.values(views).flat())];
     const val=(r,key,field)=>metricOf(r,key)?(field==="score"?metricOf(r,key).score.toFixed(1):fmtCost(metricOf(r,key).cost)):"—";
-    const head="| Model | Lab | Coding | Coding $/task | Intelligence | Intelligence $/task | Parameters | Agentic | Agentic $/task | $/1M in | $/1M out | Context | Weights |\n"
+    const head="| Model | Lab | Coding Agent | Coding Agent $/task | Intelligence | Intelligence $/task | Parameters | GDPval-AA | GDPval $/task | $/1M in | $/1M out | Context | Weights |\n"
               +"|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|\n";
     const body=rows.map(r=>"| "+[r.name,r.creator,
       val(r,"coding","score"),val(r,"coding","cost"),
@@ -1346,7 +1501,7 @@ const DATA = __DATA__;
       fmtParams(r.params),
       val(r,"agentic","score"),val(r,"agentic","cost"),
       r.pin==null?"—":"$"+r.pin, r.pout==null?"—":"$"+r.pout,
-      fmtCtx(r.ctx), r.open?(r.lic||"open"):"proprietary"].join(" | ")+" |").join("\n");
+      fmtCtx(r.ctx), weightsOf(r)].join(" | ")+" |").join("\n");
     clip(head+body+"\n\nSource: Artificial Analysis (artificialanalysis.ai), captured __CAPTURED__.",
          "✓ "+rows.length+" rows copied");
   });
@@ -1403,7 +1558,7 @@ const DATA = __DATA__;
   }
   const toggle=(id,key)=>$(id).addEventListener("click",()=>{
     st[key]=!st[key]; $(id).setAttribute("aria-pressed",String(st[key])); render();});
-  toggle("fProp","prop"); toggle("fOpen","open");
+  toggle("fProp","prop"); toggle("fOpen","open"); toggle("fUnk","unk");
   toggle("fSup","sup");   toggle("fEff","eff");   toggle("fReas","reas");
   toggle("fOnly","only");
   $("fClear").addEventListener("click",()=>{ pins.clear(); render(); });

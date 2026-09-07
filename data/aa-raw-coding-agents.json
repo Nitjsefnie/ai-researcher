@@ -1,0 +1,7136 @@
+[
+ {
+  "id": "83b40ab12281bbce1ddfb03eaf1cb2cc",
+  "isDefault": false,
+  "isHighlighted": false,
+  "agentName": "Codex",
+  "provider": "openai",
+  "hostModelSlug": "openai_gpt-5-6-sol",
+  "display": {
+   "agent": "Codex",
+   "model": "GPT-5.6 Sol (medium)",
+   "creator": {
+    "agent": "OpenAI",
+    "model": "OpenAI"
+   }
+  },
+  "displayLabel": "Codex - GPT-5.6 Sol (medium)",
+  "variantOf": null,
+  "isUnavailable": false,
+  "indexComponentCount": 3,
+  "evalCount": 3,
+  "evals": [
+   {
+    "datasetIndexName": "deep-swe",
+    "evaluationDatasetSlug": "DeepSWE",
+    "refDatasetName": "datacurve/deep-swe@2",
+    "weight": 0.333333333333333,
+    "mean": {
+     "reward": 0.640117994100295,
+     "inputTokens": 3958001.439528024,
+     "cacheWriteTokens": null,
+     "outputTokens": 22282.849557522124
+    }
+   },
+   {
+    "datasetIndexName": "swe-atlas-qna",
+    "evaluationDatasetSlug": "SWE-Atlas-QnA",
+    "refDatasetName": "datasets/swe-atlas-qna",
+    "weight": 0.333333333333333,
+    "mean": {
+     "reward": 0.403225806451613,
+     "inputTokens": 3684959.13172043,
+     "cacheWriteTokens": null,
+     "outputTokens": 13145.610215053763
+    }
+   },
+   {
+    "datasetIndexName": "terminal-bench-v2.1",
+    "evaluationDatasetSlug": "Terminal-Bench v2.1",
+    "refDatasetName": "terminal-bench@2.1",
+    "weight": 0.333333333333333,
+    "mean": {
+     "reward": 0.805243445692884,
+     "inputTokens": 736877.8389513108,
+     "cacheWriteTokens": null,
+     "outputTokens": 6287.831460674157
+    }
+   }
+  ],
+  "indexScore": 0.616195748748264,
+  "mean": {
+   "reward": 0.616195748748264,
+   "costUsd": 2.192997850306748,
+   "agentWallTimeSec": 297.95992535787343,
+   "steps": 71.35378323108384,
+   "inputTokens": 2974758.351738241,
+   "cacheWriteTokens": null,
+   "outputTokens": 14440.597137014312,
+   "cacheTokens": 2776346.5276073604,
+   "cacheHitRate": 0.8970664465490251,
+   "totalTokens": 5765545.476482623
+  },
+  "sums": {
+   "costUsd": 714.9172992000007
+  },
+  "percentiles": {
+   "costUsd": {
+    "p05": 0.6790677133742331,
+    "p25": 1.117776473619633,
+    "p50": 1.6374048278118598,
+    "p75": 2.695114021267894,
+    "p95": 5.407661515337423
+   },
+   "totalTokens": {
+    "p05": 1056199.3038854806,
+    "p25": 2091728.43047035,
+    "p50": 3661694.7484662607,
+    "p75": 6927332.56441718,
+    "p95": 17483873.972597137
+   }
+  },
+  "versions": {
+   "deep-swe": {
+    "min": {
+     "version": "0.141.0",
+     "dateReleased": "2026-06-18"
+    },
+    "max": {
+     "version": "0.141.0",
+     "dateReleased": "2026-06-18"
+    }
+   },
+   "swe-atlas-qna": {
+    "min": {
+     "version": "0.141.0",
+     "dateReleased": "2026-06-18"
+    },
+    "max": {
+     "version": "0.147.0",
+     "dateReleased": "2026-08-07"
+    }
+   },
+   "terminal-bench-v2.1": {
+    "min": {
+     "version": "0.141.0",
+     "dateReleased": "2026-06-18"
+    },
+    "max": {
+     "version": "0.144.5",
+     "dateReleased": "2026-07-16"
+    }
+   }
+  }
+ },
+ {
+  "id": "e347a66c457b5dca0bf4ed67c15afc5f",
+  "isDefault": false,
+  "isHighlighted": false,
+  "agentName": "Opencode",
+  "provider": "meta",
+  "hostModelSlug": "meta_super-nova",
+  "display": {
+   "agent": "Opencode",
+   "model": "Muse Spark 1.1 (xhigh)",
+   "creator": {
+    "agent": "SST",
+    "model": "Meta"
+   }
+  },
+  "displayLabel": "Opencode - Muse Spark 1.1 (xhigh)",
+  "variantOf": null,
+  "isUnavailable": false,
+  "indexComponentCount": 3,
+  "evalCount": 3,
+  "evals": [
+   {
+    "datasetIndexName": "deep-swe",
+    "evaluationDatasetSlug": "DeepSWE",
+    "refDatasetName": "datacurve/deep-swe@2",
+    "weight": 0.333333333333333,
+    "mean": {
+     "reward": 0.542772861356932,
+     "inputTokens": 13967690.943952803,
+     "cacheWriteTokens": 0,
+     "outputTokens": 66078.67256637168
+    }
+   },
+   {
+    "datasetIndexName": "swe-atlas-qna",
+    "evaluationDatasetSlug": "SWE-Atlas-QnA",
+    "refDatasetName": "datasets/swe-atlas-qna",
+    "weight": 0.333333333333333,
+    "mean": {
+     "reward": 0.333333333333333,
+     "inputTokens": 2452173.3575268816,
+     "cacheWriteTokens": 0,
+     "outputTokens": 13315.435483870968
+    }
+   },
+   {
+    "datasetIndexName": "terminal-bench-v2.1",
+    "evaluationDatasetSlug": "Terminal-Bench v2.1",
+    "refDatasetName": "terminal-bench@2.1",
+    "weight": 0.333333333333333,
+    "mean": {
+     "reward": 0.771535580524344,
+     "inputTokens": 1869221.7265917603,
+     "cacheWriteTokens": 0,
+     "outputTokens": 24137.303370786518
+    }
+   }
+  ],
+  "indexScore": 0.5492139250715363,
+  "mean": {
+   "reward": 0.5492139250715363,
+   "costUsd": 1.435218435173823,
+   "agentWallTimeSec": 761.3780071574635,
+   "steps": 55.51329243353784,
+   "inputTokens": 6284599.100204499,
+   "cacheWriteTokens": 0,
+   "outputTokens": 34558.969325153375,
+   "cacheTokens": 5970369.145194287,
+   "cacheHitRate": 0.9500000000000018,
+   "totalTokens": 12289527.214723915
+  },
+  "sums": {
+   "costUsd": 467.88120986666706
+  },
+  "percentiles": {
+   "costUsd": {
+    "p05": 0.37308756044785274,
+    "p25": 0.6057195473977517,
+    "p50": 0.9795425886196317,
+    "p75": 1.75764892601227,
+    "p95": 3.83617740620859
+   },
+   "totalTokens": {
+    "p05": 2746898.264335378,
+    "p25": 4702818.940030686,
+    "p50": 8092248.0038854815,
+    "p75": 14907109.151482606,
+    "p95": 33980067.62595092
+   }
+  },
+  "versions": {
+   "deep-swe": {
+    "min": {
+     "version": "1.17.14",
+     "dateReleased": "2026-07-06"
+    },
+    "max": {
+     "version": "1.17.14",
+     "dateReleased": "2026-07-06"
+    }
+   },
+   "swe-atlas-qna": {
+    "min": {
+     "version": "1.17.13",
+     "dateReleased": "2026-07-01"
+    },
+    "max": {
+     "version": "1.17.14",
+     "dateReleased": "2026-07-06"
+    }
+   },
+   "terminal-bench-v2.1": {
+    "min": {
+     "version": "1.17.14",
+     "dateReleased": "2026-07-06"
+    },
+    "max": {
+     "version": "1.18.18",
+     "dateReleased": "2026-08-13"
+    }
+   }
+  }
+ },
+ {
+  "id": "30408f5170add44f218b8104d76deccf",
+  "isDefault": false,
+  "isHighlighted": false,
+  "agentName": "Claude Code",
+  "provider": "anthropic",
+  "hostModelSlug": "anthropic_claude-sonnet-4-6",
+  "display": {
+   "agent": "Claude Code",
+   "model": "Sonnet 4.6 (medium)",
+   "creator": {
+    "agent": "Anthropic",
+    "model": "Anthropic"
+   }
+  },
+  "displayLabel": "Claude Code - Sonnet 4.6 (medium)",
+  "variantOf": null,
+  "isUnavailable": false,
+  "indexComponentCount": 3,
+  "evalCount": 3,
+  "evals": [
+   {
+    "datasetIndexName": "deep-swe",
+    "evaluationDatasetSlug": "DeepSWE",
+    "refDatasetName": "datacurve/deep-swe@2",
+    "weight": 0.333333333333333,
+    "mean": {
+     "reward": 0.289085545722714,
+     "inputTokens": 8347776.569321534,
+     "cacheWriteTokens": 172390.57817109145,
+     "outputTokens": 67150.87315634219
+    }
+   },
+   {
+    "datasetIndexName": "swe-atlas-qna",
+    "evaluationDatasetSlug": "SWE-Atlas-QnA",
+    "refDatasetName": "datasets/swe-atlas-qna",
+    "weight": 0.333333333333333,
+    "mean": {
+     "reward": 0.196236559139785,
+     "inputTokens": 2683549.6666666665,
+     "cacheWriteTokens": 110030.44354838709,
+     "outputTokens": 21375.09946236559
+    }
+   },
+   {
+    "datasetIndexName": "terminal-bench-v2.1",
+    "evaluationDatasetSlug": "Terminal-Bench v2.1",
+    "refDatasetName": "terminal-bench@2.1",
+    "weight": 0.333333333333333,
+    "mean": {
+     "reward": 0.674157303370786,
+     "inputTokens": 1065161.5917602996,
+     "cacheWriteTokens": 50804.426966292136,
+     "outputTokens": 31733.7265917603
+    }
+   }
+  ],
+  "indexScore": 0.3864931360777617,
+  "mean": {
+   "reward": 0.3864931360777617,
+   "costUsd": 2.0415130214723938,
+   "agentWallTimeSec": 827.6555807770975,
+   "steps": 67.4176891615542,
+   "inputTokens": 4205086.787321064,
+   "cacheWriteTokens": 115477.00715746419,
+   "outputTokens": 40070.130879345605,
+   "cacheTokens": 4083419.110429447,
+   "cacheHitRate": 0.9487221679807678,
+   "totalTokens": 8444053.035787314
+  },
+  "sums": {
+   "costUsd": 665.5332449999995
+  },
+  "percentiles": {
+   "costUsd": {
+    "p05": 0.7459943215337436,
+    "p25": 1.0279937055725956,
+    "p50": 1.5006240688650319,
+    "p75": 2.440753226329245,
+    "p95": 4.989403279631902
+   },
+   "totalTokens": {
+    "p05": 2479700.1734151305,
+    "p25": 3951481.8997955,
+    "p50": 6142241.967280175,
+    "p75": 9957435.183026573,
+    "p95": 22742288.40265847
+   }
+  },
+  "versions": {
+   "deep-swe": {
+    "min": {
+     "version": "2.1.153",
+     "dateReleased": "2026-05-27"
+    },
+    "max": {
+     "version": "2.1.156",
+     "dateReleased": "2026-05-28"
+    }
+   },
+   "swe-atlas-qna": {
+    "min": {
+     "version": "2.1.92",
+     "dateReleased": "2026-04-04"
+    },
+    "max": {
+     "version": "2.1.132",
+     "dateReleased": "2026-05-06"
+    }
+   },
+   "terminal-bench-v2.1": {
+    "min": {
+     "version": "2.1.91",
+     "dateReleased": "2026-04-02"
+    },
+    "max": {
+     "version": "2.1.215",
+     "dateReleased": "2026-07-19"
+    }
+   }
+  }
+ },
+ {
+  "id": "a3de73b424f0aa6d48daef70434ea21e",
+  "isDefault": false,
+  "isHighlighted": false,
+  "agentName": "Opencode",
+  "provider": "google",
+  "hostModelSlug": "google_andwise_ai-studio",
+  "display": {
+   "agent": "Opencode",
+   "model": "Gemini 3.7 Flash (high)",
+   "creator": {
+    "agent": "SST",
+    "model": "Google"
+   }
+  },
+  "displayLabel": "Opencode - Gemini 3.7 Flash (high)",
+  "variantOf": null,
+  "isUnavailable": false,
+  "indexComponentCount": 3,
+  "evalCount": 3,
+  "evals": [
+   {
+    "datasetIndexName": "deep-swe",
+    "evaluationDatasetSlug": "DeepSWE",
+    "refDatasetName": "datacurve/deep-swe@2",
+    "weight": 0.333333333333333,
+    "mean": {
+     "reward": 0.572271386430678,
+     "inputTokens": 18609812.979351033,
+     "cacheWriteTokens": 0,
+     "outputTokens": 85504.38938053098
+    }
+   },
+   {
+    "datasetIndexName": "swe-atlas-qna",
+    "evaluationDatasetSlug": "SWE-Atlas-QnA",
+    "refDatasetName": "datasets/swe-atlas-qna",
+    "weight": 0.333333333333333,
+    "mean": {
+     "reward": 0.306451612903226,
+     "inputTokens": 5978194.706989247,
+     "cacheWriteTokens": 0,
+     "outputTokens": 29988.72311827957
+    }
+   },
+   {
+    "datasetIndexName": "terminal-bench-v2.1",
+    "evaluationDatasetSlug": "Terminal-Bench v2.1",
+    "refDatasetName": "terminal-bench@2.1",
+    "weight": 0.333333333333333,
+    "mean": {
+     "reward": 0.910112359550562,
+     "inputTokens": 2830184.981273408,
+     "cacheWriteTokens": 0,
+     "outputTokens": 29501.228464419477
+    }
+   }
+  ],
+  "indexScore": 0.5962784529614886,
+  "mean": {
+   "reward": 0.5962784529614886,
+   "costUsd": 1.2679325688650298,
+   "agentWallTimeSec": 527.0915644171779,
+   "steps": 83.44887525562373,
+   "inputTokens": 9497213.109406954,
+   "cacheWriteTokens": 0,
+   "outputTokens": 49098.794478527605,
+   "cacheTokens": 8946811.470347656,
+   "cacheHitRate": 0.8634331167917663,
+   "totalTokens": 18493123.3742331
+  },
+  "sums": {
+   "costUsd": 413.34601745000003
+  },
+  "percentiles": {
+   "costUsd": {
+    "p05": 0.5016791540490798,
+    "p25": 0.7506929508435582,
+    "p50": 1.0105181285276073,
+    "p75": 1.5174770432515337,
+    "p95": 2.718053983282209
+   },
+   "totalTokens": {
+    "p05": 4430709.106339467,
+    "p25": 8787049.08997955,
+    "p50": 13507346.656441705,
+    "p75": 22815347.154396717,
+    "p95": 49006257.60899794
+   }
+  },
+  "versions": {
+   "deep-swe": {
+    "min": {
+     "version": "1.18.10",
+     "dateReleased": "2026-07-30"
+    },
+    "max": {
+     "version": "1.18.10",
+     "dateReleased": "2026-07-30"
+    }
+   },
+   "swe-atlas-qna": {
+    "min": {
+     "version": "1.18.10",
+     "dateReleased": "2026-07-30"
+    },
+    "max": {
+     "version": "1.18.10",
+     "dateReleased": "2026-07-30"
+    }
+   },
+   "terminal-bench-v2.1": {
+    "min": {
+     "version": "1.18.10",
+     "dateReleased": "2026-07-30"
+    },
+    "max": {
+     "version": "1.18.18",
+     "dateReleased": "2026-08-13"
+    }
+   }
+  }
+ },
+ {
+  "id": "a0dad1a77e513acdbf8f2ac7f0514f60",
+  "isDefault": false,
+  "isHighlighted": false,
+  "agentName": "Cursor CLI",
+  "provider": "cursor",
+  "hostModelSlug": "openai_gpt-5-5-medium",
+  "display": {
+   "agent": "Cursor CLI",
+   "model": "GPT-5.5 (medium)",
+   "creator": {
+    "agent": "Cursor",
+    "model": "OpenAI"
+   }
+  },
+  "displayLabel": "Cursor CLI - GPT-5.5 (medium)",
+  "variantOf": null,
+  "isUnavailable": false,
+  "indexComponentCount": 3,
+  "evalCount": 3,
+  "evals": [
+   {
+    "datasetIndexName": "deep-swe",
+    "evaluationDatasetSlug": "DeepSWE",
+    "refDatasetName": "datacurve/deep-swe@2",
+    "weight": 0.333333333333333,
+    "mean": {
+     "reward": 0.371681415929204,
+     "inputTokens": 3548171.5280235987,
+     "cacheWriteTokens": 0,
+     "outputTokens": 16634.790560471978
+    }
+   },
+   {
+    "datasetIndexName": "swe-atlas-qna",
+    "evaluationDatasetSlug": "SWE-Atlas-QnA",
+    "refDatasetName": "datasets/swe-atlas-qna",
+    "weight": 0.333333333333333,
+    "mean": {
+     "reward": 0.276881720430108,
+     "inputTokens": 1748372.411111111,
+     "cacheWriteTokens": 0,
+     "outputTokens": 9251.594444444445
+    }
+   },
+   {
+    "datasetIndexName": "terminal-bench-v2.1",
+    "evaluationDatasetSlug": "Terminal-Bench v2.1",
+    "refDatasetName": "terminal-bench@2.1",
+    "weight": 0.333333333333333,
+    "mean": {
+     "reward": 0.764044943820225,
+     "inputTokens": 545774.7415730337,
+     "cacheWriteTokens": 0,
+     "outputTokens": 6399.441947565543
+    }
+   }
+  ],
+  "indexScore": 0.4708693600598457,
+  "mean": {
+   "reward": 0.4708693600598457,
+   "costUsd": 1.9980312342194944,
+   "agentWallTimeSec": 386.6294212678939,
+   "steps": 77.78698023176551,
+   "inputTokens": 2043912.6185412407,
+   "cacheWriteTokens": 0,
+   "outputTokens": 11032.145330606681,
+   "cacheTokens": 1900872.9783231092,
+   "cacheHitRate": 0.8915632417465625,
+   "totalTokens": 3955817.7421949576
+  },
+  "sums": {
+   "costUsd": 643.5962420000001
+  },
+  "percentiles": {
+   "costUsd": {
+    "p05": 0.8416650134969322,
+    "p25": 1.2860806850715736,
+    "p50": 1.7080516881390577,
+    "p75": 2.459656532719838,
+    "p95": 4.163975257873207
+   },
+   "totalTokens": {
+    "p05": 1162434.5222903886,
+    "p25": 2052211.3333333335,
+    "p50": 3035036.5122699374,
+    "p75": 5163592.853783235,
+    "p95": 9646846.341513282
+   }
+  },
+  "versions": {
+   "deep-swe": {
+    "min": {
+     "version": "cli-2026.05.27-fe9a6e2",
+     "dateReleased": "2026-05-27"
+    },
+    "max": {
+     "version": "cli-2026.05.27-fe9a6e2",
+     "dateReleased": "2026-05-27"
+    }
+   },
+   "swe-atlas-qna": {
+    "min": {
+     "version": "cli-2026.04.29-c83a488",
+     "dateReleased": "2026-04-29"
+    },
+    "max": {
+     "version": "cli-2026.05.07-42ddaca",
+     "dateReleased": "2026-05-07"
+    }
+   },
+   "terminal-bench-v2.1": {
+    "min": {
+     "version": "cli-2026.04.29-c83a488",
+     "dateReleased": "2026-04-29"
+    },
+    "max": {
+     "version": "cli-2026.07.16-899851b",
+     "dateReleased": "2026-07-16"
+    }
+   }
+  }
+ },
+ {
+  "id": "5813c5748981e65ac6323473cf4c594b",
+  "isDefault": false,
+  "isHighlighted": false,
+  "agentName": "Codex",
+  "provider": "openai",
+  "hostModelSlug": "openai_gpt-5-5",
+  "display": {
+   "agent": "Codex",
+   "model": "GPT-5.5 (medium)",
+   "creator": {
+    "agent": "OpenAI",
+    "model": "OpenAI"
+   }
+  },
+  "displayLabel": "Codex - GPT-5.5 (medium)",
+  "variantOf": null,
+  "isUnavailable": false,
+  "indexComponentCount": 3,
+  "evalCount": 3,
+  "evals": [
+   {
+    "datasetIndexName": "deep-swe",
+    "evaluationDatasetSlug": "DeepSWE",
+    "refDatasetName": "datacurve/deep-swe@2",
+    "weight": 0.333333333333333,
+    "mean": {
+     "reward": 0.566371681415929,
+     "inputTokens": 5215387.471976401,
+     "cacheWriteTokens": null,
+     "outputTokens": 20313.2389380531
+    }
+   },
+   {
+    "datasetIndexName": "swe-atlas-qna",
+    "evaluationDatasetSlug": "SWE-Atlas-QnA",
+    "refDatasetName": "datasets/swe-atlas-qna",
+    "weight": 0.333333333333333,
+    "mean": {
+     "reward": 0.306451612903226,
+     "inputTokens": 3716421.064516129,
+     "cacheWriteTokens": null,
+     "outputTokens": 11132.521505376344
+    }
+   },
+   {
+    "datasetIndexName": "terminal-bench-v2.1",
+    "evaluationDatasetSlug": "Terminal-Bench v2.1",
+    "refDatasetName": "terminal-bench@2.1",
+    "weight": 0.333333333333333,
+    "mean": {
+     "reward": 0.786516853932584,
+     "inputTokens": 993822.5917602996,
+     "cacheWriteTokens": null,
+     "outputTokens": 7193.782771535581
+    }
+   }
+  ],
+  "indexScore": 0.5531133827505798,
+  "mean": {
+   "reward": 0.5531133827505798,
+   "costUsd": 2.6525358742331258,
+   "agentWallTimeSec": 386.30447648261713,
+   "steps": 78.53885480572598,
+   "inputTokens": 3492715.3588957055,
+   "cacheWriteTokens": null,
+   "outputTokens": 13239.494887525565,
+   "cacheTokens": 3379605.7259713695,
+   "cacheHitRate": 0.9409891933709401,
+   "totalTokens": 6885560.579754606
+  },
+  "sums": {
+   "costUsd": 864.7266950000003
+  },
+  "percentiles": {
+   "costUsd": {
+    "p05": 0.8614101229038844,
+    "p25": 1.2907947188139035,
+    "p50": 1.9185552218813884,
+    "p75": 3.265406941717789,
+    "p95": 6.25848835562372
+   },
+   "totalTokens": {
+    "p05": 1542330.9278118622,
+    "p25": 2654069.121676889,
+    "p50": 4478967.250511248,
+    "p75": 8879802.082822084,
+    "p95": 19563231.418200403
+   }
+  },
+  "versions": {
+   "deep-swe": {
+    "min": {
+     "version": "0.134.0",
+     "dateReleased": "2026-05-26"
+    },
+    "max": {
+     "version": "0.134.0",
+     "dateReleased": "2026-05-26"
+    }
+   },
+   "swe-atlas-qna": {
+    "min": {
+     "version": "0.122.0",
+     "dateReleased": "2026-04-20"
+    },
+    "max": {
+     "version": "0.129.0",
+     "dateReleased": "2026-05-07"
+    }
+   },
+   "terminal-bench-v2.1": {
+    "min": {
+     "version": "0.122.0",
+     "dateReleased": "2026-04-20"
+    },
+    "max": {
+     "version": "0.144.6",
+     "dateReleased": "2026-07-18"
+    }
+   }
+  }
+ },
+ {
+  "id": "95e3fe05999bbda4eebc90806b9beb5e",
+  "isDefault": false,
+  "isHighlighted": false,
+  "agentName": "Claude Code",
+  "provider": "anthropic",
+  "hostModelSlug": "anthropic_claude-opus-5",
+  "display": {
+   "agent": "Claude Code",
+   "model": "Opus 5 (low)",
+   "creator": {
+    "agent": "Anthropic",
+    "model": "Anthropic"
+   }
+  },
+  "displayLabel": "Claude Code - Opus 5 (low)",
+  "variantOf": null,
+  "isUnavailable": false,
+  "indexComponentCount": 3,
+  "evalCount": 3,
+  "evals": [
+   {
+    "datasetIndexName": "deep-swe",
+    "evaluationDatasetSlug": "DeepSWE",
+    "refDatasetName": "datacurve/deep-swe@2",
+    "weight": 0.333333333333333,
+    "mean": {
+     "reward": 0.569321533923304,
+     "inputTokens": 4850074.179941003,
+     "cacheWriteTokens": 89466.02949852508,
+     "outputTokens": 37597.81415929204
+    }
+   },
+   {
+    "datasetIndexName": "swe-atlas-qna",
+    "evaluationDatasetSlug": "SWE-Atlas-QnA",
+    "refDatasetName": "datasets/swe-atlas-qna",
+    "weight": 0.333333333333333,
+    "mean": {
+     "reward": 0.39247311827957,
+     "inputTokens": 1852802.7150537635,
+     "cacheWriteTokens": 50570.81989247312,
+     "outputTokens": 18129.854838709678
+    }
+   },
+   {
+    "datasetIndexName": "terminal-bench-v2.1",
+    "evaluationDatasetSlug": "Terminal-Bench v2.1",
+    "refDatasetName": "terminal-bench@2.1",
+    "weight": 0.333333333333333,
+    "mean": {
+     "reward": 0.820224719101124,
+     "inputTokens": 850762.2471910112,
+     "cacheWriteTokens": 83212.92509363296,
+     "outputTokens": 9906.49063670412
+    }
+   }
+  ],
+  "indexScore": 0.5940064571013326,
+  "mean": {
+   "reward": 0.5940064571013326,
+   "costUsd": 2.2951577448875273,
+   "agentWallTimeSec": 598.7677147239262,
+   "steps": 64.39263803680981,
+   "inputTokens": 2618171.0398773006,
+   "cacheWriteTokens": 72964.39672801636,
+   "outputTokens": 22632.92229038855,
+   "cacheTokens": 2544838.016359919,
+   "cacheHitRate": 0.9637890151908798,
+   "totalTokens": 5258606.375255628
+  },
+  "sums": {
+   "costUsd": 748.221424833333
+  },
+  "percentiles": {
+   "costUsd": {
+    "p05": 0.6243978168200423,
+    "p25": 1.1107088517382413,
+    "p50": 1.6812709381390596,
+    "p75": 2.8059941099182013,
+    "p95": 5.53625360940695
+   },
+   "totalTokens": {
+    "p05": 1052808.971165643,
+    "p25": 2241561.5501022516,
+    "p50": 3646113.925357871,
+    "p75": 6794902.325153373,
+    "p95": 14210701.021881402
+   }
+  },
+  "versions": {
+   "deep-swe": {
+    "min": {
+     "version": "2.1.217",
+     "dateReleased": "2026-07-21"
+    },
+    "max": {
+     "version": "2.1.217",
+     "dateReleased": "2026-07-21"
+    }
+   },
+   "swe-atlas-qna": {
+    "min": {
+     "version": "2.1.217",
+     "dateReleased": "2026-07-21"
+    },
+    "max": {
+     "version": "2.1.223",
+     "dateReleased": "2026-08-05"
+    }
+   },
+   "terminal-bench-v2.1": {
+    "min": {
+     "version": "2.1.217",
+     "dateReleased": "2026-07-21"
+    },
+    "max": {
+     "version": "2.1.223",
+     "dateReleased": "2026-08-05"
+    }
+   }
+  }
+ },
+ {
+  "id": "bd6d5da83c0937956da4ccdc57fc3058",
+  "isDefault": true,
+  "isHighlighted": false,
+  "agentName": "Muse Code 1.0.2 RC",
+  "provider": "meta",
+  "hostModelSlug": "meta_goofy-glacier135",
+  "display": {
+   "agent": "Muse Code",
+   "model": "Muse Spark 1.3 (max)",
+   "creator": {
+    "agent": "Meta",
+    "model": "Meta"
+   }
+  },
+  "displayLabel": "Muse Code - Muse Spark 1.3 (max)",
+  "variantOf": null,
+  "isUnavailable": false,
+  "indexComponentCount": 3,
+  "evalCount": 3,
+  "evals": [
+   {
+    "datasetIndexName": "deep-swe",
+    "evaluationDatasetSlug": "DeepSWE",
+    "refDatasetName": "datacurve/deep-swe@2",
+    "weight": 0.333333333333333,
+    "mean": {
+     "reward": 0.68141592920354,
+     "inputTokens": 13778486.766961653,
+     "cacheWriteTokens": 0,
+     "outputTokens": 78250.97935103245
+    }
+   },
+   {
+    "datasetIndexName": "swe-atlas-qna",
+    "evaluationDatasetSlug": "SWE-Atlas-QnA",
+    "refDatasetName": "datasets/swe-atlas-qna",
+    "weight": 0.333333333333333,
+    "mean": {
+     "reward": 0.518817204301075,
+     "inputTokens": 4509909.435483871,
+     "cacheWriteTokens": 0,
+     "outputTokens": 23698.33870967742
+    }
+   },
+   {
+    "datasetIndexName": "terminal-bench-v2.1",
+    "evaluationDatasetSlug": "Terminal-Bench v2.1",
+    "refDatasetName": "terminal-bench@2.1",
+    "weight": 0.333333333333333,
+    "mean": {
+     "reward": 0.838951310861423,
+     "inputTokens": 2637336.8946360154,
+     "cacheWriteTokens": 0,
+     "outputTokens": 30815.547892720308
+    }
+   }
+  ],
+  "indexScore": 0.6797281481220127,
+  "mean": {
+   "reward": 0.6797281481220127,
+   "costUsd": 1.5842321340370347,
+   "agentWallTimeSec": 1475.134529652353,
+   "steps": 128.54444914557038,
+   "inputTokens": 7211413.368985498,
+   "cacheWriteTokens": 0,
+   "outputTokens": 44550.73137766495,
+   "cacheTokens": 6926704.714136268,
+   "cacheHitRate": 0.9520877069904671,
+   "totalTokens": 14182668.81449944
+  },
+  "sums": {
+   "costUsd": 515.1515500249997
+  },
+  "percentiles": {
+   "costUsd": {
+    "p05": 0.5121635556799581,
+    "p25": 0.8407777441717803,
+    "p50": 1.2573390670756637,
+    "p75": 1.9979289953476507,
+    "p95": 3.418144158292425
+   },
+   "totalTokens": {
+    "p05": 4090523.2073619636,
+    "p25": 6447428.6400818005,
+    "p50": 10932625.918200409,
+    "p75": 17609018.567995913,
+    "p95": 31095377.045603257
+   }
+  },
+  "versions": {
+   "deep-swe": {
+    "min": {
+     "version": "1.0.2-R2040.1",
+     "dateReleased": null
+    },
+    "max": {
+     "version": "1.0.2-R2040.1",
+     "dateReleased": null
+    }
+   },
+   "swe-atlas-qna": {
+    "min": {
+     "version": "1.0.2-R2040.1",
+     "dateReleased": null
+    },
+    "max": {
+     "version": "1.0.2-R2040.1",
+     "dateReleased": null
+    }
+   },
+   "terminal-bench-v2.1": {
+    "min": {
+     "version": "1.0.2-R2040.1",
+     "dateReleased": null
+    },
+    "max": {
+     "version": "1.0.2-R2040.1",
+     "dateReleased": null
+    }
+   }
+  }
+ },
+ {
+  "id": "b71c4b2b1f31fca376169725acda2bee",
+  "isDefault": false,
+  "isHighlighted": false,
+  "agentName": "Codex",
+  "provider": "openai",
+  "hostModelSlug": "openai_gpt-5-6-terra",
+  "display": {
+   "agent": "Codex",
+   "model": "GPT-5.6 Terra (low)",
+   "creator": {
+    "agent": "OpenAI",
+    "model": "OpenAI"
+   }
+  },
+  "displayLabel": "Codex - GPT-5.6 Terra (low)",
+  "variantOf": null,
+  "isUnavailable": false,
+  "indexComponentCount": 3,
+  "evalCount": 3,
+  "evals": [
+   {
+    "datasetIndexName": "deep-swe",
+    "evaluationDatasetSlug": "DeepSWE",
+    "refDatasetName": "datacurve/deep-swe@2",
+    "weight": 0.333333333333333,
+    "mean": {
+     "reward": 0.297935103244838,
+     "inputTokens": 937187.8967551623,
+     "cacheWriteTokens": null,
+     "outputTokens": 8839.188790560473
+    }
+   },
+   {
+    "datasetIndexName": "swe-atlas-qna",
+    "evaluationDatasetSlug": "SWE-Atlas-QnA",
+    "refDatasetName": "datasets/swe-atlas-qna",
+    "weight": 0.333333333333333,
+    "mean": {
+     "reward": 0.228494623655914,
+     "inputTokens": 934104.9086021505,
+     "cacheWriteTokens": null,
+     "outputTokens": 6258.134408602151
+    }
+   },
+   {
+    "datasetIndexName": "terminal-bench-v2.1",
+    "evaluationDatasetSlug": "Terminal-Bench v2.1",
+    "refDatasetName": "terminal-bench@2.1",
+    "weight": 0.333333333333333,
+    "mean": {
+     "reward": 0.632958801498127,
+     "inputTokens": 664766.1573033708,
+     "cacheWriteTokens": null,
+     "outputTokens": 5163.936329588015
+    }
+   }
+  ],
+  "indexScore": 0.3864628427996264,
+  "mean": {
+   "reward": 0.3864628427996264,
+   "costUsd": 0.3850630644171779,
+   "agentWallTimeSec": 154.81494989775024,
+   "steps": 37.809815950920246,
+   "inputTokens": 861642.4202453988,
+   "cacheWriteTokens": null,
+   "outputTokens": 6854.071574642127,
+   "cacheTokens": 789150.352760736,
+   "cacheHitRate": 0.8771903855272027,
+   "totalTokens": 1657646.8445807747
+  },
+  "sums": {
+   "costUsd": 125.53055900000001
+  },
+  "percentiles": {
+   "costUsd": {
+    "p05": 0.15385166453987745,
+    "p25": 0.229308827402863,
+    "p50": 0.3078526601226994,
+    "p75": 0.45581790102249486,
+    "p95": 0.8481012219222889
+   },
+   "totalTokens": {
+    "p05": 422755.2597137016,
+    "p25": 655387.9274028642,
+    "p50": 1018669.064417179,
+    "p75": 1881435.5061349694,
+    "p95": 4651152.892229036
+   }
+  },
+  "versions": {
+   "deep-swe": {
+    "min": {
+     "version": "0.141.0",
+     "dateReleased": "2026-06-18"
+    },
+    "max": {
+     "version": "0.141.0",
+     "dateReleased": "2026-06-18"
+    }
+   },
+   "swe-atlas-qna": {
+    "min": {
+     "version": "0.141.0",
+     "dateReleased": "2026-06-18"
+    },
+    "max": {
+     "version": "0.141.0",
+     "dateReleased": "2026-06-18"
+    }
+   },
+   "terminal-bench-v2.1": {
+    "min": {
+     "version": "0.141.0",
+     "dateReleased": "2026-06-18"
+    },
+    "max": {
+     "version": "0.144.5",
+     "dateReleased": "2026-07-16"
+    }
+   }
+  }
+ },
+ {
+  "id": "ffd92212c2d830b2b9cb4802389e60bb",
+  "isDefault": false,
+  "isHighlighted": false,
+  "agentName": "Codex",
+  "provider": "openai",
+  "hostModelSlug": "openai_gpt-5-6-terra",
+  "display": {
+   "agent": "Codex",
+   "model": "GPT-5.6 Terra (none)",
+   "creator": {
+    "agent": "OpenAI",
+    "model": "OpenAI"
+   }
+  },
+  "displayLabel": "Codex - GPT-5.6 Terra (none)",
+  "variantOf": null,
+  "isUnavailable": false,
+  "indexComponentCount": 3,
+  "evalCount": 3,
+  "evals": [
+   {
+    "datasetIndexName": "deep-swe",
+    "evaluationDatasetSlug": "DeepSWE",
+    "refDatasetName": "datacurve/deep-swe@2",
+    "weight": 0.333333333333333,
+    "mean": {
+     "reward": 0.132743362831858,
+     "inputTokens": 813953.2536873156,
+     "cacheWriteTokens": null,
+     "outputTokens": 7403.879056047198
+    }
+   },
+   {
+    "datasetIndexName": "swe-atlas-qna",
+    "evaluationDatasetSlug": "SWE-Atlas-QnA",
+    "refDatasetName": "datasets/swe-atlas-qna",
+    "weight": 0.333333333333333,
+    "mean": {
+     "reward": 0.185483870967742,
+     "inputTokens": 507638.6397849462,
+     "cacheWriteTokens": null,
+     "outputTokens": 4679.467741935484
+    }
+   },
+   {
+    "datasetIndexName": "terminal-bench-v2.1",
+    "evaluationDatasetSlug": "Terminal-Bench v2.1",
+    "refDatasetName": "terminal-bench@2.1",
+    "weight": 0.333333333333333,
+    "mean": {
+     "reward": 0.374531835205992,
+     "inputTokens": 391775.38576779026,
+     "cacheWriteTokens": null,
+     "outputTokens": 2883.0823970037454
+    }
+   }
+  ],
+  "indexScore": 0.23091968966853066,
+  "mean": {
+   "reward": 0.23091968966853066,
+   "costUsd": 0.29269648179959107,
+   "agentWallTimeSec": 88.85438650306735,
+   "steps": 33.829243353783234,
+   "inputTokens": 582183.7985685072,
+   "cacheWriteTokens": null,
+   "outputTokens": 5133.394683026585,
+   "cacheTokens": 518484.3619631901,
+   "cacheHitRate": 0.8482758058887612,
+   "totalTokens": 1105801.555214723
+  },
+  "sums": {
+   "costUsd": 95.4190530666667
+  },
+  "percentiles": {
+   "costUsd": {
+    "p05": 0.13346353644171777,
+    "p25": 0.18832217914110405,
+    "p50": 0.245193609406953,
+    "p75": 0.34682965153374234,
+    "p95": 0.5971819109202453
+   },
+   "totalTokens": {
+    "p05": 331423.73006134963,
+    "p25": 550935.6390593046,
+    "p50": 772656.4171779152,
+    "p75": 1268179.1952965246,
+    "p95": 3103422.8380368124
+   }
+  },
+  "versions": {
+   "deep-swe": {
+    "min": {
+     "version": "0.142.0",
+     "dateReleased": "2026-06-22"
+    },
+    "max": {
+     "version": "0.142.0",
+     "dateReleased": "2026-06-22"
+    }
+   },
+   "swe-atlas-qna": {
+    "min": {
+     "version": "0.142.0",
+     "dateReleased": "2026-06-22"
+    },
+    "max": {
+     "version": "0.142.0",
+     "dateReleased": "2026-06-22"
+    }
+   },
+   "terminal-bench-v2.1": {
+    "min": {
+     "version": "0.142.0",
+     "dateReleased": "2026-06-22"
+    },
+    "max": {
+     "version": "0.144.5",
+     "dateReleased": "2026-07-16"
+    }
+   }
+  }
+ },
+ {
+  "id": "05edfa25eb20c09cb29022ed459bbf55",
+  "isDefault": false,
+  "isHighlighted": false,
+  "agentName": "Claude Code",
+  "provider": "anthropic",
+  "hostModelSlug": "anthropic_claude-fable-5",
+  "display": {
+   "agent": "Claude Code",
+   "model": "Fable 5 (low) (with fallback)",
+   "creator": {
+    "agent": "Anthropic",
+    "model": "Anthropic"
+   }
+  },
+  "displayLabel": "Claude Code - Fable 5 (low) (with fallback)",
+  "variantOf": null,
+  "isUnavailable": false,
+  "indexComponentCount": 3,
+  "evalCount": 3,
+  "evals": [
+   {
+    "datasetIndexName": "deep-swe",
+    "evaluationDatasetSlug": "DeepSWE",
+    "refDatasetName": "datacurve/deep-swe@2",
+    "weight": 0.333333333333333,
+    "mean": {
+     "reward": 0.59882005899705,
+     "inputTokens": 3237797.3805309734,
+     "cacheWriteTokens": 74800.27433628318,
+     "outputTokens": 34211.42477876106
+    }
+   },
+   {
+    "datasetIndexName": "swe-atlas-qna",
+    "evaluationDatasetSlug": "SWE-Atlas-QnA",
+    "refDatasetName": "datasets/swe-atlas-qna",
+    "weight": 0.333333333333333,
+    "mean": {
+     "reward": 0.341397849462366,
+     "inputTokens": 1563660.7768817204,
+     "cacheWriteTokens": 39916.970430107525,
+     "outputTokens": 15072.029569892473
+    }
+   },
+   {
+    "datasetIndexName": "terminal-bench-v2.1",
+    "evaluationDatasetSlug": "Terminal-Bench v2.1",
+    "refDatasetName": "terminal-bench@2.1",
+    "weight": 0.333333333333333,
+    "mean": {
+     "reward": 0.816479400749064,
+     "inputTokens": 538540.5018726592,
+     "cacheWriteTokens": 29417.662921348314,
+     "outputTokens": 9624.142322097377
+    }
+   }
+  ],
+  "indexScore": 0.58556576973616,
+  "mean": {
+   "reward": 0.58556576973616,
+   "costUsd": 3.166078810327201,
+   "agentWallTimeSec": 490.7785531697345,
+   "steps": 54.852760736196316,
+   "inputTokens": 1864095.536809816,
+   "cacheWriteTokens": 49142.04703476482,
+   "outputTokens": 20218.93047034765,
+   "cacheTokens": 1814556.6809815988,
+   "cacheHitRate": 0.9618678651037137,
+   "totalTokens": 3748013.195296523
+  },
+  "sums": {
+   "costUsd": 1032.141692166667
+  },
+  "percentiles": {
+   "costUsd": {
+    "p05": 1.04673935777096,
+    "p25": 1.610716036042946,
+    "p50": 2.2645025086912045,
+    "p75": 3.740454496421267,
+    "p95": 7.492274719734153
+   },
+   "totalTokens": {
+    "p05": 813436.457259715,
+    "p25": 1663076.9887525563,
+    "p50": 2451569.3210633947,
+    "p75": 4308427.860940698,
+    "p95": 9929016.751329234
+   }
+  },
+  "versions": {
+   "deep-swe": {
+    "min": {
+     "version": "2.1.216",
+     "dateReleased": "2026-07-20"
+    },
+    "max": {
+     "version": "2.1.251",
+     "dateReleased": "2026-08-28"
+    }
+   },
+   "swe-atlas-qna": {
+    "min": {
+     "version": "2.1.216",
+     "dateReleased": "2026-07-20"
+    },
+    "max": {
+     "version": "2.1.251",
+     "dateReleased": "2026-08-28"
+    }
+   },
+   "terminal-bench-v2.1": {
+    "min": {
+     "version": "2.1.216",
+     "dateReleased": "2026-07-20"
+    },
+    "max": {
+     "version": "2.1.251",
+     "dateReleased": "2026-08-28"
+    }
+   }
+  }
+ },
+ {
+  "id": "0672bef72830f21f0bf6e5adb03efa37",
+  "isDefault": false,
+  "isHighlighted": false,
+  "agentName": "Codex",
+  "provider": "openai",
+  "hostModelSlug": "openai_gpt-5-6-luna",
+  "display": {
+   "agent": "Codex",
+   "model": "GPT-5.6 Luna (high)",
+   "creator": {
+    "agent": "OpenAI",
+    "model": "OpenAI"
+   }
+  },
+  "displayLabel": "Codex - GPT-5.6 Luna (high)",
+  "variantOf": null,
+  "isUnavailable": false,
+  "indexComponentCount": 3,
+  "evalCount": 3,
+  "evals": [
+   {
+    "datasetIndexName": "deep-swe",
+    "evaluationDatasetSlug": "DeepSWE",
+    "refDatasetName": "datacurve/deep-swe@2",
+    "weight": 0.333333333333333,
+    "mean": {
+     "reward": 0.533923303834808,
+     "inputTokens": 7328567.908554573,
+     "cacheWriteTokens": null,
+     "outputTokens": 34980.05309734513
+    }
+   },
+   {
+    "datasetIndexName": "swe-atlas-qna",
+    "evaluationDatasetSlug": "SWE-Atlas-QnA",
+    "refDatasetName": "datasets/swe-atlas-qna",
+    "weight": 0.333333333333333,
+    "mean": {
+     "reward": 0.290322580645161,
+     "inputTokens": 4753182.688172043,
+     "cacheWriteTokens": null,
+     "outputTokens": 17101.43010752688
+    }
+   },
+   {
+    "datasetIndexName": "terminal-bench-v2.1",
+    "evaluationDatasetSlug": "Terminal-Bench v2.1",
+    "refDatasetName": "terminal-bench@2.1",
+    "weight": 0.333333333333333,
+    "mean": {
+     "reward": 0.726591760299625,
+     "inputTokens": 2238565.861423221,
+     "cacheWriteTokens": null,
+     "outputTokens": 13190.47191011236
+    }
+   }
+  ],
+  "indexScore": 0.516945881593198,
+  "mean": {
+   "reward": 0.516945881593198,
+   "costUsd": 0.17979322415132934,
+   "agentWallTimeSec": 342.6686574642128,
+   "steps": 83.81901840490798,
+   "inputTokens": 4959371.7443762785,
+   "cacheWriteTokens": null,
+   "outputTokens": 22230.905930470348,
+   "cacheTokens": 4659767.843558285,
+   "cacheHitRate": 0.9032288062243126,
+   "totalTokens": 9641370.49386502
+  },
+  "sums": {
+   "costUsd": 58.61259107333333
+  },
+  "percentiles": {
+   "costUsd": {
+    "p05": 0.06133415248261749,
+    "p25": 0.09294467676891614,
+    "p50": 0.13678484505112462,
+    "p75": 0.2182301113496935,
+    "p95": 0.45578660003271965
+   },
+   "totalTokens": {
+    "p05": 2003810.8664621667,
+    "p25": 3427965.872188141,
+    "p50": 5904246.124744379,
+    "p75": 12276637.903885469,
+    "p95": 26926090.992842518
+   }
+  },
+  "versions": {
+   "deep-swe": {
+    "min": {
+     "version": "0.141.0",
+     "dateReleased": "2026-06-18"
+    },
+    "max": {
+     "version": "0.141.0",
+     "dateReleased": "2026-06-18"
+    }
+   },
+   "swe-atlas-qna": {
+    "min": {
+     "version": "0.141.0",
+     "dateReleased": "2026-06-18"
+    },
+    "max": {
+     "version": "0.141.0",
+     "dateReleased": "2026-06-18"
+    }
+   },
+   "terminal-bench-v2.1": {
+    "min": {
+     "version": "0.141.0",
+     "dateReleased": "2026-06-18"
+    },
+    "max": {
+     "version": "0.144.5",
+     "dateReleased": "2026-07-16"
+    }
+   }
+  }
+ },
+ {
+  "id": "7ec73e2c1c6f40b3526a6b5a27380d8f",
+  "isDefault": false,
+  "isHighlighted": false,
+  "agentName": "Claude Code",
+  "provider": "alibaba_cloud",
+  "hostModelSlug": "alibaba_cloud_qwen3-7-plus",
+  "display": {
+   "agent": "Claude Code",
+   "model": "Qwen3.7 Plus (thinking)",
+   "creator": {
+    "agent": "Anthropic",
+    "model": "Alibaba Cloud"
+   }
+  },
+  "displayLabel": "Claude Code - Qwen3.7 Plus (thinking)",
+  "variantOf": null,
+  "isUnavailable": false,
+  "indexComponentCount": 3,
+  "evalCount": 3,
+  "evals": [
+   {
+    "datasetIndexName": "deep-swe",
+    "evaluationDatasetSlug": "DeepSWE",
+    "refDatasetName": "datacurve/deep-swe@2",
+    "weight": 0.333333333333333,
+    "mean": {
+     "reward": 0.191740412979351,
+     "inputTokens": 8634688.79941003,
+     "cacheWriteTokens": 0,
+     "outputTokens": 47864.54277286136
+    }
+   },
+   {
+    "datasetIndexName": "swe-atlas-qna",
+    "evaluationDatasetSlug": "SWE-Atlas-QnA",
+    "refDatasetName": "datasets/swe-atlas-qna",
+    "weight": 0.333333333333333,
+    "mean": {
+     "reward": 0.236559139784946,
+     "inputTokens": 2834619.2338709678,
+     "cacheWriteTokens": 0,
+     "outputTokens": 18311.516129032258
+    }
+   },
+   {
+    "datasetIndexName": "terminal-bench-v2.1",
+    "evaluationDatasetSlug": "Terminal-Bench v2.1",
+    "refDatasetName": "terminal-bench@2.1",
+    "weight": 0.333333333333333,
+    "mean": {
+     "reward": 0.715355805243446,
+     "inputTokens": 2359082.940074906,
+     "cacheWriteTokens": 0,
+     "outputTokens": 33167.168539325845
+    }
+   }
+  ],
+  "indexScore": 0.3812184526692477,
+  "mean": {
+   "reward": 0.3812184526692477,
+   "costUsd": 6.3006588057259885,
+   "agentWallTimeSec": 643.9465817995908,
+   "steps": 145.96625766871165,
+   "inputTokens": 4715248.469325154,
+   "cacheWriteTokens": 0,
+   "outputTokens": 32611.0408997955,
+   "cacheTokens": 4036775.525562375,
+   "cacheHitRate": 0.8105104948122446,
+   "totalTokens": 8784635.035787327
+  },
+  "sums": {
+   "costUsd": 2054.0147706666703
+  },
+  "percentiles": {
+   "costUsd": {
+    "p05": 2.39991676993865,
+    "p25": 3.6079912341513305,
+    "p50": 5.056965417177912,
+    "p75": 7.715945963190196,
+    "p95": 15.288813273824147
+   },
+   "totalTokens": {
+    "p05": 2964754.9392638034,
+    "p25": 4677285.6779141,
+    "p50": 7118959.040899809,
+    "p75": 10510696.065439686,
+    "p95": 21852900.408179957
+   }
+  },
+  "versions": {
+   "deep-swe": {
+    "min": {
+     "version": "2.1.167",
+     "dateReleased": "2026-06-06"
+    },
+    "max": {
+     "version": "2.1.167",
+     "dateReleased": "2026-06-06"
+    }
+   },
+   "swe-atlas-qna": {
+    "min": {
+     "version": "2.1.163",
+     "dateReleased": "2026-06-04"
+    },
+    "max": {
+     "version": "2.1.163",
+     "dateReleased": "2026-06-04"
+    }
+   },
+   "terminal-bench-v2.1": {
+    "min": {
+     "version": "2.1.163",
+     "dateReleased": "2026-06-04"
+    },
+    "max": {
+     "version": "2.1.215",
+     "dateReleased": "2026-07-19"
+    }
+   }
+  }
+ },
+ {
+  "id": "6b7cca33a464262a13e3bacf43871d16",
+  "isDefault": false,
+  "isHighlighted": false,
+  "agentName": "Codex",
+  "provider": "openai",
+  "hostModelSlug": "openai_gpt-5-6-luna",
+  "display": {
+   "agent": "Codex",
+   "model": "GPT-5.6 Luna (none)",
+   "creator": {
+    "agent": "OpenAI",
+    "model": "OpenAI"
+   }
+  },
+  "displayLabel": "Codex - GPT-5.6 Luna (none)",
+  "variantOf": null,
+  "isUnavailable": false,
+  "indexComponentCount": 3,
+  "evalCount": 3,
+  "evals": [
+   {
+    "datasetIndexName": "deep-swe",
+    "evaluationDatasetSlug": "DeepSWE",
+    "refDatasetName": "datacurve/deep-swe@2",
+    "weight": 0.333333333333333,
+    "mean": {
+     "reward": 0.0648967551622419,
+     "inputTokens": 2942031.7994100293,
+     "cacheWriteTokens": null,
+     "outputTokens": 12163.57227138643
+    }
+   },
+   {
+    "datasetIndexName": "swe-atlas-qna",
+    "evaluationDatasetSlug": "SWE-Atlas-QnA",
+    "refDatasetName": "datasets/swe-atlas-qna",
+    "weight": 0.333333333333333,
+    "mean": {
+     "reward": 0.174731182795699,
+     "inputTokens": 1099611.505376344,
+     "cacheWriteTokens": null,
+     "outputTokens": 6045.2768817204305
+    }
+   },
+   {
+    "datasetIndexName": "terminal-bench-v2.1",
+    "evaluationDatasetSlug": "Terminal-Bench v2.1",
+    "refDatasetName": "terminal-bench@2.1",
+    "weight": 0.333333333333333,
+    "mean": {
+     "reward": 0.333333333333333,
+     "inputTokens": 1456126.1310861423,
+     "cacheWriteTokens": null,
+     "outputTokens": 5197.651685393258
+    }
+   }
+  ],
+  "indexScore": 0.19098709043042467,
+  "mean": {
+   "reward": 0.19098709043042467,
+   "costUsd": 0.06947505231083852,
+   "agentWallTimeSec": 131.81620961145202,
+   "steps": 54.286298568507156,
+   "inputTokens": 1835572.5327198363,
+   "cacheWriteTokens": null,
+   "outputTokens": 7934.628834355828,
+   "cacheTokens": 1706450.0490797567,
+   "cacheHitRate": 0.8748960056789888,
+   "totalTokens": 3549957.210633946
+  },
+  "sums": {
+   "costUsd": 22.64886705333336
+  },
+  "percentiles": {
+   "costUsd": {
+    "p05": 0.0257741552597137,
+    "p25": 0.03600412617586912,
+    "p50": 0.05077628327198364,
+    "p75": 0.0800027421267895,
+    "p95": 0.17917107691206552
+   },
+   "totalTokens": {
+    "p05": 933911.0799591015,
+    "p25": 1345629.093047035,
+    "p50": 2213605.9151329244,
+    "p75": 3812860.127811861,
+    "p95": 11854141.27546011
+   }
+  },
+  "versions": {
+   "deep-swe": {
+    "min": {
+     "version": "0.142.0",
+     "dateReleased": "2026-06-22"
+    },
+    "max": {
+     "version": "0.142.0",
+     "dateReleased": "2026-06-22"
+    }
+   },
+   "swe-atlas-qna": {
+    "min": {
+     "version": "0.142.0",
+     "dateReleased": "2026-06-22"
+    },
+    "max": {
+     "version": "0.144.5",
+     "dateReleased": "2026-07-16"
+    }
+   },
+   "terminal-bench-v2.1": {
+    "min": {
+     "version": "0.142.0",
+     "dateReleased": "2026-06-22"
+    },
+    "max": {
+     "version": "0.144.5",
+     "dateReleased": "2026-07-16"
+    }
+   }
+  }
+ },
+ {
+  "id": "69b3d87eb6afbb59c379f2e891de8713",
+  "isDefault": false,
+  "isHighlighted": false,
+  "agentName": "Claude Code",
+  "provider": "anthropic",
+  "hostModelSlug": "anthropic_claude-opus-4-8_api-key",
+  "display": {
+   "agent": "Claude Code",
+   "model": "Opus 4.8 (high)",
+   "creator": {
+    "agent": "Anthropic",
+    "model": "Anthropic"
+   }
+  },
+  "displayLabel": "Claude Code - Opus 4.8 (high)",
+  "variantOf": null,
+  "isUnavailable": false,
+  "indexComponentCount": 3,
+  "evalCount": 3,
+  "evals": [
+   {
+    "datasetIndexName": "deep-swe",
+    "evaluationDatasetSlug": "DeepSWE",
+    "refDatasetName": "datacurve/deep-swe@2",
+    "weight": 0.333333333333333,
+    "mean": {
+     "reward": 0.516224188790561,
+     "inputTokens": 9442316.837758113,
+     "cacheWriteTokens": 137850.47197640117,
+     "outputTokens": 71104.73451327434
+    }
+   },
+   {
+    "datasetIndexName": "swe-atlas-qna",
+    "evaluationDatasetSlug": "SWE-Atlas-QnA",
+    "refDatasetName": "datasets/swe-atlas-qna",
+    "weight": 0.333333333333333,
+    "mean": {
+     "reward": 0.387096774193548,
+     "inputTokens": 2606780.053763441,
+     "cacheWriteTokens": 61035.12365591398,
+     "outputTokens": 26255.704301075268
+    }
+   },
+   {
+    "datasetIndexName": "terminal-bench-v2.1",
+    "evaluationDatasetSlug": "Terminal-Bench v2.1",
+    "refDatasetName": "terminal-bench@2.1",
+    "weight": 0.333333333333333,
+    "mean": {
+     "reward": 0.823970037453183,
+     "inputTokens": 1135929.063670412,
+     "cacheWriteTokens": 41030.92883895131,
+     "outputTokens": 22157.53183520599
+    }
+   }
+  ],
+  "indexScore": 0.5757636668124306,
+  "mean": {
+   "reward": 0.5757636668124306,
+   "costUsd": 3.7823013803680996,
+   "agentWallTimeSec": 761.0308312883442,
+   "steps": 104.76278118609409,
+   "inputTokens": 4574601.889570553,
+   "cacheWriteTokens": 82200.03476482617,
+   "outputTokens": 40682.707566462166,
+   "cacheTokens": 4491206.234151331,
+   "cacheHitRate": 0.9682475638703767,
+   "totalTokens": 9188690.866053157
+  },
+  "sums": {
+   "costUsd": 1233.03025
+  },
+  "percentiles": {
+   "costUsd": {
+    "p05": 1.324723864570552,
+    "p25": 2.1613091362474437,
+    "p50": 3.0680388305214725,
+    "p75": 4.650482046523516,
+    "p95": 8.142335028834356
+   },
+   "totalTokens": {
+    "p05": 2354376.6427402864,
+    "p25": 4536134.773006135,
+    "p50": 7256621.519427392,
+    "p75": 11178325.132924324,
+    "p95": 21048486.415541906
+   }
+  },
+  "versions": {
+   "deep-swe": {
+    "min": {
+     "version": "2.1.216",
+     "dateReleased": "2026-07-20"
+    },
+    "max": {
+     "version": "2.1.216",
+     "dateReleased": "2026-07-20"
+    }
+   },
+   "swe-atlas-qna": {
+    "min": {
+     "version": "2.1.216",
+     "dateReleased": "2026-07-20"
+    },
+    "max": {
+     "version": "2.1.227",
+     "dateReleased": "2026-08-10"
+    }
+   },
+   "terminal-bench-v2.1": {
+    "min": {
+     "version": "2.1.216",
+     "dateReleased": "2026-07-20"
+    },
+    "max": {
+     "version": "2.1.222",
+     "dateReleased": "2026-08-04"
+    }
+   }
+  }
+ },
+ {
+  "id": "058d0070e59fbd4de08fd8404ad6780b",
+  "isDefault": true,
+  "isHighlighted": false,
+  "agentName": "Devin CLI",
+  "provider": "cognition",
+  "hostModelSlug": "cognition_swe-1-7-lightning",
+  "display": {
+   "agent": "Devin CLI",
+   "model": "SWE-1.7 Lightning Max",
+   "creator": {
+    "agent": "Cognition",
+    "model": "Cognition"
+   }
+  },
+  "displayLabel": "Devin CLI - SWE-1.7 Lightning Max",
+  "variantOf": null,
+  "isUnavailable": false,
+  "indexComponentCount": 3,
+  "evalCount": 3,
+  "evals": [
+   {
+    "datasetIndexName": "deep-swe",
+    "evaluationDatasetSlug": "DeepSWE",
+    "refDatasetName": "datacurve/deep-swe@2",
+    "weight": 0.333333333333333,
+    "mean": {
+     "reward": 0.404129793510324,
+     "inputTokens": 12803596.014749262,
+     "cacheWriteTokens": null,
+     "outputTokens": 55368.825958702066
+    }
+   },
+   {
+    "datasetIndexName": "swe-atlas-qna",
+    "evaluationDatasetSlug": "SWE-Atlas-QnA",
+    "refDatasetName": "datasets/swe-atlas-qna",
+    "weight": 0.333333333333333,
+    "mean": {
+     "reward": 0.368279569892473,
+     "inputTokens": 7058939.701612903,
+     "cacheWriteTokens": null,
+     "outputTokens": 30336.11827956989
+    }
+   },
+   {
+    "datasetIndexName": "terminal-bench-v2.1",
+    "evaluationDatasetSlug": "Terminal-Bench v2.1",
+    "refDatasetName": "terminal-bench@2.1",
+    "weight": 0.333333333333333,
+    "mean": {
+     "reward": 0.794007490636704,
+     "inputTokens": 2604997.1310861423,
+     "cacheWriteTokens": null,
+     "outputTokens": 29984.823970037454
+    }
+   }
+  ],
+  "indexScore": 0.5221389513465003,
+  "mean": {
+   "reward": 0.5221389513465003,
+   "costUsd": 8.521259638036815,
+   "agentWallTimeSec": 637.3248271983654,
+   "steps": 86.57157464212679,
+   "inputTokens": 7834231.955010225,
+   "cacheWriteTokens": null,
+   "outputTokens": 38917.19427402863,
+   "cacheTokens": 7700523.451942731,
+   "cacheHitRate": 0.9746033359706329,
+   "totalTokens": 15573672.601226985
+  },
+  "sums": {
+   "costUsd": 2777.930641999996
+  },
+  "percentiles": {
+   "costUsd": {
+    "p05": 3.9323728356850722,
+    "p25": 6.022338548568495,
+    "p50": 7.998238709100195,
+    "p75": 10.725990870143162,
+    "p95": 14.606347550817986
+   },
+   "totalTokens": {
+    "p05": 6785579.849284254,
+    "p25": 10909935.098159498,
+    "p50": 14569009.498977508,
+    "p75": 19746654.865030665,
+    "p95": 27134733.513087932
+   }
+  },
+  "versions": {
+   "deep-swe": {
+    "min": {
+     "version": "3000.2.17",
+     "dateReleased": null
+    },
+    "max": {
+     "version": "3000.2.17",
+     "dateReleased": null
+    }
+   },
+   "swe-atlas-qna": {
+    "min": {
+     "version": "3000.2.17",
+     "dateReleased": null
+    },
+    "max": {
+     "version": "3000.2.17",
+     "dateReleased": null
+    }
+   },
+   "terminal-bench-v2.1": {
+    "min": {
+     "version": "3000.2.17",
+     "dateReleased": null
+    },
+    "max": {
+     "version": "3000.2.17",
+     "dateReleased": null
+    }
+   }
+  }
+ },
+ {
+  "id": "c16a6ff58b95541022890f02e13b0cb5",
+  "isDefault": false,
+  "isHighlighted": false,
+  "agentName": "Cursor CLI",
+  "provider": "cursor",
+  "hostModelSlug": "anthropic_claude-opus-4-7",
+  "display": {
+   "agent": "Cursor CLI",
+   "model": "Opus 4.7 (medium)",
+   "creator": {
+    "agent": "Cursor",
+    "model": "Anthropic"
+   }
+  },
+  "displayLabel": "Cursor CLI - Opus 4.7 (medium)",
+  "variantOf": null,
+  "isUnavailable": false,
+  "indexComponentCount": 3,
+  "evalCount": 3,
+  "evals": [
+   {
+    "datasetIndexName": "deep-swe",
+    "evaluationDatasetSlug": "DeepSWE",
+    "refDatasetName": "datacurve/deep-swe@2",
+    "weight": 0.333333333333333,
+    "mean": {
+     "reward": 0.315634218289085,
+     "inputTokens": 5578063.1179941,
+     "cacheWriteTokens": 143759.85398230088,
+     "outputTokens": 26842.678466076697
+    }
+   },
+   {
+    "datasetIndexName": "swe-atlas-qna",
+    "evaluationDatasetSlug": "SWE-Atlas-QnA",
+    "refDatasetName": "datasets/swe-atlas-qna",
+    "weight": 0.333333333333333,
+    "mean": {
+     "reward": 0.338709677419355,
+     "inputTokens": 1621663.1451612904,
+     "cacheWriteTokens": 52423.6935483871,
+     "outputTokens": 15036.889784946237
+    }
+   },
+   {
+    "datasetIndexName": "terminal-bench-v2.1",
+    "evaluationDatasetSlug": "Terminal-Bench v2.1",
+    "refDatasetName": "terminal-bench@2.1",
+    "weight": 0.333333333333333,
+    "mean": {
+     "reward": 0.745318352059925,
+     "inputTokens": 1117890.9737827715,
+     "cacheWriteTokens": 34126.9925093633,
+     "outputTokens": 10432.958801498127
+    }
+   }
+  ],
+  "indexScore": 0.466554082589455,
+  "mean": {
+   "reward": 0.466554082589455,
+   "costUsd": 2.7249057110173838,
+   "agentWallTimeSec": 826.6777535787319,
+   "steps": 86.42229038854805,
+   "inputTokens": 2855520.426380368,
+   "cacheWriteTokens": 79088.04856850715,
+   "outputTokens": 17872.178936605316,
+   "cacheTokens": 2776384.526584866,
+   "cacheHitRate": 0.9538631453697446,
+   "totalTokens": 5728865.180470356
+  },
+  "sums": {
+   "costUsd": 888.3192617916669
+  },
+  "percentiles": {
+   "costUsd": {
+    "p05": 0.7069227053680979,
+    "p25": 1.3602769754601236,
+    "p50": 2.247851473159511,
+    "p75": 3.3584103563394696,
+    "p95": 7.138583793762794
+   },
+   "totalTokens": {
+    "p05": 1020958.2568507165,
+    "p25": 2428069.9826175855,
+    "p50": 4593517.786298569,
+    "p75": 6946765.655419232,
+    "p95": 16505248.860736195
+   }
+  },
+  "versions": {
+   "deep-swe": {
+    "min": {
+     "version": "cli-2026.05.28-a70ca7c",
+     "dateReleased": "2026-05-28"
+    },
+    "max": {
+     "version": "cli-2026.05.28-a70ca7c",
+     "dateReleased": "2026-05-28"
+    }
+   },
+   "swe-atlas-qna": {
+    "min": {
+     "version": "cli-2026.04.17-787b533",
+     "dateReleased": "2026-04-17"
+    },
+    "max": {
+     "version": "cli-2026.05.07-42ddaca",
+     "dateReleased": "2026-05-07"
+    }
+   },
+   "terminal-bench-v2.1": {
+    "min": {
+     "version": "cli-2026.04.17-787b533",
+     "dateReleased": "2026-04-17"
+    },
+    "max": {
+     "version": "cli-2026.07.16-899851b",
+     "dateReleased": "2026-07-16"
+    }
+   }
+  }
+ },
+ {
+  "id": "72584108afbb1ea9bb96db4cc4809e0d",
+  "isDefault": false,
+  "isHighlighted": false,
+  "agentName": "Opencode",
+  "provider": "google",
+  "hostModelSlug": "google_gemini-3-6-flash_ai-studio",
+  "display": {
+   "agent": "Opencode",
+   "model": "Gemini 3.6 Flash (high)",
+   "creator": {
+    "agent": "SST",
+    "model": "Google"
+   }
+  },
+  "displayLabel": "Opencode - Gemini 3.6 Flash (high)",
+  "variantOf": null,
+  "isUnavailable": false,
+  "indexComponentCount": 3,
+  "evalCount": 3,
+  "evals": [
+   {
+    "datasetIndexName": "deep-swe",
+    "evaluationDatasetSlug": "DeepSWE",
+    "refDatasetName": "datacurve/deep-swe@2",
+    "weight": 0.333333333333333,
+    "mean": {
+     "reward": 0.412979351032448,
+     "inputTokens": 14211105.967551623,
+     "cacheWriteTokens": 0,
+     "outputTokens": 74638.99705014749
+    }
+   },
+   {
+    "datasetIndexName": "swe-atlas-qna",
+    "evaluationDatasetSlug": "SWE-Atlas-QnA",
+    "refDatasetName": "datasets/swe-atlas-qna",
+    "weight": 0.333333333333333,
+    "mean": {
+     "reward": 0.217741935483871,
+     "inputTokens": 3235373.8978494625,
+     "cacheWriteTokens": 0,
+     "outputTokens": 22602.13172043011
+    }
+   },
+   {
+    "datasetIndexName": "terminal-bench-v2.1",
+    "evaluationDatasetSlug": "Terminal-Bench v2.1",
+    "refDatasetName": "terminal-bench@2.1",
+    "weight": 0.333333333333333,
+    "mean": {
+     "reward": 0.786516853932584,
+     "inputTokens": 2231721.059925094,
+     "cacheWriteTokens": 0,
+     "outputTokens": 30381.81647940075
+    }
+   }
+  ],
+  "indexScore": 0.4724127134829677,
+  "mean": {
+   "reward": 0.4724127134829677,
+   "costUsd": 2.0838901547545983,
+   "agentWallTimeSec": 626.0057290388545,
+   "steps": 65.01533742331287,
+   "inputTokens": 6765842.061349694,
+   "cacheWriteTokens": 0,
+   "outputTokens": 42763.351738241305,
+   "cacheTokens": 6211554.129856843,
+   "cacheHitRate": 0.8377770485520734,
+   "totalTokens": 13020159.542944789
+  },
+  "sums": {
+   "costUsd": 679.34819045
+  },
+  "percentiles": {
+   "costUsd": {
+    "p05": 0.6334581922085889,
+    "p25": 1.099490890184049,
+    "p50": 1.5541124943251534,
+    "p75": 2.583374988803681,
+    "p95": 5.262779670705521
+   },
+   "totalTokens": {
+    "p05": 2163702.514519427,
+    "p25": 4833618.773006135,
+    "p50": 8308141.988752567,
+    "p75": 16677277.35480571,
+    "p95": 41120635.085480586
+   }
+  },
+  "versions": {
+   "deep-swe": {
+    "min": {
+     "version": "1.18.10",
+     "dateReleased": "2026-07-30"
+    },
+    "max": {
+     "version": "1.18.10",
+     "dateReleased": "2026-07-30"
+    }
+   },
+   "swe-atlas-qna": {
+    "min": {
+     "version": "1.18.10",
+     "dateReleased": "2026-07-30"
+    },
+    "max": {
+     "version": "1.18.10",
+     "dateReleased": "2026-07-30"
+    }
+   },
+   "terminal-bench-v2.1": {
+    "min": {
+     "version": "1.18.10",
+     "dateReleased": "2026-07-30"
+    },
+    "max": {
+     "version": "1.18.10",
+     "dateReleased": "2026-07-30"
+    }
+   }
+  }
+ },
+ {
+  "id": "7f339363f7624e3dfa5a098bace791f9",
+  "isDefault": false,
+  "isHighlighted": false,
+  "agentName": "Opencode",
+  "provider": "meta",
+  "hostModelSlug": "meta_spiffy-blimp350",
+  "display": {
+   "agent": "Opencode",
+   "model": "Muse Spark 1.2 (xhigh)",
+   "creator": {
+    "agent": "SST",
+    "model": "Meta"
+   }
+  },
+  "displayLabel": "Opencode - Muse Spark 1.2 (xhigh)",
+  "variantOf": null,
+  "isUnavailable": false,
+  "indexComponentCount": 3,
+  "evalCount": 3,
+  "evals": [
+   {
+    "datasetIndexName": "deep-swe",
+    "evaluationDatasetSlug": "DeepSWE",
+    "refDatasetName": "datacurve/deep-swe@2",
+    "weight": 0.333333333333333,
+    "mean": {
+     "reward": 0.528023598820059,
+     "inputTokens": 17294036.115044247,
+     "cacheWriteTokens": 0,
+     "outputTokens": 85931.26548672566
+    }
+   },
+   {
+    "datasetIndexName": "swe-atlas-qna",
+    "evaluationDatasetSlug": "SWE-Atlas-QnA",
+    "refDatasetName": "datasets/swe-atlas-qna",
+    "weight": 0.333333333333333,
+    "mean": {
+     "reward": 0.440860215053763,
+     "inputTokens": 3921557.325268817,
+     "cacheWriteTokens": 0,
+     "outputTokens": 18945.37365591398
+    }
+   },
+   {
+    "datasetIndexName": "terminal-bench-v2.1",
+    "evaluationDatasetSlug": "Terminal-Bench v2.1",
+    "refDatasetName": "terminal-bench@2.1",
+    "weight": 0.333333333333333,
+    "mean": {
+     "reward": 0.797752808988764,
+     "inputTokens": 3203558.554307116,
+     "cacheWriteTokens": 0,
+     "outputTokens": 37234.23220973783
+    }
+   }
+  ],
+  "indexScore": 0.5888788742875287,
+  "mean": {
+   "reward": 0.5888788742875287,
+   "costUsd": 1.9143797856952987,
+   "agentWallTimeSec": 1064.7406922290388,
+   "steps": 65.87116564417177,
+   "inputTokens": 8360784.971370144,
+   "cacheWriteTokens": 0,
+   "outputTokens": 47157.38036809816,
+   "cacheTokens": 7942745.722801624,
+   "cacheHitRate": 0.9500000000000018,
+   "totalTokens": 16350688.074539876
+  },
+  "sums": {
+   "costUsd": 624.0878101366667
+  },
+  "percentiles": {
+   "costUsd": {
+    "p05": 0.5133323346799591,
+    "p25": 0.8945503230521487,
+    "p50": 1.4466221226738254,
+    "p75": 2.3538412073466257,
+    "p95": 4.849500924805724
+   },
+   "totalTokens": {
+    "p05": 3907122.8461247417,
+    "p25": 7035509.160224963,
+    "p50": 12060462.163957069,
+    "p75": 20391822.89631903,
+    "p95": 43135364.9465746
+   }
+  },
+  "versions": {
+   "deep-swe": {
+    "min": {
+     "version": "1.18.9",
+     "dateReleased": "2026-07-28"
+    },
+    "max": {
+     "version": "1.18.9",
+     "dateReleased": "2026-07-28"
+    }
+   },
+   "swe-atlas-qna": {
+    "min": {
+     "version": "1.18.9",
+     "dateReleased": "2026-07-28"
+    },
+    "max": {
+     "version": "1.18.9",
+     "dateReleased": "2026-07-28"
+    }
+   },
+   "terminal-bench-v2.1": {
+    "min": {
+     "version": "1.18.9",
+     "dateReleased": "2026-07-28"
+    },
+    "max": {
+     "version": "1.18.9",
+     "dateReleased": "2026-07-28"
+    }
+   }
+  }
+ },
+ {
+  "id": "1afff2f22142173eb582a4f397146d2d",
+  "isDefault": false,
+  "isHighlighted": false,
+  "agentName": "Antigravity SDK v0.1.12",
+  "provider": "google",
+  "hostModelSlug": "google_skimaki_ai-studio",
+  "display": {
+   "agent": "Antigravity SDK",
+   "model": "Gemini 3.8 Flash (high)",
+   "creator": {
+    "agent": "Google",
+    "model": "Google"
+   }
+  },
+  "displayLabel": "Antigravity SDK - Gemini 3.8 Flash (high)",
+  "variantOf": null,
+  "isUnavailable": false,
+  "indexComponentCount": 3,
+  "evalCount": 3,
+  "evals": [
+   {
+    "datasetIndexName": "deep-swe",
+    "evaluationDatasetSlug": "DeepSWE",
+    "refDatasetName": "datacurve/deep-swe@2",
+    "weight": 0.333333333333333,
+    "mean": {
+     "reward": 0.607669616519174,
+     "inputTokens": 16384396,
+     "cacheWriteTokens": null,
+     "outputTokens": 141307.32743362832
+    }
+   },
+   {
+    "datasetIndexName": "swe-atlas-qna",
+    "evaluationDatasetSlug": "SWE-Atlas-QnA",
+    "refDatasetName": "datasets/swe-atlas-qna",
+    "weight": 0.333333333333333,
+    "mean": {
+     "reward": 0.352150537634409,
+     "inputTokens": 9020406.623655913,
+     "cacheWriteTokens": null,
+     "outputTokens": 58109
+    }
+   },
+   {
+    "datasetIndexName": "terminal-bench-v2.1",
+    "evaluationDatasetSlug": "Terminal-Bench v2.1",
+    "refDatasetName": "terminal-bench@2.1",
+    "weight": 0.333333333333333,
+    "mean": {
+     "reward": 0.812734082397004,
+     "inputTokens": 5127973.138576779,
+     "cacheWriteTokens": null,
+     "outputTokens": 45601.550561797754
+    }
+   }
+  ],
+  "indexScore": 0.590851412183529,
+  "mean": {
+   "reward": 0.590851412183529,
+   "costUsd": 2.0089751539110456,
+   "agentWallTimeSec": 457.93049693251515,
+   "steps": 147.39263803680984,
+   "inputTokens": 10510296.867075665,
+   "cacheWriteTokens": null,
+   "outputTokens": 83533.0736196319,
+   "cacheTokens": 9165920.774028638,
+   "cacheHitRate": 0.8589224031432205,
+   "totalTokens": 19759750.71472392
+  },
+  "sums": {
+   "costUsd": 654.9259001749999
+  },
+  "percentiles": {
+   "costUsd": {
+    "p05": 0.7472815514877301,
+    "p25": 1.28438465,
+    "p50": 1.7858371242331288,
+    "p75": 2.518630576457055,
+    "p95": 3.95217386033742
+   },
+   "totalTokens": {
+    "p05": 5215710.41206544,
+    "p25": 11216445.37832312,
+    "p50": 16702706.775051141,
+    "p75": 25897290.33946831,
+    "p95": 42538176.62351738
+   }
+  },
+  "versions": {
+   "deep-swe": {
+    "min": {
+     "version": "0.1.12",
+     "dateReleased": "2026-08-13"
+    },
+    "max": {
+     "version": "0.1.12",
+     "dateReleased": "2026-08-13"
+    }
+   },
+   "swe-atlas-qna": {
+    "min": {
+     "version": "0.1.12",
+     "dateReleased": "2026-08-13"
+    },
+    "max": {
+     "version": "0.1.12",
+     "dateReleased": "2026-08-13"
+    }
+   },
+   "terminal-bench-v2.1": {
+    "min": {
+     "version": "0.1.12",
+     "dateReleased": "2026-08-13"
+    },
+    "max": {
+     "version": "0.1.12",
+     "dateReleased": "2026-08-13"
+    }
+   }
+  }
+ },
+ {
+  "id": "44d95004637ad30aed1fba83572cff96",
+  "isDefault": false,
+  "isHighlighted": false,
+  "agentName": "Opencode",
+  "provider": "anthropic",
+  "hostModelSlug": "anthropic_claude-opus-4-7",
+  "display": {
+   "agent": "Opencode",
+   "model": "Opus 4.7 (medium)",
+   "creator": {
+    "agent": "Opencode",
+    "model": "Anthropic"
+   }
+  },
+  "displayLabel": "Opencode - Opus 4.7 (medium)",
+  "variantOf": null,
+  "isUnavailable": false,
+  "indexComponentCount": 3,
+  "evalCount": 3,
+  "evals": [
+   {
+    "datasetIndexName": "deep-swe",
+    "evaluationDatasetSlug": "DeepSWE",
+    "refDatasetName": "datacurve/deep-swe@2",
+    "weight": 0.333333333333333,
+    "mean": {
+     "reward": 0.395280235988201,
+     "inputTokens": 7106371.327433628,
+     "cacheWriteTokens": 104405.09439528023,
+     "outputTokens": 41945.90560471977
+    }
+   },
+   {
+    "datasetIndexName": "swe-atlas-qna",
+    "evaluationDatasetSlug": "SWE-Atlas-QnA",
+    "refDatasetName": "datasets/swe-atlas-qna",
+    "weight": 0.333333333333333,
+    "mean": {
+     "reward": 0.360215053763441,
+     "inputTokens": 2165287.931451613,
+     "cacheWriteTokens": 56332.36693548387,
+     "outputTokens": 18656.780913978495
+    }
+   },
+   {
+    "datasetIndexName": "terminal-bench-v2.1",
+    "evaluationDatasetSlug": "Terminal-Bench v2.1",
+    "refDatasetName": "terminal-bench@2.1",
+    "weight": 0.333333333333333,
+    "mean": {
+     "reward": 0.782771535580524,
+     "inputTokens": 1677041.6891385769,
+     "cacheWriteTokens": 36061.606741573036,
+     "outputTokens": 15778.456928838952
+    }
+   }
+  ],
+  "indexScore": 0.5127556084440553,
+  "mean": {
+   "reward": 0.5127556084440553,
+   "costUsd": 2.942840985557261,
+   "agentWallTimeSec": 752.2755521472382,
+   "steps": 54.41308793456033,
+   "inputTokens": 3744700.533231084,
+   "cacheWriteTokens": 67461.57106339467,
+   "outputTokens": 25943.591513292435,
+   "cacheTokens": 3744641.397239263,
+   "cacheHitRate": 0.9584168731547833,
+   "totalTokens": 7582747.093047047
+  },
+  "sums": {
+   "costUsd": 959.366161291666
+  },
+  "percentiles": {
+   "costUsd": {
+    "p05": 0.7817111485685081,
+    "p25": 1.3386307829754591,
+    "p50": 2.116058744120653,
+    "p75": 3.5109967993353766,
+    "p95": 9.68387757551123
+   },
+   "totalTokens": {
+    "p05": 1334767.3147239252,
+    "p25": 2849722.209611453,
+    "p50": 5072014.477505111,
+    "p75": 9045858.400817996,
+    "p95": 27446868.62004086
+   }
+  },
+  "versions": {
+   "deep-swe": {
+    "min": {
+     "version": "1.15.11",
+     "dateReleased": "2026-05-27"
+    },
+    "max": {
+     "version": "1.17.3",
+     "dateReleased": "2026-06-10"
+    }
+   },
+   "swe-atlas-qna": {
+    "min": {
+     "version": "1.14.19",
+     "dateReleased": "2026-04-20"
+    },
+    "max": {
+     "version": "1.18.16",
+     "dateReleased": "2026-08-10"
+    }
+   },
+   "terminal-bench-v2.1": {
+    "min": {
+     "version": "1.14.19",
+     "dateReleased": "2026-04-20"
+    },
+    "max": {
+     "version": "1.18.3",
+     "dateReleased": "2026-07-16"
+    }
+   }
+  }
+ },
+ {
+  "id": "e13ae2d1b90ef9252222611bc047ba1a",
+  "isDefault": false,
+  "isHighlighted": false,
+  "agentName": "Claude Code",
+  "provider": "anthropic",
+  "hostModelSlug": "anthropic_claude-opus-4-8",
+  "display": {
+   "agent": "Claude Code",
+   "model": "Opus 4.8 (low)",
+   "creator": {
+    "agent": "Anthropic",
+    "model": "Anthropic"
+   }
+  },
+  "displayLabel": "Claude Code - Opus 4.8 (low)",
+  "variantOf": null,
+  "isUnavailable": false,
+  "indexComponentCount": 3,
+  "evalCount": 3,
+  "evals": [
+   {
+    "datasetIndexName": "deep-swe",
+    "evaluationDatasetSlug": "DeepSWE",
+    "refDatasetName": "datacurve/deep-swe@2",
+    "weight": 0.333333333333333,
+    "mean": {
+     "reward": 0.410029498525074,
+     "inputTokens": 5152342.575221239,
+     "cacheWriteTokens": 83239.30678466077,
+     "outputTokens": 39453.448377581124
+    }
+   },
+   {
+    "datasetIndexName": "swe-atlas-qna",
+    "evaluationDatasetSlug": "SWE-Atlas-QnA",
+    "refDatasetName": "datasets/swe-atlas-qna",
+    "weight": 0.333333333333333,
+    "mean": {
+     "reward": 0.282258064516129,
+     "inputTokens": 1420711.3279569892,
+     "cacheWriteTokens": 36747.333333333336,
+     "outputTokens": 14888.33064516129
+    }
+   },
+   {
+    "datasetIndexName": "terminal-bench-v2.1",
+    "evaluationDatasetSlug": "Terminal-Bench v2.1",
+    "refDatasetName": "terminal-bench@2.1",
+    "weight": 0.333333333333333,
+    "mean": {
+     "reward": 0.779026217228464,
+     "inputTokens": 987071.8501872659,
+     "cacheWriteTokens": 33880.786516853936,
+     "outputTokens": 14400.468164794007
+    }
+   }
+  ],
+  "indexScore": 0.4904379267565557,
+  "mean": {
+   "reward": 0.4904379267565557,
+   "costUsd": 2.1825946797034774,
+   "agentWallTimeSec": 516.6536431492842,
+   "steps": 68.16359918200409,
+   "inputTokens": 2595804.632924335,
+   "cacheWriteTokens": 52080.06441717793,
+   "outputTokens": 23270.043967280166,
+   "cacheTokens": 2542895.2883435595,
+   "cacheHitRate": 0.9661582176104914,
+   "totalTokens": 5214050.029652352
+  },
+  "sums": {
+   "costUsd": 711.5258655833336
+  },
+  "percentiles": {
+   "costUsd": {
+    "p05": 0.6838865405419209,
+    "p25": 1.1333629511758678,
+    "p50": 1.6671502806748464,
+    "p75": 2.490957646728014,
+    "p95": 5.306790949897753
+   },
+   "totalTokens": {
+    "p05": 1084671.7100204509,
+    "p25": 2368194.8527607373,
+    "p50": 3851154.767893658,
+    "p75": 6106636.958077708,
+    "p95": 13533085.24580778
+   }
+  },
+  "versions": {
+   "deep-swe": {
+    "min": {
+     "version": "2.1.216",
+     "dateReleased": "2026-07-20"
+    },
+    "max": {
+     "version": "2.1.216",
+     "dateReleased": "2026-07-20"
+    }
+   },
+   "swe-atlas-qna": {
+    "min": {
+     "version": "2.1.216",
+     "dateReleased": "2026-07-20"
+    },
+    "max": {
+     "version": "2.1.227",
+     "dateReleased": "2026-08-10"
+    }
+   },
+   "terminal-bench-v2.1": {
+    "min": {
+     "version": "2.1.216",
+     "dateReleased": "2026-07-20"
+    },
+    "max": {
+     "version": "2.1.222",
+     "dateReleased": "2026-08-04"
+    }
+   }
+  }
+ },
+ {
+  "id": "e7209c32a743fe27dd0d1307157a1f6a",
+  "isDefault": false,
+  "isHighlighted": false,
+  "agentName": "Claude Code",
+  "provider": "anthropic",
+  "hostModelSlug": "anthropic_claude-fable-5",
+  "display": {
+   "agent": "Claude Code",
+   "model": "Fable 5 (xhigh) (with fallback)",
+   "creator": {
+    "agent": "Anthropic",
+    "model": "Anthropic"
+   }
+  },
+  "displayLabel": "Claude Code - Fable 5 (xhigh) (with fallback)",
+  "variantOf": null,
+  "isUnavailable": false,
+  "indexComponentCount": 3,
+  "evalCount": 3,
+  "evals": [
+   {
+    "datasetIndexName": "deep-swe",
+    "evaluationDatasetSlug": "DeepSWE",
+    "refDatasetName": "datacurve/deep-swe@2",
+    "weight": 0.333333333333333,
+    "mean": {
+     "reward": 0.651917404129794,
+     "inputTokens": 9917462.442477876,
+     "cacheWriteTokens": 183601.08259587022,
+     "outputTokens": 89711.09144542772
+    }
+   },
+   {
+    "datasetIndexName": "swe-atlas-qna",
+    "evaluationDatasetSlug": "SWE-Atlas-QnA",
+    "refDatasetName": "datasets/swe-atlas-qna",
+    "weight": 0.333333333333333,
+    "mean": {
+     "reward": 0.459677419354839,
+     "inputTokens": 3677713.110215054,
+     "cacheWriteTokens": 88126.3682795699,
+     "outputTokens": 38493.55376344086
+    }
+   },
+   {
+    "datasetIndexName": "terminal-bench-v2.1",
+    "evaluationDatasetSlug": "Terminal-Bench v2.1",
+    "refDatasetName": "terminal-bench@2.1",
+    "weight": 0.333333333333333,
+    "mean": {
+     "reward": 0.868913857677902,
+     "inputTokens": 1090106.6441947566,
+     "cacheWriteTokens": 63564.247191011236,
+     "outputTokens": 26512.47191011236
+    }
+   }
+  ],
+  "indexScore": 0.6601695603875117,
+  "mean": {
+   "reward": 0.6601695603875117,
+   "costUsd": 8.525764661042949,
+   "agentWallTimeSec": 1028.5488282208598,
+   "steps": 108.22085889570552,
+   "inputTokens": 5134138.567484663,
+   "cacheWriteTokens": 114514.75460122699,
+   "outputTokens": 52975.96319018405,
+   "cacheTokens": 5017709.533742331,
+   "cacheHitRate": 0.9637652234526968,
+   "totalTokens": 10319338.819018414
+  },
+  "sums": {
+   "costUsd": 2779.3992795
+  },
+  "percentiles": {
+   "costUsd": {
+    "p05": 3.0816478487218837,
+    "p25": 4.749361117075653,
+    "p50": 6.80727363752555,
+    "p75": 10.201311348926371,
+    "p95": 18.399330535582816
+   },
+   "totalTokens": {
+    "p05": 2516429.8875255627,
+    "p25": 5197882.143149273,
+    "p50": 8245286.802658499,
+    "p75": 12898084.299591014,
+    "p95": 24901095.448057253
+   }
+  },
+  "versions": {
+   "deep-swe": {
+    "min": {
+     "version": "2.1.216",
+     "dateReleased": "2026-07-20"
+    },
+    "max": {
+     "version": "2.1.251",
+     "dateReleased": "2026-08-28"
+    }
+   },
+   "swe-atlas-qna": {
+    "min": {
+     "version": "2.1.216",
+     "dateReleased": "2026-07-20"
+    },
+    "max": {
+     "version": "2.1.251",
+     "dateReleased": "2026-08-28"
+    }
+   },
+   "terminal-bench-v2.1": {
+    "min": {
+     "version": "2.1.216",
+     "dateReleased": "2026-07-20"
+    },
+    "max": {
+     "version": "2.1.251",
+     "dateReleased": "2026-08-28"
+    }
+   }
+  }
+ },
+ {
+  "id": "61259a77ada3123995322fd9b678ac93",
+  "isDefault": false,
+  "isHighlighted": false,
+  "agentName": "Codex",
+  "provider": "openai",
+  "hostModelSlug": "openai_gpt-5-6-sol",
+  "display": {
+   "agent": "Codex",
+   "model": "GPT-5.6 Sol (none)",
+   "creator": {
+    "agent": "OpenAI",
+    "model": "OpenAI"
+   }
+  },
+  "displayLabel": "Codex - GPT-5.6 Sol (none)",
+  "variantOf": null,
+  "isUnavailable": false,
+  "indexComponentCount": 3,
+  "evalCount": 3,
+  "evals": [
+   {
+    "datasetIndexName": "deep-swe",
+    "evaluationDatasetSlug": "DeepSWE",
+    "refDatasetName": "datacurve/deep-swe@2",
+    "weight": 0.333333333333333,
+    "mean": {
+     "reward": 0.353982300884956,
+     "inputTokens": 2342365.8997050147,
+     "cacheWriteTokens": null,
+     "outputTokens": 11318.06784660767
+    }
+   },
+   {
+    "datasetIndexName": "swe-atlas-qna",
+    "evaluationDatasetSlug": "SWE-Atlas-QnA",
+    "refDatasetName": "datasets/swe-atlas-qna",
+    "weight": 0.333333333333333,
+    "mean": {
+     "reward": 0.344086021505376,
+     "inputTokens": 1643087.1263440861,
+     "cacheWriteTokens": null,
+     "outputTokens": 6628.790322580645
+    }
+   },
+   {
+    "datasetIndexName": "terminal-bench-v2.1",
+    "evaluationDatasetSlug": "Terminal-Bench v2.1",
+    "refDatasetName": "terminal-bench@2.1",
+    "weight": 0.333333333333333,
+    "mean": {
+     "reward": 0.602996254681648,
+     "inputTokens": 1080850.925093633,
+     "cacheWriteTokens": null,
+     "outputTokens": 4561.760299625468
+    }
+   }
+  ],
+  "indexScore": 0.43368819235732675,
+  "mean": {
+   "reward": 0.43368819235732675,
+   "costUsd": 1.0868546433537856,
+   "agentWallTimeSec": 197.8853650306747,
+   "steps": 55.107361963190186,
+   "inputTokens": 1731981.2351738245,
+   "cacheWriteTokens": null,
+   "outputTokens": 7689.902862985686,
+   "cacheTokens": 1665241.2096114517,
+   "cacheHitRate": 0.891939654668184,
+   "totalTokens": 3404912.347648262
+  },
+  "sums": {
+   "costUsd": 354.3146137333336
+  },
+  "percentiles": {
+   "costUsd": {
+    "p05": 0.32437519926380365,
+    "p25": 0.46042516278118617,
+    "p50": 0.6418840617586915,
+    "p75": 1.2374177537832298,
+    "p95": 3.059384342740282
+   },
+   "totalTokens": {
+    "p05": 497754.07566462184,
+    "p25": 866388.3680981583,
+    "p50": 1453213.3670756635,
+    "p75": 3654306.208588957,
+    "p95": 11995449.642944809
+   }
+  },
+  "versions": {
+   "deep-swe": {
+    "min": {
+     "version": "0.142.0",
+     "dateReleased": "2026-06-22"
+    },
+    "max": {
+     "version": "0.142.0",
+     "dateReleased": "2026-06-22"
+    }
+   },
+   "swe-atlas-qna": {
+    "min": {
+     "version": "0.142.0",
+     "dateReleased": "2026-06-22"
+    },
+    "max": {
+     "version": "0.142.0",
+     "dateReleased": "2026-06-22"
+    }
+   },
+   "terminal-bench-v2.1": {
+    "min": {
+     "version": "0.142.0",
+     "dateReleased": "2026-06-22"
+    },
+    "max": {
+     "version": "0.144.5",
+     "dateReleased": "2026-07-16"
+    }
+   }
+  }
+ },
+ {
+  "id": "c90542f374d129ffef7d68a008a5b2b7",
+  "isDefault": false,
+  "isHighlighted": false,
+  "agentName": "Codex",
+  "provider": "openai",
+  "hostModelSlug": "openai_gpt-5-6-sol",
+  "display": {
+   "agent": "Codex",
+   "model": "GPT-5.6 Sol (xhigh)",
+   "creator": {
+    "agent": "OpenAI",
+    "model": "OpenAI"
+   }
+  },
+  "displayLabel": "Codex - GPT-5.6 Sol (xhigh)",
+  "variantOf": null,
+  "isUnavailable": false,
+  "indexComponentCount": 3,
+  "evalCount": 3,
+  "evals": [
+   {
+    "datasetIndexName": "deep-swe",
+    "evaluationDatasetSlug": "DeepSWE",
+    "refDatasetName": "datacurve/deep-swe@2",
+    "weight": 0.333333333333333,
+    "mean": {
+     "reward": 0.669616519174041,
+     "inputTokens": 7032300.828908554,
+     "cacheWriteTokens": null,
+     "outputTokens": 39853.498525073745
+    }
+   },
+   {
+    "datasetIndexName": "swe-atlas-qna",
+    "evaluationDatasetSlug": "SWE-Atlas-QnA",
+    "refDatasetName": "datasets/swe-atlas-qna",
+    "weight": 0.333333333333333,
+    "mean": {
+     "reward": 0.432795698924731,
+     "inputTokens": 6148894.9677419355,
+     "cacheWriteTokens": null,
+     "outputTokens": 23304.413978494624
+    }
+   },
+   {
+    "datasetIndexName": "terminal-bench-v2.1",
+    "evaluationDatasetSlug": "Terminal-Bench v2.1",
+    "refDatasetName": "terminal-bench@2.1",
+    "weight": 0.333333333333333,
+    "mean": {
+     "reward": 0.797752808988764,
+     "inputTokens": 1167061.0112359552,
+     "cacheWriteTokens": null,
+     "outputTokens": 11011.104868913857
+    }
+   }
+  ],
+  "indexScore": 0.633388342362512,
+  "mean": {
+   "reward": 0.633388342362512,
+   "costUsd": 3.7366775271983648,
+   "agentWallTimeSec": 440.51306952965217,
+   "steps": 93.87525562372188,
+   "inputTokens": 5095034.968302658,
+   "cacheWriteTokens": null,
+   "outputTokens": 25684.604294478526,
+   "cacheTokens": 4765876.231083844,
+   "cacheHitRate": 0.9080963249335339,
+   "totalTokens": 9886595.803681007
+  },
+  "sums": {
+   "costUsd": 1218.1568738666656
+  },
+  "percentiles": {
+   "costUsd": {
+    "p05": 1.2024687831492864,
+    "p25": 1.978509117791411,
+    "p50": 3.174749764417179,
+    "p75": 4.788529449079756,
+    "p95": 8.376152792556226
+   },
+   "totalTokens": {
+    "p05": 2121117.0120654386,
+    "p25": 4168832.293456034,
+    "p50": 7705434.734151338,
+    "p75": 13156656.390593046,
+    "p95": 24531841.49202454
+   }
+  },
+  "versions": {
+   "deep-swe": {
+    "min": {
+     "version": "0.141.0",
+     "dateReleased": "2026-06-18"
+    },
+    "max": {
+     "version": "0.141.0",
+     "dateReleased": "2026-06-18"
+    }
+   },
+   "swe-atlas-qna": {
+    "min": {
+     "version": "0.141.0",
+     "dateReleased": "2026-06-18"
+    },
+    "max": {
+     "version": "0.147.0",
+     "dateReleased": "2026-08-07"
+    }
+   },
+   "terminal-bench-v2.1": {
+    "min": {
+     "version": "0.141.0",
+     "dateReleased": "2026-06-18"
+    },
+    "max": {
+     "version": "0.144.5",
+     "dateReleased": "2026-07-16"
+    }
+   }
+  }
+ },
+ {
+  "id": "ee068af6a74f61f807ec8ba283f120bd",
+  "isDefault": true,
+  "isHighlighted": false,
+  "agentName": "Claude Code",
+  "provider": "alibaba_cloud",
+  "hostModelSlug": "alibaba_cloud_qwen3-8-max-public",
+  "display": {
+   "agent": "Claude Code",
+   "model": "Qwen3.8 Max",
+   "creator": {
+    "agent": "Anthropic",
+    "model": "Alibaba Cloud"
+   }
+  },
+  "displayLabel": "Claude Code - Qwen3.8 Max",
+  "variantOf": null,
+  "isUnavailable": false,
+  "indexComponentCount": 3,
+  "evalCount": 3,
+  "evals": [
+   {
+    "datasetIndexName": "deep-swe",
+    "evaluationDatasetSlug": "DeepSWE",
+    "refDatasetName": "datacurve/deep-swe@2",
+    "weight": 0.333333333333333,
+    "mean": {
+     "reward": 0.519174041297935,
+     "inputTokens": 11507847.05899705,
+     "cacheWriteTokens": 247713.88790560473,
+     "outputTokens": 103997.9174041298
+    }
+   },
+   {
+    "datasetIndexName": "swe-atlas-qna",
+    "evaluationDatasetSlug": "SWE-Atlas-QnA",
+    "refDatasetName": "datasets/swe-atlas-qna",
+    "weight": 0.333333333333333,
+    "mean": {
+     "reward": 0.481182795698925,
+     "inputTokens": 5159835.63172043,
+     "cacheWriteTokens": 127339.13978494624,
+     "outputTokens": 45816.49193548387
+    }
+   },
+   {
+    "datasetIndexName": "terminal-bench-v2.1",
+    "evaluationDatasetSlug": "Terminal-Bench v2.1",
+    "refDatasetName": "terminal-bench@2.1",
+    "weight": 0.333333333333333,
+    "mean": {
+     "reward": 0.838951310861423,
+     "inputTokens": 1896126.4232209737,
+     "cacheWriteTokens": 99783.66292134831,
+     "outputTokens": 35319.1797752809
+    }
+   }
+  ],
+  "indexScore": 0.6131027159527611,
+  "mean": {
+   "reward": 0.6131027159527611,
+   "costUsd": 3.2306109660020477,
+   "agentWallTimeSec": 1792.1471809815948,
+   "steps": 159.5848670756646,
+   "inputTokens": 6469207.32413088,
+   "cacheWriteTokens": 161541.31492842536,
+   "outputTokens": 63117.84253578731,
+   "cacheTokens": 5809875.082822086,
+   "cacheHitRate": 0.8998815214008218,
+   "totalTokens": 12503741.564417187
+  },
+  "sums": {
+   "costUsd": 1053.179174916667
+  },
+  "percentiles": {
+   "costUsd": {
+    "p05": 1.3612619990797545,
+    "p25": 2.013785316973414,
+    "p50": 2.667883204243355,
+    "p75": 3.8059226860940685,
+    "p95": 6.828903518251546
+   },
+   "totalTokens": {
+    "p05": 4382695.386298567,
+    "p25": 7331919.312883437,
+    "p50": 10237627.778118595,
+    "p75": 15420257.97546011,
+    "p95": 26478315.11738243
+   }
+  },
+  "versions": {
+   "deep-swe": {
+    "min": {
+     "version": "2.1.223",
+     "dateReleased": "2026-08-05"
+    },
+    "max": {
+     "version": "2.1.224",
+     "dateReleased": "2026-08-07"
+    }
+   },
+   "swe-atlas-qna": {
+    "min": {
+     "version": "2.1.224",
+     "dateReleased": "2026-08-07"
+    },
+    "max": {
+     "version": "2.1.236",
+     "dateReleased": "2026-08-19"
+    }
+   },
+   "terminal-bench-v2.1": {
+    "min": {
+     "version": "2.1.223",
+     "dateReleased": "2026-08-05"
+    },
+    "max": {
+     "version": "2.1.236",
+     "dateReleased": "2026-08-19"
+    }
+   }
+  }
+ },
+ {
+  "id": "2ff7e570bfd5380c3b39acacaf61d455",
+  "isDefault": false,
+  "isHighlighted": false,
+  "agentName": "Codex",
+  "provider": "openai",
+  "hostModelSlug": "openai_gpt-5-6-luna",
+  "display": {
+   "agent": "Codex",
+   "model": "GPT-5.6 Luna (low)",
+   "creator": {
+    "agent": "OpenAI",
+    "model": "OpenAI"
+   }
+  },
+  "displayLabel": "Codex - GPT-5.6 Luna (low)",
+  "variantOf": null,
+  "isUnavailable": false,
+  "indexComponentCount": 3,
+  "evalCount": 3,
+  "evals": [
+   {
+    "datasetIndexName": "deep-swe",
+    "evaluationDatasetSlug": "DeepSWE",
+    "refDatasetName": "datacurve/deep-swe@2",
+    "weight": 0.333333333333333,
+    "mean": {
+     "reward": 0.103244837758112,
+     "inputTokens": 1131570.203539823,
+     "cacheWriteTokens": null,
+     "outputTokens": 7729.495575221239
+    }
+   },
+   {
+    "datasetIndexName": "swe-atlas-qna",
+    "evaluationDatasetSlug": "SWE-Atlas-QnA",
+    "refDatasetName": "datasets/swe-atlas-qna",
+    "weight": 0.333333333333333,
+    "mean": {
+     "reward": 0.150537634408602,
+     "inputTokens": 626060.2096774194,
+     "cacheWriteTokens": null,
+     "outputTokens": 4792.110215053764
+    }
+   },
+   {
+    "datasetIndexName": "terminal-bench-v2.1",
+    "evaluationDatasetSlug": "Terminal-Bench v2.1",
+    "refDatasetName": "terminal-bench@2.1",
+    "weight": 0.333333333333333,
+    "mean": {
+     "reward": 0.49812734082397,
+     "inputTokens": 482714.0074906367,
+     "cacheWriteTokens": null,
+     "outputTokens": 4056.318352059925
+    }
+   }
+  ],
+  "indexScore": 0.250636604330228,
+  "mean": {
+   "reward": 0.250636604330228,
+   "costUsd": 0.03893760139059304,
+   "agentWallTimeSec": 100.02603374233121,
+   "steps": 34.30674846625767,
+   "inputTokens": 762148.6063394684,
+   "cacheWriteTokens": null,
+   "outputTokens": 5609.407975460122,
+   "cacheTokens": 667907.8302658484,
+   "cacheHitRate": 0.8430087375482057,
+   "totalTokens": 1435665.8445807756
+  },
+  "sums": {
+   "costUsd": 12.693658053333332
+  },
+  "percentiles": {
+   "costUsd": {
+    "p05": 0.018558010813905915,
+    "p25": 0.023961003456032724,
+    "p50": 0.03458340147239261,
+    "p75": 0.046473342597137014,
+    "p95": 0.0769414915092024
+   },
+   "totalTokens": {
+    "p05": 447907.436809816,
+    "p25": 689286.3364008178,
+    "p50": 1080021.569529651,
+    "p75": 1642005.1952965234,
+    "p95": 3721269.2711656415
+   }
+  },
+  "versions": {
+   "deep-swe": {
+    "min": {
+     "version": "0.141.0",
+     "dateReleased": "2026-06-18"
+    },
+    "max": {
+     "version": "0.144.6",
+     "dateReleased": "2026-07-18"
+    }
+   },
+   "swe-atlas-qna": {
+    "min": {
+     "version": "0.141.0",
+     "dateReleased": "2026-06-18"
+    },
+    "max": {
+     "version": "0.144.5",
+     "dateReleased": "2026-07-16"
+    }
+   },
+   "terminal-bench-v2.1": {
+    "min": {
+     "version": "0.141.0",
+     "dateReleased": "2026-06-18"
+    },
+    "max": {
+     "version": "0.144.5",
+     "dateReleased": "2026-07-16"
+    }
+   }
+  }
+ },
+ {
+  "id": "4859ca98b6e4ab6b3f67be401b33326f",
+  "isDefault": false,
+  "isHighlighted": false,
+  "agentName": "Codex",
+  "provider": "openai",
+  "hostModelSlug": "openai_gpt-5-6-terra",
+  "display": {
+   "agent": "Codex",
+   "model": "GPT-5.6 Terra (medium)",
+   "creator": {
+    "agent": "OpenAI",
+    "model": "OpenAI"
+   }
+  },
+  "displayLabel": "Codex - GPT-5.6 Terra (medium)",
+  "variantOf": null,
+  "isUnavailable": false,
+  "indexComponentCount": 3,
+  "evalCount": 3,
+  "evals": [
+   {
+    "datasetIndexName": "deep-swe",
+    "evaluationDatasetSlug": "DeepSWE",
+    "refDatasetName": "datacurve/deep-swe@2",
+    "weight": 0.333333333333333,
+    "mean": {
+     "reward": 0.457227138643068,
+     "inputTokens": 2052966.8584070797,
+     "cacheWriteTokens": null,
+     "outputTokens": 17387.890855457226
+    }
+   },
+   {
+    "datasetIndexName": "swe-atlas-qna",
+    "evaluationDatasetSlug": "SWE-Atlas-QnA",
+    "refDatasetName": "datasets/swe-atlas-qna",
+    "weight": 0.333333333333333,
+    "mean": {
+     "reward": 0.287634408602151,
+     "inputTokens": 1895970.1397849463,
+     "cacheWriteTokens": null,
+     "outputTokens": 10513.322580645161
+    }
+   },
+   {
+    "datasetIndexName": "terminal-bench-v2.1",
+    "evaluationDatasetSlug": "Terminal-Bench v2.1",
+    "refDatasetName": "terminal-bench@2.1",
+    "weight": 0.333333333333333,
+    "mean": {
+     "reward": 0.696629213483146,
+     "inputTokens": 730780.0786516854,
+     "cacheWriteTokens": null,
+     "outputTokens": 6701.40074906367
+    }
+   }
+  ],
+  "indexScore": 0.4804969202427884,
+  "mean": {
+   "reward": 0.4804969202427884,
+   "costUsd": 0.6699985707566464,
+   "agentWallTimeSec": 240.094656441718,
+   "steps": 50.95501022494887,
+   "inputTokens": 1632285.2126789368,
+   "cacheWriteTokens": null,
+   "outputTokens": 11855.547034764826,
+   "cacheTokens": 1520465.788343561,
+   "cacheHitRate": 0.8944384528371324,
+   "totalTokens": 3164606.548057258
+  },
+  "sums": {
+   "costUsd": 218.4195340666667
+  },
+  "percentiles": {
+   "costUsd": {
+    "p05": 0.24685268752556247,
+    "p25": 0.37554053333333337,
+    "p50": 0.5201061145194273,
+    "p75": 0.8061413525562372,
+    "p95": 1.5840095217995922
+   },
+   "totalTokens": {
+    "p05": 680386.5621676893,
+    "p25": 1193393.8139059318,
+    "p50": 1989297.6370143127,
+    "p75": 3766832.534764826,
+    "p95": 9490494.878323121
+   }
+  },
+  "versions": {
+   "deep-swe": {
+    "min": {
+     "version": "0.141.0",
+     "dateReleased": "2026-06-18"
+    },
+    "max": {
+     "version": "0.141.0",
+     "dateReleased": "2026-06-18"
+    }
+   },
+   "swe-atlas-qna": {
+    "min": {
+     "version": "0.141.0",
+     "dateReleased": "2026-06-18"
+    },
+    "max": {
+     "version": "0.147.0",
+     "dateReleased": "2026-08-07"
+    }
+   },
+   "terminal-bench-v2.1": {
+    "min": {
+     "version": "0.141.0",
+     "dateReleased": "2026-06-18"
+    },
+    "max": {
+     "version": "0.144.5",
+     "dateReleased": "2026-07-16"
+    }
+   }
+  }
+ },
+ {
+  "id": "734a997462b941d69481c424b01be6ba",
+  "isDefault": false,
+  "isHighlighted": false,
+  "agentName": "Claude Code",
+  "provider": "anthropic",
+  "hostModelSlug": "anthropic_claude-fable-5",
+  "display": {
+   "agent": "Claude Code",
+   "model": "Fable 5 (medium) (with fallback)",
+   "creator": {
+    "agent": "Anthropic",
+    "model": "Anthropic"
+   }
+  },
+  "displayLabel": "Claude Code - Fable 5 (medium) (with fallback)",
+  "variantOf": null,
+  "isUnavailable": false,
+  "indexComponentCount": 3,
+  "evalCount": 3,
+  "evals": [
+   {
+    "datasetIndexName": "deep-swe",
+    "evaluationDatasetSlug": "DeepSWE",
+    "refDatasetName": "datacurve/deep-swe@2",
+    "weight": 0.333333333333333,
+    "mean": {
+     "reward": 0.63716814159292,
+     "inputTokens": 5130883.191740413,
+     "cacheWriteTokens": 104156.85250737463,
+     "outputTokens": 50617.43657817109
+    }
+   },
+   {
+    "datasetIndexName": "swe-atlas-qna",
+    "evaluationDatasetSlug": "SWE-Atlas-QnA",
+    "refDatasetName": "datasets/swe-atlas-qna",
+    "weight": 0.333333333333333,
+    "mean": {
+     "reward": 0.389784946236559,
+     "inputTokens": 2195029.5913978494,
+     "cacheWriteTokens": 52502.43817204301,
+     "outputTokens": 21392.809139784946
+    }
+   },
+   {
+    "datasetIndexName": "terminal-bench-v2.1",
+    "evaluationDatasetSlug": "Terminal-Bench v2.1",
+    "refDatasetName": "terminal-bench@2.1",
+    "weight": 0.333333333333333,
+    "mean": {
+     "reward": 0.868913857677903,
+     "inputTokens": 724465.7078651686,
+     "cacheWriteTokens": 44348.22097378277,
+     "outputTokens": 13464.74531835206
+    }
+   }
+  ],
+  "indexScore": 0.6319556485024607,
+  "mean": {
+   "reward": 0.6319556485024607,
+   "costUsd": 4.7355212489775065,
+   "agentWallTimeSec": 661.8129744376279,
+   "steps": 72.83793456032718,
+   "inputTokens": 2811199.1349693253,
+   "cacheWriteTokens": 68181.03783231083,
+   "outputTokens": 29358.407975460123,
+   "cacheTokens": 2742416.5695296503,
+   "cacheHitRate": 0.9633202755012386,
+   "totalTokens": 5651155.150306753
+  },
+  "sums": {
+   "costUsd": 1543.7799271666672
+  },
+  "percentiles": {
+   "costUsd": {
+    "p05": 1.574489229192229,
+    "p25": 2.340858028374233,
+    "p50": 3.691470043967279,
+    "p75": 5.402143788854805,
+    "p95": 11.359676447750488
+   },
+   "totalTokens": {
+    "p05": 1295797.6157464227,
+    "p25": 2439411.8098159498,
+    "p50": 3876825.6400818,
+    "p75": 6483336.271983625,
+    "p95": 15577467.475664584
+   }
+  },
+  "versions": {
+   "deep-swe": {
+    "min": {
+     "version": "2.1.216",
+     "dateReleased": "2026-07-20"
+    },
+    "max": {
+     "version": "2.1.216",
+     "dateReleased": "2026-07-20"
+    }
+   },
+   "swe-atlas-qna": {
+    "min": {
+     "version": "2.1.216",
+     "dateReleased": "2026-07-20"
+    },
+    "max": {
+     "version": "2.1.251",
+     "dateReleased": "2026-08-28"
+    }
+   },
+   "terminal-bench-v2.1": {
+    "min": {
+     "version": "2.1.170",
+     "dateReleased": "2026-06-09"
+    },
+    "max": {
+     "version": "2.1.251",
+     "dateReleased": "2026-08-28"
+    }
+   }
+  }
+ },
+ {
+  "id": "0eb5f9920c6d4e3347f30b73266f1e7d",
+  "isDefault": false,
+  "isHighlighted": false,
+  "agentName": "Codex",
+  "provider": "openai",
+  "hostModelSlug": "openai_gpt-5-6-terra",
+  "display": {
+   "agent": "Codex",
+   "model": "GPT-5.6 Terra (xhigh)",
+   "creator": {
+    "agent": "OpenAI",
+    "model": "OpenAI"
+   }
+  },
+  "displayLabel": "Codex - GPT-5.6 Terra (xhigh)",
+  "variantOf": null,
+  "isUnavailable": false,
+  "indexComponentCount": 3,
+  "evalCount": 3,
+  "evals": [
+   {
+    "datasetIndexName": "deep-swe",
+    "evaluationDatasetSlug": "DeepSWE",
+    "refDatasetName": "datacurve/deep-swe@2",
+    "weight": 0.333333333333333,
+    "mean": {
+     "reward": 0.584070796460177,
+     "inputTokens": 4651084.256637168,
+     "cacheWriteTokens": null,
+     "outputTokens": 40481.45132743363
+    }
+   },
+   {
+    "datasetIndexName": "swe-atlas-qna",
+    "evaluationDatasetSlug": "SWE-Atlas-QnA",
+    "refDatasetName": "datasets/swe-atlas-qna",
+    "weight": 0.333333333333333,
+    "mean": {
+     "reward": 0.325268817204301,
+     "inputTokens": 3747692.5349462368,
+     "cacheWriteTokens": null,
+     "outputTokens": 21979.155913978495
+    }
+   },
+   {
+    "datasetIndexName": "terminal-bench-v2.1",
+    "evaluationDatasetSlug": "Terminal-Bench v2.1",
+    "refDatasetName": "terminal-bench@2.1",
+    "weight": 0.333333333333333,
+    "mean": {
+     "reward": 0.771535580524344,
+     "inputTokens": 1343381.4344569289,
+     "cacheWriteTokens": null,
+     "outputTokens": 13257.988764044943
+    }
+   }
+  ],
+  "indexScore": 0.5602917313962741,
+  "mean": {
+   "reward": 0.5602917313962741,
+   "costUsd": 1.3588569202453962,
+   "agentWallTimeSec": 403.22344478527606,
+   "steps": 74.95092024539876,
+   "inputTokens": 3404439.7024539877,
+   "cacheWriteTokens": null,
+   "outputTokens": 26011.59611451943,
+   "cacheTokens": 3201200.9100204487,
+   "cacheHitRate": 0.910418152728672,
+   "totalTokens": 6631652.208588957
+  },
+  "sums": {
+   "costUsd": 442.9873560000003
+  },
+  "percentiles": {
+   "costUsd": {
+    "p05": 0.48796739182004073,
+    "p25": 0.7622106053169723,
+    "p50": 1.1644744873210633,
+    "p75": 1.687146050715745,
+    "p95": 3.0938142692024515
+   },
+   "totalTokens": {
+    "p05": 1455146.7231083857,
+    "p25": 2723237.8865030673,
+    "p50": 4985434.912065441,
+    "p75": 8405137.968302669,
+    "p95": 18445191.33394682
+   }
+  },
+  "versions": {
+   "deep-swe": {
+    "min": {
+     "version": "0.141.0",
+     "dateReleased": "2026-06-18"
+    },
+    "max": {
+     "version": "0.141.0",
+     "dateReleased": "2026-06-18"
+    }
+   },
+   "swe-atlas-qna": {
+    "min": {
+     "version": "0.141.0",
+     "dateReleased": "2026-06-18"
+    },
+    "max": {
+     "version": "0.141.0",
+     "dateReleased": "2026-06-18"
+    }
+   },
+   "terminal-bench-v2.1": {
+    "min": {
+     "version": "0.141.0",
+     "dateReleased": "2026-06-18"
+    },
+    "max": {
+     "version": "0.144.5",
+     "dateReleased": "2026-07-16"
+    }
+   }
+  }
+ },
+ {
+  "id": "198fa31740fe182ce8f553c452921037",
+  "isDefault": false,
+  "isHighlighted": false,
+  "agentName": "Codex",
+  "provider": "openai",
+  "hostModelSlug": "openai_gpt-5-6-sol",
+  "display": {
+   "agent": "Codex",
+   "model": "GPT-5.6 Sol (high)",
+   "creator": {
+    "agent": "OpenAI",
+    "model": "OpenAI"
+   }
+  },
+  "displayLabel": "Codex - GPT-5.6 Sol (high)",
+  "variantOf": null,
+  "isUnavailable": false,
+  "indexComponentCount": 3,
+  "evalCount": 3,
+  "evals": [
+   {
+    "datasetIndexName": "deep-swe",
+    "evaluationDatasetSlug": "DeepSWE",
+    "refDatasetName": "datacurve/deep-swe@2",
+    "weight": 0.333333333333333,
+    "mean": {
+     "reward": 0.648967551622419,
+     "inputTokens": 5539775.120943952,
+     "cacheWriteTokens": null,
+     "outputTokens": 30420.62831858407
+    }
+   },
+   {
+    "datasetIndexName": "swe-atlas-qna",
+    "evaluationDatasetSlug": "SWE-Atlas-QnA",
+    "refDatasetName": "datasets/swe-atlas-qna",
+    "weight": 0.333333333333333,
+    "mean": {
+     "reward": 0.454301075268817,
+     "inputTokens": 5040848.024193549,
+     "cacheWriteTokens": null,
+     "outputTokens": 18296.064516129034
+    }
+   },
+   {
+    "datasetIndexName": "terminal-bench-v2.1",
+    "evaluationDatasetSlug": "Terminal-Bench v2.1",
+    "refDatasetName": "terminal-bench@2.1",
+    "weight": 0.333333333333333,
+    "mean": {
+     "reward": 0.820224719101123,
+     "inputTokens": 1094881.9400749065,
+     "cacheWriteTokens": null,
+     "outputTokens": 9135.194756554307
+    }
+   }
+  ],
+  "indexScore": 0.6411644486641197,
+  "mean": {
+   "reward": 0.6411644486641197,
+   "costUsd": 3.000466998773008,
+   "agentWallTimeSec": 369.9402760736197,
+   "steps": 84.6717791411043,
+   "inputTokens": 4136516.062372188,
+   "cacheWriteTokens": null,
+   "outputTokens": 19997.777096114518,
+   "cacheTokens": 3873764.664621675,
+   "cacheHitRate": 0.9060190184699437,
+   "totalTokens": 8030278.504089993
+  },
+  "sums": {
+   "costUsd": 978.1522416000003
+  },
+  "percentiles": {
+   "costUsd": {
+    "p05": 0.8755426288752566,
+    "p25": 1.4947796809815976,
+    "p50": 2.263844878527609,
+    "p75": 3.7542808752556223,
+    "p95": 7.031302475582824
+   },
+   "totalTokens": {
+    "p05": 1506412.7503067497,
+    "p25": 2967505.0746421246,
+    "p50": 5465747.442740289,
+    "p75": 10526537.291411066,
+    "p95": 23316027.41370143
+   }
+  },
+  "versions": {
+   "deep-swe": {
+    "min": {
+     "version": "0.141.0",
+     "dateReleased": "2026-06-18"
+    },
+    "max": {
+     "version": "0.141.0",
+     "dateReleased": "2026-06-18"
+    }
+   },
+   "swe-atlas-qna": {
+    "min": {
+     "version": "0.141.0",
+     "dateReleased": "2026-06-18"
+    },
+    "max": {
+     "version": "0.141.0",
+     "dateReleased": "2026-06-18"
+    }
+   },
+   "terminal-bench-v2.1": {
+    "min": {
+     "version": "0.141.0",
+     "dateReleased": "2026-06-18"
+    },
+    "max": {
+     "version": "0.144.5",
+     "dateReleased": "2026-07-16"
+    }
+   }
+  }
+ },
+ {
+  "id": "6e559b7e9283e560f0df72b78be2a52a",
+  "isDefault": false,
+  "isHighlighted": false,
+  "agentName": "Claude Code",
+  "provider": "anthropic",
+  "hostModelSlug": "anthropic_claude-opus-4-8",
+  "display": {
+   "agent": "Claude Code",
+   "model": "Opus 4.8 (max)",
+   "creator": {
+    "agent": "Anthropic",
+    "model": "Anthropic"
+   }
+  },
+  "displayLabel": "Claude Code - Opus 4.8 (max)",
+  "variantOf": null,
+  "isUnavailable": false,
+  "indexComponentCount": 3,
+  "evalCount": 3,
+  "evals": [
+   {
+    "datasetIndexName": "deep-swe",
+    "evaluationDatasetSlug": "DeepSWE",
+    "refDatasetName": "datacurve/deep-swe@2",
+    "weight": 0.333333333333333,
+    "mean": {
+     "reward": 0.557522123893805,
+     "inputTokens": 18153203.522123896,
+     "cacheWriteTokens": 301517.69911504426,
+     "outputTokens": 148269.50147492625
+    }
+   },
+   {
+    "datasetIndexName": "swe-atlas-qna",
+    "evaluationDatasetSlug": "SWE-Atlas-QnA",
+    "refDatasetName": "datasets/swe-atlas-qna",
+    "weight": 0.333333333333333,
+    "mean": {
+     "reward": 0.467741935483871,
+     "inputTokens": 5147235.474462366,
+     "cacheWriteTokens": 131961.28225806452,
+     "outputTokens": 61929.74865591398
+    }
+   },
+   {
+    "datasetIndexName": "terminal-bench-v2.1",
+    "evaluationDatasetSlug": "Terminal-Bench v2.1",
+    "refDatasetName": "terminal-bench@2.1",
+    "weight": 0.333333333333333,
+    "mean": {
+     "reward": 0.838951310861423,
+     "inputTokens": 2452756.501872659,
+     "cacheWriteTokens": 86365.32958801498,
+     "outputTokens": 52837.10861423221
+    }
+   }
+  ],
+  "indexScore": 0.6214051234130329,
+  "mean": {
+   "reward": 0.6214051234130329,
+   "costUsd": 7.7247257970092145,
+   "agentWallTimeSec": 1386.6877980572617,
+   "steps": 165.01758453417034,
+   "inputTokens": 8919829.832822086,
+   "cacheWriteTokens": 178285.93047034767,
+   "outputTokens": 89374.98517382414,
+   "cacheTokens": 8733088.67944784,
+   "cacheHitRate": 0.9657541826994763,
+   "totalTokens": 17920579.42791411
+  },
+  "sums": {
+   "costUsd": 2518.260609825
+  },
+  "percentiles": {
+   "costUsd": {
+    "p05": 3.0878346297034738,
+    "p25": 4.540317843813904,
+    "p50": 6.637475091513282,
+    "p75": 9.330402129345616,
+    "p95": 15.42150974396728
+   },
+   "totalTokens": {
+    "p05": 5053780.532310828,
+    "p25": 9526310.119631888,
+    "p50": 15064885.397750512,
+    "p75": 22834926.87627812,
+    "p95": 36568102.85869118
+   }
+  },
+  "versions": {
+   "deep-swe": {
+    "min": {
+     "version": "2.1.156",
+     "dateReleased": "2026-05-28"
+    },
+    "max": {
+     "version": "2.1.156",
+     "dateReleased": "2026-05-28"
+    }
+   },
+   "swe-atlas-qna": {
+    "min": {
+     "version": "2.1.156",
+     "dateReleased": "2026-05-28"
+    },
+    "max": {
+     "version": "2.1.227",
+     "dateReleased": "2026-08-10"
+    }
+   },
+   "terminal-bench-v2.1": {
+    "min": {
+     "version": "2.1.154",
+     "dateReleased": "2026-05-28"
+    },
+    "max": {
+     "version": "2.1.215",
+     "dateReleased": "2026-07-19"
+    }
+   }
+  }
+ },
+ {
+  "id": "59096497f7a1a7458a4c5e5ebba2777a",
+  "isDefault": false,
+  "isHighlighted": false,
+  "agentName": "Claude Code",
+  "provider": "anthropic",
+  "hostModelSlug": "anthropic_claude-opus-4-8",
+  "display": {
+   "agent": "Claude Code",
+   "model": "Opus 4.8 (medium)",
+   "creator": {
+    "agent": "Anthropic",
+    "model": "Anthropic"
+   }
+  },
+  "displayLabel": "Claude Code - Opus 4.8 (medium)",
+  "variantOf": null,
+  "isUnavailable": false,
+  "indexComponentCount": 3,
+  "evalCount": 3,
+  "evals": [
+   {
+    "datasetIndexName": "deep-swe",
+    "evaluationDatasetSlug": "DeepSWE",
+    "refDatasetName": "datacurve/deep-swe@2",
+    "weight": 0.333333333333333,
+    "mean": {
+     "reward": 0.492625368731563,
+     "inputTokens": 8063404.238938053,
+     "cacheWriteTokens": 133784.22713864307,
+     "outputTokens": 61098.227138643066
+    }
+   },
+   {
+    "datasetIndexName": "swe-atlas-qna",
+    "evaluationDatasetSlug": "SWE-Atlas-QnA",
+    "refDatasetName": "datasets/swe-atlas-qna",
+    "weight": 0.333333333333333,
+    "mean": {
+     "reward": 0.360215053763441,
+     "inputTokens": 2126437.5134408604,
+     "cacheWriteTokens": 55581.15053763441,
+     "outputTokens": 22352.416666666668
+    }
+   },
+   {
+    "datasetIndexName": "terminal-bench-v2.1",
+    "evaluationDatasetSlug": "Terminal-Bench v2.1",
+    "refDatasetName": "terminal-bench@2.1",
+    "weight": 0.333333333333333,
+    "mean": {
+     "reward": 0.820224719101124,
+     "inputTokens": 1079725.65917603,
+     "cacheWriteTokens": 49350.760299625465,
+     "outputTokens": 18270.36329588015
+    }
+   }
+  ],
+  "indexScore": 0.5576883805320427,
+  "mean": {
+   "reward": 0.5576883805320427,
+   "costUsd": 3.3038416339468313,
+   "agentWallTimeSec": 722.922882413088,
+   "steps": 92.91239658858525,
+   "inputTokens": 3898584.3997955015,
+   "cacheWriteTokens": 80987.4171779141,
+   "outputTokens": 34668.28732106339,
+   "cacheTokens": 3813114.2648261734,
+   "cacheHitRate": 0.9638401283466974,
+   "totalTokens": 7827354.369120649
+  },
+  "sums": {
+   "costUsd": 1077.052372666667
+  },
+  "percentiles": {
+   "costUsd": {
+    "p05": 1.1740537311349681,
+    "p25": 1.8085681804703484,
+    "p50": 2.616861440695297,
+    "p75": 3.8440494422290383,
+    "p95": 7.370494565184035
+   },
+   "totalTokens": {
+    "p05": 1950044.523108385,
+    "p25": 3780855.565439674,
+    "p50": 5878463.766871154,
+    "p75": 9197766.923312873,
+    "p95": 19460032.661349706
+   }
+  },
+  "versions": {
+   "deep-swe": {
+    "min": {
+     "version": "2.1.156",
+     "dateReleased": "2026-05-28"
+    },
+    "max": {
+     "version": "2.1.157",
+     "dateReleased": "2026-05-29"
+    }
+   },
+   "swe-atlas-qna": {
+    "min": {
+     "version": "2.1.159",
+     "dateReleased": "2026-05-31"
+    },
+    "max": {
+     "version": "2.1.159",
+     "dateReleased": "2026-05-31"
+    }
+   },
+   "terminal-bench-v2.1": {
+    "min": {
+     "version": "2.1.154",
+     "dateReleased": "2026-05-28"
+    },
+    "max": {
+     "version": "2.1.215",
+     "dateReleased": "2026-07-19"
+    }
+   }
+  }
+ },
+ {
+  "id": "7c759307cdae6c6d33230846318cc21c",
+  "isDefault": false,
+  "isHighlighted": false,
+  "agentName": "Claude Code",
+  "provider": "anthropic",
+  "hostModelSlug": "anthropic_claude-opus-5",
+  "display": {
+   "agent": "Claude Code",
+   "model": "Opus 5 (none)",
+   "creator": {
+    "agent": "Anthropic",
+    "model": "Anthropic"
+   }
+  },
+  "displayLabel": "Claude Code - Opus 5 (none)",
+  "variantOf": null,
+  "isUnavailable": false,
+  "indexComponentCount": 3,
+  "evalCount": 3,
+  "evals": [
+   {
+    "datasetIndexName": "deep-swe",
+    "evaluationDatasetSlug": "DeepSWE",
+    "refDatasetName": "datacurve/deep-swe@2",
+    "weight": 0.333333333333333,
+    "mean": {
+     "reward": 0.442477876106194,
+     "inputTokens": 8893054.079646017,
+     "cacheWriteTokens": 130020.65191740413,
+     "outputTokens": 51338.902654867255
+    }
+   },
+   {
+    "datasetIndexName": "swe-atlas-qna",
+    "evaluationDatasetSlug": "SWE-Atlas-QnA",
+    "refDatasetName": "datasets/swe-atlas-qna",
+    "weight": 0.333333333333333,
+    "mean": {
+     "reward": 0.516129032258065,
+     "inputTokens": 2807302.4166666665,
+     "cacheWriteTokens": 65774.59677419355,
+     "outputTokens": 24759.833333333332
+    }
+   },
+   {
+    "datasetIndexName": "terminal-bench-v2.1",
+    "evaluationDatasetSlug": "Terminal-Bench v2.1",
+    "refDatasetName": "terminal-bench@2.1",
+    "weight": 0.333333333333333,
+    "mean": {
+     "reward": 0.816479400749064,
+     "inputTokens": 1526114.2471910112,
+     "cacheWriteTokens": 38924.299625468164,
+     "outputTokens": 14685.393258426966
+    }
+   }
+  ],
+  "indexScore": 0.5916954363711078,
+  "mean": {
+   "reward": 0.5916954363711078,
+   "costUsd": 3.53093715925358,
+   "agentWallTimeSec": 708.6105337423306,
+   "steps": 60.88548057259713,
+   "inputTokens": 4567008.523517382,
+   "cacheWriteTokens": 80713.6390593047,
+   "outputTokens": 31222.439672801633,
+   "cacheTokens": 4485501.258691209,
+   "cacheHitRate": 0.9712292805469993,
+   "totalTokens": 9164445.860940713
+  },
+  "sums": {
+   "costUsd": 1151.085513916667
+  },
+  "percentiles": {
+   "costUsd": {
+    "p05": 1.284190859611453,
+    "p25": 1.9096601543967267,
+    "p50": 3.0003018997955038,
+    "p75": 4.573047067484663,
+    "p95": 7.395087259662566
+   },
+   "totalTokens": {
+    "p05": 2640129.7989775036,
+    "p25": 4419293.569529653,
+    "p50": 7718412.611451931,
+    "p75": 12001963.325153362,
+    "p95": 20153188.299386483
+   }
+  },
+  "versions": {
+   "deep-swe": {
+    "min": {
+     "version": "2.1.251",
+     "dateReleased": "2026-08-28"
+    },
+    "max": {
+     "version": "2.1.251",
+     "dateReleased": "2026-08-28"
+    }
+   },
+   "swe-atlas-qna": {
+    "min": {
+     "version": "2.1.251",
+     "dateReleased": "2026-08-28"
+    },
+    "max": {
+     "version": "2.1.251",
+     "dateReleased": "2026-08-28"
+    }
+   },
+   "terminal-bench-v2.1": {
+    "min": {
+     "version": "2.1.251",
+     "dateReleased": "2026-08-28"
+    },
+    "max": {
+     "version": "2.1.251",
+     "dateReleased": "2026-08-28"
+    }
+   }
+  }
+ },
+ {
+  "id": "26c49d626af606abb33dbbc9dd951c20",
+  "isDefault": false,
+  "isHighlighted": false,
+  "agentName": "Codex",
+  "provider": "openai",
+  "hostModelSlug": "openai_gpt-5-6-sol",
+  "display": {
+   "agent": "Codex",
+   "model": "GPT-5.6 Sol (low)",
+   "creator": {
+    "agent": "OpenAI",
+    "model": "OpenAI"
+   }
+  },
+  "displayLabel": "Codex - GPT-5.6 Sol (low)",
+  "variantOf": null,
+  "isUnavailable": false,
+  "indexComponentCount": 3,
+  "evalCount": 3,
+  "evals": [
+   {
+    "datasetIndexName": "deep-swe",
+    "evaluationDatasetSlug": "DeepSWE",
+    "refDatasetName": "datacurve/deep-swe@2",
+    "weight": 0.333333333333333,
+    "mean": {
+     "reward": 0.533923303834809,
+     "inputTokens": 2024676.6755162242,
+     "cacheWriteTokens": null,
+     "outputTokens": 13434.126843657818
+    }
+   },
+   {
+    "datasetIndexName": "swe-atlas-qna",
+    "evaluationDatasetSlug": "SWE-Atlas-QnA",
+    "refDatasetName": "datasets/swe-atlas-qna",
+    "weight": 0.333333333333333,
+    "mean": {
+     "reward": 0.344086021505376,
+     "inputTokens": 2068182.572580645,
+     "cacheWriteTokens": null,
+     "outputTokens": 8172.586021505376
+    }
+   },
+   {
+    "datasetIndexName": "terminal-bench-v2.1",
+    "evaluationDatasetSlug": "Terminal-Bench v2.1",
+    "refDatasetName": "terminal-bench@2.1",
+    "weight": 0.333333333333333,
+    "mean": {
+     "reward": 0.779026217228464,
+     "inputTokens": 621431.6029962547,
+     "cacheWriteTokens": null,
+     "outputTokens": 4385.985018726592
+    }
+   }
+  ],
+  "indexScore": 0.5523451808562164,
+  "mean": {
+   "reward": 0.5523451808562164,
+   "costUsd": 1.2924588445807745,
+   "agentWallTimeSec": 212.89958282208605,
+   "steps": 53.92126789366053,
+   "inputTokens": 1658130.4171779142,
+   "cacheWriteTokens": null,
+   "outputTokens": 8962.606339468302,
+   "cacheTokens": 1533143.0419222915,
+   "cacheHitRate": 0.8829664546361218,
+   "totalTokens": 3200236.065439673
+  },
+  "sums": {
+   "costUsd": 421.341583333333
+  },
+  "percentiles": {
+   "costUsd": {
+    "p05": 0.41743781595092044,
+    "p25": 0.6564808764826177,
+    "p50": 0.9224106711656431,
+    "p75": 1.6436827501022504,
+    "p95": 3.2644622835173833
+   },
+   "totalTokens": {
+    "p05": 578046.32597137,
+    "p25": 1063969.3752556215,
+    "p50": 1836089.7372188151,
+    "p75": 4087589.9713701443,
+    "p95": 9629874.463599168
+   }
+  },
+  "versions": {
+   "deep-swe": {
+    "min": {
+     "version": "0.141.0",
+     "dateReleased": "2026-06-18"
+    },
+    "max": {
+     "version": "0.141.0",
+     "dateReleased": "2026-06-18"
+    }
+   },
+   "swe-atlas-qna": {
+    "min": {
+     "version": "0.141.0",
+     "dateReleased": "2026-06-18"
+    },
+    "max": {
+     "version": "0.141.0",
+     "dateReleased": "2026-06-18"
+    }
+   },
+   "terminal-bench-v2.1": {
+    "min": {
+     "version": "0.141.0",
+     "dateReleased": "2026-06-18"
+    },
+    "max": {
+     "version": "0.144.5",
+     "dateReleased": "2026-07-16"
+    }
+   }
+  }
+ },
+ {
+  "id": "5f0e6c243cc2349353481b6c445fda4c",
+  "isDefault": false,
+  "isHighlighted": false,
+  "agentName": "Claude Code",
+  "provider": "anthropic",
+  "hostModelSlug": "anthropic_claude-opus-4-7",
+  "display": {
+   "agent": "Claude Code",
+   "model": "Opus 4.7 (medium)",
+   "creator": {
+    "agent": "Anthropic",
+    "model": "Anthropic"
+   }
+  },
+  "displayLabel": "Claude Code - Opus 4.7 (medium)",
+  "variantOf": null,
+  "isUnavailable": false,
+  "indexComponentCount": 3,
+  "evalCount": 3,
+  "evals": [
+   {
+    "datasetIndexName": "deep-swe",
+    "evaluationDatasetSlug": "DeepSWE",
+    "refDatasetName": "datacurve/deep-swe@2",
+    "weight": 0.333333333333333,
+    "mean": {
+     "reward": 0.274336283185841,
+     "inputTokens": 4030146.286135693,
+     "cacheWriteTokens": 74578.96460176991,
+     "outputTokens": 26493.814159292036
+    }
+   },
+   {
+    "datasetIndexName": "swe-atlas-qna",
+    "evaluationDatasetSlug": "SWE-Atlas-QnA",
+    "refDatasetName": "datasets/swe-atlas-qna",
+    "weight": 0.333333333333333,
+    "mean": {
+     "reward": 0.225806451612903,
+     "inputTokens": 1586909.7634408602,
+     "cacheWriteTokens": 51859.47580645161,
+     "outputTokens": 11912.739247311829
+    }
+   },
+   {
+    "datasetIndexName": "terminal-bench-v2.1",
+    "evaluationDatasetSlug": "Terminal-Bench v2.1",
+    "refDatasetName": "terminal-bench@2.1",
+    "weight": 0.333333333333333,
+    "mean": {
+     "reward": 0.771535580524345,
+     "inputTokens": 1134429.6329588015,
+     "cacheWriteTokens": 83489.32584269663,
+     "outputTokens": 12649.973782771536
+    }
+   }
+  ],
+  "indexScore": 0.423892771774363,
+  "mean": {
+   "reward": 0.423892771774363,
+   "costUsd": 1.8006617447341524,
+   "agentWallTimeSec": 399.3926789366056,
+   "steps": 42.04907975460122,
+   "inputTokens": 2310268.6451942744,
+   "cacheWriteTokens": 68369.7791411043,
+   "outputTokens": 17168.185071574644,
+   "cacheTokens": 2240468.118609408,
+   "cacheHitRate": 0.9576237577125704,
+   "totalTokens": 4636274.728016362
+  },
+  "sums": {
+   "costUsd": 587.015728783333
+  },
+  "percentiles": {
+   "costUsd": {
+    "p05": 0.22484732071574676,
+    "p25": 0.9312690847137002,
+    "p50": 1.344785876431494,
+    "p75": 2.09134604299591,
+    "p95": 4.186194260224948
+   },
+   "totalTokens": {
+    "p05": 449231.3997955008,
+    "p25": 2065942.8537832333,
+    "p50": 3746688.0051124734,
+    "p75": 5805076.918200399,
+    "p95": 11551619.8224949
+   }
+  },
+  "versions": {
+   "deep-swe": {
+    "min": {
+     "version": "2.1.152",
+     "dateReleased": "2026-05-26"
+    },
+    "max": {
+     "version": "2.1.154",
+     "dateReleased": "2026-05-28"
+    }
+   },
+   "swe-atlas-qna": {
+    "min": {
+     "version": "2.1.114",
+     "dateReleased": "2026-04-17"
+    },
+    "max": {
+     "version": "2.1.132",
+     "dateReleased": "2026-05-06"
+    }
+   },
+   "terminal-bench-v2.1": {
+    "min": {
+     "version": "2.1.112",
+     "dateReleased": "2026-04-16"
+    },
+    "max": {
+     "version": "2.1.215",
+     "dateReleased": "2026-07-19"
+    }
+   }
+  }
+ },
+ {
+  "id": "cd471e5f13685c3e9fd4961baef60542",
+  "isDefault": false,
+  "isHighlighted": false,
+  "agentName": "Claude Code",
+  "provider": "anthropic",
+  "hostModelSlug": "anthropic_claude-fable-5",
+  "display": {
+   "agent": "Claude Code",
+   "model": "Fable 5 (max) (with fallback)",
+   "creator": {
+    "agent": "Anthropic",
+    "model": "Anthropic"
+   }
+  },
+  "displayLabel": "Claude Code - Fable 5 (max) (with fallback)",
+  "variantOf": null,
+  "isUnavailable": false,
+  "indexComponentCount": 3,
+  "evalCount": 3,
+  "evals": [
+   {
+    "datasetIndexName": "deep-swe",
+    "evaluationDatasetSlug": "DeepSWE",
+    "refDatasetName": "datacurve/deep-swe@2",
+    "weight": 0.333333333333333,
+    "mean": {
+     "reward": 0.660766961651917,
+     "inputTokens": 13437258.132743362,
+     "cacheWriteTokens": 245125.98525073746,
+     "outputTokens": 117577.40117994101
+    }
+   },
+   {
+    "datasetIndexName": "swe-atlas-qna",
+    "evaluationDatasetSlug": "SWE-Atlas-QnA",
+    "refDatasetName": "datasets/swe-atlas-qna",
+    "weight": 0.333333333333333,
+    "mean": {
+     "reward": 0.489247311827957,
+     "inputTokens": 4694453.73655914,
+     "cacheWriteTokens": 115269.31182795699,
+     "outputTokens": 55510.45430107527
+    }
+   },
+   {
+    "datasetIndexName": "terminal-bench-v2.1",
+    "evaluationDatasetSlug": "Terminal-Bench v2.1",
+    "refDatasetName": "terminal-bench@2.1",
+    "weight": 0.333333333333333,
+    "mean": {
+     "reward": 0.865168539325843,
+     "inputTokens": 1676792.6441947566,
+     "cacheWriteTokens": 85043.85767790262,
+     "outputTokens": 45404.56928838951
+    }
+   }
+  ],
+  "indexScore": 0.6717276042685724,
+  "mean": {
+   "reward": 0.6717276042685724,
+   "costUsd": 11.687407620910026,
+   "agentWallTimeSec": 1407.3063016359897,
+   "steps": 137.007744236847,
+   "inputTokens": 6901095.023517382,
+   "cacheWriteTokens": 152029.2464212679,
+   "outputTokens": 74265.48875255625,
+   "cacheTokens": 6741270.240286304,
+   "cacheHitRate": 0.9619283373252913,
+   "totalTokens": 13868659.998977493
+  },
+  "sums": {
+   "costUsd": 3810.0948844166674
+  },
+  "percentiles": {
+   "costUsd": {
+    "p05": 4.38214207770961,
+    "p25": 7.169764968302672,
+    "p50": 10.202877346114533,
+    "p75": 14.322796870398784,
+    "p95": 22.565137445501023
+   },
+   "totalTokens": {
+    "p05": 3983240.0343558304,
+    "p25": 7196608.279141106,
+    "p50": 11437461.643149285,
+    "p75": 17269030.05521474,
+    "p95": 28308224.76666665
+   }
+  },
+  "versions": {
+   "deep-swe": {
+    "min": {
+     "version": "2.1.170",
+     "dateReleased": "2026-06-09"
+    },
+    "max": {
+     "version": "2.1.170",
+     "dateReleased": "2026-06-09"
+    }
+   },
+   "swe-atlas-qna": {
+    "min": {
+     "version": "2.1.173",
+     "dateReleased": "2026-06-11"
+    },
+    "max": {
+     "version": "2.1.227",
+     "dateReleased": "2026-08-10"
+    }
+   },
+   "terminal-bench-v2.1": {
+    "min": {
+     "version": "2.1.170",
+     "dateReleased": "2026-06-09"
+    },
+    "max": {
+     "version": "2.1.215",
+     "dateReleased": "2026-07-19"
+    }
+   }
+  }
+ },
+ {
+  "id": "b026d661faa32a782bbeaf16ae84eb4c",
+  "isDefault": false,
+  "isHighlighted": false,
+  "agentName": "Claude Code",
+  "provider": "friendliai",
+  "hostModelSlug": "friendliai_glm-5-1",
+  "display": {
+   "agent": "Claude Code",
+   "model": "GLM-5.1",
+   "creator": {
+    "agent": "Anthropic",
+    "model": "Z.ai"
+   }
+  },
+  "displayLabel": "Claude Code - GLM-5.1",
+  "variantOf": null,
+  "isUnavailable": false,
+  "indexComponentCount": 3,
+  "evalCount": 3,
+  "evals": [
+   {
+    "datasetIndexName": "deep-swe",
+    "evaluationDatasetSlug": "DeepSWE",
+    "refDatasetName": "datacurve/deep-swe@2",
+    "weight": 0.333333333333333,
+    "mean": {
+     "reward": 0.185840707964602,
+     "inputTokens": 30011169.017699115,
+     "cacheWriteTokens": 0,
+     "outputTokens": 78135.85840707965
+    }
+   },
+   {
+    "datasetIndexName": "swe-atlas-qna",
+    "evaluationDatasetSlug": "SWE-Atlas-QnA",
+    "refDatasetName": "datasets/swe-atlas-qna",
+    "weight": 0.333333333333333,
+    "mean": {
+     "reward": 0.247311827956989,
+     "inputTokens": 5692462.252688172,
+     "cacheWriteTokens": 0,
+     "outputTokens": 31937.432795698925
+    }
+   },
+   {
+    "datasetIndexName": "terminal-bench-v2.1",
+    "evaluationDatasetSlug": "Terminal-Bench v2.1",
+    "refDatasetName": "terminal-bench@2.1",
+    "weight": 0.333333333333333,
+    "mean": {
+     "reward": 0.674157303370786,
+     "inputTokens": 2093620.4382022473,
+     "cacheWriteTokens": 0,
+     "outputTokens": 39015.880149812736
+    }
+   }
+  ],
+  "indexScore": 0.36910327976412566,
+  "mean": {
+   "reward": 0.36910327976412566,
+   "costUsd": 4.282000252842536,
+   "agentWallTimeSec": 1140.250613496931,
+   "steps": 174.23670756646217,
+   "inputTokens": 13139446.7402863,
+   "cacheWriteTokens": 0,
+   "outputTokens": 49883.45705521473,
+   "cacheTokens": 12572554.732106362,
+   "cacheHitRate": 0.888922540999181,
+   "totalTokens": 25761884.929447833
+  },
+  "sums": {
+   "costUsd": 1395.9320824266667
+  },
+  "percentiles": {
+   "costUsd": {
+    "p05": 1.1511014575132912,
+    "p25": 2.284663888834356,
+    "p50": 3.3654531102658467,
+    "p75": 5.3949928344376294,
+    "p95": 10.849708794331287
+   },
+   "totalTokens": {
+    "p05": 5840826.400409009,
+    "p25": 12971156.087934572,
+    "p50": 19767202.67382414,
+    "p75": 32106886.179959103,
+    "p95": 64542416.985889584
+   }
+  },
+  "versions": {
+   "deep-swe": {
+    "min": {
+     "version": "2.1.153",
+     "dateReleased": "2026-05-27"
+    },
+    "max": {
+     "version": "2.1.153",
+     "dateReleased": "2026-05-27"
+    }
+   },
+   "swe-atlas-qna": {
+    "min": {
+     "version": "2.1.128",
+     "dateReleased": "2026-05-04"
+    },
+    "max": {
+     "version": "2.1.132",
+     "dateReleased": "2026-05-06"
+    }
+   },
+   "terminal-bench-v2.1": {
+    "min": {
+     "version": "2.1.128",
+     "dateReleased": "2026-05-04"
+    },
+    "max": {
+     "version": "2.1.153",
+     "dateReleased": "2026-05-27"
+    }
+   }
+  }
+ },
+ {
+  "id": "97d23cb0189af0bd83b489fc51582331",
+  "isDefault": false,
+  "isHighlighted": false,
+  "agentName": "Antigravity SDK v0.1.8",
+  "provider": "google",
+  "hostModelSlug": "google_andwise_ai-studio",
+  "display": {
+   "agent": "Antigravity SDK",
+   "model": "Gemini 3.7 Flash (high)",
+   "creator": {
+    "agent": "Google",
+    "model": "Google"
+   }
+  },
+  "displayLabel": "Antigravity SDK - Gemini 3.7 Flash (high)",
+  "variantOf": null,
+  "isUnavailable": false,
+  "indexComponentCount": 3,
+  "evalCount": 3,
+  "evals": [
+   {
+    "datasetIndexName": "deep-swe",
+    "evaluationDatasetSlug": "DeepSWE",
+    "refDatasetName": "datacurve/deep-swe@2",
+    "weight": 0.333333333333333,
+    "mean": {
+     "reward": 0.56047197640118,
+     "inputTokens": 13115582.507374631,
+     "cacheWriteTokens": null,
+     "outputTokens": 115264.40117994101
+    }
+   },
+   {
+    "datasetIndexName": "swe-atlas-qna",
+    "evaluationDatasetSlug": "SWE-Atlas-QnA",
+    "refDatasetName": "datasets/swe-atlas-qna",
+    "weight": 0.333333333333333,
+    "mean": {
+     "reward": 0.271505376344086,
+     "inputTokens": 6139631.661246613,
+     "cacheWriteTokens": null,
+     "outputTokens": 38537.18428184282
+    }
+   },
+   {
+    "datasetIndexName": "terminal-bench-v2.1",
+    "evaluationDatasetSlug": "Terminal-Bench v2.1",
+    "refDatasetName": "terminal-bench@2.1",
+    "weight": 0.333333333333333,
+    "mean": {
+     "reward": 0.865168539325843,
+     "inputTokens": 3871068.3595505618,
+     "cacheWriteTokens": null,
+     "outputTokens": 35963.13857677903
+    }
+   }
+  ],
+  "indexScore": 0.5657152973570364,
+  "mean": {
+   "reward": 0.5657152973570364,
+   "costUsd": 1.396316917192255,
+   "agentWallTimeSec": 384.96212576687134,
+   "steps": 110.79856850715746,
+   "inputTokens": 7938344.274012004,
+   "cacheWriteTokens": null,
+   "outputTokens": 64430.0844098625,
+   "cacheTokens": 7110910.5075315405,
+   "cacheHitRate": 0.8677594149804605,
+   "totalTokens": 15113684.865953416
+  },
+  "sums": {
+   "costUsd": 454.18970233749997
+  },
+  "percentiles": {
+   "costUsd": {
+    "p05": 0.5468133232361964,
+    "p25": 0.7885281593558283,
+    "p50": 1.1521619174846627,
+    "p75": 1.7347784703987732,
+    "p95": 2.9453022634049084
+   },
+   "totalTokens": {
+    "p05": 4017932.4278118596,
+    "p25": 7140364.868098146,
+    "p50": 11649811.44580776,
+    "p75": 19734331.401840515,
+    "p95": 36032779.88343561
+   }
+  },
+  "versions": {
+   "deep-swe": {
+    "min": {
+     "version": "0.1.8",
+     "dateReleased": "2026-07-23"
+    },
+    "max": {
+     "version": "0.1.8",
+     "dateReleased": "2026-07-23"
+    }
+   },
+   "swe-atlas-qna": {
+    "min": {
+     "version": "0.1.8",
+     "dateReleased": "2026-07-23"
+    },
+    "max": {
+     "version": "0.1.8",
+     "dateReleased": "2026-07-23"
+    }
+   },
+   "terminal-bench-v2.1": {
+    "min": {
+     "version": "0.1.8",
+     "dateReleased": "2026-07-23"
+    },
+    "max": {
+     "version": "0.1.8",
+     "dateReleased": "2026-07-23"
+    }
+   }
+  }
+ },
+ {
+  "id": "842ebd5261ec73cba427b5ae3cf5d6a0",
+  "isDefault": false,
+  "isHighlighted": false,
+  "agentName": "Claude Code",
+  "provider": "anthropic",
+  "hostModelSlug": "anthropic_claude-opus-5",
+  "display": {
+   "agent": "Claude Code",
+   "model": "Opus 5 (max)",
+   "creator": {
+    "agent": "Anthropic",
+    "model": "Anthropic"
+   }
+  },
+  "displayLabel": "Claude Code - Opus 5 (max)",
+  "variantOf": null,
+  "isUnavailable": false,
+  "indexComponentCount": 3,
+  "evalCount": 3,
+  "evals": [
+   {
+    "datasetIndexName": "deep-swe",
+    "evaluationDatasetSlug": "DeepSWE",
+    "refDatasetName": "datacurve/deep-swe@2",
+    "weight": 0.333333333333333,
+    "mean": {
+     "reward": 0.631268436578171,
+     "inputTokens": 23588053.076696165,
+     "cacheWriteTokens": 257349.37463126844,
+     "outputTokens": 129118.68436578171
+    }
+   },
+   {
+    "datasetIndexName": "swe-atlas-qna",
+    "evaluationDatasetSlug": "SWE-Atlas-QnA",
+    "refDatasetName": "datasets/swe-atlas-qna",
+    "weight": 0.333333333333333,
+    "mean": {
+     "reward": 0.491935483870968,
+     "inputTokens": 7532571.672043011,
+     "cacheWriteTokens": 142204.00268817204,
+     "outputTokens": 61763.529569892475
+    }
+   },
+   {
+    "datasetIndexName": "terminal-bench-v2.1",
+    "evaluationDatasetSlug": "Terminal-Bench v2.1",
+    "refDatasetName": "terminal-bench@2.1",
+    "weight": 0.333333333333333,
+    "mean": {
+     "reward": 0.887640449438202,
+     "inputTokens": 2818987.647940075,
+     "cacheWriteTokens": 103880.41573033707,
+     "outputTokens": 48117.32209737827
+    }
+   }
+  ],
+  "indexScore": 0.6702814566291138,
+  "mean": {
+   "reward": 0.6702814566291138,
+   "costUsd": 8.943547018021484,
+   "agentWallTimeSec": 1451.329194274025,
+   "steps": 165.72025469418108,
+   "inputTokens": 11810977.870143149,
+   "cacheWriteTokens": 171653.78118609407,
+   "outputTokens": 81385.06339468302,
+   "cacheTokens": 11635411.337423319,
+   "cacheHitRate": 0.974703359327879,
+   "totalTokens": 23699428.05214722
+  },
+  "sums": {
+   "costUsd": 2915.596327875
+  },
+  "percentiles": {
+   "costUsd": {
+    "p05": 3.3249459562372183,
+    "p25": 5.313411108895693,
+    "p50": 7.931988964979537,
+    "p75": 11.199857742586923,
+    "p95": 18.22484211866052
+   },
+   "totalTokens": {
+    "p05": 7261359.795092022,
+    "p25": 12475684.381390607,
+    "p50": 20108116.414110407,
+    "p75": 30787239.526584882,
+    "p95": 51983299.03456033
+   }
+  },
+  "versions": {
+   "deep-swe": {
+    "min": {
+     "version": "2.1.218",
+     "dateReleased": "2026-07-22"
+    },
+    "max": {
+     "version": "2.1.218",
+     "dateReleased": "2026-07-22"
+    }
+   },
+   "swe-atlas-qna": {
+    "min": {
+     "version": "2.1.218",
+     "dateReleased": "2026-07-22"
+    },
+    "max": {
+     "version": "2.1.227",
+     "dateReleased": "2026-08-10"
+    }
+   },
+   "terminal-bench-v2.1": {
+    "min": {
+     "version": "2.1.218",
+     "dateReleased": "2026-07-22"
+    },
+    "max": {
+     "version": "2.1.223",
+     "dateReleased": "2026-08-05"
+    }
+   }
+  }
+ },
+ {
+  "id": "6d8067b23e62fa66558c776c2237ea61",
+  "isDefault": false,
+  "isHighlighted": false,
+  "agentName": "Codex",
+  "provider": "openai",
+  "hostModelSlug": "openai_gpt-5-6-luna",
+  "display": {
+   "agent": "Codex",
+   "model": "GPT-5.6 Luna (medium)",
+   "creator": {
+    "agent": "OpenAI",
+    "model": "OpenAI"
+   }
+  },
+  "displayLabel": "Codex - GPT-5.6 Luna (medium)",
+  "variantOf": null,
+  "isUnavailable": true,
+  "indexComponentCount": 3,
+  "evalCount": 3,
+  "evals": [
+   {
+    "datasetIndexName": "deep-swe",
+    "evaluationDatasetSlug": "DeepSWE",
+    "refDatasetName": "datacurve/deep-swe@2",
+    "weight": 0.333333333333333,
+    "mean": {
+     "reward": 0.365781710914454,
+     "inputTokens": 3299689.0707964604,
+     "cacheWriteTokens": null,
+     "outputTokens": 17537.923303834807
+    }
+   },
+   {
+    "datasetIndexName": "swe-atlas-qna",
+    "evaluationDatasetSlug": "SWE-Atlas-QnA",
+    "refDatasetName": "datasets/swe-atlas-qna",
+    "weight": 0.333333333333333,
+    "mean": {
+     "reward": 0.271505376344086,
+     "inputTokens": 1920542.8010752688,
+     "cacheWriteTokens": null,
+     "outputTokens": 8879.97311827957
+    }
+   },
+   {
+    "datasetIndexName": "terminal-bench-v2.1",
+    "evaluationDatasetSlug": "Terminal-Bench v2.1",
+    "refDatasetName": "terminal-bench@2.1",
+    "weight": 0.333333333333333,
+    "mean": {
+     "reward": 0.621722846441948,
+     "inputTokens": 1270638.9737827715,
+     "cacheWriteTokens": null,
+     "outputTokens": 8081.812734082397
+    }
+   }
+  ],
+  "indexScore": 0.4196699779001627,
+  "mean": {
+   "reward": 0.4196699779001627,
+   "costUsd": 0.08841796668711666,
+   "agentWallTimeSec": 191.3819171779141,
+   "steps": 57.08588957055215,
+   "inputTokens": 2221162.702453987,
+   "cacheWriteTokens": null,
+   "outputTokens": 11663.139059304702,
+   "cacheTokens": 2054501.8926380372,
+   "cacheHitRate": 0.8832984632099318,
+   "totalTokens": 4287327.734151328
+  },
+  "sums": {
+   "costUsd": 28.82425714000003
+  },
+  "percentiles": {
+   "costUsd": {
+    "p05": 0.03335310491615541,
+    "p25": 0.0455788280163599,
+    "p50": 0.06822790773006147,
+    "p75": 0.10655672830265862,
+    "p95": 0.21754381708384446
+   },
+   "totalTokens": {
+    "p05": 1027636.4750511239,
+    "p25": 1569117.0582822086,
+    "p50": 2675487.222903886,
+    "p75": 5085057.618609403,
+    "p95": 13282409.549284244
+   }
+  },
+  "versions": {
+   "deep-swe": {
+    "min": {
+     "version": "0.141.0",
+     "dateReleased": "2026-06-18"
+    },
+    "max": {
+     "version": "0.141.0",
+     "dateReleased": "2026-06-18"
+    }
+   },
+   "swe-atlas-qna": {
+    "min": {
+     "version": "0.141.0",
+     "dateReleased": "2026-06-18"
+    },
+    "max": {
+     "version": "0.141.0",
+     "dateReleased": "2026-06-18"
+    }
+   },
+   "terminal-bench-v2.1": {
+    "min": {
+     "version": "0.141.0",
+     "dateReleased": "2026-06-18"
+    },
+    "max": {
+     "version": "0.144.5",
+     "dateReleased": "2026-07-16"
+    }
+   }
+  }
+ },
+ {
+  "id": "880e4b6741c80ef089bb4b6cea21856d",
+  "isDefault": false,
+  "isHighlighted": false,
+  "agentName": "Codex",
+  "provider": "openai",
+  "hostModelSlug": "openai_gpt-5-6-sol",
+  "display": {
+   "agent": "Codex",
+   "model": "GPT-5.6 Sol (max)",
+   "creator": {
+    "agent": "OpenAI",
+    "model": "OpenAI"
+   }
+  },
+  "displayLabel": "Codex - GPT-5.6 Sol (max)",
+  "variantOf": null,
+  "isUnavailable": false,
+  "indexComponentCount": 3,
+  "evalCount": 3,
+  "evals": [
+   {
+    "datasetIndexName": "deep-swe",
+    "evaluationDatasetSlug": "DeepSWE",
+    "refDatasetName": "datacurve/deep-swe@2",
+    "weight": 0.333333333333333,
+    "mean": {
+     "reward": 0.687315634218289,
+     "inputTokens": 9770635.345132744,
+     "cacheWriteTokens": null,
+     "outputTokens": 55315.890855457226
+    }
+   },
+   {
+    "datasetIndexName": "swe-atlas-qna",
+    "evaluationDatasetSlug": "SWE-Atlas-QnA",
+    "refDatasetName": "datasets/swe-atlas-qna",
+    "weight": 0.333333333333333,
+    "mean": {
+     "reward": 0.432795698924731,
+     "inputTokens": 7898018.697580645,
+     "cacheWriteTokens": null,
+     "outputTokens": 31499.083333333332
+    }
+   },
+   {
+    "datasetIndexName": "terminal-bench-v2.1",
+    "evaluationDatasetSlug": "Terminal-Bench v2.1",
+    "refDatasetName": "terminal-bench@2.1",
+    "weight": 0.333333333333333,
+    "mean": {
+     "reward": 0.831460674157303,
+     "inputTokens": 1447583.138576779,
+     "cacheWriteTokens": null,
+     "outputTokens": 14757.374531835207
+    }
+   }
+  ],
+  "indexScore": 0.6505240024334411,
+  "mean": {
+   "reward": 0.6505240024334411,
+   "costUsd": 4.995463274846626,
+   "agentWallTimeSec": 613.70177198364,
+   "steps": 112.26891615541923,
+   "inputTokens": 6786107.398261759,
+   "cacheWriteTokens": null,
+   "outputTokens": 35184.01329243354,
+   "cacheTokens": 6347957.384458077,
+   "cacheHitRate": 0.902597320865973,
+   "totalTokens": 13169248.796012262
+  },
+  "sums": {
+   "costUsd": 1628.5210276
+  },
+  "percentiles": {
+   "costUsd": {
+    "p05": 1.747826310020451,
+    "p25": 2.883100860531697,
+    "p50": 4.458223105930468,
+    "p75": 6.3859977063394675,
+    "p95": 9.808078401799614
+   },
+   "totalTokens": {
+    "p05": 3162338.0656441706,
+    "p25": 5842840.164621675,
+    "p50": 10825989.57361963,
+    "p75": 17278764.205521483,
+    "p95": 30398216.373006135
+   }
+  },
+  "versions": {
+   "deep-swe": {
+    "min": {
+     "version": "0.139.0",
+     "dateReleased": "2026-06-09"
+    },
+    "max": {
+     "version": "0.139.0",
+     "dateReleased": "2026-06-09"
+    }
+   },
+   "swe-atlas-qna": {
+    "min": {
+     "version": "0.139.0",
+     "dateReleased": "2026-06-09"
+    },
+    "max": {
+     "version": "0.147.0",
+     "dateReleased": "2026-08-07"
+    }
+   },
+   "terminal-bench-v2.1": {
+    "min": {
+     "version": "0.139.0",
+     "dateReleased": "2026-06-09"
+    },
+    "max": {
+     "version": "0.144.5",
+     "dateReleased": "2026-07-16"
+    }
+   }
+  }
+ },
+ {
+  "id": "81e05f6f587e1c1add0e717f7702b496",
+  "isDefault": false,
+  "isHighlighted": false,
+  "agentName": "Claude Code",
+  "provider": "moonshotai",
+  "hostModelSlug": "moonshot_kimi-k2-6",
+  "display": {
+   "agent": "Claude Code",
+   "model": "Kimi K2.6",
+   "creator": {
+    "agent": "Anthropic",
+    "model": "Moonshot AI"
+   }
+  },
+  "displayLabel": "Claude Code - Kimi K2.6",
+  "variantOf": null,
+  "isUnavailable": false,
+  "indexComponentCount": 3,
+  "evalCount": 3,
+  "evals": [
+   {
+    "datasetIndexName": "deep-swe",
+    "evaluationDatasetSlug": "DeepSWE",
+    "refDatasetName": "datacurve/deep-swe@2",
+    "weight": 0.333333333333333,
+    "mean": {
+     "reward": 0.165191740412979,
+     "inputTokens": 10905739.256637169,
+     "cacheWriteTokens": 0,
+     "outputTokens": 61150.30088495575
+    }
+   },
+   {
+    "datasetIndexName": "swe-atlas-qna",
+    "evaluationDatasetSlug": "SWE-Atlas-QnA",
+    "refDatasetName": "datasets/swe-atlas-qna",
+    "weight": 0.333333333333333,
+    "mean": {
+     "reward": 0.158602150537634,
+     "inputTokens": 4140735.7580645164,
+     "cacheWriteTokens": 0,
+     "outputTokens": 19063.298387096773
+    }
+   },
+   {
+    "datasetIndexName": "terminal-bench-v2.1",
+    "evaluationDatasetSlug": "Terminal-Bench v2.1",
+    "refDatasetName": "terminal-bench@2.1",
+    "weight": 0.333333333333333,
+    "mean": {
+     "reward": 0.692883895131086,
+     "inputTokens": 1966081.6741573033,
+     "cacheWriteTokens": 0,
+     "outputTokens": 31071.96629213483
+    }
+   }
+  ],
+  "indexScore": 0.3388925953605663,
+  "mean": {
+   "reward": 0.3388925953605663,
+   "costUsd": 1.2171000741104296,
+   "agentWallTimeSec": 2443.3850674846617,
+   "steps": 133.76754107608772,
+   "inputTokens": 5891966.377300614,
+   "cacheWriteTokens": 0,
+   "outputTokens": 36930.17791411043,
+   "cacheTokens": 5731631.260736199,
+   "cacheHitRate": 0.9554328157869916,
+   "totalTokens": 11660527.815950915
+  },
+  "sums": {
+   "costUsd": 396.77462416
+  },
+  "percentiles": {
+   "costUsd": {
+    "p05": 0.3282753132556236,
+    "p25": 0.5960932058691195,
+    "p50": 0.9528025763701418,
+    "p75": 1.4259257315541933,
+    "p95": 3.006997658701428
+   },
+   "totalTokens": {
+    "p05": 2669832.4296523514,
+    "p25": 5223396.162576699,
+    "p50": 8778725.128834343,
+    "p75": 13814392.563394696,
+    "p95": 29727664.95971368
+   }
+  },
+  "versions": {
+   "deep-swe": {
+    "min": {
+     "version": "2.1.152",
+     "dateReleased": "2026-05-26"
+    },
+    "max": {
+     "version": "2.1.154",
+     "dateReleased": "2026-05-28"
+    }
+   },
+   "swe-atlas-qna": {
+    "min": {
+     "version": "2.1.123",
+     "dateReleased": "2026-04-29"
+    },
+    "max": {
+     "version": "2.1.133",
+     "dateReleased": "2026-05-07"
+    }
+   },
+   "terminal-bench-v2.1": {
+    "min": {
+     "version": "2.1.123",
+     "dateReleased": "2026-04-29"
+    },
+    "max": {
+     "version": "2.1.153",
+     "dateReleased": "2026-05-27"
+    }
+   }
+  }
+ },
+ {
+  "id": "2716a5a99ab155d317bae7f710d4af5c",
+  "isDefault": false,
+  "isHighlighted": false,
+  "agentName": "Claude Code",
+  "provider": "anthropic",
+  "hostModelSlug": "anthropic_claude-opus-4-8",
+  "display": {
+   "agent": "Claude Code",
+   "model": "Opus 4.8 (xhigh)",
+   "creator": {
+    "agent": "Anthropic",
+    "model": "Anthropic"
+   }
+  },
+  "displayLabel": "Claude Code - Opus 4.8 (xhigh)",
+  "variantOf": null,
+  "isUnavailable": false,
+  "indexComponentCount": 3,
+  "evalCount": 3,
+  "evals": [
+   {
+    "datasetIndexName": "deep-swe",
+    "evaluationDatasetSlug": "DeepSWE",
+    "refDatasetName": "datacurve/deep-swe@2",
+    "weight": 0.333333333333333,
+    "mean": {
+     "reward": 0.513274336283186,
+     "inputTokens": 13948613.442477876,
+     "cacheWriteTokens": 207146.6430678466,
+     "outputTokens": 108090.61946902655
+    }
+   },
+   {
+    "datasetIndexName": "swe-atlas-qna",
+    "evaluationDatasetSlug": "SWE-Atlas-QnA",
+    "refDatasetName": "datasets/swe-atlas-qna",
+    "weight": 0.333333333333333,
+    "mean": {
+     "reward": 0.42741935483871,
+     "inputTokens": 3917778.6021505375,
+     "cacheWriteTokens": 88110.64516129032,
+     "outputTokens": 39932.12903225807
+    }
+   },
+   {
+    "datasetIndexName": "terminal-bench-v2.1",
+    "evaluationDatasetSlug": "Terminal-Bench v2.1",
+    "refDatasetName": "terminal-bench@2.1",
+    "weight": 0.333333333333333,
+    "mean": {
+     "reward": 0.831460674157303,
+     "inputTokens": 1680180.1273408239,
+     "cacheWriteTokens": 60521.56928838951,
+     "outputTokens": 36211.50561797753
+    }
+   }
+  ],
+  "indexScore": 0.590718121759733,
+  "mean": {
+   "reward": 0.590718121759733,
+   "costUsd": 5.665366469580767,
+   "agentWallTimeSec": 1065.6153854805739,
+   "steps": 136.13033905000927,
+   "inputTokens": 6783846.309815951,
+   "cacheWriteTokens": 121839.60224948874,
+   "outputTokens": 62541.865030674846,
+   "cacheTokens": 6660078.465235163,
+   "cacheHitRate": 0.9687226730983397,
+   "totalTokens": 13628306.242331294
+  },
+  "sums": {
+   "costUsd": 1846.909469083337
+  },
+  "percentiles": {
+   "costUsd": {
+    "p05": 2.345849934611451,
+    "p25": 3.4131138599182003,
+    "p50": 4.7277840999488765,
+    "p75": 7.169710323108398,
+    "p95": 11.594308001073607
+   },
+   "totalTokens": {
+    "p05": 4173360.6472392636,
+    "p25": 7106908.308793457,
+    "p50": 10812270.644171767,
+    "p75": 18366102.298568495,
+    "p95": 29648284.744376294
+   }
+  },
+  "versions": {
+   "deep-swe": {
+    "min": {
+     "version": "2.1.216",
+     "dateReleased": "2026-07-20"
+    },
+    "max": {
+     "version": "2.1.223",
+     "dateReleased": "2026-08-05"
+    }
+   },
+   "swe-atlas-qna": {
+    "min": {
+     "version": "2.1.216",
+     "dateReleased": "2026-07-20"
+    },
+    "max": {
+     "version": "2.1.227",
+     "dateReleased": "2026-08-10"
+    }
+   },
+   "terminal-bench-v2.1": {
+    "min": {
+     "version": "2.1.216",
+     "dateReleased": "2026-07-20"
+    },
+    "max": {
+     "version": "2.1.223",
+     "dateReleased": "2026-08-05"
+    }
+   }
+  }
+ },
+ {
+  "id": "cfa79ce9b0580609991f7d6e6f347105",
+  "isDefault": false,
+  "isHighlighted": false,
+  "agentName": "Codex",
+  "provider": "openai",
+  "hostModelSlug": "openai_gpt-5-6-luna",
+  "display": {
+   "agent": "Codex",
+   "model": "GPT-5.6 Luna (xhigh)",
+   "creator": {
+    "agent": "OpenAI",
+    "model": "OpenAI"
+   }
+  },
+  "displayLabel": "Codex - GPT-5.6 Luna (xhigh)",
+  "variantOf": null,
+  "isUnavailable": false,
+  "indexComponentCount": 3,
+  "evalCount": 3,
+  "evals": [
+   {
+    "datasetIndexName": "deep-swe",
+    "evaluationDatasetSlug": "DeepSWE",
+    "refDatasetName": "datacurve/deep-swe@2",
+    "weight": 0.333333333333333,
+    "mean": {
+     "reward": 0.566371681415929,
+     "inputTokens": 10054200.713864306,
+     "cacheWriteTokens": null,
+     "outputTokens": 50065.55752212389
+    }
+   },
+   {
+    "datasetIndexName": "swe-atlas-qna",
+    "evaluationDatasetSlug": "SWE-Atlas-QnA",
+    "refDatasetName": "datasets/swe-atlas-qna",
+    "weight": 0.333333333333333,
+    "mean": {
+     "reward": 0.314516129032258,
+     "inputTokens": 6090114.876344086,
+     "cacheWriteTokens": null,
+     "outputTokens": 23359.327956989247
+    }
+   },
+   {
+    "datasetIndexName": "terminal-bench-v2.1",
+    "evaluationDatasetSlug": "Terminal-Bench v2.1",
+    "refDatasetName": "terminal-bench@2.1",
+    "weight": 0.333333333333333,
+    "mean": {
+     "reward": 0.707865168539326,
+     "inputTokens": 2833542.4082397004,
+     "cacheWriteTokens": null,
+     "outputTokens": 16853.43445692884
+    }
+   }
+  ],
+  "indexScore": 0.529584326329171,
+  "mean": {
+   "reward": 0.529584326329171,
+   "costUsd": 0.23590978378323102,
+   "agentWallTimeSec": 413.8987709611452,
+   "steps": 96.1922290388548,
+   "inputTokens": 6575104.906952964,
+   "cacheWriteTokens": null,
+   "outputTokens": 30840.24642126789,
+   "cacheTokens": 6200663.851738243,
+   "cacheHitRate": 0.910023539336985,
+   "totalTokens": 12806609.005112467
+  },
+  "sums": {
+   "costUsd": 76.90658951333327
+  },
+  "percentiles": {
+   "costUsd": {
+    "p05": 0.0776502814478529,
+    "p25": 0.12347340388548057,
+    "p50": 0.18451392020449872,
+    "p75": 0.2872626885071575,
+    "p95": 0.5529712892392638
+   },
+   "totalTokens": {
+    "p05": 2860363.7922290363,
+    "p25": 4854447.493865028,
+    "p50": 8967939.262781177,
+    "p75": 16025483.297546001,
+    "p95": 37110717.87218809
+   }
+  },
+  "versions": {
+   "deep-swe": {
+    "min": {
+     "version": "0.141.0",
+     "dateReleased": "2026-06-18"
+    },
+    "max": {
+     "version": "0.144.6",
+     "dateReleased": "2026-07-18"
+    }
+   },
+   "swe-atlas-qna": {
+    "min": {
+     "version": "0.141.0",
+     "dateReleased": "2026-06-18"
+    },
+    "max": {
+     "version": "0.141.0",
+     "dateReleased": "2026-06-18"
+    }
+   },
+   "terminal-bench-v2.1": {
+    "min": {
+     "version": "0.141.0",
+     "dateReleased": "2026-06-18"
+    },
+    "max": {
+     "version": "0.144.5",
+     "dateReleased": "2026-07-16"
+    }
+   }
+  }
+ },
+ {
+  "id": "98fcc93d8df3a3df337855dba1e72e29",
+  "isDefault": false,
+  "isHighlighted": false,
+  "agentName": "Codex",
+  "provider": "openai",
+  "hostModelSlug": "openai_gpt-5-5",
+  "display": {
+   "agent": "Codex",
+   "model": "GPT-5.5 (xhigh)",
+   "creator": {
+    "agent": "OpenAI",
+    "model": "OpenAI"
+   }
+  },
+  "displayLabel": "Codex - GPT-5.5 (xhigh)",
+  "variantOf": null,
+  "isUnavailable": false,
+  "indexComponentCount": 3,
+  "evalCount": 3,
+  "evals": [
+   {
+    "datasetIndexName": "deep-swe",
+    "evaluationDatasetSlug": "DeepSWE",
+    "refDatasetName": "datacurve/deep-swe@2",
+    "weight": 0.333333333333333,
+    "mean": {
+     "reward": 0.64306784660767,
+     "inputTokens": 9686260.805309735,
+     "cacheWriteTokens": null,
+     "outputTokens": 39818.52802359882
+    }
+   },
+   {
+    "datasetIndexName": "swe-atlas-qna",
+    "evaluationDatasetSlug": "SWE-Atlas-QnA",
+    "refDatasetName": "datasets/swe-atlas-qna",
+    "weight": 0.333333333333333,
+    "mean": {
+     "reward": 0.360215053763441,
+     "inputTokens": 6152267.989247312,
+     "cacheWriteTokens": null,
+     "outputTokens": 20032.002688172044
+    }
+   },
+   {
+    "datasetIndexName": "terminal-bench-v2.1",
+    "evaluationDatasetSlug": "Terminal-Bench v2.1",
+    "refDatasetName": "terminal-bench@2.1",
+    "weight": 0.333333333333333,
+    "mean": {
+     "reward": 0.827715355805243,
+     "inputTokens": 1708582.2359550563,
+     "cacheWriteTokens": null,
+     "outputTokens": 14155.003745318352
+    }
+   }
+  ],
+  "indexScore": 0.6103327520587847,
+  "mean": {
+   "reward": 0.6103327520587847,
+   "costUsd": 4.7523700715746395,
+   "agentWallTimeSec": 614.9898987730064,
+   "steps": 107.1319018404908,
+   "inputTokens": 6164087.486707566,
+   "cacheWriteTokens": null,
+   "outputTokens": 25286.065439672802,
+   "cacheTokens": 5961477.627811859,
+   "cacheHitRate": 0.9341674523911521,
+   "totalTokens": 12150851.179959117
+  },
+  "sums": {
+   "costUsd": 1549.272643333333
+  },
+  "percentiles": {
+   "costUsd": {
+    "p05": 1.5731688742331311,
+    "p25": 2.52117802658487,
+    "p50": 3.581854980572596,
+    "p75": 5.990755888548058,
+    "p95": 10.500685678527617
+   },
+   "totalTokens": {
+    "p05": 2792595.204907974,
+    "p25": 5432712.050102251,
+    "p50": 8829357.087934572,
+    "p75": 16330387.864008196,
+    "p95": 31639869.806134973
+   }
+  },
+  "versions": {
+   "deep-swe": {
+    "min": {
+     "version": "0.134.0",
+     "dateReleased": "2026-05-26"
+    },
+    "max": {
+     "version": "0.134.0",
+     "dateReleased": "2026-05-26"
+    }
+   },
+   "swe-atlas-qna": {
+    "min": {
+     "version": "0.122.0",
+     "dateReleased": "2026-04-20"
+    },
+    "max": {
+     "version": "0.132.0",
+     "dateReleased": "2026-05-20"
+    }
+   },
+   "terminal-bench-v2.1": {
+    "min": {
+     "version": "0.120.0",
+     "dateReleased": "2026-04-11"
+    },
+    "max": {
+     "version": "0.144.6",
+     "dateReleased": "2026-07-18"
+    }
+   }
+  }
+ },
+ {
+  "id": "fb21a5f096c93f898cfdb70695b60fb2",
+  "isDefault": true,
+  "isHighlighted": false,
+  "agentName": "Codex",
+  "provider": "openai",
+  "hostModelSlug": "openai_gpt-5-6-luna",
+  "display": {
+   "agent": "Codex",
+   "model": "GPT-5.6 Luna (max)",
+   "creator": {
+    "agent": "OpenAI",
+    "model": "OpenAI"
+   }
+  },
+  "displayLabel": "Codex - GPT-5.6 Luna (max)",
+  "variantOf": null,
+  "isUnavailable": false,
+  "indexComponentCount": 3,
+  "evalCount": 3,
+  "evals": [
+   {
+    "datasetIndexName": "deep-swe",
+    "evaluationDatasetSlug": "DeepSWE",
+    "refDatasetName": "datacurve/deep-swe@2",
+    "weight": 0.333333333333333,
+    "mean": {
+     "reward": 0.634218289085546,
+     "inputTokens": 13054325.640117994,
+     "cacheWriteTokens": null,
+     "outputTokens": 67927.49852507375
+    }
+   },
+   {
+    "datasetIndexName": "swe-atlas-qna",
+    "evaluationDatasetSlug": "SWE-Atlas-QnA",
+    "refDatasetName": "datasets/swe-atlas-qna",
+    "weight": 0.333333333333333,
+    "mean": {
+     "reward": 0.327956989247312,
+     "inputTokens": 7111539.8655913975,
+     "cacheWriteTokens": null,
+     "outputTokens": 30052.916666666668
+    }
+   },
+   {
+    "datasetIndexName": "terminal-bench-v2.1",
+    "evaluationDatasetSlug": "Terminal-Bench v2.1",
+    "refDatasetName": "terminal-bench@2.1",
+    "weight": 0.333333333333333,
+    "mean": {
+     "reward": 0.752808988764045,
+     "inputTokens": 3446664.1685393257,
+     "cacheWriteTokens": null,
+     "outputTokens": 22409.393258426968
+    }
+   }
+  ],
+  "indexScore": 0.5716614223656344,
+  "mean": {
+   "reward": 0.5716614223656344,
+   "costUsd": 0.2882767483844579,
+   "agentWallTimeSec": 482.0907147239265,
+   "steps": 114.62883435582822,
+   "inputTokens": 8170928.9928425355,
+   "cacheWriteTokens": null,
+   "outputTokens": 41094.49386503067,
+   "cacheTokens": 7751235.793456022,
+   "cacheHitRate": 0.9181831202060824,
+   "totalTokens": 15963259.28016359
+  },
+  "sums": {
+   "costUsd": 93.9782199733334
+  },
+  "percentiles": {
+   "costUsd": {
+    "p05": 0.10161469504703487,
+    "p25": 0.15864420077709623,
+    "p50": 0.2245659202862987,
+    "p75": 0.37009361292433546,
+    "p95": 0.6084670543721881
+   },
+   "totalTokens": {
+    "p05": 3844150.5460122693,
+    "p25": 7007431.9171779035,
+    "p50": 11820197.452965235,
+    "p75": 20715600.550102264,
+    "p95": 39769422.78425357
+   }
+  },
+  "versions": {
+   "deep-swe": {
+    "min": {
+     "version": "0.141.0",
+     "dateReleased": "2026-06-18"
+    },
+    "max": {
+     "version": "0.141.0",
+     "dateReleased": "2026-06-18"
+    }
+   },
+   "swe-atlas-qna": {
+    "min": {
+     "version": "0.141.0",
+     "dateReleased": "2026-06-18"
+    },
+    "max": {
+     "version": "0.141.0",
+     "dateReleased": "2026-06-18"
+    }
+   },
+   "terminal-bench-v2.1": {
+    "min": {
+     "version": "0.141.0",
+     "dateReleased": "2026-06-18"
+    },
+    "max": {
+     "version": "0.144.6",
+     "dateReleased": "2026-07-18"
+    }
+   }
+  }
+ },
+ {
+  "id": "fe452287ec00459d819078798647bbb3",
+  "isDefault": false,
+  "isHighlighted": false,
+  "agentName": "Codex",
+  "provider": "openai",
+  "hostModelSlug": "openai_gpt-5-6-terra",
+  "display": {
+   "agent": "Codex",
+   "model": "GPT-5.6 Terra (max)",
+   "creator": {
+    "agent": "OpenAI",
+    "model": "OpenAI"
+   }
+  },
+  "displayLabel": "Codex - GPT-5.6 Terra (max)",
+  "variantOf": null,
+  "isUnavailable": false,
+  "indexComponentCount": 3,
+  "evalCount": 3,
+  "evals": [
+   {
+    "datasetIndexName": "deep-swe",
+    "evaluationDatasetSlug": "DeepSWE",
+    "refDatasetName": "datacurve/deep-swe@2",
+    "weight": 0.333333333333333,
+    "mean": {
+     "reward": 0.669616519174041,
+     "inputTokens": 7011344.04719764,
+     "cacheWriteTokens": null,
+     "outputTokens": 58797.35103244838
+    }
+   },
+   {
+    "datasetIndexName": "swe-atlas-qna",
+    "evaluationDatasetSlug": "SWE-Atlas-QnA",
+    "refDatasetName": "datasets/swe-atlas-qna",
+    "weight": 0.333333333333333,
+    "mean": {
+     "reward": 0.360215053763441,
+     "inputTokens": 5320969.6344086025,
+     "cacheWriteTokens": null,
+     "outputTokens": 30942.53494623656
+    }
+   },
+   {
+    "datasetIndexName": "terminal-bench-v2.1",
+    "evaluationDatasetSlug": "Terminal-Bench v2.1",
+    "refDatasetName": "terminal-bench@2.1",
+    "weight": 0.333333333333333,
+    "mean": {
+     "reward": 0.782771535580524,
+     "inputTokens": 1756349.7640449437,
+     "cacheWriteTokens": null,
+     "outputTokens": 19395.868913857677
+    }
+   }
+  ],
+  "indexScore": 0.6042010361726687,
+  "mean": {
+   "reward": 0.6042010361726687,
+   "costUsd": 1.9300146631901811,
+   "agentWallTimeSec": 491.0206543967283,
+   "steps": 95.80674846625767,
+   "inputTokens": 4933733.868098159,
+   "cacheWriteTokens": null,
+   "outputTokens": 37445.42126789366,
+   "cacheTokens": 4659332.293456035,
+   "cacheHitRate": 0.9184675548550253,
+   "totalTokens": 9630511.582822077
+  },
+  "sums": {
+   "costUsd": 629.1847802
+  },
+  "percentiles": {
+   "costUsd": {
+    "p05": 0.672859230429449,
+    "p25": 1.130996534969325,
+    "p50": 1.6132328728016347,
+    "p75": 2.425857758895708,
+    "p95": 4.179074560327199
+   },
+   "totalTokens": {
+    "p05": 2180100.9316973425,
+    "p25": 4388012.159509203,
+    "p50": 7256083.370143139,
+    "p75": 12575416.522494912,
+    "p95": 24233841.672801606
+   }
+  },
+  "versions": {
+   "deep-swe": {
+    "min": {
+     "version": "0.140.0",
+     "dateReleased": "2026-06-15"
+    },
+    "max": {
+     "version": "0.140.0",
+     "dateReleased": "2026-06-15"
+    }
+   },
+   "swe-atlas-qna": {
+    "min": {
+     "version": "0.140.0",
+     "dateReleased": "2026-06-15"
+    },
+    "max": {
+     "version": "0.144.5",
+     "dateReleased": "2026-07-16"
+    }
+   },
+   "terminal-bench-v2.1": {
+    "min": {
+     "version": "0.140.0",
+     "dateReleased": "2026-06-15"
+    },
+    "max": {
+     "version": "0.144.6",
+     "dateReleased": "2026-07-18"
+    }
+   }
+  }
+ },
+ {
+  "id": "8409ab2b091b3f2dd5af20c518d6217f",
+  "isDefault": false,
+  "isHighlighted": false,
+  "agentName": "Claude Code",
+  "provider": "deepseek",
+  "hostModelSlug": "deepseek_deepseek-v4-pro-1m",
+  "display": {
+   "agent": "Claude Code",
+   "model": "DeepSeek V4 Pro (high)",
+   "creator": {
+    "agent": "Anthropic",
+    "model": "DeepSeek"
+   }
+  },
+  "displayLabel": "Claude Code - DeepSeek V4 Pro (high)",
+  "variantOf": null,
+  "isUnavailable": false,
+  "indexComponentCount": 3,
+  "evalCount": 3,
+  "evals": [
+   {
+    "datasetIndexName": "deep-swe",
+    "evaluationDatasetSlug": "DeepSWE",
+    "refDatasetName": "datacurve/deep-swe@2",
+    "weight": 0.333333333333333,
+    "mean": {
+     "reward": 0.0855457227138643,
+     "inputTokens": 8912558.292035399,
+     "cacheWriteTokens": 0,
+     "outputTokens": 62187.78466076696
+    }
+   },
+   {
+    "datasetIndexName": "swe-atlas-qna",
+    "evaluationDatasetSlug": "SWE-Atlas-QnA",
+    "refDatasetName": "datasets/swe-atlas-qna",
+    "weight": 0.333333333333333,
+    "mean": {
+     "reward": 0.198924731182796,
+     "inputTokens": 3342595.053763441,
+     "cacheWriteTokens": 0,
+     "outputTokens": 29335.25806451613
+    }
+   },
+   {
+    "datasetIndexName": "terminal-bench-v2.1",
+    "evaluationDatasetSlug": "Terminal-Bench v2.1",
+    "refDatasetName": "terminal-bench@2.1",
+    "weight": 0.333333333333333,
+    "mean": {
+     "reward": 0.700374531835206,
+     "inputTokens": 3005448.958801498,
+     "cacheWriteTokens": 0,
+     "outputTokens": 33924.925093632955
+    }
+   }
+  ],
+  "indexScore": 0.32828166191062214,
+  "mean": {
+   "reward": 0.32828166191062214,
+   "costUsd": 0.2547256318476481,
+   "agentWallTimeSec": 1072.5318353783239,
+   "steps": 128.1457055214724,
+   "inputTokens": 5181244.880368099,
+   "cacheWriteTokens": 0,
+   "outputTokens": 41975.79754601227,
+   "cacheTokens": 4718944.850715748,
+   "cacheHitRate": 0.854135754522167,
+   "totalTokens": 9942165.52862986
+  },
+  "sums": {
+   "costUsd": 83.0405559823333
+  },
+  "percentiles": {
+   "costUsd": {
+    "p05": 0.05087515489079754,
+    "p25": 0.08143422855214723,
+    "p50": 0.12767178196830262,
+    "p75": 0.24445280851533743,
+    "p95": 0.8711294357672811
+   },
+   "totalTokens": {
+    "p05": 2500237.071574641,
+    "p25": 4548021.064417177,
+    "p50": 7104936.186094082,
+    "p75": 11813149.80061351,
+    "p95": 24455698.88793455
+   }
+  },
+  "versions": {
+   "deep-swe": {
+    "min": {
+     "version": "2.1.153",
+     "dateReleased": "2026-05-27"
+    },
+    "max": {
+     "version": "2.1.153",
+     "dateReleased": "2026-05-27"
+    }
+   },
+   "swe-atlas-qna": {
+    "min": {
+     "version": "2.1.123",
+     "dateReleased": "2026-04-29"
+    },
+    "max": {
+     "version": "2.1.132",
+     "dateReleased": "2026-05-06"
+    }
+   },
+   "terminal-bench-v2.1": {
+    "min": {
+     "version": "2.1.123",
+     "dateReleased": "2026-04-29"
+    },
+    "max": {
+     "version": "2.1.153",
+     "dateReleased": "2026-05-27"
+    }
+   }
+  }
+ },
+ {
+  "id": "a5175928405dcdb4f3be90b935fbf33b",
+  "isDefault": false,
+  "isHighlighted": false,
+  "agentName": "Claude Code",
+  "provider": "anthropic",
+  "hostModelSlug": "anthropic_claude-opus-5",
+  "display": {
+   "agent": "Claude Code",
+   "model": "Opus 5 (high)",
+   "creator": {
+    "agent": "Anthropic",
+    "model": "Anthropic"
+   }
+  },
+  "displayLabel": "Claude Code - Opus 5 (high)",
+  "variantOf": null,
+  "isUnavailable": false,
+  "indexComponentCount": 3,
+  "evalCount": 3,
+  "evals": [
+   {
+    "datasetIndexName": "deep-swe",
+    "evaluationDatasetSlug": "DeepSWE",
+    "refDatasetName": "datacurve/deep-swe@2",
+    "weight": 0.333333333333333,
+    "mean": {
+     "reward": 0.607669616519174,
+     "inputTokens": 9157929.675516224,
+     "cacheWriteTokens": 131215.8761061947,
+     "outputTokens": 58192.36283185841
+    }
+   },
+   {
+    "datasetIndexName": "swe-atlas-qna",
+    "evaluationDatasetSlug": "SWE-Atlas-QnA",
+    "refDatasetName": "datasets/swe-atlas-qna",
+    "weight": 0.333333333333333,
+    "mean": {
+     "reward": 0.491935483870968,
+     "inputTokens": 3654147.2258064514,
+     "cacheWriteTokens": 80417.16397849463,
+     "outputTokens": 30374.067204301075
+    }
+   },
+   {
+    "datasetIndexName": "terminal-bench-v2.1",
+    "evaluationDatasetSlug": "Terminal-Bench v2.1",
+    "refDatasetName": "terminal-bench@2.1",
+    "weight": 0.333333333333333,
+    "mean": {
+     "reward": 0.868913857677903,
+     "inputTokens": 1366649.4531835206,
+     "cacheWriteTokens": 48070.449438202246,
+     "outputTokens": 20538.715355805245
+    }
+   }
+  ],
+  "indexScore": 0.6561729860226817,
+  "mean": {
+   "reward": 0.6561729860226817,
+   "costUsd": 3.918602446063396,
+   "agentWallTimeSec": 842.8052382413097,
+   "steps": 94.85071574642126,
+   "inputTokens": 4937399.112474437,
+   "cacheWriteTokens": 89194.45501022496,
+   "outputTokens": 37331.49386503067,
+   "cacheTokens": 4847441.288343559,
+   "cacheHitRate": 0.9702723303233403,
+   "totalTokens": 9911366.34969326
+  },
+  "sums": {
+   "costUsd": 1277.464397416667
+  },
+  "percentiles": {
+   "costUsd": {
+    "p05": 1.1507523613496922,
+    "p25": 1.8743382175357883,
+    "p50": 3.077453001789364,
+    "p75": 4.696103432515338,
+    "p95": 9.468759566615528
+   },
+   "totalTokens": {
+    "p05": 2194642.1993865026,
+    "p25": 4138935.4611451942,
+    "p50": 7261765.312883423,
+    "p75": 12165083.799591001,
+    "p95": 25970371.180572584
+   }
+  },
+  "versions": {
+   "deep-swe": {
+    "min": {
+     "version": "2.1.216",
+     "dateReleased": "2026-07-20"
+    },
+    "max": {
+     "version": "2.1.216",
+     "dateReleased": "2026-07-20"
+    }
+   },
+   "swe-atlas-qna": {
+    "min": {
+     "version": "2.1.216",
+     "dateReleased": "2026-07-20"
+    },
+    "max": {
+     "version": "2.1.227",
+     "dateReleased": "2026-08-10"
+    }
+   },
+   "terminal-bench-v2.1": {
+    "min": {
+     "version": "2.1.216",
+     "dateReleased": "2026-07-20"
+    },
+    "max": {
+     "version": "2.1.223",
+     "dateReleased": "2026-08-05"
+    }
+   }
+  }
+ },
+ {
+  "id": "467c7211ff2f9d82fd40e8cdf50cfa58",
+  "isDefault": false,
+  "isHighlighted": false,
+  "agentName": "Cursor CLI",
+  "provider": "cursor",
+  "hostModelSlug": "cursor_composer-2-5",
+  "display": {
+   "agent": "Cursor CLI",
+   "model": "Composer 2.5",
+   "creator": {
+    "agent": "Cursor",
+    "model": "Cursor"
+   }
+  },
+  "displayLabel": "Cursor CLI - Composer 2.5",
+  "variantOf": null,
+  "isUnavailable": false,
+  "indexComponentCount": 3,
+  "evalCount": 3,
+  "evals": [
+   {
+    "datasetIndexName": "deep-swe",
+    "evaluationDatasetSlug": "DeepSWE",
+    "refDatasetName": "datacurve/deep-swe@2",
+    "weight": 0.333333333333333,
+    "mean": {
+     "reward": 0.15929203539823,
+     "inputTokens": 2521667.073746313,
+     "cacheWriteTokens": 0,
+     "outputTokens": 24661.35693215339
+    }
+   },
+   {
+    "datasetIndexName": "swe-atlas-qna",
+    "evaluationDatasetSlug": "SWE-Atlas-QnA",
+    "refDatasetName": "datasets/swe-atlas-qna",
+    "weight": 0.333333333333333,
+    "mean": {
+     "reward": 0.3118279569892475,
+     "inputTokens": 1734338.6559139786,
+     "cacheWriteTokens": 0,
+     "outputTokens": 13781.508064516129
+    }
+   },
+   {
+    "datasetIndexName": "terminal-bench-v2.1",
+    "evaluationDatasetSlug": "Terminal-Bench v2.1",
+    "refDatasetName": "terminal-bench@2.1",
+    "weight": 0.333333333333333,
+    "mean": {
+     "reward": 0.6779026217228465,
+     "inputTokens": 1240630.3520599252,
+     "cacheWriteTokens": 0,
+     "outputTokens": 17082.21722846442
+    }
+   }
+  ],
+  "indexScore": 0.3830075380367747,
+  "mean": {
+   "reward": 0.3830075380367747,
+   "costUsd": 0.08505141359918204,
+   "agentWallTimeSec": 625.1976421267894,
+   "steps": 116.8680981595092,
+   "inputTokens": 1872461.5766871169,
+   "cacheWriteTokens": 0,
+   "outputTokens": 18453.857873210633,
+   "cacheTokens": 1818057.5028757663,
+   "cacheHitRate": 1.0528330757504785,
+   "totalTokens": 3705076.4698364004
+  },
+  "sums": {
+   "costUsd": 27.726760833333298
+  },
+  "percentiles": {
+   "costUsd": {
+    "p05": 0.04360381012269938,
+    "p25": 0.05653364775051127,
+    "p50": 0.07384662781186108,
+    "p75": 0.09482758128834345,
+    "p95": 0.17383052443762775
+   },
+   "totalTokens": {
+    "p05": 990606.0683026584,
+    "p25": 1857929.4509202433,
+    "p50": 2974258.7801635973,
+    "p75": 4375944.492331289,
+    "p95": 9443925.113087943
+   }
+  },
+  "versions": {
+   "deep-swe": {
+    "min": {
+     "version": "cli-2026.05.28-418efe5",
+     "dateReleased": "2026-05-28"
+    },
+    "max": {
+     "version": "cli-2026.05.28-a70ca7c",
+     "dateReleased": "2026-05-28"
+    }
+   },
+   "swe-atlas-qna": {
+    "min": {
+     "version": "cli-2026.05.16-0338208",
+     "dateReleased": "2026-05-16"
+    },
+    "max": {
+     "version": "cli-2026.05.16-0338208",
+     "dateReleased": "2026-05-16"
+    }
+   },
+   "terminal-bench-v2.1": {
+    "min": {
+     "version": "cli-2026.05.16-0338208",
+     "dateReleased": "2026-05-16"
+    },
+    "max": {
+     "version": "cli-2026.07.16-899851b",
+     "dateReleased": "2026-07-16"
+    }
+   }
+  }
+ },
+ {
+  "id": "66ac7c91716267e154f215ab26e4172f",
+  "isDefault": false,
+  "isHighlighted": false,
+  "agentName": "Gemini CLI",
+  "provider": "gemini",
+  "hostModelSlug": "google_gemini-3-1-pro_ai-studio",
+  "display": {
+   "agent": "Gemini CLI",
+   "model": "Gemini 3.1 Pro (high)",
+   "creator": {
+    "agent": "Google",
+    "model": "Google"
+   }
+  },
+  "displayLabel": "Gemini CLI - Gemini 3.1 Pro (high)",
+  "variantOf": null,
+  "isUnavailable": false,
+  "indexComponentCount": 3,
+  "evalCount": 3,
+  "evals": [
+   {
+    "datasetIndexName": "deep-swe",
+    "evaluationDatasetSlug": "DeepSWE",
+    "refDatasetName": "datacurve/deep-swe@2",
+    "weight": 0.333333333333333,
+    "mean": {
+     "reward": 0.141592920353982,
+     "inputTokens": 4115262.5619469024,
+     "cacheWriteTokens": null,
+     "outputTokens": 14681.55604719764
+    }
+   },
+   {
+    "datasetIndexName": "swe-atlas-qna",
+    "evaluationDatasetSlug": "SWE-Atlas-QnA",
+    "refDatasetName": "datasets/swe-atlas-qna",
+    "weight": 0.333333333333333,
+    "mean": {
+     "reward": 0.0860215053763441,
+     "inputTokens": 1971708.4758064516,
+     "cacheWriteTokens": null,
+     "outputTokens": 11834.010752688173
+    }
+   },
+   {
+    "datasetIndexName": "terminal-bench-v2.1",
+    "evaluationDatasetSlug": "Terminal-Bench v2.1",
+    "refDatasetName": "terminal-bench@2.1",
+    "weight": 0.333333333333333,
+    "mean": {
+     "reward": 0.760299625468165,
+     "inputTokens": 1060308.573033708,
+     "cacheWriteTokens": null,
+     "outputTokens": 12407.119850187266
+    }
+   }
+  ],
+  "indexScore": 0.3293046837328304,
+  "mean": {
+   "reward": 0.3293046837328304,
+   "costUsd": 1.0400415618609393,
+   "agentWallTimeSec": 663.8363599182014,
+   "steps": 30.96883483789777,
+   "inputTokens": 2465901.7898773006,
+   "cacheWriteTokens": null,
+   "outputTokens": 12977.505623721883,
+   "cacheTokens": 2248924.9268916156,
+   "cacheHitRate": 0.8650361016121304,
+   "totalTokens": 4727804.222392637
+  },
+  "sums": {
+   "costUsd": 339.0535491666667
+  },
+  "percentiles": {
+   "costUsd": {
+    "p05": 0.36608919047034755,
+    "p25": 0.5390052752556238,
+    "p50": 0.8129432676891616,
+    "p75": 1.2471155828220835,
+    "p95": 2.450035792392639
+   },
+   "totalTokens": {
+    "p05": 1164483.423926379,
+    "p25": 2043386.9979550082,
+    "p50": 3480244.0163599174,
+    "p75": 5796592.5582822105,
+    "p95": 11897442.543149283
+   }
+  },
+  "versions": {
+   "deep-swe": {
+    "min": {
+     "version": "0.46.0",
+     "dateReleased": "2026-06-10"
+    },
+    "max": {
+     "version": "0.46.0",
+     "dateReleased": "2026-06-10"
+    }
+   },
+   "swe-atlas-qna": {
+    "min": {
+     "version": "0.36.0",
+     "dateReleased": "2026-04-01"
+    },
+    "max": {
+     "version": "0.41.2",
+     "dateReleased": "2026-05-06"
+    }
+   },
+   "terminal-bench-v2.1": {
+    "min": {
+     "version": "0.36.0",
+     "dateReleased": "2026-04-01"
+    },
+    "max": {
+     "version": "0.51.0",
+     "dateReleased": "2026-07-16"
+    }
+   }
+  }
+ },
+ {
+  "id": "65465ef1138666fb436574ab955ecb46",
+  "isDefault": false,
+  "isHighlighted": false,
+  "agentName": "Claude Code",
+  "provider": "anthropic",
+  "hostModelSlug": "anthropic_claude-fable-5",
+  "display": {
+   "agent": "Claude Code",
+   "model": "Fable 5 (high) (with fallback)",
+   "creator": {
+    "agent": "Anthropic",
+    "model": "Anthropic"
+   }
+  },
+  "displayLabel": "Claude Code - Fable 5 (high) (with fallback)",
+  "variantOf": null,
+  "isUnavailable": false,
+  "indexComponentCount": 3,
+  "evalCount": 3,
+  "evals": [
+   {
+    "datasetIndexName": "deep-swe",
+    "evaluationDatasetSlug": "DeepSWE",
+    "refDatasetName": "datacurve/deep-swe@2",
+    "weight": 0.333333333333333,
+    "mean": {
+     "reward": 0.64306784660767,
+     "inputTokens": 6560981.401179941,
+     "cacheWriteTokens": 131781.13569321533,
+     "outputTokens": 64836.27138643068
+    }
+   },
+   {
+    "datasetIndexName": "swe-atlas-qna",
+    "evaluationDatasetSlug": "SWE-Atlas-QnA",
+    "refDatasetName": "datasets/swe-atlas-qna",
+    "weight": 0.333333333333333,
+    "mean": {
+     "reward": 0.419354838709677,
+     "inputTokens": 2719303.8575268816,
+     "cacheWriteTokens": 66659.03225806452,
+     "outputTokens": 26985.467741935485
+    }
+   },
+   {
+    "datasetIndexName": "terminal-bench-v2.1",
+    "evaluationDatasetSlug": "Terminal-Bench v2.1",
+    "refDatasetName": "terminal-bench@2.1",
+    "weight": 0.333333333333333,
+    "mean": {
+     "reward": 0.891385767790262,
+     "inputTokens": 814177.913857678,
+     "cacheWriteTokens": 48317.58426966292,
+     "outputTokens": 17327.936329588014
+    }
+   }
+  ],
+  "indexScore": 0.6512694843692031,
+  "mean": {
+   "reward": 0.6512694843692031,
+   "costUsd": 5.970994269427395,
+   "agentWallTimeSec": 731.3774856850721,
+   "steps": 85.64621676891616,
+   "inputTokens": 3530817.211656442,
+   "cacheWriteTokens": 84224.70347648261,
+   "outputTokens": 37468.96625766872,
+   "cacheTokens": 3445337.4815950906,
+   "cacheHitRate": 0.9637766239989286,
+   "totalTokens": 7097848.362985681
+  },
+  "sums": {
+   "costUsd": 1946.544131833337
+  },
+  "percentiles": {
+   "costUsd": {
+    "p05": 1.952593959918199,
+    "p25": 3.116917173568506,
+    "p50": 4.683271800102247,
+    "p75": 7.062531088190182,
+    "p95": 13.099995810276083
+   },
+   "totalTokens": {
+    "p05": 1636550.7586912066,
+    "p25": 3295909.085889572,
+    "p50": 5213664.717791411,
+    "p75": 8652196.585889561,
+    "p95": 17946398.14744376
+   }
+  },
+  "versions": {
+   "deep-swe": {
+    "min": {
+     "version": "2.1.216",
+     "dateReleased": "2026-07-20"
+    },
+    "max": {
+     "version": "2.1.216",
+     "dateReleased": "2026-07-20"
+    }
+   },
+   "swe-atlas-qna": {
+    "min": {
+     "version": "2.1.216",
+     "dateReleased": "2026-07-20"
+    },
+    "max": {
+     "version": "2.1.251",
+     "dateReleased": "2026-08-28"
+    }
+   },
+   "terminal-bench-v2.1": {
+    "min": {
+     "version": "2.1.216",
+     "dateReleased": "2026-07-20"
+    },
+    "max": {
+     "version": "2.1.251",
+     "dateReleased": "2026-08-28"
+    }
+   }
+  }
+ },
+ {
+  "id": "9cb708b920e4975c78ca7d4ab4b2c7c6",
+  "isDefault": false,
+  "isHighlighted": false,
+  "agentName": "Codex",
+  "provider": "deepseek",
+  "hostModelSlug": "deepseek_deepseek-v4-pro-0813",
+  "display": {
+   "agent": "Codex",
+   "model": "DeepSeek V4 Pro 0813 (max)",
+   "creator": {
+    "agent": "OpenAI",
+    "model": "DeepSeek"
+   }
+  },
+  "displayLabel": "Codex - DeepSeek V4 Pro 0813 (max)",
+  "variantOf": null,
+  "isUnavailable": false,
+  "indexComponentCount": 3,
+  "evalCount": 3,
+  "evals": [
+   {
+    "datasetIndexName": "deep-swe",
+    "evaluationDatasetSlug": "DeepSWE",
+    "refDatasetName": "datacurve/deep-swe@2",
+    "weight": 0.333333333333333,
+    "mean": {
+     "reward": 0.162241887905605,
+     "inputTokens": 5840791.135693216,
+     "cacheWriteTokens": null,
+     "outputTokens": 36753.21533923304
+    }
+   },
+   {
+    "datasetIndexName": "swe-atlas-qna",
+    "evaluationDatasetSlug": "SWE-Atlas-QnA",
+    "refDatasetName": "datasets/swe-atlas-qna",
+    "weight": 0.333333333333333,
+    "mean": {
+     "reward": 0.491935483870968,
+     "inputTokens": 9935218.799731182,
+     "cacheWriteTokens": null,
+     "outputTokens": 45869.646505376346
+    }
+   },
+   {
+    "datasetIndexName": "terminal-bench-v2.1",
+    "evaluationDatasetSlug": "Terminal-Bench v2.1",
+    "refDatasetName": "terminal-bench@2.1",
+    "weight": 0.333333333333333,
+    "mean": {
+     "reward": 0.629213483146068,
+     "inputTokens": 2104701.9737827717,
+     "cacheWriteTokens": null,
+     "outputTokens": 28156.131086142323
+    }
+   }
+  ],
+  "indexScore": 0.42779695164088033,
+  "mean": {
+   "reward": 0.42779695164088033,
+   "costUsd": 0.09081146755368105,
+   "agentWallTimeSec": 743.5829417177914,
+   "steps": 66.08691206543966,
+   "inputTokens": 6378205.537321064,
+   "cacheWriteTokens": null,
+   "outputTokens": 37873.7581799591,
+   "cacheTokens": 6297671.656441719,
+   "cacheHitRate": 0.9780317126088944,
+   "totalTokens": 12713750.951942736
+  },
+  "sums": {
+   "costUsd": 29.6045384225
+  },
+  "percentiles": {
+   "costUsd": {
+    "p05": 0.03228660245153373,
+    "p25": 0.05248182514314927,
+    "p50": 0.07628450275766872,
+    "p75": 0.11611144504294478,
+    "p95": 0.19201996519652373
+   },
+   "totalTokens": {
+    "p05": 2425331.223517384,
+    "p25": 5115128.072597138,
+    "p50": 9116396.25051125,
+    "p75": 16634722.342535792,
+    "p95": 33454825.54907975
+   }
+  },
+  "versions": {
+   "deep-swe": {
+    "min": {
+     "version": "0.147.0",
+     "dateReleased": "2026-08-07"
+    },
+    "max": {
+     "version": "0.147.0",
+     "dateReleased": "2026-08-07"
+    }
+   },
+   "swe-atlas-qna": {
+    "min": {
+     "version": "0.147.0",
+     "dateReleased": "2026-08-07"
+    },
+    "max": {
+     "version": "0.147.0",
+     "dateReleased": "2026-08-07"
+    }
+   },
+   "terminal-bench-v2.1": {
+    "min": {
+     "version": "0.147.0",
+     "dateReleased": "2026-08-07"
+    },
+    "max": {
+     "version": "0.149.0",
+     "dateReleased": "2026-08-20"
+    }
+   }
+  }
+ },
+ {
+  "id": "4584eb859617bbc12a810ea1e7717eb4",
+  "isDefault": false,
+  "isHighlighted": false,
+  "agentName": "Codex",
+  "provider": "openai",
+  "hostModelSlug": "openai_gpt-5-6-terra",
+  "display": {
+   "agent": "Codex",
+   "model": "GPT-5.6 Terra (high)",
+   "creator": {
+    "agent": "OpenAI",
+    "model": "OpenAI"
+   }
+  },
+  "displayLabel": "Codex - GPT-5.6 Terra (high)",
+  "variantOf": null,
+  "isUnavailable": false,
+  "indexComponentCount": 3,
+  "evalCount": 3,
+  "evals": [
+   {
+    "datasetIndexName": "deep-swe",
+    "evaluationDatasetSlug": "DeepSWE",
+    "refDatasetName": "datacurve/deep-swe@2",
+    "weight": 0.333333333333333,
+    "mean": {
+     "reward": 0.604719764011799,
+     "inputTokens": 3972302.8230088498,
+     "cacheWriteTokens": null,
+     "outputTokens": 32853.94985250737
+    }
+   },
+   {
+    "datasetIndexName": "swe-atlas-qna",
+    "evaluationDatasetSlug": "SWE-Atlas-QnA",
+    "refDatasetName": "datasets/swe-atlas-qna",
+    "weight": 0.333333333333333,
+    "mean": {
+     "reward": 0.311827956989247,
+     "inputTokens": 3196254.3387096776,
+     "cacheWriteTokens": null,
+     "outputTokens": 17773.577956989247
+    }
+   },
+   {
+    "datasetIndexName": "terminal-bench-v2.1",
+    "evaluationDatasetSlug": "Terminal-Bench v2.1",
+    "refDatasetName": "terminal-bench@2.1",
+    "weight": 0.333333333333333,
+    "mean": {
+     "reward": 0.722846441947566,
+     "inputTokens": 1041883.5280898877,
+     "cacheWriteTokens": null,
+     "outputTokens": 10088.191011235955
+    }
+   }
+  ],
+  "indexScore": 0.5464647209828707,
+  "mean": {
+   "reward": 0.5464647209828707,
+   "costUsd": 1.1409262999999978,
+   "agentWallTimeSec": 358.7396482617585,
+   "steps": 67.06952965235175,
+   "inputTokens": 2877096.291411043,
+   "cacheWriteTokens": null,
+   "outputTokens": 20902.66564417178,
+   "cacheTokens": 2702276.816973416,
+   "cacheHitRate": 0.9049339862289004,
+   "totalTokens": 5600275.774028629
+  },
+  "sums": {
+   "costUsd": 371.9419738
+  },
+  "percentiles": {
+   "costUsd": {
+    "p05": 0.41128784744376284,
+    "p25": 0.6201384310838445,
+    "p50": 0.9265331067484676,
+    "p75": 1.4362905893660534,
+    "p95": 2.61693529014315
+   },
+   "totalTokens": {
+    "p05": 1214530.4104294481,
+    "p25": 2137300.2914110445,
+    "p50": 3889419.0408997983,
+    "p75": 7180419.8599181995,
+    "p95": 16126691.535173811
+   }
+  },
+  "versions": {
+   "deep-swe": {
+    "min": {
+     "version": "0.141.0",
+     "dateReleased": "2026-06-18"
+    },
+    "max": {
+     "version": "0.141.0",
+     "dateReleased": "2026-06-18"
+    }
+   },
+   "swe-atlas-qna": {
+    "min": {
+     "version": "0.141.0",
+     "dateReleased": "2026-06-18"
+    },
+    "max": {
+     "version": "0.141.0",
+     "dateReleased": "2026-06-18"
+    }
+   },
+   "terminal-bench-v2.1": {
+    "min": {
+     "version": "0.141.0",
+     "dateReleased": "2026-06-18"
+    },
+    "max": {
+     "version": "0.144.5",
+     "dateReleased": "2026-07-16"
+    }
+   }
+  }
+ },
+ {
+  "id": "b30fdf295a5c8fe070c6f0063bb81bfa",
+  "isDefault": false,
+  "isHighlighted": false,
+  "agentName": "Claude Code",
+  "provider": "anthropic",
+  "hostModelSlug": "anthropic_claude-opus-4-7",
+  "display": {
+   "agent": "Claude Code",
+   "model": "Opus 4.7 (max)",
+   "creator": {
+    "agent": "Anthropic",
+    "model": "Anthropic"
+   }
+  },
+  "displayLabel": "Claude Code - Opus 4.7 (max)",
+  "variantOf": null,
+  "isUnavailable": false,
+  "indexComponentCount": 3,
+  "evalCount": 3,
+  "evals": [
+   {
+    "datasetIndexName": "deep-swe",
+    "evaluationDatasetSlug": "DeepSWE",
+    "refDatasetName": "datacurve/deep-swe@2",
+    "weight": 0.333333333333333,
+    "mean": {
+     "reward": 0.40117994100295,
+     "inputTokens": 14256507.348082596,
+     "cacheWriteTokens": 186574.30088495577,
+     "outputTokens": 74954.85840707965
+    }
+   },
+   {
+    "datasetIndexName": "swe-atlas-qna",
+    "evaluationDatasetSlug": "SWE-Atlas-QnA",
+    "refDatasetName": "datasets/swe-atlas-qna",
+    "weight": 0.333333333333333,
+    "mean": {
+     "reward": 0.370967741935484,
+     "inputTokens": 6438676.424731183,
+     "cacheWriteTokens": 121632.04838709677,
+     "outputTokens": 33447.594086021505
+    }
+   },
+   {
+    "datasetIndexName": "terminal-bench-v2.1",
+    "evaluationDatasetSlug": "Terminal-Bench v2.1",
+    "refDatasetName": "terminal-bench@2.1",
+    "weight": 0.333333333333333,
+    "mean": {
+     "reward": 0.775280898876405,
+     "inputTokens": 2387192.1086142324,
+     "cacheWriteTokens": 193278.44194756553,
+     "outputTokens": 31209.85393258427
+    }
+   }
+  ],
+  "indexScore": 0.5158095272716129,
+  "mean": {
+   "reward": 0.5158095272716129,
+   "costUsd": 5.915424259100202,
+   "agentWallTimeSec": 950.312358895707,
+   "steps": 107.99932608291505,
+   "inputTokens": 8042457.98977505,
+   "cacheWriteTokens": 163702.61145194274,
+   "outputTokens": 47224.16462167689,
+   "cacheTokens": 7876338.34867077,
+   "cacheHitRate": 0.9665216325317719,
+   "totalTokens": 16129723.114519436
+  },
+  "sums": {
+   "costUsd": 1928.428308466663
+  },
+  "percentiles": {
+   "costUsd": {
+    "p05": 2.201966280214726,
+    "p25": 3.2363459299079755,
+    "p50": 4.665619382924337,
+    "p75": 7.24556442566462,
+    "p95": 11.979843897668697
+   },
+   "totalTokens": {
+    "p05": 5103355.666871176,
+    "p25": 8382229.777096125,
+    "p50": 12787253.517382437,
+    "p75": 20136633.117586896,
+    "p95": 34458909.64253578
+   }
+  },
+  "versions": {
+   "deep-swe": {
+    "min": {
+     "version": "2.1.153",
+     "dateReleased": "2026-05-27"
+    },
+    "max": {
+     "version": "2.1.154",
+     "dateReleased": "2026-05-28"
+    }
+   },
+   "swe-atlas-qna": {
+    "min": {
+     "version": "2.1.114",
+     "dateReleased": "2026-04-17"
+    },
+    "max": {
+     "version": "2.1.227",
+     "dateReleased": "2026-08-10"
+    }
+   },
+   "terminal-bench-v2.1": {
+    "min": {
+     "version": "2.1.112",
+     "dateReleased": "2026-04-16"
+    },
+    "max": {
+     "version": "2.1.215",
+     "dateReleased": "2026-07-19"
+    }
+   }
+  }
+ },
+ {
+  "id": "6c3080bc3b0c724948e1397602acafde",
+  "isDefault": false,
+  "isHighlighted": false,
+  "agentName": "Claude Code",
+  "provider": "anthropic",
+  "hostModelSlug": "anthropic_claude-opus-5",
+  "display": {
+   "agent": "Claude Code",
+   "model": "Opus 5 (medium)",
+   "creator": {
+    "agent": "Anthropic",
+    "model": "Anthropic"
+   }
+  },
+  "displayLabel": "Claude Code - Opus 5 (medium)",
+  "variantOf": null,
+  "isUnavailable": false,
+  "indexComponentCount": 3,
+  "evalCount": 3,
+  "evals": [
+   {
+    "datasetIndexName": "deep-swe",
+    "evaluationDatasetSlug": "DeepSWE",
+    "refDatasetName": "datacurve/deep-swe@2",
+    "weight": 0.333333333333333,
+    "mean": {
+     "reward": 0.628318584070797,
+     "inputTokens": 7508302.138643068,
+     "cacheWriteTokens": 113600.84365781711,
+     "outputTokens": 49221.59587020649
+    }
+   },
+   {
+    "datasetIndexName": "swe-atlas-qna",
+    "evaluationDatasetSlug": "SWE-Atlas-QnA",
+    "refDatasetName": "datasets/swe-atlas-qna",
+    "weight": 0.333333333333333,
+    "mean": {
+     "reward": 0.443548387096774,
+     "inputTokens": 2899025.9005376343,
+     "cacheWriteTokens": 65258.1129032258,
+     "outputTokens": 24442.677419354837
+    }
+   },
+   {
+    "datasetIndexName": "terminal-bench-v2.1",
+    "evaluationDatasetSlug": "Terminal-Bench v2.1",
+    "refDatasetName": "terminal-bench@2.1",
+    "weight": 0.333333333333333,
+    "mean": {
+     "reward": 0.850187265917603,
+     "inputTokens": 1023961.0224719101,
+     "cacheWriteTokens": 32419.775280898877,
+     "outputTokens": 14092.868913857677
+    }
+   }
+  ],
+  "indexScore": 0.640684745695058,
+  "mean": {
+   "reward": 0.640684745695058,
+   "costUsd": 3.1718671924846644,
+   "agentWallTimeSec": 730.924389570552,
+   "steps": 83.47801635991821,
+   "inputTokens": 3984815.59611452,
+   "cacheWriteTokens": 73049.88139059306,
+   "outputTokens": 30206.127811860937,
+   "cacheTokens": 3911286.5030674855,
+   "cacheHitRate": 0.9695331242878967,
+   "totalTokens": 7999358.108384455
+  },
+  "sums": {
+   "costUsd": 1034.028704750001
+  },
+  "percentiles": {
+   "costUsd": {
+    "p05": 0.9122573930981596,
+    "p25": 1.4558017896216782,
+    "p50": 2.5159838049591,
+    "p75": 4.010404956288343,
+    "p95": 7.628413473057269
+   },
+   "totalTokens": {
+    "p05": 1629622.7020449906,
+    "p25": 3106494.4867075677,
+    "p50": 5930074.6400818005,
+    "p75": 10458382.908997942,
+    "p95": 21261192.96605318
+   }
+  },
+  "versions": {
+   "deep-swe": {
+    "min": {
+     "version": "2.1.216",
+     "dateReleased": "2026-07-20"
+    },
+    "max": {
+     "version": "2.1.216",
+     "dateReleased": "2026-07-20"
+    }
+   },
+   "swe-atlas-qna": {
+    "min": {
+     "version": "2.1.216",
+     "dateReleased": "2026-07-20"
+    },
+    "max": {
+     "version": "2.1.227",
+     "dateReleased": "2026-08-10"
+    }
+   },
+   "terminal-bench-v2.1": {
+    "min": {
+     "version": "2.1.216",
+     "dateReleased": "2026-07-20"
+    },
+    "max": {
+     "version": "2.1.223",
+     "dateReleased": "2026-08-05"
+    }
+   }
+  }
+ },
+ {
+  "id": "279e5a03d4cf7f4856bff2d8410c20c0",
+  "isDefault": false,
+  "isHighlighted": false,
+  "agentName": "Muse Code",
+  "provider": "meta",
+  "hostModelSlug": "meta_spiffy-blimp350-tbh-r708-1",
+  "display": {
+   "agent": "Muse Code",
+   "model": "Muse Spark 1.2 (xhigh)",
+   "creator": {
+    "agent": "Meta",
+    "model": "Meta"
+   }
+  },
+  "displayLabel": "Muse Code - Muse Spark 1.2 (xhigh)",
+  "variantOf": null,
+  "isUnavailable": false,
+  "indexComponentCount": 3,
+  "evalCount": 3,
+  "evals": [
+   {
+    "datasetIndexName": "deep-swe",
+    "evaluationDatasetSlug": "DeepSWE",
+    "refDatasetName": "datacurve/deep-swe@2",
+    "weight": 0.333333333333333,
+    "mean": {
+     "reward": 0.581120943952802,
+     "inputTokens": 20134689.07079646,
+     "cacheWriteTokens": 0,
+     "outputTokens": 100399.46017699115
+    }
+   },
+   {
+    "datasetIndexName": "swe-atlas-qna",
+    "evaluationDatasetSlug": "SWE-Atlas-QnA",
+    "refDatasetName": "datasets/swe-atlas-qna",
+    "weight": 0.333333333333333,
+    "mean": {
+     "reward": 0.451612903225806,
+     "inputTokens": 5189406.553763441,
+     "cacheWriteTokens": 0,
+     "outputTokens": 28810.674731182797
+    }
+   },
+   {
+    "datasetIndexName": "terminal-bench-v2.1",
+    "evaluationDatasetSlug": "Terminal-Bench v2.1",
+    "refDatasetName": "terminal-bench@2.1",
+    "weight": 0.333333333333333,
+    "mean": {
+     "reward": 0.816479400749064,
+     "inputTokens": 4178201.1835205993,
+     "cacheWriteTokens": 0,
+     "outputTokens": 45956.03370786517
+    }
+   }
+  ],
+  "indexScore": 0.6164044159758908,
+  "mean": {
+   "reward": 0.6164044159758908,
+   "costUsd": 2.0728230519427373,
+   "agentWallTimeSec": 2448.643313905929,
+   "steps": 151.43456032719837,
+   "inputTokens": 10093761.297546012,
+   "cacheWriteTokens": 0,
+   "outputTokens": 58305.98057259714,
+   "cacheTokens": 9811071.80674846,
+   "cacheHitRate": 0.9538301727874866,
+   "totalTokens": 19963139.084867075
+  },
+  "sums": {
+   "costUsd": 675.7403149333334
+  },
+  "percentiles": {
+   "costUsd": {
+    "p05": 0.6862941823926392,
+    "p25": 1.140766536758691,
+    "p50": 1.6566146034764837,
+    "p75": 2.608470499591001,
+    "p95": 4.1701330911656385
+   },
+   "totalTokens": {
+    "p05": 5822041.184662586,
+    "p25": 9734565.153374245,
+    "p50": 15884675.322085874,
+    "p75": 25839539.32413087,
+    "p95": 42880000.01186091
+   }
+  },
+  "versions": {
+   "deep-swe": {
+    "min": {
+     "version": "0.1.0-R708.1",
+     "dateReleased": null
+    },
+    "max": {
+     "version": "0.1.0-R708.1",
+     "dateReleased": null
+    }
+   },
+   "swe-atlas-qna": {
+    "min": {
+     "version": "0.1.0-R708.1",
+     "dateReleased": null
+    },
+    "max": {
+     "version": "0.1.0-R708.1",
+     "dateReleased": null
+    }
+   },
+   "terminal-bench-v2.1": {
+    "min": {
+     "version": "0.1.0-R708.1",
+     "dateReleased": null
+    },
+    "max": {
+     "version": "0.1.0-R708.1",
+     "dateReleased": null
+    }
+   }
+  }
+ }
+]
