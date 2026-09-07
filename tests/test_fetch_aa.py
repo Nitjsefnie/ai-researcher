@@ -83,9 +83,90 @@ class RichestModelsArrayTests(unittest.TestCase):
         self.assertEqual(len(fetch_aa.richest_models_array(payload)[0]), 25)
 
 
+def costed(name="M", *, total=1.0, evaluations=None):
+    """A model carrying the cost breakdown build.py reads."""
+    if evaluations is None:
+        evaluations = [
+            {"slug": "gdpval-aa", "weightedCostPerTask": total * 0.4},
+            {"slug": "scicode", "weightedCostPerTask": total * 0.6},
+        ]
+    return {"name": name,
+            "intelligenceIndexCostPerTask": {"cost": {"total": total},
+                                             "evaluations": evaluations}}
+
+
+class IndexVersionTests(unittest.TestCase):
+    def test_the_pinned_version_passes(self):
+        payload = f"blah Intelligence Index v{fetch_aa.INDEX_VERSION} blah"
+
+        self.assertEqual(fetch_aa.check_index_version(payload),
+                         fetch_aa.INDEX_VERSION)
+
+    def test_a_bumped_version_exits_naming_both_versions(self):
+        # v4.2 rebalanced the weights without changing a single field name --
+        # undetectable from the data, which is the whole reason for the pin.
+        with self.assertRaises(SystemExit) as caught:
+            fetch_aa.check_index_version("Intelligence Index v9.9")
+
+        message = str(caught.exception)
+        self.assertIn("v9.9", message)
+        self.assertIn(f"v{fetch_aa.INDEX_VERSION}", message)
+        self.assertIn("methodology", message)
+
+    def test_a_payload_with_no_version_at_all_exits(self):
+        with self.assertRaises(SystemExit) as caught:
+            fetch_aa.check_index_version("nothing here")
+
+        self.assertIn("page structure changed", str(caught.exception))
+
+
+class CostBreakdownTests(unittest.TestCase):
+    def test_a_consistent_breakdown_passes_and_is_counted(self):
+        models = [costed("A"), costed("B"), {"name": "unpriced"}]
+
+        self.assertEqual(fetch_aa.check_cost_breakdown(models), 2)
+
+    def test_a_dropped_slug_exits_before_the_chart_can_empty(self):
+        # Exactly what v4.3 did to terminalbench-v2-1 and tau3-banking.
+        models = [costed(evaluations=[{"slug": "scicode", "weightedCostPerTask": 1.0}])]
+
+        with self.assertRaises(SystemExit) as caught:
+            fetch_aa.check_cost_breakdown(models)
+
+        self.assertIn("gdpval-aa", str(caught.exception))
+
+    def test_components_that_stop_summing_to_the_total_exit(self):
+        # build.py divides an index weight back out of these; that is only
+        # valid while the parts still make up the published whole.
+        models = [costed(total=1.0, evaluations=[
+            {"slug": "gdpval-aa", "weightedCostPerTask": 0.1},
+            {"slug": "scicode", "weightedCostPerTask": 0.1},
+        ])]
+
+        with self.assertRaises(SystemExit) as caught:
+            fetch_aa.check_cost_breakdown(models)
+
+        self.assertIn("sum to", str(caught.exception))
+
+    def test_a_capture_with_no_priced_model_at_all_exits(self):
+        with self.assertRaises(SystemExit) as caught:
+            fetch_aa.check_cost_breakdown([{"name": "unpriced"}])
+
+        self.assertIn("schema changed", str(caught.exception))
+
+    def test_a_breakdown_missing_its_total_exits(self):
+        models = [{"name": "M", "intelligenceIndexCostPerTask": {"evaluations": []}}]
+
+        with self.assertRaises(SystemExit) as caught:
+            fetch_aa.check_cost_breakdown(models)
+
+        self.assertIn("schema changed", str(caught.exception))
+
+
 def agent_row(label: str, score: float | None = 0.64,
               cost: float | None = 1.5) -> dict:
-    row = {"id": label, "displayLabel": label, "agentName": label.split(" - ")[0]}
+    row: dict = {"id": label, "displayLabel": label,
+                 "agentName": label.split(" - ")[0]}
     if score is not None:
         row["indexScore"] = score
     row["mean"] = {} if cost is None else {"costUsd": cost}

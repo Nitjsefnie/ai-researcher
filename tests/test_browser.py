@@ -35,12 +35,27 @@ class BrowserInteractionTests(unittest.TestCase):
         cls.browser.close()
         cls.playwright.stop()
 
+    def first_point(self, page, selector):
+        """A point locator that fails SAYING SO rather than timing out.
+
+        `hover()` on a selector that matches nothing waits the full 30s and
+        reports a locator timeout -- which is what an emptied chart looked like
+        when AA dropped the cost slugs the coding axis was built on. Counting
+        first turns that into "the chart is empty", named, in under a second.
+        """
+        points = page.locator(selector)
+        self.assertGreater(
+            points.count(), 0,
+            f"no points matched {selector!r} -- the chart rendered empty, so "
+            "every interaction below would time out instead of failing here")
+        return points.first
+
     def test_non_frontier_points_pin_a_visible_name_on_capability_charts(self):
         for metric in ("coding", "agentic"):
             with self.subTest(metric=metric):
                 page = self.browser.new_page(viewport={"width": 1280, "height": 900})
                 page.goto(build.OUT.as_uri())
-                point = page.locator(f"#svg-{metric} circle.pt[r='5']").first
+                point = self.first_point(page, f"#svg-{metric} circle.pt[r='5']")
                 point.hover()
                 model_name = page.locator(f"#tip-{metric} .tname").inner_text()
 
@@ -54,7 +69,7 @@ class BrowserInteractionTests(unittest.TestCase):
         page = self.browser.new_page(viewport={"width": 1280, "height": 900})
         page.goto(build.OUT.as_uri())
 
-        point = page.locator("#svg-coding circle.pt[r='5']").first
+        point = self.first_point(page, "#svg-coding circle.pt[r='5']")
         point.hover()
         model_name = page.locator("#tip-coding .tname").inner_text()
         accessible_name = f"Pin {model_name} on the Coding Agent Index chart"
@@ -91,7 +106,7 @@ class BrowserInteractionTests(unittest.TestCase):
         page = self.browser.new_page(viewport={"width": 1280, "height": 900})
         page.goto(build.OUT.as_uri())
 
-        point = page.locator("#svg-parameters circle.pt").first
+        point = self.first_point(page, "#svg-parameters circle.pt")
         point.hover()
         model_name = page.locator("#tip-parameters .tname").inner_text()
         tooltip = page.locator("#tip-parameters").inner_text()
@@ -116,7 +131,7 @@ class BrowserInteractionTests(unittest.TestCase):
         page = self.browser.new_page(viewport={"width": 1280, "height": 900})
         page.goto(build.OUT.as_uri())
 
-        frontier_point = page.locator("#svg-parameters circle.pt[r='6']").first
+        frontier_point = self.first_point(page, "#svg-parameters circle.pt[r='6']")
         frontier_point.hover()
         model_name = page.locator("#tip-parameters .tname").inner_text()
         row = page.locator("#tbl tbody tr").filter(has_text=model_name)

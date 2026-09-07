@@ -4,11 +4,15 @@ name: refresh
 # numbers actually moved, commit the new capture and publish the rebuilt page
 # to docs-hub.
 #
-# WHAT COUNTS AS "MOVED" IS data/aa-raw-models.json, NOT data/. The stamp file
-# beside it records today's date on every fetch, so gating on the directory
+# WHAT COUNTS AS "MOVED" IS THE TWO CAPTURE FILES, NOT data/. The stamp file
+# beside them records today's date on every fetch, so gating on the directory
 # would commit and publish a date-only change every calendar day whether or not
-# AA measured anything new. Gating on the capture itself means the stamp moves
-# when the data moves, and a quiet day is silent.
+# AA measured anything new. Gating on the captures themselves means the stamp
+# moves when the data moves, and a quiet day is silent.
+#
+# There are two captures because the page draws two AA products: the model
+# leaderboard and the Coding Agent Index. Either one moving is news, so the
+# gate is an OR over both.
 #
 # THE SUITE RUNS BEFORE THE COMMIT, NOT AFTER. A capture can break the page —
 # a new field shape, a model with a null AA never emitted before — and the
@@ -17,8 +21,11 @@ name: refresh
 # live, which is the correct failure.
 #
 # fetch_aa.py exits nonzero when the flight payload or the model schema changes
-# shape. That is the designed signal to go re-read the leaderboard by hand; a
-# red run here means read it, not retry it.
+# shape, when AA bumps the Intelligence Index version build.py is written
+# against, when the cost breakdown drops a slug build.py reads, or when the
+# per-evaluation costs stop summing to the published total. Those are the
+# designed signals to go re-read the leaderboard and the methodology page by
+# hand; a red run here means read them, not retry.
 
 on:
   schedule:
@@ -68,7 +75,7 @@ jobs:
       - name: Did anything move?
         id: capture
         run: |
-          if git diff --quiet -- data/aa-raw-models.json; then
+          if git diff --quiet -- data/aa-raw-models.json data/aa-raw-coding-agents.json; then
             echo "changed=false" >> "$GITHUB_OUTPUT"
             # Drop the date-only stamp change so the tree is clean.
             git checkout -- data/captured-at.txt
@@ -117,7 +124,8 @@ jobs:
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add data/aa-raw-models.json data/captured-at.txt out/frontier-models.html
+          git add data/aa-raw-models.json data/aa-raw-coding-agents.json \
+                  data/captured-at.txt out/frontier-models.html
           # The message is diff_aa.py's own rendering, subject line included —
           # not truncated here. A long one means a lot genuinely moved, and
           # that is the day you want the detail.

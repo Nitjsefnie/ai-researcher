@@ -240,8 +240,10 @@ def build_agent_rows(agents, models):
             continue
         label = a.get("displayLabel") or ""
         base, eff = split_effort(label)
-        display = a.get("display") if isinstance(a.get("display"), dict) else {}
-        creators = display.get("creator") if isinstance(display.get("creator"), dict) else {}
+        display = a.get("display")
+        display = display if isinstance(display, dict) else {}
+        creators = display.get("creator")
+        creators = creators if isinstance(creators, dict) else {}
         rows.append({
             "name": label,
             "base": base,

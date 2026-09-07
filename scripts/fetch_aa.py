@@ -29,6 +29,11 @@ import re
 import sys
 import urllib.request
 
+ROOT_FOR_IMPORT = pathlib.Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(ROOT_FOR_IMPORT))
+
+from build import GDPVAL_SLUG, INDEX_VERSION  # noqa: E402  # pylint: disable=wrong-import-position
+
 URL = "https://artificialanalysis.ai/leaderboards/models"
 # The Coding Agent Index. This is a DIFFERENT AA product from the leaderboard's
 # `codingIndex` field: it scores agent+model+harness combinations (Claude Code -
@@ -51,6 +56,14 @@ STAMP = ROOT / "data" / "captured-at.txt"
 
 # The flight payload escapes the model array into JS string chunks.
 CHUNK_RE = re.compile(r'self\.__next_f\.push\(\[1,("(?:[^"\\]|\\.)*")\]\)')
+
+# AA stamps the live index version into the leaderboard copy.
+VERSION_RE = re.compile(r"Intelligence Index v(\d+\.\d+)")
+
+# The per-evaluation costs are the index weights already applied, so they sum
+# to the published total. A drift past this means AA changed what the breakdown
+# contains -- exactly the move that silently emptied two charts at v4.3.
+SUM_TOLERANCE = 1e-6
 
 
 def fetch_html(cached: str | None, url: str = URL) -> str:
@@ -115,6 +128,62 @@ def richest_models_array(payload: str) -> list[dict]:
     return best
 
 
+def check_index_version(payload: str) -> str:
+    """Refuse a capture from an index version build.py was not written for.
+
+    AA publishes the per-evaluation weights on its methodology page and NEVER
+    in the payload, so a rebalance is undetectable from the data alone: the
+    numbers stay well-formed and the page silently ships wrong costs. v4.2 did
+    exactly that. Pinning the version is the only place this can be caught.
+    """
+    found = VERSION_RE.search(payload)
+    if not found:
+        sys.exit("no Intelligence Index version in the payload -- page structure changed")
+    if found.group(1) != INDEX_VERSION:
+        sys.exit(
+            f"AA is now on Intelligence Index v{found.group(1)}, but build.py is "
+            f"written against v{INDEX_VERSION}. Re-read "
+            "https://artificialanalysis.ai/methodology/intelligence-benchmarking "
+            "-- a version bump can rename a cost slug or rebalance the weights, "
+            "and neither shows up in the data."
+        )
+    return found.group(1)
+
+
+def check_cost_breakdown(models: list[dict]) -> int:
+    """The cost breakdown still contains what build.py reads from it."""
+    checked = 0
+    for m in models:
+        outer = m.get("intelligenceIndexCostPerTask")
+        if not isinstance(outer, dict):
+            continue
+        evaluations = outer.get("evaluations")
+        total = (outer.get("cost") or {}).get("total")
+        if not isinstance(evaluations, list) or not isinstance(total, (int, float)):
+            sys.exit(f"{m.get('name')}: cost breakdown lost its evaluations or total "
+                     "-- schema changed")
+        slugs = {e.get("slug") for e in evaluations if isinstance(e, dict)}
+        if GDPVAL_SLUG not in slugs:
+            sys.exit(
+                f"{m.get('name')}: cost breakdown no longer carries "
+                f"'{GDPVAL_SLUG}' -- the GDPval axis has no cost to plot. "
+                "Re-read the leaderboard rather than publishing an empty chart."
+            )
+        summed = sum(e["weightedCostPerTask"] for e in evaluations
+                     if isinstance(e, dict)
+                     and isinstance(e.get("weightedCostPerTask"), (int, float)))
+        if abs(summed - total) > SUM_TOLERANCE * max(1.0, abs(total)):
+            sys.exit(
+                f"{m.get('name')}: per-evaluation costs sum to {summed!r} but the "
+                f"published total is {total!r}. build.py divides an index weight "
+                "back out of these, which is only valid while they sum to the total."
+            )
+        checked += 1
+    if not checked:
+        sys.exit("no model carries a cost breakdown -- schema changed")
+    return checked
+
+
 def coding_agent_rows(payload: str) -> list[dict]:
     """The Coding Agent Index table, server-rendered inside the flight payload.
 
@@ -158,7 +227,10 @@ def main() -> None:
     ap.add_argument("--agents-html", help="use a cached copy of the coding-agents HTML")
     args = ap.parse_args()
 
-    models = richest_models_array(flight_payload(fetch_html(args.html)))
+    payload = flight_payload(fetch_html(args.html))
+    version = check_index_version(payload)
+    models = richest_models_array(payload)
+    priced = check_cost_breakdown(models)
     agents = coding_agent_rows(
         flight_payload(fetch_html(args.agents_html, AGENTS_URL))
     )
@@ -169,7 +241,8 @@ def main() -> None:
     STAMP.write_text(dt.date.today().isoformat() + "\n", encoding="utf-8")
 
     scored = sum(1 for m in models if isinstance(m.get("intelligenceIndex"), (int, float)))
-    print(f"wrote {OUT.relative_to(ROOT)}: {len(models)} models, {scored} with an intelligence index")
+    print(f"wrote {OUT.relative_to(ROOT)}: {len(models)} models, {scored} with an "
+          f"intelligence index, {priced} with a v{version} cost breakdown")
     print(f"wrote {AGENTS_OUT.relative_to(ROOT)}: {len(agents)} agent+model rows "
           f"with a paired index score and cost per task")
 
