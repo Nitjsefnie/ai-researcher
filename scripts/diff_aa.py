@@ -241,6 +241,64 @@ def chart_frontier(models, agents, metric):
     return {r["name"]: r for r in undominated(rows, metric)}, rows
 
 
+# Report section header -> the short name a subject line uses for it. The
+# effort-collapsed frontier is a SECOND VIEW of the intelligence chart rather
+# than a fifth chart, so it stays in the body and never double-counts here.
+SUBJECT_FRONTIERS = {
+    "efficient frontier (expanded)": "intelligence",
+    "coding agent frontier": "coding",
+    "GDPval-AA frontier": "GDPval-AA",
+    "parameter-efficiency frontier": "parameters",
+}
+
+# Conventional git subject width. Past this, GitHub and `git log --oneline`
+# truncate mid-word, so a subject that names models degrades to counting them
+# rather than being cut off somewhere arbitrary.
+SUBJECT_WIDTH = 72
+
+
+def frontier_moves(lines):
+    """[(chart, [entered], [left])] read back out of the report.
+
+    Named rather than counted, because a SWAP -- one model in, one out -- leaves
+    the count identical and used to render as no news at all, which is exactly
+    backwards: a change of who is on the frontier is the most interesting thing
+    a refresh can contain.
+    """
+    moves, chart, entered, left = [], None, [], []
+
+    def flush():
+        if chart:
+            moves.append((chart, entered[:], left[:]))
+
+    for line in lines:
+        if line.startswith("== "):
+            flush()
+            header = line[3:].split(":", 1)[0]
+            chart, entered, left = SUBJECT_FRONTIERS.get(header), [], []
+        elif chart and line.startswith(("  + ", "  - ")):
+            # "  + Name  II 55.0  $0.20/task" -- the double space is the
+            # delimiter the report itself writes, so the name survives spaces.
+            name = line[4:].split("  ")[0].strip()
+            (entered if line.startswith("  + ") else left).append(name)
+    flush()
+    return [(c, e, latest) for c, e, latest in moves if e or latest]
+
+
+def frontier_phrase(moves, named=True):
+    """The frontier clause of a subject line, named where it fits."""
+    if not moves:
+        return ""
+    total = sum(len(e) + len(x) for _, e, x in moves)
+    if named and total <= 2 and len(moves) == 1:
+        chart, entered, left = moves[0]
+        bits = [f"{n} in" for n in entered] + [f"{n} out" for n in left]
+        return f"{chart} frontier: " + ", ".join(bits)
+    if len(moves) == 1:
+        return f"{total} move{'' if total == 1 else 's'} on the {moves[0][0]} frontier"
+    return f"{total} frontier moves across {len(moves)} charts"
+
+
 def as_commit_message(report: str) -> str:
     """Render a full diff report as a commit message.
 
@@ -271,15 +329,46 @@ def as_commit_message(report: str) -> str:
         elif line.startswith("== efficient frontier (expanded): ") and not frontier:
             frontier = line.split(": ", 1)[1].split(" of ")[0].strip()
 
-    moved = []
-    if added or removed:
-        moved.append(f"+{added}/-{removed} models")
-    if speed:
-        moved.append(f"{speed} rendered speed moves")
-    if frontier and frontier.split(" -> ")[0] != frontier.split(" -> ")[-1]:
-        moved.append(f"frontier {frontier}")
-    subject = (f"Refresh capture: {models} models"
-               + (", " + ", ".join(moved) if moved else ", no material change"))
+    moves = frontier_moves(lines)
+    head = f"Refresh capture: {models} models"
+
+    def clauses(named):
+        """Subject clauses, MOST newsworthy first -- that order is what the
+        width budget spends itself on.
+
+        Who is on the efficient frontier is the analytical payload, so it
+        outranks the model count; re-sampled throughput is the noisiest thing
+        that still clears the tolerance, so it goes last and is the first to be
+        dropped. Nothing is lost by dropping it: the body carries every section
+        in full, and the subject is a headline, not a summary.
+        """
+        out = []
+        phrase = frontier_phrase(moves, named)
+        if phrase:
+            out.append(phrase)
+        if added or removed:
+            # Not "+1/-0 models" -- the head already said "models" once.
+            out.append(f"+{added}/-{removed}")
+        if speed:
+            out.append(f"{speed} rendered speed move" + ("" if speed == 1 else "s"))
+        return out
+
+    def fit(parts):
+        """The longest prefix of `parts` that stays inside the width."""
+        for i in range(len(parts), 0, -1):
+            subject = head + ", " + ", ".join(parts[:i])
+            if len(subject) <= SUBJECT_WIDTH:
+                return subject
+        # Truncating beats lying: one over-long clause still says what moved,
+        # where an empty subject would claim nothing did.
+        return head + ", " + parts[0] if parts else (
+            # The workflow only commits when a capture actually moved, so
+            # reaching here means AA re-sampled only fields the page discards.
+            head + ", nothing the page renders")
+
+    subject = fit(clauses(named=True))
+    if len(subject) > SUBJECT_WIDTH:
+        subject = fit(clauses(named=False))
 
     return subject + "\n\n" + "\n".join(lines).strip() + "\n"
 

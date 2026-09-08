@@ -51,36 +51,97 @@ class CommitMessageTests(unittest.TestCase):
                 out.append(line)
         return "\n".join(out)
 
+    @staticmethod
+    def without_frontier(report: str) -> str:
+        """A report with the frontier section gone.
+
+        print_report OMITS a frontier section whose membership did not change,
+        so "unchanged" is an ABSENT section, never a present one with equal
+        counts. Editing the header counts and leaving the entries behind would
+        build a report the differ can never emit."""
+        out, dropping = [], False
+        for line in report.splitlines():
+            if line.startswith("== "):
+                dropping = line.startswith("== efficient frontier")
+            if not dropping:
+                out.append(line)
+        return "\n".join(out)
+
     def quiet(self) -> str:
         """REPORT with every material mover removed."""
-        text = self.without_speed(REPORT)
-        return (text.replace("== models added: 6", "== models added: 0")
-                    .replace("16 -> 17 of 136 -> 142", "17 -> 17 of 142 -> 142"))
+        text = self.without_frontier(self.without_speed(REPORT))
+        return text.replace("== models added: 6", "== models added: 0")
 
-    def test_subject_names_what_moved(self):
+    def test_subject_names_who_moved_on_the_frontier(self):
+        # Who is on the efficient frontier is the analytical payload, so it
+        # outranks the model count and the re-sampled throughput for the
+        # limited room a subject line has.
         subject = diff_aa.as_commit_message(REPORT).splitlines()[0]
 
         self.assertEqual(
             subject,
-            "Refresh capture: 616 models, +6/-0 models, "
-            "769 rendered speed moves, frontier 16 -> 17")
+            "Refresh capture: 616 models, intelligence frontier: Grok 4.6 (xhigh) in")
+        self.assertLessEqual(len(subject), diff_aa.SUBJECT_WIDTH)
+
+    def test_a_frontier_swap_is_reported_even_though_the_count_holds(self):
+        # One model in, one out leaves 17 -> 17. Reporting only the count made
+        # the single most interesting kind of refresh look like no news at all.
+        swap = REPORT.replace(
+            "== efficient frontier (expanded): 16 -> 17 of 136 -> 142",
+            "== efficient frontier (expanded): 17 -> 17 of 136 -> 142").replace(
+            "  + Grok 4.6 (xhigh)  II 60.0  $1.04/task",
+            "  + Grok 4.6 (xhigh)  II 60.0  $1.04/task\n"
+            "  - Opus 4.8 (max)  II 59.0  $3.00/task")
+
+        subject = diff_aa.as_commit_message(swap).splitlines()[0]
+
+        self.assertIn("frontier", subject)
+        self.assertLessEqual(len(subject), diff_aa.SUBJECT_WIDTH)
+
+    def test_a_model_name_containing_spaces_survives_extraction(self):
+        moves = diff_aa.frontier_moves(REPORT.splitlines())
+
+        self.assertEqual(moves, [("intelligence", ["Grok 4.6 (xhigh)"], [])])
+
+    def test_added_models_are_not_mistaken_for_frontier_entries(self):
+        # "== models added" also lists "  + Name" lines; only the frontier
+        # sections may contribute to the frontier clause.
+        moves = diff_aa.frontier_moves(self.without_frontier(REPORT).splitlines())
+
+        self.assertEqual(moves, [])
+
+    def test_the_noisiest_clause_is_dropped_before_the_subject_overflows(self):
+        # All three clauses never fit together. The body keeps every section in
+        # full, so the subject drops re-sampled speed rather than truncating.
+        subject = diff_aa.as_commit_message(REPORT).splitlines()[0]
+
+        self.assertNotIn("rendered speed", subject)
+        self.assertIn("rendered speed", diff_aa.as_commit_message(REPORT))
 
     def test_subject_says_so_when_nothing_material_moved(self):
         self.assertEqual(diff_aa.as_commit_message(self.quiet()).splitlines()[0],
-                         "Refresh capture: 616 models, no material change")
+                         "Refresh capture: 616 models, nothing the page renders")
 
     def test_speed_moves_alone_count_as_material(self):
         # Issue 9: a run whose only movement was rendered speed past the
         # tolerance was committed as "no material change" — and the moves
         # were dropped from the body. The section is already threshold-
         # filtered and the page renders those numbers, so it is material.
-        speed_only = (REPORT
-                      .replace("== models added: 6", "== models added: 0")
-                      .replace("16 -> 17 of 136 -> 142", "17 -> 17 of 142 -> 142"))
+        speed_only = self.without_frontier(REPORT).replace(
+            "== models added: 6", "== models added: 0")
 
         self.assertEqual(
             diff_aa.as_commit_message(speed_only).splitlines()[0],
             "Refresh capture: 616 models, 769 rendered speed moves")
+
+    def test_a_single_speed_move_is_not_pluralised(self):
+        one = self.without_frontier(REPORT).replace(
+            "== models added: 6", "== models added: 0").replace(
+            "more than 25%: 769 value(s)", "more than 25%: 1 value(s)")
+
+        self.assertEqual(
+            diff_aa.as_commit_message(one).splitlines()[0],
+            "Refresh capture: 616 models, 1 rendered speed move")
 
     def test_keeps_the_thresholded_speed_section(self):
         body = diff_aa.as_commit_message(REPORT)
@@ -283,8 +344,13 @@ class ReportTests(unittest.TestCase):
 
         self.assertIn("== models added: 1", report)
         self.assertIn("+ Newcomer  [Fixture Lab]", report)
-        self.assertIn("Refresh capture: 2 models, +1/-0 models",
-                      diff_aa.as_commit_message(report))
+        subject = diff_aa.as_commit_message(report).splitlines()[0]
+        # The newcomer displaces the incumbent on three charts at once. The
+        # effort-collapsed frontier is a second VIEW of the intelligence
+        # chart, so it must not inflate that count to four.
+        self.assertEqual(
+            subject,
+            "Refresh capture: 2 models, 6 frontier moves across 3 charts, +1/-0")
 
     def test_a_removed_model_is_reported(self):
         old = [capture("Incumbent"), capture("Doomed", ident="doomed")]
@@ -327,7 +393,7 @@ class ReportTests(unittest.TestCase):
         report = self.render(old, new)
 
         self.assertIn("(none)", report)
-        self.assertIn("no material change", diff_aa.as_commit_message(report))
+        self.assertIn("nothing the page renders", diff_aa.as_commit_message(report))
 
     def test_unchanged_frontier_sections_are_omitted(self):
         # A quiet capture used to spend most of its summary on five frontier
