@@ -35,6 +35,14 @@ sys.path.insert(0, str(ROOT_FOR_IMPORT))
 from build import GDPVAL_SLUG, INDEX_VERSION  # noqa: E402  # pylint: disable=wrong-import-position
 
 URL = "https://artificialanalysis.ai/leaderboards/models"
+# The leaderboard's payload was trimmed to 50 fields: it kept identity, price,
+# speed and context but LOST name, licenceName, releaseDate, the parameter
+# count and the per-evaluation cost breakdown. All of those still ship, on any
+# model detail page, which embeds the whole corpus for its comparison widgets.
+# The two routes render from one snapshot -- every shared intelligenceIndex and
+# cost.total agrees exactly -- so merging them keeps the score/cost pairing on
+# a single AA run, which is the rule the whole page rests on.
+MODEL_DETAIL_URL = "https://artificialanalysis.ai/models/{slug}"
 # The Coding Agent Index. This is a DIFFERENT AA product from the leaderboard's
 # `codingIndex` field: it scores agent+model+harness combinations (Claude Code -
 # Opus 5 (xhigh), Codex - GPT-6 Astra (max)) rather than bare models, and it is
@@ -56,6 +64,12 @@ STAMP = ROOT / "data" / "captured-at.txt"
 
 # The flight payload escapes the model array into JS string chunks.
 CHUNK_RE = re.compile(r'self\.__next_f\.push\(\[1,("(?:[^"\\]|\\.)*")\]\)')
+
+# AA server-renders only its HIGHLIGHTED coding-agent rows; the full table it
+# used to embed is no longer in the public payload. Ten is what that selection
+# currently holds, so the floor only has to catch the selection vanishing
+# outright rather than shrinking.
+CODING_ROW_FLOOR = 5
 
 # AA stamps the live index version into the leaderboard copy.
 VERSION_RE = re.compile(r"Intelligence Index v(\d+\.\d+)")
@@ -125,7 +139,10 @@ def richest_models_array(payload: str) -> list[dict]:
             best, best_keys = arr, keys
     if best_keys < 20:
         sys.exit(f"richest models array had only {best_keys} fields -- schema changed")
-    return best
+    # RSC splices marker strings ("$L1c") in among the records; they are
+    # references to other payload nodes, not models, and every consumer
+    # downstream treats an entry as a mapping.
+    return [m for m in best if isinstance(m, dict)]
 
 
 def check_index_version(payload: str) -> str:
@@ -184,36 +201,143 @@ def check_cost_breakdown(models: list[dict]) -> int:
     return checked
 
 
-def coding_agent_rows(payload: str) -> list[dict]:
-    """The Coding Agent Index table, server-rendered inside the flight payload.
+def balanced_object(text: str, start: int) -> str | None:
+    """Return the JSON object literal beginning at text[start] == '{'."""
+    depth = 0
+    in_str = False
+    esc = False
+    for j in range(start, len(text)):
+        c = text[j]
+        if esc:
+            esc = False
+            continue
+        if c == "\\":
+            esc = True
+            continue
+        if c == '"':
+            in_str = not in_str
+            continue
+        if in_str:
+            continue
+        if c == "{":
+            depth += 1
+        elif c == "}":
+            depth -= 1
+            if depth == 0:
+                return text[start : j + 1]
+    return None
 
-    The page embeds it twice -- once as the ten highlighted rows behind the
-    summary charts, once in full -- so this takes the largest array whose
-    entries carry an `indexScore`. Entries interleave with RSC marker strings,
-    hence the isinstance filter.
+
+def enclosing_object(payload: str, offset: int, window: int = 40000) -> dict | None:
+    """The smallest JSON object containing `offset`, parsed.
+
+    Walks back to successive '{' candidates until one both parses and actually
+    spans the offset. `window` bounds that walk: a row is a few KB, so a search
+    that runs further has lost the thread and should give up rather than crawl
+    the whole payload.
     """
-    best: list[dict] = []
-    for m in re.finditer(r'\[\{"id":"', payload):
-        raw = balanced_array(payload, m.start())
-        if not raw:
+    i = offset
+    floor = max(0, offset - window)
+    while i > floor:
+        i = payload.rfind("{", floor, i)
+        if i < 0:
+            return None
+        raw = balanced_object(payload, i)
+        if raw and i + len(raw) > offset:
+            try:
+                return json.loads(raw)
+            except json.JSONDecodeError:
+                continue
+    return None
+
+
+def detail_host_slug(models: list[dict]) -> str:
+    """Which model's page to pull the corpus from.
+
+    A detail page lists every model EXCEPT the one it is about, so whichever
+    slug is picked loses its detail-only fields. Picking one with no measured
+    cost per task makes that free: without a cost it cannot appear on any
+    chart, so the loss is confined to table columns the merge back-fills from
+    the leaderboard anyway. Sorted, so the choice -- and therefore the capture
+    -- is stable between runs instead of churning the diff.
+    """
+    def measured(m):
+        # AA writes absent fields as the STRING "$undefined", so a bare
+        # `or {}` keeps the string and .get() blows up on it.
+        outer = m.get("intelligenceIndexCostPerTask")
+        cost = outer.get("cost") if isinstance(outer, dict) else None
+        total = cost.get("total") if isinstance(cost, dict) else None
+        return isinstance(total, (int, float))
+
+    unpriced = sorted(m["slug"] for m in models
+                      if isinstance(m.get("slug"), str) and not measured(m))
+    if not unpriced:
+        sys.exit("every model carries a cost -- no free detail host; schema changed")
+    return unpriced[0]
+
+
+def merge_captures(base: list[dict], detail: list[dict]) -> list[dict]:
+    """Leaderboard records widened with the detail route's extra fields.
+
+    The leaderboard is the authority on WHICH models exist and on every field
+    it still carries; detail only fills gaps. Overlapping values are identical
+    between the routes, so gap-filling and overwriting would agree -- filling
+    is chosen so a future divergence surfaces on the detail-only fields rather
+    than silently rewriting the leaderboard's own numbers.
+    """
+    def fill(into, extra):
+        """`into` wins; `extra` supplies only what is absent.
+
+        One level deep, because the split runs THROUGH a nested object: the
+        leaderboard kept intelligenceIndexCostPerTask.cost and dropped its
+        .evaluations, so a key-level fill would let the surviving stub shadow
+        the complete breakdown and leave the GDPval axis with no cost.
+        """
+        out = dict(into)
+        for k, v in extra.items():
+            if k not in out:
+                out[k] = v
+            elif isinstance(out[k], dict) and isinstance(v, dict):
+                out[k] = fill(out[k], v)
+        return out
+
+    by_slug = {m["slug"]: m for m in detail if isinstance(m.get("slug"), str)}
+    return [fill(m, by_slug[m["slug"]]) if by_slug.get(m.get("slug")) else m
+            for m in base]
+
+
+def coding_agent_rows(payload: str) -> list[dict]:
+    """Every agent+model row in the Coding Agent Index, wherever it is nested.
+
+    AA splits these across at least two arrays: `rows`, holding the highlighted
+    selection, and `benchmarkRows`, which begins with an RSC BACK-REFERENCE
+    STRING pointing at a row in the first array and then carries the remainder
+    inline. Anchoring on an array that starts with an object missed the second
+    array completely and published 10 of 13 rows without a word.
+
+    So this anchors on the PAIR ITSELF -- every object carrying a score and a
+    cost, wherever it sits -- and dedupes. A future reshuffle between arrays,
+    or a third array, costs nothing.
+    """
+    seen: dict[str, dict] = {}
+    for m in re.finditer(r'"indexScore"', payload):
+        row = enclosing_object(payload, m.start())
+        if not isinstance(row, dict):
             continue
-        try:
-            arr = json.loads(raw)
-        except json.JSONDecodeError:
+        mean = row.get("mean")
+        if not (isinstance(row.get("indexScore"), (int, float))
+                and isinstance(mean, dict)
+                and isinstance(mean.get("costUsd"), (int, float))):
             continue
-        scored = [r for r in arr if isinstance(r, dict) and "indexScore" in r]
-        if len(scored) > len(best):
-            best = scored
-    priced = [
-        r for r in best
-        if isinstance(r.get("indexScore"), (int, float))
-        and isinstance(r.get("mean"), dict)
-        and isinstance(r["mean"].get("costUsd"), (int, float))
-    ]
-    # AA has shipped 58 rows here; a collapse to a handful means the page moved
-    # its data client-side or renamed the pair, which is a hand-read signal and
-    # not something to publish a half-empty chart from.
-    if len(priced) < 20:
+        # Back-references mean one row can be reachable twice.
+        key = row.get("id") or row.get("displayLabel")
+        if isinstance(key, str):
+            seen.setdefault(key, row)
+    priced = list(seen.values())
+    # A collapse below the highlighted selection means the page moved its data
+    # or renamed the pair -- a hand-read signal, not something to publish a
+    # half-empty chart from.
+    if len(priced) < CODING_ROW_FLOOR:
         sys.exit(
             f"coding agent index: only {len(priced)} rows carry indexScore and "
             f"mean.costUsd -- schema changed"
@@ -224,12 +348,20 @@ def coding_agent_rows(payload: str) -> list[dict]:
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--html", help="use a cached copy of the leaderboard HTML")
+    ap.add_argument("--detail-html", help="use a cached copy of a model detail page")
     ap.add_argument("--agents-html", help="use a cached copy of the coding-agents HTML")
     args = ap.parse_args()
 
     payload = flight_payload(fetch_html(args.html))
     version = check_index_version(payload)
-    models = richest_models_array(payload)
+    base = richest_models_array(payload)
+
+    host = detail_host_slug(base)
+    detail = richest_models_array(
+        flight_payload(fetch_html(args.detail_html,
+                                  MODEL_DETAIL_URL.format(slug=host)))
+    )
+    models = merge_captures(base, detail)
     priced = check_cost_breakdown(models)
     agents = coding_agent_rows(
         flight_payload(fetch_html(args.agents_html, AGENTS_URL))
@@ -242,7 +374,8 @@ def main() -> None:
 
     scored = sum(1 for m in models if isinstance(m.get("intelligenceIndex"), (int, float)))
     print(f"wrote {OUT.relative_to(ROOT)}: {len(models)} models, {scored} with an "
-          f"intelligence index, {priced} with a v{version} cost breakdown")
+          f"intelligence index, {priced} with a v{version} cost breakdown "
+          f"(detail merged from /models/{host})")
     print(f"wrote {AGENTS_OUT.relative_to(ROOT)}: {len(agents)} agent+model rows "
           f"with a paired index score and cost per task")
 

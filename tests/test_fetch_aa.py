@@ -173,12 +173,12 @@ def agent_row(label: str, score: float | None = 0.64,
     return row
 
 
-def agent_payload(rows: list[dict]) -> str:
+def agent_payload(rows: list[dict], key: str = "rows") -> str:
     """The coding-agents flight payload interleaves RSC marker strings with the
     row objects, exactly as the extractor must tolerate."""
     # Next.js emits the payload compact; the extractor anchors on that shape.
     body = json.dumps(rows, separators=(",", ":"))[1:-1]
-    return '{"rows":[' + body + ',"$L1c"]}'
+    return '{"' + key + '":[' + body + ',"$L1c"]}'
 
 
 class CodingAgentRowsTests(unittest.TestCase):
@@ -198,16 +198,44 @@ class CodingAgentRowsTests(unittest.TestCase):
 
         self.assertTrue(all(isinstance(r, dict) for r in payload))
 
-    def test_the_full_table_wins_over_the_highlight_subset(self):
-        # The page embeds the ten highlighted rows AND the full table; taking
-        # the first array found would silently publish a tenth of the data.
+    def test_rows_are_collected_from_every_array_not_just_the_biggest(self):
+        # AA splits the set across `rows` (its highlighted selection) and
+        # `benchmarkRows` (the remainder). Taking only the largest array
+        # published 10 of 13 rows silently -- and the dropped ones included the
+        # cheapest run on the chart, which is a frontier point.
+        highlighted = agent_payload([agent_row(f"H - {i}") for i in range(10)])
+        rest = agent_payload([agent_row(f"R - {i}") for i in range(3)],
+                             key="benchmarkRows")
+
+        got = fetch_aa.coding_agent_rows(highlighted + rest)
+
+        self.assertEqual(len(got), 13)
+
+    def test_an_array_starting_with_a_back_reference_is_not_skipped(self):
+        # `benchmarkRows` begins with an RSC back-reference STRING pointing at
+        # a row in the other array, so the array does not start with an object.
+        rows = [agent_row(f"A - {i}") for i in range(13)]
+        body = json.dumps(rows, separators=(",", ":"))[1:-1]
+        payload = ('{"benchmarkRows":["$d:props:children:1:props:rows:0",'
+                   + body + ']}')
+
+        self.assertEqual(len(fetch_aa.coding_agent_rows(payload)), 13)
+
+    def test_a_row_reachable_twice_is_counted_once(self):
+        rows = [agent_row(f"A - {i}") for i in range(13)]
+        doubled = agent_payload(rows) + agent_payload(rows, key="benchmarkRows")
+
+        self.assertEqual(len(fetch_aa.coding_agent_rows(doubled)), 13)
+
+    def test_overlapping_arrays_union_rather_than_replace(self):
+        # The page has embedded the highlighted rows AND a fuller set at once.
+        # Neither may win outright: the union is the chart.
         highlights = agent_payload([agent_row(f"H - {i}") for i in range(10)])
         full = agent_payload([agent_row(f"F - {i}") for i in range(58)])
 
         got = fetch_aa.coding_agent_rows(highlights + full)
 
-        self.assertEqual(len(got), 58)
-        self.assertTrue(all(r["id"].startswith("F - ") for r in got))
+        self.assertEqual(len(got), 68)
 
     def test_rows_without_a_cost_do_not_count_toward_the_floor(self):
         rows = [agent_row(f"A - {i}", cost=None) for i in range(58)]
@@ -218,12 +246,85 @@ class CodingAgentRowsTests(unittest.TestCase):
         self.assertIn("schema changed", str(caught.exception))
 
     def test_a_collapsed_table_exits_rather_than_publishing_a_stub(self):
-        rows = [agent_row(f"A - {i}") for i in range(5)]
+        rows = [agent_row(f"A - {i}") for i in range(fetch_aa.CODING_ROW_FLOOR - 1)]
 
         with self.assertRaises(SystemExit) as caught:
             fetch_aa.coding_agent_rows(agent_payload(rows))
 
-        self.assertIn("only 5 rows", str(caught.exception))
+        self.assertIn("schema changed", str(caught.exception))
+
+    def test_the_highlighted_selection_alone_is_enough(self):
+        # AA no longer server-renders the full table, only its highlighted
+        # rows. That selection is the chart now, so it must not trip the floor.
+        rows = [agent_row(f"A - {i}") for i in range(10)]
+
+        self.assertEqual(len(fetch_aa.coding_agent_rows(agent_payload(rows))), 10)
+
+
+class MergeCapturesTests(unittest.TestCase):
+    def test_detail_only_fields_fill_gaps_without_touching_the_leaderboard(self):
+        base = [{"slug": "a", "intelligenceIndex": 50, "modelCreatorName": "Lab"}]
+        detail = [{"slug": "a", "intelligenceIndex": 50, "name": "A (high)",
+                   "parameters": 27}]
+
+        got = fetch_aa.merge_captures(base, detail)
+
+        self.assertEqual(got[0]["name"], "A (high)")
+        self.assertEqual(got[0]["parameters"], 27)
+        self.assertEqual(got[0]["modelCreatorName"], "Lab")
+
+    def test_a_nested_stub_does_not_shadow_the_complete_breakdown(self):
+        # The leaderboard kept intelligenceIndexCostPerTask.cost and dropped
+        # .evaluations. A key-level merge leaves the stub in place and the
+        # GDPval axis silently loses its cost.
+        base = [{"slug": "a",
+                 "intelligenceIndexCostPerTask": {"cost": {"total": 1.0}}}]
+        detail = [{"slug": "a", "intelligenceIndexCostPerTask": {
+            "cost": {"total": 1.0},
+            "evaluations": [{"slug": "gdpval-aa", "weightedCostPerTask": 0.4}]}}]
+
+        got = fetch_aa.merge_captures(base, detail)
+
+        self.assertEqual(
+            got[0]["intelligenceIndexCostPerTask"]["evaluations"],
+            [{"slug": "gdpval-aa", "weightedCostPerTask": 0.4}])
+        self.assertEqual(
+            got[0]["intelligenceIndexCostPerTask"]["cost"]["total"], 1.0)
+
+    def test_a_model_absent_from_the_detail_route_is_kept_as_is(self):
+        # A detail page lists every model EXCEPT its own, so exactly one model
+        # never gets widened. Dropping it would silently shrink the corpus.
+        base = [{"slug": "host", "intelligenceIndex": 10}]
+
+        self.assertEqual(fetch_aa.merge_captures(base, []), base)
+
+
+class DetailHostSlugTests(unittest.TestCase):
+    def test_picks_an_unpriced_model_so_the_exclusion_costs_nothing(self):
+        models = [
+            {"slug": "priced", "intelligenceIndexCostPerTask": {"cost": {"total": 1.0}}},
+            {"slug": "free"},
+        ]
+
+        self.assertEqual(fetch_aa.detail_host_slug(models), "free")
+
+    def test_the_choice_is_deterministic_so_captures_do_not_churn(self):
+        models = [{"slug": s} for s in ("zeta", "alpha", "mid")]
+
+        self.assertEqual(fetch_aa.detail_host_slug(models), "alpha")
+
+    def test_an_undefined_cost_string_counts_as_unpriced(self):
+        # AA writes absent fields as the string "$undefined".
+        models = [{"slug": "a", "intelligenceIndexCostPerTask": "$undefined"}]
+
+        self.assertEqual(fetch_aa.detail_host_slug(models), "a")
+
+    def test_no_free_host_exits_rather_than_silently_dropping_a_model(self):
+        models = [{"slug": "a",
+                   "intelligenceIndexCostPerTask": {"cost": {"total": 1.0}}}]
+
+        with self.assertRaises(SystemExit):
+            fetch_aa.detail_host_slug(models)
 
 
 class FetchHtmlTests(unittest.TestCase):

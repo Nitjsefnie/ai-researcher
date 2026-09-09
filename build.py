@@ -161,11 +161,18 @@ def build_rows(models):
         metrics = {metric: metric_record(m, metric) for metric in METRIC_ORDER}
         if not any(metrics.values()):
             continue
-        base, eff = split_effort(m.get("name") or "")
+        # AA trimmed `name` out of the leaderboard payload; it survives on the
+        # detail route, which fetch_aa.py merges in. `shortName` is the
+        # leaderboard's own label and covers the one model a detail page cannot
+        # describe -- itself.
+        label = m.get("name") or m.get("shortName") or ""
+        base, eff = split_effort(label)
         intelligence = metrics["intelligence"]
-        parameters = num(m.get("totalParameters"))
+        # Renamed by AA: totalParameters -> parameters. Same numbers -- every
+        # model carrying both across the rename agreed exactly.
+        parameters = num(m.get("parameters"))
         rows.append({
-            "name": m.get("name") or "",
+            "name": label,
             "base": base,
             "eff": eff,
             # Which capture the row came from. Model rows carry the
@@ -175,7 +182,9 @@ def build_rows(models):
             "kind": "model",
             "agent": None,
             "creator": m.get("modelCreatorName") or "",
-            "country": m.get("modelCreatorCountry") or "",
+            # AA dropped modelCreatorCountry from every route. Nothing on the
+            # page reads it; the key stays so the row shape is uniform.
+            "country": "",
             # Compatibility aliases used by diff_aa.py and historical callers.
             "ii": intelligence["score"] if intelligence else None,
             "cost": intelligence["cost"] if intelligence else None,
@@ -625,7 +634,10 @@ TEMPLATE = r"""<!DOCTYPE html>
     <p class="sub">DeepSWE, Terminal-Bench v2.1 and SWE-Atlas-QnA, equally weighted. The unit here is an
       <b>agent plus a model</b> &mdash; Claude Code on Opus 5 (xhigh) is a different row from Codex on the
       same model &mdash; because the harness is part of what is being measured. Score and cost are both
-      AA's, read off one run, so nothing is reweighted to put them on the same axis.</p>
+      AA's, read off one run, so nothing is reweighted to put them on the same axis.
+      AA no longer publishes the full table it once did, so this is every agent run still in its payload
+      rather than the whole field it has measured &mdash; the frontier is drawn between the runs AA still
+      reports.</p>
     <div class="card">
       <div class="cap">Coding Agent Index vs measured cost per task &middot; log cost axis &middot; up-and-left is better
         &middot; click any point to pin its name</div>
@@ -751,7 +763,9 @@ TEMPLATE = r"""<!DOCTYPE html>
   <div class="foot">
     <p>Sourced entirely from Artificial Analysis. Intelligence Index v4.3 comprises
       <span id="evals"></span>. The Coding Agent Index carries its own measured cost per task, and the
-      Intelligence Index cost is AA's own total. GDPval-AA's cost is AA's figure for that evaluation with
+      Intelligence Index cost is AA's own total, and the model rows are one AA snapshot stitched from its
+      leaderboard and a model detail page, which carry different halves of the record and agree exactly on
+      every value they share. GDPval-AA's cost is AA's figure for that evaluation with
       its 10% index weight divided back out &mdash; AA reports each component's task cost pre-weighted, and
       the components sum exactly to the published total. No score, token price or task measurement is
       estimated, and nothing is filled in from another source. Rebuild with

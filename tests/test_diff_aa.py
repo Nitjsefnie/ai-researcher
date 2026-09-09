@@ -174,7 +174,7 @@ def capture(name, *, ident=None, intelligence: float | None = 51,
         "slug": (ident or name.lower().replace(" ", "-")),
         "intelligenceIndex": intelligence,
         "gdpvalNormalized": None if intelligence is None else intelligence / 100,
-        "totalParameters": params,
+        "parameters": params,
         "intelligenceIndexCostPerTask": {
             "cost": {"total": cost},
             "evaluations": [

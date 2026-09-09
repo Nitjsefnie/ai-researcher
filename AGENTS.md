@@ -39,9 +39,9 @@ costs more than its sticker price implies, which is the point of using it.
 | axis | y | source | unit |
 |---|---|---|---|
 | coding | Coding Agent Index v1.4 | `/agents/coding-agents` | agent + model |
-| intelligence | Intelligence Index v4.3 | `/leaderboards/models` | model |
-| agentic | GDPval-AA v2 | `/leaderboards/models` | model |
-| parameters | Intelligence Index vs total parameters | `/leaderboards/models` | model |
+| intelligence | Intelligence Index v4.3 | leaderboard + model detail | model |
+| agentic | GDPval-AA v2 | leaderboard + model detail | model |
+| parameters | Intelligence Index vs parameters | leaderboard + model detail | model |
 
 - **Coding Agent Index** — DeepSWE, Terminal-Bench v2.1 and SWE-Atlas-QnA at
   equal weight. Its rows carry `indexScore` and `mean.costUsd` on ONE record,
@@ -61,6 +61,35 @@ breakdown — the scores are still published, the costs are not. A score with no
 cost cannot go on a cost axis, and estimating the missing half is forbidden by
 the single-source rule above. This is why the coding axis moved to a different
 AA product rather than being dropped.
+
+**The model capture is TWO ROUTES stitched together.** AA trimmed the
+leaderboard payload to 50 fields, dropping `name`, `licenseName`,
+`releaseDate`, the parameter count and the per-evaluation cost breakdown. All
+of those still ship on any model detail page (`/models/<slug>`), which embeds
+the whole corpus for its comparison widgets. `fetch_aa.py` fetches both and
+gap-fills, one level deep — the split runs *through* a nested object, since the
+leaderboard kept `intelligenceIndexCostPerTask.cost` and dropped its
+`.evaluations`, so a key-level merge lets the surviving stub shadow the
+complete breakdown. The routes render from one snapshot (every shared
+`intelligenceIndex` and `cost.total` agrees exactly), which is what keeps the
+score/cost pairing on a single AA run.
+
+A detail page lists every model **except** its own, so the host slug loses its
+detail-only fields. `detail_host_slug` therefore picks a model with no measured
+cost — without one it cannot be on any chart — and picks it deterministically,
+so the capture does not churn.
+
+Field renames absorbed: `totalParameters` → `parameters` (identical values
+across the rename), `name` → falls back to `shortName`. `modelCreatorCountry`
+is gone from every route; nothing rendered it.
+
+**Coding rows are scattered across arrays, so the extractor anchors on the
+PAIR, not on an array shape.** AA splits them between `rows` (its highlighted
+selection) and `benchmarkRows`, which begins with an RSC back-reference string
+rather than an object. Taking the largest array published 10 of 13 rows in
+silence, and the dropped rows included the cheapest run on the chart — a
+frontier point. `coding_agent_rows` finds every object carrying an
+`indexScore` and a `mean.costUsd`, wherever it sits, and dedupes by id.
 
 **Two captures means two row universes in one table.** Rows carry a `kind`;
 `model` rows have the intelligence, agentic and parameter axes, `agent` rows
@@ -112,7 +141,7 @@ retry or to hand-fix JSON — when any of these move:
   factors of 2–3 for a day. The pin is the only place that can be caught;
 - the cost breakdown drops a slug `build.py` reads, or the per-evaluation costs
   stop summing to the published total;
-- the Coding Agent Index table collapses below 20 paired rows.
+- the Coding Agent Index collapses below `CODING_ROW_FLOOR` paired rows.
 
 `build.py` additionally refuses to write a page where a rendered axis has no
 rows, so an emptied chart is a build failure rather than a published blank.

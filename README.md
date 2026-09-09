@@ -37,6 +37,7 @@ AA ships the leaderboard as a Next.js RSC flight payload; there is no public
 JSON API, so the extractor reassembles it.
 
 ```sh
+# models = leaderboard + a model detail page, stitched; agents = coding index
 python3 scripts/fetch_aa.py     # → data/aa-raw-models.json + data/aa-raw-coding-agents.json
 python3 scripts/diff_aa.py      # what moved since the last capture
 python3 build.py                # → out/frontier-models.html

@@ -64,7 +64,7 @@ def model_fixture(
         "intelligenceIndex": intelligence,
         # AA reports GDPval as a 0-1 fraction; the page shows it out of 100.
         "gdpvalNormalized": gdpval,
-        "totalParameters": parameters,
+        "parameters": parameters,
         "intelligenceIndexCostPerTask": {
             "cost": {"total": 0.75},
             "evaluations": evaluations
@@ -143,7 +143,7 @@ class CapabilityCostTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             build.capability_cost_per_task(model_fixture(), "nonsense")
 
-    def test_total_parameter_count_is_carried_for_parameter_efficiency_plot(self):
+    def test_parameter_count_is_carried_for_parameter_efficiency_plot(self):
         rows = build.build_rows([model_fixture(parameters=1.25)])
 
         self.assertEqual(rows[0]["params"], 1.25)
@@ -290,7 +290,14 @@ class GeneratedArtifactTests(unittest.TestCase):
             raw = root / "models.json"
             agents_raw = root / "coding-agents.json"
             output = root / "frontier-models.html"
-            raw.write_text(json.dumps([model]), encoding="utf-8")
+            # A second model with NO `name` exercises the shortName fallback,
+            # which AA's payload trim made a live path rather than a spare one
+            # -- and keeps that path under the same escaping check.
+            fallback = dict(model)
+            fallback.pop("name")
+            fallback["shortName"] = upper
+            fallback["slug"] = "fixture-model-2"
+            raw.write_text(json.dumps([model, fallback]), encoding="utf-8")
             # Hermetic: without its own agent capture this would build against
             # the committed one, so the escaping check would silently stop
             # covering the half of the payload that comes from agent rows.
@@ -320,12 +327,16 @@ class GeneratedArtifactTests(unittest.TestCase):
             payload = json.loads(embedded)
         except json.JSONDecodeError as exc:
             self.fail(f"embedded JSON is invalid: {exc}")
-        row = payload["rows"][0]
-        self.assertEqual(row["name"], lower)
+        # Keyed by kind as well as name: the agent fixture deliberately reuses
+        # the same hostile label, and a name-only key lets one row shadow the
+        # other and silently drop half the assertions.
+        rows = {(r["kind"], r["name"]): r for r in payload["rows"]}
+        row = rows[("model", lower)]
         self.assertEqual(row["creator"], mixed)
-        self.assertEqual(row["country"], upper)
         self.assertEqual(row["lic"], ordinary)
         self.assertEqual(row["rel"], exact)
+        # The fallback carries its hostile string through the same escaping.
+        self.assertIn(("model", upper), rows)
 
 
 if __name__ == "__main__":
