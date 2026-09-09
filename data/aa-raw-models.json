@@ -82278,7 +82278,7 @@
   "apexAgents": null,
   "analystAgent": null,
   "itbenchSre": null,
-  "gdpvalNormalized": 0.43814,
+  "gdpvalNormalized": 0.437625,
   "mmmuPro": 0.775722543352601,
   "price1mBlended0To3To1": 0.45,
   "price1mBlended7To2To1": 0.174,
@@ -82392,11 +82392,11 @@
    }
   },
   "gdpvalBreakdown": {
-   "elo": 1376.28,
+   "elo": 1375.25,
    "avgTurns": 22.1045454545455,
-   "lower95ci": 1362.18,
-   "upper95ci": 1390.38,
-   "lastUpdated": "2026-09-07T11:53:28.347074+00:00"
+   "lower95ci": 1361.19,
+   "upper95ci": 1389.31,
+   "lastUpdated": "2026-09-08T16:34:01.665550+00:00"
   },
   "omniscienceBreakdown": {
    "total": {
