@@ -154,6 +154,27 @@ class CostBreakdownTests(unittest.TestCase):
 
         self.assertIn("schema changed", str(caught.exception))
 
+    def test_the_guard_names_the_model_by_slug_not_by_a_droppable_field(self):
+        # These messages fire exactly when AA's schema moved, and `name` is a
+        # field it has already deleted once -- which reduced a real diagnostic
+        # to "None: cost breakdown lost its evaluations".
+        models = [{"slug": "a-model",
+                   "intelligenceIndexCostPerTask": {"evaluations": []}}]
+
+        with self.assertRaises(SystemExit) as caught:
+            fetch_aa.check_cost_breakdown(models)
+
+        self.assertIn("a-model", str(caught.exception))
+        self.assertNotIn("None", str(caught.exception))
+
+    def test_a_model_with_no_identifier_at_all_still_reads_as_a_message(self):
+        models = [{"intelligenceIndexCostPerTask": {"evaluations": []}}]
+
+        with self.assertRaises(SystemExit) as caught:
+            fetch_aa.check_cost_breakdown(models)
+
+        self.assertIn("unidentifiable", str(caught.exception))
+
     def test_a_breakdown_missing_its_total_exits(self):
         models = [{"name": "M", "intelligenceIndexCostPerTask": {"evaluations": []}}]
 

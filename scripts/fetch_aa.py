@@ -8,16 +8,17 @@ model array (the one carrying intelligenceIndex, not the lightweight filter list
 
 Writes two captures, both from artificialanalysis.ai and nothing else:
 
-  data/aa-raw-models.json         the model leaderboard -- intelligence index,
-                                  its measured cost breakdown, GDPval-AA, price,
-                                  parameters, context, licence
+  data/aa-raw-models.json         the model leaderboard STITCHED WITH a model
+                                  detail page -- AA trimmed the leaderboard
+                                  payload and the two now carry different
+                                  halves of one record, from one snapshot
   data/aa-raw-coding-agents.json  the Coding Agent Index -- agent+model rows
                                   carrying indexScore and mean.costUsd on the
                                   SAME record, so no reweighting is needed
 
 alongside data/captured-at.txt, the date the capture was taken.
 
-Usage:  python3 scripts/fetch_aa.py [--html CACHED.html] [--agents-html CACHED.html]
+Usage:  python3 scripts/fetch_aa.py [--html F] [--detail-html F] [--agents-html F]
 """
 from __future__ import annotations
 
@@ -65,10 +66,10 @@ STAMP = ROOT / "data" / "captured-at.txt"
 # The flight payload escapes the model array into JS string chunks.
 CHUNK_RE = re.compile(r'self\.__next_f\.push\(\[1,("(?:[^"\\]|\\.)*")\]\)')
 
-# AA server-renders only its HIGHLIGHTED coding-agent rows; the full table it
-# used to embed is no longer in the public payload. Ten is what that selection
-# currently holds, so the floor only has to catch the selection vanishing
-# outright rather than shrinking.
+# AA no longer server-renders the full coding table it once did; what remains
+# is a smaller set split across two arrays, currently thirteen rows. The floor
+# only has to catch that set vanishing outright rather than shrinking, since
+# AA is free to feature fewer runs without anything being broken.
 CODING_ROW_FLOOR = 5
 
 # AA stamps the live index version into the leaderboard copy.
@@ -167,6 +168,21 @@ def check_index_version(payload: str) -> str:
     return found.group(1)
 
 
+def label(m: dict) -> str:
+    """How a guard names the offending model.
+
+    Deliberately not `name` alone: these messages fire precisely WHEN AA's
+    schema moved, and `name` is one of the fields it has already deleted once
+    -- which turned a real diagnostic into "None: cost breakdown lost its
+    evaluations". `slug` is the join key, so it is the last thing to go.
+    """
+    for key in ("slug", "name", "shortName"):
+        value = m.get(key)
+        if isinstance(value, str) and value:
+            return value
+    return "<unidentifiable model>"
+
+
 def check_cost_breakdown(models: list[dict]) -> int:
     """The cost breakdown still contains what build.py reads from it."""
     checked = 0
@@ -177,12 +193,12 @@ def check_cost_breakdown(models: list[dict]) -> int:
         evaluations = outer.get("evaluations")
         total = (outer.get("cost") or {}).get("total")
         if not isinstance(evaluations, list) or not isinstance(total, (int, float)):
-            sys.exit(f"{m.get('name')}: cost breakdown lost its evaluations or total "
+            sys.exit(f"{label(m)}: cost breakdown lost its evaluations or total "
                      "-- schema changed")
         slugs = {e.get("slug") for e in evaluations if isinstance(e, dict)}
         if GDPVAL_SLUG not in slugs:
             sys.exit(
-                f"{m.get('name')}: cost breakdown no longer carries "
+                f"{label(m)}: cost breakdown no longer carries "
                 f"'{GDPVAL_SLUG}' -- the GDPval axis has no cost to plot. "
                 "Re-read the leaderboard rather than publishing an empty chart."
             )
@@ -191,7 +207,7 @@ def check_cost_breakdown(models: list[dict]) -> int:
                      and isinstance(e.get("weightedCostPerTask"), (int, float)))
         if abs(summed - total) > SUM_TOLERANCE * max(1.0, abs(total)):
             sys.exit(
-                f"{m.get('name')}: per-evaluation costs sum to {summed!r} but the "
+                f"{label(m)}: per-evaluation costs sum to {summed!r} but the "
                 f"published total is {total!r}. build.py divides an index weight "
                 "back out of these, which is only valid while they sum to the total."
             )
