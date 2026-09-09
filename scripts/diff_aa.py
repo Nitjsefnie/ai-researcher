@@ -3,7 +3,7 @@
 
 `git diff data/aa-raw-models.json` is useless for a refresh review: AA re-samples
 throughput and latency on every crawl, so ~half the records churn on numbers that
-mean nothing for this page. This differ compares captures *by model id* and sorts
+mean nothing for this page. This differ compares captures *by model slug* and sorts
 every changed field into a class, then reports only the classes that can change
 what the page says:
 
@@ -91,6 +91,20 @@ def is_derived(path):
             "intelligenceIndexCostPerTask.cost.total":
         return True
     return False
+
+
+def key(m):
+    """The identity a record is compared under, across captures.
+
+    `slug` first: it is what fetch_aa.py merges the two model routes on, so it
+    is the one field guaranteed present. id/name are fallbacks for older
+    captures read out of git history, which predate the merge.
+    """
+    for field in ("slug", "id", "name"):
+        value = m.get(field)
+        if isinstance(value, str) and value:
+            return value
+    raise SystemExit("a record carries no slug, id or name -- schema changed")
 
 
 def load(spec, name="aa-raw-models.json", missing_ok=False):
@@ -419,8 +433,14 @@ def print_report(args):
                       "aa-raw-coding-agents.json", missing_ok=True)
     new_agents = load(getattr(args, "new_agents", None) or args.new,
                       "aa-raw-coding-agents.json", missing_ok=True)
-    old_by_id = {m["id"]: m for m in old}
-    new_by_id = {m["id"]: m for m in new}
+    # Keyed by SLUG, not id. AA removed `id` from the leaderboard payload; it
+    # survives only on the model detail route, and a detail page cannot
+    # describe the model it is about -- so exactly one record has no id and
+    # keying on it raises KeyError on the whole report. `slug` is the key the
+    # two routes are merged on, so it is present on every record by
+    # construction.
+    old_by_id = {key(m): m for m in old}
+    new_by_id = {key(m): m for m in new}
 
     print(f"old: {args.old}  ({len(old)} models)")
     print(f"new: {args.new}  ({len(new)} models)")
@@ -489,7 +509,7 @@ def print_report(args):
     if speed_moves:
         print(f"\n== rendered speed re-sampled by more than "
               f"{args.speed_tol * 100:.0f}%: {len(speed_moves)} value(s), "
-              f"{len({m['id'] for m, _, _, _ in speed_moves})} model(s)")
+              f"{len({key(m) for m, _, _, _ in speed_moves})} model(s)")
         for m, path, a, b in speed_moves:
             print(f"  {m.get('name')}  [{m.get('modelCreatorName')}]  "
                   f"{path}: {fmt(a)} -> {fmt(b)}{delta_note(a, b)}")

@@ -11,6 +11,7 @@ import unittest
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent / "scripts"))
 
 import diff_aa  # noqa: E402  # pylint: disable=wrong-import-position
+import build  # noqa: E402  # pylint: disable=wrong-import-position,wrong-import-order
 
 # A report in the exact shape diff_aa.report() prints, trimmed to one entry per
 # section. The renderer reads this back rather than re-running the analysis, so
@@ -420,6 +421,56 @@ class ReportTests(unittest.TestCase):
                       "parameter-efficiency frontier"):
             self.assertIn(f"== {label}", report)
         self.assertIn("+ Cheaper", report)
+
+
+class RealCaptureTests(unittest.TestCase):
+    """Run the differ over the CAPTURE THIS REPO ACTUALLY SHIPS.
+
+    Every other test here builds its own records, so they all carry whatever
+    fields the fixture author remembered -- which means the suite stayed green
+    while AA deleted `id` from the payload and the differ, keyed on it, raised
+    KeyError on the first scheduled run. Fixtures cannot catch a schema drift
+    they are not made of; the committed capture can.
+    """
+
+    def test_the_differ_survives_the_committed_capture(self):
+        path = str(build.RAW)
+        args = argparse.Namespace(old=path, new=path,
+                                  old_agents=None, new_agents=None,
+                                  speed_tol=0.25, tol=0.0, derived=False,
+                                  all=False, commit_msg=False)
+        buffer = io.StringIO()
+        with contextlib.redirect_stdout(buffer):
+            diff_aa.print_report(args)
+        report = buffer.getvalue()
+
+        self.assertIn("== models added: 0", report)
+        self.assertIn("== models removed: 0", report)
+
+    def test_every_committed_record_has_the_identity_the_differ_keys_on(self):
+        models = json.loads(build.RAW.read_text(encoding="utf-8"))
+
+        keys = [diff_aa.key(m) for m in models]
+
+        self.assertEqual(len(set(keys)), len(models))
+
+    def test_a_commit_message_renders_from_the_committed_capture(self):
+        # The same two steps the workflow runs: report, then render it as a
+        # message. `--commit-msg` is handled in main(), so print_report alone
+        # would not exercise the renderer.
+        path = str(build.RAW)
+        args = argparse.Namespace(old=path, new=path,
+                                  old_agents=None, new_agents=None,
+                                  speed_tol=0.25, tol=0.0, derived=False,
+                                  all=False, commit_msg=False)
+        buffer = io.StringIO()
+        with contextlib.redirect_stdout(buffer):
+            diff_aa.print_report(args)
+
+        message = diff_aa.as_commit_message(buffer.getvalue())
+
+        self.assertTrue(message.startswith("Refresh capture: "), message[:120])
+        self.assertIn("644 models", message)
 
 
 class LoadTests(unittest.TestCase):

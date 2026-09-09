@@ -112,7 +112,11 @@ jobs:
           fi
 
       - name: Summarise what changed
-        if: steps.capture.outputs.changed == 'true'
+        # Runs on `proceed`, not `changed`: this is the ONLY step that executes
+        # diff_aa.py, so gating it on the data moving meant a forced run could
+        # go green while the differ was broken -- which is exactly how a
+        # KeyError on a removed field reached main.
+        if: steps.capture.outputs.proceed == 'true'
         # Both paths compare the committed capture against the one just
         # fetched. The paths are passed EXPLICITLY AND RELATIVELY: the defaults
         # are absolute, and an absolute runner path (/home/runner/work/...)
@@ -122,10 +126,16 @@ jobs:
         # under a subject line naming what moved. The speed section is already
         # threshold-filtered and unchanged frontier sections are omitted at
         # the source, so the commit carries everything that is news.
+        env:
+          CHANGED: ${{ steps.capture.outputs.changed }}
         run: |
           python3 scripts/diff_aa.py git:HEAD data/aa-raw-models.json > diff.txt
-          python3 scripts/diff_aa.py git:HEAD data/aa-raw-models.json \
-            --commit-msg > commit-msg.txt
+          # Only a run whose DATA moved gets diff_aa's message; a forced
+          # build-only run writes its own in the commit step.
+          if [ "$CHANGED" = true ]; then
+            python3 scripts/diff_aa.py git:HEAD data/aa-raw-models.json \
+              --commit-msg > commit-msg.txt
+          fi
           {
             echo '### What moved'
             echo
