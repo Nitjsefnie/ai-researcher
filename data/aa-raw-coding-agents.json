@@ -1670,173 +1670,6 @@
   }
  },
  {
-  "id": "709f801275dedae5675b1f56e97c9df3",
-  "isDefault": true,
-  "isHighlighted": false,
-  "agentName": "Codex",
-  "provider": "openai",
-  "hostModelSlug": "openai_gpt-5-6-sol",
-  "display": {
-   "agent": "Codex",
-   "model": "GPT-5.6 Sol (max)",
-   "creator": {
-    "agent": "OpenAI",
-    "model": "OpenAI"
-   }
-  },
-  "displayLabel": "Codex - GPT-5.6 Sol (max) ({'reasoning_effort': 'max'})",
-  "variantOf": null,
-  "isUnavailable": false,
-  "indexComponentCount": 3,
-  "evalCount": 3,
-  "evals": [
-   {
-    "datasetIndexName": "deep-swe-v1.1",
-    "evaluationDatasetSlug": "DeepSWE v1.1",
-    "refDatasetName": "datacurve/deep-swe-1-1@1",
-    "weight": 0.333333333333333,
-    "safety": {
-     "attemptCount": 339,
-     "refusedAttemptCount": 0,
-     "hardStopAttemptCount": 0,
-     "recoveredAttemptCount": 0,
-     "fallbackAttemptCount": 0,
-     "continuedAttemptCount": 0,
-     "rate": 0,
-     "hardStopRate": 0,
-     "recoveredRate": 0
-    },
-    "mean": {
-     "reward": 0.722713864306785,
-     "inputTokens": 10907777.09439528,
-     "cacheWriteTokens": 172328.92625368733,
-     "outputTokens": 56943.890855457226
-    }
-   },
-   {
-    "datasetIndexName": "swe-atlas-qna",
-    "evaluationDatasetSlug": "SWE-Atlas-QnA",
-    "refDatasetName": "datasets/swe-atlas-qna",
-    "weight": 0.333333333333333,
-    "safety": {
-     "attemptCount": 372,
-     "refusedAttemptCount": 1,
-     "hardStopAttemptCount": 1,
-     "recoveredAttemptCount": 0,
-     "fallbackAttemptCount": 0,
-     "continuedAttemptCount": 0,
-     "rate": 0.002688172043010753,
-     "hardStopRate": 0.002688172043010753,
-     "recoveredRate": 0
-    },
-    "mean": {
-     "reward": 0.540322580645161,
-     "inputTokens": 7898018.697580645,
-     "cacheWriteTokens": 554055.9435483871,
-     "outputTokens": 31499.083333333332
-    }
-   },
-   {
-    "datasetIndexName": "terminal-bench-v4",
-    "evaluationDatasetSlug": "Terminal-Bench v4",
-    "refDatasetName": "terminal-bench/terminal-bench@sha256:39d9f44b40420cde8fdcc087579c0d72a7e14fa3656d603c3f0d22fb35e27732",
-    "weight": 0.333333333333333,
-    "safety": {
-     "attemptCount": 198,
-     "refusedAttemptCount": 0,
-     "hardStopAttemptCount": 0,
-     "recoveredAttemptCount": 0,
-     "fallbackAttemptCount": 0,
-     "continuedAttemptCount": 0,
-     "rate": 0,
-     "hardStopRate": 0,
-     "recoveredRate": 0
-    },
-    "mean": {
-     "reward": 0.373737373737374,
-     "inputTokens": 12950366.515151516,
-     "cacheWriteTokens": 204088.7095959596,
-     "outputTokens": 68992.93181818182
-    }
-   }
-  ],
-  "safety": {
-   "attemptCount": 909,
-   "refusedAttemptCount": 1,
-   "hardStopAttemptCount": 1,
-   "recoveredAttemptCount": 0,
-   "fallbackAttemptCount": 0,
-   "continuedAttemptCount": 0,
-   "rate": 0.000896057347670251,
-   "hardStopRate": 0.000896057347670251,
-   "recoveredRate": 0
-  },
-  "indexScore": 0.54559127289644,
-  "mean": {
-   "reward": 0.54559127289644,
-   "costUsd": 6.579795483718375,
-   "agentWallTimeSec": 1237.696445544555,
-   "steps": 116.39493949394938,
-   "inputTokens": 10120981.254675467,
-   "cacheWriteTokens": 335465.21617161715,
-   "outputTokens": 49155.37788778878,
-   "cacheTokens": 9784083.974697473,
-   "cacheHitRate": 0.9458037017976718,
-   "totalTokens": 10170136.632563243
-  },
-  "sums": {
-   "costUsd": 1993.6780315666658
-  },
-  "percentiles": {
-   "costUsd": {
-    "p05": 1.9250130490429063,
-    "p25": 3.3290840171617164,
-    "p50": 5.455513733333337,
-    "p75": 8.075064605500549,
-    "p95": 15.22439335944993
-   },
-   "totalTokens": {
-    "p05": 1994550.4016501652,
-    "p25": 3937210.7585258516,
-    "p50": 7714596.468646868,
-    "p75": 12446152.79537957,
-    "p95": 27006730.063476328
-   }
-  },
-  "versions": {
-   "deep-swe-v1.1": {
-    "min": {
-     "version": "0.153.4",
-     "dateReleased": "2026-09-04"
-    },
-    "max": {
-     "version": "0.153.4",
-     "dateReleased": "2026-09-04"
-    }
-   },
-   "swe-atlas-qna": {
-    "min": {
-     "version": "0.139.0",
-     "dateReleased": "2026-06-09"
-    },
-    "max": {
-     "version": "0.147.0",
-     "dateReleased": "2026-08-07"
-    }
-   },
-   "terminal-bench-v4": {
-    "min": {
-     "version": "0.153.4",
-     "dateReleased": "2026-09-04"
-    },
-    "max": {
-     "version": "0.153.4",
-     "dateReleased": "2026-09-04"
-    }
-   }
-  }
- },
- {
   "id": "28ef65135f08f035dc93a97d324fea73",
   "isDefault": true,
   "isHighlighted": false,
@@ -1941,7 +1774,7 @@
   "indexScore": 0.3874247758775307,
   "mean": {
    "reward": 0.3874247758775307,
-   "costUsd": 0.0827862290103409,
+   "costUsd": 0.08278622901034095,
    "agentWallTimeSec": 1097.0404400440034,
    "steps": 121.66666666666667,
    "inputTokens": 15269826.30913091,
@@ -2166,6 +1999,173 @@
     "max": {
      "version": "1.0.2-R2040.1",
      "dateReleased": "2026-09-02"
+    }
+   }
+  }
+ },
+ {
+  "id": "709f801275dedae5675b1f56e97c9df3",
+  "isDefault": true,
+  "isHighlighted": false,
+  "agentName": "Codex",
+  "provider": "openai",
+  "hostModelSlug": "openai_gpt-5-6-sol",
+  "display": {
+   "agent": "Codex",
+   "model": "GPT-5.6 Sol (max)",
+   "creator": {
+    "agent": "OpenAI",
+    "model": "OpenAI"
+   }
+  },
+  "displayLabel": "Codex - GPT-5.6 Sol (max) ({'reasoning_effort': 'max'})",
+  "variantOf": null,
+  "isUnavailable": false,
+  "indexComponentCount": 3,
+  "evalCount": 3,
+  "evals": [
+   {
+    "datasetIndexName": "deep-swe-v1.1",
+    "evaluationDatasetSlug": "DeepSWE v1.1",
+    "refDatasetName": "datacurve/deep-swe-1-1@1",
+    "weight": 0.333333333333333,
+    "safety": {
+     "attemptCount": 339,
+     "refusedAttemptCount": 0,
+     "hardStopAttemptCount": 0,
+     "recoveredAttemptCount": 0,
+     "fallbackAttemptCount": 0,
+     "continuedAttemptCount": 0,
+     "rate": 0,
+     "hardStopRate": 0,
+     "recoveredRate": 0
+    },
+    "mean": {
+     "reward": 0.722713864306785,
+     "inputTokens": 10907777.09439528,
+     "cacheWriteTokens": 172328.92625368733,
+     "outputTokens": 56943.890855457226
+    }
+   },
+   {
+    "datasetIndexName": "swe-atlas-qna",
+    "evaluationDatasetSlug": "SWE-Atlas-QnA",
+    "refDatasetName": "datasets/swe-atlas-qna",
+    "weight": 0.333333333333333,
+    "safety": {
+     "attemptCount": 372,
+     "refusedAttemptCount": 1,
+     "hardStopAttemptCount": 1,
+     "recoveredAttemptCount": 0,
+     "fallbackAttemptCount": 0,
+     "continuedAttemptCount": 0,
+     "rate": 0.002688172043010753,
+     "hardStopRate": 0.002688172043010753,
+     "recoveredRate": 0
+    },
+    "mean": {
+     "reward": 0.540322580645161,
+     "inputTokens": 7898018.697580645,
+     "cacheWriteTokens": 554055.9435483871,
+     "outputTokens": 31499.083333333332
+    }
+   },
+   {
+    "datasetIndexName": "terminal-bench-v4",
+    "evaluationDatasetSlug": "Terminal-Bench v4",
+    "refDatasetName": "terminal-bench/terminal-bench@sha256:39d9f44b40420cde8fdcc087579c0d72a7e14fa3656d603c3f0d22fb35e27732",
+    "weight": 0.333333333333333,
+    "safety": {
+     "attemptCount": 198,
+     "refusedAttemptCount": 0,
+     "hardStopAttemptCount": 0,
+     "recoveredAttemptCount": 0,
+     "fallbackAttemptCount": 0,
+     "continuedAttemptCount": 0,
+     "rate": 0,
+     "hardStopRate": 0,
+     "recoveredRate": 0
+    },
+    "mean": {
+     "reward": 0.373737373737374,
+     "inputTokens": 12950366.515151516,
+     "cacheWriteTokens": 204088.7095959596,
+     "outputTokens": 68992.93181818182
+    }
+   }
+  ],
+  "safety": {
+   "attemptCount": 909,
+   "refusedAttemptCount": 1,
+   "hardStopAttemptCount": 1,
+   "recoveredAttemptCount": 0,
+   "fallbackAttemptCount": 0,
+   "continuedAttemptCount": 0,
+   "rate": 0.000896057347670251,
+   "hardStopRate": 0.000896057347670251,
+   "recoveredRate": 0
+  },
+  "indexScore": 0.54559127289644,
+  "mean": {
+   "reward": 0.54559127289644,
+   "costUsd": 6.579795483718375,
+   "agentWallTimeSec": 1237.696445544555,
+   "steps": 116.39493949394938,
+   "inputTokens": 10120981.254675467,
+   "cacheWriteTokens": 335465.21617161715,
+   "outputTokens": 49155.37788778878,
+   "cacheTokens": 9784083.974697473,
+   "cacheHitRate": 0.9458037017976718,
+   "totalTokens": 10170136.632563243
+  },
+  "sums": {
+   "costUsd": 1993.6780315666658
+  },
+  "percentiles": {
+   "costUsd": {
+    "p05": 1.9250130490429063,
+    "p25": 3.3290840171617164,
+    "p50": 5.455513733333337,
+    "p75": 8.075064605500549,
+    "p95": 15.22439335944993
+   },
+   "totalTokens": {
+    "p05": 1994550.4016501652,
+    "p25": 3937210.7585258516,
+    "p50": 7714596.468646868,
+    "p75": 12446152.79537957,
+    "p95": 27006730.063476328
+   }
+  },
+  "versions": {
+   "deep-swe-v1.1": {
+    "min": {
+     "version": "0.153.4",
+     "dateReleased": "2026-09-04"
+    },
+    "max": {
+     "version": "0.153.4",
+     "dateReleased": "2026-09-04"
+    }
+   },
+   "swe-atlas-qna": {
+    "min": {
+     "version": "0.139.0",
+     "dateReleased": "2026-06-09"
+    },
+    "max": {
+     "version": "0.147.0",
+     "dateReleased": "2026-08-07"
+    }
+   },
+   "terminal-bench-v4": {
+    "min": {
+     "version": "0.153.4",
+     "dateReleased": "2026-09-04"
+    },
+    "max": {
+     "version": "0.153.4",
+     "dateReleased": "2026-09-04"
     }
    }
   }
