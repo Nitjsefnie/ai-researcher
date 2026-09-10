@@ -426,6 +426,11 @@ class ReportTests(unittest.TestCase):
 class RealCaptureTests(unittest.TestCase):
     """Run the differ over the CAPTURE THIS REPO ACTUALLY SHIPS.
 
+    EVERY ASSERTION HERE MUST BE AN INVARIANT, never a value read off today's
+    data. The capture changes hourly by design, so a literal count, model name
+    or score pinned here is a build failure with a date on it. Assert shapes,
+    relationships and things derived from the capture itself.
+
     Every other test here builds its own records, so they all carry whatever
     fields the fixture author remembered -- which means the suite stayed green
     while AA deleted `id` from the payload and the differ, keyed on it, raised
@@ -469,8 +474,13 @@ class RealCaptureTests(unittest.TestCase):
 
         message = diff_aa.as_commit_message(buffer.getvalue())
 
-        self.assertTrue(message.startswith("Refresh capture: "), message[:120])
-        self.assertIn("644 models", message)
+        self.assertRegex(message, r"^Refresh capture: \d+ models")
+        # DERIVED, never pinned. An earlier version of this line asserted
+        # "644 models" and failed the build the next day because AA published
+        # a 645th -- a test over live data asserting a live VALUE is a
+        # scheduled failure, not a check. Tie it to the capture instead.
+        self.assertIn(f"{len(json.loads(build.RAW.read_text(encoding='utf-8')))} models",
+                      message)
 
 
 class LoadTests(unittest.TestCase):
