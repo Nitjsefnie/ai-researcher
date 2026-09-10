@@ -334,21 +334,21 @@
   }
  },
  {
-  "id": "29a1cdad0d140781d05b9b4746cfdd0d",
+  "id": "542590ecc1aa12a718d158565d464daa",
   "isDefault": true,
   "isHighlighted": true,
-  "agentName": "Claude Code",
-  "provider": "anthropic",
-  "hostModelSlug": "anthropic_claude-fable-5-1",
+  "agentName": "Codex",
+  "provider": "deepseek",
+  "hostModelSlug": "deepseek_deepseek-v4-pro-0813",
   "display": {
-   "agent": "Claude Code",
-   "model": "Fable 5.1 (max) (with fallback)",
+   "agent": "Codex",
+   "model": "DeepSeek V4 Pro 0813 (max)",
    "creator": {
-    "agent": "Anthropic",
-    "model": "Anthropic"
+    "agent": "OpenAI",
+    "model": "DeepSeek"
    }
   },
-  "displayLabel": "Claude Code - Fable 5.1 (max) (with fallback)",
+  "displayLabel": "Codex - DeepSeek V4 Pro 0813 (max)",
   "variantOf": null,
   "isUnavailable": false,
   "indexComponentCount": 3,
@@ -371,10 +371,10 @@
      "recoveredRate": 0
     },
     "mean": {
-     "reward": 0.64306784660767,
-     "inputTokens": 6428754.772861357,
-     "cacheWriteTokens": 427534.0796460177,
-     "outputTokens": 155542.35398230088
+     "reward": 0.572271386430678,
+     "inputTokens": 21857745.433628317,
+     "cacheWriteTokens": null,
+     "outputTokens": 116676.62241887905
     }
    },
    {
@@ -384,20 +384,20 @@
     "weight": 0.333333333333333,
     "safety": {
      "attemptCount": 372,
-     "refusedAttemptCount": 70,
+     "refusedAttemptCount": 0,
      "hardStopAttemptCount": 0,
-     "recoveredAttemptCount": 70,
-     "fallbackAttemptCount": 70,
+     "recoveredAttemptCount": 0,
+     "fallbackAttemptCount": 0,
      "continuedAttemptCount": 0,
-     "rate": 0.1881720430107527,
+     "rate": 0,
      "hardStopRate": 0,
-     "recoveredRate": 0.1881720430107527
+     "recoveredRate": 0
     },
     "mean": {
-     "reward": 0.647849462365591,
-     "inputTokens": 3623187.8387096776,
-     "cacheWriteTokens": 225089.60483870967,
-     "outputTokens": 81143.10752688172
+     "reward": 0.618279569892473,
+     "inputTokens": 9909987.63575269,
+     "cacheWriteTokens": null,
+     "outputTokens": 46368.04435483871
     }
    },
    {
@@ -407,95 +407,95 @@
     "weight": 0.333333333333333,
     "safety": {
      "attemptCount": 198,
-     "refusedAttemptCount": 28,
+     "refusedAttemptCount": 0,
      "hardStopAttemptCount": 0,
-     "recoveredAttemptCount": 28,
-     "fallbackAttemptCount": 28,
+     "recoveredAttemptCount": 0,
+     "fallbackAttemptCount": 0,
      "continuedAttemptCount": 0,
-     "rate": 0.1414141414141414,
+     "rate": 0,
      "hardStopRate": 0,
-     "recoveredRate": 0.1414141414141414
+     "recoveredRate": 0
     },
     "mean": {
-     "reward": 0.575757575757576,
-     "inputTokens": 7809925.909090909,
-     "cacheWriteTokens": 556181.0505050505,
-     "outputTokens": 192146.03535353535
+     "reward": 0.101010101010101,
+     "inputTokens": 54448314.87373737,
+     "cacheWriteTokens": null,
+     "outputTokens": 247887.35606060605
     }
    }
   ],
   "safety": {
    "attemptCount": 909,
-   "refusedAttemptCount": 98,
+   "refusedAttemptCount": 0,
    "hardStopAttemptCount": 0,
-   "recoveredAttemptCount": 98,
-   "fallbackAttemptCount": 98,
+   "recoveredAttemptCount": 0,
+   "fallbackAttemptCount": 0,
    "continuedAttemptCount": 0,
-   "rate": 0.10986206147496469,
+   "rate": 0,
    "hardStopRate": 0,
-   "recoveredRate": 0.10986206147496469
+   "recoveredRate": 0
   },
-  "indexScore": 0.6222249615769457,
+  "indexScore": 0.4305203524444174,
   "mean": {
-   "reward": 0.6222249615769457,
-   "costUsd": 12.3583006848185,
-   "agentWallTimeSec": 2087.141664466449,
-   "steps": 36.65126512651265,
-   "inputTokens": 5581451.126512651,
-   "cacheWriteTokens": 372707.6281628163,
-   "outputTokens": 133068.2167216722,
-   "cacheTokens": 5205513.488448848,
-   "cacheHitRate": 0.9161171280255292,
-   "totalTokens": 11292740.45984597
+   "reward": 0.4305203524444174,
+   "costUsd": 0.23807686151650143,
+   "agentWallTimeSec": 2415.612587458747,
+   "steps": 138.14301430143016,
+   "inputTokens": 24067169.909240924,
+   "cacheWriteTokens": null,
+   "outputTokens": 116484.03080308028,
+   "cacheTokens": 23952438.49504949,
+   "cacheHitRate": 0.9898479195143476,
+   "totalTokens": 48136092.43509357
   },
   "sums": {
-   "costUsd": 3744.565107499993
+   "costUsd": 72.1372890395
   },
   "percentiles": {
    "costUsd": {
-    "p05": 5.444339298624863,
-    "p25": 7.8804961398515,
-    "p50": 11.040917095709577,
-    "p75": 14.93645990085259,
-    "p95": 22.439563513833875
+    "p05": 0.08553589994158414,
+    "p25": 0.13481908242684273,
+    "p50": 0.20057701675687584,
+    "p75": 0.30849491996424616,
+    "p95": 0.4808581146649064
    },
    "totalTokens": {
-    "p05": 3134570.934323436,
-    "p25": 5350346.68976898,
-    "p50": 8753920.601760175,
-    "p75": 14387914.07810782,
-    "p95": 27713688.216831718
+    "p05": 7351260.022442257,
+    "p25": 16440701.608360823,
+    "p50": 35454361.356435634,
+    "p75": 64342342.67216713,
+    "p95": 126918442.80979104
    }
   },
   "versions": {
    "deep-swe-v1.1": {
     "min": {
-     "version": "2.1.263",
-     "dateReleased": "2026-09-06"
+     "version": "0.153.2",
+     "dateReleased": "2026-09-03"
     },
     "max": {
-     "version": "2.1.263",
-     "dateReleased": "2026-09-06"
+     "version": "0.153.4",
+     "dateReleased": "2026-09-04"
     }
    },
    "swe-atlas-qna": {
     "min": {
-     "version": "2.1.259",
-     "dateReleased": "2026-09-02"
+     "version": "0.147.0",
+     "dateReleased": "2026-08-07"
     },
     "max": {
-     "version": "2.1.259",
-     "dateReleased": "2026-09-02"
+     "version": "0.153.4",
+     "dateReleased": "2026-09-04"
     }
    },
    "terminal-bench-v4": {
     "min": {
-     "version": "2.1.263",
-     "dateReleased": "2026-09-06"
+     "version": "0.153.2",
+     "dateReleased": "2026-09-03"
     },
     "max": {
-     "version": "2.1.263",
-     "dateReleased": "2026-09-06"
+     "version": "0.153.4",
+     "dateReleased": "2026-09-04"
     }
    }
   }
@@ -668,21 +668,21 @@
   }
  },
  {
-  "id": "542590ecc1aa12a718d158565d464daa",
+  "id": "9e810ff3c6cce5ebaaff7c744c687a47",
   "isDefault": true,
   "isHighlighted": true,
   "agentName": "Codex",
-  "provider": "deepseek",
-  "hostModelSlug": "deepseek_deepseek-v4-pro-0813",
+  "provider": "openai",
+  "hostModelSlug": "openai_vega-alpha",
   "display": {
    "agent": "Codex",
-   "model": "DeepSeek V4 Pro 0813 (max)",
+   "model": "GPT-6 Astra (max)",
    "creator": {
     "agent": "OpenAI",
-    "model": "DeepSeek"
+    "model": "OpenAI"
    }
   },
-  "displayLabel": "Codex - DeepSeek V4 Pro 0813 (max)",
+  "displayLabel": "Codex - GPT-6 Astra (max) ({'reasoning_effort': 'max'})",
   "variantOf": null,
   "isUnavailable": false,
   "indexComponentCount": 3,
@@ -705,10 +705,10 @@
      "recoveredRate": 0
     },
     "mean": {
-     "reward": 0.572271386430678,
-     "inputTokens": 21857745.433628317,
-     "cacheWriteTokens": null,
-     "outputTokens": 116676.62241887905
+     "reward": 0.675516224188791,
+     "inputTokens": 3338101.7050147494,
+     "cacheWriteTokens": 149223.0029498525,
+     "outputTokens": 56420.18289085546
     }
    },
    {
@@ -718,20 +718,20 @@
     "weight": 0.333333333333333,
     "safety": {
      "attemptCount": 372,
-     "refusedAttemptCount": 0,
-     "hardStopAttemptCount": 0,
+     "refusedAttemptCount": 12,
+     "hardStopAttemptCount": 12,
      "recoveredAttemptCount": 0,
      "fallbackAttemptCount": 0,
      "continuedAttemptCount": 0,
-     "rate": 0,
-     "hardStopRate": 0,
+     "rate": 0.03225806451612903,
+     "hardStopRate": 0.03225806451612903,
      "recoveredRate": 0
     },
     "mean": {
      "reward": 0.618279569892473,
-     "inputTokens": 9909987.63575269,
-     "cacheWriteTokens": null,
-     "outputTokens": 46368.04435483871
+     "inputTokens": 2630808.0191256832,
+     "cacheWriteTokens": 143752.92213114753,
+     "outputTokens": 28659.091530054644
     }
    },
    {
@@ -751,61 +751,61 @@
      "recoveredRate": 0
     },
     "mean": {
-     "reward": 0.101010101010101,
-     "inputTokens": 54448314.87373737,
-     "cacheWriteTokens": null,
-     "outputTokens": 247887.35606060605
+     "reward": 0.555555555555555,
+     "inputTokens": 4503151.8838383835,
+     "cacheWriteTokens": 197441.8686868687,
+     "outputTokens": 65844.76262626263
     }
    }
   ],
   "safety": {
    "attemptCount": 909,
-   "refusedAttemptCount": 0,
-   "hardStopAttemptCount": 0,
+   "refusedAttemptCount": 12,
+   "hardStopAttemptCount": 12,
    "recoveredAttemptCount": 0,
    "fallbackAttemptCount": 0,
    "continuedAttemptCount": 0,
-   "rate": 0,
-   "hardStopRate": 0,
+   "rate": 0.01075268817204301,
+   "hardStopRate": 0.01075268817204301,
    "recoveredRate": 0
   },
-  "indexScore": 0.4305203524444174,
+  "indexScore": 0.6164504498789397,
   "mean": {
-   "reward": 0.4305203524444174,
-   "costUsd": 0.23807686151650143,
-   "agentWallTimeSec": 2415.612587458747,
-   "steps": 138.14301430143016,
-   "inputTokens": 24067169.909240924,
-   "cacheWriteTokens": null,
-   "outputTokens": 116484.03080308028,
-   "cacheTokens": 23952438.49504949,
-   "cacheHitRate": 0.9898479195143476,
-   "totalTokens": 48136092.43509357
+   "reward": 0.6164504498789397,
+   "costUsd": 7.474426621246558,
+   "agentWallTimeSec": 1763.5894427942787,
+   "steps": 39.41089108910891,
+   "inputTokens": 3302421.489675197,
+   "cacheWriteTokens": 157487.5412901946,
+   "outputTokens": 47112.08696279464,
+   "cacheTokens": 3144345.719652296,
+   "cacheHitRate": 0.9339048285192524,
+   "totalTokens": 6651366.837580476
   },
   "sums": {
-   "costUsd": 72.1372890395
+   "costUsd": 2253.312244583334
   },
   "percentiles": {
    "costUsd": {
-    "p05": 0.08553589994158414,
-    "p25": 0.13481908242684273,
-    "p50": 0.20057701675687584,
-    "p75": 0.30849491996424616,
-    "p95": 0.4808581146649064
+    "p05": 2.755270684763477,
+    "p25": 4.340413036578659,
+    "p50": 6.125789602860287,
+    "p75": 8.728907821232124,
+    "p95": 14.871133791914197
    },
    "totalTokens": {
-    "p05": 7351260.022442257,
-    "p25": 16440701.608360823,
-    "p50": 35454361.356435634,
-    "p75": 64342342.67216713,
-    "p95": 126918442.80979104
+    "p05": 1652861.967216722,
+    "p25": 3071357.435643567,
+    "p50": 4762421.480748074,
+    "p75": 7821132.546204617,
+    "p95": 14886771.040154029
    }
   },
   "versions": {
    "deep-swe-v1.1": {
     "min": {
-     "version": "0.153.2",
-     "dateReleased": "2026-09-03"
+     "version": "0.153.4",
+     "dateReleased": "2026-09-04"
     },
     "max": {
      "version": "0.153.4",
@@ -814,18 +814,18 @@
    },
    "swe-atlas-qna": {
     "min": {
-     "version": "0.147.0",
-     "dateReleased": "2026-08-07"
+     "version": "0.151.0",
+     "dateReleased": "2026-08-29"
     },
     "max": {
-     "version": "0.153.4",
-     "dateReleased": "2026-09-04"
+     "version": "0.151.0",
+     "dateReleased": "2026-08-29"
     }
    },
    "terminal-bench-v4": {
     "min": {
-     "version": "0.153.2",
-     "dateReleased": "2026-09-03"
+     "version": "0.153.4",
+     "dateReleased": "2026-09-04"
     },
     "max": {
      "version": "0.153.4",
@@ -1002,21 +1002,21 @@
   }
  },
  {
-  "id": "9e810ff3c6cce5ebaaff7c744c687a47",
+  "id": "29a1cdad0d140781d05b9b4746cfdd0d",
   "isDefault": true,
   "isHighlighted": true,
-  "agentName": "Codex",
-  "provider": "openai",
-  "hostModelSlug": "openai_vega-alpha",
+  "agentName": "Claude Code",
+  "provider": "anthropic",
+  "hostModelSlug": "anthropic_claude-fable-5-1",
   "display": {
-   "agent": "Codex",
-   "model": "GPT-6 Astra (max)",
+   "agent": "Claude Code",
+   "model": "Fable 5.1 (max) (with fallback)",
    "creator": {
-    "agent": "OpenAI",
-    "model": "OpenAI"
+    "agent": "Anthropic",
+    "model": "Anthropic"
    }
   },
-  "displayLabel": "Codex - GPT-6 Astra (max) ({'reasoning_effort': 'max'})",
+  "displayLabel": "Claude Code - Fable 5.1 (max) (with fallback)",
   "variantOf": null,
   "isUnavailable": false,
   "indexComponentCount": 3,
@@ -1039,10 +1039,10 @@
      "recoveredRate": 0
     },
     "mean": {
-     "reward": 0.675516224188791,
-     "inputTokens": 3338101.7050147494,
-     "cacheWriteTokens": null,
-     "outputTokens": 56420.18289085546
+     "reward": 0.64306784660767,
+     "inputTokens": 6428754.772861357,
+     "cacheWriteTokens": 427534.0796460177,
+     "outputTokens": 155542.35398230088
     }
    },
    {
@@ -1052,20 +1052,20 @@
     "weight": 0.333333333333333,
     "safety": {
      "attemptCount": 372,
-     "refusedAttemptCount": 12,
-     "hardStopAttemptCount": 12,
-     "recoveredAttemptCount": 0,
-     "fallbackAttemptCount": 0,
+     "refusedAttemptCount": 70,
+     "hardStopAttemptCount": 0,
+     "recoveredAttemptCount": 70,
+     "fallbackAttemptCount": 70,
      "continuedAttemptCount": 0,
-     "rate": 0.03225806451612903,
-     "hardStopRate": 0.03225806451612903,
-     "recoveredRate": 0
+     "rate": 0.1881720430107527,
+     "hardStopRate": 0,
+     "recoveredRate": 0.1881720430107527
     },
     "mean": {
-     "reward": 0.618279569892473,
-     "inputTokens": 2630808.0191256832,
-     "cacheWriteTokens": null,
-     "outputTokens": 28659.091530054644
+     "reward": 0.647849462365591,
+     "inputTokens": 3623187.8387096776,
+     "cacheWriteTokens": 225089.60483870967,
+     "outputTokens": 81143.10752688172
     }
    },
    {
@@ -1075,95 +1075,95 @@
     "weight": 0.333333333333333,
     "safety": {
      "attemptCount": 198,
-     "refusedAttemptCount": 0,
+     "refusedAttemptCount": 28,
      "hardStopAttemptCount": 0,
-     "recoveredAttemptCount": 0,
-     "fallbackAttemptCount": 0,
+     "recoveredAttemptCount": 28,
+     "fallbackAttemptCount": 28,
      "continuedAttemptCount": 0,
-     "rate": 0,
+     "rate": 0.1414141414141414,
      "hardStopRate": 0,
-     "recoveredRate": 0
+     "recoveredRate": 0.1414141414141414
     },
     "mean": {
-     "reward": 0.555555555555555,
-     "inputTokens": 4503151.8838383835,
-     "cacheWriteTokens": null,
-     "outputTokens": 65844.76262626263
+     "reward": 0.575757575757576,
+     "inputTokens": 7809926.747474748,
+     "cacheWriteTokens": 556087.4444444445,
+     "outputTokens": 192147.398989899
     }
    }
   ],
   "safety": {
    "attemptCount": 909,
-   "refusedAttemptCount": 12,
-   "hardStopAttemptCount": 12,
-   "recoveredAttemptCount": 0,
-   "fallbackAttemptCount": 0,
+   "refusedAttemptCount": 98,
+   "hardStopAttemptCount": 0,
+   "recoveredAttemptCount": 98,
+   "fallbackAttemptCount": 98,
    "continuedAttemptCount": 0,
-   "rate": 0.01075268817204301,
-   "hardStopRate": 0.01075268817204301,
-   "recoveredRate": 0
+   "rate": 0.10986206147496469,
+   "hardStopRate": 0,
+   "recoveredRate": 0.10986206147496469
   },
-  "indexScore": 0.6164504498789397,
+  "indexScore": 0.6222249615769457,
   "mean": {
-   "reward": 0.6164504498789397,
-   "costUsd": 7.080707768021063,
-   "agentWallTimeSec": 1763.5894427942787,
-   "steps": 39.41089108910891,
-   "inputTokens": 3302421.489675197,
-   "cacheWriteTokens": null,
-   "outputTokens": 47112.08696279464,
-   "cacheTokens": 3144345.719652296,
-   "cacheHitRate": 0.9339048285192524,
-   "totalTokens": 6493879.296290288
+   "reward": 0.6222249615769457,
+   "costUsd": 12.358066111661186,
+   "agentWallTimeSec": 2085.713365236524,
+   "steps": 36.65236523652365,
+   "inputTokens": 5581451.3091309145,
+   "cacheWriteTokens": 372687.2387238724,
+   "outputTokens": 133068.51375137514,
+   "cacheTokens": 5205534.029702973,
+   "cacheHitRate": 0.9161879412236281,
+   "totalTokens": 11292741.091309117
   },
   "sums": {
-   "costUsd": 2134.7341966666672
+   "costUsd": 3744.494031833333
   },
   "percentiles": {
    "costUsd": {
-    "p05": 2.5648315363036303,
-    "p25": 4.0618241221122116,
-    "p50": 5.74500911441144,
-    "p75": 8.325720451595158,
-    "p95": 14.105444143674372
+    "p05": 5.444339298624863,
+    "p25": 7.8804961398515,
+    "p50": 11.040917095709577,
+    "p75": 14.93645990085259,
+    "p95": 22.439563513833875
    },
    "totalTokens": {
-    "p05": 1583401.6163916404,
-    "p25": 2961727.161166116,
-    "p50": 4631707.583058306,
-    "p75": 7639156.263476347,
-    "p95": 14605146.488558847
+    "p05": 3134570.934323436,
+    "p25": 5350346.68976898,
+    "p50": 8753920.601760175,
+    "p75": 14387914.07810782,
+    "p95": 27713688.216831718
    }
   },
   "versions": {
    "deep-swe-v1.1": {
     "min": {
-     "version": "0.153.4",
-     "dateReleased": "2026-09-04"
+     "version": "2.1.263",
+     "dateReleased": "2026-09-06"
     },
     "max": {
-     "version": "0.153.4",
-     "dateReleased": "2026-09-04"
+     "version": "2.1.263",
+     "dateReleased": "2026-09-06"
     }
    },
    "swe-atlas-qna": {
     "min": {
-     "version": "0.151.0",
-     "dateReleased": "2026-08-29"
+     "version": "2.1.259",
+     "dateReleased": "2026-09-02"
     },
     "max": {
-     "version": "0.151.0",
-     "dateReleased": "2026-08-29"
+     "version": "2.1.259",
+     "dateReleased": "2026-09-02"
     }
    },
    "terminal-bench-v4": {
     "min": {
-     "version": "0.153.4",
-     "dateReleased": "2026-09-04"
+     "version": "2.1.263",
+     "dateReleased": "2026-09-06"
     },
     "max": {
-     "version": "0.153.4",
-     "dateReleased": "2026-09-04"
+     "version": "2.1.263",
+     "dateReleased": "2026-09-06"
     }
    }
   }
@@ -1670,173 +1670,6 @@
   }
  },
  {
-  "id": "709f801275dedae5675b1f56e97c9df3",
-  "isDefault": true,
-  "isHighlighted": false,
-  "agentName": "Codex",
-  "provider": "openai",
-  "hostModelSlug": "openai_gpt-5-6-sol",
-  "display": {
-   "agent": "Codex",
-   "model": "GPT-5.6 Sol (max)",
-   "creator": {
-    "agent": "OpenAI",
-    "model": "OpenAI"
-   }
-  },
-  "displayLabel": "Codex - GPT-5.6 Sol (max) ({'reasoning_effort': 'max'})",
-  "variantOf": null,
-  "isUnavailable": false,
-  "indexComponentCount": 3,
-  "evalCount": 3,
-  "evals": [
-   {
-    "datasetIndexName": "deep-swe-v1.1",
-    "evaluationDatasetSlug": "DeepSWE v1.1",
-    "refDatasetName": "datacurve/deep-swe-1-1@1",
-    "weight": 0.333333333333333,
-    "safety": {
-     "attemptCount": 339,
-     "refusedAttemptCount": 0,
-     "hardStopAttemptCount": 0,
-     "recoveredAttemptCount": 0,
-     "fallbackAttemptCount": 0,
-     "continuedAttemptCount": 0,
-     "rate": 0,
-     "hardStopRate": 0,
-     "recoveredRate": 0
-    },
-    "mean": {
-     "reward": 0.722713864306785,
-     "inputTokens": 10907777.09439528,
-     "cacheWriteTokens": null,
-     "outputTokens": 56943.890855457226
-    }
-   },
-   {
-    "datasetIndexName": "swe-atlas-qna",
-    "evaluationDatasetSlug": "SWE-Atlas-QnA",
-    "refDatasetName": "datasets/swe-atlas-qna",
-    "weight": 0.333333333333333,
-    "safety": {
-     "attemptCount": 372,
-     "refusedAttemptCount": 1,
-     "hardStopAttemptCount": 1,
-     "recoveredAttemptCount": 0,
-     "fallbackAttemptCount": 0,
-     "continuedAttemptCount": 0,
-     "rate": 0.002688172043010753,
-     "hardStopRate": 0.002688172043010753,
-     "recoveredRate": 0
-    },
-    "mean": {
-     "reward": 0.540322580645161,
-     "inputTokens": 7898018.697580645,
-     "cacheWriteTokens": null,
-     "outputTokens": 31499.083333333332
-    }
-   },
-   {
-    "datasetIndexName": "terminal-bench-v4",
-    "evaluationDatasetSlug": "Terminal-Bench v4",
-    "refDatasetName": "terminal-bench/terminal-bench@sha256:39d9f44b40420cde8fdcc087579c0d72a7e14fa3656d603c3f0d22fb35e27732",
-    "weight": 0.333333333333333,
-    "safety": {
-     "attemptCount": 198,
-     "refusedAttemptCount": 0,
-     "hardStopAttemptCount": 0,
-     "recoveredAttemptCount": 0,
-     "fallbackAttemptCount": 0,
-     "continuedAttemptCount": 0,
-     "rate": 0,
-     "hardStopRate": 0,
-     "recoveredRate": 0
-    },
-    "mean": {
-     "reward": 0.373737373737374,
-     "inputTokens": 12950366.515151516,
-     "cacheWriteTokens": null,
-     "outputTokens": 68992.93181818182
-    }
-   }
-  ],
-  "safety": {
-   "attemptCount": 909,
-   "refusedAttemptCount": 1,
-   "hardStopAttemptCount": 1,
-   "recoveredAttemptCount": 0,
-   "fallbackAttemptCount": 0,
-   "continuedAttemptCount": 0,
-   "rate": 0.000896057347670251,
-   "hardStopRate": 0.000896057347670251,
-   "recoveredRate": 0
-  },
-  "indexScore": 0.54559127289644,
-  "mean": {
-   "reward": 0.54559127289644,
-   "costUsd": 6.244330267546756,
-   "agentWallTimeSec": 1237.696445544555,
-   "steps": 116.39493949394938,
-   "inputTokens": 10120981.254675467,
-   "cacheWriteTokens": null,
-   "outputTokens": 49155.37788778878,
-   "cacheTokens": 9784083.974697473,
-   "cacheHitRate": 0.9458037017976718,
-   "totalTokens": 19954220.607260708
-  },
-  "sums": {
-   "costUsd": 1892.032071066667
-  },
-  "percentiles": {
-   "costUsd": {
-    "p05": 1.7965572579097915,
-    "p25": 3.1234494862486235,
-    "p50": 5.122324118811879,
-    "p75": 7.659364039383936,
-    "p95": 14.647698635775596
-   },
-   "totalTokens": {
-    "p05": 3837744.1946094586,
-    "p25": 7606286.355885588,
-    "p50": 15063601.168316806,
-    "p75": 24386830.97029703,
-    "p95": 53339427.33872388
-   }
-  },
-  "versions": {
-   "deep-swe-v1.1": {
-    "min": {
-     "version": "0.153.4",
-     "dateReleased": "2026-09-04"
-    },
-    "max": {
-     "version": "0.153.4",
-     "dateReleased": "2026-09-04"
-    }
-   },
-   "swe-atlas-qna": {
-    "min": {
-     "version": "0.139.0",
-     "dateReleased": "2026-06-09"
-    },
-    "max": {
-     "version": "0.147.0",
-     "dateReleased": "2026-08-07"
-    }
-   },
-   "terminal-bench-v4": {
-    "min": {
-     "version": "0.153.4",
-     "dateReleased": "2026-09-04"
-    },
-    "max": {
-     "version": "0.153.4",
-     "dateReleased": "2026-09-04"
-    }
-   }
-  }
- },
- {
   "id": "cd60470c35fd626a116af80fd5915dfa",
   "isDefault": true,
   "isHighlighted": false,
@@ -2004,6 +1837,173 @@
   }
  },
  {
+  "id": "709f801275dedae5675b1f56e97c9df3",
+  "isDefault": true,
+  "isHighlighted": false,
+  "agentName": "Codex",
+  "provider": "openai",
+  "hostModelSlug": "openai_gpt-5-6-sol",
+  "display": {
+   "agent": "Codex",
+   "model": "GPT-5.6 Sol (max)",
+   "creator": {
+    "agent": "OpenAI",
+    "model": "OpenAI"
+   }
+  },
+  "displayLabel": "Codex - GPT-5.6 Sol (max) ({'reasoning_effort': 'max'})",
+  "variantOf": null,
+  "isUnavailable": false,
+  "indexComponentCount": 3,
+  "evalCount": 3,
+  "evals": [
+   {
+    "datasetIndexName": "deep-swe-v1.1",
+    "evaluationDatasetSlug": "DeepSWE v1.1",
+    "refDatasetName": "datacurve/deep-swe-1-1@1",
+    "weight": 0.333333333333333,
+    "safety": {
+     "attemptCount": 339,
+     "refusedAttemptCount": 0,
+     "hardStopAttemptCount": 0,
+     "recoveredAttemptCount": 0,
+     "fallbackAttemptCount": 0,
+     "continuedAttemptCount": 0,
+     "rate": 0,
+     "hardStopRate": 0,
+     "recoveredRate": 0
+    },
+    "mean": {
+     "reward": 0.722713864306785,
+     "inputTokens": 10907777.09439528,
+     "cacheWriteTokens": 172328.92625368733,
+     "outputTokens": 56943.890855457226
+    }
+   },
+   {
+    "datasetIndexName": "swe-atlas-qna",
+    "evaluationDatasetSlug": "SWE-Atlas-QnA",
+    "refDatasetName": "datasets/swe-atlas-qna",
+    "weight": 0.333333333333333,
+    "safety": {
+     "attemptCount": 372,
+     "refusedAttemptCount": 1,
+     "hardStopAttemptCount": 1,
+     "recoveredAttemptCount": 0,
+     "fallbackAttemptCount": 0,
+     "continuedAttemptCount": 0,
+     "rate": 0.002688172043010753,
+     "hardStopRate": 0.002688172043010753,
+     "recoveredRate": 0
+    },
+    "mean": {
+     "reward": 0.540322580645161,
+     "inputTokens": 7898018.697580645,
+     "cacheWriteTokens": 554055.9435483871,
+     "outputTokens": 31499.083333333332
+    }
+   },
+   {
+    "datasetIndexName": "terminal-bench-v4",
+    "evaluationDatasetSlug": "Terminal-Bench v4",
+    "refDatasetName": "terminal-bench/terminal-bench@sha256:39d9f44b40420cde8fdcc087579c0d72a7e14fa3656d603c3f0d22fb35e27732",
+    "weight": 0.333333333333333,
+    "safety": {
+     "attemptCount": 198,
+     "refusedAttemptCount": 0,
+     "hardStopAttemptCount": 0,
+     "recoveredAttemptCount": 0,
+     "fallbackAttemptCount": 0,
+     "continuedAttemptCount": 0,
+     "rate": 0,
+     "hardStopRate": 0,
+     "recoveredRate": 0
+    },
+    "mean": {
+     "reward": 0.373737373737374,
+     "inputTokens": 12950366.515151516,
+     "cacheWriteTokens": 204088.7095959596,
+     "outputTokens": 68992.93181818182
+    }
+   }
+  ],
+  "safety": {
+   "attemptCount": 909,
+   "refusedAttemptCount": 1,
+   "hardStopAttemptCount": 1,
+   "recoveredAttemptCount": 0,
+   "fallbackAttemptCount": 0,
+   "continuedAttemptCount": 0,
+   "rate": 0.000896057347670251,
+   "hardStopRate": 0.000896057347670251,
+   "recoveredRate": 0
+  },
+  "indexScore": 0.54559127289644,
+  "mean": {
+   "reward": 0.54559127289644,
+   "costUsd": 6.579795483718375,
+   "agentWallTimeSec": 1237.696445544555,
+   "steps": 116.39493949394938,
+   "inputTokens": 10120981.254675467,
+   "cacheWriteTokens": 335465.21617161715,
+   "outputTokens": 49155.37788778878,
+   "cacheTokens": 9784083.974697473,
+   "cacheHitRate": 0.9458037017976718,
+   "totalTokens": 20289685.823432323
+  },
+  "sums": {
+   "costUsd": 1993.6780315666658
+  },
+  "percentiles": {
+   "costUsd": {
+    "p05": 1.9250130490429063,
+    "p25": 3.3290840171617164,
+    "p50": 5.455513733333337,
+    "p75": 8.075064605500549,
+    "p95": 15.22439335944993
+   },
+   "totalTokens": {
+    "p05": 3960138.5669966973,
+    "p25": 7836502.877887789,
+    "p50": 15378144.209020916,
+    "p75": 24832323.777777802,
+    "p95": 53910906.24246431
+   }
+  },
+  "versions": {
+   "deep-swe-v1.1": {
+    "min": {
+     "version": "0.153.4",
+     "dateReleased": "2026-09-04"
+    },
+    "max": {
+     "version": "0.153.4",
+     "dateReleased": "2026-09-04"
+    }
+   },
+   "swe-atlas-qna": {
+    "min": {
+     "version": "0.139.0",
+     "dateReleased": "2026-06-09"
+    },
+    "max": {
+     "version": "0.147.0",
+     "dateReleased": "2026-08-07"
+    }
+   },
+   "terminal-bench-v4": {
+    "min": {
+     "version": "0.153.4",
+     "dateReleased": "2026-09-04"
+    },
+    "max": {
+     "version": "0.153.4",
+     "dateReleased": "2026-09-04"
+    }
+   }
+  }
+ },
+ {
   "id": "28ef65135f08f035dc93a97d324fea73",
   "isDefault": true,
   "isHighlighted": false,
@@ -2108,7 +2108,7 @@
   "indexScore": 0.3874247758775307,
   "mean": {
    "reward": 0.3874247758775307,
-   "costUsd": 0.08278622901034095,
+   "costUsd": 0.0827862290103409,
    "agentWallTimeSec": 1097.0404400440034,
    "steps": 121.66666666666667,
    "inputTokens": 15269826.30913091,
