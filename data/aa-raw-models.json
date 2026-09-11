@@ -72445,7 +72445,7 @@
    "type": "firstParty",
    "providerName": "Alibaba"
   },
-  "hostModelCount": 7,
+  "hostModelCount": 8,
   "creator": {
    "id": "d874d370-74d3-4fa0-ba00-5272f92f946b",
    "slug": "alibaba",
@@ -77041,7 +77041,7 @@
   "omniscience": -2.96666666666667,
   "omniscienceAccuracy": 0.18183333333333335,
   "omniscienceNonHallucination": 0.7414952128743124,
-  "gdpvalNormalized": 0.455,
+  "gdpvalNormalized": 0.45214,
   "analystAgent": null,
   "terminalbenchHard": null,
   "terminalbenchV21": 0.719101123595506,
@@ -77100,10 +77100,11 @@
    "hallucinationRate": 0.25850478712568753
   },
   "gdpPdfAllPass": 0.074,
-  "gdpval": 1410,
+  "gdpval": 1404.28,
   "itBenchSre": null,
   "livecodebench": null,
   "aime25": null,
+  "automationBenchPartialScore": 0.3720802754388014,
   "cacheHitDiscountPercent": null,
   "pricePer1k1mpImages": null,
   "price1mBlended0To3To1": null,
@@ -77113,20 +77114,20 @@
   "price1mBlended0To100To1": null,
   "briefcaseBreakdown": {
    "overall": {
-    "elo": 1302.74,
-    "lower95ci": 1294.68,
-    "upper95ci": 1311.93
+    "elo": 1299.25,
+    "lower95ci": 1291.48,
+    "upper95ci": 1307.94
    },
    "rubricPassRate": 0.4164926931106472,
    "analyticalQuality": {
-    "elo": 1402.22,
-    "lower95ci": 1386.16,
-    "upper95ci": 1420.99
+    "elo": 1396.38,
+    "lower95ci": 1380.12,
+    "upper95ci": 1413.66
    },
    "presentation": {
-    "elo": 1255.9,
-    "lower95ci": 1243.81,
-    "upper95ci": 1269.03
+    "elo": 1252.38,
+    "lower95ci": 1240.88,
+    "upper95ci": 1265.38
    }
   },
   "timescaleData": {},
