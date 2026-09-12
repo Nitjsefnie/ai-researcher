@@ -75,6 +75,24 @@ class RichestModelsArrayTests(unittest.TestCase):
 
         self.assertIn("schema changed", str(caught.exception))
 
+    def test_an_identical_duplicate_record_is_collapsed(self):
+        # AA has emitted one model twice in the same array, byte-identical.
+        # Downstream keys on slug; a duplicate must not reach it.
+        rec = model(25, "dup")
+        rec["slug"] = "granite-4-1-8b"
+        payload = f'{{"models":{json.dumps([rec, rec])}}}'
+
+        got = fetch_aa.richest_models_array(payload)
+
+        self.assertEqual(len(got), 1)
+
+    def test_records_without_a_slug_are_never_collapsed_together(self):
+        # Only a shared SLUG identifies a duplicate; two slug-less records
+        # are two records.
+        payload = f'{{"models":{json.dumps([model(25, "a"), model(25, "b")])}}}'
+
+        self.assertEqual(len(fetch_aa.richest_models_array(payload)), 2)
+
     def test_unparseable_candidate_is_skipped_not_fatal(self):
         broken = '"models":[{"a":,}]'
         good = f'"models":{json.dumps([model(25, "good")])}'

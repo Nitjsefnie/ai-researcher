@@ -143,7 +143,21 @@ def richest_models_array(payload: str) -> list[dict]:
     # RSC splices marker strings ("$L1c") in among the records; they are
     # references to other payload nodes, not models, and every consumer
     # downstream treats an entry as a mapping.
-    return [m for m in best if isinstance(m, dict)]
+    records = [m for m in best if isinstance(m, dict)]
+    # AA has shipped the same record twice in one array -- identical id, name
+    # and scores. Everything downstream keys on slug, so a duplicate would
+    # either collapse silently in a dict or trip the uniqueness check and stop
+    # the run over a row that carries no new information. Keep the first.
+    seen: set[str] = set()
+    unique = []
+    for m in records:
+        slug = m.get("slug")
+        if isinstance(slug, str):
+            if slug in seen:
+                continue
+            seen.add(slug)
+        unique.append(m)
+    return unique
 
 
 def check_index_version(payload: str) -> str:
