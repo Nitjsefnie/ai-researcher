@@ -60,8 +60,22 @@ JITTER = re.compile(
 # so a change in one cannot alter the artifact and is dropped without a threshold.
 SPEED_SHOWN = {"medianOutputTokensPerSecond", "intelligenceIndexTimePerTask"}
 
-# Lab branding churn -- AA reshuffles logo colours; never a finding.
-COSMETIC = {"modelCreatorColor", "modelCreatorLogo"}
+# Lab branding churn and AA's own UI state -- never a finding.
+COSMETIC = {
+    "modelCreatorColor", "modelCreatorLogo",
+    "chartDefaultSelected", "chartHighlighted", "microevalsEnabled",
+    "performanceDataSource", "hostModelCount",
+}
+
+# The only NESTED paths the page reads. Everything else beneath a "." is a
+# breakdown, a percentile, a per-prompt-type re-sample or a CI -- a component
+# of some headline, never a headline. Classifying by STRUCTURE rather than by
+# name is what survives AA adding a field family: the detail-route merge
+# brought eighteen new nested families in one day, and a name-based list
+# reported every one of them, per model, per value, as an index move.
+HEADLINE_PATHS = {
+    "intelligenceIndexCostPerTask.cost.total",
+}
 
 # Components of a headline this differ already reports. They move whenever the
 # headline moves, so listing them restates one finding a dozen times.
@@ -75,13 +89,20 @@ DERIVED_EXACT = {
     # Whole-run cost, in dollars-per-index-run; cost.total per task is the headline.
     "intelligenceIndexCostTotal", "intelligenceIndexCostInput",
     "intelligenceIndexCostOutput", "intelligenceIndexCostReasoning",
-    "intelligenceIndexCostAnswer",
+    "intelligenceIndexCostAnswer", "intelligenceIndexCost",
+    # Raw Elo and token tallies behind headlines the page renders normalised.
+    "gdpval", "briefcaseTotalCost", "canonicalIntelligenceIndexTokenCount",
+    "reasoningTokens",
 }
 
 
 def is_derived(path):
     head = path.split(".", 1)[0]
     if head in DERIVED_ROOTS or path in DERIVED_EXACT:
+        return True
+    # Structural rule: a nested path that is not a named headline is a
+    # component of one. See HEADLINE_PATHS.
+    if "." in path and path not in HEADLINE_PATHS:
         return True
     # Five fixed input:output blends of price1mInput/OutputTokens, both reported.
     if head.startswith("price1mBlended"):
@@ -174,6 +195,22 @@ def classify(path):
     if is_derived(path):
         return "derived"
     return "significant"
+
+
+def significant_families(models):
+    """Top-level families that would be REPORTED if they moved.
+
+    The triage surface: every entry here is either something the page reads,
+    a component eval score that explains an index move, or a field AA added
+    that nobody has classified yet. The real-capture test pins this set so
+    the third kind is caught by the suite, named, before it can flood a
+    commit message."""
+    families = set()
+    for m in models:
+        for path in flatten(m):
+            if classify(path) == "significant":
+                families.add(path.split(".", 1)[0])
+    return families
 
 
 def rel_change(a, b):

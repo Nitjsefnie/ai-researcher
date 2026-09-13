@@ -483,6 +483,58 @@ class RealCaptureTests(unittest.TestCase):
                       message)
 
 
+class ClassifierStructureTests(unittest.TestCase):
+    """The classifier's structural rule, checked over the committed capture.
+
+    Both assertions are invariants, not a pinned field list: AA adding a
+    nested family must be silent, and every field the page reads must be
+    reportable. A pinned list would go red on every harmless AA addition;
+    these go red only when a change could alter what the commit message says.
+    """
+
+    def test_no_nested_path_is_significant_unless_it_is_a_named_headline(self):
+        # The detail-route merge brought eighteen nested families at once --
+        # latency percentiles, per-prompt-type re-samples, Elo CIs -- and the
+        # name-based classifier reported every one as an index move.
+        models = json.loads(build.RAW.read_text(encoding="utf-8"))
+        leaked = set()
+        for m in models:
+            for path in diff_aa.flatten(m):
+                if "." in path and path not in diff_aa.HEADLINE_PATHS \
+                        and diff_aa.classify(path) == "significant":
+                    leaked.add(path.split(".", 1)[0])
+
+        self.assertEqual(leaked, set(),
+                         f"nested families reported as significant: {sorted(leaked)}")
+
+    def test_every_field_the_page_reads_is_reportable(self):
+        # If one of these moved and the differ swallowed it, the page would
+        # change without the commit message saying so.
+        rendered = {
+            "name", "shortName", "slug", "modelCreatorName", "intelligenceIndex",
+            "intelligenceIndexIsEstimated", "gdpvalNormalized", "parameters",
+            "isOpenWeights", "deprecated", "isReasoning", "licenseName",
+            "contextWindowTokens", "releaseDate", "price1mInputTokens",
+            "price1mOutputTokens", "intelligenceIndexCostPerTask.cost.total",
+        }
+        shown_speed = {"medianOutputTokensPerSecond", "intelligenceIndexTimePerTask"}
+
+        for path in rendered:
+            self.assertEqual(diff_aa.classify(path), "significant", path)
+        for path in shown_speed:
+            self.assertEqual(diff_aa.classify(path), "jitter", path)
+
+    def test_the_families_that_flooded_the_report_are_now_silent(self):
+        for path in ("performanceByPromptType.medium.medianEndToEndResponseTime",
+                     "endToEndResponseTime.answer", "outputSpeedVariance.p95",
+                     "timeToFirstChunkVariance.q75", "timescaleData.medianTimeToFirstChunk",
+                     "briefcaseBreakdown.overall.elo", "timeToFirstAnswerToken.total"):
+            self.assertNotEqual(diff_aa.classify(path), "significant", path)
+        for leaf in ("gdpval", "intelligenceIndexCost", "chartHighlighted",
+                     "hostModelCount", "reasoningTokens"):
+            self.assertNotEqual(diff_aa.classify(leaf), "significant", leaf)
+
+
 class LoadTests(unittest.TestCase):
     def test_a_git_revision_that_does_not_exist_exits_with_a_message(self):
         with self.assertRaises(SystemExit) as caught:
