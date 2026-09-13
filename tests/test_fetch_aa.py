@@ -330,6 +330,31 @@ class MergeCapturesTests(unittest.TestCase):
         self.assertEqual(
             got[0]["intelligenceIndexCostPerTask"]["cost"]["total"], 1.0)
 
+    def test_a_flattened_scalar_does_not_shadow_the_structured_breakdown(self):
+        # AA flattened the leaderboard's intelligenceIndexCostPerTask to its
+        # bare total. Same key, scalar shape; the detail route kept the
+        # object. "Present, so keep it" left every model without a breakdown
+        # and stopped the pipeline for a day. The object must win.
+        base = [{"slug": "a", "intelligenceIndexCostPerTask": 1.5}]
+        detail = [{"slug": "a", "intelligenceIndexCostPerTask": {
+            "cost": {"total": 1.5},
+            "evaluations": [{"slug": "gdpval-aa", "weightedCostPerTask": 0.4}]}}]
+
+        got = fetch_aa.merge_captures(base, detail)
+
+        self.assertEqual(got[0]["intelligenceIndexCostPerTask"]["cost"]["total"], 1.5)
+        self.assertEqual(len(got[0]["intelligenceIndexCostPerTask"]["evaluations"]), 1)
+
+    def test_a_scalar_never_overwrites_a_structured_value(self):
+        # The reverse direction: the leaderboard's object must not be
+        # replaced by a detail-route scalar, should the shapes ever swap.
+        base = [{"slug": "a", "intelligenceIndexCostPerTask": {"cost": {"total": 1.5}}}]
+        detail = [{"slug": "a", "intelligenceIndexCostPerTask": 1.5}]
+
+        got = fetch_aa.merge_captures(base, detail)
+
+        self.assertIsInstance(got[0]["intelligenceIndexCostPerTask"], dict)
+
     def test_a_model_absent_from_the_detail_route_is_kept_as_is(self):
         # A detail page lists every model EXCEPT its own, so exactly one model
         # never gets widened. Dropping it would silently shrink the corpus.
@@ -351,6 +376,14 @@ class DetailHostSlugTests(unittest.TestCase):
         models = [{"slug": s} for s in ("zeta", "alpha", "mid")]
 
         self.assertEqual(fetch_aa.detail_host_slug(models), "alpha")
+
+    def test_a_bare_numeric_cost_counts_as_priced(self):
+        # The leaderboard's flattened shape. Treating it as unpriced would
+        # make a costed model the detail host and strip its breakdown.
+        models = [{"slug": "priced", "intelligenceIndexCostPerTask": 1.5},
+                  {"slug": "free"}]
+
+        self.assertEqual(fetch_aa.detail_host_slug(models), "free")
 
     def test_an_undefined_cost_string_counts_as_unpriced(self):
         # AA writes absent fields as the string "$undefined".

@@ -118,6 +118,14 @@ class CapabilityCostTests(unittest.TestCase):
         self.assertAlmostEqual(measured_cost(model, "agentic"), 8.0)
         self.assertAlmostEqual(measured_cost(model, "intelligence"), 0.75)
 
+    def test_a_bare_numeric_cost_is_the_total(self):
+        # The leaderboard's flattened shape, which the one model the detail
+        # route cannot describe is left with.
+        model = model_fixture()
+        model["intelligenceIndexCostPerTask"] = 0.75
+
+        self.assertAlmostEqual(measured_cost(model, "intelligence"), 0.75)
+
     def test_model_rows_carry_no_coding_pair(self):
         # Coding is the Coding Agent Index now; AA publishes no cost for the
         # leaderboard's codingIndex, so a model row must not claim one.

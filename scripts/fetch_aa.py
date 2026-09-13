@@ -292,9 +292,14 @@ def detail_host_slug(models: list[dict]) -> str:
     -- is stable between runs instead of churning the diff.
     """
     def measured(m):
-        # AA writes absent fields as the STRING "$undefined", so a bare
-        # `or {}` keeps the string and .get() blows up on it.
+        # Two shapes: the object {"cost": {"total": x}, ...} on the detail
+        # route, and a bare number -- just the total -- on the leaderboard
+        # since AA flattened it. Either means AA spent money on this model.
+        # AA writes ABSENT fields as the string "$undefined", which is why
+        # the type checks are explicit rather than truthiness.
         outer = m.get("intelligenceIndexCostPerTask")
+        if isinstance(outer, (int, float)):
+            return True
         cost = outer.get("cost") if isinstance(outer, dict) else None
         total = cost.get("total") if isinstance(cost, dict) else None
         return isinstance(total, (int, float))
@@ -329,6 +334,13 @@ def merge_captures(base: list[dict], detail: list[dict]) -> list[dict]:
                 out[k] = v
             elif isinstance(out[k], dict) and isinstance(v, dict):
                 out[k] = fill(out[k], v)
+            elif isinstance(v, dict) and not isinstance(out[k], dict):
+                # Same key, different SHAPE. The leaderboard flattened
+                # intelligenceIndexCostPerTask to its bare total while the
+                # detail route kept the object with the per-evaluation
+                # breakdown. A scalar cannot hold what the object holds, so
+                # the object wins; the scalar was its `cost.total` anyway.
+                out[k] = v
         return out
 
     by_slug = {m["slug"]: m for m in detail if isinstance(m.get("slug"), str)}

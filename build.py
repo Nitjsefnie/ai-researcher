@@ -91,8 +91,17 @@ def num(v):
 
 
 def cost_per_task(m):
-    """AA nests this: intelligenceIndexCostPerTask.cost.total (USD)."""
+    """AA's measured cost per task, USD.
+
+    Two shapes: the object intelligenceIndexCostPerTask.cost.total from the
+    detail route, and -- since AA flattened the leaderboard -- a bare number
+    that IS the total. The merge restores the object for every model the
+    detail route describes; the bare number is what the one model it cannot
+    describe (the detail host) is left with.
+    """
     outer = m.get("intelligenceIndexCostPerTask")
+    if isinstance(outer, (int, float)):
+        return outer
     if not isinstance(outer, dict):
         return None
     inner = outer.get("cost")
