@@ -63511,10 +63511,10 @@
     "medianEndToEndResponseTime": 94.12340937356926
    },
    "hundredK": {
-    "medianOutputSpeed": 57.0930556456773,
-    "medianTimeToFirstChunk": 131.151903013,
-    "medianTimeToFirstAnswerToken": 131.151903013,
-    "medianEndToEndResponseTime": 139.9095355191848
+    "medianOutputSpeed": 57.6493071934132,
+    "medianTimeToFirstChunk": 82.539425417,
+    "medianTimeToFirstAnswerToken": 82.539425417,
+    "medianEndToEndResponseTime": 91.21255653239228
    },
    "mediumParallel": {
     "medianOutputSpeed": 50.8768251439476,
@@ -63628,6 +63628,9 @@
   "modelWeightsSourceUrl": null,
   "microevalsEnabled": false,
   "capabilities": {
+   "financeAndAccounting": 21.508589316442063,
+   "strategyAndOps": 23.518373906547826,
+   "legal": 22.643423336890844,
    "engineering": 21.395074165192234,
    "economics": 24.326763708680872
   },
@@ -63635,6 +63638,7 @@
    "accuracy": 0.36816666666666664,
    "hallucinationRate": 0.9501450804537062
   },
+  "gdpPdfAllPass": 0.112,
   "gdpval": 1145.71,
   "itBenchSre": null,
   "livecodebench": null,
@@ -63647,6 +63651,82 @@
   "price1mBlended0To1To1": 7,
   "price1mBlended100To1To1": 0.3333333333333333,
   "price1mBlended0To100To1": 2.099009900990099,
+  "intelligenceIndexTimePerTask": 33.69972191750391,
+  "intelligenceIndexCost": {
+   "total": 255.774127835583,
+   "input": 185.957551835583,
+   "nonCacheInput": 55.864946,
+   "cacheRead": 58.074636231688444,
+   "cacheWrite": 72.01796960389453,
+   "output": 69.816576,
+   "reasoning": 0,
+   "answer": 69.816576
+  },
+  "intelligenceIndexCostPerTask": {
+   "cost": {
+    "total": 0.13972397093498629,
+    "input": 0.10217123351802342,
+    "nonCacheInput": 0.04302788974757639,
+    "cacheRead": 0.02692936191690272,
+    "cacheWrite": 0.03221398185354431,
+    "output": 0.03755273741696287,
+    "reasoning": 0,
+    "answer": 0.03755273741696287
+   },
+   "evaluations": [
+    {
+     "slug": "aa-briefcase",
+     "weightedCostPerTask": 0.0473949019625091
+    },
+    {
+     "slug": "gdpval-aa",
+     "weightedCostPerTask": 0.012772426687915752
+    },
+    {
+     "slug": "automationbench-aa",
+     "weightedCostPerTask": 0.008952398302386448
+    },
+    {
+     "slug": "terminalbench-4-0",
+     "weightedCostPerTask": 0.0234792579366993
+    },
+    {
+     "slug": "scicode",
+     "weightedCostPerTask": 0.000995851388888889
+    },
+    {
+     "slug": "humanitys-last-exam",
+     "weightedCostPerTask": 0.0003016113994439296
+    },
+    {
+     "slug": "gdp-pdf",
+     "weightedCostPerTask": 0.03374418
+    },
+    {
+     "slug": "critpt",
+     "weightedCostPerTask": 0.002552942857142857
+    },
+    {
+     "slug": "omniscience",
+     "weightedCostPerTask": 4.79524e-05
+    },
+    {
+     "slug": "artificial-analysis-long-context-reasoning",
+     "weightedCostPerTask": 0.009482448
+    }
+   ]
+  },
+  "canonicalIntelligenceIndexTokenCount": {
+   "input": 347112842,
+   "output": 5818048,
+   "answer": 5818048,
+   "reasoning": 0
+  },
+  "intelligenceIndexOutputTokensPerTask": {
+   "reasoning": 0,
+   "answer": 3129.3947847469058,
+   "output": 3129.3947847469058
+  },
   "briefcaseBreakdown": {
    "overall": {
     "elo": 947.67,
@@ -88444,7 +88524,7 @@
    "type": "firstParty",
    "providerName": "DeepSeek"
   },
-  "hostModelCount": 5,
+  "hostModelCount": 6,
   "creator": {
    "id": "58b835bf-4c87-4f87-a846-df4b692c6e7d",
    "slug": "deepseek",
@@ -88534,12 +88614,17 @@
   "modelWeightsSourceUrl": null,
   "microevalsEnabled": false,
   "capabilities": {
+   "financeAndAccounting": 16.742052468172048,
+   "strategyAndOps": 15.477031205736665,
+   "legal": 17.55304004802501,
+   "engineering": 18.749759643769888,
    "economics": 22.114141315261044
   },
   "omniscienceBreakdown": {
    "accuracy": 0.286,
    "hallucinationRate": 0.75
   },
+  "gdpPdfAllPass": 0.06,
   "gdpval": 987.47,
   "itBenchSre": null,
   "livecodebench": null,
