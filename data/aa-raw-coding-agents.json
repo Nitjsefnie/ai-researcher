@@ -107,8 +107,7 @@
        "attemptCount": 63
       }
      ],
-     "rate": 0,
-     "reviewCoverage": 1
+     "rate": 0
     },
     "mean": {
      "reward": 0.318181818181818,
@@ -302,8 +301,7 @@
        "attemptCount": 33
       }
      ],
-     "rate": 0.020202020202020204,
-     "reviewCoverage": 1
+     "rate": 0.020202020202020204
     },
     "mean": {
      "reward": 0.146464646464646,
@@ -497,8 +495,7 @@
        "attemptCount": 33
       }
      ],
-     "rate": 0,
-     "reviewCoverage": 1
+     "rate": 0
     },
     "mean": {
      "reward": 0.166666666666667,
@@ -692,8 +689,7 @@
        "attemptCount": 108
       }
      ],
-     "rate": 0,
-     "reviewCoverage": 1
+     "rate": 0
     },
     "mean": {
      "reward": 0.545454545454545,
@@ -887,8 +883,7 @@
        "attemptCount": 110
       }
      ],
-     "rate": 0,
-     "reviewCoverage": 1
+     "rate": 0
     },
     "mean": {
      "reward": 0.555555555555555,
@@ -1082,8 +1077,7 @@
        "attemptCount": 42
       }
      ],
-     "rate": 0,
-     "reviewCoverage": 1
+     "rate": 0
     },
     "mean": {
      "reward": 0.212121212121212,
@@ -1277,8 +1271,7 @@
        "attemptCount": 114
       }
      ],
-     "rate": 0,
-     "reviewCoverage": 1
+     "rate": 0
     },
     "mean": {
      "reward": 0.575757575757576,
@@ -1472,8 +1465,7 @@
        "attemptCount": 80
       }
      ],
-     "rate": 0.005050505050505051,
-     "reviewCoverage": 1
+     "rate": 0.005050505050505051
     },
     "mean": {
      "reward": 0.398989898989899,
@@ -1667,8 +1659,7 @@
        "attemptCount": 36
       }
      ],
-     "rate": 0.005050505050505051,
-     "reviewCoverage": 1
+     "rate": 0.005050505050505051
     },
     "mean": {
      "reward": 0.176767676767677,
@@ -1862,8 +1853,7 @@
        "attemptCount": 21
       }
      ],
-     "rate": 0.005050505050505051,
-     "reviewCoverage": 1
+     "rate": 0.005050505050505051
     },
     "mean": {
      "reward": 0.101010101010101,
@@ -2053,8 +2043,7 @@
        "attemptCount": 99
       }
      ],
-     "rate": 0,
-     "reviewCoverage": 1
+     "rate": 0
     },
     "mean": {
      "reward": 0.5,
@@ -2244,8 +2233,7 @@
        "attemptCount": 111
       }
      ],
-     "rate": 0,
-     "reviewCoverage": 1
+     "rate": 0
     },
     "mean": {
      "reward": 0.560606060606061,
@@ -2439,8 +2427,7 @@
        "attemptCount": 74
       }
      ],
-     "rate": 0,
-     "reviewCoverage": 1
+     "rate": 0
     },
     "mean": {
      "reward": 0.373737373737374,
@@ -2634,8 +2621,7 @@
        "attemptCount": 21
       }
      ],
-     "rate": 0,
-     "reviewCoverage": 1
+     "rate": 0
     },
     "mean": {
      "reward": 0.106060606060606,
@@ -2829,8 +2815,7 @@
        "attemptCount": 35
       }
      ],
-     "rate": 0.005050505050505051,
-     "reviewCoverage": 1
+     "rate": 0.005050505050505051
     },
     "mean": {
      "reward": 0.171717171717172,
