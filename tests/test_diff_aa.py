@@ -161,6 +161,33 @@ class CommitMessageTests(unittest.TestCase):
         self.assertEqual(diff_aa.flatten({"a": "$undefined", "b": 1}), {"b": 1})
         self.assertEqual(diff_aa.flatten({"n": {"deep": "$undefined"}}), {})
 
+    def test_an_empty_list_is_absence_not_a_value(self):
+        # AA seeded a per-eval array as [] on every model in one crawl.
+        self.assertEqual(diff_aa.flatten({"a": [], "b": 1}), {"b": 1})
+
+    def test_a_slug_keyed_list_flattens_to_one_leaf_per_element(self):
+        # AA's per-evaluation arrays are records keyed by slug, not ordered
+        # tuples. Kept whole, one re-sampled timePerTask inside compares as a
+        # change to the entire 3 KB array and prints it twice per model --
+        # which is what made a routine refresh a 300 KB commit message.
+        flat = diff_aa.flatten({"intelligenceIndexEvaluations": [
+            {"slug": "scicode", "score": 0.6, "timePerTask": 115.0},
+            {"slug": "critpt", "score": 0.3, "timePerTask": 1056.0},
+        ]})
+        self.assertEqual(flat, {
+            "intelligenceIndexEvaluations[scicode].score": 0.6,
+            "intelligenceIndexEvaluations[scicode].timePerTask": 115.0,
+            "intelligenceIndexEvaluations[critpt].score": 0.3,
+            "intelligenceIndexEvaluations[critpt].timePerTask": 1056.0,
+        })
+
+    def test_a_list_that_is_not_slug_keyed_stays_whole(self):
+        # Order is AA's; a tuple compared element-wise would report a reorder
+        # as N moves.
+        self.assertEqual(diff_aa.flatten({"tags": ["a", "b"]}), {"tags": ["a", "b"]})
+        self.assertEqual(diff_aa.flatten({"pairs": [{"x": 1}, {"x": 2}]}),
+                         {"pairs": [{"x": 1}, {"x": 2}]})
+
 
 def capture(name, *, ident=None, intelligence: float | None = 51,
             cost: float = 0.75, params: float | None = 27,
@@ -210,6 +237,18 @@ class ClassifyTests(unittest.TestCase):
                          "jitter-unused")
         self.assertEqual(diff_aa.classify("medianTimeToFirstTokenSeconds"),
                          "jitter-unused")
+
+    def test_per_evaluation_leaves_are_never_significant(self):
+        # The array element's slug is part of the path, the leaf still decides.
+        self.assertEqual(
+            diff_aa.classify("intelligenceIndexEvaluations[scicode].timePerTask"),
+            "jitter-unused")
+        self.assertEqual(
+            diff_aa.classify("intelligenceIndexEvaluations[scicode].score"),
+            "derived")
+        self.assertEqual(
+            diff_aa.classify("intelligenceIndexEvaluations[gdpval-aa].costPerTask"),
+            "derived")
 
     def test_lab_branding_is_cosmetic(self):
         self.assertEqual(diff_aa.classify("modelCreatorColor"), "cosmetic")
@@ -320,13 +359,13 @@ class FrontierTests(unittest.TestCase):
 class ReportTests(unittest.TestCase):
     """End-to-end: two captures in, a report out, rendered to a message."""
 
-    def render(self, old, new):
+    def render(self, old, new, tol=0.0):
         old_path = pathlib.Path(self.tmp) / "old.json"
         new_path = pathlib.Path(self.tmp) / "new.json"
         old_path.write_text(json.dumps(old), encoding="utf-8")
         new_path.write_text(json.dumps(new), encoding="utf-8")
         args = argparse.Namespace(old=str(old_path), new=str(new_path),
-                                  speed_tol=0.25, tol=0.0, derived=False,
+                                  speed_tol=0.25, tol=tol, derived=False,
                                   all=False, commit_msg=False)
         buffer = io.StringIO()
         with contextlib.redirect_stdout(buffer):
@@ -385,6 +424,42 @@ class ReportTests(unittest.TestCase):
         self.assertIn("== rendered speed re-sampled", report)
         self.assertNotIn("medianOutputTokensPerSecond: 100 -> 180",
                          report.split("== rendered speed")[0])
+
+    def test_a_per_evaluation_resample_never_prints_the_array(self):
+        evals = [{"slug": "scicode", "score": 0.63, "costPerTask": 0.66,
+                  "timePerTask": 115.36},
+                 {"slug": "critpt", "score": 0.30, "costPerTask": 5.71,
+                  "timePerTask": 1056.08}]
+        resampled = [dict(e, timePerTask=e["timePerTask"] * 1.4) for e in evals]
+        old = [capture("Steady", intelligenceIndexEvaluations=evals)]
+        new = [capture("Steady", intelligenceIndexEvaluations=resampled)]
+
+        report = self.render(old, new)
+
+        self.assertIn("(none)", report)
+        self.assertNotIn("intelligenceIndexEvaluations", report)
+        self.assertIn("nothing the page renders", diff_aa.as_commit_message(report))
+
+    def test_a_score_wiggle_inside_the_tolerance_is_discarded_and_counted(self):
+        # gdpvalNormalized is an Elo renormalised over the field, so every
+        # newcomer nudges every incumbent by a hundredth of a percent -- a
+        # dozen lines of +0.01% per refresh that no reader can act on.
+        old = [capture("Steady", intelligence=50, gdpvalNormalized=0.54762)]
+        new = [capture("Steady", intelligence=50, gdpvalNormalized=0.547705)]
+
+        report = self.render(old, new, tol=0.005)
+
+        self.assertIn("(none)", report)
+        self.assertNotIn("gdpvalNormalized", report)
+        self.assertIn("1 other numeric moves <= 0.5%", report)
+
+    def test_a_score_move_past_the_tolerance_is_still_reported(self):
+        old = [capture("Mover", intelligence=50, gdpvalNormalized=0.500)]
+        new = [capture("Mover", intelligence=50, gdpvalNormalized=0.504)]
+
+        report = self.render(old, new, tol=0.005)
+
+        self.assertIn("gdpvalNormalized: 0.5 -> 0.504", report)
 
     def test_the_undefined_sentinel_produces_no_hit_at_all(self):
         # The bug that made a re-encoding look like 615 models moving.
@@ -533,6 +608,14 @@ class ClassifierStructureTests(unittest.TestCase):
         for leaf in ("gdpval", "intelligenceIndexCost", "chartHighlighted",
                      "hostModelCount", "reasoningTokens"):
             self.assertNotEqual(diff_aa.classify(leaf), "significant", leaf)
+
+
+class DefaultsTests(unittest.TestCase):
+    def test_the_default_tolerance_hides_sub_half_percent_wiggles(self):
+        # The workflow passes no --tol, so the default IS the commit-message
+        # policy. Pinned here so a "tidy-up" back to 0 is a red test, not a
+        # 300-line commit body the next morning.
+        self.assertEqual(diff_aa.DEFAULT_TOL, 0.005)
 
 
 class LoadTests(unittest.TestCase):

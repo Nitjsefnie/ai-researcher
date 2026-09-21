@@ -9,7 +9,8 @@ what the page says:
 
   significant  intelligence index, cost per task, price, context, deprecation,
                release date, licence, and the component benchmark scores that
-               explain an index move -- always reported
+               explain an index move -- reported when past --tol (a renormalised
+               Elo wiggles on every incumbent whenever a model lands)
   jitter       re-sampled speed/latency. Only the two speed numbers the page
                actually renders (see SPEED_SHOWN) survive at all, and only above
                --speed-tol; every other percentile/TTFT/e2e field is discarded
@@ -48,11 +49,18 @@ from build import build_agent_rows, build_rows, undominated  # noqa: E402  # pyl
 
 RAW = ROOT / "data" / "aa-raw-models.json"
 
+# Relative move below which a significant numeric field is not reported.
+# gdpvalNormalized is an Elo renormalised over the whole field, so every
+# newcomer nudges every incumbent by a hundredth of a percent; at 0 that is a
+# dozen +0.01% lines per refresh. 0.5% is below anything the page renders
+# to one decimal, so a move that clears it can change what the page says.
+DEFAULT_TOL = 0.005
+
 # Re-measured every crawl; a different number is a new sample of the same thing,
 # not news. Matched against the LAST segment of the flattened field path.
 JITTER = re.compile(
     r"(TokensPerSecond|TimeToFirst\w*Seconds|ResponseTimeSeconds"
-    r"|ReasoningTimeSeconds|OutputSpeed|TimePerTask)$"
+    r"|ReasoningTimeSeconds|OutputSpeed|[Tt]imePerTask)$"
 )
 
 # The only two re-sampled speed numbers build_rows() carries onto the page
@@ -170,20 +178,43 @@ def load(spec, name="aa-raw-models.json", missing_ok=False):
 UNDEFINED = "$undefined"
 
 
-def flatten(value, prefix=""):
-    """Dotted leaf paths. Lists stay whole -- their order is AA's, not ours.
+def slug_keyed(value):
+    """A list of records each carrying a string `slug` -- AA's per-evaluation
+    arrays. They are keyed collections, not ordered tuples."""
+    return (isinstance(value, list) and bool(value)
+            and all(isinstance(e, dict) and isinstance(e.get("slug"), str)
+                    for e in value))
 
-    A leaf whose value is the undefined sentinel is dropped rather than
-    recorded, which makes it identical to the key being absent -- because that
-    is what it means. An absent -> sentinel transition then produces no hit at
-    all, while sentinel -> real value still reads as an appearance.
+
+def flatten(value, prefix=""):
+    """Dotted leaf paths.
+
+    A slug-keyed list opens into one leaf per element per field, addressed
+    `path[slug].field`, so the leaf's own name decides its class: a re-sampled
+    `timePerTask` inside `intelligenceIndexEvaluations` is jitter like any
+    other, instead of turning the whole 3 KB array into one "significant"
+    change printed twice. Every other list stays whole -- its order is AA's,
+    not ours, and element-wise comparison would report a reorder as N moves.
+
+    A leaf whose value is the undefined sentinel, or an empty list, is dropped
+    rather than recorded, which makes it identical to the key being absent --
+    because that is what it means. An absent -> sentinel transition then
+    produces no hit at all, while sentinel -> real value still reads as an
+    appearance. (AA seeded `intelligenceIndexEvaluations: []` on 645 models in
+    one crawl; kept as a value, that was 645 lines of "— -> []".)
     """
     if isinstance(value, dict):
         flat = {}
         for k, v in value.items():
             flat.update(flatten(v, f"{prefix}.{k}" if prefix else k))
         return flat
-    return {} if value == UNDEFINED else {prefix: value}
+    if slug_keyed(value):
+        flat = {}
+        for e in value:
+            flat.update(flatten({k: v for k, v in e.items() if k != "slug"},
+                                f"{prefix}[{e['slug']}]"))
+        return flat
+    return {} if value == UNDEFINED or value == [] else {prefix: value}
 
 
 def classify(path):
@@ -442,9 +473,9 @@ def main():
                          f"({', '.join(sorted(SPEED_SHOWN))}) only when it moved by "
                          "more than X relative (default 0.25 = 25%%; 0 shows all). "
                          "Speed fields the page never renders are dropped regardless.")
-    ap.add_argument("--tol", type=float, default=0.0, metavar="X",
-                    help="same threshold for significant numeric fields (default 0 = "
-                         "report any change)")
+    ap.add_argument("--tol", type=float, default=DEFAULT_TOL, metavar="X",
+                    help="same threshold for significant numeric fields (default "
+                         f"{DEFAULT_TOL} = {DEFAULT_TOL * 100:g}%%; 0 reports any change)")
     ap.add_argument("--derived", action="store_true",
                     help="also show breakdowns beneath a reported headline")
     ap.add_argument("--all", action="store_true",
@@ -592,7 +623,7 @@ def print_report(args):
               f"{args.speed_tol * 100:.0f}%, "
               f"{suppressed['derived']} derived breakdown values, "
               f"{suppressed['cosmetic']} cosmetic, "
-              f"{suppressed['below-tol']} other numeric moves <= {args.tol * 100:.0f}%")
+              f"{suppressed['below-tol']} other numeric moves <= {args.tol * 100:g}%")
 
 
 if __name__ == "__main__":
