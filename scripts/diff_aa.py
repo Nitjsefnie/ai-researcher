@@ -214,7 +214,7 @@ def flatten(value, prefix=""):
             flat.update(flatten({k: v for k, v in e.items() if k != "slug"},
                                 f"{prefix}[{e['slug']}]"))
         return flat
-    return {} if value == UNDEFINED or value == [] else {prefix: value}
+    return {} if value in (UNDEFINED, []) else {prefix: value}
 
 
 def classify(path):
