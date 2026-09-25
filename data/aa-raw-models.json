@@ -106606,7 +106606,7 @@
   "intelligenceIndexEvaluations": [
    {
     "slug": "aa-briefcase",
-    "score": 1425.29,
+    "score": 1425.23,
     "outputTokensPerTask": 170690.02197802198,
     "costPerTask": 0.5657690592682244,
     "timePerTask": 523.466371308922
@@ -106684,20 +106684,20 @@
   },
   "briefcaseBreakdown": {
    "overall": {
-    "elo": 1425.29,
-    "lower95ci": 1415.37,
-    "upper95ci": 1435.22
+    "elo": 1425.23,
+    "lower95ci": 1415.48,
+    "upper95ci": 1434.98
    },
    "rubricPassRate": 0.45194274028629855,
    "analyticalQuality": {
-    "elo": 1641.86,
-    "lower95ci": 1625.86,
-    "upper95ci": 1659.81
+    "elo": 1641.41,
+    "lower95ci": 1624.39,
+    "upper95ci": 1658.85
    },
    "presentation": {
-    "elo": 1331.18,
-    "lower95ci": 1312.85,
-    "upper95ci": 1350.25
+    "elo": 1330.87,
+    "lower95ci": 1310.99,
+    "upper95ci": 1349.76
    }
   },
   "briefcaseTotalCost": 51.48498439340842,
