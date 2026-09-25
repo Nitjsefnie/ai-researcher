@@ -98185,7 +98185,7 @@
   "isReasoning": true,
   "isOpenWeights": true,
   "paramClass": "large",
-  "priceClass": "high",
+  "priceClass": "medium",
   "modelCreatorName": "Z AI",
   "modelCreatorColor": "#1c7ff8",
   "modelCreatorLogo": "/img/logos/zai.svg",
@@ -98213,10 +98213,10 @@
   "mmmuPro": null,
   "intelligenceIndexCostPerTask": {
    "cost": {
-    "total": 3.6634208691514356,
-    "input": 3.5312395931362923,
+    "total": 0.8522174973386498,
+    "input": 0.7200362213235071,
     "nonCacheInput": 0.01262893975328442,
-    "cacheRead": 3.452355018015701,
+    "cacheRead": 0.6411516462029161,
     "cacheWrite": 0.06625563536730684,
     "output": 0.1321812760151425,
     "reasoning": 0.09204407477677669,
@@ -98225,19 +98225,19 @@
    "evaluations": [
     {
      "slug": "aa-briefcase",
-     "weightedCostPerTask": 0.4115783953846153
+     "weightedCostPerTask": 0.10884047927684508
     },
     {
      "slug": "gdpval-aa",
-     "weightedCostPerTask": 0.1378258700909091
+     "weightedCostPerTask": 0.038483972661293636
     },
     {
      "slug": "automationbench-aa",
-     "weightedCostPerTask": 0.033433184368340946
+     "weightedCostPerTask": 0.01025062959983227
     },
     {
      "slug": "terminalbench-4-0",
-     "weightedCostPerTask": 3.0264350863636365
+     "weightedCostPerTask": 0.6404940828567455
     },
     {
      "slug": "scicode",
@@ -98267,7 +98267,7 @@
   },
   "price1mInputTokens": 1.4,
   "price1mOutputTokens": 4.4,
-  "cacheHitPrice": null,
+  "cacheHitPrice": 0.26,
   "cacheWritePrice": null,
   "medianOutputTokensPerSecond": 77.9680402861676,
   "percentile05OutputTokensPerSecond": 46.1000983534983,
@@ -98316,19 +98316,19 @@
   "livecodebench": null,
   "aime25": null,
   "automationBenchPartialScore": 0.519790983751346,
-  "cacheHitDiscountPercent": null,
+  "cacheHitDiscountPercent": 0.8142857142857143,
   "pricePer1k1mpImages": null,
   "price1mBlended0To3To1": 2.15,
-  "price1mBlended7To2To1": 1.7,
+  "price1mBlended7To2To1": 0.9019999999999999,
   "price1mBlended0To1To1": 2.9000000000000004,
-  "price1mBlended100To1To1": 1.4294117647058824,
+  "price1mBlended100To1To1": 0.3117647058823529,
   "price1mBlended0To100To1": 1.4297029702970299,
   "intelligenceIndexTimePerTask": 375.9028917610918,
   "intelligenceIndexCost": {
-   "total": 3294.0537148,
-   "input": 2908.6667568,
+   "total": 1012.5007060433802,
+   "input": 627.1137480433802,
    "nonCacheInput": 21.8245202,
-   "cacheRead": 2801.9072037362,
+   "cacheRead": 520.35419497958,
    "cacheWrite": 84.93503286380002,
    "output": 385.38695800000005,
    "reasoning": 326.79687480000007,
@@ -98350,28 +98350,28 @@
     "slug": "aa-briefcase",
     "score": 1188.37,
     "outputTokensPerTask": 33551.53846153846,
-    "costPerTask": 2.743855969230769,
+    "costPerTask": 0.7256031951789672,
     "timePerTask": 419.82746065211444
    },
    {
     "slug": "gdpval-aa",
     "score": 1304.83,
     "outputTokensPerTask": 22444.00909090909,
-    "costPerTask": 1.378258700909091,
+    "costPerTask": 0.38483972661293636,
     "timePerTask": 280.8399189888377
    },
    {
     "slug": "automationbench-aa",
     "score": 0.519790983751346,
     "outputTokensPerTask": 10548.106544901066,
-    "costPerTask": 0.6686636873668188,
+    "costPerTask": 0.20501259199664537,
     "timePerTask": 131.98753286709064
    },
    {
     "slug": "terminalbench-4-0",
     "score": 0.348484848484849,
     "outputTokensPerTask": 128004.36363636363,
-    "costPerTask": 30.264350863636366,
+    "costPerTask": 6.404940828567455,
     "timePerTask": 1601.7073851754526
    },
    {
@@ -98435,7 +98435,7 @@
     "upper95ci": 1081.11
    }
   },
-  "briefcaseTotalCost": 249.69089319999995,
+  "briefcaseTotalCost": 66.02989076128601,
   "timescaleData": {
    "medianOutputSpeed": 77.9680402861676,
    "medianTimeToFirstChunk": 3.25628334050003
