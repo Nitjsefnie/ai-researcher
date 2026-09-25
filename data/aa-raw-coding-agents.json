@@ -96,7 +96,7 @@
      "gradingErrorAttemptCount": 0,
      "invalidAuditAttemptCount": 0,
      "snapshotMismatchAttemptCount": 0,
-     "materializedAt": "2026-09-24T02:35:53.318576+00:00",
+     "materializedAt": "2026-09-25T03:19:56.911347+00:00",
      "gradingVersion": "v1",
      "graderConfigHash": "e3e86c5c130946ce",
      "reviewSources": [
@@ -290,7 +290,7 @@
      "gradingErrorAttemptCount": 0,
      "invalidAuditAttemptCount": 0,
      "snapshotMismatchAttemptCount": 0,
-     "materializedAt": "2026-09-24T02:35:53.318576+00:00",
+     "materializedAt": "2026-09-25T03:19:56.911347+00:00",
      "gradingVersion": "v1",
      "graderConfigHash": "e3e86c5c130946ce",
      "reviewSources": [
@@ -484,7 +484,7 @@
      "gradingErrorAttemptCount": 0,
      "invalidAuditAttemptCount": 0,
      "snapshotMismatchAttemptCount": 0,
-     "materializedAt": "2026-09-24T02:35:53.318576+00:00",
+     "materializedAt": "2026-09-25T03:19:56.911347+00:00",
      "gradingVersion": "v1",
      "graderConfigHash": "e3e86c5c130946ce",
      "reviewSources": [
@@ -678,7 +678,7 @@
      "gradingErrorAttemptCount": 0,
      "invalidAuditAttemptCount": 0,
      "snapshotMismatchAttemptCount": 0,
-     "materializedAt": "2026-09-24T02:35:53.318576+00:00",
+     "materializedAt": "2026-09-25T03:19:56.911347+00:00",
      "gradingVersion": "v1",
      "graderConfigHash": "e3e86c5c130946ce",
      "reviewSources": [
@@ -872,7 +872,7 @@
      "gradingErrorAttemptCount": 0,
      "invalidAuditAttemptCount": 0,
      "snapshotMismatchAttemptCount": 0,
-     "materializedAt": "2026-09-24T02:35:53.318576+00:00",
+     "materializedAt": "2026-09-25T03:19:56.911347+00:00",
      "gradingVersion": "v1",
      "graderConfigHash": "e3e86c5c130946ce",
      "reviewSources": [
@@ -1066,7 +1066,7 @@
      "gradingErrorAttemptCount": 0,
      "invalidAuditAttemptCount": 0,
      "snapshotMismatchAttemptCount": 0,
-     "materializedAt": "2026-09-24T02:35:53.318576+00:00",
+     "materializedAt": "2026-09-25T03:19:56.911347+00:00",
      "gradingVersion": "v1",
      "graderConfigHash": "e3e86c5c130946ce",
      "reviewSources": [
@@ -1260,7 +1260,7 @@
      "gradingErrorAttemptCount": 0,
      "invalidAuditAttemptCount": 0,
      "snapshotMismatchAttemptCount": 0,
-     "materializedAt": "2026-09-24T02:35:53.318576+00:00",
+     "materializedAt": "2026-09-25T03:19:56.911347+00:00",
      "gradingVersion": "v1",
      "graderConfigHash": "e3e86c5c130946ce",
      "reviewSources": [
@@ -1454,7 +1454,7 @@
      "gradingErrorAttemptCount": 0,
      "invalidAuditAttemptCount": 0,
      "snapshotMismatchAttemptCount": 0,
-     "materializedAt": "2026-09-24T02:35:53.318576+00:00",
+     "materializedAt": "2026-09-25T03:19:56.911347+00:00",
      "gradingVersion": "v1",
      "graderConfigHash": "e3e86c5c130946ce",
      "reviewSources": [
@@ -1552,21 +1552,21 @@
   }
  },
  {
-  "id": "cd60470c35fd626a116af80fd5915dfa",
-  "isDefault": false,
+  "id": "55b029d6971b4d378335bb168eb98b3b",
+  "isDefault": true,
   "isHighlighted": false,
-  "agentName": "Muse Code 1.0.2 RC",
-  "provider": "meta",
-  "hostModelSlug": "meta_joyful-jello138",
+  "agentName": "Kimi Code CLI",
+  "provider": "moonshotai",
+  "hostModelSlug": "moonshot_kimi-k3",
   "display": {
-   "agent": "Muse Code",
-   "model": "Muse Spark 1.3 (xhigh)",
+   "agent": "Kimi Code CLI",
+   "model": "Kimi K3",
    "creator": {
-    "agent": "Meta",
-    "model": "Meta"
+    "agent": "Moonshot AI",
+    "model": "Moonshot AI"
    }
   },
-  "displayLabel": "Muse Code - Muse Spark 1.3 (xhigh)",
+  "displayLabel": "Kimi Code CLI - Kimi K3",
   "variantOf": null,
   "isUnavailable": false,
   "indexComponentCount": 3,
@@ -1590,10 +1590,10 @@
     },
     "rewardHacking": null,
     "mean": {
-     "reward": 0.731563421828909,
-     "inputTokens": 15210161.250737464,
+     "reward": 0.684365781710915,
+     "inputTokens": 8571957.041297935,
      "cacheWriteTokens": 0,
-     "outputTokens": 78929.04719764012
+     "outputTokens": 75080.34808259587
     }
    },
    {
@@ -1614,10 +1614,10 @@
     },
     "rewardHacking": null,
     "mean": {
-     "reward": 0.545698924731183,
-     "inputTokens": 3764504.801075269,
+     "reward": 0.661290322580645,
+     "inputTokens": 4719526.534946237,
      "cacheWriteTokens": 0,
-     "outputTokens": 21519.38440860215
+     "outputTokens": 49977.29838709677
     }
    },
    {
@@ -1638,9 +1638,9 @@
     },
     "rewardHacking": {
      "retainedAttemptCount": 198,
-     "passingAttemptCount": 35,
-     "reviewedAttemptCount": 35,
-     "flaggedAttemptCount": 1,
+     "passingAttemptCount": 42,
+     "reviewedAttemptCount": 42,
+     "flaggedAttemptCount": 0,
      "notApplicableAttemptCount": 0,
      "missingAuditAttemptCount": 0,
      "skippedAuditAttemptCount": 0,
@@ -1648,7 +1648,7 @@
      "gradingErrorAttemptCount": 0,
      "invalidAuditAttemptCount": 0,
      "snapshotMismatchAttemptCount": 0,
-     "materializedAt": "2026-09-24T02:35:53.318576+00:00",
+     "materializedAt": "2026-09-25T03:19:56.911347+00:00",
      "gradingVersion": "v1",
      "graderConfigHash": "e3e86c5c130946ce",
      "reviewSources": [
@@ -1656,16 +1656,16 @@
        "judgeModel": "sonnet",
        "rubricId": "ca-bench-reward-hacking-v1",
        "auditSchemaVersion": 1,
-       "attemptCount": 35
+       "attemptCount": 42
       }
      ],
-     "rate": 0.005050505050505051
+     "rate": 0
     },
     "mean": {
-     "reward": 0.171717171717172,
-     "inputTokens": 40760107.72474747,
+     "reward": 0.212121212121212,
+     "inputTokens": 14964824.787878787,
      "cacheWriteTokens": 0,
-     "outputTokens": 493004.18434343435
+     "outputTokens": 205571.03535353535
     }
    }
   ],
@@ -1680,67 +1680,67 @@
    "hardStopRate": 0,
    "recoveredRate": 0
   },
-  "indexScore": 0.482993172759088,
+  "indexScore": 0.519259105470924,
   "mean": {
-   "reward": 0.482993172759088,
-   "costUsd": 3.467754041474145,
-   "agentWallTimeSec": 1098.202911991198,
-   "steps": 187.48954895489547,
-   "inputTokens": 16091465.103960397,
+   "reward": 0.519259105470924,
+   "costUsd": 5.047195443300332,
+   "agentWallTimeSec": 3689.3441947194724,
+   "steps": 173.36028602860284,
+   "inputTokens": 8387890.666666667,
    "cacheWriteTokens": 0,
-   "outputTokens": 145629.2480748075,
-   "cacheTokens": 15709288.80143016,
-   "cacheHitRate": 0.9661832360411203,
-   "totalTokens": 16237094.352035202
+   "outputTokens": 93230.86688668867,
+   "cacheTokens": 7968496.133333323,
+   "cacheHitRate": 0.9500000000000017,
+   "totalTokens": 8481121.533553353
   },
   "sums": {
-   "costUsd": 1050.7294745666659
+   "costUsd": 1529.30021932
   },
   "percentiles": {
    "costUsd": {
-    "p05": 0.6543826890539068,
-    "p25": 1.1450520823432337,
-    "p50": 1.6800104498349842,
-    "p75": 3.3331835402640264,
-    "p95": 11.812090951716167
+    "p05": 1.1201608924026403,
+    "p25": 2.1660128471864684,
+    "p50": 4.013249413745875,
+    "p75": 6.4578525155775575,
+    "p95": 11.098114784331683
    },
    "totalTokens": {
-    "p05": 2805937.5105610583,
-    "p25": 5191748.90649065,
-    "p50": 8172270.941694162,
-    "p75": 15773437.224972516,
-    "p95": 58864615.07931783
+    "p05": 1514640.538393838,
+    "p25": 3247568.457095711,
+    "p50": 6455899.625962595,
+    "p75": 11496187.961496139,
+    "p95": 19359817.106380656
    }
   },
   "versions": {
    "deep-swe-v1.1": {
     "min": {
-     "version": "1.0.2-R2040.1",
-     "dateReleased": "2026-09-02"
+     "version": "0.36.0",
+     "dateReleased": "2026-08-13"
     },
     "max": {
-     "version": "1.0.2-R2040.1",
-     "dateReleased": "2026-09-02"
+     "version": "0.36.1",
+     "dateReleased": "2026-08-14"
     }
    },
    "swe-atlas-qna": {
     "min": {
-     "version": "1.0.2-R2040.1",
-     "dateReleased": "2026-09-02"
+     "version": "0.26.0",
+     "dateReleased": "2026-07-16"
     },
     "max": {
-     "version": "1.0.2-R2040.1",
-     "dateReleased": "2026-09-02"
+     "version": "0.26.0",
+     "dateReleased": "2026-07-16"
     }
    },
    "terminal-bench-v4": {
     "min": {
-     "version": "1.0.2-R2040.1",
-     "dateReleased": "2026-09-02"
+     "version": "0.36.1",
+     "dateReleased": "2026-08-14"
     },
     "max": {
-     "version": "1.0.2-R2040.1",
-     "dateReleased": "2026-09-02"
+     "version": "0.36.1",
+     "dateReleased": "2026-08-14"
     }
    }
   }
@@ -1842,7 +1842,7 @@
      "gradingErrorAttemptCount": 0,
      "invalidAuditAttemptCount": 0,
      "snapshotMismatchAttemptCount": 0,
-     "materializedAt": "2026-09-24T02:35:53.318576+00:00",
+     "materializedAt": "2026-09-25T03:19:56.911347+00:00",
      "gradingVersion": "v1",
      "graderConfigHash": "e3e86c5c130946ce",
      "reviewSources": [
@@ -2036,7 +2036,7 @@
      "gradingErrorAttemptCount": 0,
      "invalidAuditAttemptCount": 0,
      "snapshotMismatchAttemptCount": 0,
-     "materializedAt": "2026-09-24T02:35:53.318576+00:00",
+     "materializedAt": "2026-09-25T03:19:56.911347+00:00",
      "gradingVersion": "v1",
      "graderConfigHash": "e3e86c5c130946ce",
      "reviewSources": [
@@ -2142,8 +2142,7 @@
   "hostModelSlug": "cognition_fusion-gpt-6-astra-xhigh-sidekick-penguin-medium",
   "display": {
    "agent": "Devin Fusion CLI",
-   "model": "GPT-6 Astra XHigh + SWE-2 Medium",
-   "creator": "$undefined"
+   "model": "GPT-6 Astra XHigh + SWE-2 Medium"
   },
   "displayLabel": "Devin Fusion CLI - GPT-6 Astra XHigh + SWE-2 Medium",
   "variantOf": null,
@@ -2227,7 +2226,7 @@
      "gradingErrorAttemptCount": 0,
      "invalidAuditAttemptCount": 0,
      "snapshotMismatchAttemptCount": 0,
-     "materializedAt": "2026-09-24T02:35:53.318576+00:00",
+     "materializedAt": "2026-09-25T03:19:56.911347+00:00",
      "gradingVersion": "v1",
      "graderConfigHash": "e3e86c5c130946ce",
      "reviewSources": [
@@ -2421,7 +2420,7 @@
      "gradingErrorAttemptCount": 0,
      "invalidAuditAttemptCount": 0,
      "snapshotMismatchAttemptCount": 0,
-     "materializedAt": "2026-09-24T02:35:53.318576+00:00",
+     "materializedAt": "2026-09-25T03:19:56.911347+00:00",
      "gradingVersion": "v1",
      "graderConfigHash": "e3e86c5c130946ce",
      "reviewSources": [
@@ -2527,8 +2526,7 @@
   "hostModelSlug": "cognition_fusion-claude-fable-5-1-xhigh-sidekick-penguin-medium",
   "display": {
    "agent": "Devin Fusion CLI",
-   "model": "Claude Fable 5.1 XHigh + SWE-2 Medium",
-   "creator": "$undefined"
+   "model": "Claude Fable 5.1 XHigh + SWE-2 Medium"
   },
   "displayLabel": "Devin Fusion CLI - Claude Fable 5.1 XHigh + SWE-2 Medium",
   "variantOf": null,
@@ -2612,7 +2610,7 @@
      "gradingErrorAttemptCount": 0,
      "invalidAuditAttemptCount": 0,
      "snapshotMismatchAttemptCount": 0,
-     "materializedAt": "2026-09-24T02:35:53.318576+00:00",
+     "materializedAt": "2026-09-25T03:19:56.911347+00:00",
      "gradingVersion": "v1",
      "graderConfigHash": "e3e86c5c130946ce",
      "reviewSources": [
@@ -2806,7 +2804,7 @@
      "gradingErrorAttemptCount": 0,
      "invalidAuditAttemptCount": 0,
      "snapshotMismatchAttemptCount": 0,
-     "materializedAt": "2026-09-24T02:35:53.318576+00:00",
+     "materializedAt": "2026-09-25T03:19:56.911347+00:00",
      "gradingVersion": "v1",
      "graderConfigHash": "e3e86c5c130946ce",
      "reviewSources": [
@@ -3000,7 +2998,7 @@
      "gradingErrorAttemptCount": 0,
      "invalidAuditAttemptCount": 0,
      "snapshotMismatchAttemptCount": 0,
-     "materializedAt": "2026-09-24T02:35:53.318576+00:00",
+     "materializedAt": "2026-09-25T03:19:56.911347+00:00",
      "gradingVersion": "v1",
      "graderConfigHash": "e3e86c5c130946ce",
      "reviewSources": [
@@ -3098,21 +3096,21 @@
   }
  },
  {
-  "id": "55b029d6971b4d378335bb168eb98b3b",
-  "isDefault": true,
+  "id": "cd60470c35fd626a116af80fd5915dfa",
+  "isDefault": false,
   "isHighlighted": false,
-  "agentName": "Kimi Code CLI",
-  "provider": "moonshotai",
-  "hostModelSlug": "moonshot_kimi-k3",
+  "agentName": "Muse Code 1.0.2 RC",
+  "provider": "meta",
+  "hostModelSlug": "meta_joyful-jello138",
   "display": {
-   "agent": "Kimi Code CLI",
-   "model": "Kimi K3",
+   "agent": "Muse Code",
+   "model": "Muse Spark 1.3 (xhigh)",
    "creator": {
-    "agent": "Moonshot AI",
-    "model": "Moonshot AI"
+    "agent": "Meta",
+    "model": "Meta"
    }
   },
-  "displayLabel": "Kimi Code CLI - Kimi K3",
+  "displayLabel": "Muse Code - Muse Spark 1.3 (xhigh)",
   "variantOf": null,
   "isUnavailable": false,
   "indexComponentCount": 3,
@@ -3136,10 +3134,10 @@
     },
     "rewardHacking": null,
     "mean": {
-     "reward": 0.684365781710915,
-     "inputTokens": 8571957.041297935,
+     "reward": 0.731563421828909,
+     "inputTokens": 15210161.250737464,
      "cacheWriteTokens": 0,
-     "outputTokens": 75080.34808259587
+     "outputTokens": 78929.04719764012
     }
    },
    {
@@ -3160,10 +3158,10 @@
     },
     "rewardHacking": null,
     "mean": {
-     "reward": 0.661290322580645,
-     "inputTokens": 4719526.534946237,
+     "reward": 0.545698924731183,
+     "inputTokens": 3764504.801075269,
      "cacheWriteTokens": 0,
-     "outputTokens": 49977.29838709677
+     "outputTokens": 21519.38440860215
     }
    },
    {
@@ -3184,9 +3182,9 @@
     },
     "rewardHacking": {
      "retainedAttemptCount": 198,
-     "passingAttemptCount": 42,
-     "reviewedAttemptCount": 42,
-     "flaggedAttemptCount": 0,
+     "passingAttemptCount": 35,
+     "reviewedAttemptCount": 35,
+     "flaggedAttemptCount": 1,
      "notApplicableAttemptCount": 0,
      "missingAuditAttemptCount": 0,
      "skippedAuditAttemptCount": 0,
@@ -3194,7 +3192,7 @@
      "gradingErrorAttemptCount": 0,
      "invalidAuditAttemptCount": 0,
      "snapshotMismatchAttemptCount": 0,
-     "materializedAt": "2026-09-24T02:35:53.318576+00:00",
+     "materializedAt": "2026-09-25T03:19:56.911347+00:00",
      "gradingVersion": "v1",
      "graderConfigHash": "e3e86c5c130946ce",
      "reviewSources": [
@@ -3202,16 +3200,16 @@
        "judgeModel": "sonnet",
        "rubricId": "ca-bench-reward-hacking-v1",
        "auditSchemaVersion": 1,
-       "attemptCount": 42
+       "attemptCount": 35
       }
      ],
-     "rate": 0
+     "rate": 0.005050505050505051
     },
     "mean": {
-     "reward": 0.212121212121212,
-     "inputTokens": 14964824.787878787,
+     "reward": 0.171717171717172,
+     "inputTokens": 40760107.72474747,
      "cacheWriteTokens": 0,
-     "outputTokens": 205571.03535353535
+     "outputTokens": 493004.18434343435
     }
    }
   ],
@@ -3226,67 +3224,67 @@
    "hardStopRate": 0,
    "recoveredRate": 0
   },
-  "indexScore": 0.519259105470924,
+  "indexScore": 0.482993172759088,
   "mean": {
-   "reward": 0.519259105470924,
-   "costUsd": 5.047195443300332,
-   "agentWallTimeSec": 3689.3441947194724,
-   "steps": 173.36028602860284,
-   "inputTokens": 8387890.666666667,
+   "reward": 0.482993172759088,
+   "costUsd": 3.467754041474145,
+   "agentWallTimeSec": 1098.202911991198,
+   "steps": 187.48954895489547,
+   "inputTokens": 16091465.103960397,
    "cacheWriteTokens": 0,
-   "outputTokens": 93230.86688668867,
-   "cacheTokens": 7968496.133333323,
-   "cacheHitRate": 0.9500000000000017,
-   "totalTokens": 8481121.533553353
+   "outputTokens": 145629.2480748075,
+   "cacheTokens": 15709288.80143016,
+   "cacheHitRate": 0.9661832360411203,
+   "totalTokens": 16237094.352035202
   },
   "sums": {
-   "costUsd": 1529.30021932
+   "costUsd": 1050.7294745666659
   },
   "percentiles": {
    "costUsd": {
-    "p05": 1.1201608924026403,
-    "p25": 2.1660128471864684,
-    "p50": 4.013249413745875,
-    "p75": 6.4578525155775575,
-    "p95": 11.098114784331683
+    "p05": 0.6543826890539068,
+    "p25": 1.1450520823432337,
+    "p50": 1.6800104498349842,
+    "p75": 3.3331835402640264,
+    "p95": 11.812090951716167
    },
    "totalTokens": {
-    "p05": 1514640.538393838,
-    "p25": 3247568.457095711,
-    "p50": 6455899.625962595,
-    "p75": 11496187.961496139,
-    "p95": 19359817.106380656
+    "p05": 2805937.5105610583,
+    "p25": 5191748.90649065,
+    "p50": 8172270.941694162,
+    "p75": 15773437.224972516,
+    "p95": 58864615.07931783
    }
   },
   "versions": {
    "deep-swe-v1.1": {
     "min": {
-     "version": "0.36.0",
-     "dateReleased": "2026-08-13"
+     "version": "1.0.2-R2040.1",
+     "dateReleased": "2026-09-02"
     },
     "max": {
-     "version": "0.36.1",
-     "dateReleased": "2026-08-14"
+     "version": "1.0.2-R2040.1",
+     "dateReleased": "2026-09-02"
     }
    },
    "swe-atlas-qna": {
     "min": {
-     "version": "0.26.0",
-     "dateReleased": "2026-07-16"
+     "version": "1.0.2-R2040.1",
+     "dateReleased": "2026-09-02"
     },
     "max": {
-     "version": "0.26.0",
-     "dateReleased": "2026-07-16"
+     "version": "1.0.2-R2040.1",
+     "dateReleased": "2026-09-02"
     }
    },
    "terminal-bench-v4": {
     "min": {
-     "version": "0.36.1",
-     "dateReleased": "2026-08-14"
+     "version": "1.0.2-R2040.1",
+     "dateReleased": "2026-09-02"
     },
     "max": {
-     "version": "0.36.1",
-     "dateReleased": "2026-08-14"
+     "version": "1.0.2-R2040.1",
+     "dateReleased": "2026-09-02"
     }
    }
   }
@@ -3388,7 +3386,7 @@
      "gradingErrorAttemptCount": 0,
      "invalidAuditAttemptCount": 0,
      "snapshotMismatchAttemptCount": 0,
-     "materializedAt": "2026-09-24T02:35:53.318576+00:00",
+     "materializedAt": "2026-09-25T03:19:56.911347+00:00",
      "gradingVersion": "v1",
      "graderConfigHash": "e3e86c5c130946ce",
      "reviewSources": [
@@ -3582,7 +3580,7 @@
      "gradingErrorAttemptCount": 0,
      "invalidAuditAttemptCount": 0,
      "snapshotMismatchAttemptCount": 0,
-     "materializedAt": "2026-09-24T02:35:53.318576+00:00",
+     "materializedAt": "2026-09-25T03:19:56.911347+00:00",
      "gradingVersion": "v1",
      "graderConfigHash": "e3e86c5c130946ce",
      "reviewSources": [
@@ -3776,7 +3774,7 @@
      "gradingErrorAttemptCount": 0,
      "invalidAuditAttemptCount": 0,
      "snapshotMismatchAttemptCount": 0,
-     "materializedAt": "2026-09-24T02:35:53.318576+00:00",
+     "materializedAt": "2026-09-25T03:19:56.911347+00:00",
      "gradingVersion": "v1",
      "graderConfigHash": "e3e86c5c130946ce",
      "reviewSources": [
