@@ -55449,7 +55449,7 @@
    "type": "firstParty",
    "providerName": "OpenAI"
   },
-  "hostModelCount": 6,
+  "hostModelCount": 7,
   "creator": {
    "id": "e67e56e3-15cd-43db-b679-da4660a69f41",
    "slug": "openai",
@@ -95917,7 +95917,7 @@
    "type": "firstParty",
    "providerName": "OpenAI"
   },
-  "hostModelCount": 6,
+  "hostModelCount": 7,
   "creator": {
    "id": "e67e56e3-15cd-43db-b679-da4660a69f41",
    "slug": "openai",
