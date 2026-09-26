@@ -1754,7 +1754,8 @@
   "hostModelSlug": "cognition_fusion-gpt-6-astra-xhigh-sidekick-penguin-medium",
   "display": {
    "agent": "Devin Fusion CLI",
-   "model": "GPT-6 Astra XHigh + SWE-2 Medium"
+   "model": "GPT-6 Astra XHigh + SWE-2 Medium",
+   "creator": "$undefined"
   },
   "displayLabel": "Devin Fusion CLI - GPT-6 Astra XHigh + SWE-2 Medium",
   "variantOf": null,
@@ -2138,7 +2139,8 @@
   "hostModelSlug": "cognition_fusion-claude-fable-5-1-xhigh-sidekick-penguin-medium",
   "display": {
    "agent": "Devin Fusion CLI",
-   "model": "Claude Fable 5.1 XHigh + SWE-2 Medium"
+   "model": "Claude Fable 5.1 XHigh + SWE-2 Medium",
+   "creator": "$undefined"
   },
   "displayLabel": "Devin Fusion CLI - Claude Fable 5.1 XHigh + SWE-2 Medium",
   "variantOf": null,
