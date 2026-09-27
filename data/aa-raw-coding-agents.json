@@ -40,7 +40,6 @@
     "mean": {
      "reward": 0.716814159292036,
      "inputTokens": 13526615.77581121,
-     "cacheWriteTokens": 0,
      "outputTokens": 122491.69026548673
     }
    },
@@ -64,7 +63,6 @@
     "mean": {
      "reward": 0.594086021505376,
      "inputTokens": 4493624.8655913975,
-     "cacheWriteTokens": 0,
      "outputTokens": 23615.916666666668
     }
    },
@@ -112,7 +110,6 @@
     "mean": {
      "reward": 0.318181818181818,
      "inputTokens": 43900184.35858586,
-     "cacheWriteTokens": 0,
      "outputTokens": 955492.9924242424
     }
    }
@@ -135,7 +132,6 @@
    "agentWallTimeSec": 1106.8533531353135,
    "steps": 185.23817381738175,
    "inputTokens": 16445971.068206819,
-   "cacheWriteTokens": 0,
    "outputTokens": 263473.5055005501,
    "cacheTokens": 16090656.487898799,
    "cacheHitRate": 0.9712826195905685,
@@ -234,7 +230,6 @@
     "mean": {
      "reward": 0.657817109144543,
      "inputTokens": 16400687.365781711,
-     "cacheWriteTokens": null,
      "outputTokens": 148259.0501474926
     }
    },
@@ -258,7 +253,6 @@
     "mean": {
      "reward": 0.451612903225807,
      "inputTokens": 9020406.623655913,
-     "cacheWriteTokens": null,
      "outputTokens": 58109
     }
    },
@@ -306,7 +300,6 @@
     "mean": {
      "reward": 0.146464646464646,
      "inputTokens": 16468964.714646464,
-     "cacheWriteTokens": null,
      "outputTokens": 168736.55303030304
     }
    }
@@ -329,7 +322,6 @@
    "agentWallTimeSec": 702.7110253025301,
    "steps": 188.4884488448845,
    "inputTokens": 13395246.748624865,
-   "cacheWriteTokens": null,
    "outputTokens": 115826.40649064905,
    "cacheTokens": 11871691.682068229,
    "cacheHitRate": 0.8697428234581179,
@@ -428,7 +420,6 @@
     "mean": {
      "reward": 0.690265486725664,
      "inputTokens": 9754196.967551623,
-     "cacheWriteTokens": 174583.98820058996,
      "outputTokens": 70300.33038348083
     }
    },
@@ -452,7 +443,6 @@
     "mean": {
      "reward": 0.575268817204301,
      "inputTokens": 6133614.827956989,
-     "cacheWriteTokens": 161604.0376344086,
      "outputTokens": 37933.720430107525
     }
    },
@@ -500,7 +490,6 @@
     "mean": {
      "reward": 0.434343434343434,
      "inputTokens": 16668544.737373738,
-     "cacheWriteTokens": 213188.60606060605,
      "outputTokens": 93810.5303030303
     }
    }
@@ -523,7 +512,6 @@
    "agentWallTimeSec": 1338.0527051705185,
    "steps": 86.55005500550054,
    "inputTokens": 9778602.140814083,
-   "cacheWriteTokens": 177680.98789878987,
    "outputTokens": 62175.62266226623,
    "cacheTokens": 9598928.887788778,
    "cacheHitRate": 0.9640119921972632,
@@ -622,7 +610,6 @@
     "mean": {
      "reward": 0.675516224188791,
      "inputTokens": 3338101.7050147494,
-     "cacheWriteTokens": 149223.0029498525,
      "outputTokens": 56420.18289085546
     }
    },
@@ -646,7 +633,6 @@
     "mean": {
      "reward": 0.618279569892473,
      "inputTokens": 2623791.1885245903,
-     "cacheWriteTokens": 143514.26912568306,
      "outputTokens": 28534.494535519127
     }
    },
@@ -694,7 +680,6 @@
     "mean": {
      "reward": 0.555555555555555,
      "inputTokens": 4503151.8838383835,
-     "cacheWriteTokens": 197441.8686868687,
      "outputTokens": 65844.76262626263
     }
    }
@@ -717,7 +702,6 @@
    "agentWallTimeSec": 1762.0330264026397,
    "steps": 39.378437843784376,
    "inputTokens": 3299549.915435806,
-   "cacheWriteTokens": 157389.87471370088,
    "outputTokens": 47061.09677361179,
    "cacheTokens": 3141588.9050659174,
    "cacheHitRate": 0.9335591564904552,
@@ -816,7 +800,6 @@
     "mean": {
      "reward": 0.725663716814159,
      "inputTokens": 14656743.734513273,
-     "cacheWriteTokens": null,
      "outputTokens": 152948.2005899705
     }
    },
@@ -840,7 +823,6 @@
     "mean": {
      "reward": 0.629032258064516,
      "inputTokens": 7966825.954301075,
-     "cacheWriteTokens": null,
      "outputTokens": 57168.37634408602
     }
    },
@@ -888,7 +870,6 @@
     "mean": {
      "reward": 0.333333333333333,
      "inputTokens": 25135458.641414143,
-     "cacheWriteTokens": null,
      "outputTokens": 196677.30303030304
     }
    }
@@ -911,7 +892,6 @@
    "agentWallTimeSec": 2354.367686468646,
    "steps": 162.64576457645765,
    "inputTokens": 14201447.955995597,
-   "cacheWriteTokens": null,
    "outputTokens": 123276.32783278328,
    "cacheTokens": 13550056.765676552,
    "cacheHitRate": 0.938882976190201,
@@ -1010,7 +990,6 @@
     "mean": {
      "reward": 0.64306784660767,
      "inputTokens": 6428754.772861357,
-     "cacheWriteTokens": 427534.0796460177,
      "outputTokens": 155542.35398230088
     }
    },
@@ -1034,7 +1013,6 @@
     "mean": {
      "reward": 0.647849462365591,
      "inputTokens": 3623187.8387096776,
-     "cacheWriteTokens": 225089.60483870967,
      "outputTokens": 81143.10752688172
     }
    },
@@ -1082,7 +1060,6 @@
     "mean": {
      "reward": 0.575757575757576,
      "inputTokens": 7810711.565656566,
-     "cacheWriteTokens": 556772.9191919192,
      "outputTokens": 194732.47474747474
     }
    }
@@ -1105,7 +1082,6 @@
    "agentWallTimeSec": 2089.900125412543,
    "steps": 36.65676567656766,
    "inputTokens": 5581622.259625964,
-   "cacheWriteTokens": 372836.5500550055,
    "outputTokens": 133631.59955995603,
    "cacheTokens": 5205555.651265128,
    "cacheHitRate": 0.9159555838702423,
@@ -1204,7 +1180,6 @@
     "mean": {
      "reward": 0.684365781710915,
      "inputTokens": 15895334.887905605,
-     "cacheWriteTokens": 752507.1474926254,
      "outputTokens": 406479.005899705
     }
    },
@@ -1228,7 +1203,6 @@
     "mean": {
      "reward": 0.663978494623656,
      "inputTokens": 14842420.086021505,
-     "cacheWriteTokens": 448827.7150537634,
      "outputTokens": 214788.37634408602
     }
    },
@@ -1276,7 +1250,6 @@
     "mean": {
      "reward": 0.631313131313131,
      "inputTokens": 14764903.207070706,
-     "cacheWriteTokens": 780847.601010101,
      "outputTokens": 430101.28282828286
     }
    }
@@ -1299,7 +1272,6 @@
    "agentWallTimeSec": 3867.0923410341024,
    "steps": 155.0957095709571,
    "inputTokens": 15218206.418041805,
-   "cacheWriteTokens": 634402.2640264026,
    "outputTokens": 333176.801980198,
    "cacheTokens": 14568923.550055025,
    "cacheHitRate": 0.9500106599458848,
@@ -1398,7 +1370,6 @@
     "mean": {
      "reward": 0.613569321533923,
      "inputTokens": 16638607.92920354,
-     "cacheWriteTokens": 0,
      "outputTokens": 75199.58702064896
     }
    },
@@ -1422,7 +1393,6 @@
     "mean": {
      "reward": 0.594086021505376,
      "inputTokens": 6141052.228494624,
-     "cacheWriteTokens": 0,
      "outputTokens": 28542.190860215054
     }
    },
@@ -1470,7 +1440,6 @@
     "mean": {
      "reward": 0.398989898989899,
      "inputTokens": 25175801.106060605,
-     "cacheWriteTokens": 0,
      "outputTokens": 158541.98484848483
     }
    }
@@ -1493,7 +1462,6 @@
    "agentWallTimeSec": 2887.9556523652373,
    "steps": 107.04950495049505,
    "inputTokens": 14202165.166116614,
-   "cacheWriteTokens": 0,
    "outputTokens": 74259.26072607259,
    "cacheTokens": 14007356.268426869,
    "cacheHitRate": 0.9745705628087887,
@@ -1592,7 +1560,6 @@
     "mean": {
      "reward": 0.542772861356932,
      "inputTokens": 18697668.702064898,
-     "cacheWriteTokens": null,
      "outputTokens": 97092.21238938053
     }
    },
@@ -1616,7 +1583,6 @@
     "mean": {
      "reward": 0.513440860215054,
      "inputTokens": 8160643.36827957,
-     "cacheWriteTokens": null,
      "outputTokens": 35348.784946236556
     }
    },
@@ -1664,7 +1630,6 @@
     "mean": {
      "reward": 0.106060606060606,
      "inputTokens": 22757591.373737372,
-     "cacheWriteTokens": null,
      "outputTokens": 136457.94949494948
     }
    }
@@ -1687,7 +1652,6 @@
    "agentWallTimeSec": 1097.0404400440034,
    "steps": 121.66666666666667,
    "inputTokens": 15269826.30913091,
-   "cacheWriteTokens": null,
    "outputTokens": 80398.9900990099,
    "cacheTokens": 15142136.818481851,
    "cacheHitRate": 0.9869993314104538,
@@ -1786,7 +1750,6 @@
     "mean": {
      "reward": 0.63716814159292,
      "inputTokens": 12385746.131268436,
-     "cacheWriteTokens": 226418.24926253688,
      "outputTokens": 108271.5634218289
     }
    },
@@ -1810,7 +1773,6 @@
     "mean": {
      "reward": 0.443548387096774,
      "inputTokens": 5786509.854838709,
-     "cacheWriteTokens": 171312.1935483871,
      "outputTokens": 53341.779569892475
     }
    },
@@ -1858,7 +1820,6 @@
     "mean": {
      "reward": 0.151515151515152,
      "inputTokens": 14381227.393939395,
-     "cacheWriteTokens": 305330.9595959596,
      "outputTokens": 165884.42424242425
     }
    }
@@ -1881,7 +1842,6 @@
    "agentWallTimeSec": 1285.9268514851478,
    "steps": 88.64301430143014,
    "inputTokens": 10119727.864136413,
-   "cacheWriteTokens": 221055.50330033002,
    "outputTokens": 98341.38393839383,
    "cacheTokens": 9897312.69911991,
    "cacheHitRate": 0.9606438143896164,
@@ -1976,7 +1936,6 @@
     "mean": {
      "reward": 0.672566371681416,
      "inputTokens": 10312445.209439527,
-     "cacheWriteTokens": 127106.27138643067,
      "outputTokens": 83838.11799410029
     }
    },
@@ -2000,7 +1959,6 @@
     "mean": {
      "reward": 0.594086021505376,
      "inputTokens": 2112115.313172043,
-     "cacheWriteTokens": 126197.9126344086,
      "outputTokens": 23623.837365591397
     }
    },
@@ -2048,7 +2006,6 @@
     "mean": {
      "reward": 0.5,
      "inputTokens": 6001673.575757576,
-     "cacheWriteTokens": 134167.62121212122,
      "outputTokens": 71827.65656565657
     }
    }
@@ -2071,7 +2028,6 @@
    "agentWallTimeSec": 1481.89598019802,
    "steps": 78.55115511551155,
    "inputTokens": 6017554.665016501,
-   "cacheWriteTokens": 128272.64961496148,
    "outputTokens": 56579.83003300329,
    "cacheTokens": 5695796.99229923,
    "cacheHitRate": 0.920061132172241,
@@ -2170,7 +2126,6 @@
     "mean": {
      "reward": 0.510324483775811,
      "inputTokens": 10307762.331858408,
-     "cacheWriteTokens": 237687.26253687317,
      "outputTokens": 104418.39233038347
     }
    },
@@ -2194,7 +2149,6 @@
     "mean": {
      "reward": 0.620967741935484,
      "inputTokens": 5159227.653225807,
-     "cacheWriteTokens": 127447.58333333333,
      "outputTokens": 45811.73655913978
     }
    },
@@ -2242,7 +2196,6 @@
     "mean": {
      "reward": 0.166666666666667,
      "inputTokens": 12143161.925641026,
-     "cacheWriteTokens": 649710.3512820513,
      "outputTokens": 223315.56923076924
     }
    }
@@ -2265,7 +2218,6 @@
    "agentWallTimeSec": 3784.416073707372,
    "steps": 110.03670136244394,
    "inputTokens": 8600561.252779894,
-   "cacheWriteTokens": 282320.27783701447,
    "outputTokens": 106332.54533299482,
    "cacheTokens": 8290829.75631717,
    "cacheHitRate": 0.9507113544554301,
@@ -2360,7 +2312,6 @@
     "mean": {
      "reward": 0.631268436578171,
      "inputTokens": 10080280.292035399,
-     "cacheWriteTokens": 165017.7551622419,
      "outputTokens": 111599.9557522124
     }
    },
@@ -2384,7 +2335,6 @@
     "mean": {
      "reward": 0.658602150537635,
      "inputTokens": 5492119.514784946,
-     "cacheWriteTokens": 118952.6626344086,
      "outputTokens": 55827.5685483871
     }
    },
@@ -2432,7 +2382,6 @@
     "mean": {
      "reward": 0.560606060606061,
      "inputTokens": 16451944.767676767,
-     "cacheWriteTokens": 251254.7702020202,
      "outputTokens": 167921.75252525252
     }
    }
@@ -2455,7 +2404,6 @@
    "agentWallTimeSec": 2146.9920896589642,
    "steps": 99.53135313531354,
    "inputTokens": 9590504.44719472,
-   "cacheWriteTokens": 164950.33443344335,
    "outputTokens": 101043.72662266226,
    "cacheTokens": 9279592.760176014,
    "cacheHitRate": 0.9584900963367992,
@@ -2554,7 +2502,6 @@
     "mean": {
      "reward": 0.722713864306785,
      "inputTokens": 10907777.09439528,
-     "cacheWriteTokens": 172328.92625368733,
      "outputTokens": 56943.890855457226
     }
    },
@@ -2578,7 +2525,6 @@
     "mean": {
      "reward": 0.540322580645161,
      "inputTokens": 7898018.697580645,
-     "cacheWriteTokens": 120494,
      "outputTokens": 31499.083333333332
     }
    },
@@ -2626,7 +2572,6 @@
     "mean": {
      "reward": 0.373737373737374,
      "inputTokens": 12950366.515151516,
-     "cacheWriteTokens": 204088.7095959596,
      "outputTokens": 68992.93181818182
     }
    }
@@ -2649,7 +2594,6 @@
    "agentWallTimeSec": 1237.696445544555,
    "steps": 116.39493949394938,
    "inputTokens": 10120981.254675467,
-   "cacheWriteTokens": 158033.92574257427,
    "outputTokens": 49155.37788778878,
    "cacheTokens": 9784083.974697473,
    "cacheHitRate": 0.9458037017976718,
@@ -2748,7 +2692,6 @@
     "mean": {
      "reward": 0.625368731563422,
      "inputTokens": 13358102.041297935,
-     "cacheWriteTokens": 269934.39823008847,
      "outputTokens": 129793.94690265486
     }
    },
@@ -2772,7 +2715,6 @@
     "mean": {
      "reward": 0.620967741935484,
      "inputTokens": 7586223.970430108,
-     "cacheWriteTokens": 143245.69086021505,
      "outputTokens": 61960.48924731183
     }
    },
@@ -2820,7 +2762,6 @@
     "mean": {
      "reward": 0.545454545454545,
      "inputTokens": 14469933.381313132,
-     "cacheWriteTokens": 672466.7929292929,
      "outputTokens": 288742.0505050505
     }
    }
@@ -2843,7 +2784,6 @@
    "agentWallTimeSec": 2515.540235973597,
    "steps": 152.13036303630363,
    "inputTokens": 11238194.40979098,
-   "cacheWriteTokens": 305768.51815181517,
    "outputTokens": 136656.0792079208,
    "cacheTokens": 10929014.04565457,
    "cacheHitRate": 0.9698258997320075,
@@ -2942,7 +2882,6 @@
     "mean": {
      "reward": 0.731563421828909,
      "inputTokens": 15210161.250737464,
-     "cacheWriteTokens": 0,
      "outputTokens": 78929.04719764012
     }
    },
@@ -2966,7 +2905,6 @@
     "mean": {
      "reward": 0.545698924731183,
      "inputTokens": 3764504.801075269,
-     "cacheWriteTokens": 0,
      "outputTokens": 21519.38440860215
     }
    },
@@ -3014,7 +2952,6 @@
     "mean": {
      "reward": 0.171717171717172,
      "inputTokens": 40760107.72474747,
-     "cacheWriteTokens": 0,
      "outputTokens": 493004.18434343435
     }
    }
@@ -3037,7 +2974,6 @@
    "agentWallTimeSec": 1098.202911991198,
    "steps": 187.48954895489547,
    "inputTokens": 16091465.103960397,
-   "cacheWriteTokens": 0,
    "outputTokens": 145629.2480748075,
    "cacheTokens": 15709288.80143016,
    "cacheHitRate": 0.9661832360411203,
@@ -3136,7 +3072,6 @@
     "mean": {
      "reward": 0.684365781710915,
      "inputTokens": 8571957.041297935,
-     "cacheWriteTokens": 0,
      "outputTokens": 75080.34808259587
     }
    },
@@ -3160,7 +3095,6 @@
     "mean": {
      "reward": 0.661290322580645,
      "inputTokens": 4719526.534946237,
-     "cacheWriteTokens": 0,
      "outputTokens": 49977.29838709677
     }
    },
@@ -3208,7 +3142,6 @@
     "mean": {
      "reward": 0.212121212121212,
      "inputTokens": 14964824.787878787,
-     "cacheWriteTokens": 0,
      "outputTokens": 205571.03535353535
     }
    }
@@ -3231,7 +3164,6 @@
    "agentWallTimeSec": 3689.3441947194724,
    "steps": 173.36028602860284,
    "inputTokens": 8387890.666666667,
-   "cacheWriteTokens": 0,
    "outputTokens": 93230.86688668867,
    "cacheTokens": 7968496.133333323,
    "cacheHitRate": 0.9500000000000017,
@@ -3330,7 +3262,6 @@
     "mean": {
      "reward": 0.648967551622419,
      "inputTokens": 6323126.3598820055,
-     "cacheWriteTokens": null,
      "outputTokens": 69583.08554572272
     }
    },
@@ -3354,7 +3285,6 @@
     "mean": {
      "reward": 0.583333333333333,
      "inputTokens": 2992096.1370967743,
-     "cacheWriteTokens": null,
      "outputTokens": 26161.698924731183
     }
    },
@@ -3402,7 +3332,6 @@
     "mean": {
      "reward": 0.176767676767677,
      "inputTokens": 8745920.277777778,
-     "cacheWriteTokens": null,
      "outputTokens": 88596.601010101
     }
    }
@@ -3425,7 +3354,6 @@
    "agentWallTimeSec": 1167.3387480748086,
    "steps": 112.06160616061608,
    "inputTokens": 5487669.762376238,
-   "cacheWriteTokens": null,
    "outputTokens": 55954.83498349835,
    "cacheTokens": 5160616.836083612,
    "cacheHitRate": 0.9057792630165156,
@@ -3524,7 +3452,6 @@
     "mean": {
      "reward": 0.663716814159292,
      "inputTokens": 16195750.386430679,
-     "cacheWriteTokens": 227126.1622418879,
      "outputTokens": 75781.00294985251
     }
    },
@@ -3548,7 +3475,6 @@
     "mean": {
      "reward": 0.486559139784946,
      "inputTokens": 7864729.142473118,
-     "cacheWriteTokens": 198277.96774193548,
      "outputTokens": 31795.564516129034
     }
    },
@@ -3596,7 +3522,6 @@
     "mean": {
      "reward": 0.146464646464646,
      "inputTokens": 25363172.36868687,
-     "cacheWriteTokens": 363449.6919191919,
      "outputTokens": 137870.4292929293
     }
    }
@@ -3619,7 +3544,6 @@
    "agentWallTimeSec": 1412.260883388339,
    "steps": 121.51375137513753,
    "inputTokens": 14783219.74807481,
-   "cacheWriteTokens": 245014.53465346535,
    "outputTokens": 71304.79097909792,
    "cacheTokens": 14535765.897689763,
    "cacheHitRate": 0.971880328680834,
@@ -3718,7 +3642,6 @@
     "mean": {
      "reward": 0.572271386430678,
      "inputTokens": 21857745.433628317,
-     "cacheWriteTokens": null,
      "outputTokens": 116676.62241887905
     }
    },
@@ -3742,7 +3665,6 @@
     "mean": {
      "reward": 0.618279569892473,
      "inputTokens": 9901327.01075269,
-     "cacheWriteTokens": null,
      "outputTokens": 46364.06182795699
     }
    },
@@ -3790,7 +3712,6 @@
     "mean": {
      "reward": 0.101010101010101,
      "inputTokens": 54448314.87373737,
-     "cacheWriteTokens": null,
      "outputTokens": 247887.35606060605
     }
    }
@@ -3813,7 +3734,6 @@
    "agentWallTimeSec": 2417.5500099009905,
    "steps": 138.14631463146316,
    "inputTokens": 24063625.627062704,
-   "cacheWriteTokens": null,
    "outputTokens": 116482.400990099,
    "cacheTokens": 23948932.43564355,
    "cacheHitRate": 0.9898485564269163,
