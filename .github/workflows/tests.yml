@@ -1,7 +1,8 @@
 name: tests
 
-# The suite that guards the published page: 10 unittest TestCases, half of
-# them driving the built HTML in a real headless Chromium through playwright.
+# The suite that guards the published page. Its browser file,
+# tests/test_browser.py, drives the built HTML in a real headless Chromium
+# through playwright.
 #
 # TWO JOBS, split on purpose. `suites` is a 3-OS x 3-Python matrix running the
 # non-browser suite on every cell — that is what buys portability coverage of
@@ -14,7 +15,8 @@ name: tests
 # misses. The coverage job installs playwright and Chromium; the matrix job
 # does not. That asymmetry is deliberate.
 #
-# THE RUNNER IS ALWAYS THE `-m` FORM — `python -m pytest`, NOT `pytest`, AND
+# THE RUNNER IS ALWAYS THE `-m` FORM — `python -m pytest`, which the coverage
+# job spells `python3 -m pytest` — NOT `pytest`, AND
 # NOT `unittest discover`. tests/ has no __init__.py and the tests `import
 # build` from the repo root, so the root has to be on sys.path. Only the `-m`
 # form puts the cwd there — the bare `pytest` binary collects the same files
