@@ -35,6 +35,7 @@
 /.github/*
 !/.github/dependabot.yml
 !/.github/PULL_REQUEST_TEMPLATE.md
+!/.github/ci-thresholds.json
 !/.github/ISSUE_TEMPLATE/
 /.github/ISSUE_TEMPLATE/*
 !/.github/ISSUE_TEMPLATE/*.md
@@ -58,6 +59,11 @@
 !/scripts/
 /scripts/*
 !/scripts/*.py
+
+# ---- scripts/ci/ — the coverage ratchet tooling ----------------------------
+!/scripts/ci/
+/scripts/ci/*
+!/scripts/ci/*.py
 
 # ---- tests/ ----------------------------------------------------------------
 !/tests/
