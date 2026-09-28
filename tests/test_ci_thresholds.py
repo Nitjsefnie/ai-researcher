@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import os
 import subprocess
 import sys
 from decimal import Decimal
@@ -342,6 +343,8 @@ def test_unknown_language_in_coverage_cli_lookup(tmp_path):
         thresholds.coverage(thresholds.load(target), "ruby")
 
 
+@pytest.mark.skipif(os.name == "nt", reason="Windows stat carries no POSIX "
+                    "permission bits")
 def test_write_preserves_the_target_mode(tmp_path):
     target = tmp_path / "ci-thresholds.json"
     target.write_bytes(b"{}\n")
