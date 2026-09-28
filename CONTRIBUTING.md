@@ -111,7 +111,7 @@ reachable through those tests, so a change to the emitted JavaScript needs one.
 
 ## CI
 
-Seven workflows run. Six of them you can run locally:
+Eight workflows run. Five of them you can run locally:
 
 ```sh
 python3 -m pytest -q                                             # tests
@@ -133,9 +133,12 @@ and cannot speak to: `build.py`
 is ~1400 lines but only ~100 statements, because most of it is HTML, CSS and
 JavaScript in string literals. The browser tests are what cover those.
 
-The seventh, `codeql`, needs GitHub: it is gated on repository visibility,
-because code scanning is free on public repositories and needs Code Security on
-private ones.
+Three run only on GitHub. `codeql` is gated on repository visibility, because
+code scanning is free on public repositories and needs Code Security on private
+ones. `refresh` is the hourly capture → commit → publish of the page. `claim`
+watches issue comments: `/claim` assigns the commenter to an unassigned open
+issue, and `/unclaim` and `/release` remove the commenter's own assignment —
+self-service issue claiming for contributors without write access.
 
 **Actions are hash-pinned**, with the version in a trailing comment. Do not
 "tidy" one back to `@v4`: a tag is a moving pointer, and these jobs hold a
