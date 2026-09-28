@@ -100,7 +100,9 @@ def leaves(value, parts=None, out=None):
     an added key.
     """
     if parts is None:
-        parts, out = [], {}
+        parts = []
+    if out is None:
+        out = {}
     if not isinstance(value, dict) or not value:
         out[_key_path(parts)] = value
         return out
@@ -189,7 +191,9 @@ def coverage_relaxations(base, head):
 
 
 def _git(cwd, args):
-    return subprocess.run(
+    # The returncode is inspected by every caller, so check=False is the
+    # deliberate shape here.
+    return subprocess.run(  # pylint: disable=subprocess-run-check
         ['git', *args], cwd=str(cwd), capture_output=True, text=True)
 
 

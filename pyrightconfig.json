@@ -13,6 +13,7 @@
     ],
     "extraPaths": [
         ".",
-        "scripts"
+        "scripts",
+        "scripts/ci"
     ]
 }

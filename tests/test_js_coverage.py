@@ -17,13 +17,14 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts" / "ci"))
 
-from js_coverage import (  # noqa: E402
+from js_coverage import (  # pylint: disable=wrong-import-position  # noqa: E402
     collect_coverage,
+    main,
     merge_records,
     page_script,
     render_markdown,
 )
-from js_lines import code_lines  # noqa: E402
+from js_lines import code_lines  # noqa: E402  # pylint: disable=wrong-import-position
 
 BODY = (
     "const a = 1;\n"
@@ -211,7 +212,6 @@ def test_collect_refuses_a_dump_that_is_not_an_array(tmp_path):
 def test_cli_total_format_is_machine_readable(tmp_path, capsys):
     _page(tmp_path)
     dump = _write_dump(tmp_path, [_record()])
-    from js_coverage import main
     assert main([str(dump), "--root", str(tmp_path), "--format=total"]) == 0
     assert capsys.readouterr().out == "100.0\n"
 
@@ -222,7 +222,6 @@ def test_cli_renders_the_page_row_and_attribution(tmp_path, capsys):
         _record(ranges=[{"startOffset": 0, "endOffset": 14, "count": 1}]),
         _record(source="unrelated", url="node:child_process"),
     ])
-    from js_coverage import main
     assert main([str(dump), "--root", str(tmp_path)]) == 0
     assert capsys.readouterr().out == (
         "| Name | Covered | Total | Cover |\n"
@@ -239,7 +238,6 @@ def test_cli_fail_under_above_measured_fails(tmp_path, capsys):
     dump = _write_dump(tmp_path, [
         _record(ranges=[{"startOffset": 0, "endOffset": 14, "count": 1}]),
     ])
-    from js_coverage import main
     code = main([str(dump), "--root", str(tmp_path), "--format=total",
                  "--fail-under", "50.1"])
     assert code == 2
@@ -251,7 +249,6 @@ def test_cli_fail_under_above_measured_fails(tmp_path, capsys):
 def test_cli_fail_under_at_or_below_measured_passes(tmp_path, capsys):
     _page(tmp_path)
     dump = _write_dump(tmp_path, [_record()])
-    from js_coverage import main
     code = main([str(dump), "--root", str(tmp_path), "--format=total",
                  "--fail-under", "100.0"])
     assert code == 0
