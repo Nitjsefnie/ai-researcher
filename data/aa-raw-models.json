@@ -24436,8 +24436,8 @@
   "modelCreatorColor": "#ff7018",
   "modelCreatorLogo": "/img/logos/alibaba.svg",
   "contextWindowTokens": 262144,
-  "intelligenceIndex": 13.6541001649716,
-  "intelligenceIndexIsEstimated": true,
+  "intelligenceIndex": 11.1961650827156,
+  "intelligenceIndexIsEstimated": false,
   "omniscience": -53.46666666666667,
   "omniscienceAccuracy": 0.16416666666666666,
   "omniscienceNonHallucination": 0.1639082751744766,
@@ -24457,7 +24457,60 @@
   "apexAgents": null,
   "itbenchSre": null,
   "mmmuPro": 0.692485549132948,
-  "intelligenceIndexCostPerTask": "$undefined",
+  "intelligenceIndexCostPerTask": {
+   "cost": {
+    "total": 0.21257844933934256,
+    "input": 0.20559965373578074,
+    "nonCacheInput": 0.0019204910362781514,
+    "cacheRead": 0,
+    "cacheWrite": 0.2036791626995026,
+    "output": 0.006978795603561866,
+    "reasoning": 0.003968795263090511,
+    "answer": 0.003010000340471354
+   },
+   "evaluations": [
+    {
+     "slug": "aa-briefcase",
+     "weightedCostPerTask": 0.036478869090659345
+    },
+    {
+     "slug": "gdpval-aa",
+     "weightedCostPerTask": 0.061588715636363645
+    },
+    {
+     "slug": "automationbench-aa",
+     "weightedCostPerTask": 0.004698548325722984
+    },
+    {
+     "slug": "terminalbench-4-0",
+     "weightedCostPerTask": 0.10498508090909092
+    },
+    {
+     "slug": "scicode",
+     "weightedCostPerTask": 0.00017788336458333335
+    },
+    {
+     "slug": "humanitys-last-exam",
+     "weightedCostPerTask": 0.0009007684754402224
+    },
+    {
+     "slug": "gdp-pdf",
+     "weightedCostPerTask": 0.0014299320050000003
+    },
+    {
+     "slug": "critpt",
+     "weightedCostPerTask": 0.001176173242857143
+    },
+    {
+     "slug": "omniscience",
+     "weightedCostPerTask": 0.00041337722962500004
+    },
+    {
+     "slug": "artificial-analysis-long-context-reasoning",
+     "weightedCostPerTask": 0.00072910106
+    }
+   ]
+  },
   "price1mInputTokens": 0.135,
   "price1mOutputTokens": 0.2,
   "cacheHitPrice": null,
@@ -24494,7 +24547,13 @@
   "licenseUrl": "https://huggingface.co/Qwen/Qwen3.5-122B-A10B/blob/main/LICENSE",
   "modelWeightsSourceUrl": "https://huggingface.co/Qwen/Qwen3.5-9B",
   "microevalsEnabled": false,
-  "capabilities": {},
+  "capabilities": {
+   "financeAndAccounting": 9.77085071030485,
+   "strategyAndOps": 6.5559585649821,
+   "legal": 10.9555467406551,
+   "engineering": 14.1160574811177,
+   "economics": 15.535708537459
+  },
   "omniscienceHallucinationRate": 0.8360917248255234,
   "gdpPdfAllPass": 0.066,
   "gdpval": 413.53,
@@ -24510,7 +24569,100 @@
   "price1mBlended0To1To1": 0.1675,
   "price1mBlended100To1To1": 0.13563725490196077,
   "price1mBlended0To100To1": 0.13564356435643563,
-  "intelligenceIndexEvaluations": [],
+  "intelligenceIndexTimePerTask": 877.3959149822756,
+  "intelligenceIndexCost": {
+   "total": 328.85219908500005,
+   "input": 285.79701028500006,
+   "nonCacheInput": 2.8140239700000005,
+   "cacheRead": 0,
+   "cacheWrite": 282.98298631500006,
+   "output": 43.0551888,
+   "reasoning": 38.300563000000004,
+   "answer": 4.7546258
+  },
+  "canonicalIntelligenceIndexTokenCount": {
+   "input": 2117014891,
+   "output": 215275944,
+   "answer": 23773129,
+   "reasoning": 191502815
+  },
+  "intelligenceIndexOutputTokensPerTask": {
+   "reasoning": 19843.97631545256,
+   "answer": 15050.001702356765,
+   "output": 34893.97801780933
+  },
+  "intelligenceIndexEvaluations": [
+   {
+    "slug": "aa-briefcase",
+    "score": 335.84,
+    "outputTokensPerTask": 29620.956043956045,
+    "costPerTask": 0.24319246060439564,
+    "timePerTask": 744.807766473976
+   },
+   {
+    "slug": "gdpval-aa",
+    "score": 413.53,
+    "outputTokensPerTask": 61129.222727272725,
+    "costPerTask": 0.6158871563636364,
+    "timePerTask": 1537.071247066659
+   },
+   {
+    "slug": "automationbench-aa",
+    "score": 0.010473867343065657,
+    "outputTokensPerTask": 9205.44901065449,
+    "costPerTask": 0.09397096651445966,
+    "timePerTask": 231.4675430070942
+   },
+   {
+    "slug": "terminalbench-4-0",
+    "score": 0.00505050505050505,
+    "outputTokensPerTask": 93439.18181818182,
+    "costPerTask": 1.0498508090909093,
+    "timePerTask": 2349.4929808437423
+   },
+   {
+    "slug": "scicode",
+    "score": 0.295138888888889,
+    "outputTokensPerTask": 6483.260416666667,
+    "costPerTask": 0.0017788336458333333,
+    "timePerTask": 163.01913764164001
+   },
+   {
+    "slug": "humanitys-last-exam",
+    "score": 0.149212233549583,
+    "outputTokensPerTask": 44829.96200185357,
+    "costPerTask": 0.009007684754402223,
+    "timePerTask": 1127.2324843318727
+   },
+   {
+    "slug": "gdp-pdf",
+    "score": 0.066,
+    "outputTokensPerTask": 11388.37,
+    "costPerTask": 0.014299320050000001,
+    "timePerTask": 286.35626786968476
+   },
+   {
+    "slug": "critpt",
+    "score": 0.00285714285714286,
+    "outputTokensPerTask": 57463.65714285714,
+    "costPerTask": 0.01176173242857143,
+    "timePerTask": 1444.9019831259188
+   },
+   {
+    "slug": "omniscience",
+    "score": -53.46666666666667,
+    "outputTokensPerTask": 13703.705,
+    "costPerTask": 0.0027558481975000007,
+    "timePerTask": 344.57449308260425
+   },
+   {
+    "slug": "artificial-analysis-long-context-reasoning",
+    "score": 0.7,
+    "outputTokensPerTask": 9232.82,
+    "costPerTask": 0.0145820212,
+    "timePerTask": 232.1557762096404
+   }
+  ],
   "openness": {
    "opennessIndex": 38.888888888888886,
    "modelAvailability": 6,
@@ -24518,6 +24670,25 @@
    "transparencyPostTrainingData": 0,
    "transparencyPreTrainingData": 0
   },
+  "briefcaseBreakdown": {
+   "overall": {
+    "elo": 335.84,
+    "lower95ci": 324.06,
+    "upper95ci": 346.74
+   },
+   "rubricPassRate": 0.0797979797979798,
+   "analyticalQuality": {
+    "elo": 118.67,
+    "lower95ci": 96.1,
+    "upper95ci": 138.94
+   },
+   "presentation": {
+    "elo": 238.79,
+    "lower95ci": 215.78,
+    "upper95ci": 259.89
+   }
+  },
+  "briefcaseTotalCost": 22.130513915,
   "timescaleData": {
    "medianOutputSpeed": 34.9850233716635,
    "medianTimeToFirstChunk": 2.39134712850005
