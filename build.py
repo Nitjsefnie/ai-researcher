@@ -921,6 +921,16 @@ const DATA = __DATA__;
   const strokeOf = r => unknownWeights(r) ? colourOf(r) : "var(--surface-1)";
   const weightsOf = r => unknownWeights(r) ? "not published"
                        : (r.open ? (r.lic || "open") : "proprietary");
+  // Secondary tooltip rows shared by every chart, so one record reads the
+  // same wherever it is hovered; the chart's own metric rows stay
+  // chart-specific and come first. Each value goes through show(), so a
+  // field the record does not carry renders as the em dash, never blank.
+  const secondaryRows = r => [
+    ["Lab", show(r.creator)],
+    ["Weights", weightsOf(r)],
+    ["Output speed", show(r.tps == null ? null : r.tps + " tok/s")],
+    ["Context", fmtCtx(r.ctx)],
+  ];
 
   /* ---------- scatter ---------- */
   // The plot fills whatever width the page gives it. The viewBox width tracks
@@ -1194,10 +1204,7 @@ const DATA = __DATA__;
     n.textContent=r.name; tip.appendChild(n);
     const rows=[["Intelligence Index",r.ii.toFixed(1)],
                 ["Cost per task",fmtCost(r.cost)],
-                ["Lab",show(r.creator)],
-                ["Weights",weightsOf(r)],
-                ["Output speed",r.tps==null?"—":r.tps+" tok/s"],
-                ["Context",fmtCtx(r.ctx)]];
+                ...secondaryRows(r)];
     rows.push(["On frontier", frontSet.has(r) ? "yes" : "no — superseded"]);
     if(r.dep) rows.push(["Vendor status","retired"]);
     for(const [k,v] of rows){
@@ -1386,10 +1393,10 @@ const DATA = __DATA__;
     const name=document.createElement("div"); name.className="tname"; name.textContent=hit.r.name; popup.appendChild(name);
     const lines=key==="parameters"
       ? [["Intelligence Index",m.score.toFixed(1)],["Parameters",fmtParams(m.cost)],
-         ["Lab",show(hit.r.creator)],["Weights",weightsOf(hit.r)],
+         ...secondaryRows(hit.r),
          ["On parameter frontier",plot.front.has(hit.r)?"yes":"no — superseded"]]
       : [[cfg.label,m.score.toFixed(1)],["Cost per task",fmtCost(m.cost)],
-         ["Lab",show(hit.r.creator)],["Weights",weightsOf(hit.r)],
+         ...secondaryRows(hit.r),
          ["On frontier",plot.front.has(hit.r)?"yes":"no — superseded"]];
     if(hit.r.dep) lines.push(["Vendor status","retired"]);
     for(const [k,v] of lines){
