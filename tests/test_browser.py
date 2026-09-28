@@ -321,6 +321,64 @@ class BrowserInteractionTests(unittest.TestCase):
                 build.RAW, build.AGENTS_RAW, build.OUT = old_raw, old_agents, old_out
                 page.close()
 
+    def test_missing_lab_renders_as_em_dash_on_every_surface(self):
+        # #28: the two "Devin Fusion CLI" coding-agent rows carry creator:"",
+        # and a missing value must render as the page's em dash everywhere --
+        # never as a blank option, cell or export field (AGENTS.md).
+        page = self.browser.new_page(viewport={"width": 1280, "height": 900})
+        page.goto(build.OUT.as_uri())
+
+        with self.subTest("lab filter dropdown"):
+            options = page.locator("#fLab option").all_text_contents()
+            self.assertNotIn("", options)
+            self.assertEqual(options[0], "All labs")
+
+        with self.subTest("chart tooltip"):
+            devin = page.locator(
+                "#svg-coding circle.pt[aria-label^='Pin Devin Fusion CLI']")
+            self.assertGreater(devin.count(), 0)
+            devin.first.hover()
+            lab_row = page.locator("#tip-coding .trow").filter(has_text="Lab")
+            self.assertEqual(lab_row.count(), 1)
+            self.assertEqual(lab_row.first.locator(".tv").inner_text(), "—")
+
+        with self.subTest("full table"):
+            rows = page.locator("#tbl tbody tr").filter(
+                has_text="Devin Fusion CLI")
+            self.assertEqual(rows.count(), 2)
+            for row in rows.all():
+                self.assertEqual(row.locator("td").nth(1).inner_text(), "—")
+
+        stub = """() => {
+          window.__copied = null;
+          Object.defineProperty(navigator, 'clipboard', {
+            value: { writeText: t => { window.__copied = t;
+                                       return Promise.resolve(); } },
+            configurable: true,
+          });
+        }"""
+        with self.subTest("copy as markdown"):
+            page.evaluate(stub)
+            page.locator("#copyMd").click()
+            md = page.evaluate("() => window.__copied")
+            self.assertIsNotNone(md)
+            devin_lines = [line for line in md.split("\n")
+                           if line.startswith("| Devin Fusion CLI")]
+            self.assertEqual(len(devin_lines), 2)
+            for line in devin_lines:
+                self.assertEqual(line.split(" | ")[1], "—")
+
+        with self.subTest("copy as json"):
+            page.evaluate(stub)
+            page.locator("#copyJson").click()
+            exported = json.loads(page.evaluate("() => window.__copied"))
+            devin_rows = [m for m in exported["models"]
+                          if m["name"].startswith("Devin Fusion CLI")]
+            self.assertEqual(len(devin_rows), 2)
+            for row in devin_rows:
+                self.assertEqual(row["creator"], "—")
+        page.close()
+
     def test_script_terminators_in_remote_strings_cannot_execute(self):
         lower = "</script><script>document.documentElement.dataset.auditLower=1</script>"
         mixed = "</ScRiPt><ScRiPt>document.documentElement.dataset.auditMixed=1</sCrIpT>"
