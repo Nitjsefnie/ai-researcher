@@ -23801,7 +23801,7 @@
   "analystAgent": null,
   "terminalbenchHard": 0.242424242424242,
   "terminalBench21": 0.292134831460674,
-  "terminalBench40": null,
+  "terminalBench40": 0.00505050505050505,
   "tau2": 0.868421052631579,
   "tauBanking": 0.0701030927835052,
   "lcr": 0.7,
