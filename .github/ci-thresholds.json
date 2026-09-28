@@ -1,0 +1,13 @@
+{
+  "coverage": {
+    "javascript": {
+      "floor": 93.1,
+      "measured": 94.6
+    },
+    "python": {
+      "floor": 88.1,
+      "measured": 89.6
+    }
+  },
+  "schema_version": 1
+}

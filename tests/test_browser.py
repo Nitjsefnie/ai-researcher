@@ -19,6 +19,14 @@ CHROMIUM_EXECUTABLE = CHROMIUM if pathlib.Path(CHROMIUM).exists() else None
 
 
 class BrowserInteractionTests(unittest.TestCase):
+    # V8 coverage for the JavaScript ratchet. With JS_COVERAGE_OUT set (the
+    # coverage job sets it), every page this class creates records V8 block
+    # coverage and its dump joins a class-level list written out when the
+    # class tears down; unset, nothing changes. One pytest run then produces
+    # both measurements the coverage gates read.
+    _coverage_entries = []
+    _open_pages = []
+
     @classmethod
     def setUpClass(cls):
         with contextlib.redirect_stdout(io.StringIO()):
@@ -29,9 +37,73 @@ class BrowserInteractionTests(unittest.TestCase):
             headless=True,
             args=["--no-sandbox"],
         )
+        cls._coverage_entries = []
+        cls._open_pages = []
+        original_new_page = cls.browser.new_page
+
+        def new_page(**kwargs):
+            page = original_new_page(**kwargs)
+            # playwright-python ships no page.coverage wrapper, so the V8
+            # block coverage comes straight from Chromium's Profiler domain
+            # over a CDP session — the same {url, source,
+            # functions[].ranges[]} evidence stop_js_coverage() would have
+            # handed back.
+            session = page.context.new_cdp_session(page)
+            session.send("Debugger.enable")
+            session.send("Profiler.enable")
+            session.send("Profiler.startPreciseCoverage",
+                         {"callCount": True, "detailed": True})
+            original_close = page.close
+
+            def close(**close_kwargs):
+                if page in cls._open_pages:
+                    cls._open_pages.remove(page)
+                cls._coverage_entries.extend(
+                    cls._collect_coverage(session))
+                return original_close(**close_kwargs)
+
+            page.close = close
+            cls._open_pages.append((page, session))
+            return page
+
+        cls.browser.new_page = new_page
+
+    @classmethod
+    def _collect_coverage(cls, session):
+        """Take and stop precise V8 coverage; one entry per compiled script."""
+        entries = []
+        blocks = session.send("Profiler.takePreciseCoverage")["result"]
+        for block in blocks:
+            try:
+                source = session.send(
+                    "Debugger.getScriptSource",
+                    {"scriptId": block["scriptId"]})["scriptSource"]
+            except Exception:
+                source = None
+            entries.append({
+                "url": block.get("url", ""),
+                "source": source,
+                "functions": block.get("functions", []),
+            })
+        session.send("Profiler.stopPreciseCoverage")
+        session.send("Profiler.disable")
+        session.detach()
+        return entries
 
     @classmethod
     def tearDownClass(cls):
+        # A test that failed mid-way leaves its page open; take its coverage
+        # here so the dump still describes the whole run.
+        for _page, session in list(cls._open_pages):
+            try:
+                cls._coverage_entries.extend(cls._collect_coverage(session))
+            except Exception:
+                pass
+        cls._open_pages.clear()
+        dump = os.environ.get("JS_COVERAGE_OUT")
+        if dump:
+            pathlib.Path(dump).write_text(
+                json.dumps(cls._coverage_entries), encoding="utf-8")
         cls.browser.close()
         cls.playwright.stop()
 

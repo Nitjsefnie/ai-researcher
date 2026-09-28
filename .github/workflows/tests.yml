@@ -85,8 +85,8 @@ jobs:
       # 3.11 is the floor: all three pinned test tools (pytest 9.1.1,
       # playwright 1.63.0, coverage 7.16.1) declare requires_python >=3.10,
       # and 3.11/3.12/3.13 is the catalogue's standard triple. The full suite
-      # was measured green under 3.11 and 3.12 locally on Linux (118 passed
-      # each); CI runs 3.13 today.
+      # was measured green under 3.11 and 3.12 locally on Linux; CI runs 3.13
+      # today.
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
         python: ["3.11", "3.12", "3.13"]
@@ -121,18 +121,28 @@ jobs:
         run: python -m pytest -q -ra --ignore=tests/test_browser.py
 
   # --- The dedicated Linux job for the browser suite ---------------------
-  # The full suite (browser included) under coverage. It installs playwright
-  # and Chromium; the matrix job above does not — that asymmetry is
-  # deliberate, see the header and the matrix job's --ignore comment.
+  # The full suite (browser included) under the coverage ratchet. It
+  # installs playwright and Chromium; the matrix job above does not — that
+  # asymmetry is deliberate, see the header and the matrix job's --ignore
+  # comment. One pytest run produces BOTH measurements: coverage.py counts
+  # the Python statements, and the browser harness writes the V8 block
+  # coverage of the page's inline script to JS_COVERAGE_OUT for
+  # scripts/ci/js_coverage.py to fold into code-line coverage.
   coverage:
     runs-on: ubuntu-latest
+
+    permissions:
+      # One step below pushes the automated ratchet raise to main, which the
+      # default read-only token cannot do; refresh.yml's commit step runs
+      # under this same single permission. Everything else here only reads.
+      contents: write
 
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          # Nothing in this workflow pushes. Leaving the job token in
-          # .git/config lets any later step — or anything a dependency pulls
-          # in — reuse it.
+          # The ratchet commit at the end pushes through an explicit remote
+          # URL instead, so the token never sits in .git/config for later
+          # steps to reuse.
           persist-credentials: false
 
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
@@ -160,20 +170,32 @@ jobs:
       - name: Run tests
         id: pytest
         # Under coverage, and with the repo root as cwd — see the header.
+        # JS_COVERAGE_OUT makes tests/test_browser.py record every page's V8
+        # coverage and dump it on teardown; unset, the suite behaves exactly
+        # as before.
+        env:
+          JS_COVERAGE_OUT: ${{ runner.temp }}/js-coverage.json
         run: |
           python3 -m coverage run --source=. --omit='tests/*' -m pytest -q -ra
 
       - name: Coverage summary
-        # Renders whether or not the gate below passes — a coverage regression
+        # Renders whether or not the gates below pass — a coverage regression
         # is only actionable if you can see WHICH file lost lines, and
         # re-reading a scrolled CI log to find that is exactly the friction
-        # that gets a gate disabled.
+        # that gets a gate disabled. Python statement coverage and JavaScript
+        # physical code-line coverage are separate metrics.
         if: ${{ !cancelled() && steps.pytest.conclusion != 'skipped' }}
+        env:
+          JS_COVERAGE_OUT: ${{ runner.temp }}/js-coverage.json
         run: |
           {
             echo '### Coverage'
             echo
             python3 -m coverage report --format=markdown --precision=1
+            echo
+            echo '### JavaScript coverage'
+            echo
+            python3 scripts/ci/js_coverage.py "$JS_COVERAGE_OUT"
           } >> "$GITHUB_STEP_SUMMARY"
           python3 -m coverage xml -o coverage.xml
 
@@ -187,10 +209,13 @@ jobs:
 
       - name: Coverage gate
         if: ${{ !cancelled() && steps.pytest.conclusion != 'skipped' }}
-        # A RATCHET, not a target. 88 sits under the 91.2% measured when
-        # scripts/ joined the gate, so ordinary churn stays green and a real
-        # regression goes red. Raise the floor by hand as coverage climbs —
-        # never lower it to make a red build green.
+        # A RATCHET, not a target. The floor is committed data in
+        # .github/ci-thresholds.json: seeded 1.5 points under the measured
+        # coverage of the run that recorded it, so ordinary churn stays green
+        # and a real regression goes red. On a push to main this workflow
+        # raises the floor itself once coverage climbs more than the
+        # hysteresis (1.5) above the recorded measured — the floor is never
+        # lowered, not even by hand.
         #
         # SCRIPTS ARE COUNTED, and that is a deliberate reversal. They were
         # omitted while they were operator tooling a human ran and eyeballed.
@@ -203,4 +228,108 @@ jobs:
         # but only ~100 statements, because most of it is HTML/JS/SVG string
         # literals no line-coverage number reaches. The browser tests are what
         # actually exercise those.
-        run: python3 -m coverage report --fail-under=88 --precision=1
+        run: |
+          floor="$(python3 scripts/ci/thresholds.py --coverage-floor python)"
+          python3 -m coverage report "--fail-under=${floor}" --precision=1
+
+      - name: JavaScript coverage gate
+        if: ${{ !cancelled() && steps.pytest.conclusion != 'skipped' }}
+        # The front-end half of the same ratchet. The browser harness wrote
+        # the V8 block coverage Chromium collected for the built page to
+        # JS_COVERAGE_OUT; js_coverage.py attributes a record only when its
+        # source is the page's single inline <script> and folds the rest of
+        # what the browser compiled into an unattributed count that is never
+        # scored. The floor is the committed javascript record, same rules
+        # as python: seeded 1.5 under measured, never lowered, raised on
+        # main by ratchet.py --language javascript.
+        env:
+          JS_COVERAGE_OUT: ${{ runner.temp }}/js-coverage.json
+        run: |
+          js_floor="$(python3 scripts/ci/thresholds.py \
+            --coverage-floor javascript)"
+          python3 scripts/ci/js_coverage.py "$JS_COVERAGE_OUT" \
+            "--fail-under=${js_floor}" --format=total
+
+      - name: Ratchet documents
+        if: ${{ github.event_name == 'pull_request' }}
+        # A pull request must not relax its own ratchet data: the recorded
+        # measured values and their floors may only rise. The merge ref
+        # merges the head into the base, so HEAD^1 is the base tip and
+        # HEAD^2 the head, and the check compares the document at their
+        # merge base with the head's copy — never the working tree. The
+        # history is still shallow by the time this runs, and a shallow
+        # history can make git merge-base return a wrong base without
+        # erroring, so the step completes the history of both sides first.
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          git fetch --unshallow origin main \
+            "+refs/pull/${PR_NUMBER}/head:refs/remotes/pr/head"
+          python3 scripts/ci/check_ratchets.py HEAD^1 HEAD^2
+
+      - name: Ratchet the thresholds
+        # Only measurements from a main push may move the recorded
+        # calibration — a pull request runs untrusted code and must not be
+        # able to write it. The ratchet raises either coverage floor when
+        # this run justifies it; a lower measurement, or one within the
+        # hysteresis, leaves the document untouched.
+        id: ratchet
+        if: ${{ !cancelled() && steps.pytest.outcome == 'success'
+                && github.event_name == 'push'
+                && github.ref == 'refs/heads/main' }}
+        env:
+          JS_COVERAGE_OUT: ${{ runner.temp }}/js-coverage.json
+        run: |
+          measured="$(python3 -m coverage report --format=total --precision=1)"
+          js_measured="$(python3 scripts/ci/js_coverage.py \
+            "$JS_COVERAGE_OUT" --format=total)"
+          python3 scripts/ci/ratchet.py --measured "${measured}"
+          python3 scripts/ci/ratchet.py --language javascript \
+            --measured "${js_measured}"
+          python3 scripts/ci/thresholds.py --check
+          if [ -n "$(git status --porcelain .github/ci-thresholds.json)" ]; then
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            {
+              echo '### Recorded by this run'
+              echo
+              echo '```diff'
+              git diff -- .github/ci-thresholds.json
+              echo '```'
+            } >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "Python coverage ${measured}% and JavaScript coverage" \
+              "${js_measured}% justify no raise." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Commit the ratchet
+        # Runs only when the step above changed the data file. The push
+        # authenticates with the workflow token through an explicit remote
+        # URL — refresh.yml's pattern — so the credential never lands in
+        # .git/config, and the commit carries no co-author trailer: no model
+        # authored it.
+        if: ${{ !cancelled() && steps.ratchet.outputs.changed == 'true' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email \
+            '41898282+github-actions[bot]@users.noreply.github.com'
+          git add .github/ci-thresholds.json
+          git commit -m 'Ratchet ci-thresholds: raise the coverage floor (automated)'
+          if git push "https://x-access-token:${GH_TOKEN}@github.com/${REPO}" HEAD:main; then
+            exit 0
+          fi
+          # A rejected push usually means main moved while this run was
+          # going; failing the job for that would turn `tests` red for an
+          # ordinary concurrent push. Distinguish it: if the remote still
+          # points at this commit's parent, the race explanation is wrong
+          # and the push failed for a real reason.
+          git fetch --quiet "https://x-access-token:${GH_TOKEN}@github.com/${REPO}" main
+          if [ "$(git rev-parse HEAD^)" = "$(git rev-parse FETCH_HEAD)" ]; then
+            echo "the ratchet push was rejected while main stood still" >&2
+            exit 1
+          fi
+          echo 'Main moved while this run measured; the next push raises instead.' \
+            >> "$GITHUB_STEP_SUMMARY"
