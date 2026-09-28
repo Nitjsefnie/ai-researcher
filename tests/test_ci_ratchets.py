@@ -337,19 +337,24 @@ def _seed_repo(tmp_path, document):
     return repo
 
 
+def _commit_here(repo, document, message):
+    """Commit the document on whatever branch is checked out."""
+    (repo / ".github").mkdir(exist_ok=True)
+    _thresholds().write(repo / ".github" / "ci-thresholds.json", document)
+    _git(repo, "add", ".github/ci-thresholds.json")
+    _git(repo, "commit", "-qm", message)
+    return _git(repo, "rev-parse", "HEAD").stdout.strip()
+
+
 def _commit_on_branch(repo, document, message):
-    """Commit on a `pr` branch, the way a pull request head does.
+    """Commit on a `pr` branch forked from main, as a pull request does.
 
     Both revisions must have history behind them: with the change on main
     itself, the merge base of main and the tip IS the tip, and the check
     would compare the document with itself.
     """
     _git(repo, "checkout", "-q", "-b", "pr")
-    (repo / ".github").mkdir(exist_ok=True)
-    _thresholds().write(repo / ".github" / "ci-thresholds.json", document)
-    _git(repo, "add", ".github/ci-thresholds.json")
-    _git(repo, "commit", "-qm", message)
-    return _git(repo, "rev-parse", "HEAD").stdout.strip()
+    return _commit_here(repo, document, message)
 
 
 def test_end_to_end_clean_raise_is_ok(tmp_path, monkeypatch):
@@ -376,6 +381,46 @@ def test_end_to_end_relaxed_head_fails_with_findings(tmp_path, capsys,
     monkeypatch.chdir(repo)
     assert guard.main(["main", head]) == 1
     assert "relaxation(s)" in capsys.readouterr().out
+
+
+def test_end_to_end_main_advancing_after_the_fork_is_not_a_relaxation(
+        tmp_path, monkeypatch):
+    """The merge base, not main's tip, is the reference.
+
+    Main records a higher measured after the branch forked — a raise the
+    stale branch must not be penalised for missing. Comparing against
+    main's tip instead of the merge base would read the branch's older
+    values as a lowering; the guard compares against the fork, so the
+    stale branch is clean.
+    """
+    repo = _seed_repo(tmp_path, _document())
+    _git(repo, "checkout", "-q", "-b", "pr")
+    _git(repo, "checkout", "-q", "main")
+    tip = _commit_here(repo, _document(measured="94.2", floor="92.7"),
+                       "raise on main after the branch forked")
+    guard = _guard()
+    fork, findings = guard.check_ratchets(repo, "main", "pr")
+    assert findings == []
+    assert fork == _git(repo, "rev-parse", "pr").stdout.strip()
+    assert fork != tip
+    monkeypatch.chdir(repo)
+    assert guard.main(["main", "pr"]) == 0
+
+
+def test_end_to_end_branch_lowering_while_main_advanced_is_flagged(tmp_path):
+    """Main's raise does not make the branch's own lowering acceptable."""
+    repo = _seed_repo(tmp_path, _document())
+    _git(repo, "checkout", "-q", "-b", "pr")
+    _git(repo, "checkout", "-q", "main")
+    _commit_here(repo, _document(measured="94.2", floor="92.7"),
+                 "raise on main after the branch forked")
+    _git(repo, "checkout", "-q", "pr")
+    head = _commit_here(repo, _document(measured="90.0", floor="88.5"),
+                        "lower the calibration on the branch")
+    guard = _guard()
+    _fork, findings = guard.check_ratchets(repo, "main", head)
+    assert len(findings) == 2
+    assert all("lowered" in line for line in findings)
 
 
 def test_end_to_end_shallow_repository_is_refused(tmp_path):
