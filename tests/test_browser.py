@@ -180,6 +180,147 @@ class BrowserInteractionTests(unittest.TestCase):
                 )
         page.close()
 
+    def test_pinned_names_stay_labelled_on_every_chart(self):
+        # #27: a pin is an explicit reader request. The capability charts
+        # guarantee a pinned label with a last-resort clamp; the intelligence
+        # chart used to drop pinned names the same view kept labelled
+        # elsewhere. Every pinned name must be visible on every chart that
+        # draws the pinned point. A pin is page-global, so pins made on one
+        # chart must also survive wherever the pinned row renders on another.
+        page = self.browser.new_page(viewport={"width": 1280, "height": 900})
+        page.goto(build.OUT.as_uri())
+        chart_labels = {"coding": "Coding Agent Index",
+                        "intelligence": "Intelligence Index",
+                        "agentic": "GDPval-AA v2",
+                        "parameters": "Parameter efficiency"}
+        # 40 pins on the intelligence chart -- the crowd the audit used, enough
+        # to exhaust the clear slots -- plus a couple on every other chart so
+        # each chart guarantees its own pins. Agent-run rows never share names
+        # with model rows, so the coding chart can only pin its own rows.
+        pin_counts = {"intelligence": 40, "coding": 2, "agentic": 2,
+                      "parameters": 2}
+        pinned = {}
+        already = set()
+        for chart, label in chart_labels.items():
+            suffix = f" on the {label} chart"
+            points = page.locator(f"#svg-{chart} circle.pt")
+            aris = page.evaluate(
+                "sel => [...document.querySelectorAll(sel)]"
+                ".map(c => c.getAttribute('aria-label'))",
+                f"#svg-{chart} circle.pt")
+            # a pin is keyed by name and page-global, so pinning the same row
+            # through a second chart would toggle it OFF again -- pick rows
+            # no earlier chart has pinned
+            pick = []
+            for i, aria in enumerate(aris):
+                if not (aria.startswith("Pin ") and aria.endswith(suffix)):
+                    continue
+                name = aria[len("Pin "):-len(suffix)]
+                if name in already:
+                    continue
+                pick.append((i, name))
+                if len(pick) == pin_counts[chart]:
+                    break
+            self.assertEqual(len(pick), pin_counts[chart],
+                             f"could not pick {pin_counts[chart]} fresh names on {chart}")
+            for i, _ in pick:
+                points.nth(i).focus()
+                points.nth(i).press("Enter")
+            pinned[chart] = [n for _, n in pick]
+            already.update(pinned[chart])
+
+        # every chart labels every one of its own pinned points
+        for chart in chart_labels:
+            labels = page.locator(f"#svg-{chart} text.lbl").all_text_contents()
+            missing = [n for n in pinned[chart] if n not in labels]
+            self.assertEqual(
+                missing, [],
+                f"pinned names dropped on the {chart} chart")
+
+        # and wherever a pinned row renders on ANOTHER chart, its label
+        # survives there too (the pin set is page-global)
+        for chart, label in chart_labels.items():
+            aria = page.evaluate(
+                "sel => [...document.querySelectorAll(sel)]"
+                ".map(c => c.getAttribute('aria-label'))",
+                f"#svg-{chart} circle.pt")
+            foreign = {n for names in pinned.values() for n in names
+                       if f"Pin {n} on the {label} chart" in aria}
+            labels = page.locator(f"#svg-{chart} text.lbl").all_text_contents()
+            self.assertEqual(
+                [n for n in foreign if n not in labels], [],
+                f"cross-chart pinned names dropped on the {chart} chart")
+        page.close()
+
+    def test_unpinned_labels_still_refuse_when_no_clear_space(self):
+        # #27's flip side, as a guard: the pin fallback must stay pin-only.
+        # Thirty-one unpinned models crowd one spot (plus one anchor so the
+        # y-scale is not degenerate); the placer offers each label exactly 14
+        # candidate offsets from its dot, so at most 15 labels can ever place
+        # here whatever the platform's font metrics are -- well under the 31
+        # points. If this ever exceeds the bound, unpinned labels have begun
+        # overlapping, which the placer is designed to refuse.
+        page = self.browser.new_page(viewport={"width": 1280, "height": 900})
+        cluster = []
+        for i in range(30):
+            cluster.append({
+                "name": f"Cluster Model {i:02d}",
+                "modelCreatorName": "Cluster Lab",
+                "isOpenWeights": i % 2 == 0,
+                "slug": f"cluster-{i}",
+                "intelligenceIndex": 51,
+                "gdpvalNormalized": 0.47,
+                "parameters": 27,
+                "intelligenceIndexCostPerTask": {
+                    "cost": {"total": 0.75},
+                    "evaluations": [{"slug": "gdpval-aa",
+                                     "weightedCostPerTask": 0.075}],
+                },
+            })
+        cluster.append({
+            "name": "Cluster Anchor",
+            "modelCreatorName": "Cluster Lab",
+            "isOpenWeights": False,
+            "slug": "cluster-anchor",
+            "intelligenceIndex": 80,
+            "gdpvalNormalized": 0.47,
+            "parameters": 27,
+            "intelligenceIndexCostPerTask": {
+                "cost": {"total": 8.0},
+                "evaluations": [{"slug": "gdpval-aa",
+                                 "weightedCostPerTask": 0.8}],
+            },
+        })
+        agent = {
+            "id": "cluster-agent", "displayLabel": "Cluster Agent",
+            "agentName": "Cluster Agent CLI",
+            "hostModelSlug": "vendor_cluster-0",
+            "display": {"creator": {"agent": "Agent Lab",
+                                    "model": "Cluster Lab"}},
+            "indexScore": 0.64,
+            "mean": {"costUsd": 2.5, "agentWallTimeSec": 900.0},
+        }
+        with tempfile.TemporaryDirectory(prefix=".issue-27-browser-",
+                                         dir=build.ROOT) as tmp:
+            root = pathlib.Path(tmp)
+            raw, agents_raw = root / "models.json", root / "coding-agents.json"
+            output = root / "frontier-models.html"
+            raw.write_text(json.dumps(cluster), encoding="utf-8")
+            agents_raw.write_text(json.dumps([agent]), encoding="utf-8")
+            old_raw, old_agents, old_out = build.RAW, build.AGENTS_RAW, build.OUT
+            try:
+                build.RAW, build.AGENTS_RAW, build.OUT = raw, agents_raw, output
+                with contextlib.redirect_stdout(io.StringIO()):
+                    build.main()
+                page.goto(output.as_uri())
+                self.assertEqual(
+                    page.locator("#svg-intelligence circle.pt").count(), 31)
+                self.assertLess(
+                    page.locator("#svg-intelligence text.lbl").count(), 20)
+            finally:
+                build.RAW, build.AGENTS_RAW, build.OUT = old_raw, old_agents, old_out
+                page.close()
+
     def test_script_terminators_in_remote_strings_cannot_execute(self):
         lower = "</script><script>document.documentElement.dataset.auditLower=1</script>"
         mixed = "</ScRiPt><ScRiPt>document.documentElement.dataset.auditMixed=1</sCrIpT>"

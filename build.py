@@ -1031,7 +1031,9 @@ const DATA = __DATA__;
     // Real collision detection against every dot, every frontier segment, every
     // already-placed label and the plot edges. A label that cannot find a clear
     // slot is dropped entirely rather than shipped overlapping -- the tooltip
-    // and the table still carry it, so nothing becomes unreachable.
+    // and the table still carry it, so nothing becomes unreachable. The one
+    // exception is a pinned name, which falls back to a clamped placement that
+    // accepts overlap: the reader asked for that label by name.
     const PAD=3, boxes=[];
     const hitsBox=(a,b)=> a.x < b.x+b.w+PAD && a.x+a.w+PAD > b.x &&
                           a.y < b.y+b.h+PAD && a.y+a.h+PAD > b.y;
@@ -1135,6 +1137,20 @@ const DATA = __DATA__;
         const sx=cx+(nx-cx)/d*7, sy=cy+(ny-cy)/d*7;
         if(!leaderClear(sx,sy,nx,ny,own)) continue;
         put={bx,by,box,sx,sy,nx,ny}; break;
+      }
+      // A pin is an explicit reader request: when every clear candidate is
+      // taken, clamp the label somewhere visible and accept the overlap --
+      // the same last resort the capability charts extend to their pins.
+      // Unpinned labels keep the refuse-and-drop behaviour above, so the
+      // dropped counter only ever counts labels nobody asked for by name.
+      if(!put&&pin){
+        const bx=Math.max(7,Math.min(W-w-7,cx+10));
+        const by=Math.max(T+PADY,Math.min(T+py-h-PADY,cy-h-6.5));
+        const box={x:bx-PADX,y:by-PADY,w:w+2*PADX,h:h+2*PADY};
+        const nx=Math.max(box.x,Math.min(cx,box.x+box.w));
+        const ny=Math.max(box.y,Math.min(cy,box.y+box.h));
+        const d=Math.hypot(nx-cx,ny-cy)||1;
+        put={bx,by,box,sx:cx+(nx-cx)/d*7,sy:cy+(ny-cy)/d*7,nx,ny};
       }
       if(!put){ svg.removeChild(t); dropped++; continue; }
 
