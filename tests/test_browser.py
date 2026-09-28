@@ -142,6 +142,44 @@ class BrowserInteractionTests(unittest.TestCase):
         )
         page.close()
 
+    def test_superseded_points_draw_de_emphasis_gray_on_all_four_charts(self):
+        # The colour rule is stated once for the page (AGENTS.md: superseded
+        # models draw in de-emphasis gray), so every off-frontier point draws
+        # var(--muted) on every chart, and every legend documents the swatch.
+        page = self.browser.new_page(viewport={"width": 1280, "height": 900})
+        page.goto(build.OUT.as_uri())
+        for chart in ("coding", "intelligence", "agentic", "parameters"):
+            with self.subTest(chart=chart):
+                off_frontier = page.evaluate(
+                    "sel => [...new Set([...document.querySelectorAll(sel)]"
+                    ".map(c => c.getAttribute('fill')))]",
+                    f"#svg-{chart} circle.pt[r='5']",
+                )
+                self.assertEqual(off_frontier, ["var(--muted)"])
+
+                # frontier points keep their weights fill -- the gray is a
+                # superseded verdict, not a repainting of the whole chart
+                on_frontier = page.locator(f"#svg-{chart} circle.pt[r='6']")
+                self.assertGreater(on_frontier.count(), 0)
+                self.assertNotIn(
+                    "var(--muted)",
+                    page.evaluate(
+                        "sel => [...new Set([...document.querySelectorAll(sel)]"
+                        ".map(c => c.getAttribute('fill')))]",
+                        f"#svg-{chart} circle.pt[r='6']",
+                    ),
+                )
+
+                legend = page.locator(f"#{chart} .legend .item").filter(
+                    has_text="Superseded"
+                )
+                self.assertEqual(legend.count(), 1)
+                self.assertIn(
+                    "var(--muted)",
+                    legend.locator(".swatch").first.get_attribute("style"),
+                )
+        page.close()
+
     def test_script_terminators_in_remote_strings_cannot_execute(self):
         lower = "</script><script>document.documentElement.dataset.auditLower=1</script>"
         mixed = "</ScRiPt><ScRiPt>document.documentElement.dataset.auditMixed=1</sCrIpT>"

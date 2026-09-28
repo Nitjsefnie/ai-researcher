@@ -426,6 +426,11 @@ TEMPLATE = r"""<!DOCTYPE html>
     --grid:#e1e0d9; --axis:#c3c2b7; --border:rgba(11,11,11,0.10);
     --series-prop:#2a78d6; --series-open:#eb6834; --dim:#a9a7a0;
     --accent:#2a78d6;
+    /* Dedicated token for the dashed frontier line: the line used to borrow
+       --muted, which now also fills every superseded point on every chart.
+       Same value today, so nothing shifts visually -- the point is that
+       retuning the de-emphasis gray no longer silently restyles the line. */
+    --frontier-line:#898781;
     --sans:system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;
     --mono:ui-monospace,'SF Mono',Menlo,Monaco,monospace;
     --radius:12px;
@@ -525,7 +530,7 @@ TEMPLATE = r"""<!DOCTYPE html>
   .legend .item{display:inline-flex;align-items:center;gap:7px}
   .legend .swatch{width:11px;height:11px;border-radius:50%;display:inline-block}
   .legend .swatch.hollow{background:none !important;border:2px solid var(--series-prop);box-sizing:border-box}
-  .legend .line{width:20px;height:0;border-top:2px dashed var(--muted);display:inline-block}
+  .legend .line{width:20px;height:0;border-top:2px dashed var(--frontier-line);display:inline-block}
 
   .tip{position:absolute;pointer-events:none;opacity:0;transition:opacity 120ms ease;
     background:var(--surface-1);border:1px solid var(--border);border-radius:9px;
@@ -659,6 +664,7 @@ TEMPLATE = r"""<!DOCTYPE html>
         <span class="item"><span class="swatch" style="background:var(--series-prop)"></span>Proprietary</span>
         <span class="item"><span class="swatch" style="background:var(--series-open)"></span>Open-weights</span>
         <span class="item"><span class="swatch hollow"></span>Weights unpublished</span>
+        <span class="item"><span class="swatch" style="background:var(--muted)"></span>Superseded</span>
         <span class="item"><span class="line"></span>Efficient frontier</span>
       </div>
     </div>
@@ -678,6 +684,7 @@ TEMPLATE = r"""<!DOCTYPE html>
       <div class="legend">
         <span class="item"><span class="swatch" style="background:var(--series-prop)"></span>Proprietary</span>
         <span class="item"><span class="swatch" style="background:var(--series-open)"></span>Open-weights</span>
+        <span class="item"><span class="swatch" style="background:var(--muted)"></span>Superseded</span>
         <span class="item"><span class="line"></span>Efficient frontier</span>
       </div>
     </div>
@@ -699,6 +706,7 @@ TEMPLATE = r"""<!DOCTYPE html>
       <div class="legend">
         <span class="item"><span class="swatch" style="background:var(--series-prop)"></span>Proprietary</span>
         <span class="item"><span class="swatch" style="background:var(--series-open)"></span>Open-weights</span>
+        <span class="item"><span class="swatch" style="background:var(--muted)"></span>Superseded</span>
         <span class="item"><span class="line"></span>Efficient frontier</span>
       </div>
     </div>
@@ -718,8 +726,8 @@ TEMPLATE = r"""<!DOCTYPE html>
         <div class="tip" id="tip-parameters" role="status"></div>
       </div>
       <div class="legend">
-        <span class="item"><span class="swatch" style="background:var(--series-prop)"></span>Proprietary frontier</span>
-        <span class="item"><span class="swatch" style="background:var(--series-open)"></span>Open-weights frontier</span>
+        <span class="item"><span class="swatch" style="background:var(--series-prop)"></span>Proprietary</span>
+        <span class="item"><span class="swatch" style="background:var(--series-open)"></span>Open-weights</span>
         <span class="item"><span class="swatch" style="background:var(--muted)"></span>Superseded</span>
         <span class="item"><span class="line"></span>Parameter-efficiency frontier</span>
       </div>
@@ -999,7 +1007,7 @@ const DATA = __DATA__;
         segs.push([x1,y1,x2,y2]);
         d+=" L "+x2+" "+y2;
       }
-      svg.appendChild(el("path",{d:d,fill:"none",stroke:"var(--muted)",
+      svg.appendChild(el("path",{d:d,fill:"none",stroke:"var(--frontier-line)",
         "stroke-width":1.5,"stroke-dasharray":"5 4","stroke-linejoin":"round"}));
     }
 
@@ -1007,7 +1015,10 @@ const DATA = __DATA__;
     pts=[];
     for(const r of rows){
       const cx=X(r.cost), cy=Y(r.ii), on=frontSet.has(r);
-      const c=el("circle",{cx:cx,cy:cy,r:on?6:5,fill:fillOf(r),
+      // the de-emphasis gray is page-wide, matching drawCapability: a point
+      // off this chart's frontier draws var(--muted); a frontier point keeps
+      // its weights fill
+      const c=el("circle",{cx:cx,cy:cy,r:on?6:5,fill:on?fillOf(r):"var(--muted)",
         stroke:strokeOf(r),"stroke-width":2,
         class:"pt"+(pins.has(r.name)?" pinned":""),role:"button",tabindex:0,
         "aria-label":"Pin "+r.name+" on the Intelligence Index chart",
@@ -1268,13 +1279,16 @@ const DATA = __DATA__;
       for(let i=1;i<frontier.length;i++){
         const m=metricOf(frontier[i],key); d+=" L "+X(m.cost)+" "+Y(m.score);
       }
-      chart.appendChild(el("path",{d,fill:"none",stroke:"var(--muted)",
+      chart.appendChild(el("path",{d,fill:"none",stroke:"var(--frontier-line)",
         "stroke-width":1.5,"stroke-dasharray":"5 4","stroke-linejoin":"round"}));
     }
     const pts=[];
     for(const r of rows){
       const m=metricOf(r,key), x=X(m.cost), y=Y(m.score), on=front.has(r);
-      const fill=key==="parameters"&&!on?"var(--muted)":fillOf(r);
+      // the de-emphasis gray is page-wide: a point off THIS chart's frontier
+      // draws var(--muted) here and on the other three charts alike, while a
+      // frontier point keeps its weights fill
+      const fill=!on?"var(--muted)":fillOf(r);
       const mark=el("circle",{cx:x,cy:y,r:on?6:5,fill:fill,
         stroke:strokeOf(r),"stroke-width":2,
         class:"pt"+(pins.has(r.name)?" pinned":""),role:"button",tabindex:0,
