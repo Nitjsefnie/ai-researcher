@@ -30469,7 +30469,7 @@
    "type": "firstParty",
    "providerName": "Alibaba"
   },
-  "hostModelCount": 4,
+  "hostModelCount": 3,
   "creator": {
    "id": "d874d370-74d3-4fa0-ba00-5272f92f946b",
    "slug": "alibaba",
@@ -36876,7 +36876,7 @@
    "type": "firstParty",
    "providerName": "Alibaba"
   },
-  "hostModelCount": 6,
+  "hostModelCount": 5,
   "creator": {
    "id": "d874d370-74d3-4fa0-ba00-5272f92f946b",
    "slug": "alibaba",
@@ -64223,7 +64223,7 @@
    "type": "firstParty",
    "providerName": "Alibaba"
   },
-  "hostModelCount": 4,
+  "hostModelCount": 3,
   "creator": {
    "id": "d874d370-74d3-4fa0-ba00-5272f92f946b",
    "slug": "alibaba",
@@ -66210,7 +66210,7 @@
   "isReasoning": false,
   "isOpenWeights": true,
   "paramClass": "small",
-  "priceClass": "low",
+  "priceClass": null,
   "modelCreatorName": "IBM",
   "modelCreatorColor": "#0f62fe",
   "modelCreatorLogo": "/img/logos/ibm.svg",
@@ -66237,8 +66237,8 @@
   "itbenchSre": null,
   "mmmuPro": null,
   "intelligenceIndexCostPerTask": "$undefined",
-  "price1mInputTokens": 0.05,
-  "price1mOutputTokens": 0.1,
+  "price1mInputTokens": null,
+  "price1mOutputTokens": null,
   "cacheHitPrice": null,
   "cacheWritePrice": null,
   "medianOutputTokensPerSecond": 126.332523970729,
@@ -66282,11 +66282,11 @@
   "aime25": null,
   "cacheHitDiscountPercent": null,
   "pricePer1k1mpImages": null,
-  "price1mBlended0To3To1": 0.0625,
-  "price1mBlended7To2To1": 0.05500000000000001,
-  "price1mBlended0To1To1": 0.07500000000000001,
-  "price1mBlended100To1To1": 0.05049019607843137,
-  "price1mBlended0To100To1": 0.05049504950495049,
+  "price1mBlended0To3To1": null,
+  "price1mBlended7To2To1": null,
+  "price1mBlended0To1To1": null,
+  "price1mBlended100To1To1": null,
+  "price1mBlended0To100To1": null,
   "intelligenceIndexEvaluations": [],
   "openness": {
    "opennessIndex": 61.111111111111114,
@@ -66335,7 +66335,7 @@
   "performanceDataSource": {
    "type": "median"
   },
-  "hostModelCount": 1,
+  "hostModelCount": 0,
   "creator": {
    "id": "512ef1e4-e02e-4532-a5f2-d11a40962498",
    "slug": "ibm",
@@ -68604,8 +68604,8 @@
   "itbenchSre": null,
   "mmmuPro": null,
   "intelligenceIndexCostPerTask": "$undefined",
-  "price1mInputTokens": 0.13,
-  "price1mOutputTokens": 0.28,
+  "price1mInputTokens": 0.1119,
+  "price1mOutputTokens": 0.23750000000000002,
   "cacheHitPrice": 0.028,
   "cacheWritePrice": null,
   "medianOutputTokensPerSecond": "$undefined",
@@ -68655,13 +68655,13 @@
   "livecodebench": null,
   "aime25": null,
   "automationBenchPartialScore": 0.28504323745973587,
-  "cacheHitDiscountPercent": 0.7910283746104642,
+  "cacheHitDiscountPercent": 0.7974413646055437,
   "pricePer1k1mpImages": null,
-  "price1mBlended0To3To1": 0.1675,
-  "price1mBlended7To2To1": 0.0736,
-  "price1mBlended0To1To1": 0.20500000000000002,
-  "price1mBlended100To1To1": 0.03147058823529412,
-  "price1mBlended0To100To1": 0.1314851485148515,
+  "price1mBlended0To3To1": 0.1433,
+  "price1mBlended7To2To1": 0.06573,
+  "price1mBlended0To1To1": 0.17470000000000002,
+  "price1mBlended100To1To1": 0.030876470588235293,
+  "price1mBlended0To100To1": 0.11314356435643565,
   "intelligenceIndexEvaluations": [],
   "openness": {
    "opennessIndex": 50,
@@ -68688,13 +68688,13 @@
     "upper95ci": 1066.27
    }
   },
-  "briefcaseTotalCost": 23.301330905541835,
+  "briefcaseTotalCost": 24.02078046394495,
   "timescaleData": {},
   "performanceByPromptType": {},
   "performanceDataSource": {
    "type": "median"
   },
-  "hostModelCount": 7,
+  "hostModelCount": 6,
   "creator": {
    "id": "58b835bf-4c87-4f87-a846-df4b692c6e7d",
    "slug": "deepseek",
@@ -70164,7 +70164,7 @@
    "type": "firstParty",
    "providerName": "Alibaba"
   },
-  "hostModelCount": 5,
+  "hostModelCount": 4,
   "creator": {
    "id": "d874d370-74d3-4fa0-ba00-5272f92f946b",
    "slug": "alibaba",
@@ -84062,9 +84062,9 @@
   "itbenchSre": null,
   "mmmuPro": null,
   "intelligenceIndexCostPerTask": "$undefined",
-  "price1mInputTokens": 0.0938,
-  "price1mOutputTokens": 0.195,
-  "cacheHitPrice": 0.07,
+  "price1mInputTokens": 0.0919,
+  "price1mOutputTokens": 0.1913,
+  "cacheHitPrice": 0.0545,
   "cacheWritePrice": null,
   "medianOutputTokensPerSecond": "$undefined",
   "percentile05OutputTokensPerSecond": "$undefined",
@@ -84105,13 +84105,13 @@
   "terminalBenchScience": null,
   "livecodebench": null,
   "aime25": null,
-  "cacheHitDiscountPercent": 0.6487206823027718,
+  "cacheHitDiscountPercent": 0.7974413646055437,
   "pricePer1k1mpImages": null,
-  "price1mBlended0To3To1": 0.1191,
-  "price1mBlended7To2To1": 0.08726,
-  "price1mBlended0To1To1": 0.1444,
-  "price1mBlended100To1To1": 0.07145882352941177,
-  "price1mBlended0To100To1": 0.09480198019801979,
+  "price1mBlended0To3To1": 0.11674999999999999,
+  "price1mBlended7To2To1": 0.07566,
+  "price1mBlended0To1To1": 0.1416,
+  "price1mBlended100To1To1": 0.0562078431372549,
+  "price1mBlended0To100To1": 0.09288415841584158,
   "intelligenceIndexEvaluations": [],
   "openness": {
    "opennessIndex": 50,
@@ -84125,7 +84125,7 @@
   "performanceDataSource": {
    "type": "median"
   },
-  "hostModelCount": 3,
+  "hostModelCount": 2,
   "creator": {
    "id": "58b835bf-4c87-4f87-a846-df4b692c6e7d",
    "slug": "deepseek",
@@ -88846,7 +88846,7 @@
   "intelligenceIndexCostPerTask": "$undefined",
   "price1mInputTokens": 0.475,
   "price1mOutputTokens": 0.495,
-  "cacheHitPrice": 0.355,
+  "cacheHitPrice": null,
   "cacheWritePrice": null,
   "medianOutputTokensPerSecond": "$undefined",
   "percentile05OutputTokensPerSecond": "$undefined",
@@ -114782,7 +114782,7 @@
    "type": "firstParty",
    "providerName": "Alibaba"
   },
-  "hostModelCount": 3,
+  "hostModelCount": 2,
   "creator": {
    "id": "d874d370-74d3-4fa0-ba00-5272f92f946b",
    "slug": "alibaba",
