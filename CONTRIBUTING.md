@@ -127,8 +127,9 @@ actionlint .github/workflows/*.yml && zizmor .github/workflows/  # actionlint
 `python3 -m pip install -r requirements-dev.txt -r requirements-test.txt` gets
 the pinned toolchain. Coverage is gated by a **ratchet**, not a fixed target:
 the floors live in `.github/ci-thresholds.json`, each seeded 1.5 points under
-the coverage of the run that recorded it, and are never lowered — not even by
-hand. There are two floors: Python statement coverage from the pytest run,
+the coverage of the run that recorded it. CI never lowers them: the automated
+raise is the only writer on main. There are two floors: Python statement
+coverage from the pytest run,
 and JavaScript physical code-line coverage of the page's inline script,
 measured through the browser suite (`tests/test_browser.py` records V8
 coverage when `JS_COVERAGE_OUT` is set, and `scripts/ci/js_coverage.py` folds
