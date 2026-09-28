@@ -209,7 +209,7 @@ def _base_head():
 
 def test_guard_identical_documents_are_clean():
     guard = _guard()
-    base, head = _base_head()
+    base = _document()
     # round-trip the way the guard itself reads a document: JSON text
     # parsed back with numbers as Decimals
     round_trip = json.loads(
@@ -221,8 +221,10 @@ def test_guard_identical_documents_are_clean():
 def test_guard_deleted_document_is_a_finding():
     guard = _guard()
     findings = guard.coverage_relaxations({"schema_version": 1}, None)
-    assert findings == [guard._finding(
-        "(document)", "present", None, "the document was deleted")]
+    assert findings == [
+        '.github/ci-thresholds.json: (document): merge base "present", '
+        'head absent — the document was deleted'
+    ]
 
 
 def test_guard_key_removed_is_a_finding():
@@ -409,9 +411,10 @@ def test_end_to_end_symlink_head_entry_is_a_finding(tmp_path, monkeypatch):
     _git(repo, "commit", "-qm", "swap the document for a symlink")
     guard = _guard()
     _fork, findings = guard.check_ratchets(repo, "main", "pr")
-    assert findings == [guard._finding(
-        "(document)", guard.REGULAR_FILE, "120000 blob",
-        "not a regular file")]
+    assert findings == [
+        '.github/ci-thresholds.json: (document): merge base "100644 blob", '
+        'head "120000 blob" — not a regular file'
+    ]
     monkeypatch.chdir(repo)
     assert guard.main(["main", "pr"]) == 1
 
@@ -429,6 +432,6 @@ def test_end_to_end_invalid_json_at_head_is_a_git_error(tmp_path):
 
 
 def test_end_to_end_unknown_revision_is_exit_2(tmp_path):
-    repo = _seed_repo(tmp_path, _document())
+    _seed_repo(tmp_path, _document())
     guard = _guard()
     assert guard.main(["main", "no-such-revision"]) == 2
