@@ -12,6 +12,11 @@
     --grid:#e1e0d9; --axis:#c3c2b7; --border:rgba(11,11,11,0.10);
     --series-prop:#2a78d6; --series-open:#eb6834; --dim:#a9a7a0;
     --accent:#2a78d6;
+    /* Dedicated token for the dashed frontier line: the line used to borrow
+       --muted, which now also fills every superseded point on every chart.
+       Same value today, so nothing shifts visually -- the point is that
+       retuning the de-emphasis gray no longer silently restyles the line. */
+    --frontier-line:#898781;
     --sans:system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;
     --mono:ui-monospace,'SF Mono',Menlo,Monaco,monospace;
     --radius:12px;
@@ -111,7 +116,7 @@
   .legend .item{display:inline-flex;align-items:center;gap:7px}
   .legend .swatch{width:11px;height:11px;border-radius:50%;display:inline-block}
   .legend .swatch.hollow{background:none !important;border:2px solid var(--series-prop);box-sizing:border-box}
-  .legend .line{width:20px;height:0;border-top:2px dashed var(--muted);display:inline-block}
+  .legend .line{width:20px;height:0;border-top:2px dashed var(--frontier-line);display:inline-block}
 
   .tip{position:absolute;pointer-events:none;opacity:0;transition:opacity 120ms ease;
     background:var(--surface-1);border:1px solid var(--border);border-radius:9px;
@@ -245,6 +250,7 @@
         <span class="item"><span class="swatch" style="background:var(--series-prop)"></span>Proprietary</span>
         <span class="item"><span class="swatch" style="background:var(--series-open)"></span>Open-weights</span>
         <span class="item"><span class="swatch hollow"></span>Weights unpublished</span>
+        <span class="item"><span class="swatch" style="background:var(--muted)"></span>Superseded</span>
         <span class="item"><span class="line"></span>Efficient frontier</span>
       </div>
     </div>
@@ -264,6 +270,7 @@
       <div class="legend">
         <span class="item"><span class="swatch" style="background:var(--series-prop)"></span>Proprietary</span>
         <span class="item"><span class="swatch" style="background:var(--series-open)"></span>Open-weights</span>
+        <span class="item"><span class="swatch" style="background:var(--muted)"></span>Superseded</span>
         <span class="item"><span class="line"></span>Efficient frontier</span>
       </div>
     </div>
@@ -285,6 +292,7 @@
       <div class="legend">
         <span class="item"><span class="swatch" style="background:var(--series-prop)"></span>Proprietary</span>
         <span class="item"><span class="swatch" style="background:var(--series-open)"></span>Open-weights</span>
+        <span class="item"><span class="swatch" style="background:var(--muted)"></span>Superseded</span>
         <span class="item"><span class="line"></span>Efficient frontier</span>
       </div>
     </div>
@@ -304,8 +312,8 @@
         <div class="tip" id="tip-parameters" role="status"></div>
       </div>
       <div class="legend">
-        <span class="item"><span class="swatch" style="background:var(--series-prop)"></span>Proprietary frontier</span>
-        <span class="item"><span class="swatch" style="background:var(--series-open)"></span>Open-weights frontier</span>
+        <span class="item"><span class="swatch" style="background:var(--series-prop)"></span>Proprietary</span>
+        <span class="item"><span class="swatch" style="background:var(--series-open)"></span>Open-weights</span>
         <span class="item"><span class="swatch" style="background:var(--muted)"></span>Superseded</span>
         <span class="item"><span class="line"></span>Parameter-efficiency frontier</span>
       </div>
@@ -390,7 +398,10 @@ const DATA = {"rows":[{"name":"Claude Opus 5.5 (Adaptive Reasoning, Max Effort, 
   $("cParams").textContent = S.parameterCount;
   $("evals").textContent  = S.evals.join(", ");
 
-  const labs = [...new Set(R.map(r => r.creator))].sort((a,b)=>a.localeCompare(b));
+  // An empty lab (some coding-agent runs do not name one) is not a category:
+  // skip it here so no blank entry reaches the dropdown, and show() renders
+  // it as the em dash on every surface that reads it.
+  const labs = [...new Set(R.map(r => r.creator))].filter(Boolean).sort((a,b)=>a.localeCompare(b));
   for (const l of labs) {
     const o = document.createElement("option");
     o.value = l; o.textContent = l; $("fLab").appendChild(o);
@@ -496,6 +507,16 @@ const DATA = {"rows":[{"name":"Claude Opus 5.5 (Adaptive Reasoning, Max Effort, 
   const strokeOf = r => unknownWeights(r) ? colourOf(r) : "var(--surface-1)";
   const weightsOf = r => unknownWeights(r) ? "not published"
                        : (r.open ? (r.lic || "open") : "proprietary");
+  // Secondary tooltip rows shared by every chart, so one record reads the
+  // same wherever it is hovered; the chart's own metric rows stay
+  // chart-specific and come first. Each value goes through show(), so a
+  // field the record does not carry renders as the em dash, never blank.
+  const secondaryRows = r => [
+    ["Lab", show(r.creator)],
+    ["Weights", weightsOf(r)],
+    ["Output speed", show(r.tps == null ? null : r.tps + " tok/s")],
+    ["Context", fmtCtx(r.ctx)],
+  ];
 
   /* ---------- scatter ---------- */
   // The plot fills whatever width the page gives it. The viewBox width tracks
@@ -585,7 +606,7 @@ const DATA = {"rows":[{"name":"Claude Opus 5.5 (Adaptive Reasoning, Max Effort, 
         segs.push([x1,y1,x2,y2]);
         d+=" L "+x2+" "+y2;
       }
-      svg.appendChild(el("path",{d:d,fill:"none",stroke:"var(--muted)",
+      svg.appendChild(el("path",{d:d,fill:"none",stroke:"var(--frontier-line)",
         "stroke-width":1.5,"stroke-dasharray":"5 4","stroke-linejoin":"round"}));
     }
 
@@ -593,7 +614,10 @@ const DATA = {"rows":[{"name":"Claude Opus 5.5 (Adaptive Reasoning, Max Effort, 
     pts=[];
     for(const r of rows){
       const cx=X(r.cost), cy=Y(r.ii), on=frontSet.has(r);
-      const c=el("circle",{cx:cx,cy:cy,r:on?6:5,fill:fillOf(r),
+      // the de-emphasis gray is page-wide, matching drawCapability: a point
+      // off this chart's frontier draws var(--muted); a frontier point keeps
+      // its weights fill
+      const c=el("circle",{cx:cx,cy:cy,r:on?6:5,fill:on?fillOf(r):"var(--muted)",
         stroke:strokeOf(r),"stroke-width":2,
         class:"pt"+(pins.has(r.name)?" pinned":""),role:"button",tabindex:0,
         "aria-label":"Pin "+r.name+" on the Intelligence Index chart",
@@ -606,7 +630,9 @@ const DATA = {"rows":[{"name":"Claude Opus 5.5 (Adaptive Reasoning, Max Effort, 
     // Real collision detection against every dot, every frontier segment, every
     // already-placed label and the plot edges. A label that cannot find a clear
     // slot is dropped entirely rather than shipped overlapping -- the tooltip
-    // and the table still carry it, so nothing becomes unreachable.
+    // and the table still carry it, so nothing becomes unreachable. The one
+    // exception is a pinned name, which falls back to a clamped placement that
+    // accepts overlap: the reader asked for that label by name.
     const PAD=3, boxes=[];
     const hitsBox=(a,b)=> a.x < b.x+b.w+PAD && a.x+a.w+PAD > b.x &&
                           a.y < b.y+b.h+PAD && a.y+a.h+PAD > b.y;
@@ -711,6 +737,20 @@ const DATA = {"rows":[{"name":"Claude Opus 5.5 (Adaptive Reasoning, Max Effort, 
         if(!leaderClear(sx,sy,nx,ny,own)) continue;
         put={bx,by,box,sx,sy,nx,ny}; break;
       }
+      // A pin is an explicit reader request: when every clear candidate is
+      // taken, clamp the label somewhere visible and accept the overlap --
+      // the same last resort the capability charts extend to their pins.
+      // Unpinned labels keep the refuse-and-drop behaviour above, so the
+      // dropped counter only ever counts labels nobody asked for by name.
+      if(!put&&pin){
+        const bx=Math.max(7,Math.min(W-w-7,cx+10));
+        const by=Math.max(T+PADY,Math.min(T+py-h-PADY,cy-h-6.5));
+        const box={x:bx-PADX,y:by-PADY,w:w+2*PADX,h:h+2*PADY};
+        const nx=Math.max(box.x,Math.min(cx,box.x+box.w));
+        const ny=Math.max(box.y,Math.min(cy,box.y+box.h));
+        const d=Math.hypot(nx-cx,ny-cy)||1;
+        put={bx,by,box,sx:cx+(nx-cx)/d*7,sy:cy+(ny-cy)/d*7,nx,ny};
+      }
       if(!put){ svg.removeChild(t); dropped++; continue; }
 
       // leader and box go behind the text, which was appended to measure it
@@ -750,10 +790,7 @@ const DATA = {"rows":[{"name":"Claude Opus 5.5 (Adaptive Reasoning, Max Effort, 
     n.textContent=r.name; tip.appendChild(n);
     const rows=[["Intelligence Index",r.ii.toFixed(1)],
                 ["Cost per task",fmtCost(r.cost)],
-                ["Lab",r.creator],
-                ["Weights",weightsOf(r)],
-                ["Output speed",r.tps==null?"—":r.tps+" tok/s"],
-                ["Context",fmtCtx(r.ctx)]];
+                ...secondaryRows(r)];
     rows.push(["On frontier", frontSet.has(r) ? "yes" : "no — superseded"]);
     if(r.dep) rows.push(["Vendor status","retired"]);
     for(const [k,v] of rows){
@@ -854,13 +891,16 @@ const DATA = {"rows":[{"name":"Claude Opus 5.5 (Adaptive Reasoning, Max Effort, 
       for(let i=1;i<frontier.length;i++){
         const m=metricOf(frontier[i],key); d+=" L "+X(m.cost)+" "+Y(m.score);
       }
-      chart.appendChild(el("path",{d,fill:"none",stroke:"var(--muted)",
+      chart.appendChild(el("path",{d,fill:"none",stroke:"var(--frontier-line)",
         "stroke-width":1.5,"stroke-dasharray":"5 4","stroke-linejoin":"round"}));
     }
     const pts=[];
     for(const r of rows){
       const m=metricOf(r,key), x=X(m.cost), y=Y(m.score), on=front.has(r);
-      const fill=key==="parameters"&&!on?"var(--muted)":fillOf(r);
+      // the de-emphasis gray is page-wide: a point off THIS chart's frontier
+      // draws var(--muted) here and on the other three charts alike, while a
+      // frontier point keeps its weights fill
+      const fill=!on?"var(--muted)":fillOf(r);
       const mark=el("circle",{cx:x,cy:y,r:on?6:5,fill:fill,
         stroke:strokeOf(r),"stroke-width":2,
         class:"pt"+(pins.has(r.name)?" pinned":""),role:"button",tabindex:0,
@@ -939,10 +979,10 @@ const DATA = {"rows":[{"name":"Claude Opus 5.5 (Adaptive Reasoning, Max Effort, 
     const name=document.createElement("div"); name.className="tname"; name.textContent=hit.r.name; popup.appendChild(name);
     const lines=key==="parameters"
       ? [["Intelligence Index",m.score.toFixed(1)],["Parameters",fmtParams(m.cost)],
-         ["Lab",hit.r.creator],["Weights",weightsOf(hit.r)],
+         ...secondaryRows(hit.r),
          ["On parameter frontier",plot.front.has(hit.r)?"yes":"no — superseded"]]
       : [[cfg.label,m.score.toFixed(1)],["Cost per task",fmtCost(m.cost)],
-         ["Lab",hit.r.creator],["Weights",weightsOf(hit.r)],
+         ...secondaryRows(hit.r),
          ["On frontier",plot.front.has(hit.r)?"yes":"no — superseded"]];
     if(hit.r.dep) lines.push(["Vendor status","retired"]);
     for(const [k,v] of lines){
@@ -986,7 +1026,7 @@ const DATA = {"rows":[{"name":"Claude Opus 5.5 (Adaptive Reasoning, Max Effort, 
         const m=metricOf(r,key), tr=document.createElement("tr");
         const add=(txt,cls)=>{const td=document.createElement("td");
           if(cls) td.className=cls; td.textContent=txt; tr.appendChild(td);};
-        add(METRICS[key].label); add(r.name,"name"); add(r.creator);
+        add(METRICS[key].label); add(r.name,"name"); add(show(r.creator));
         add(m.score.toFixed(1),"n"); add(fmtCost(m.cost),"n");
         add("$"+(m.cost/m.score).toFixed(4),"n");
         const td=document.createElement("td");
@@ -1039,7 +1079,7 @@ const DATA = {"rows":[{"name":"Claude Opus 5.5 (Adaptive Reasoning, Max Effort, 
       if(r.dep){const s=document.createElement("span");
         s.className="tag"; s.textContent="vendor-retired"; nameTd.appendChild(s);}
       tr.appendChild(nameTd);
-      add(r.creator);
+      add(show(r.creator));
       for(const key of Object.keys(METRICS)){
         const m=metricOf(r,key), score=document.createElement("td"), cost=document.createElement("td");
         score.className="n"; cost.className="n";
@@ -1106,7 +1146,7 @@ const DATA = {"rows":[{"name":"Claude Opus 5.5 (Adaptive Reasoning, Max Effort, 
     const val=(r,key,field)=>metricOf(r,key)?(field==="score"?metricOf(r,key).score.toFixed(1):fmtCost(metricOf(r,key).cost)):"—";
     const head="| Model | Lab | Coding Agent | Coding Agent $/task | Intelligence | Intelligence $/task | Parameters | GDPval-AA | GDPval $/task | $/1M in | $/1M out | Context | Weights |\n"
               +"|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|\n";
-    const body=rows.map(r=>"| "+[r.name,r.creator,
+    const body=rows.map(r=>"| "+[r.name,show(r.creator),
       val(r,"coding","score"),val(r,"coding","cost"),
       val(r,"intelligence","score"),val(r,"intelligence","cost"),
       fmtParams(r.params),
@@ -1118,8 +1158,10 @@ const DATA = {"rows":[{"name":"Claude Opus 5.5 (Adaptive Reasoning, Max Effort, 
   });
   $("copyJson").addEventListener("click",()=>{
     const views=metricViews(), rows=[...new Set(Object.values(views).flat())];
+    // same em dash as the page: an absent lab exports as "—", not ""
     clip(JSON.stringify({source:"artificialanalysis.ai",captured:"2026-09-28",
-      models:rows},null,2),"✓ JSON copied");
+      models:rows.map(r=>Object.assign({},r,{creator:show(r.creator)}))},null,2),
+      "✓ JSON copied");
   });
 
   /* ---------- wiring ---------- */
