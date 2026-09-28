@@ -125,13 +125,22 @@ actionlint .github/workflows/*.yml && zizmor .github/workflows/  # actionlint
 ```
 
 `python3 -m pip install -r requirements-dev.txt -r requirements-test.txt` gets
-the pinned toolchain. Coverage is gated at **88%** — a ratchet set under the
-current number, not a target. Raise it as coverage climbs; never lower it to
-turn a build green. Scripts are counted deliberately — `--omit` leaves out
-only `tests/*` — because they run unattended in CI. Note what that number can
-and cannot speak to: `build.py`
-is ~1400 lines but only ~100 statements, because most of it is HTML, CSS and
-JavaScript in string literals. The browser tests are what cover those.
+the pinned toolchain. Coverage is gated by a **ratchet**, not a fixed target:
+the floors live in `.github/ci-thresholds.json`, each seeded 1.5 points under
+the coverage of the run that recorded it, and are never lowered — not even by
+hand. There are two floors: Python statement coverage from the pytest run,
+and JavaScript physical code-line coverage of the page's inline script,
+measured through the browser suite (`tests/test_browser.py` records V8
+coverage when `JS_COVERAGE_OUT` is set, and `scripts/ci/js_coverage.py` folds
+the dump). A push to `main` whose coverage climbs more than 1.5 points past
+the recorded measurement raises the floor automatically; a pull request
+cannot relax the file — a guard step compares it against the merge base and
+refuses any change that lowers a value.
+Scripts are counted deliberately — `--omit` leaves out only `tests/*` —
+because they run unattended in CI. Note what the numbers can and cannot speak
+to: `build.py` is ~1400 lines but only ~100 statements, because most of it is
+HTML, CSS and JavaScript in string literals. The browser tests are what cover
+those.
 
 Three run only on GitHub. `codeql` is gated on repository visibility, because
 code scanning is free on public repositories and needs Code Security on private

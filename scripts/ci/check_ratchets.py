@@ -56,7 +56,14 @@ def _is_number(value):
         return False
     if isinstance(value, Decimal):
         return value.is_finite()
-    return isinstance(value, (int, float))  # unrounded ints parse exactly
+    return isinstance(value, (int, float))
+
+
+def _decimal(value):
+    """The value as a Decimal, so the gap arithmetic cannot mix types."""
+    if isinstance(value, Decimal):
+        return value
+    return Decimal(str(value))
 
 
 def _show(value):
@@ -131,7 +138,7 @@ def _implied_floor_findings(before, after):
             continue
         if not (_is_number(measured) and _is_number(floor)):
             continue
-        if floor != measured - GAP:
+        if _decimal(floor) != _decimal(measured) - GAP:
             findings.append(_finding(
                 floor_key, before.get(floor_key), floor,
                 f'is not the floor implied by measured {measured}: a '
