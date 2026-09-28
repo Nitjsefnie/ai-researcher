@@ -379,6 +379,83 @@ class BrowserInteractionTests(unittest.TestCase):
                 self.assertEqual(row["creator"], "—")
         page.close()
 
+    def test_tooltip_secondary_rows_identical_across_charts(self):
+        # #29: one record must read the same wherever it is hovered. The
+        # intelligence tooltip used to carry "Output speed" and "Context"
+        # rows the three capability tooltips omitted. All four tooltips now
+        # share one secondary-row builder; the chart's own metric rows stay
+        # chart-specific and first.
+        page = self.browser.new_page(viewport={"width": 1280, "height": 900})
+        page.goto(build.OUT.as_uri())
+        chart_labels = {"coding": "Coding Agent Index",
+                        "intelligence": "Intelligence Index",
+                        "agentic": "GDPval-AA v2",
+                        "parameters": "Parameter efficiency"}
+        secondary = ["Lab", "Weights", "Output speed", "Context"]
+
+        def tip_rows(chart):
+            out = {}
+            rows = page.locator(f"#tip-{chart} .trow")
+            for i in range(rows.count()):
+                row = rows.nth(i)
+                out[row.locator("span").first.inner_text()] = \
+                    row.locator("span.tv").inner_text()
+            return out
+
+        def hover_by_name(chart, name):
+            aria = f"Pin {name} on the {chart_labels[chart]} chart"
+            self.assertNotIn('"', name)
+            page.locator(
+                f'#svg-{chart} circle.pt[aria-label="{aria}"]').hover()
+            return tip_rows(chart)
+
+        # a model present on the intelligence, agentic and parameter charts
+        name_sets = {}
+        for chart in ("intelligence", "agentic", "parameters"):
+            aris = page.evaluate(
+                "sel => [...document.querySelectorAll(sel)]"
+                ".map(c => c.getAttribute('aria-label'))",
+                f"#svg-{chart} circle.pt")
+            suffix = f" on the {chart_labels[chart]} chart"
+            name_sets[chart] = {
+                a[len("Pin "):-len(suffix)] for a in aris
+                if a.startswith("Pin ") and a.endswith(suffix)
+            }
+        common = name_sets["intelligence"] & name_sets["agentic"] \
+            & name_sets["parameters"]
+        self.assertTrue(common)
+        model = sorted(n for n in common if '"' not in n)[0]
+
+        snapshots = {chart: hover_by_name(chart, model)
+                     for chart in ("intelligence", "agentic", "parameters")}
+        for chart, rows in snapshots.items():
+            with self.subTest(chart=chart):
+                for key in secondary:
+                    self.assertIn(key, rows)
+        for key in secondary:
+            values = {snapshots[c][key]
+                      for c in ("intelligence", "agentic", "parameters")}
+            self.assertEqual(len(values), 1,
+                             f"{key} differs across charts: {values}")
+
+        # agent rows carry no speed/context fields -- the shared builder must
+        # render those as the em dash rather than omitting the rows
+        aris = page.evaluate(
+            "sel => [...document.querySelectorAll(sel)]"
+            ".map(c => c.getAttribute('aria-label'))", "#svg-coding circle.pt")
+        agent_names = [
+            a[len("Pin "):-len(" on the Coding Agent Index chart")]
+            for a in aris
+            if a.startswith("Pin ") and a.endswith(" on the Coding Agent Index chart")
+        ]
+        agent = next(n for n in agent_names if '"' not in n)
+        agent_rows = hover_by_name("coding", agent)
+        for key in secondary:
+            self.assertIn(key, agent_rows)
+        self.assertEqual(agent_rows["Output speed"], "—")
+        self.assertEqual(agent_rows["Context"], "—")
+        page.close()
+
     def test_script_terminators_in_remote_strings_cannot_execute(self):
         lower = "</script><script>document.documentElement.dataset.auditLower=1</script>"
         mixed = "</ScRiPt><ScRiPt>document.documentElement.dataset.auditMixed=1</sCrIpT>"
