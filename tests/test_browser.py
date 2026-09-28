@@ -174,10 +174,9 @@ class BrowserInteractionTests(unittest.TestCase):
                     has_text="Superseded"
                 )
                 self.assertEqual(legend.count(), 1)
-                self.assertIn(
-                    "var(--muted)",
-                    legend.locator(".swatch").first.get_attribute("style"),
-                )
+                style = legend.locator(".swatch").first.get_attribute("style")
+                assert style is not None, "Superseded swatch has no style attribute"
+                self.assertIn("var(--muted)", style)
         page.close()
 
     def test_pinned_names_stay_labelled_on_every_chart(self):
