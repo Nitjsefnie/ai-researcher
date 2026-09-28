@@ -812,7 +812,10 @@ const DATA = __DATA__;
   $("cParams").textContent = S.parameterCount;
   $("evals").textContent  = S.evals.join(", ");
 
-  const labs = [...new Set(R.map(r => r.creator))].sort((a,b)=>a.localeCompare(b));
+  // An empty lab (some coding-agent runs do not name one) is not a category:
+  // skip it here so no blank entry reaches the dropdown, and show() renders
+  // it as the em dash on every surface that reads it.
+  const labs = [...new Set(R.map(r => r.creator))].filter(Boolean).sort((a,b)=>a.localeCompare(b));
   for (const l of labs) {
     const o = document.createElement("option");
     o.value = l; o.textContent = l; $("fLab").appendChild(o);
@@ -1191,7 +1194,7 @@ const DATA = __DATA__;
     n.textContent=r.name; tip.appendChild(n);
     const rows=[["Intelligence Index",r.ii.toFixed(1)],
                 ["Cost per task",fmtCost(r.cost)],
-                ["Lab",r.creator],
+                ["Lab",show(r.creator)],
                 ["Weights",weightsOf(r)],
                 ["Output speed",r.tps==null?"—":r.tps+" tok/s"],
                 ["Context",fmtCtx(r.ctx)]];
@@ -1383,10 +1386,10 @@ const DATA = __DATA__;
     const name=document.createElement("div"); name.className="tname"; name.textContent=hit.r.name; popup.appendChild(name);
     const lines=key==="parameters"
       ? [["Intelligence Index",m.score.toFixed(1)],["Parameters",fmtParams(m.cost)],
-         ["Lab",hit.r.creator],["Weights",weightsOf(hit.r)],
+         ["Lab",show(hit.r.creator)],["Weights",weightsOf(hit.r)],
          ["On parameter frontier",plot.front.has(hit.r)?"yes":"no — superseded"]]
       : [[cfg.label,m.score.toFixed(1)],["Cost per task",fmtCost(m.cost)],
-         ["Lab",hit.r.creator],["Weights",weightsOf(hit.r)],
+         ["Lab",show(hit.r.creator)],["Weights",weightsOf(hit.r)],
          ["On frontier",plot.front.has(hit.r)?"yes":"no — superseded"]];
     if(hit.r.dep) lines.push(["Vendor status","retired"]);
     for(const [k,v] of lines){
@@ -1430,7 +1433,7 @@ const DATA = __DATA__;
         const m=metricOf(r,key), tr=document.createElement("tr");
         const add=(txt,cls)=>{const td=document.createElement("td");
           if(cls) td.className=cls; td.textContent=txt; tr.appendChild(td);};
-        add(METRICS[key].label); add(r.name,"name"); add(r.creator);
+        add(METRICS[key].label); add(r.name,"name"); add(show(r.creator));
         add(m.score.toFixed(1),"n"); add(fmtCost(m.cost),"n");
         add("$"+(m.cost/m.score).toFixed(4),"n");
         const td=document.createElement("td");
@@ -1483,7 +1486,7 @@ const DATA = __DATA__;
       if(r.dep){const s=document.createElement("span");
         s.className="tag"; s.textContent="vendor-retired"; nameTd.appendChild(s);}
       tr.appendChild(nameTd);
-      add(r.creator);
+      add(show(r.creator));
       for(const key of Object.keys(METRICS)){
         const m=metricOf(r,key), score=document.createElement("td"), cost=document.createElement("td");
         score.className="n"; cost.className="n";
@@ -1550,7 +1553,7 @@ const DATA = __DATA__;
     const val=(r,key,field)=>metricOf(r,key)?(field==="score"?metricOf(r,key).score.toFixed(1):fmtCost(metricOf(r,key).cost)):"—";
     const head="| Model | Lab | Coding Agent | Coding Agent $/task | Intelligence | Intelligence $/task | Parameters | GDPval-AA | GDPval $/task | $/1M in | $/1M out | Context | Weights |\n"
               +"|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|\n";
-    const body=rows.map(r=>"| "+[r.name,r.creator,
+    const body=rows.map(r=>"| "+[r.name,show(r.creator),
       val(r,"coding","score"),val(r,"coding","cost"),
       val(r,"intelligence","score"),val(r,"intelligence","cost"),
       fmtParams(r.params),
@@ -1562,8 +1565,10 @@ const DATA = __DATA__;
   });
   $("copyJson").addEventListener("click",()=>{
     const views=metricViews(), rows=[...new Set(Object.values(views).flat())];
+    // same em dash as the page: an absent lab exports as "—", not ""
     clip(JSON.stringify({source:"artificialanalysis.ai",captured:"__CAPTURED__",
-      models:rows},null,2),"✓ JSON copied");
+      models:rows.map(r=>Object.assign({},r,{creator:show(r.creator)}))},null,2),
+      "✓ JSON copied");
   });
 
   /* ---------- wiring ---------- */
