@@ -27,7 +27,9 @@ else:
     js_lines = importlib.import_module('js_lines')
 
 ROOT = Path(__file__).resolve().parents[2]
-PAGE = Path('out') / 'frontier-models.html'
+# Spelled POSIX and kept a string: this is the report's row name and the
+# error label on every OS, while path joins convert it to the native form.
+PAGE = 'out/frontier-models.html'
 
 
 @dataclass
@@ -130,12 +132,12 @@ def collect_coverage(dump_path, root):
             'from a run that never loaded the built page, or the page was '
             'rebuilt since the dump was captured')
     counts = merge_records(attributed, len(script))
-    executable = js_lines.code_lines(script, str(PAGE))
+    executable = js_lines.code_lines(script, PAGE)
     covered = {
         line for line, start, end in _line_spans(script)
         if line in executable and any(counts[start:end])
     }
-    files = {str(PAGE): FileCoverage(executable, covered)}
+    files = {PAGE: FileCoverage(executable, covered)}
     return CoverageReport(files, len(entries), ignored_other)
 
 
