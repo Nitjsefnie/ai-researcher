@@ -111,11 +111,11 @@ reachable through those tests, so a change to the emitted JavaScript needs one.
 
 ## CI
 
-Six workflows run. Five of them you can run locally:
+Seven workflows run. Six of them you can run locally:
 
 ```sh
 python3 -m pytest -q                                             # tests
-python3 -m coverage run --source=. --omit='tests/*,scripts/*' \
+python3 -m coverage run --source=. --omit='tests/*' \
   -m pytest -q && python3 -m coverage report                     # coverage
 git ls-files '*.py' | xargs python3 -m pylint                    # lint
 git ls-files '*.py' | xargs python3 -m pycodestyle               # lint
@@ -125,13 +125,15 @@ actionlint .github/workflows/*.yml && zizmor .github/workflows/  # actionlint
 ```
 
 `python3 -m pip install -r requirements-dev.txt -r requirements-test.txt` gets
-the pinned toolchain. Coverage is gated at **95%** — a ratchet set under the
+the pinned toolchain. Coverage is gated at **88%** — a ratchet set under the
 current number, not a target. Raise it as coverage climbs; never lower it to
-turn a build green. Note what that number can and cannot speak to: `build.py`
+turn a build green. Scripts are counted deliberately — `--omit` leaves out
+only `tests/*` — because they run unattended in CI. Note what that number can
+and cannot speak to: `build.py`
 is ~1400 lines but only ~100 statements, because most of it is HTML, CSS and
 JavaScript in string literals. The browser tests are what cover those.
 
-The sixth, `codeql`, needs GitHub: it is gated on repository visibility,
+The seventh, `codeql`, needs GitHub: it is gated on repository visibility,
 because code scanning is free on public repositories and needs Code Security on
 private ones.
 
