@@ -56,8 +56,11 @@ class BrowserInteractionTests(unittest.TestCase):
             original_close = page.close
 
             def close(**close_kwargs):
-                if page in cls._open_pages:
-                    cls._open_pages.remove(page)
+                # the list holds (page, session) pairs — membership must be
+                # tested the same way, or a closed page stays queued for a
+                # second, doomed collection in tearDownClass
+                if (page, session) in cls._open_pages:
+                    cls._open_pages.remove((page, session))
                 cls._coverage_entries.extend(
                     cls._collect_coverage(session))
                 return original_close(**close_kwargs)

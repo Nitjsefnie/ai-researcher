@@ -214,8 +214,10 @@ jobs:
         # coverage of the run that recorded it, so ordinary churn stays green
         # and a real regression goes red. On a push to main this workflow
         # raises the floor itself once coverage climbs more than the
-        # hysteresis (1.5) above the recorded measured — the floor is never
-        # lowered, not even by hand.
+        # hysteresis (1.5) above the recorded measured. CI never lowers the
+        # floor: the automated raise is the only writer on main, and the
+        # Ratchet documents step below refuses a pull request that relaxes
+        # the document.
         #
         # SCRIPTS ARE COUNTED, and that is a deliberate reversal. They were
         # omitted while they were operator tooling a human ran and eyeballed.
@@ -233,6 +235,7 @@ jobs:
           python3 -m coverage report "--fail-under=${floor}" --precision=1
 
       - name: JavaScript coverage gate
+        id: jscov
         if: ${{ !cancelled() && steps.pytest.conclusion != 'skipped' }}
         # The front-end half of the same ratchet. The browser harness wrote
         # the V8 block coverage Chromium collected for the built page to
@@ -275,6 +278,7 @@ jobs:
         # hysteresis, leaves the document untouched.
         id: ratchet
         if: ${{ !cancelled() && steps.pytest.outcome == 'success'
+                && steps.jscov.outcome == 'success'
                 && github.event_name == 'push'
                 && github.ref == 'refs/heads/main' }}
         env:
