@@ -13,6 +13,17 @@ on:
       - '**/*.md'
       - 'LICENSE'
       - '.gitignore'
+    # Paired with pull_request, push must name branches: an in-repo PR head
+    # would otherwise run twice per commit under two refs the github.ref
+    # concurrency group cannot collapse.
+    branches: [main]
+  pull_request:
+    # Same paths-ignore as push. No branches filter: PRs target main only
+    # here.
+    paths-ignore:
+      - '**/*.md'
+      - 'LICENSE'
+      - '.gitignore'
   workflow_dispatch:
 
 permissions:
