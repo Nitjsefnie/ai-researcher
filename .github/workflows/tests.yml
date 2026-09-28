@@ -3,13 +3,25 @@ name: tests
 # The suite that guards the published page: 10 unittest TestCases, half of
 # them driving the built HTML in a real headless Chromium through playwright.
 #
-# THE RUNNER IS `python3 -m pytest`, NOT `pytest`, AND NOT `unittest
-# discover`. tests/ has no __init__.py and the tests `import build` from the
-# repo root, so the root has to be on sys.path. Only the `-m` form puts the
-# cwd there — the bare `pytest` binary collects the same files and every test
-# errors on the import. `unittest discover -t .` refuses outright ("start
-# directory is not importable"). pytest is the runner here purely because it
-# tolerates that layout; nothing in the suite is written against pytest.
+# TWO JOBS, split on purpose. `suites` is a 3-OS x 3-Python matrix running the
+# non-browser suite on every cell — that is what buys portability coverage of
+# the tooling itself. `coverage` is the dedicated Linux job: the full suite
+# (browser included) under the coverage ratchet. The browser suite stays OUT
+# of the matrix because (a) playwright's --with-deps browser install is
+# Ubuntu-only, so cross-OS browser steps would need per-OS install recipes for
+# near-zero signal, and (b) the page under test is OS-independent text (HTML/
+# JS built by build.py), so a second OS adds no behavioral coverage the matrix
+# misses. The coverage job installs playwright and Chromium; the matrix job
+# does not. That asymmetry is deliberate.
+#
+# THE RUNNER IS ALWAYS THE `-m` FORM — `python -m pytest`, NOT `pytest`, AND
+# NOT `unittest discover`. tests/ has no __init__.py and the tests `import
+# build` from the repo root, so the root has to be on sys.path. Only the `-m`
+# form puts the cwd there — the bare `pytest` binary collects the same files
+# and every test errors on the import. `unittest discover -t .` refuses
+# outright ("start directory is not importable"). pytest is the runner here
+# purely because it tolerates that layout; nothing in the suite is written
+# against pytest.
 
 on:
   push:
@@ -47,7 +59,70 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  pytest:
+  # --- The portability matrix -------------------------------------------
+  # The non-browser suite across ubuntu-latest, windows-latest and
+  # macos-latest x Python 3.11/3.12/3.13. No playwright, no Chromium, no
+  # coverage — those live in the `coverage` job below.
+  suites:
+    name: pytest (${{ matrix.os }}, ${{ matrix.python }})
+    runs-on: ${{ matrix.os }}
+    # Per-cell ceiling, matching the catalogue's tests.yml: a hung cell fails
+    # in 20 minutes instead of holding GitHub's 6-hour default.
+    timeout-minutes: 20
+    defaults:
+      run:
+        # One shell on every OS keeps the run blocks identical syntax, and it
+        # has to be bash — the windows default (pwsh) would need different
+        # syntax. The commands use bare `python`, never `python3`: on windows
+        # runners the WindowsApps `python3` stub hijacks PATH, while `python`
+        # resolves to the setup-python install on all three OSes.
+        shell: bash
+
+    strategy:
+      fail-fast: false
+      # 3.11 is the floor: all three pinned test tools (pytest 9.1.1,
+      # playwright 1.63.0, coverage 7.16.1) declare requires_python >=3.10,
+      # and 3.11/3.12/3.13 is the catalogue's standard triple. The full suite
+      # was measured green under 3.11 and 3.12 locally on Linux (118 passed
+      # each); CI runs 3.13 today.
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        python: ["3.11", "3.12", "3.13"]
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # Nothing in this workflow pushes. Leaving the job token in
+          # .git/config lets any later step — or anything a dependency pulls
+          # in — reuse it.
+          persist-credentials: false
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: ${{ matrix.python }}
+          cache: pip
+          # There is no requirements.txt here (the runtime is pure stdlib), so
+          # the cache must be keyed off the pins that do exist or setup-python
+          # fails the job looking for one.
+          cache-dependency-path: requirements-*.txt
+
+      - name: Install the test toolchain
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements-test.txt
+
+      - name: Run tests
+        # --ignore=tests/test_browser.py: the browser suite stays OUT of the
+        # matrix and lives only in the `coverage` job below — --with-deps is
+        # Ubuntu-only and the page under test is OS-independent text, so a
+        # second OS adds nothing (see the header for the full reasoning).
+        run: python -m pytest -q -ra --ignore=tests/test_browser.py
+
+  # --- The dedicated Linux job for the browser suite ---------------------
+  # The full suite (browser included) under coverage. It installs playwright
+  # and Chromium; the matrix job above does not — that asymmetry is
+  # deliberate, see the header and the matrix job's --ignore comment.
+  coverage:
     runs-on: ubuntu-latest
 
     steps:
