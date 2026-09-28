@@ -20,6 +20,19 @@ on:
       - '**/*.md'
       - 'LICENSE'
       - '.gitignore'
+    # Paired with pull_request, push must name branches: an in-repo PR head
+    # would otherwise run twice per commit under two refs the github.ref
+    # concurrency group cannot collapse.
+    branches: [main]
+  pull_request:
+    # Deny-list rather than an allow-list: a new top-level code directory
+    # would silently stop being tested under an allow-list, whereas an
+    # unlisted path here just runs CI needlessly.
+    # No branches filter: PRs target main only here.
+    paths-ignore:
+      - '**/*.md'
+      - 'LICENSE'
+      - '.gitignore'
   workflow_dispatch:
 
 # Least privilege: this job only reads the tree. Without an explicit block it

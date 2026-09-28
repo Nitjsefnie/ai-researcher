@@ -28,6 +28,23 @@ on:
       - '**/*.md'
       - 'LICENSE'
       - '.gitignore'
+    # Paired with pull_request, push must name branches: an in-repo PR head
+    # would otherwise run twice per commit under two refs the github.ref
+    # concurrency group cannot collapse.
+    branches: [main]
+  pull_request:
+    # Same deny-list as tests.yml — an allow-list would silently stop scanning
+    # a new top-level code directory.
+    # No branches filter: PRs target main only here.
+    #
+    # PR heads run untrusted code, so note the write surface: this job's only
+    # write is the `security-events: write` upload of its OWN analysis results
+    # — the standard GitHub starter pattern for push+pull_request — and the
+    # scheduled publish path (refresh.yml) stays off PR events entirely.
+    paths-ignore:
+      - '**/*.md'
+      - 'LICENSE'
+      - '.gitignore'
   schedule:
     # Wednesday 03:47 UTC. Off the hour and off Monday deliberately: the top
     # of the hour is when every cron on GitHub fires at once and jobs queue.
@@ -68,7 +85,9 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           # No `ref:` here: CodeQL must analyse exactly the commit it will
-          # file alerts against, which is the event's own SHA.
+          # file alerts against, which is the event's own SHA. On a
+          # pull_request event that SHA is the refs/pull/N/merge merge commit —
+          # exactly what a checkout without `ref:` checks out.
           persist-credentials: false
 
       - name: Initialize CodeQL

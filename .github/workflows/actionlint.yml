@@ -29,6 +29,16 @@ on:
     paths:
       - '.github/workflows/**'
       - '.github/dependabot.yml'
+    # Paired with pull_request, push must name branches: an in-repo PR head
+    # would otherwise run twice per commit under two refs the github.ref
+    # concurrency group cannot collapse.
+    branches: [main]
+  pull_request:
+    # Same paths allow-list as push. No branches filter: PRs target main only
+    # here.
+    paths:
+      - '.github/workflows/**'
+      - '.github/dependabot.yml'
   workflow_dispatch:
 
 permissions:
