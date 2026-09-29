@@ -99,6 +99,10 @@ data. If you find a way to make it do something its author did not
 intend, report it privately — see [SECURITY.md](SECURITY.md). Please do
 not open a public issue for it.
 
+## License
+
+MIT — see [LICENSE](LICENSE).
+
 ## What this repo is not
 
 Not a benchmark harness — AA runs the evals, we read their numbers. Not a
