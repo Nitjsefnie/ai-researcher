@@ -29,6 +29,8 @@ import os
 import pathlib
 import re
 import sys
+import time
+import typing
 import urllib.error
 import urllib.request
 
@@ -68,6 +70,48 @@ STAMP = ROOT / "data" / "captured-at.txt"
 # The flight payload escapes the model array into JS string chunks.
 CHUNK_RE = re.compile(r'self\.__next_f\.push\(\[1,("(?:[^"\\]|\\.)*")\]\)')
 
+# Cross-route disagreement retry (issue #89). AA updates its leaderboard and
+# model-detail routes minutes apart, and a capture that straddles an update
+# sees a mixed snapshot: check_route_agreement refuses it -- correctly, the
+# page must never ship a score from one AA run beside a cost from another --
+# but before this bound every such refusal turned the whole refresh run red
+# even though a re-read minutes later passed (three red runs on 2026-09-29).
+# On a disagreement the capture waits and re-fetches BOTH routes, comparing a
+# complete fresh pair each time; the unit of retry is the (leaderboard,
+# detail) PAIR, and the coding-agents page is still fetched once, after a
+# pair agrees.
+#
+# The bound, against refresh.yml's timeout-minutes: 30 (1800 s), which is
+# sized for a FULL heal run -- checkout, setup-python, the pip + Chromium
+# installs, the browser suite, build, commit, publish (~7 min / 420 s
+# measured) -- on top of the capture. Worst case for the capture itself:
+#
+#     waits:   (ATTEMPTS - 1) * WAIT_SECONDS
+#              = 3 * 120                                             =  360 s
+#     fetches: ATTEMPTS * 2 * FETCH_TIMEOUT_SECONDS
+#              (leaderboard + detail per attempt, at the urlopen bound)
+#              = 4 * 2 * 90                                          =  720 s
+#     agents:  FETCH_TIMEOUT_SECONDS, fetched once after a pair agrees
+#                                                                    =   90 s
+#     total                                                        = 1170 s
+#
+# 1170 s is inside the 1200 s capture budget the suite pins
+# (RetryBoundArithmeticTests), which leaves >= 600 s of the job for
+# everything that is not the capture -- the ~420 s heal remainder, with
+# slack. The fetch terms are the per-fetch BOUND, not a promise: a slow-drip
+# body can outlast a single socket timeout, and the 600 s of headroom is
+# what absorbs the difference rather than the sum meeting the job timeout.
+ATTEMPTS = 4
+WAIT_SECONDS = 120
+FETCH_TIMEOUT_SECONDS = 90
+
+
+def _sleep(seconds: float) -> None:
+    """The wait between re-read attempts, as a seam so tests can record the
+    waits without sleeping."""
+    time.sleep(seconds)
+
+
 # AA no longer server-renders the full coding table it once did; what remains
 # is a smaller set split across two arrays, currently thirteen rows. The floor
 # only has to catch that set vanishing outright rather than shrinking, since
@@ -88,7 +132,7 @@ def fetch_html(cached: str | None, url: str = URL) -> str:
         return pathlib.Path(cached).read_text(encoding="utf-8", errors="replace")
     req = urllib.request.Request(url, headers={"User-Agent": UA})
     try:
-        with urllib.request.urlopen(req, timeout=90) as r:
+        with urllib.request.urlopen(req, timeout=FETCH_TIMEOUT_SECONDS) as r:
             return r.read().decode("utf-8", errors="replace")
     except (urllib.error.URLError, OSError) as exc:
         # HTTPError subclasses URLError and socket.timeout subclasses OSError,
@@ -418,6 +462,96 @@ def write_atomic(path: pathlib.Path, text: str) -> None:
         raise
 
 
+class _RouteDisagreement(SystemExit):
+    """check_route_agreement's refusal, tagged for the retry loop.
+
+    The retry loop catches ONLY this tagged exit; every other SystemExit a
+    capture attempt can raise (schema change, index bump, no free detail
+    host) propagates uncaught -- pinned from main() by
+    RouteDisagreementRetryTests. The tag is applied at the agreement call
+    site by converting whatever SystemExit check_route_agreement raises,
+    and TODAY that is only the divergence exit: the check's own contract is
+    to return the compared count or exit listing the divergences, and the
+    coupling is to those two documented outcomes, not a promise about its
+    future -- a second exit kind appearing there would be tagged and
+    retried with this code none the wiser.
+
+    Tagging keeps the scoping true without matching on the message. The
+    message is untouched, so on the last attempt the process still exits 1
+    with exactly the diagnostic the check has always raised (issue #89).
+    """
+
+
+class CapturePair(typing.NamedTuple):
+    """One capture attempt's agreed (leaderboard, detail) pair, plus what
+    the capture log quotes from the attempt that produced it."""
+
+    base: list
+    detail: list
+    host: str
+    version: str
+    shared_values: int
+
+
+def capture_pair(cached_base: str | None, cached_detail: str | None) -> CapturePair:
+    """One capture attempt: BOTH routes fetched fresh, each parsed from its
+    own bytes, and check_route_agreement run UNCHANGED over the fresh pair.
+
+    detail_host_slug is recomputed from THIS attempt's own leaderboard: the
+    detail page is chosen for what its page excludes, so a retry must never
+    pair attempt N's leaderboard with attempt N-1's host. Everything the
+    caller keeps comes from the attempt that returns from here -- no parsed
+    value crosses attempts, so the written capture cannot mix one attempt's
+    score with another's cost.
+    """
+    payload = flight_payload(fetch_html(cached_base))
+    version = check_index_version(payload)
+    base = richest_models_array(payload)
+
+    host = detail_host_slug(base)
+    detail = richest_models_array(
+        flight_payload(fetch_html(cached_detail,
+                                  MODEL_DETAIL_URL.format(slug=host)))
+    )
+    # The page claims the two routes agree exactly on every value they share;
+    # only a check run while they are still separate can see a divergence --
+    # after the merge, the leaderboard's copy shadows the detail's (issue
+    # #44).
+    try:
+        shared_values = check_route_agreement(base, detail)
+    except SystemExit as exc:
+        raise _RouteDisagreement(exc.code) from None
+    return CapturePair(base, detail, host, version, shared_values)
+
+
+def capture_pair_retrying(cached_base: str | None,
+                          cached_detail: str | None) -> CapturePair:
+    """capture_pair, retried while the two routes disagree (issue #89).
+
+    Each refusal costs one stderr line and one bounded wait, then a fully
+    fresh pair -- fresh bytes, fresh parse, nothing carried over. The loop
+    covers attempts 1..ATTEMPTS-1; the LAST attempt runs outside the try, so
+    its refusal propagates uncaught: the exact unchanged diagnostic, exit 1,
+    nothing written.
+
+    A capture whose pages BOTH come from --html/--detail-html files is
+    exempt: those bytes are pinned, so a re-read would return the identical
+    snapshot and the wait could never clear the disagreement -- the one
+    attempt then refuses exactly as before this bound existed.
+    """
+    both_cached = bool(cached_base) and bool(cached_detail)
+    attempts = 1 if both_cached else ATTEMPTS
+    for attempt in range(1, attempts):
+        try:
+            return capture_pair(cached_base, cached_detail)
+        except _RouteDisagreement:
+            print(f"routes disagree on attempt {attempt} of {attempts}; "
+                  f"re-reading both routes in {WAIT_SECONDS}s",
+                  file=sys.stderr)
+            _sleep(WAIT_SECONDS)
+    return capture_pair(cached_base, cached_detail)
+
+
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--html", help="use a cached copy of the leaderboard HTML")
@@ -425,21 +559,8 @@ def main() -> None:
     ap.add_argument("--agents-html", help="use a cached copy of the coding-agents HTML")
     args = ap.parse_args()
 
-    payload = flight_payload(fetch_html(args.html))
-    version = check_index_version(payload)
-    base = richest_models_array(payload)
-
-    host = detail_host_slug(base)
-    detail = richest_models_array(
-        flight_payload(fetch_html(args.detail_html,
-                                  MODEL_DETAIL_URL.format(slug=host)))
-    )
-    # The page claims the two routes agree exactly on every value they share;
-    # only a check run while they are still separate can see a divergence --
-    # after the merge, the leaderboard's copy shadows the detail's (issue
-    # #44).
-    shared_values = check_route_agreement(base, detail)
-    models = merge_captures(base, detail)
+    pair = capture_pair_retrying(args.html, args.detail_html)
+    models = merge_captures(pair.base, pair.detail)
     priced = check_cost_breakdown(models)
     agents = coding_agent_rows(
         flight_payload(fetch_html(args.agents_html, AGENTS_URL))
@@ -452,9 +573,9 @@ def main() -> None:
 
     scored = sum(1 for m in models if isinstance(m.get("intelligenceIndex"), (int, float)))
     print(f"wrote {OUT.relative_to(ROOT)}: {len(models)} models, {scored} with an "
-          f"intelligence index, {priced} with a v{version} cost breakdown "
-          f"(detail merged from /models/{host}; {shared_values} shared values "
-          "cross-checked)")
+          f"intelligence index, {priced} with a v{pair.version} cost breakdown "
+          f"(detail merged from /models/{pair.host}; {pair.shared_values} shared "
+          "values cross-checked)")
     print(f"wrote {AGENTS_OUT.relative_to(ROOT)}: {len(agents)} agent+model rows "
           f"with a paired index score and cost per task")
 

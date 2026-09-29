@@ -449,11 +449,11 @@ def detail_record(**overrides: object) -> dict:
             **overrides}
 
 
-def leaderboard_payload() -> str:
+def leaderboard_payload(host_slug: str = "detail-host-model") -> str:
     """A leaderboard flight payload: the pinned index version and the model
-    array, one unpriced detail host plus the shared model. Compact JSON --
-    the extractor anchors on that shape."""
-    host = {"slug": "detail-host-model",
+    array, one unpriced detail host (named `host_slug`) plus the shared
+    model. Compact JSON -- the extractor anchors on that shape."""
+    host = {"slug": host_slug,
             "intelligenceIndexCostPerTask": "$undefined"}
     return json.dumps({
         "intro": f"Intelligence Index v{fetch_aa.INDEX_VERSION}",
@@ -844,6 +844,417 @@ class TransportErrorTests(unittest.TestCase):
         self.assertIn("fetch failed", proc.stderr)
         self.assertIn("Connection refused", proc.stderr)
         self.assertEqual(proc.stdout, "")
+
+
+def serving(*pages: str):
+    """A urlopen route handler serving each page in turn, the last repeating.
+
+    This is what AA midway through an update looks like to the stub: the
+    same route answers a different snapshot on each read, then settles."""
+    remaining = list(pages)
+
+    def handler() -> _FakeResponse:
+        page = remaining.pop(0) if remaining else pages[-1]
+        return _FakeResponse(page)
+
+    return handler
+
+
+class RouteDisagreementRetryTests(unittest.TestCase):
+    """Issue #89: a cross-route disagreement that clears within a bounded
+    wait must not fail the hourly refresh. fetch_aa waits, re-reads BOTH
+    routes, and compares a complete fresh pair each time -- proceeding once
+    they agree, refusing with the unchanged diagnostic only past the bound.
+
+    Every page comes through LoudUrlopenStub (unmodeled URLs raise rather
+    than touch the network) and the sleep seam is a recorder, so no test
+    really sleeps. The written captures are the observable for "never mix
+    attempts": attempts can carry distinct sentinels, and the written bytes
+    must be the SUCCESSFUL attempt's data alone.
+    """
+
+    DETAIL_URL = fetch_aa.MODEL_DETAIL_URL.format(slug="detail-host-model")
+    AGENTS = flight_html(agent_payload(
+        [agent_row(f"Agent - Model {i}") for i in range(5)]))
+
+    @contextlib.contextmanager
+    def capture_over_routes(self, routes: dict, *, seed: bool = False):
+        """fetch_aa.main() over the stubbed urlopen with the sleep seam
+        recorded. Yields (root, stub, sleeps, run, captured); call run()
+        inside the block -- it returns (stdout, stderr) on success, and
+        `captured` holds both buffers even when it raises. The written
+        captures are readable under root while the block is open."""
+        stub = LoudUrlopenStub(routes)
+        sleeps: list = []
+        with tempfile.TemporaryDirectory(prefix=".issue-89-retry-") as tmp:
+            root = pathlib.Path(tmp)
+            old = (fetch_aa.ROOT, fetch_aa.OUT, fetch_aa.AGENTS_OUT,
+                   fetch_aa.STAMP)
+            argv = sys.argv
+            try:
+                fetch_aa.ROOT = root
+                fetch_aa.OUT = root / "aa-raw-models.json"
+                fetch_aa.AGENTS_OUT = root / "aa-raw-coding-agents.json"
+                fetch_aa.STAMP = root / "captured-at.txt"
+                if seed:
+                    # The previous capture, as a refused run must leave it.
+                    fetch_aa.OUT.write_bytes(b"SENTINEL MODELS CAPTURE")
+                    fetch_aa.AGENTS_OUT.write_bytes(b"SENTINEL AGENTS CAPTURE")
+                    fetch_aa.STAMP.write_text("2020-01-01\n", encoding="utf-8")
+                sys.argv = ["fetch_aa.py"]
+                # create=True: the seam patch must also WORK against a tree
+                # that predates the seam, so the red-on-main run of these
+                # pins shows main's real behavior -- refusing on the first
+                # disagreement -- rather than a missing-attribute error.
+                with unittest.mock.patch.object(urllib.request, "urlopen", stub), \
+                        unittest.mock.patch.object(fetch_aa, "_sleep",
+                                                   side_effect=sleeps.append,
+                                                   create=True):
+                    def run() -> tuple[str, str]:
+                        out, err = io.StringIO(), io.StringIO()
+                        with contextlib.redirect_stdout(out), \
+                                contextlib.redirect_stderr(err):
+                            try:
+                                fetch_aa.main()
+                            finally:
+                                captured["stdout"] = out.getvalue()
+                                captured["stderr"] = err.getvalue()
+                        return captured["stdout"], captured["stderr"]
+
+                    captured: dict = {"stdout": "", "stderr": ""}
+                    yield root, stub, sleeps, run, captured
+            finally:
+                sys.argv = argv
+                (fetch_aa.ROOT, fetch_aa.OUT, fetch_aa.AGENTS_OUT,
+                 fetch_aa.STAMP) = old
+
+    def test_an_agreeing_pair_captures_once_and_never_waits(self):
+        # The quiet path is today's behavior, unchanged: one fetch of each
+        # route, no wait, no stderr noise, and the capture lands.
+        routes = {
+            fetch_aa.URL: lambda: _FakeResponse(flight_html(leaderboard_payload())),
+            self.DETAIL_URL: lambda: _FakeResponse(flight_html(detail_payload())),
+            fetch_aa.AGENTS_URL: lambda: _FakeResponse(self.AGENTS),
+        }
+        with self.capture_over_routes(routes) as (root, stub, sleeps, run,
+                                                  _captured):
+            stdout, stderr = run()
+
+            self.assertEqual(stub.calls,
+                             [fetch_aa.URL, self.DETAIL_URL,
+                              fetch_aa.AGENTS_URL])
+            self.assertEqual(sleeps, [], "the quiet path slept")
+            self.assertEqual(stderr, "", "the quiet path logged a retry")
+            self.assertIn("wrote aa-raw-models.json", stdout)
+            self.assertEqual(
+                (root / "captured-at.txt").read_text(encoding="utf-8"),
+                datetime.date.today().isoformat() + "\n")
+
+    def test_a_disagreement_that_clears_is_retried_and_captures_the_fresh_pair(self):
+        # Attempt 1 straddles AA's update: the detail route's intelligenceIndex
+        # is 52 against the leaderboard's 51 (the 2026-09-29 17:41Z window).
+        # Attempt 2 reads a settled pair. The pin is the whole shape: BOTH
+        # routes re-read (5 calls, not 3), exactly one wait at exactly the
+        # constant, the retry announced once on stderr, and the capture that
+        # lands is the fresh pair's.
+        routes = {
+            fetch_aa.URL: lambda: _FakeResponse(flight_html(leaderboard_payload())),
+            self.DETAIL_URL: serving(flight_html(detail_payload(intelligenceIndex=52)),
+                                     flight_html(detail_payload())),
+            fetch_aa.AGENTS_URL: lambda: _FakeResponse(self.AGENTS),
+        }
+        with self.capture_over_routes(routes, seed=True) as (root, stub, sleeps,
+                                                             run, _captured):
+            stdout, stderr = run()
+
+            self.assertEqual(
+                stub.calls,
+                [fetch_aa.URL, self.DETAIL_URL,
+                 fetch_aa.URL, self.DETAIL_URL,
+                 fetch_aa.AGENTS_URL],
+                "the injected fault did not visibly fire")
+            self.assertEqual(sleeps, [fetch_aa.WAIT_SECONDS])
+            self.assertEqual(stderr.count("re-reading"), 1, stderr)
+            self.assertIn("attempt 1 of", stderr)
+            self.assertIn("wrote aa-raw-models.json", stdout)
+            models = json.loads(
+                (root / "aa-raw-models.json").read_text(encoding="utf-8"))
+            self.assertEqual([m["slug"] for m in models],
+                             ["detail-host-model", "fixture-model"])
+            self.assertEqual(
+                len(json.loads(
+                    (root / "aa-raw-coding-agents.json").read_text(encoding="utf-8"))),
+                5)
+            self.assertEqual(
+                (root / "captured-at.txt").read_text(encoding="utf-8"),
+                datetime.date.today().isoformat() + "\n")
+
+    def test_a_disagreement_past_the_bound_refuses_with_the_unchanged_diagnostic(self):
+        # Every attempt straddles the update. The refusal is exactly today's:
+        # the same message the #44 wiring tests pin, the same exit shape --
+        # and the previous capture on disk is untouched, because a refused
+        # run writes nothing.
+        routes = {
+            fetch_aa.URL: lambda: _FakeResponse(flight_html(leaderboard_payload())),
+            self.DETAIL_URL: lambda: _FakeResponse(
+                flight_html(detail_payload(intelligenceIndex=52))),
+        }
+        with self.capture_over_routes(routes, seed=True) as (root, stub, sleeps,
+                                                             run, captured):
+            with self.assertRaises(SystemExit) as caught:
+                run()
+
+            message = str(caught.exception)
+            self.assertIn("shared value(s) disagree", message)
+            self.assertIn(
+                "fixture-model: intelligenceIndex: leaderboard 51, detail 52",
+                message)
+            self.assertEqual(sleeps,
+                             [fetch_aa.WAIT_SECONDS] * (fetch_aa.ATTEMPTS - 1))
+            self.assertEqual(stub.calls,
+                             [fetch_aa.URL, self.DETAIL_URL] * fetch_aa.ATTEMPTS)
+            self.assertEqual(captured["stderr"].count("re-reading"),
+                             fetch_aa.ATTEMPTS - 1, captured["stderr"])
+            self.assertEqual((root / "aa-raw-models.json").read_bytes(),
+                             b"SENTINEL MODELS CAPTURE")
+            self.assertEqual(
+                (root / "aa-raw-coding-agents.json").read_bytes(),
+                b"SENTINEL AGENTS CAPTURE")
+            self.assertEqual(
+                (root / "captured-at.txt").read_text(encoding="utf-8"),
+                "2020-01-01\n",
+                "the stamp moved even though the capture did not land")
+
+    def test_none_against_a_value_still_counts_as_disagreement(self):
+        # The leaderboard measured 51 while the detail route's copy arrived
+        # as null. A comparison loosened into "absent means agree" would
+        # accept this pair outright (3 calls, no waits); the pin is that the
+        # retry ENGAGES, then captures the settled pair.
+        routes = {
+            fetch_aa.URL: lambda: _FakeResponse(flight_html(leaderboard_payload())),
+            self.DETAIL_URL: serving(flight_html(
+                detail_payload(intelligenceIndex=None)),
+                                     flight_html(detail_payload())),
+            fetch_aa.AGENTS_URL: lambda: _FakeResponse(self.AGENTS),
+        }
+        with self.capture_over_routes(routes) as (_root, stub, sleeps, run,
+                                                  _captured):
+            stdout, _ = run()
+
+            self.assertGreaterEqual(
+                len(sleeps), 1,
+                "None-vs-value was accepted without a re-read")
+            self.assertGreater(len(stub.calls), 3)
+            self.assertEqual(sleeps, [fetch_aa.WAIT_SECONDS])
+            self.assertEqual(stub.calls,
+                             [fetch_aa.URL, self.DETAIL_URL,
+                              fetch_aa.URL, self.DETAIL_URL,
+                              fetch_aa.AGENTS_URL])
+            self.assertIn("wrote aa-raw-models.json", stdout)
+
+    def test_the_capture_keeps_only_the_successful_attempt_data(self):
+        # Each attempt's detail route carries a distinct sentinel in a
+        # detail-only field (`parameters` is absent from the leaderboard
+        # record, so it never enters check_route_agreement's comparison and
+        # survives the merge). The written capture must be attempt 2's --
+        # exact, whole, and with no trace of attempt 1's sentinel.
+        routes = {
+            fetch_aa.URL: lambda: _FakeResponse(flight_html(leaderboard_payload())),
+            self.DETAIL_URL: serving(
+                flight_html(detail_payload(intelligenceIndex=52,
+                                           parameters=888001)),
+                flight_html(detail_payload(parameters=888002))),
+            fetch_aa.AGENTS_URL: lambda: _FakeResponse(self.AGENTS),
+        }
+        with self.capture_over_routes(routes) as (root, _stub, sleeps, run,
+                                                  _captured):
+            _ = run()
+
+            self.assertEqual(sleeps, [fetch_aa.WAIT_SECONDS])
+            written = json.loads(
+                (root / "aa-raw-models.json").read_text(encoding="utf-8"))
+            expected = fetch_aa.merge_captures(
+                json.loads(leaderboard_payload())["models"],
+                json.loads(detail_payload(parameters=888002))["models"])
+            self.assertEqual(written, expected)
+            self.assertEqual(written[1]["parameters"], 888002)
+            self.assertNotIn("888001",
+                             (root / "aa-raw-models.json").read_text(encoding="utf-8"))
+
+    def test_each_attempt_rereads_the_host_its_own_leaderboard_names(self):
+        # detail_host_slug is recomputed per attempt: the detail page is
+        # chosen for what its page EXCLUDES, so a retry must never pair
+        # attempt 2's leaderboard with attempt 1's host -- the obvious
+        # regression is reusing the stale host, or pairing fresh leaderboard
+        # with stale page.
+        detail1 = fetch_aa.MODEL_DETAIL_URL.format(slug="detail-host-model")
+        detail2 = fetch_aa.MODEL_DETAIL_URL.format(slug="second-host-model")
+        routes = {
+            fetch_aa.URL: serving(flight_html(leaderboard_payload()),
+                                  flight_html(leaderboard_payload(
+                                      host_slug="second-host-model"))),
+            detail1: lambda: _FakeResponse(
+                flight_html(detail_payload(intelligenceIndex=52))),
+            detail2: lambda: _FakeResponse(flight_html(detail_payload())),
+            fetch_aa.AGENTS_URL: lambda: _FakeResponse(self.AGENTS),
+        }
+        with self.capture_over_routes(routes) as (_root, stub, sleeps, run,
+                                                  _captured):
+            stdout, _ = run()
+
+            self.assertEqual(sleeps, [fetch_aa.WAIT_SECONDS])
+            self.assertEqual(
+                stub.calls,
+                [fetch_aa.URL, detail1, fetch_aa.URL, detail2,
+                 fetch_aa.AGENTS_URL])
+            self.assertEqual(stub.calls[3], detail2,
+                             "attempt 2 reused attempt 1's detail host")
+            self.assertIn("wrote aa-raw-models", stdout)
+            self.assertIn("/models/second-host-model", stdout)
+
+    def test_a_fully_cached_capture_refuses_without_waiting_or_rereading(self):
+        # --html/--detail-html pin the bytes: re-reading a file would return
+        # the identical snapshot, so the bounded wait could never clear a
+        # disagreement between two cached pages. One attempt, no seam call,
+        # and the unchanged refusal -- which is also what keeps the #44
+        # cached-page wiring pins instant instead of six minutes of sleep.
+        with tempfile.TemporaryDirectory(prefix=".issue-89-cached-") as tmp:
+            root = pathlib.Path(tmp)
+            pages = [root / name for name in
+                     ("leaderboard.html", "detail.html", "agents.html")]
+            payloads = (leaderboard_payload(),
+                        detail_payload(intelligenceIndex=52),
+                        agent_payload([agent_row(f"Agent - Model {i}")
+                                       for i in range(5)]))
+            for path, payload in zip(pages, payloads):
+                path.write_text(flight_html(payload), encoding="utf-8")
+            old = (fetch_aa.ROOT, fetch_aa.OUT, fetch_aa.AGENTS_OUT,
+                   fetch_aa.STAMP)
+            argv = sys.argv
+            sleeps: list = []
+            try:
+                fetch_aa.ROOT = root
+                fetch_aa.OUT = root / "aa-raw-models.json"
+                fetch_aa.AGENTS_OUT = root / "aa-raw-coding-agents.json"
+                fetch_aa.STAMP = root / "captured-at.txt"
+                fetch_aa.OUT.write_bytes(b"SENTINEL MODELS CAPTURE")
+                fetch_aa.AGENTS_OUT.write_bytes(b"SENTINEL AGENTS CAPTURE")
+                fetch_aa.STAMP.write_text("2020-01-01\n", encoding="utf-8")
+                sys.argv = ["fetch_aa.py", "--html", str(pages[0]),
+                            "--detail-html", str(pages[1]),
+                            "--agents-html", str(pages[2])]
+                with unittest.mock.patch.object(fetch_aa, "_sleep",
+                                                side_effect=sleeps.append):
+                    with self.assertRaises(SystemExit) as caught:
+                        with contextlib.redirect_stdout(io.StringIO()):
+                            fetch_aa.main()
+
+                message = str(caught.exception)
+                self.assertIn("shared value(s) disagree", message)
+                self.assertIn(
+                    "fixture-model: intelligenceIndex: leaderboard 51, detail 52",
+                    message)
+                self.assertEqual(sleeps, [],
+                                 "a cached capture waited on the seam")
+            finally:
+                sys.argv = argv
+                (fetch_aa.ROOT, fetch_aa.OUT, fetch_aa.AGENTS_OUT,
+                 fetch_aa.STAMP) = old
+
+    def test_the_retry_catches_only_the_tagged_disagreement_exit(self):
+        # A schema refusal is not the tagged disagreement exit, so the retry
+        # loop must not catch it: refused inside the FIRST attempt (here by
+        # the index-version pin), it propagates uncaught carrying the
+        # version-bump message, with no wait, no re-read, no agents fetch,
+        # and the previous capture on disk untouched. The seam itself is
+        # left REAL: time.sleep is the observation point (as in the
+        # seam-delegation pin), so "the seam was never called" is provable
+        # -- and a mutant that widens the retry's except to bare SystemExit
+        # fails here instead of really sleeping through its retries.
+        bad_version = leaderboard_payload().replace(
+            f"Intelligence Index v{fetch_aa.INDEX_VERSION}",
+            "Intelligence Index v9.9")
+        routes = {
+            fetch_aa.URL: lambda: _FakeResponse(flight_html(bad_version)),
+        }
+        stub = LoudUrlopenStub(routes)
+        with tempfile.TemporaryDirectory(prefix=".issue-89-schema-") as tmp:
+            root = pathlib.Path(tmp)
+            old = (fetch_aa.ROOT, fetch_aa.OUT, fetch_aa.AGENTS_OUT,
+                   fetch_aa.STAMP)
+            argv = sys.argv
+            try:
+                fetch_aa.ROOT = root
+                fetch_aa.OUT = root / "aa-raw-models.json"
+                fetch_aa.AGENTS_OUT = root / "aa-raw-coding-agents.json"
+                fetch_aa.STAMP = root / "captured-at.txt"
+                # The previous capture, as a refused run must leave it.
+                fetch_aa.OUT.write_bytes(b"SENTINEL MODELS CAPTURE")
+                fetch_aa.AGENTS_OUT.write_bytes(b"SENTINEL AGENTS CAPTURE")
+                fetch_aa.STAMP.write_text("2020-01-01\n", encoding="utf-8")
+                sys.argv = ["fetch_aa.py"]
+                with unittest.mock.patch.object(urllib.request, "urlopen", stub), \
+                        unittest.mock.patch.object(fetch_aa.time, "sleep") as slept:
+                    err = io.StringIO()
+                    with self.assertRaises(SystemExit) as caught:
+                        with contextlib.redirect_stdout(io.StringIO()), \
+                                contextlib.redirect_stderr(err):
+                            fetch_aa.main()
+
+                message = str(caught.exception)
+                self.assertIn("Intelligence Index v9.9", message)
+                self.assertIn(f"v{fetch_aa.INDEX_VERSION}", message)
+                self.assertIn("methodology", message)
+                self.assertFalse(slept.called, "a schema refusal slept")
+                self.assertEqual(
+                    stub.calls, [fetch_aa.URL],
+                    "a schema refusal was re-read, or the agents route "
+                    "was fetched")
+                self.assertNotIn("re-reading", err.getvalue())
+                self.assertEqual((root / "aa-raw-models.json").read_bytes(),
+                                 b"SENTINEL MODELS CAPTURE")
+                self.assertEqual(
+                    (root / "aa-raw-coding-agents.json").read_bytes(),
+                    b"SENTINEL AGENTS CAPTURE")
+                self.assertEqual(
+                    (root / "captured-at.txt").read_text(encoding="utf-8"),
+                    "2020-01-01\n",
+                    "the stamp moved even though the capture did not land")
+            finally:
+                sys.argv = argv
+                (fetch_aa.ROOT, fetch_aa.OUT, fetch_aa.AGENTS_OUT,
+                 fetch_aa.STAMP) = old
+
+
+class RetryBoundArithmeticTests(unittest.TestCase):
+    """Issue #89: the retry bound must fit inside refresh.yml's 30-minute
+    job timeout WITHOUT editing the workflow, so the fit is pinned as an
+    assertion rather than narrated. A future constant bump that would crowd
+    out the heal-run remainder (checkout, pip + Chromium, the browser suite,
+    build, publish -- ~7 min measured) fails here instead of timing out a
+    real run."""
+
+    def test_worst_case_stays_within_the_capture_budget(self):
+        # The comment in fetch_aa.py commits to exactly this arithmetic: the
+        # waits, the two fetches per attempt at the 90 s socket bound, and
+        # the one agents fetch after a pair agrees. 1200 s is the capture
+        # budget that leaves the ~7-min heal remainder room in the job's
+        # 1800 s, with slack.
+        worst_case = ((fetch_aa.ATTEMPTS - 1) * fetch_aa.WAIT_SECONDS
+                      + fetch_aa.ATTEMPTS * 2 * fetch_aa.FETCH_TIMEOUT_SECONDS
+                      + fetch_aa.FETCH_TIMEOUT_SECONDS)
+
+        self.assertLessEqual(worst_case, 1200)
+
+    def test_the_sleep_seam_actually_sleeps(self):
+        # The seam exists so no TEST ever really sleeps -- and so the wait
+        # is real in production. Patching time.sleep itself proves the seam
+        # delegates rather than no-ops. (The seam itself is the unit under
+        # test here, hence the protected-access.)
+        with unittest.mock.patch.object(fetch_aa.time, "sleep") as fake:
+            fetch_aa._sleep(5)  # pylint: disable=protected-access
+
+        fake.assert_called_once_with(5)
 
 
 if __name__ == "__main__":
