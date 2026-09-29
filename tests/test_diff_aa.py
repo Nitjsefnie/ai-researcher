@@ -1,9 +1,12 @@
 import argparse
+import ast
 import contextlib
 import io
 import json
 import pathlib
+import re
 import shutil
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -724,6 +727,95 @@ class LoadTests(unittest.TestCase):
             diff_aa.load("git:no-such-rev-at-all")
 
         self.assertIn("cannot read", str(caught.exception))
+
+
+def tracked_texts(root: pathlib.Path) -> dict[str, str]:
+    """Every git-tracked file's text, except captured/generated artifacts.
+
+    data/ holds the captures and out/ the page built from them -- artifacts,
+    not citations, so neither can keep a definition alive.
+    """
+    listed = subprocess.run(
+        ["git", "ls-files"], cwd=root, capture_output=True, text=True, check=True,
+    ).stdout.split()
+    return {rel: (root / rel).read_text(encoding="utf-8", errors="replace")
+            for rel in listed
+            if not rel.startswith(("data/", "out/"))}
+
+
+def unreferenced_helpers(texts: dict[str, str], module_path: str) -> list[str]:
+    """Module-level functions defined in `module_path` that nothing names.
+
+    A reference is a whole-word occurrence of the helper's name in any of
+    `texts`, other than inside the helper's own def block -- a function
+    calling itself, or its own docstring promising a test that does not
+    exist, is not a caller. Word-matching over file text (rather than a
+    cross-module AST import graph) is deliberately cheap: the pin targets
+    wholesale dead code, and a helper kept "alive" only by an unrelated
+    common word is a review-visible edge.
+    """
+    dead = []
+    for node in ast.parse(texts[module_path]).body:
+        if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            continue
+        first, last = node.lineno, node.end_lineno
+        if last is None:
+            continue  # no end line means no def block to exclude; skip
+        referenced = False
+        for path, text in texts.items():
+            for hit in re.finditer(rf"\b{re.escape(node.name)}\b", text):
+                if (path == module_path
+                        and first <= text.count("\n", 0, hit.start()) + 1 <= last):
+                    continue  # naming itself is not a caller
+                referenced = True
+                break
+            if referenced:
+                break
+        if not referenced:
+            dead.append(node.name)
+    return dead
+
+
+class NoDeadHelpersTests(unittest.TestCase):
+    """Issue #61: diff_aa.py carried a helper with zero call sites whose
+    docstring claimed "the real-capture test pins this set" -- no test did.
+    Deleted rather than decorated; this guard is the pin that must have
+    caught it, and the fixtures below prove the guard itself fires.
+    """
+
+    MODULE = "scripts/diff_aa.py"
+
+    def test_every_module_level_function_in_diff_aa_is_referenced_somewhere(self):
+        root = pathlib.Path(__file__).resolve().parent.parent
+
+        self.assertEqual(
+            unreferenced_helpers(tracked_texts(root), self.MODULE), [],
+            "dead helper(s) in " + self.MODULE
+            + " -- delete them or wire a real caller, not a docstring claim")
+
+    def test_the_reference_check_fires_on_a_planted_dead_helper(self):
+        # The liveness oracle: the same checker over a synthetic tree flags
+        # exactly the planted orphan, so the empty result above is evidence
+        # and not a check that cannot fail.
+        texts = {
+            "helpers.py": "def used():\n    return 1\n\n\ndef unused_one():\n    return 2\n",
+            "app.py": "import helpers\n\nhelpers.used()\n",
+        }
+
+        self.assertEqual(unreferenced_helpers(texts, "helpers.py"), ["unused_one"])
+
+    def test_naming_itself_or_its_own_docstring_does_not_count_as_a_reference(self):
+        # The hole the deleted helper fell through: a self-call and a docstring
+        # naming the function both live inside its own def block, so neither
+        # keeps it.
+        texts = {
+            "helpers.py": ('def orphan():\n    """orphan is pinned elsewhere."""\n'
+                           "    return orphan()\n"
+                           "\n\ndef live():\n    return 3\n"),
+            "app.py": "import helpers\n\nhelpers.live()\n",
+        }
+
+        self.assertEqual(unreferenced_helpers(texts, "helpers.py"), ["orphan"])
 
 
 if __name__ == "__main__":
