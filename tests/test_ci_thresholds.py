@@ -18,6 +18,10 @@ from pathlib import Path
 
 import pytest
 
+# Load-bearing: the by-path-loaded thresholds module resolves its
+# scripts/ci sibling (check_ratchets) through a fallback import, so
+# scripts/ci must be importable — remove this and collection dies with
+# ModuleNotFoundError before any test runs.
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts" / "ci"))
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -450,6 +454,28 @@ def test_check_fails_closed_when_committed_copy_is_unreadable(tmp_path,
     thresholds.write(target, _document())
     assert thresholds.main(["--check", "--thresholds", str(target)]) == 1
     assert "not valid JSON" in capsys.readouterr().err
+
+
+def test_check_finding_names_the_checked_path(tmp_path, capsys):
+    # The finding prefix names the path that was checked, not always the
+    # canonical document: this target is committed at a non-canonical
+    # relpath in the same repository, and the finding must carry that
+    # relpath.
+    repo = Path(tmp_path) / "repo"
+    (repo / "legacy").mkdir(parents=True)
+    _git(repo, "init", "-q", "-b", "main")
+    _git(repo, "config", "user.email", "tests@example.invalid")
+    _git(repo, "config", "user.name", "Tests")
+    target = repo / "legacy" / "ci-thresholds.json"
+    thresholds.write(target, _document())
+    _git(repo, "add", "legacy/ci-thresholds.json")
+    _git(repo, "commit", "-qm", "seed a non-canonical document")
+    thresholds.write(target, _document(measured="90.0", floor="88.5"))
+    assert thresholds.main(["--check", "--thresholds", str(target)]) == 1
+    captured = capsys.readouterr()
+    assert "legacy/ci-thresholds.json: coverage.python.measured" in (
+        captured.err)
+    assert ".github/ci-thresholds.json" not in captured.err
 
 
 def test_invalid_json_text_refused(tmp_path):
