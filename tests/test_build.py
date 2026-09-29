@@ -105,8 +105,11 @@ def route_pair() -> tuple[dict, dict]:
     values agree exactly; contextWindowTokens is "$undefined" on the
     leaderboard route -- AA's encoding of an absent field -- where the detail
     route has measured it. intelligenceIndexEvaluations is a shared LIST: the
-    real corpus ships it empty on both routes (678/679 records in the merged
-    capture), so the fixture carries elements to pin the walk's list limb."""
+    real corpus ships the key on 678/679 records, 502 empty arrays and 176
+    populated in this branch's base capture (177 populated at main HEAD), so
+    the walk's list limb runs on every live capture -- the fixture still
+    carries elements rather than empty arrays because elements pin the limb
+    deterministically, where an empty list walks nothing and proves nothing."""
     return (
         {
             "slug": "fixture-model",
@@ -439,7 +442,7 @@ class CaptureStampTests(unittest.TestCase):
             with self.subTest(stamp_text=stamp_text):
                 html = self.build_with_stamp(stamp_text)
 
-                self.assertIn("captured 2026-09-29", html)
+                self.assertIn("captured 2026-09-29</div>", html)
                 self.assertIn('<div class="v">2026-09-29</div>', html)
                 self.assertIn('"captured":"2026-09-29"', html)
                 # The copy clips carry the same value into their JS string and
