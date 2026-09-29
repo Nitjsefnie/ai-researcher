@@ -3,6 +3,7 @@ import io
 import json
 import os
 import pathlib
+import re
 import tempfile
 import unittest
 
@@ -594,6 +595,122 @@ class BrowserInteractionTests(unittest.TestCase):
                 page.close()
             finally:
                 build.RAW, build.AGENTS_RAW, build.OUT = old_raw, old_agents, old_out
+
+    # The hostile fixture shared by the two copy-export tests: a name whose
+    # pipes, backticks and script tags are exactly what breaks a pasted
+    # markdown table while being legitimate raw data for the JSON export.
+    HOSTILE_NAME = "P|ipe `Tick` Model <script>alert(1)</script>"
+
+    def _hostile_export_page(self):
+        """Build a one-model page whose captured strings carry markdown-
+        significant characters, and return a page with the clipboard stubbed."""
+        model = {
+            "name": self.HOSTILE_NAME,
+            "modelCreatorName": "Hostile Lab",
+            "isOpenWeights": True,
+            "slug": "hostile-model",
+            "intelligenceIndex": 51,
+            "gdpvalNormalized": 0.47,
+            "parameters": 27,
+            "intelligenceIndexCostPerTask": {
+                "cost": {"total": 0.75},
+                "evaluations": [{"slug": "gdpval-aa",
+                                 "weightedCostPerTask": 0.80}],
+            },
+        }
+        agent = {
+            "id": "hostile-agent", "displayLabel": "Hostile Agent",
+            "agentName": "Hostile Agent CLI",
+            "hostModelSlug": "vendor_hostile-model",
+            "display": {"creator": {"agent": "Agent Lab",
+                                    "model": "Hostile Lab"}},
+            "indexScore": 0.64,
+            "mean": {"costUsd": 2.5, "agentWallTimeSec": 900.0},
+        }
+        # The directory outlives this helper -- the test cleans it up in its
+        # own finally, next to the page close -- so it cannot live in a with.
+        tmp = tempfile.TemporaryDirectory(  # pylint: disable=consider-using-with
+            prefix=".issue-48-browser-", dir=build.ROOT)
+        root = pathlib.Path(tmp.name)
+        raw, agents_raw = root / "models.json", root / "coding-agents.json"
+        output = root / "frontier-models.html"
+        raw.write_text(json.dumps([model]), encoding="utf-8")
+        agents_raw.write_text(json.dumps([agent]), encoding="utf-8")
+        old_raw, old_agents, old_out = build.RAW, build.AGENTS_RAW, build.OUT
+        build.RAW, build.AGENTS_RAW, build.OUT = raw, agents_raw, output
+        try:
+            with contextlib.redirect_stdout(io.StringIO()):
+                build.main()
+        except BaseException:
+            tmp.cleanup()
+            build.RAW, build.AGENTS_RAW, build.OUT = old_raw, old_agents, old_out
+            raise
+        page = self.browser.new_page(viewport={"width": 1280, "height": 900})
+        page.goto(output.as_uri())
+        page.evaluate("""() => {
+          window.__copied = null;
+          Object.defineProperty(navigator, 'clipboard', {
+            value: { writeText: t => { window.__copied = t;
+                                       return Promise.resolve(); } },
+            configurable: true,
+          });
+        }""")
+        return tmp, (old_raw, old_agents, old_out), page
+
+    def test_copy_as_markdown_escapes_markdown_significant_cell_text(self):
+        # #48: the markdown export interpolated raw captured strings into a
+        # markdown table, where a literal pipe closes the cell, a backtick
+        # opens a code span and a backslash reads as an escape -- so a pasted
+        # row fell apart as text. Cells now carry the escaped display text.
+        tmp, saved, page = self._hostile_export_page()
+        try:
+            page.locator("#copyMd").click()
+            md = page.evaluate("() => window.__copied")
+            self.assertIsNotNone(md)
+            escaped = (self.HOSTILE_NAME.replace("\\", "\\\\")
+                                        .replace("|", "\\|")
+                                        .replace("`", "\\`"))
+            rows = [line for line in md.split("\n") if escaped in line]
+            self.assertTrue(
+                rows,
+                "no markdown row carries the escaped name -- the export "
+                "embedded the captured string without escaping it")
+            row = rows[0]
+            # every cell separator survived: 13 columns -> exactly 14 pipes,
+            # so no captured pipe leaked through into the row structure
+            self.assertEqual(len(re.findall(r"(?<!\\)\|", row)), 14)
+            self.assertIn("P\\|ipe", row)
+            self.assertIn("\\`Tick\\`", row)
+            self.assertNotIn(self.HOSTILE_NAME, row)
+        finally:
+            page.close()
+            build.RAW, build.AGENTS_RAW, build.OUT = saved
+            tmp.cleanup()
+
+    def test_copy_as_json_keeps_raw_values_and_documents_the_rawness(self):
+        # #48's documented alternative: the JSON export stays RAW -- structured
+        # data goes out exactly as captured -- and the rawness is documented
+        # where the reader of the button sees it (the button's title).
+        tmp, saved, page = self._hostile_export_page()
+        try:
+            page.locator("#copyJson").click()
+            exported = json.loads(page.evaluate("() => window.__copied"))
+            rows = [m for m in exported["models"]
+                    if m["name"] == self.HOSTILE_NAME]
+            self.assertEqual(len(rows), 1)
+            self.assertEqual(rows[0]["name"], self.HOSTILE_NAME)
+            self.assertEqual(rows[0]["creator"], "Hostile Lab")
+
+            title = page.locator("#copyJson").get_attribute("title")
+            assert title is not None, (
+                "#copyJson documents nowhere that its export is raw captured "
+                "data, unescaped")
+            self.assertIn("raw", title.lower())
+            self.assertIn("unescaped", title.lower())
+        finally:
+            page.close()
+            build.RAW, build.AGENTS_RAW, build.OUT = saved
+            tmp.cleanup()
 
 
 if __name__ == "__main__":
