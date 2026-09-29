@@ -73,10 +73,6 @@ on:
         type: boolean
         default: false
 
-permissions:
-  # This job commits the capture it takes. Everything else stays read-only.
-  contents: write
-
 concurrency:
   # Never cancel in progress: a cancelled run can land between the commit and
   # the publish, leaving the repo and the hub disagreeing.
@@ -86,6 +82,21 @@ concurrency:
 jobs:
   refresh:
     runs-on: ubuntu-latest
+
+    # Job-level rather than workflow-level (issue #52): only this job pushes
+    # — the commit step to main, the publish step to refs/heads/published,
+    # both under the explicit token URL — so the write scope sits where the
+    # pushes are. A workflow-level block would hand contents: write to any
+    # job added to this file later.
+    permissions:
+      # This job commits the capture it takes. Everything else stays read-only.
+      contents: write
+
+    # Sized for a FULL heal run — pip + Chromium installs, the full suite
+    # with the browser, the publish — not the 13-second unchanged-capture
+    # skip that most hours are. A hung run fails in 30 minutes instead of
+    # holding GitHub's 6-hour default.
+    timeout-minutes: 30
 
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
