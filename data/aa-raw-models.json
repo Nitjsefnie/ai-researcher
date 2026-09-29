@@ -87333,7 +87333,7 @@
    "type": "firstParty",
    "providerName": "Anthropic"
   },
-  "hostModelCount": 3,
+  "hostModelCount": 8,
   "creator": {
    "id": "f0aa413f-e8ae-4fcd-9c48-0e049f4f3128",
    "slug": "anthropic",
@@ -103725,7 +103725,7 @@
   "omniscience": 23.116666666666667,
   "omniscienceAccuracy": 0.4151666666666667,
   "omniscienceNonHallucination": 0.6853804502707324,
-  "gdpvalNormalized": 0.563885,
+  "gdpvalNormalized": 0.55932,
   "analystAgent": null,
   "terminalbenchHard": null,
   "terminalBench21": 0.853932584269663,
@@ -103846,7 +103846,7 @@
   "omniscienceHallucinationRate": 0.3146195497292676,
   "harveyLab": 0.954841511072514,
   "gdpPdfAllPass": 0.242,
-  "gdpval": 1627.77,
+  "gdpval": 1618.64,
   "itBenchSre": null,
   "terminalBenchScience": null,
   "livecodebench": null,
@@ -103884,14 +103884,14 @@
   "intelligenceIndexEvaluations": [
    {
     "slug": "aa-briefcase",
-    "score": 1486.81,
+    "score": 1488,
     "outputTokensPerTask": 78964.14285714286,
     "costPerTask": 3.420601304780222,
     "timePerTask": 455.39838567550237
    },
    {
     "slug": "gdpval-aa",
-    "score": 1627.77,
+    "score": 1618.64,
     "outputTokensPerTask": 63663.53636363636,
     "costPerTask": 1.395897439386364,
     "timePerTask": 367.1574291491355
@@ -103955,20 +103955,20 @@
   ],
   "briefcaseBreakdown": {
    "overall": {
-    "elo": 1486.81,
-    "lower95ci": 1477.28,
-    "upper95ci": 1496.75
+    "elo": 1488,
+    "lower95ci": 1478.32,
+    "upper95ci": 1497.59
    },
    "rubricPassRate": 0.5161616161616162,
    "analyticalQuality": {
-    "elo": 1586.97,
-    "lower95ci": 1568.83,
-    "upper95ci": 1604.44
+    "elo": 1576.27,
+    "lower95ci": 1560.22,
+    "upper95ci": 1594.61
    },
    "presentation": {
-    "elo": 1477.85,
-    "lower95ci": 1459.52,
-    "upper95ci": 1495.69
+    "elo": 1485.24,
+    "lower95ci": 1469.09,
+    "upper95ci": 1503.82
    }
   },
   "briefcaseTotalCost": 311.2747187350002,
