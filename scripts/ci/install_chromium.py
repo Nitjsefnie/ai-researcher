@@ -355,10 +355,14 @@ def download_archive(urls: list, destination: Path, label: str,
 
 
 def extract_archive(archive_path: Path, destination: Path) -> None:
-    """Extract a verified zip into destination, preserving unix modes.
+    """Extract a verified zip into destination, honoring its unix modes
+    minus the world bits.
 
     The CFT zips store their mode bits (the chrome binaries are 0755), and
-    restoring them is what makes the executables executable. Symlink
+    restoring them is what makes the executables executable. The world bits
+    are masked off -- CodeQL py/overly-permissive-file: the job runs as one
+    user, so group rx is the most anything beyond the owner needs, and a
+    0755 archive entry lands 0750. Symlink
     entries and path escapes are refused loudly: playwright's zips carry
     none, so one appearing is a format change to inspect, not to follow.
     """
@@ -386,7 +390,10 @@ def extract_archive(archive_path: Path, destination: Path) -> None:
                 with archive.open(info) as source, \
                         open(target, "wb") as out:
                     shutil.copyfileobj(source, out)
-                os.chmod(target, (mode & 0o7777) or 0o644)
+                # Mask world bits (CodeQL py/overly-permissive-file): the
+                # job runs as one user, so group rx is the most anything
+                # beyond the owner needs; a 0755 archive entry lands 0750.
+                os.chmod(target, (mode & 0o770) or 0o640)
     except (OSError, zipfile.BadZipFile) as error:
         shutil.rmtree(destination, ignore_errors=True)
         raise InstallError(

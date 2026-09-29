@@ -6,8 +6,8 @@ committed table, refuse to trust a browser directory it did not verify
 itself, and fail loudly when playwright re-downloads anything anyway. The
 cases below pin the registry resolution (revision/browserVersion/digest,
 trust-on-first-use recipe on a miss), the URL templates, the streaming
-downloader's mirror fallback, the mode-preserving extractor's refusals
-(symlink entries, zip-slip), the seed/replace/skip lifecycle around the
+downloader's mirror fallback, the extractor's refusals (symlink entries,
+zip-slip) and its world-bit mask, the seed/replace/skip lifecycle around the
 DIGEST_VERIFIED provenance marker, the no-re-download assertion, and the
 CLI's exit codes. No test touches the network: downloads are file:// URLs
 of local files or a stubbed download_archive.
@@ -17,6 +17,7 @@ from __future__ import annotations
 import hashlib
 import importlib.machinery
 import json
+import os
 import shutil
 import sys
 import zipfile
@@ -343,7 +344,9 @@ def test_download_archive_all_mirrors_fail(tmp_path):
 
 # --- extraction ---------------------------------------------------------
 
-def test_extract_archive_preserves_modes_and_nesting(tmp_path):
+def test_extract_archive_extracts_content_and_nesting(tmp_path):
+    # Runs on every OS: what lands on disk is the archive's bytes, nested
+    # as stored — the mode questions live in the test below.
     archive = write_zip(tmp_path / "a.zip", [
         ("top/", b"", 0),
         ("top/bin", b"binary", 0o755),
@@ -352,11 +355,28 @@ def test_extract_archive_preserves_modes_and_nesting(tmp_path):
     destination = tmp_path / "out"
     install_chromium.extract_archive(archive, destination)
     assert (destination / "top" / "bin").read_bytes() == b"binary"
-    assert (destination / "top" / "bin").stat().st_mode & 0o777 == 0o755
     assert (destination / "top" / "dir" / "nested.txt") \
         .read_bytes() == b"text"
+
+
+@pytest.mark.skipif(os.name == "nt",
+                    reason="mode semantics are POSIX-only and the browser "
+                           "consumers are ubuntu-latest")
+def test_extract_archive_modes_mask_world_bits(tmp_path):
+    # Extraction fidelity, modulo the world-bit mask: the extractor honors
+    # the archive's unix modes with world bits stripped (CodeQL
+    # py/overly-permissive-file), so a 0755 entry lands 0750 and a 0644
+    # entry lands 0640.
+    archive = write_zip(tmp_path / "a.zip", [
+        ("top/", b"", 0),
+        ("top/bin", b"binary", 0o755),
+        ("top/dir/nested.txt", b"text", 0o644),
+    ])
+    destination = tmp_path / "out"
+    install_chromium.extract_archive(archive, destination)
+    assert (destination / "top" / "bin").stat().st_mode & 0o777 == 0o750
     assert (destination / "top" / "dir" / "nested.txt") \
-        .stat().st_mode & 0o777 == 0o644
+        .stat().st_mode & 0o777 == 0o640
 
 
 def test_extract_archive_refuses_symlink_entries(tmp_path):
@@ -410,7 +430,11 @@ def test_seed_product_downloads_verifies_and_marks(browsers_root, digests,
     assert record["revision"] == REVISION
     assert record["sha256"] == digests[("chromium", REVISION)]
     executable = product_dir / "chrome-linux64" / "chrome"
-    assert executable.stat().st_mode & 0o111
+    # Mode semantics are POSIX-only and the browser consumers are
+    # ubuntu-latest: Windows reports a fixed st_mode, so the assertion is
+    # meaningless there — every non-mode assertion above ran on all OSes.
+    if os.name != "nt":
+        assert executable.stat().st_mode & 0o111
     assert stub_downloads == [[
         "https://cdn.playwright.dev/builds/cft/153.0.8010.12/linux64/"
         "chrome-linux64.zip"]]
