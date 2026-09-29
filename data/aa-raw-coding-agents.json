@@ -1,385 +1,5 @@
 [
  {
-  "id": "d1003684d8f29b95a3b14d2a7722221a",
-  "isDefault": true,
-  "isHighlighted": true,
-  "agentName": "Antigravity SDK v0.1.12",
-  "provider": "google",
-  "hostModelSlug": "google_skimaki_ai-studio",
-  "display": {
-   "agent": "Antigravity SDK",
-   "model": "Gemini 3.8 Flash (high)",
-   "creator": {
-    "agent": "Google",
-    "model": "Google"
-   }
-  },
-  "displayLabel": "Antigravity SDK - Gemini 3.8 Flash (high)",
-  "variantOf": null,
-  "isUnavailable": false,
-  "indexComponentCount": 3,
-  "evalCount": 3,
-  "evals": [
-   {
-    "datasetIndexName": "deep-swe-v1.1",
-    "evaluationDatasetSlug": "DeepSWE v1.1",
-    "refDatasetName": "datacurve/deep-swe-1-1@1",
-    "weight": 0.333333333333333,
-    "safety": {
-     "attemptCount": 339,
-     "refusedAttemptCount": 0,
-     "hardStopAttemptCount": 0,
-     "recoveredAttemptCount": 0,
-     "fallbackAttemptCount": 0,
-     "continuedAttemptCount": 0,
-     "rate": 0,
-     "hardStopRate": 0,
-     "recoveredRate": 0
-    },
-    "rewardHacking": null,
-    "mean": {
-     "reward": 0.657817109144543,
-     "inputTokens": 16400687.365781711,
-     "outputTokens": 148259.0501474926
-    }
-   },
-   {
-    "datasetIndexName": "swe-atlas-qna",
-    "evaluationDatasetSlug": "SWE-Atlas-QnA",
-    "refDatasetName": "datasets/swe-atlas-qna",
-    "weight": 0.333333333333333,
-    "safety": {
-     "attemptCount": 372,
-     "refusedAttemptCount": 0,
-     "hardStopAttemptCount": 0,
-     "recoveredAttemptCount": 0,
-     "fallbackAttemptCount": 0,
-     "continuedAttemptCount": 0,
-     "rate": 0,
-     "hardStopRate": 0,
-     "recoveredRate": 0
-    },
-    "rewardHacking": null,
-    "mean": {
-     "reward": 0.451612903225807,
-     "inputTokens": 9020406.623655913,
-     "outputTokens": 58109
-    }
-   },
-   {
-    "datasetIndexName": "terminal-bench-v4",
-    "evaluationDatasetSlug": "Terminal-Bench v4",
-    "refDatasetName": "terminal-bench/terminal-bench@sha256:39d9f44b40420cde8fdcc087579c0d72a7e14fa3656d603c3f0d22fb35e27732",
-    "weight": 0.333333333333333,
-    "safety": {
-     "attemptCount": 198,
-     "refusedAttemptCount": 0,
-     "hardStopAttemptCount": 0,
-     "recoveredAttemptCount": 0,
-     "fallbackAttemptCount": 0,
-     "continuedAttemptCount": 0,
-     "rate": 0,
-     "hardStopRate": 0,
-     "recoveredRate": 0
-    },
-    "rewardHacking": {
-     "retainedAttemptCount": 198,
-     "passingAttemptCount": 33,
-     "reviewedAttemptCount": 33,
-     "flaggedAttemptCount": 4,
-     "notApplicableAttemptCount": 0,
-     "missingAuditAttemptCount": 0,
-     "skippedAuditAttemptCount": 0,
-     "unavailableAuditAttemptCount": 0,
-     "gradingErrorAttemptCount": 0,
-     "invalidAuditAttemptCount": 0,
-     "snapshotMismatchAttemptCount": 0,
-     "materializedAt": "2026-09-29T21:01:02.992399+00:00",
-     "gradingVersion": "v1",
-     "graderConfigHash": "e3e86c5c130946ce",
-     "reviewSources": [
-      {
-       "judgeModel": "sonnet",
-       "rubricId": "ca-bench-reward-hacking-v1",
-       "auditSchemaVersion": 1,
-       "attemptCount": 33
-      }
-     ],
-     "rate": 0.020202020202020204
-    },
-    "mean": {
-     "reward": 0.146464646464646,
-     "inputTokens": 16468964.714646464,
-     "outputTokens": 168736.55303030304
-    }
-   }
-  ],
-  "safety": {
-   "attemptCount": 909,
-   "refusedAttemptCount": 0,
-   "hardStopAttemptCount": 0,
-   "recoveredAttemptCount": 0,
-   "fallbackAttemptCount": 0,
-   "continuedAttemptCount": 0,
-   "rate": 0,
-   "hardStopRate": 0,
-   "recoveredRate": 0
-  },
-  "indexScore": 0.4186315529449987,
-  "mean": {
-   "reward": 0.4186315529449987,
-   "costUsd": 2.4673922004125437,
-   "agentWallTimeSec": 702.7110253025301,
-   "steps": 188.4884488448845,
-   "inputTokens": 13395246.748624865,
-   "outputTokens": 115826.40649064905,
-   "cacheTokens": 11871691.682068229,
-   "cacheHitRate": 0.8697428234581179,
-   "totalTokens": 13511073.155115515
-  },
-  "sums": {
-   "costUsd": 747.619836725
-  },
-  "percentiles": {
-   "costUsd": {
-    "p05": 1.099103153622112,
-    "p25": 1.6439984646864687,
-    "p50": 2.1229609128712874,
-    "p75": 3.008778207632013,
-    "p95": 4.849891568358086
-   },
-   "totalTokens": {
-    "p05": 4679184.810451044,
-    "p25": 8015173.094609471,
-    "p50": 11559537.268426849,
-    "p75": 16883320.984598454,
-    "p95": 28318875.752915297
-   }
-  },
-  "versions": {
-   "deep-swe-v1.1": {
-    "min": {
-     "version": "0.1.16",
-     "dateReleased": "2026-09-02"
-    },
-    "max": {
-     "version": "0.1.16",
-     "dateReleased": "2026-09-02"
-    }
-   },
-   "swe-atlas-qna": {
-    "min": {
-     "version": "0.1.12",
-     "dateReleased": "2026-08-13"
-    },
-    "max": {
-     "version": "0.1.12",
-     "dateReleased": "2026-08-13"
-    }
-   },
-   "terminal-bench-v4": {
-    "min": {
-     "version": "0.1.16",
-     "dateReleased": "2026-09-02"
-    },
-    "max": {
-     "version": "0.1.16",
-     "dateReleased": "2026-09-02"
-    }
-   }
-  }
- },
- {
-  "id": "f927d9c41b5c3021996eb14c3dd1341e",
-  "isDefault": true,
-  "isHighlighted": true,
-  "agentName": "Grok Build",
-  "provider": "xai",
-  "hostModelSlug": "xai_grok-bop-o86-xhigh",
-  "display": {
-   "agent": "Grok Build",
-   "model": "Grok 4.7 (xhigh)",
-   "creator": {
-    "agent": "xAI",
-    "model": "xAI"
-   }
-  },
-  "displayLabel": "Grok Build - Grok 4.7 (xhigh)",
-  "variantOf": null,
-  "isUnavailable": false,
-  "indexComponentCount": 3,
-  "evalCount": 3,
-  "evals": [
-   {
-    "datasetIndexName": "deep-swe-v1.1",
-    "evaluationDatasetSlug": "DeepSWE v1.1",
-    "refDatasetName": "datacurve/deep-swe-1-1@1",
-    "weight": 0.333333333333333,
-    "safety": {
-     "attemptCount": 335,
-     "refusedAttemptCount": 0,
-     "hardStopAttemptCount": 0,
-     "recoveredAttemptCount": 0,
-     "fallbackAttemptCount": 0,
-     "continuedAttemptCount": 0,
-     "rate": 0,
-     "hardStopRate": 0,
-     "recoveredRate": 0
-    },
-    "rewardHacking": null,
-    "mean": {
-     "reward": 0.725663716814159,
-     "inputTokens": 14656743.734513273,
-     "outputTokens": 152948.2005899705
-    }
-   },
-   {
-    "datasetIndexName": "swe-atlas-qna",
-    "evaluationDatasetSlug": "SWE-Atlas-QnA",
-    "refDatasetName": "datasets/swe-atlas-qna",
-    "weight": 0.333333333333333,
-    "safety": {
-     "attemptCount": 372,
-     "refusedAttemptCount": 0,
-     "hardStopAttemptCount": 0,
-     "recoveredAttemptCount": 0,
-     "fallbackAttemptCount": 0,
-     "continuedAttemptCount": 0,
-     "rate": 0,
-     "hardStopRate": 0,
-     "recoveredRate": 0
-    },
-    "rewardHacking": null,
-    "mean": {
-     "reward": 0.629032258064516,
-     "inputTokens": 7966825.954301075,
-     "outputTokens": 57168.37634408602
-    }
-   },
-   {
-    "datasetIndexName": "terminal-bench-v4",
-    "evaluationDatasetSlug": "Terminal-Bench v4",
-    "refDatasetName": "terminal-bench/terminal-bench@sha256:39d9f44b40420cde8fdcc087579c0d72a7e14fa3656d603c3f0d22fb35e27732",
-    "weight": 0.333333333333333,
-    "safety": {
-     "attemptCount": 198,
-     "refusedAttemptCount": 0,
-     "hardStopAttemptCount": 0,
-     "recoveredAttemptCount": 0,
-     "fallbackAttemptCount": 0,
-     "continuedAttemptCount": 0,
-     "rate": 0,
-     "hardStopRate": 0,
-     "recoveredRate": 0
-    },
-    "rewardHacking": {
-     "retainedAttemptCount": 198,
-     "passingAttemptCount": 66,
-     "reviewedAttemptCount": 66,
-     "flaggedAttemptCount": 0,
-     "notApplicableAttemptCount": 0,
-     "missingAuditAttemptCount": 0,
-     "skippedAuditAttemptCount": 0,
-     "unavailableAuditAttemptCount": 0,
-     "gradingErrorAttemptCount": 0,
-     "invalidAuditAttemptCount": 0,
-     "snapshotMismatchAttemptCount": 0,
-     "materializedAt": "2026-09-29T21:01:02.992399+00:00",
-     "gradingVersion": "v1",
-     "graderConfigHash": "e3e86c5c130946ce",
-     "reviewSources": [
-      {
-       "judgeModel": "sonnet",
-       "rubricId": "ca-bench-reward-hacking-v1",
-       "auditSchemaVersion": 1,
-       "attemptCount": 66
-      }
-     ],
-     "rate": 0
-    },
-    "mean": {
-     "reward": 0.333333333333333,
-     "inputTokens": 25135458.641414143,
-     "outputTokens": 196677.30303030304
-    }
-   }
-  ],
-  "safety": {
-   "attemptCount": 905,
-   "refusedAttemptCount": 0,
-   "hardStopAttemptCount": 0,
-   "recoveredAttemptCount": 0,
-   "fallbackAttemptCount": 0,
-   "continuedAttemptCount": 0,
-   "rate": 0,
-   "hardStopRate": 0,
-   "recoveredRate": 0
-  },
-  "indexScore": 0.5626764360706693,
-  "mean": {
-   "reward": 0.5626764360706693,
-   "costUsd": 8.817468730473037,
-   "agentWallTimeSec": 2354.367686468646,
-   "steps": 162.64576457645765,
-   "inputTokens": 14201447.955995597,
-   "outputTokens": 123276.32783278328,
-   "cacheTokens": 13550056.765676552,
-   "cacheHitRate": 0.938882976190201,
-   "totalTokens": 14324724.283828393
-  },
-  "sums": {
-   "costUsd": 2671.693025333334
-  },
-  "percentiles": {
-   "costUsd": {
-    "p05": 2.7192659427942796,
-    "p25": 4.51524115951595,
-    "p50": 6.599111777777779,
-    "p75": 9.808614987898796,
-    "p95": 18.236931686028605
-   },
-   "totalTokens": {
-    "p05": 3709632.12431243,
-    "p25": 6478872.97579758,
-    "p50": 9948394.636963697,
-    "p75": 15872444.876787692,
-    "p95": 31362264.765786577
-   }
-  },
-  "versions": {
-   "deep-swe-v1.1": {
-    "min": {
-     "version": "1.0.40",
-     "dateReleased": null
-    },
-    "max": {
-     "version": "1.0.40",
-     "dateReleased": null
-    }
-   },
-   "swe-atlas-qna": {
-    "min": {
-     "version": "1.0.40",
-     "dateReleased": null
-    },
-    "max": {
-     "version": "1.0.40",
-     "dateReleased": null
-    }
-   },
-   "terminal-bench-v4": {
-    "min": {
-     "version": "1.0.40",
-     "dateReleased": null
-    },
-    "max": {
-     "version": "1.0.40",
-     "dateReleased": null
-    }
-   }
-  }
- },
- {
   "id": "f2de07373c3626f1b9269a6ecad7804c",
   "isDefault": true,
   "isHighlighted": true,
@@ -474,7 +94,7 @@
      "gradingErrorAttemptCount": 0,
      "invalidAuditAttemptCount": 0,
      "snapshotMismatchAttemptCount": 0,
-     "materializedAt": "2026-09-29T21:01:02.992399+00:00",
+     "materializedAt": "2026-09-29T23:11:35.302184+00:00",
      "gradingVersion": "v1",
      "graderConfigHash": "e3e86c5c130946ce",
      "reviewSources": [
@@ -565,6 +185,196 @@
     "max": {
      "version": "1.0.3-R2198.1",
      "dateReleased": "2026-09-04"
+    }
+   }
+  }
+ },
+ {
+  "id": "d1003684d8f29b95a3b14d2a7722221a",
+  "isDefault": true,
+  "isHighlighted": true,
+  "agentName": "Antigravity SDK v0.1.12",
+  "provider": "google",
+  "hostModelSlug": "google_skimaki_ai-studio",
+  "display": {
+   "agent": "Antigravity SDK",
+   "model": "Gemini 3.8 Flash (high)",
+   "creator": {
+    "agent": "Google",
+    "model": "Google"
+   }
+  },
+  "displayLabel": "Antigravity SDK - Gemini 3.8 Flash (high)",
+  "variantOf": null,
+  "isUnavailable": false,
+  "indexComponentCount": 3,
+  "evalCount": 3,
+  "evals": [
+   {
+    "datasetIndexName": "deep-swe-v1.1",
+    "evaluationDatasetSlug": "DeepSWE v1.1",
+    "refDatasetName": "datacurve/deep-swe-1-1@1",
+    "weight": 0.333333333333333,
+    "safety": {
+     "attemptCount": 339,
+     "refusedAttemptCount": 0,
+     "hardStopAttemptCount": 0,
+     "recoveredAttemptCount": 0,
+     "fallbackAttemptCount": 0,
+     "continuedAttemptCount": 0,
+     "rate": 0,
+     "hardStopRate": 0,
+     "recoveredRate": 0
+    },
+    "rewardHacking": null,
+    "mean": {
+     "reward": 0.657817109144543,
+     "inputTokens": 16400687.365781711,
+     "outputTokens": 148259.0501474926
+    }
+   },
+   {
+    "datasetIndexName": "swe-atlas-qna",
+    "evaluationDatasetSlug": "SWE-Atlas-QnA",
+    "refDatasetName": "datasets/swe-atlas-qna",
+    "weight": 0.333333333333333,
+    "safety": {
+     "attemptCount": 372,
+     "refusedAttemptCount": 0,
+     "hardStopAttemptCount": 0,
+     "recoveredAttemptCount": 0,
+     "fallbackAttemptCount": 0,
+     "continuedAttemptCount": 0,
+     "rate": 0,
+     "hardStopRate": 0,
+     "recoveredRate": 0
+    },
+    "rewardHacking": null,
+    "mean": {
+     "reward": 0.451612903225807,
+     "inputTokens": 9020406.623655913,
+     "outputTokens": 58109
+    }
+   },
+   {
+    "datasetIndexName": "terminal-bench-v4",
+    "evaluationDatasetSlug": "Terminal-Bench v4",
+    "refDatasetName": "terminal-bench/terminal-bench@sha256:39d9f44b40420cde8fdcc087579c0d72a7e14fa3656d603c3f0d22fb35e27732",
+    "weight": 0.333333333333333,
+    "safety": {
+     "attemptCount": 198,
+     "refusedAttemptCount": 0,
+     "hardStopAttemptCount": 0,
+     "recoveredAttemptCount": 0,
+     "fallbackAttemptCount": 0,
+     "continuedAttemptCount": 0,
+     "rate": 0,
+     "hardStopRate": 0,
+     "recoveredRate": 0
+    },
+    "rewardHacking": {
+     "retainedAttemptCount": 198,
+     "passingAttemptCount": 33,
+     "reviewedAttemptCount": 33,
+     "flaggedAttemptCount": 4,
+     "notApplicableAttemptCount": 0,
+     "missingAuditAttemptCount": 0,
+     "skippedAuditAttemptCount": 0,
+     "unavailableAuditAttemptCount": 0,
+     "gradingErrorAttemptCount": 0,
+     "invalidAuditAttemptCount": 0,
+     "snapshotMismatchAttemptCount": 0,
+     "materializedAt": "2026-09-29T23:11:35.302184+00:00",
+     "gradingVersion": "v1",
+     "graderConfigHash": "e3e86c5c130946ce",
+     "reviewSources": [
+      {
+       "judgeModel": "sonnet",
+       "rubricId": "ca-bench-reward-hacking-v1",
+       "auditSchemaVersion": 1,
+       "attemptCount": 33
+      }
+     ],
+     "rate": 0.020202020202020204
+    },
+    "mean": {
+     "reward": 0.146464646464646,
+     "inputTokens": 16468964.714646464,
+     "outputTokens": 168736.55303030304
+    }
+   }
+  ],
+  "safety": {
+   "attemptCount": 909,
+   "refusedAttemptCount": 0,
+   "hardStopAttemptCount": 0,
+   "recoveredAttemptCount": 0,
+   "fallbackAttemptCount": 0,
+   "continuedAttemptCount": 0,
+   "rate": 0,
+   "hardStopRate": 0,
+   "recoveredRate": 0
+  },
+  "indexScore": 0.4186315529449987,
+  "mean": {
+   "reward": 0.4186315529449987,
+   "costUsd": 2.4673922004125437,
+   "agentWallTimeSec": 702.7110253025301,
+   "steps": 188.4884488448845,
+   "inputTokens": 13395246.748624865,
+   "outputTokens": 115826.40649064905,
+   "cacheTokens": 11871691.682068229,
+   "cacheHitRate": 0.8697428234581179,
+   "totalTokens": 13511073.155115515
+  },
+  "sums": {
+   "costUsd": 747.619836725
+  },
+  "percentiles": {
+   "costUsd": {
+    "p05": 1.099103153622112,
+    "p25": 1.6439984646864687,
+    "p50": 2.1229609128712874,
+    "p75": 3.008778207632013,
+    "p95": 4.849891568358086
+   },
+   "totalTokens": {
+    "p05": 4679184.810451044,
+    "p25": 8015173.094609471,
+    "p50": 11559537.268426849,
+    "p75": 16883320.984598454,
+    "p95": 28318875.752915297
+   }
+  },
+  "versions": {
+   "deep-swe-v1.1": {
+    "min": {
+     "version": "0.1.16",
+     "dateReleased": "2026-09-02"
+    },
+    "max": {
+     "version": "0.1.16",
+     "dateReleased": "2026-09-02"
+    }
+   },
+   "swe-atlas-qna": {
+    "min": {
+     "version": "0.1.12",
+     "dateReleased": "2026-08-13"
+    },
+    "max": {
+     "version": "0.1.12",
+     "dateReleased": "2026-08-13"
+    }
+   },
+   "terminal-bench-v4": {
+    "min": {
+     "version": "0.1.16",
+     "dateReleased": "2026-09-02"
+    },
+    "max": {
+     "version": "0.1.16",
+     "dateReleased": "2026-09-02"
     }
    }
   }
@@ -664,7 +474,7 @@
      "gradingErrorAttemptCount": 0,
      "invalidAuditAttemptCount": 0,
      "snapshotMismatchAttemptCount": 0,
-     "materializedAt": "2026-09-29T21:01:02.992399+00:00",
+     "materializedAt": "2026-09-29T23:11:35.302184+00:00",
      "gradingVersion": "v1",
      "graderConfigHash": "e3e86c5c130946ce",
      "reviewSources": [
@@ -760,21 +570,21 @@
   }
  },
  {
-  "id": "29a1cdad0d140781d05b9b4746cfdd0d",
+  "id": "f927d9c41b5c3021996eb14c3dd1341e",
   "isDefault": true,
   "isHighlighted": true,
-  "agentName": "Claude Code",
-  "provider": "anthropic",
-  "hostModelSlug": "anthropic_claude-fable-5-1",
+  "agentName": "Grok Build",
+  "provider": "xai",
+  "hostModelSlug": "xai_grok-bop-o86-xhigh",
   "display": {
-   "agent": "Claude Code",
-   "model": "Fable 5.1 (max) (with fallback)",
+   "agent": "Grok Build",
+   "model": "Grok 4.7 (xhigh)",
    "creator": {
-    "agent": "Anthropic",
-    "model": "Anthropic"
+    "agent": "xAI",
+    "model": "xAI"
    }
   },
-  "displayLabel": "Claude Code - Fable 5.1 (max) (with fallback)",
+  "displayLabel": "Grok Build - Grok 4.7 (xhigh)",
   "variantOf": null,
   "isUnavailable": false,
   "indexComponentCount": 3,
@@ -786,7 +596,7 @@
     "refDatasetName": "datacurve/deep-swe-1-1@1",
     "weight": 0.333333333333333,
     "safety": {
-     "attemptCount": 339,
+     "attemptCount": 335,
      "refusedAttemptCount": 0,
      "hardStopAttemptCount": 0,
      "recoveredAttemptCount": 0,
@@ -798,9 +608,9 @@
     },
     "rewardHacking": null,
     "mean": {
-     "reward": 0.64306784660767,
-     "inputTokens": 6428754.772861357,
-     "outputTokens": 155542.35398230088
+     "reward": 0.725663716814159,
+     "inputTokens": 14656743.734513273,
+     "outputTokens": 152948.2005899705
     }
    },
    {
@@ -810,20 +620,20 @@
     "weight": 0.333333333333333,
     "safety": {
      "attemptCount": 372,
-     "refusedAttemptCount": 46,
+     "refusedAttemptCount": 0,
      "hardStopAttemptCount": 0,
-     "recoveredAttemptCount": 46,
-     "fallbackAttemptCount": 46,
+     "recoveredAttemptCount": 0,
+     "fallbackAttemptCount": 0,
      "continuedAttemptCount": 0,
-     "rate": 0.12365591397849462,
+     "rate": 0,
      "hardStopRate": 0,
-     "recoveredRate": 0.12365591397849462
+     "recoveredRate": 0
     },
     "rewardHacking": null,
     "mean": {
-     "reward": 0.647849462365591,
-     "inputTokens": 3623187.8387096776,
-     "outputTokens": 81143.10752688172
+     "reward": 0.629032258064516,
+     "inputTokens": 7966825.954301075,
+     "outputTokens": 57168.37634408602
     }
    },
    {
@@ -833,19 +643,19 @@
     "weight": 0.333333333333333,
     "safety": {
      "attemptCount": 198,
-     "refusedAttemptCount": 28,
+     "refusedAttemptCount": 0,
      "hardStopAttemptCount": 0,
-     "recoveredAttemptCount": 28,
-     "fallbackAttemptCount": 28,
+     "recoveredAttemptCount": 0,
+     "fallbackAttemptCount": 0,
      "continuedAttemptCount": 0,
-     "rate": 0.1414141414141414,
+     "rate": 0,
      "hardStopRate": 0,
-     "recoveredRate": 0.1414141414141414
+     "recoveredRate": 0
     },
     "rewardHacking": {
      "retainedAttemptCount": 198,
-     "passingAttemptCount": 114,
-     "reviewedAttemptCount": 114,
+     "passingAttemptCount": 66,
+     "reviewedAttemptCount": 66,
      "flaggedAttemptCount": 0,
      "notApplicableAttemptCount": 0,
      "missingAuditAttemptCount": 0,
@@ -854,7 +664,7 @@
      "gradingErrorAttemptCount": 0,
      "invalidAuditAttemptCount": 0,
      "snapshotMismatchAttemptCount": 0,
-     "materializedAt": "2026-09-29T21:01:02.992399+00:00",
+     "materializedAt": "2026-09-29T23:11:35.302184+00:00",
      "gradingVersion": "v1",
      "graderConfigHash": "e3e86c5c130946ce",
      "reviewSources": [
@@ -862,89 +672,89 @@
        "judgeModel": "sonnet",
        "rubricId": "ca-bench-reward-hacking-v1",
        "auditSchemaVersion": 1,
-       "attemptCount": 114
+       "attemptCount": 66
       }
      ],
      "rate": 0
     },
     "mean": {
-     "reward": 0.575757575757576,
-     "inputTokens": 7810711.565656566,
-     "outputTokens": 194732.47474747474
+     "reward": 0.333333333333333,
+     "inputTokens": 25135458.641414143,
+     "outputTokens": 196677.30303030304
     }
    }
   ],
   "safety": {
-   "attemptCount": 909,
-   "refusedAttemptCount": 74,
+   "attemptCount": 905,
+   "refusedAttemptCount": 0,
    "hardStopAttemptCount": 0,
-   "recoveredAttemptCount": 74,
-   "fallbackAttemptCount": 74,
+   "recoveredAttemptCount": 0,
+   "fallbackAttemptCount": 0,
    "continuedAttemptCount": 0,
-   "rate": 0.08835668513087869,
+   "rate": 0,
    "hardStopRate": 0,
-   "recoveredRate": 0.08835668513087869
+   "recoveredRate": 0
   },
-  "indexScore": 0.6222249615769457,
+  "indexScore": 0.5626764360706693,
   "mean": {
-   "reward": 0.6222249615769457,
-   "costUsd": 12.388092375137534,
-   "agentWallTimeSec": 2089.900125412543,
-   "steps": 36.65676567656766,
-   "inputTokens": 5581622.259625964,
-   "outputTokens": 133631.59955995603,
-   "cacheTokens": 5205555.651265128,
-   "cacheHitRate": 0.9159555838702423,
-   "totalTokens": 5715253.85918592
+   "reward": 0.5626764360706693,
+   "costUsd": 8.817468730473037,
+   "agentWallTimeSec": 2354.367686468646,
+   "steps": 162.64576457645765,
+   "inputTokens": 14201447.955995597,
+   "outputTokens": 123276.32783278328,
+   "cacheTokens": 13550056.765676552,
+   "cacheHitRate": 0.938882976190201,
+   "totalTokens": 14324724.283828393
   },
   "sums": {
-   "costUsd": 3753.591989666663
+   "costUsd": 2671.693025333334
   },
   "percentiles": {
    "costUsd": {
-    "p05": 5.444339298624863,
-    "p25": 7.8804961398515,
-    "p50": 11.040917095709577,
-    "p75": 14.93645990085259,
-    "p95": 22.439563513833875
+    "p05": 2.7192659427942796,
+    "p25": 4.51524115951595,
+    "p50": 6.599111777777779,
+    "p75": 9.808614987898796,
+    "p95": 18.236931686028605
    },
    "totalTokens": {
-    "p05": 1605004.4331133126,
-    "p25": 2728342.3767876793,
-    "p50": 4432038.257425743,
-    "p75": 7298906.072607261,
-    "p95": 13976824.222882291
+    "p05": 3709632.12431243,
+    "p25": 6478872.97579758,
+    "p50": 9948394.636963697,
+    "p75": 15872444.876787692,
+    "p95": 31362264.765786577
    }
   },
   "versions": {
    "deep-swe-v1.1": {
     "min": {
-     "version": "2.1.263",
-     "dateReleased": "2026-09-06"
+     "version": "1.0.40",
+     "dateReleased": null
     },
     "max": {
-     "version": "2.1.263",
-     "dateReleased": "2026-09-06"
+     "version": "1.0.40",
+     "dateReleased": null
     }
    },
    "swe-atlas-qna": {
     "min": {
-     "version": "2.1.259",
-     "dateReleased": "2026-09-02"
+     "version": "1.0.40",
+     "dateReleased": null
     },
     "max": {
-     "version": "2.1.259",
-     "dateReleased": "2026-09-02"
+     "version": "1.0.40",
+     "dateReleased": null
     }
    },
    "terminal-bench-v4": {
     "min": {
-     "version": "2.1.263",
-     "dateReleased": "2026-09-06"
+     "version": "1.0.40",
+     "dateReleased": null
     },
     "max": {
-     "version": "2.1.263",
-     "dateReleased": "2026-09-06"
+     "version": "1.0.40",
+     "dateReleased": null
     }
    }
   }
@@ -1044,7 +854,7 @@
      "gradingErrorAttemptCount": 0,
      "invalidAuditAttemptCount": 0,
      "snapshotMismatchAttemptCount": 0,
-     "materializedAt": "2026-09-29T21:01:02.992399+00:00",
+     "materializedAt": "2026-09-29T23:11:35.302184+00:00",
      "gradingVersion": "v1",
      "graderConfigHash": "e3e86c5c130946ce",
      "reviewSources": [
@@ -1135,6 +945,196 @@
     "max": {
      "version": "0.153.4",
      "dateReleased": "2026-09-04"
+    }
+   }
+  }
+ },
+ {
+  "id": "29a1cdad0d140781d05b9b4746cfdd0d",
+  "isDefault": true,
+  "isHighlighted": true,
+  "agentName": "Claude Code",
+  "provider": "anthropic",
+  "hostModelSlug": "anthropic_claude-fable-5-1",
+  "display": {
+   "agent": "Claude Code",
+   "model": "Fable 5.1 (max) (with fallback)",
+   "creator": {
+    "agent": "Anthropic",
+    "model": "Anthropic"
+   }
+  },
+  "displayLabel": "Claude Code - Fable 5.1 (max) (with fallback)",
+  "variantOf": null,
+  "isUnavailable": false,
+  "indexComponentCount": 3,
+  "evalCount": 3,
+  "evals": [
+   {
+    "datasetIndexName": "deep-swe-v1.1",
+    "evaluationDatasetSlug": "DeepSWE v1.1",
+    "refDatasetName": "datacurve/deep-swe-1-1@1",
+    "weight": 0.333333333333333,
+    "safety": {
+     "attemptCount": 339,
+     "refusedAttemptCount": 0,
+     "hardStopAttemptCount": 0,
+     "recoveredAttemptCount": 0,
+     "fallbackAttemptCount": 0,
+     "continuedAttemptCount": 0,
+     "rate": 0,
+     "hardStopRate": 0,
+     "recoveredRate": 0
+    },
+    "rewardHacking": null,
+    "mean": {
+     "reward": 0.64306784660767,
+     "inputTokens": 6428754.772861357,
+     "outputTokens": 155542.35398230088
+    }
+   },
+   {
+    "datasetIndexName": "swe-atlas-qna",
+    "evaluationDatasetSlug": "SWE-Atlas-QnA",
+    "refDatasetName": "datasets/swe-atlas-qna",
+    "weight": 0.333333333333333,
+    "safety": {
+     "attemptCount": 372,
+     "refusedAttemptCount": 46,
+     "hardStopAttemptCount": 0,
+     "recoveredAttemptCount": 46,
+     "fallbackAttemptCount": 46,
+     "continuedAttemptCount": 0,
+     "rate": 0.12365591397849462,
+     "hardStopRate": 0,
+     "recoveredRate": 0.12365591397849462
+    },
+    "rewardHacking": null,
+    "mean": {
+     "reward": 0.647849462365591,
+     "inputTokens": 3623187.8387096776,
+     "outputTokens": 81143.10752688172
+    }
+   },
+   {
+    "datasetIndexName": "terminal-bench-v4",
+    "evaluationDatasetSlug": "Terminal-Bench v4",
+    "refDatasetName": "terminal-bench/terminal-bench@sha256:39d9f44b40420cde8fdcc087579c0d72a7e14fa3656d603c3f0d22fb35e27732",
+    "weight": 0.333333333333333,
+    "safety": {
+     "attemptCount": 198,
+     "refusedAttemptCount": 28,
+     "hardStopAttemptCount": 0,
+     "recoveredAttemptCount": 28,
+     "fallbackAttemptCount": 28,
+     "continuedAttemptCount": 0,
+     "rate": 0.1414141414141414,
+     "hardStopRate": 0,
+     "recoveredRate": 0.1414141414141414
+    },
+    "rewardHacking": {
+     "retainedAttemptCount": 198,
+     "passingAttemptCount": 114,
+     "reviewedAttemptCount": 114,
+     "flaggedAttemptCount": 0,
+     "notApplicableAttemptCount": 0,
+     "missingAuditAttemptCount": 0,
+     "skippedAuditAttemptCount": 0,
+     "unavailableAuditAttemptCount": 0,
+     "gradingErrorAttemptCount": 0,
+     "invalidAuditAttemptCount": 0,
+     "snapshotMismatchAttemptCount": 0,
+     "materializedAt": "2026-09-29T23:11:35.302184+00:00",
+     "gradingVersion": "v1",
+     "graderConfigHash": "e3e86c5c130946ce",
+     "reviewSources": [
+      {
+       "judgeModel": "sonnet",
+       "rubricId": "ca-bench-reward-hacking-v1",
+       "auditSchemaVersion": 1,
+       "attemptCount": 114
+      }
+     ],
+     "rate": 0
+    },
+    "mean": {
+     "reward": 0.575757575757576,
+     "inputTokens": 7810711.565656566,
+     "outputTokens": 194732.47474747474
+    }
+   }
+  ],
+  "safety": {
+   "attemptCount": 909,
+   "refusedAttemptCount": 74,
+   "hardStopAttemptCount": 0,
+   "recoveredAttemptCount": 74,
+   "fallbackAttemptCount": 74,
+   "continuedAttemptCount": 0,
+   "rate": 0.08835668513087869,
+   "hardStopRate": 0,
+   "recoveredRate": 0.08835668513087869
+  },
+  "indexScore": 0.6222249615769457,
+  "mean": {
+   "reward": 0.6222249615769457,
+   "costUsd": 12.388092375137534,
+   "agentWallTimeSec": 2089.900125412543,
+   "steps": 36.65676567656766,
+   "inputTokens": 5581622.259625964,
+   "outputTokens": 133631.59955995603,
+   "cacheTokens": 5205555.651265128,
+   "cacheHitRate": 0.9159555838702423,
+   "totalTokens": 5715253.85918592
+  },
+  "sums": {
+   "costUsd": 3753.591989666663
+  },
+  "percentiles": {
+   "costUsd": {
+    "p05": 5.444339298624863,
+    "p25": 7.8804961398515,
+    "p50": 11.040917095709577,
+    "p75": 14.93645990085259,
+    "p95": 22.439563513833875
+   },
+   "totalTokens": {
+    "p05": 1605004.4331133126,
+    "p25": 2728342.3767876793,
+    "p50": 4432038.257425743,
+    "p75": 7298906.072607261,
+    "p95": 13976824.222882291
+   }
+  },
+  "versions": {
+   "deep-swe-v1.1": {
+    "min": {
+     "version": "2.1.263",
+     "dateReleased": "2026-09-06"
+    },
+    "max": {
+     "version": "2.1.263",
+     "dateReleased": "2026-09-06"
+    }
+   },
+   "swe-atlas-qna": {
+    "min": {
+     "version": "2.1.259",
+     "dateReleased": "2026-09-02"
+    },
+    "max": {
+     "version": "2.1.259",
+     "dateReleased": "2026-09-02"
+    }
+   },
+   "terminal-bench-v4": {
+    "min": {
+     "version": "2.1.263",
+     "dateReleased": "2026-09-06"
+    },
+    "max": {
+     "version": "2.1.263",
+     "dateReleased": "2026-09-06"
     }
    }
   }
@@ -1234,7 +1234,7 @@
      "gradingErrorAttemptCount": 0,
      "invalidAuditAttemptCount": 0,
      "snapshotMismatchAttemptCount": 0,
-     "materializedAt": "2026-09-29T21:01:02.992399+00:00",
+     "materializedAt": "2026-09-29T23:11:35.302184+00:00",
      "gradingVersion": "v1",
      "graderConfigHash": "e3e86c5c130946ce",
      "reviewSources": [
@@ -1424,7 +1424,7 @@
      "gradingErrorAttemptCount": 0,
      "invalidAuditAttemptCount": 0,
      "snapshotMismatchAttemptCount": 0,
-     "materializedAt": "2026-09-29T21:01:02.992399+00:00",
+     "materializedAt": "2026-09-29T23:11:35.302184+00:00",
      "gradingVersion": "v1",
      "graderConfigHash": "e3e86c5c130946ce",
      "reviewSources": [
@@ -1484,196 +1484,6 @@
     "p50": 2203242.6336633656,
     "p75": 3691119.964796481,
     "p95": 7871107.464686463
-   }
-  },
-  "versions": {
-   "deep-swe-v1.1": {
-    "min": {
-     "version": "0.154.0",
-     "dateReleased": null
-    },
-    "max": {
-     "version": "0.154.0",
-     "dateReleased": null
-    }
-   },
-   "swe-atlas-qna": {
-    "min": {
-     "version": "0.154.0",
-     "dateReleased": null
-    },
-    "max": {
-     "version": "0.154.0",
-     "dateReleased": null
-    }
-   },
-   "terminal-bench-v4": {
-    "min": {
-     "version": "0.154.0",
-     "dateReleased": null
-    },
-    "max": {
-     "version": "0.154.0",
-     "dateReleased": null
-    }
-   }
-  }
- },
- {
-  "id": "ac8276cd5d15ac2daacb9956ad44c132",
-  "isDefault": true,
-  "isHighlighted": false,
-  "agentName": "Codex",
-  "provider": "openai",
-  "hostModelSlug": "openai_gpt-6-luna",
-  "display": {
-   "agent": "Codex",
-   "model": "GPT-6 Luna (max)",
-   "creator": {
-    "agent": "OpenAI",
-    "model": "OpenAI"
-   }
-  },
-  "displayLabel": "Codex - GPT-6 Luna (max) ({'reasoning_effort': 'max'})",
-  "variantOf": null,
-  "isUnavailable": false,
-  "indexComponentCount": 3,
-  "evalCount": 3,
-  "evals": [
-   {
-    "datasetIndexName": "deep-swe-v1.1",
-    "evaluationDatasetSlug": "DeepSWE v1.1",
-    "refDatasetName": "datacurve/deep-swe-1-1@1",
-    "weight": 0.333333333333333,
-    "safety": {
-     "attemptCount": 338,
-     "refusedAttemptCount": 0,
-     "hardStopAttemptCount": 0,
-     "recoveredAttemptCount": 0,
-     "fallbackAttemptCount": 0,
-     "continuedAttemptCount": 0,
-     "rate": 0,
-     "hardStopRate": 0,
-     "recoveredRate": 0
-    },
-    "rewardHacking": null,
-    "mean": {
-     "reward": 0.63716814159292,
-     "inputTokens": 12385746.131268436,
-     "outputTokens": 108271.5634218289
-    }
-   },
-   {
-    "datasetIndexName": "swe-atlas-qna",
-    "evaluationDatasetSlug": "SWE-Atlas-QnA",
-    "refDatasetName": "datasets/swe-atlas-qna",
-    "weight": 0.333333333333333,
-    "safety": {
-     "attemptCount": 372,
-     "refusedAttemptCount": 0,
-     "hardStopAttemptCount": 0,
-     "recoveredAttemptCount": 0,
-     "fallbackAttemptCount": 0,
-     "continuedAttemptCount": 0,
-     "rate": 0,
-     "hardStopRate": 0,
-     "recoveredRate": 0
-    },
-    "rewardHacking": null,
-    "mean": {
-     "reward": 0.443548387096774,
-     "inputTokens": 5786509.854838709,
-     "outputTokens": 53341.779569892475
-    }
-   },
-   {
-    "datasetIndexName": "terminal-bench-v4",
-    "evaluationDatasetSlug": "Terminal-Bench v4",
-    "refDatasetName": "terminal-bench/terminal-bench@sha256:39d9f44b40420cde8fdcc087579c0d72a7e14fa3656d603c3f0d22fb35e27732",
-    "weight": 0.333333333333333,
-    "safety": {
-     "attemptCount": 198,
-     "refusedAttemptCount": 0,
-     "hardStopAttemptCount": 0,
-     "recoveredAttemptCount": 0,
-     "fallbackAttemptCount": 0,
-     "continuedAttemptCount": 0,
-     "rate": 0,
-     "hardStopRate": 0,
-     "recoveredRate": 0
-    },
-    "rewardHacking": {
-     "retainedAttemptCount": 198,
-     "passingAttemptCount": 30,
-     "reviewedAttemptCount": 30,
-     "flaggedAttemptCount": 0,
-     "notApplicableAttemptCount": 0,
-     "missingAuditAttemptCount": 0,
-     "skippedAuditAttemptCount": 0,
-     "unavailableAuditAttemptCount": 0,
-     "gradingErrorAttemptCount": 0,
-     "invalidAuditAttemptCount": 0,
-     "snapshotMismatchAttemptCount": 0,
-     "materializedAt": "2026-09-29T21:01:02.992399+00:00",
-     "gradingVersion": "v1",
-     "graderConfigHash": "e3e86c5c130946ce",
-     "reviewSources": [
-      {
-       "judgeModel": "sonnet",
-       "rubricId": "ca-bench-reward-hacking-v1",
-       "auditSchemaVersion": 1,
-       "attemptCount": 30
-      }
-     ],
-     "rate": 0
-    },
-    "mean": {
-     "reward": 0.151515151515152,
-     "inputTokens": 14381227.393939395,
-     "outputTokens": 165884.42424242425
-    }
-   }
-  ],
-  "safety": {
-   "attemptCount": 908,
-   "refusedAttemptCount": 0,
-   "hardStopAttemptCount": 0,
-   "recoveredAttemptCount": 0,
-   "fallbackAttemptCount": 0,
-   "continuedAttemptCount": 0,
-   "rate": 0,
-   "hardStopRate": 0,
-   "recoveredRate": 0
-  },
-  "indexScore": 0.4107438934016153,
-  "mean": {
-   "reward": 0.4107438934016153,
-   "costUsd": 0.17591172304455457,
-   "agentWallTimeSec": 1285.9268514851478,
-   "steps": 88.64301430143014,
-   "inputTokens": 10119727.864136413,
-   "outputTokens": 98341.38393839383,
-   "cacheTokens": 9897312.69911991,
-   "cacheHitRate": 0.9606438143896164,
-   "totalTokens": 10218069.248074815
-  },
-  "sums": {
-   "costUsd": 53.3012520824999
-  },
-  "percentiles": {
-   "costUsd": {
-    "p05": 0.05139677199229924,
-    "p25": 0.08709199411441132,
-    "p50": 0.12790623996149636,
-    "p75": 0.23731735201595155,
-    "p95": 0.4026450882722773
-   },
-   "totalTokens": {
-    "p05": 2000123.225962595,
-    "p25": 3915894.559955995,
-    "p50": 7023106.606160604,
-    "p75": 13626608.82783279,
-    "p95": 26835833.369636964
    }
   },
   "versions": {
@@ -1804,7 +1614,7 @@
      "gradingErrorAttemptCount": 0,
      "invalidAuditAttemptCount": 0,
      "snapshotMismatchAttemptCount": 0,
-     "materializedAt": "2026-09-29T21:01:02.992399+00:00",
+     "materializedAt": "2026-09-29T23:11:35.302184+00:00",
      "gradingVersion": "v1",
      "graderConfigHash": "e3e86c5c130946ce",
      "reviewSources": [
@@ -1895,576 +1705,6 @@
     "max": {
      "version": "1.0.2-R2040.1",
      "dateReleased": "2026-09-02"
-    }
-   }
-  }
- },
- {
-  "id": "55b029d6971b4d378335bb168eb98b3b",
-  "isDefault": true,
-  "isHighlighted": false,
-  "agentName": "Kimi Code CLI",
-  "provider": "moonshotai",
-  "hostModelSlug": "moonshot_kimi-k3",
-  "display": {
-   "agent": "Kimi Code CLI",
-   "model": "Kimi K3",
-   "creator": {
-    "agent": "Moonshot AI",
-    "model": "Moonshot AI"
-   }
-  },
-  "displayLabel": "Kimi Code CLI - Kimi K3",
-  "variantOf": null,
-  "isUnavailable": false,
-  "indexComponentCount": 3,
-  "evalCount": 3,
-  "evals": [
-   {
-    "datasetIndexName": "deep-swe-v1.1",
-    "evaluationDatasetSlug": "DeepSWE v1.1",
-    "refDatasetName": "datacurve/deep-swe-1-1@1",
-    "weight": 0.333333333333333,
-    "safety": {
-     "attemptCount": 339,
-     "refusedAttemptCount": 0,
-     "hardStopAttemptCount": 0,
-     "recoveredAttemptCount": 0,
-     "fallbackAttemptCount": 0,
-     "continuedAttemptCount": 0,
-     "rate": 0,
-     "hardStopRate": 0,
-     "recoveredRate": 0
-    },
-    "rewardHacking": null,
-    "mean": {
-     "reward": 0.684365781710915,
-     "inputTokens": 8571957.041297935,
-     "outputTokens": 75080.34808259587
-    }
-   },
-   {
-    "datasetIndexName": "swe-atlas-qna",
-    "evaluationDatasetSlug": "SWE-Atlas-QnA",
-    "refDatasetName": "datasets/swe-atlas-qna",
-    "weight": 0.333333333333333,
-    "safety": {
-     "attemptCount": 372,
-     "refusedAttemptCount": 0,
-     "hardStopAttemptCount": 0,
-     "recoveredAttemptCount": 0,
-     "fallbackAttemptCount": 0,
-     "continuedAttemptCount": 0,
-     "rate": 0,
-     "hardStopRate": 0,
-     "recoveredRate": 0
-    },
-    "rewardHacking": null,
-    "mean": {
-     "reward": 0.661290322580645,
-     "inputTokens": 4719526.534946237,
-     "outputTokens": 49977.29838709677
-    }
-   },
-   {
-    "datasetIndexName": "terminal-bench-v4",
-    "evaluationDatasetSlug": "Terminal-Bench v4",
-    "refDatasetName": "terminal-bench/terminal-bench@sha256:39d9f44b40420cde8fdcc087579c0d72a7e14fa3656d603c3f0d22fb35e27732",
-    "weight": 0.333333333333333,
-    "safety": {
-     "attemptCount": 198,
-     "refusedAttemptCount": 0,
-     "hardStopAttemptCount": 0,
-     "recoveredAttemptCount": 0,
-     "fallbackAttemptCount": 0,
-     "continuedAttemptCount": 0,
-     "rate": 0,
-     "hardStopRate": 0,
-     "recoveredRate": 0
-    },
-    "rewardHacking": {
-     "retainedAttemptCount": 198,
-     "passingAttemptCount": 42,
-     "reviewedAttemptCount": 42,
-     "flaggedAttemptCount": 0,
-     "notApplicableAttemptCount": 0,
-     "missingAuditAttemptCount": 0,
-     "skippedAuditAttemptCount": 0,
-     "unavailableAuditAttemptCount": 0,
-     "gradingErrorAttemptCount": 0,
-     "invalidAuditAttemptCount": 0,
-     "snapshotMismatchAttemptCount": 0,
-     "materializedAt": "2026-09-29T21:01:02.992399+00:00",
-     "gradingVersion": "v1",
-     "graderConfigHash": "e3e86c5c130946ce",
-     "reviewSources": [
-      {
-       "judgeModel": "sonnet",
-       "rubricId": "ca-bench-reward-hacking-v1",
-       "auditSchemaVersion": 1,
-       "attemptCount": 42
-      }
-     ],
-     "rate": 0
-    },
-    "mean": {
-     "reward": 0.212121212121212,
-     "inputTokens": 14964824.787878787,
-     "outputTokens": 205571.03535353535
-    }
-   }
-  ],
-  "safety": {
-   "attemptCount": 909,
-   "refusedAttemptCount": 0,
-   "hardStopAttemptCount": 0,
-   "recoveredAttemptCount": 0,
-   "fallbackAttemptCount": 0,
-   "continuedAttemptCount": 0,
-   "rate": 0,
-   "hardStopRate": 0,
-   "recoveredRate": 0
-  },
-  "indexScore": 0.519259105470924,
-  "mean": {
-   "reward": 0.519259105470924,
-   "costUsd": 5.047195443300332,
-   "agentWallTimeSec": 3689.3441947194724,
-   "steps": 173.36028602860284,
-   "inputTokens": 8387890.666666667,
-   "outputTokens": 93230.86688668867,
-   "cacheTokens": 7968496.133333323,
-   "cacheHitRate": 0.9500000000000017,
-   "totalTokens": 8481121.533553353
-  },
-  "sums": {
-   "costUsd": 1529.30021932
-  },
-  "percentiles": {
-   "costUsd": {
-    "p05": 1.1201608924026403,
-    "p25": 2.1660128471864684,
-    "p50": 4.013249413745875,
-    "p75": 6.4578525155775575,
-    "p95": 11.098114784331683
-   },
-   "totalTokens": {
-    "p05": 1514640.538393838,
-    "p25": 3247568.457095711,
-    "p50": 6455899.625962595,
-    "p75": 11496187.961496139,
-    "p95": 19359817.106380656
-   }
-  },
-  "versions": {
-   "deep-swe-v1.1": {
-    "min": {
-     "version": "0.36.0",
-     "dateReleased": "2026-08-13"
-    },
-    "max": {
-     "version": "0.36.1",
-     "dateReleased": "2026-08-14"
-    }
-   },
-   "swe-atlas-qna": {
-    "min": {
-     "version": "0.26.0",
-     "dateReleased": "2026-07-16"
-    },
-    "max": {
-     "version": "0.26.0",
-     "dateReleased": "2026-07-16"
-    }
-   },
-   "terminal-bench-v4": {
-    "min": {
-     "version": "0.36.1",
-     "dateReleased": "2026-08-14"
-    },
-    "max": {
-     "version": "0.36.1",
-     "dateReleased": "2026-08-14"
-    }
-   }
-  }
- },
- {
-  "id": "fa589dad83ffcdd6cce72a467e552063",
-  "isDefault": false,
-  "isHighlighted": false,
-  "agentName": "Codex",
-  "provider": "openai",
-  "hostModelSlug": "openai_quasar-alpha",
-  "display": {
-   "agent": "Codex",
-   "model": "GPT-6.1 Sol (low)",
-   "creator": {
-    "agent": "OpenAI",
-    "model": "OpenAI"
-   }
-  },
-  "displayLabel": "Codex - GPT-6.1 Sol (low) ({'reasoning_effort': 'low'})",
-  "variantOf": null,
-  "isUnavailable": false,
-  "indexComponentCount": 3,
-  "evalCount": 3,
-  "evals": [
-   {
-    "datasetIndexName": "deep-swe-v1.1",
-    "evaluationDatasetSlug": "DeepSWE v1.1",
-    "refDatasetName": "datacurve/deep-swe-1-1@1",
-    "weight": 0.333333333333333,
-    "safety": {
-     "attemptCount": 339,
-     "refusedAttemptCount": 0,
-     "hardStopAttemptCount": 0,
-     "recoveredAttemptCount": 0,
-     "fallbackAttemptCount": 0,
-     "continuedAttemptCount": 0,
-     "rate": 0,
-     "hardStopRate": 0,
-     "recoveredRate": 0
-    },
-    "rewardHacking": null,
-    "mean": {
-     "reward": 0.675516224188791,
-     "inputTokens": 1135333.3510324485,
-     "outputTokens": 12865.970501474927
-    }
-   },
-   {
-    "datasetIndexName": "swe-atlas-qna",
-    "evaluationDatasetSlug": "SWE-Atlas-QnA",
-    "refDatasetName": "datasets/swe-atlas-qna",
-    "weight": 0.333333333333333,
-    "safety": {
-     "attemptCount": 372,
-     "refusedAttemptCount": 9,
-     "hardStopAttemptCount": 9,
-     "recoveredAttemptCount": 0,
-     "fallbackAttemptCount": 0,
-     "continuedAttemptCount": 0,
-     "rate": 0.024193548387096774,
-     "hardStopRate": 0.024193548387096774,
-     "recoveredRate": 0
-    },
-    "rewardHacking": null,
-    "mean": {
-     "reward": 0.551075268817204,
-     "inputTokens": 1278601.31147541,
-     "outputTokens": 9084.045081967213
-    }
-   },
-   {
-    "datasetIndexName": "terminal-bench-v4",
-    "evaluationDatasetSlug": "Terminal-Bench v4",
-    "refDatasetName": "terminal-bench/terminal-bench@sha256:39d9f44b40420cde8fdcc087579c0d72a7e14fa3656d603c3f0d22fb35e27732",
-    "weight": 0.333333333333333,
-    "safety": {
-     "attemptCount": 198,
-     "refusedAttemptCount": 0,
-     "hardStopAttemptCount": 0,
-     "recoveredAttemptCount": 0,
-     "fallbackAttemptCount": 0,
-     "continuedAttemptCount": 0,
-     "rate": 0,
-     "hardStopRate": 0,
-     "recoveredRate": 0
-    },
-    "rewardHacking": {
-     "retainedAttemptCount": 198,
-     "passingAttemptCount": 98,
-     "reviewedAttemptCount": 98,
-     "flaggedAttemptCount": 1,
-     "notApplicableAttemptCount": 0,
-     "missingAuditAttemptCount": 0,
-     "skippedAuditAttemptCount": 0,
-     "unavailableAuditAttemptCount": 0,
-     "gradingErrorAttemptCount": 0,
-     "invalidAuditAttemptCount": 0,
-     "snapshotMismatchAttemptCount": 0,
-     "materializedAt": "2026-09-29T21:01:02.992399+00:00",
-     "gradingVersion": "v1",
-     "graderConfigHash": "e3e86c5c130946ce",
-     "reviewSources": [
-      {
-       "judgeModel": "sonnet",
-       "rubricId": "ca-bench-reward-hacking-v1",
-       "auditSchemaVersion": 1,
-       "attemptCount": 98
-      }
-     ],
-     "rate": 0.005050505050505051
-    },
-    "mean": {
-     "reward": 0.48989898989899,
-     "inputTokens": 3454474.217171717,
-     "outputTokens": 28368.58080808081
-    }
-   }
-  ],
-  "safety": {
-   "attemptCount": 909,
-   "refusedAttemptCount": 9,
-   "hardStopAttemptCount": 9,
-   "recoveredAttemptCount": 0,
-   "fallbackAttemptCount": 0,
-   "continuedAttemptCount": 0,
-   "rate": 0.008064516129032258,
-   "hardStopRate": 0.008064516129032258,
-   "recoveredRate": 0
-  },
-  "indexScore": 0.5721634943016617,
-  "mean": {
-   "reward": 0.5721634943016617,
-   "costUsd": 0.49880364510270725,
-   "agentWallTimeSec": 517.8138943894386,
-   "steps": 35.74037403740374,
-   "inputTokens": 1699123.8601417518,
-   "outputTokens": 14695.05805334632,
-   "cacheTokens": 1627295.6717524226,
-   "cacheHitRate": 0.9135762473536158,
-   "totalTokens": 1713818.9181950986
-  },
-  "sums": {
-   "costUsd": 150.4073521333333
-  },
-  "percentiles": {
-   "costUsd": {
-    "p05": 0.14515691546754672,
-    "p25": 0.2084983163916393,
-    "p50": 0.2965749825082511,
-    "p75": 0.5361287875687569,
-    "p95": 1.465534774675468
-   },
-   "totalTokens": {
-    "p05": 240942.00825082537,
-    "p25": 418718.0632563254,
-    "p50": 753671.7865786579,
-    "p75": 1840610.7161716148,
-    "p95": 5662162.880087997
-   }
-  },
-  "versions": {
-   "deep-swe-v1.1": {
-    "min": {
-     "version": "0.154.0",
-     "dateReleased": null
-    },
-    "max": {
-     "version": "0.154.0",
-     "dateReleased": null
-    }
-   },
-   "swe-atlas-qna": {
-    "min": {
-     "version": "0.154.0",
-     "dateReleased": null
-    },
-    "max": {
-     "version": "0.154.0",
-     "dateReleased": null
-    }
-   },
-   "terminal-bench-v4": {
-    "min": {
-     "version": "0.154.0",
-     "dateReleased": null
-    },
-    "max": {
-     "version": "0.154.0",
-     "dateReleased": null
-    }
-   }
-  }
- },
- {
-  "id": "4aee8aa2d4a0bad6068644f40edae235",
-  "isDefault": false,
-  "isHighlighted": false,
-  "agentName": "Codex",
-  "provider": "openai",
-  "hostModelSlug": "openai_quasar-alpha",
-  "display": {
-   "agent": "Codex",
-   "model": "GPT-6.1 Sol (high)",
-   "creator": {
-    "agent": "OpenAI",
-    "model": "OpenAI"
-   }
-  },
-  "displayLabel": "Codex - GPT-6.1 Sol (high) ({'reasoning_effort': 'high'})",
-  "variantOf": null,
-  "isUnavailable": false,
-  "indexComponentCount": 3,
-  "evalCount": 3,
-  "evals": [
-   {
-    "datasetIndexName": "deep-swe-v1.1",
-    "evaluationDatasetSlug": "DeepSWE v1.1",
-    "refDatasetName": "datacurve/deep-swe-1-1@1",
-    "weight": 0.333333333333333,
-    "safety": {
-     "attemptCount": 339,
-     "refusedAttemptCount": 0,
-     "hardStopAttemptCount": 0,
-     "recoveredAttemptCount": 0,
-     "fallbackAttemptCount": 0,
-     "continuedAttemptCount": 0,
-     "rate": 0,
-     "hardStopRate": 0,
-     "recoveredRate": 0
-    },
-    "rewardHacking": null,
-    "mean": {
-     "reward": 0.705014749262537,
-     "inputTokens": 2382530.2064896757,
-     "outputTokens": 31206.94395280236
-    }
-   },
-   {
-    "datasetIndexName": "swe-atlas-qna",
-    "evaluationDatasetSlug": "SWE-Atlas-QnA",
-    "refDatasetName": "datasets/swe-atlas-qna",
-    "weight": 0.333333333333333,
-    "safety": {
-     "attemptCount": 372,
-     "refusedAttemptCount": 14,
-     "hardStopAttemptCount": 14,
-     "recoveredAttemptCount": 0,
-     "fallbackAttemptCount": 0,
-     "continuedAttemptCount": 0,
-     "rate": 0.03763440860215054,
-     "hardStopRate": 0.03763440860215054,
-     "recoveredRate": 0
-    },
-    "rewardHacking": null,
-    "mean": {
-     "reward": 0.599462365591398,
-     "inputTokens": 2421836.2786885244,
-     "outputTokens": 17768.75956284153
-    }
-   },
-   {
-    "datasetIndexName": "terminal-bench-v4",
-    "evaluationDatasetSlug": "Terminal-Bench v4",
-    "refDatasetName": "terminal-bench/terminal-bench@sha256:39d9f44b40420cde8fdcc087579c0d72a7e14fa3656d603c3f0d22fb35e27732",
-    "weight": 0.333333333333333,
-    "safety": {
-     "attemptCount": 198,
-     "refusedAttemptCount": 1,
-     "hardStopAttemptCount": 1,
-     "recoveredAttemptCount": 0,
-     "fallbackAttemptCount": 0,
-     "continuedAttemptCount": 0,
-     "rate": 0.005050505050505051,
-     "hardStopRate": 0.005050505050505051,
-     "recoveredRate": 0
-    },
-    "rewardHacking": {
-     "retainedAttemptCount": 198,
-     "passingAttemptCount": 99,
-     "reviewedAttemptCount": 99,
-     "flaggedAttemptCount": 0,
-     "notApplicableAttemptCount": 0,
-     "missingAuditAttemptCount": 0,
-     "skippedAuditAttemptCount": 0,
-     "unavailableAuditAttemptCount": 0,
-     "gradingErrorAttemptCount": 0,
-     "invalidAuditAttemptCount": 0,
-     "snapshotMismatchAttemptCount": 0,
-     "materializedAt": "2026-09-29T21:01:02.992399+00:00",
-     "gradingVersion": "v1",
-     "graderConfigHash": "e3e86c5c130946ce",
-     "reviewSources": [
-      {
-       "judgeModel": "sonnet",
-       "rubricId": "ca-bench-reward-hacking-v1",
-       "auditSchemaVersion": 1,
-       "attemptCount": 99
-      }
-     ],
-     "rate": 0
-    },
-    "mean": {
-     "reward": 0.5,
-     "inputTokens": 4184679.611111111,
-     "outputTokens": 45169.030303030304
-    }
-   }
-  ],
-  "safety": {
-   "attemptCount": 909,
-   "refusedAttemptCount": 15,
-   "hardStopAttemptCount": 15,
-   "recoveredAttemptCount": 0,
-   "fallbackAttemptCount": 0,
-   "continuedAttemptCount": 0,
-   "rate": 0.014228304550885196,
-   "hardStopRate": 0.014228304550885196,
-   "recoveredRate": 0
-  },
-  "indexScore": 0.6014923716179784,
-  "mean": {
-   "reward": 0.6014923716179784,
-   "costUsd": 0.8892413135295484,
-   "agentWallTimeSec": 799.7652123212325,
-   "steps": 38.97909790979098,
-   "inputTokens": 2791163.2548648305,
-   "outputTokens": 28748.735486663423,
-   "cacheTokens": 2665415.3918375443,
-   "cacheHitRate": 0.9278388366571144,
-   "totalTokens": 2819911.9903514963
-  },
-  "sums": {
-   "costUsd": 268.0356914333333
-  },
-  "percentiles": {
-   "costUsd": {
-    "p05": 0.312068081210121,
-    "p25": 0.4989411210121013,
-    "p50": 0.6891893533553354,
-    "p75": 0.9873919497799788,
-    "p95": 2.1023536615841585
-   },
-   "totalTokens": {
-    "p05": 527228.1344334432,
-    "p25": 1136802.8481848184,
-    "p50": 1870636.3718371852,
-    "p75": 3261089.490649065,
-    "p95": 6454477.248184814
-   }
-  },
-  "versions": {
-   "deep-swe-v1.1": {
-    "min": {
-     "version": "0.154.0",
-     "dateReleased": null
-    },
-    "max": {
-     "version": "0.154.0",
-     "dateReleased": null
-    }
-   },
-   "swe-atlas-qna": {
-    "min": {
-     "version": "0.154.0",
-     "dateReleased": null
-    },
-    "max": {
-     "version": "0.154.0",
-     "dateReleased": null
-    }
-   },
-   "terminal-bench-v4": {
-    "min": {
-     "version": "0.154.0",
-     "dateReleased": null
-    },
-    "max": {
-     "version": "0.154.0",
-     "dateReleased": null
     }
    }
   }
@@ -2564,7 +1804,7 @@
      "gradingErrorAttemptCount": 0,
      "invalidAuditAttemptCount": 0,
      "snapshotMismatchAttemptCount": 0,
-     "materializedAt": "2026-09-29T21:01:02.992399+00:00",
+     "materializedAt": "2026-09-29T23:11:35.302184+00:00",
      "gradingVersion": "v1",
      "graderConfigHash": "e3e86c5c130946ce",
      "reviewSources": [
@@ -2754,7 +1994,7 @@
      "gradingErrorAttemptCount": 0,
      "invalidAuditAttemptCount": 0,
      "snapshotMismatchAttemptCount": 0,
-     "materializedAt": "2026-09-29T21:01:02.992399+00:00",
+     "materializedAt": "2026-09-29T23:11:35.302184+00:00",
      "gradingVersion": "v1",
      "graderConfigHash": "e3e86c5c130946ce",
      "reviewSources": [
@@ -2944,7 +2184,7 @@
      "gradingErrorAttemptCount": 0,
      "invalidAuditAttemptCount": 0,
      "snapshotMismatchAttemptCount": 0,
-     "materializedAt": "2026-09-29T21:01:02.992399+00:00",
+     "materializedAt": "2026-09-29T23:11:35.302184+00:00",
      "gradingVersion": "v1",
      "graderConfigHash": "e3e86c5c130946ce",
      "reviewSources": [
@@ -2988,7 +2228,7 @@
    "totalTokens": 7087678.3960396005
   },
   "sums": {
-   "costUsd": 1010.016120066666
+   "costUsd": 1010.0161200666669
   },
   "percentiles": {
    "costUsd": {
@@ -3040,6 +2280,196 @@
   }
  },
  {
+  "id": "ac8276cd5d15ac2daacb9956ad44c132",
+  "isDefault": true,
+  "isHighlighted": false,
+  "agentName": "Codex",
+  "provider": "openai",
+  "hostModelSlug": "openai_gpt-6-luna",
+  "display": {
+   "agent": "Codex",
+   "model": "GPT-6 Luna (max)",
+   "creator": {
+    "agent": "OpenAI",
+    "model": "OpenAI"
+   }
+  },
+  "displayLabel": "Codex - GPT-6 Luna (max) ({'reasoning_effort': 'max'})",
+  "variantOf": null,
+  "isUnavailable": false,
+  "indexComponentCount": 3,
+  "evalCount": 3,
+  "evals": [
+   {
+    "datasetIndexName": "deep-swe-v1.1",
+    "evaluationDatasetSlug": "DeepSWE v1.1",
+    "refDatasetName": "datacurve/deep-swe-1-1@1",
+    "weight": 0.333333333333333,
+    "safety": {
+     "attemptCount": 338,
+     "refusedAttemptCount": 0,
+     "hardStopAttemptCount": 0,
+     "recoveredAttemptCount": 0,
+     "fallbackAttemptCount": 0,
+     "continuedAttemptCount": 0,
+     "rate": 0,
+     "hardStopRate": 0,
+     "recoveredRate": 0
+    },
+    "rewardHacking": null,
+    "mean": {
+     "reward": 0.63716814159292,
+     "inputTokens": 12385746.131268436,
+     "outputTokens": 108271.5634218289
+    }
+   },
+   {
+    "datasetIndexName": "swe-atlas-qna",
+    "evaluationDatasetSlug": "SWE-Atlas-QnA",
+    "refDatasetName": "datasets/swe-atlas-qna",
+    "weight": 0.333333333333333,
+    "safety": {
+     "attemptCount": 372,
+     "refusedAttemptCount": 0,
+     "hardStopAttemptCount": 0,
+     "recoveredAttemptCount": 0,
+     "fallbackAttemptCount": 0,
+     "continuedAttemptCount": 0,
+     "rate": 0,
+     "hardStopRate": 0,
+     "recoveredRate": 0
+    },
+    "rewardHacking": null,
+    "mean": {
+     "reward": 0.443548387096774,
+     "inputTokens": 5786509.854838709,
+     "outputTokens": 53341.779569892475
+    }
+   },
+   {
+    "datasetIndexName": "terminal-bench-v4",
+    "evaluationDatasetSlug": "Terminal-Bench v4",
+    "refDatasetName": "terminal-bench/terminal-bench@sha256:39d9f44b40420cde8fdcc087579c0d72a7e14fa3656d603c3f0d22fb35e27732",
+    "weight": 0.333333333333333,
+    "safety": {
+     "attemptCount": 198,
+     "refusedAttemptCount": 0,
+     "hardStopAttemptCount": 0,
+     "recoveredAttemptCount": 0,
+     "fallbackAttemptCount": 0,
+     "continuedAttemptCount": 0,
+     "rate": 0,
+     "hardStopRate": 0,
+     "recoveredRate": 0
+    },
+    "rewardHacking": {
+     "retainedAttemptCount": 198,
+     "passingAttemptCount": 30,
+     "reviewedAttemptCount": 30,
+     "flaggedAttemptCount": 0,
+     "notApplicableAttemptCount": 0,
+     "missingAuditAttemptCount": 0,
+     "skippedAuditAttemptCount": 0,
+     "unavailableAuditAttemptCount": 0,
+     "gradingErrorAttemptCount": 0,
+     "invalidAuditAttemptCount": 0,
+     "snapshotMismatchAttemptCount": 0,
+     "materializedAt": "2026-09-29T23:11:35.302184+00:00",
+     "gradingVersion": "v1",
+     "graderConfigHash": "e3e86c5c130946ce",
+     "reviewSources": [
+      {
+       "judgeModel": "sonnet",
+       "rubricId": "ca-bench-reward-hacking-v1",
+       "auditSchemaVersion": 1,
+       "attemptCount": 30
+      }
+     ],
+     "rate": 0
+    },
+    "mean": {
+     "reward": 0.151515151515152,
+     "inputTokens": 14381227.393939395,
+     "outputTokens": 165884.42424242425
+    }
+   }
+  ],
+  "safety": {
+   "attemptCount": 908,
+   "refusedAttemptCount": 0,
+   "hardStopAttemptCount": 0,
+   "recoveredAttemptCount": 0,
+   "fallbackAttemptCount": 0,
+   "continuedAttemptCount": 0,
+   "rate": 0,
+   "hardStopRate": 0,
+   "recoveredRate": 0
+  },
+  "indexScore": 0.4107438934016153,
+  "mean": {
+   "reward": 0.4107438934016153,
+   "costUsd": 0.17591172304455457,
+   "agentWallTimeSec": 1285.9268514851478,
+   "steps": 88.64301430143014,
+   "inputTokens": 10119727.864136413,
+   "outputTokens": 98341.38393839383,
+   "cacheTokens": 9897312.69911991,
+   "cacheHitRate": 0.9606438143896164,
+   "totalTokens": 10218069.248074815
+  },
+  "sums": {
+   "costUsd": 53.3012520824999
+  },
+  "percentiles": {
+   "costUsd": {
+    "p05": 0.05139677199229924,
+    "p25": 0.08709199411441132,
+    "p50": 0.12790623996149636,
+    "p75": 0.23731735201595155,
+    "p95": 0.4026450882722773
+   },
+   "totalTokens": {
+    "p05": 2000123.225962595,
+    "p25": 3915894.559955995,
+    "p50": 7023106.606160604,
+    "p75": 13626608.82783279,
+    "p95": 26835833.369636964
+   }
+  },
+  "versions": {
+   "deep-swe-v1.1": {
+    "min": {
+     "version": "0.154.0",
+     "dateReleased": null
+    },
+    "max": {
+     "version": "0.154.0",
+     "dateReleased": null
+    }
+   },
+   "swe-atlas-qna": {
+    "min": {
+     "version": "0.154.0",
+     "dateReleased": null
+    },
+    "max": {
+     "version": "0.154.0",
+     "dateReleased": null
+    }
+   },
+   "terminal-bench-v4": {
+    "min": {
+     "version": "0.154.0",
+     "dateReleased": null
+    },
+    "max": {
+     "version": "0.154.0",
+     "dateReleased": null
+    }
+   }
+  }
+ },
+ {
   "id": "fa2595093fa640e73d072e7d1aa7df82",
   "isDefault": true,
   "isHighlighted": false,
@@ -3048,8 +2478,7 @@
   "hostModelSlug": "cognition_fusion-gpt-6-astra-xhigh-sidekick-penguin-medium",
   "display": {
    "agent": "Devin Fusion CLI",
-   "model": "GPT-6 Astra XHigh + SWE-2 Medium",
-   "creator": "$undefined"
+   "model": "GPT-6 Astra XHigh + SWE-2 Medium"
   },
   "displayLabel": "Devin Fusion CLI - GPT-6 Astra XHigh + SWE-2 Medium",
   "variantOf": null,
@@ -3131,7 +2560,7 @@
      "gradingErrorAttemptCount": 0,
      "invalidAuditAttemptCount": 0,
      "snapshotMismatchAttemptCount": 0,
-     "materializedAt": "2026-09-29T21:01:02.992399+00:00",
+     "materializedAt": "2026-09-29T23:11:35.302184+00:00",
      "gradingVersion": "v1",
      "graderConfigHash": "e3e86c5c130946ce",
      "reviewSources": [
@@ -3321,7 +2750,7 @@
      "gradingErrorAttemptCount": 0,
      "invalidAuditAttemptCount": 0,
      "snapshotMismatchAttemptCount": 0,
-     "materializedAt": "2026-09-29T21:01:02.992399+00:00",
+     "materializedAt": "2026-09-29T23:11:35.302184+00:00",
      "gradingVersion": "v1",
      "graderConfigHash": "e3e86c5c130946ce",
      "reviewSources": [
@@ -3425,8 +2854,7 @@
   "hostModelSlug": "cognition_fusion-claude-fable-5-1-xhigh-sidekick-penguin-medium",
   "display": {
    "agent": "Devin Fusion CLI",
-   "model": "Claude Fable 5.1 XHigh + SWE-2 Medium",
-   "creator": "$undefined"
+   "model": "Claude Fable 5.1 XHigh + SWE-2 Medium"
   },
   "displayLabel": "Devin Fusion CLI - Claude Fable 5.1 XHigh + SWE-2 Medium",
   "variantOf": null,
@@ -3508,7 +2936,7 @@
      "gradingErrorAttemptCount": 0,
      "invalidAuditAttemptCount": 0,
      "snapshotMismatchAttemptCount": 0,
-     "materializedAt": "2026-09-29T21:01:02.992399+00:00",
+     "materializedAt": "2026-09-29T23:11:35.302184+00:00",
      "gradingVersion": "v1",
      "graderConfigHash": "e3e86c5c130946ce",
      "reviewSources": [
@@ -3698,7 +3126,7 @@
      "gradingErrorAttemptCount": 0,
      "invalidAuditAttemptCount": 0,
      "snapshotMismatchAttemptCount": 0,
-     "materializedAt": "2026-09-29T21:01:02.992399+00:00",
+     "materializedAt": "2026-09-29T23:11:35.302184+00:00",
      "gradingVersion": "v1",
      "graderConfigHash": "e3e86c5c130946ce",
      "reviewSources": [
@@ -3888,7 +3316,7 @@
      "gradingErrorAttemptCount": 0,
      "invalidAuditAttemptCount": 0,
      "snapshotMismatchAttemptCount": 0,
-     "materializedAt": "2026-09-29T21:01:02.992399+00:00",
+     "materializedAt": "2026-09-29T23:11:35.302184+00:00",
      "gradingVersion": "v1",
      "graderConfigHash": "e3e86c5c130946ce",
      "reviewSources": [
@@ -4078,7 +3506,7 @@
      "gradingErrorAttemptCount": 0,
      "invalidAuditAttemptCount": 0,
      "snapshotMismatchAttemptCount": 0,
-     "materializedAt": "2026-09-29T21:01:02.992399+00:00",
+     "materializedAt": "2026-09-29T23:11:35.302184+00:00",
      "gradingVersion": "v1",
      "graderConfigHash": "e3e86c5c130946ce",
      "reviewSources": [
@@ -4130,7 +3558,7 @@
     "p25": 0.7844812155115526,
     "p50": 1.140491010561054,
     "p75": 1.8937155413641367,
-    "p95": 3.7431764045654536
+    "p95": 3.7431764045654563
    },
    "totalTokens": {
     "p05": 795880.5675467533,
@@ -4268,7 +3696,7 @@
      "gradingErrorAttemptCount": 0,
      "invalidAuditAttemptCount": 0,
      "snapshotMismatchAttemptCount": 0,
-     "materializedAt": "2026-09-29T21:01:02.992399+00:00",
+     "materializedAt": "2026-09-29T23:11:35.302184+00:00",
      "gradingVersion": "v1",
      "graderConfigHash": "e3e86c5c130946ce",
      "reviewSources": [
@@ -4458,7 +3886,7 @@
      "gradingErrorAttemptCount": 0,
      "invalidAuditAttemptCount": 0,
      "snapshotMismatchAttemptCount": 0,
-     "materializedAt": "2026-09-29T21:01:02.992399+00:00",
+     "materializedAt": "2026-09-29T23:11:35.302184+00:00",
      "gradingVersion": "v1",
      "graderConfigHash": "e3e86c5c130946ce",
      "reviewSources": [
@@ -4648,7 +4076,7 @@
      "gradingErrorAttemptCount": 0,
      "invalidAuditAttemptCount": 0,
      "snapshotMismatchAttemptCount": 0,
-     "materializedAt": "2026-09-29T21:01:02.992399+00:00",
+     "materializedAt": "2026-09-29T23:11:35.302184+00:00",
      "gradingVersion": "v1",
      "graderConfigHash": "e3e86c5c130946ce",
      "reviewSources": [
@@ -4838,7 +4266,7 @@
      "gradingErrorAttemptCount": 0,
      "invalidAuditAttemptCount": 0,
      "snapshotMismatchAttemptCount": 0,
-     "materializedAt": "2026-09-29T21:01:02.992399+00:00",
+     "materializedAt": "2026-09-29T23:11:35.302184+00:00",
      "gradingVersion": "v1",
      "graderConfigHash": "e3e86c5c130946ce",
      "reviewSources": [
@@ -4929,6 +4357,576 @@
     "max": {
      "version": "0.154.0",
      "dateReleased": null
+    }
+   }
+  }
+ },
+ {
+  "id": "4aee8aa2d4a0bad6068644f40edae235",
+  "isDefault": false,
+  "isHighlighted": false,
+  "agentName": "Codex",
+  "provider": "openai",
+  "hostModelSlug": "openai_quasar-alpha",
+  "display": {
+   "agent": "Codex",
+   "model": "GPT-6.1 Sol (high)",
+   "creator": {
+    "agent": "OpenAI",
+    "model": "OpenAI"
+   }
+  },
+  "displayLabel": "Codex - GPT-6.1 Sol (high) ({'reasoning_effort': 'high'})",
+  "variantOf": null,
+  "isUnavailable": false,
+  "indexComponentCount": 3,
+  "evalCount": 3,
+  "evals": [
+   {
+    "datasetIndexName": "deep-swe-v1.1",
+    "evaluationDatasetSlug": "DeepSWE v1.1",
+    "refDatasetName": "datacurve/deep-swe-1-1@1",
+    "weight": 0.333333333333333,
+    "safety": {
+     "attemptCount": 339,
+     "refusedAttemptCount": 0,
+     "hardStopAttemptCount": 0,
+     "recoveredAttemptCount": 0,
+     "fallbackAttemptCount": 0,
+     "continuedAttemptCount": 0,
+     "rate": 0,
+     "hardStopRate": 0,
+     "recoveredRate": 0
+    },
+    "rewardHacking": null,
+    "mean": {
+     "reward": 0.705014749262537,
+     "inputTokens": 2382530.2064896757,
+     "outputTokens": 31206.94395280236
+    }
+   },
+   {
+    "datasetIndexName": "swe-atlas-qna",
+    "evaluationDatasetSlug": "SWE-Atlas-QnA",
+    "refDatasetName": "datasets/swe-atlas-qna",
+    "weight": 0.333333333333333,
+    "safety": {
+     "attemptCount": 372,
+     "refusedAttemptCount": 14,
+     "hardStopAttemptCount": 14,
+     "recoveredAttemptCount": 0,
+     "fallbackAttemptCount": 0,
+     "continuedAttemptCount": 0,
+     "rate": 0.03763440860215054,
+     "hardStopRate": 0.03763440860215054,
+     "recoveredRate": 0
+    },
+    "rewardHacking": null,
+    "mean": {
+     "reward": 0.599462365591398,
+     "inputTokens": 2421836.2786885244,
+     "outputTokens": 17768.75956284153
+    }
+   },
+   {
+    "datasetIndexName": "terminal-bench-v4",
+    "evaluationDatasetSlug": "Terminal-Bench v4",
+    "refDatasetName": "terminal-bench/terminal-bench@sha256:39d9f44b40420cde8fdcc087579c0d72a7e14fa3656d603c3f0d22fb35e27732",
+    "weight": 0.333333333333333,
+    "safety": {
+     "attemptCount": 198,
+     "refusedAttemptCount": 1,
+     "hardStopAttemptCount": 1,
+     "recoveredAttemptCount": 0,
+     "fallbackAttemptCount": 0,
+     "continuedAttemptCount": 0,
+     "rate": 0.005050505050505051,
+     "hardStopRate": 0.005050505050505051,
+     "recoveredRate": 0
+    },
+    "rewardHacking": {
+     "retainedAttemptCount": 198,
+     "passingAttemptCount": 99,
+     "reviewedAttemptCount": 99,
+     "flaggedAttemptCount": 0,
+     "notApplicableAttemptCount": 0,
+     "missingAuditAttemptCount": 0,
+     "skippedAuditAttemptCount": 0,
+     "unavailableAuditAttemptCount": 0,
+     "gradingErrorAttemptCount": 0,
+     "invalidAuditAttemptCount": 0,
+     "snapshotMismatchAttemptCount": 0,
+     "materializedAt": "2026-09-29T23:11:35.302184+00:00",
+     "gradingVersion": "v1",
+     "graderConfigHash": "e3e86c5c130946ce",
+     "reviewSources": [
+      {
+       "judgeModel": "sonnet",
+       "rubricId": "ca-bench-reward-hacking-v1",
+       "auditSchemaVersion": 1,
+       "attemptCount": 99
+      }
+     ],
+     "rate": 0
+    },
+    "mean": {
+     "reward": 0.5,
+     "inputTokens": 4184679.611111111,
+     "outputTokens": 45169.030303030304
+    }
+   }
+  ],
+  "safety": {
+   "attemptCount": 909,
+   "refusedAttemptCount": 15,
+   "hardStopAttemptCount": 15,
+   "recoveredAttemptCount": 0,
+   "fallbackAttemptCount": 0,
+   "continuedAttemptCount": 0,
+   "rate": 0.014228304550885196,
+   "hardStopRate": 0.014228304550885196,
+   "recoveredRate": 0
+  },
+  "indexScore": 0.6014923716179784,
+  "mean": {
+   "reward": 0.6014923716179784,
+   "costUsd": 0.8892413135295484,
+   "agentWallTimeSec": 799.7652123212325,
+   "steps": 38.97909790979098,
+   "inputTokens": 2791163.2548648305,
+   "outputTokens": 28748.735486663423,
+   "cacheTokens": 2665415.3918375443,
+   "cacheHitRate": 0.9278388366571141,
+   "totalTokens": 2819911.9903514963
+  },
+  "sums": {
+   "costUsd": 268.0356914333333
+  },
+  "percentiles": {
+   "costUsd": {
+    "p05": 0.312068081210121,
+    "p25": 0.4989411210121013,
+    "p50": 0.6891893533553354,
+    "p75": 0.9873919497799788,
+    "p95": 2.1023536615841585
+   },
+   "totalTokens": {
+    "p05": 527228.1344334432,
+    "p25": 1136802.8481848184,
+    "p50": 1870636.3718371852,
+    "p75": 3261089.490649065,
+    "p95": 6454477.248184814
+   }
+  },
+  "versions": {
+   "deep-swe-v1.1": {
+    "min": {
+     "version": "0.154.0",
+     "dateReleased": null
+    },
+    "max": {
+     "version": "0.154.0",
+     "dateReleased": null
+    }
+   },
+   "swe-atlas-qna": {
+    "min": {
+     "version": "0.154.0",
+     "dateReleased": null
+    },
+    "max": {
+     "version": "0.154.0",
+     "dateReleased": null
+    }
+   },
+   "terminal-bench-v4": {
+    "min": {
+     "version": "0.154.0",
+     "dateReleased": null
+    },
+    "max": {
+     "version": "0.154.0",
+     "dateReleased": null
+    }
+   }
+  }
+ },
+ {
+  "id": "fa589dad83ffcdd6cce72a467e552063",
+  "isDefault": false,
+  "isHighlighted": false,
+  "agentName": "Codex",
+  "provider": "openai",
+  "hostModelSlug": "openai_quasar-alpha",
+  "display": {
+   "agent": "Codex",
+   "model": "GPT-6.1 Sol (low)",
+   "creator": {
+    "agent": "OpenAI",
+    "model": "OpenAI"
+   }
+  },
+  "displayLabel": "Codex - GPT-6.1 Sol (low) ({'reasoning_effort': 'low'})",
+  "variantOf": null,
+  "isUnavailable": false,
+  "indexComponentCount": 3,
+  "evalCount": 3,
+  "evals": [
+   {
+    "datasetIndexName": "deep-swe-v1.1",
+    "evaluationDatasetSlug": "DeepSWE v1.1",
+    "refDatasetName": "datacurve/deep-swe-1-1@1",
+    "weight": 0.333333333333333,
+    "safety": {
+     "attemptCount": 339,
+     "refusedAttemptCount": 0,
+     "hardStopAttemptCount": 0,
+     "recoveredAttemptCount": 0,
+     "fallbackAttemptCount": 0,
+     "continuedAttemptCount": 0,
+     "rate": 0,
+     "hardStopRate": 0,
+     "recoveredRate": 0
+    },
+    "rewardHacking": null,
+    "mean": {
+     "reward": 0.675516224188791,
+     "inputTokens": 1135333.3510324485,
+     "outputTokens": 12865.970501474927
+    }
+   },
+   {
+    "datasetIndexName": "swe-atlas-qna",
+    "evaluationDatasetSlug": "SWE-Atlas-QnA",
+    "refDatasetName": "datasets/swe-atlas-qna",
+    "weight": 0.333333333333333,
+    "safety": {
+     "attemptCount": 372,
+     "refusedAttemptCount": 9,
+     "hardStopAttemptCount": 9,
+     "recoveredAttemptCount": 0,
+     "fallbackAttemptCount": 0,
+     "continuedAttemptCount": 0,
+     "rate": 0.024193548387096774,
+     "hardStopRate": 0.024193548387096774,
+     "recoveredRate": 0
+    },
+    "rewardHacking": null,
+    "mean": {
+     "reward": 0.551075268817204,
+     "inputTokens": 1278601.31147541,
+     "outputTokens": 9084.045081967213
+    }
+   },
+   {
+    "datasetIndexName": "terminal-bench-v4",
+    "evaluationDatasetSlug": "Terminal-Bench v4",
+    "refDatasetName": "terminal-bench/terminal-bench@sha256:39d9f44b40420cde8fdcc087579c0d72a7e14fa3656d603c3f0d22fb35e27732",
+    "weight": 0.333333333333333,
+    "safety": {
+     "attemptCount": 198,
+     "refusedAttemptCount": 0,
+     "hardStopAttemptCount": 0,
+     "recoveredAttemptCount": 0,
+     "fallbackAttemptCount": 0,
+     "continuedAttemptCount": 0,
+     "rate": 0,
+     "hardStopRate": 0,
+     "recoveredRate": 0
+    },
+    "rewardHacking": {
+     "retainedAttemptCount": 198,
+     "passingAttemptCount": 98,
+     "reviewedAttemptCount": 98,
+     "flaggedAttemptCount": 1,
+     "notApplicableAttemptCount": 0,
+     "missingAuditAttemptCount": 0,
+     "skippedAuditAttemptCount": 0,
+     "unavailableAuditAttemptCount": 0,
+     "gradingErrorAttemptCount": 0,
+     "invalidAuditAttemptCount": 0,
+     "snapshotMismatchAttemptCount": 0,
+     "materializedAt": "2026-09-29T23:11:35.302184+00:00",
+     "gradingVersion": "v1",
+     "graderConfigHash": "e3e86c5c130946ce",
+     "reviewSources": [
+      {
+       "judgeModel": "sonnet",
+       "rubricId": "ca-bench-reward-hacking-v1",
+       "auditSchemaVersion": 1,
+       "attemptCount": 98
+      }
+     ],
+     "rate": 0.005050505050505051
+    },
+    "mean": {
+     "reward": 0.48989898989899,
+     "inputTokens": 3454474.217171717,
+     "outputTokens": 28368.58080808081
+    }
+   }
+  ],
+  "safety": {
+   "attemptCount": 909,
+   "refusedAttemptCount": 9,
+   "hardStopAttemptCount": 9,
+   "recoveredAttemptCount": 0,
+   "fallbackAttemptCount": 0,
+   "continuedAttemptCount": 0,
+   "rate": 0.008064516129032258,
+   "hardStopRate": 0.008064516129032258,
+   "recoveredRate": 0
+  },
+  "indexScore": 0.5721634943016617,
+  "mean": {
+   "reward": 0.5721634943016617,
+   "costUsd": 0.49880364510270725,
+   "agentWallTimeSec": 517.8138943894386,
+   "steps": 35.74037403740374,
+   "inputTokens": 1699123.8601417518,
+   "outputTokens": 14695.05805334632,
+   "cacheTokens": 1627295.6717524226,
+   "cacheHitRate": 0.9135762473536158,
+   "totalTokens": 1713818.9181950986
+  },
+  "sums": {
+   "costUsd": 150.4073521333333
+  },
+  "percentiles": {
+   "costUsd": {
+    "p05": 0.14515691546754672,
+    "p25": 0.2084983163916393,
+    "p50": 0.2965749825082511,
+    "p75": 0.5361287875687569,
+    "p95": 1.465534774675468
+   },
+   "totalTokens": {
+    "p05": 240942.00825082537,
+    "p25": 418718.0632563254,
+    "p50": 753671.7865786579,
+    "p75": 1840610.7161716148,
+    "p95": 5662162.880087997
+   }
+  },
+  "versions": {
+   "deep-swe-v1.1": {
+    "min": {
+     "version": "0.154.0",
+     "dateReleased": null
+    },
+    "max": {
+     "version": "0.154.0",
+     "dateReleased": null
+    }
+   },
+   "swe-atlas-qna": {
+    "min": {
+     "version": "0.154.0",
+     "dateReleased": null
+    },
+    "max": {
+     "version": "0.154.0",
+     "dateReleased": null
+    }
+   },
+   "terminal-bench-v4": {
+    "min": {
+     "version": "0.154.0",
+     "dateReleased": null
+    },
+    "max": {
+     "version": "0.154.0",
+     "dateReleased": null
+    }
+   }
+  }
+ },
+ {
+  "id": "55b029d6971b4d378335bb168eb98b3b",
+  "isDefault": true,
+  "isHighlighted": false,
+  "agentName": "Kimi Code CLI",
+  "provider": "moonshotai",
+  "hostModelSlug": "moonshot_kimi-k3",
+  "display": {
+   "agent": "Kimi Code CLI",
+   "model": "Kimi K3",
+   "creator": {
+    "agent": "Moonshot AI",
+    "model": "Moonshot AI"
+   }
+  },
+  "displayLabel": "Kimi Code CLI - Kimi K3",
+  "variantOf": null,
+  "isUnavailable": false,
+  "indexComponentCount": 3,
+  "evalCount": 3,
+  "evals": [
+   {
+    "datasetIndexName": "deep-swe-v1.1",
+    "evaluationDatasetSlug": "DeepSWE v1.1",
+    "refDatasetName": "datacurve/deep-swe-1-1@1",
+    "weight": 0.333333333333333,
+    "safety": {
+     "attemptCount": 339,
+     "refusedAttemptCount": 0,
+     "hardStopAttemptCount": 0,
+     "recoveredAttemptCount": 0,
+     "fallbackAttemptCount": 0,
+     "continuedAttemptCount": 0,
+     "rate": 0,
+     "hardStopRate": 0,
+     "recoveredRate": 0
+    },
+    "rewardHacking": null,
+    "mean": {
+     "reward": 0.684365781710915,
+     "inputTokens": 8571957.041297935,
+     "outputTokens": 75080.34808259587
+    }
+   },
+   {
+    "datasetIndexName": "swe-atlas-qna",
+    "evaluationDatasetSlug": "SWE-Atlas-QnA",
+    "refDatasetName": "datasets/swe-atlas-qna",
+    "weight": 0.333333333333333,
+    "safety": {
+     "attemptCount": 372,
+     "refusedAttemptCount": 0,
+     "hardStopAttemptCount": 0,
+     "recoveredAttemptCount": 0,
+     "fallbackAttemptCount": 0,
+     "continuedAttemptCount": 0,
+     "rate": 0,
+     "hardStopRate": 0,
+     "recoveredRate": 0
+    },
+    "rewardHacking": null,
+    "mean": {
+     "reward": 0.661290322580645,
+     "inputTokens": 4719526.534946237,
+     "outputTokens": 49977.29838709677
+    }
+   },
+   {
+    "datasetIndexName": "terminal-bench-v4",
+    "evaluationDatasetSlug": "Terminal-Bench v4",
+    "refDatasetName": "terminal-bench/terminal-bench@sha256:39d9f44b40420cde8fdcc087579c0d72a7e14fa3656d603c3f0d22fb35e27732",
+    "weight": 0.333333333333333,
+    "safety": {
+     "attemptCount": 198,
+     "refusedAttemptCount": 0,
+     "hardStopAttemptCount": 0,
+     "recoveredAttemptCount": 0,
+     "fallbackAttemptCount": 0,
+     "continuedAttemptCount": 0,
+     "rate": 0,
+     "hardStopRate": 0,
+     "recoveredRate": 0
+    },
+    "rewardHacking": {
+     "retainedAttemptCount": 198,
+     "passingAttemptCount": 42,
+     "reviewedAttemptCount": 42,
+     "flaggedAttemptCount": 0,
+     "notApplicableAttemptCount": 0,
+     "missingAuditAttemptCount": 0,
+     "skippedAuditAttemptCount": 0,
+     "unavailableAuditAttemptCount": 0,
+     "gradingErrorAttemptCount": 0,
+     "invalidAuditAttemptCount": 0,
+     "snapshotMismatchAttemptCount": 0,
+     "materializedAt": "2026-09-29T23:11:35.302184+00:00",
+     "gradingVersion": "v1",
+     "graderConfigHash": "e3e86c5c130946ce",
+     "reviewSources": [
+      {
+       "judgeModel": "sonnet",
+       "rubricId": "ca-bench-reward-hacking-v1",
+       "auditSchemaVersion": 1,
+       "attemptCount": 42
+      }
+     ],
+     "rate": 0
+    },
+    "mean": {
+     "reward": 0.212121212121212,
+     "inputTokens": 14964824.787878787,
+     "outputTokens": 205571.03535353535
+    }
+   }
+  ],
+  "safety": {
+   "attemptCount": 909,
+   "refusedAttemptCount": 0,
+   "hardStopAttemptCount": 0,
+   "recoveredAttemptCount": 0,
+   "fallbackAttemptCount": 0,
+   "continuedAttemptCount": 0,
+   "rate": 0,
+   "hardStopRate": 0,
+   "recoveredRate": 0
+  },
+  "indexScore": 0.519259105470924,
+  "mean": {
+   "reward": 0.519259105470924,
+   "costUsd": 5.047195443300332,
+   "agentWallTimeSec": 3689.3441947194724,
+   "steps": 173.36028602860284,
+   "inputTokens": 8387890.666666667,
+   "outputTokens": 93230.86688668867,
+   "cacheTokens": 7968496.133333323,
+   "cacheHitRate": 0.9500000000000017,
+   "totalTokens": 8481121.533553353
+  },
+  "sums": {
+   "costUsd": 1529.30021932
+  },
+  "percentiles": {
+   "costUsd": {
+    "p05": 1.1201608924026403,
+    "p25": 2.1660128471864684,
+    "p50": 4.013249413745875,
+    "p75": 6.4578525155775575,
+    "p95": 11.098114784331683
+   },
+   "totalTokens": {
+    "p05": 1514640.538393838,
+    "p25": 3247568.457095711,
+    "p50": 6455899.625962595,
+    "p75": 11496187.961496139,
+    "p95": 19359817.106380656
+   }
+  },
+  "versions": {
+   "deep-swe-v1.1": {
+    "min": {
+     "version": "0.36.0",
+     "dateReleased": "2026-08-13"
+    },
+    "max": {
+     "version": "0.36.1",
+     "dateReleased": "2026-08-14"
+    }
+   },
+   "swe-atlas-qna": {
+    "min": {
+     "version": "0.26.0",
+     "dateReleased": "2026-07-16"
+    },
+    "max": {
+     "version": "0.26.0",
+     "dateReleased": "2026-07-16"
+    }
+   },
+   "terminal-bench-v4": {
+    "min": {
+     "version": "0.36.1",
+     "dateReleased": "2026-08-14"
+    },
+    "max": {
+     "version": "0.36.1",
+     "dateReleased": "2026-08-14"
     }
    }
   }
@@ -5028,7 +5026,7 @@
      "gradingErrorAttemptCount": 0,
      "invalidAuditAttemptCount": 0,
      "snapshotMismatchAttemptCount": 0,
-     "materializedAt": "2026-09-29T21:01:02.992399+00:00",
+     "materializedAt": "2026-09-29T23:11:35.302184+00:00",
      "gradingVersion": "v1",
      "graderConfigHash": "e3e86c5c130946ce",
      "reviewSources": [
@@ -5218,7 +5216,7 @@
      "gradingErrorAttemptCount": 0,
      "invalidAuditAttemptCount": 0,
      "snapshotMismatchAttemptCount": 0,
-     "materializedAt": "2026-09-29T21:01:02.992399+00:00",
+     "materializedAt": "2026-09-29T23:11:35.302184+00:00",
      "gradingVersion": "v1",
      "graderConfigHash": "e3e86c5c130946ce",
      "reviewSources": [
@@ -5408,7 +5406,7 @@
      "gradingErrorAttemptCount": 0,
      "invalidAuditAttemptCount": 0,
      "snapshotMismatchAttemptCount": 0,
-     "materializedAt": "2026-09-29T21:01:02.992399+00:00",
+     "materializedAt": "2026-09-29T23:11:35.302184+00:00",
      "gradingVersion": "v1",
      "graderConfigHash": "e3e86c5c130946ce",
      "reviewSources": [
@@ -5448,7 +5446,7 @@
    "inputTokens": 14783219.74807481,
    "outputTokens": 71304.79097909792,
    "cacheTokens": 14535765.897689763,
-   "cacheHitRate": 0.971880328680834,
+   "cacheHitRate": 0.9718803286808345,
    "totalTokens": 14854524.539053895
   },
   "sums": {
@@ -5598,7 +5596,7 @@
      "gradingErrorAttemptCount": 0,
      "invalidAuditAttemptCount": 0,
      "snapshotMismatchAttemptCount": 0,
-     "materializedAt": "2026-09-29T21:01:02.992399+00:00",
+     "materializedAt": "2026-09-29T23:11:35.302184+00:00",
      "gradingVersion": "v1",
      "graderConfigHash": "e3e86c5c130946ce",
      "reviewSources": [
