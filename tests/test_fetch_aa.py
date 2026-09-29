@@ -1,10 +1,13 @@
 import contextlib
+import datetime
 import io
 import json
+import os
 import pathlib
 import sys
 import tempfile
 import unittest
+import unittest.mock
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent / "scripts"))
 
@@ -531,6 +534,120 @@ class CaptureAgreementWiringTests(unittest.TestCase):
         self.assertIn("24 shared values cross-checked", stdout)
         self.assertIn("wrote aa-raw-models.json", stdout)
         self.assertIn("wrote aa-raw-coding-agents.json", stdout)
+
+
+class AtomicCaptureWritesTests(unittest.TestCase):
+    """Issue #66: capture writes must not leave a half-written capture.
+
+    fetch_aa.py wrote the captures with a bare write_text: a crash mid-write
+    (ENOSPC, a killed runner) left a truncated file where the previous good
+    capture -- the one the page builds from, committed and trusted -- used
+    to be. write_atomic stages the text in a temp file in the destination's
+    own directory and os.replace()s it into place, so the swap is atomic and
+    the previous capture survives every failure. The failure is injected at
+    the write boundary itself (os.replace raising), and the observable is
+    the pre-existing capture on disk staying byte-identical.
+    """
+
+    @contextlib.contextmanager
+    def capture_over_existing(self, replace_raiser=None):
+        """fetch_aa.main() over cached pages, with previous captures already
+        on disk. Yields (root, run) -- call run() inside the block; it
+        returns the capture's stdout."""
+        with tempfile.TemporaryDirectory(prefix=".issue-66-atomic-") as tmp:
+            root = pathlib.Path(tmp)
+            pages = [root / name for name in
+                     ("leaderboard.html", "detail.html", "agents.html")]
+            payloads = (leaderboard_payload(), detail_payload(),
+                        agent_payload([agent_row(f"Agent - Model {i}")
+                                       for i in range(5)]))
+            for path, payload in zip(pages, payloads):
+                path.write_text(flight_html(payload), encoding="utf-8")
+            old = (fetch_aa.ROOT, fetch_aa.OUT, fetch_aa.AGENTS_OUT,
+                   fetch_aa.STAMP)
+            argv = sys.argv
+            patcher = None
+            if replace_raiser is not None:
+                # The real os module: the boundary the fix writes through,
+                # patched where it lives rather than through fetch_aa's
+                # attribute, so the pin cannot be defeated by an import
+                # reshuffle.
+                patcher = unittest.mock.patch.object(
+                    os, "replace", side_effect=replace_raiser)
+            try:
+                fetch_aa.ROOT = root
+                fetch_aa.OUT = root / "aa-raw-models.json"
+                fetch_aa.AGENTS_OUT = root / "aa-raw-coding-agents.json"
+                fetch_aa.STAMP = root / "captured-at.txt"
+                # The previous capture, as a crashed run would have left it.
+                fetch_aa.OUT.write_bytes(b"PREVIOUS MODELS CAPTURE")
+                fetch_aa.AGENTS_OUT.write_bytes(b"PREVIOUS AGENTS CAPTURE")
+                fetch_aa.STAMP.write_text("2020-01-01\n", encoding="utf-8")
+                sys.argv = ["fetch_aa.py", "--html", str(pages[0]),
+                            "--detail-html", str(pages[1]),
+                            "--agents-html", str(pages[2])]
+                if patcher is not None:
+                    patcher.start()
+
+                def run() -> str:
+                    buffer = io.StringIO()
+                    with contextlib.redirect_stdout(buffer):
+                        fetch_aa.main()
+                    return buffer.getvalue()
+
+                yield root, run
+            finally:
+                if patcher is not None:
+                    patcher.stop()
+                sys.argv = argv
+                (fetch_aa.ROOT, fetch_aa.OUT, fetch_aa.AGENTS_OUT,
+                 fetch_aa.STAMP) = old
+
+    def test_a_failed_replace_leaves_the_previous_capture_byte_identical(self):
+        # The write boundary fails after the staging file is written: the
+        # previous captures on disk must be untouched, and no staging litter
+        # may remain.
+        def disk_full(staged, dest):
+            raise OSError(28, "No space left on device")
+
+        with self.capture_over_existing(disk_full) as (root, run):
+            with self.assertRaises(OSError):
+                run()
+
+            self.assertEqual(
+                (root / "aa-raw-models.json").read_bytes(),
+                b"PREVIOUS MODELS CAPTURE")
+            self.assertEqual(
+                (root / "aa-raw-coding-agents.json").read_bytes(),
+                b"PREVIOUS AGENTS CAPTURE")
+            self.assertEqual(
+                (root / "captured-at.txt").read_text(encoding="utf-8"),
+                "2020-01-01\n",
+                "the stamp moved even though the capture did not land")
+            self.assertEqual(
+                [p.name for p in root.iterdir() if p.name.endswith(".tmp")], [],
+                "a failed write left staging litter behind")
+
+    def test_a_healthy_capture_replaces_both_files_and_lands_no_litter(self):
+        with self.capture_over_existing() as (root, run):
+            stdout = run()
+
+            self.assertIn("wrote aa-raw-models.json", stdout)
+            models = json.loads(
+                (root / "aa-raw-models.json").read_text(encoding="utf-8"))
+            self.assertEqual(
+                [m["slug"] for m in models],
+                ["detail-host-model", "fixture-model"])
+            self.assertEqual(
+                len(json.loads(
+                    (root / "aa-raw-coding-agents.json").read_text(encoding="utf-8"))),
+                5)
+            self.assertEqual(
+                [p.name for p in root.iterdir() if p.name.endswith(".tmp")], [],
+                "a healthy capture left staging files behind")
+            self.assertEqual(
+                (root / "captured-at.txt").read_text(encoding="utf-8"),
+                datetime.date.today().isoformat() + "\n")
 
 
 if __name__ == "__main__":

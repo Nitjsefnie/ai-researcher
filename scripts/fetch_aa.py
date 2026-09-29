@@ -25,6 +25,7 @@ from __future__ import annotations
 import argparse
 import datetime as dt
 import json
+import os
 import pathlib
 import re
 import sys
@@ -387,6 +388,26 @@ def coding_agent_rows(payload: str) -> list[dict]:
     return priced
 
 
+def write_atomic(path: pathlib.Path, text: str) -> None:
+    """Stage `text` in a temp file beside `path`, then os.replace it in.
+
+    A crash mid-write (ENOSPC, a killed runner) used to leave a truncated
+    file where the previous good capture -- the one the page builds from
+    and that is committed -- used to be (issue #66). The staging file lives
+    in the destination's own directory so the rename never crosses a
+    filesystem, and carries the pid so two concurrent fetches cannot stage
+    onto the same file. On any failure the staging file is removed and the
+    previous capture is left byte-intact.
+    """
+    staged = path.with_name(f"{path.name}.{os.getpid()}.tmp")
+    try:
+        staged.write_text(text, encoding="utf-8")
+        os.replace(staged, path)
+    except BaseException:
+        staged.unlink(missing_ok=True)
+        raise
+
+
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--html", help="use a cached copy of the leaderboard HTML")
@@ -415,8 +436,8 @@ def main() -> None:
     )
 
     OUT.parent.mkdir(parents=True, exist_ok=True)
-    OUT.write_text(json.dumps(models, indent=1), encoding="utf-8")
-    AGENTS_OUT.write_text(json.dumps(agents, indent=1), encoding="utf-8")
+    write_atomic(OUT, json.dumps(models, indent=1))
+    write_atomic(AGENTS_OUT, json.dumps(agents, indent=1))
     STAMP.write_text(dt.date.today().isoformat() + "\n", encoding="utf-8")
 
     scored = sum(1 for m in models if isinstance(m.get("intelligenceIndex"), (int, float)))
