@@ -45,7 +45,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-from build import build_agent_rows, build_rows, undominated  # noqa: E402  # pylint: disable=wrong-import-position
+from build import build_agent_rows, build_rows, display_name, undominated  # noqa: E402  # pylint: disable=wrong-import-position
 
 RAW = ROOT / "data" / "aa-raw-models.json"
 
@@ -279,6 +279,16 @@ def delta_note(a, b):
     if rc is None or rc == float("inf"):
         return ""
     return f"  ({b - a:+.6g}, {rc * 100:+.2f}%)" if rc else ""
+
+
+def shown_name(m):
+    """A report line's name for a model record: the display name the page
+    shows (#88) -- AA's dict-form effort text is decoded before it reaches a
+    reader -- through one_line() like every other captured value (#41). A
+    record carrying no name at all renders exactly as it did before."""
+    name = m.get("name")
+    return one_line(display_name(name)) if isinstance(name, str) \
+        else one_line(name)
 
 
 def frontier_names(models, collapse=False):
@@ -528,10 +538,15 @@ def print_report(args):
 
     def line(m):
         rows = {r["name"]: r for r in build_rows([m])}
-        r = rows.get(m.get("name"))
+        # build_rows() keys rows by the CLEANED display name (#88), so the
+        # lookup must clean the same label the builder cleaned -- a lookup on
+        # the raw capture name matches nothing and every changed model's
+        # II/cost silently degrades to the em-dash fallback.
+        label = m.get("name") or m.get("shortName") or ""
+        r = rows.get(display_name(label))
         ii = f"{r['ii']:.1f}" if r else fmt(m.get("intelligenceIndex"))
         cost = f"${r['cost']:.2f}" if r else "—"
-        return (f"{one_line(m.get('name'))}  [{one_line(m.get('modelCreatorName'))}]  "
+        return (f"{shown_name(m)}  [{one_line(m.get('modelCreatorName'))}]  "
                 f"II {ii}  cost/task {cost}"
                 f"{'  open-weights' if m.get('isOpenWeights') else ''}"
                 f"{'  RETIRED' if m.get('deprecated') else ''}")
@@ -577,7 +592,7 @@ def print_report(args):
         if not hits:
             continue
         changed_models += 1
-        print(f"\n  {one_line(new_by_id[i].get('name'))}  "
+        print(f"\n  {shown_name(new_by_id[i])}  "
               f"[{one_line(new_by_id[i].get('modelCreatorName'))}]")
         for path, cls, a, b in hits:
             tag = "" if cls == "significant" else f" <{cls}>"
@@ -591,7 +606,7 @@ def print_report(args):
               f"{args.speed_tol * 100:.0f}%: {len(speed_moves)} value(s), "
               f"{len({key(m) for m, _, _, _ in speed_moves})} model(s)")
         for m, path, a, b in speed_moves:
-            print(f"  {one_line(m.get('name'))}  "
+            print(f"  {shown_name(m)}  "
                   f"[{one_line(m.get('modelCreatorName'))}]  "
                   f"{one_line(path)}: {fmt(a)} -> {fmt(b)}{delta_note(a, b)}")
 

@@ -601,6 +601,123 @@ class ReportTests(unittest.TestCase):
                                  for line in text.splitlines()))
 
 
+class DisplayNameTests(unittest.TestCase):
+    """Issue #88 in the differ: no report line carries AA's dict-form effort.
+
+    The chart-frontier sections key on the row builders' names, so they clean
+    through build.py; `line()` and the two section headers printed the raw
+    capture name directly and wrap it in build.display_name instead. The
+    exact-line pins also hold `line()`'s II/cost lookup to the CLEANED key: a
+    lookup left on the raw name matches nothing and silently degrades every
+    changed model's II/cost to the em-dash fallback ("62.0" -> "62",
+    "$0.50" -> "—").
+    """
+
+    def setUp(self):
+        self.tmp = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, self.tmp)
+
+    def render(self, old, new, old_agents=None, new_agents=None, tol=0.0):
+        """Two captures in, a report out -- with the captures named
+        "...-models.json" so the coding-agents siblings resolve beside them,
+        the way load() finds them for a path spec."""
+        root = pathlib.Path(self.tmp)
+        for name, data in (("old-models.json", old),
+                           ("new-models.json", new)):
+            (root / name).write_text(json.dumps(data), encoding="utf-8")
+        for name, data in (("old-coding-agents.json", old_agents),
+                           ("new-coding-agents.json", new_agents)):
+            if data is not None:
+                (root / name).write_text(json.dumps(data), encoding="utf-8")
+        args = argparse.Namespace(old=str(root / "old-models.json"),
+                                  new=str(root / "new-models.json"),
+                                  old_agents=None, new_agents=None,
+                                  speed_tol=0.25, tol=tol, derived=False,
+                                  all=False, commit_msg=False)
+        buffer = io.StringIO()
+        with contextlib.redirect_stdout(buffer):
+            diff_aa.print_report(args)
+        return buffer.getvalue()
+
+    def test_no_report_line_carries_the_dict_effort_text(self):
+        old = [capture("Incumbent", intelligence=50, cost=1.0)]
+        new = old + [capture("Newcomer ({'reasoning_effort': 'max'})",
+                             ident="newcomer", intelligence=62, cost=0.5)]
+        old_agents = [agent_capture(
+            "Codex - GPT-6 Luna (max) ({'reasoning_effort': 'max'})",
+            score=0.5, cost=4.0)]
+        new_agents = old_agents + [agent_capture(
+            "Codex - GPT-6 Luna (xhigh) ({'reasoning_effort': 'xhigh'})",
+            score=0.65, cost=1.5)]
+
+        report = self.render(old, new, old_agents, new_agents)
+
+        self.assertNotIn("reasoning_effort", report)
+        self.assertIn(
+            "  + Newcomer (max)  [Fixture Lab]  II 62.0  cost/task $0.50",
+            report)
+        self.assertIn("== coding agent frontier: 1 -> 1 of 1 -> 2 plotted",
+                      report)
+        self.assertIn("  + Codex - GPT-6 Luna (xhigh)  65.0  $1.50/task",
+                      report)
+        self.assertIn("  - Codex - GPT-6 Luna (max)  50.0  $4.00/task", report)
+
+    def test_the_field_changes_header_carries_the_cleaned_name(self):
+        # A sink the issue text does not name: the per-model header of the
+        # field-changes section prints the raw capture name directly.
+        old = [capture("Steady ({'reasoning_effort': 'high'})",
+                       intelligence=50)]
+        new = [capture("Steady ({'reasoning_effort': 'high'})",
+                       intelligence=58)]
+
+        report = self.render(old, new)
+
+        self.assertNotIn("reasoning_effort", report)
+        self.assertIn("  Steady (high)  [Fixture Lab]", report)
+
+    def test_the_rendered_speed_section_carries_the_cleaned_name(self):
+        # The rendered-speed section's per-model lines are the other raw-name
+        # sink the issue text does not name.
+        old = [capture("Fast ({'reasoning_effort': 'high'})", intelligence=50,
+                       medianOutputTokensPerSecond=100.0)]
+        new = [capture("Fast ({'reasoning_effort': 'high'})", intelligence=50,
+                       medianOutputTokensPerSecond=180.0)]
+
+        report = self.render(old, new)
+
+        self.assertNotIn("reasoning_effort", report)
+        self.assertIn(
+            "  Fast (high)  [Fixture Lab]  "
+            "medianOutputTokensPerSecond: 100 -> 180  (+80, +80.00%)", report)
+
+    def test_the_differ_cleans_names_by_the_same_rule_build_does(self):
+        # The shared-literal pin: the real capture's dict labels, through the
+        # differ's coding-frontier sink, come out exactly build.display_name's
+        # answer -- one rule, both modules.
+        for raw, cleaned in (
+            ("Opencode - GLM-5.3 ({'reasoning_effort': 'max'})",
+             "Opencode - GLM-5.3 (max)"),
+            ("Codex - GPT-6 Luna (max) ({'reasoning_effort': 'max'})",
+             "Codex - GPT-6 Luna (max)"),
+            ("Codex - GPT-5.6 Sol (max) ({'reasoning_effort': 'max'})",
+             "Codex - GPT-5.6 Sol (max)"),
+        ):
+            with self.subTest(raw=raw):
+                report = self.render(
+                    [], [capture("Anchor", intelligence=50)],
+                    [], [agent_capture(raw, score=0.6, cost=2.0)])
+
+                self.assertIn(
+                    f"  + {build.display_name(raw)}  60.0  $2.00/task", report)
+                self.assertNotIn("reasoning_effort", report)
+                self.assertEqual(build.display_name(raw), cleaned)
+
+    def test_a_record_without_a_name_still_renders_one_line(self):
+        # The degenerate record -- no name at all -- renders exactly as
+        # before: the cleaning wraps a string name only.
+        self.assertEqual(diff_aa.shown_name({}), "None")
+
+
 class RealCaptureTests(unittest.TestCase):
     """Run the differ over the CAPTURE THIS REPO ACTUALLY SHIPS.
 
