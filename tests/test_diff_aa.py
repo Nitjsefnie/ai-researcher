@@ -313,7 +313,7 @@ class SanitizeTests(unittest.TestCase):
 
     def test_every_control_and_unicode_line_break_collapses_to_a_space(self):
         self.assertEqual(
-            diff_aa.one_line("a\r\nb\x00c\x0bd\x7fe\x85f g h i"),
+            diff_aa.one_line("a\r\nb\x00c\x0bd\x7fe\x85f\u2028g\u2029h\u00a0i"),
             "a b c d e f g h i")
 
     def test_a_fence_escape_stays_on_one_line(self):

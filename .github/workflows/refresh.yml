@@ -126,8 +126,10 @@ jobs:
           # branch records the last main commit whose page is live; a MISSING
           # ref means nothing was ever published, and a page under it that
           # differs from HEAD means the live render is behind main. Either
-          # way this run republishes. A missing ref is the only tolerated
-          # fetch failure; any other fetch error exits nonzero here.
+          # way this run republishes. ANY fetch failure is treated as stale:
+          # republishing a page that was already current costs one hub
+          # version, while a real outage still fails red at the publish
+          # step's ref push.
           live_stale=false
           if [ "$changed" = false ] && [ "${{ inputs.force }}" != 'true' ]; then
             if git fetch --depth=1 origin \
