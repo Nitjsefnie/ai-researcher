@@ -797,6 +797,138 @@ class BrowserInteractionTests(unittest.TestCase):
         self.assertEqual(page.evaluate(toast), "0.2s")
         page.close()
 
+    # Replay drawCapability's label placement over a rendered chart and return
+    # the slot every frontier label MUST occupy under the nearest-clear-slot
+    # rule, alongside the labels actually on the page. Queue: frontier points,
+    # smartest first (Y is affine in the score, so score-descending order is
+    # y-ascending; ties keep row order). Candidates, widths and collision
+    # rules mirror the placer exactly -- a measuring text element takes
+    # getComputedTextLength() under the same .lbl class so the font metrics
+    # match to the pixel.
+    _REPLAY_NEAREST_CLEAR_SLOT = """(chartId) => {
+      const svg = document.getElementById(chartId);
+      const dom = [...svg.querySelectorAll("text.lbl")].map(t => ({
+        x: +t.getAttribute("x"), y: +t.getAttribute("y"),
+        text: t.textContent, claimed: false}));
+      const pts = [...svg.querySelectorAll("circle.pt")].map(p => {
+        const a = p.getAttribute("aria-label") || "";
+        return {x: +p.getAttribute("cx"), y: +p.getAttribute("cy"),
+                r: p.getAttribute("r"),
+                name: a.slice(4, a.lastIndexOf(" on the "))};
+      });
+      const W = svg.viewBox.baseVal.width, H = svg.viewBox.baseVal.height;
+      const T = 20, PY = H - 72;
+      const meas = document.createElementNS(svg.namespaceURI, "text");
+      meas.setAttribute("class", "lbl");
+      svg.appendChild(meas);
+      const hits = (a, b) => a.x < b.x + b.w && a.x + a.w > b.x &&
+                             a.y < b.y + b.h && a.y + a.h > b.y;
+      const boxes = [];
+      const queue = pts.filter(p => p.r === "6").map((p, j) => ({p, j}))
+        .sort((a, b) => (a.p.y - b.p.y) || (a.j - b.j));
+      const out = [];
+      for (const {p} of queue) {
+        const text = p.name.length > 34
+          ? p.name.slice(0, 33) + "\\u2026" : p.name;
+        meas.textContent = text;
+        const tw = meas.getComputedTextLength();
+        const cands = [];
+        for (let dy = -16; dy <= 16; dy += 16) {
+          cands.push([p.x + 10, p.y + dy, Math.hypot(10, dy)]);
+          cands.push([p.x - tw - 10, p.y + dy, Math.hypot(tw + 10, dy)]);
+        }
+        cands.sort((a, b) => a[2] - b[2]);
+        let chosen = null;
+        for (const [bx, by] of cands) {
+          const box = {x: bx - 3, y: by - 12, w: tw + 6, h: 15};
+          if (box.x < 4 || box.x + box.w > W - 4 ||
+              box.y < T || box.y + box.h > T + PY) continue;
+          if (boxes.some(q => hits(box, q))) continue;
+          if (pts.some(q => q !== p &&
+              q.x >= box.x - 7 && q.x <= box.x + box.w + 7 &&
+              q.y >= box.y - 7 && q.y <= box.y + box.h + 7)) continue;
+          chosen = {x: bx, y: by}; break;
+        }
+        if (!chosen) continue;                  // refuse-and-drop: no label
+        out.push({text, x: chosen.x, y: chosen.y});
+        boxes.push({x: chosen.x - 3, y: chosen.y - 12, w: tw + 6, h: 15});
+      }
+      svg.removeChild(meas);
+      return {dom, replay: out, n_pts: pts.length};
+    }"""
+
+    def test_capability_labels_take_the_nearest_clear_slot(self):
+        # #84: the capability placer walked its candidates in generation
+        # order -- right(-16), left(-16), right(0), left(0), right(16),
+        # left(16) -- so one blocked slot threw a label to the far side of
+        # its dot (a full truncated-label width, ~215px on the live capture)
+        # while nearer slots on the SAME side sat clear. The intelligence
+        # chart has sorted candidates by distance since 9c74397; the placer
+        # must drift a label only as far as the crowd genuinely forces it.
+        page = self.browser.new_page(viewport={"width": 1280, "height": 900})
+        page.goto(build.OUT.as_uri())
+        for chart in ("coding", "agentic", "parameters"):
+            with self.subTest(chart=chart):
+                res = page.evaluate(self._REPLAY_NEAREST_CLEAR_SLOT,
+                                    f"svg-{chart}")
+                # a broken page must fail here, saying so -- both sides of
+                # the comparison below are vacuously equal on an empty chart
+                self.assertGreater(res["n_pts"], 0,
+                                   f"{chart} rendered empty")
+                self.assertTrue(res["dom"], f"{chart} has no labels")
+                unmatched = []
+                for want in res["replay"]:
+                    hit = next((d for d in res["dom"] if not d["claimed"]
+                                and d["text"] == want["text"]
+                                and abs(d["x"] - want["x"]) <= 0.5
+                                and abs(d["y"] - want["y"]) <= 0.5), None)
+                    if hit:
+                        hit["claimed"] = True
+                    else:
+                        unmatched.append(want)
+                leftover = [d for d in res["dom"] if not d["claimed"]]
+                self.assertEqual(
+                    (unmatched, leftover), ([], []),
+                    f"labels not at their nearest clear slot on {chart}: "
+                    f"{[(w['text'], (w['x'], w['y'])) for w in unmatched]}"
+                    f"{[(d['text'], (d['x'], d['y'])) for d in leftover]}")
+        page.close()
+
+    def test_no_op_clicks_leave_label_positions_unchanged(self):
+        # #84, the issue's first invariant: a click that does not change
+        # which points are drawn must leave every label exactly where it
+        # was. Table sort is the page's pure no-op control; a Hide-superseded
+        # round trip must restore the identical layout, because the placer
+        # is a pure function of the drawn state.
+        page = self.browser.new_page(viewport={"width": 1280, "height": 900})
+        page.goto(build.OUT.as_uri())
+        snap = ("charts => Object.fromEntries(charts.map(c => [c, "
+                "Object.fromEntries([...document.querySelectorAll("
+                "`#svg-${c} text.lbl`)].map(t => "
+                "[t.textContent, [t.getAttribute('x'), "
+                "t.getAttribute('y')]]))]))")
+        charts = ["coding", "intelligence", "agentic", "parameters"]
+        before = page.evaluate(snap, charts)
+        # an empty snapshot compares vacuously equal to everything -- the
+        # page must have rendered labels before any click is judged
+        self.assertTrue(any(before[c] for c in charts),
+                        "no chart rendered any label; nothing to compare")
+
+        header = page.locator("#tbl th[data-k='ii']")
+        header.click()
+        self.assertEqual(page.evaluate(snap, charts), before,
+                         "a table-sort click moved chart labels")
+        header.click()
+        self.assertEqual(page.evaluate(snap, charts), before,
+                         "the second sort click moved chart labels")
+
+        page.locator("#fSup").click()
+        page.locator("#fSup").click()
+        self.assertEqual(page.evaluate(snap, charts), before,
+                         "a Hide-superseded round trip did not restore the "
+                         "identical label layout")
+        page.close()
+
     def test_footer_carries_a_licence_note_linking_the_licence(self):
         # #69 (page half): the generated page ships under the repo's MIT
         # licence but never said so. The footer now carries the one-line
