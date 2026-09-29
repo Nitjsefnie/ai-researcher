@@ -90,3 +90,26 @@ class GateTests(unittest.TestCase):
 
         self.assertEqual(s["id"], "commit")
         self.assertIn('echo "publish=true"', flattened(s["run"]))
+
+    def test_the_commit_step_concedes_a_lost_push_race_instead_of_dying_red(self):
+        # Issue 46: two same-group runs raced the push to main and the loser
+        # died red on a non-fast-forward rejection. The loser must fetch the
+        # moved main, rebase, and either push again or concede -- green, with
+        # publish=false, because the concurrent run's capture stands and
+        # publishing it is that run's job.
+        run = flattened(step(self.wf, "Commit the capture")["run"])
+
+        self.assertIn("git fetch --depth=1 origin main", run)
+        self.assertIn("git rebase origin/main", run)
+        # A conflict is the concurrent capture arriving first; the loser
+        # aborts, says so in the summary, and exits 0 without publishing.
+        self.assertIn("git rebase --abort", run)
+        self.assertLess(run.index("git rebase --abort"),
+                        run.index('echo "publish=false"'))
+        self.assertIn("lost the race", run.lower())
+        self.assertLess(run.rindex('echo "publish=false"'),
+                        run.rindex("exit 0"))
+        # Exactly two push attempts: the original and the post-rebase retry,
+        # which is the final one -- a second rejection fails the run red
+        # rather than looping.
+        self.assertEqual(run.count("HEAD:main"), 2)

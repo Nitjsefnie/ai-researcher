@@ -40,6 +40,17 @@ name: refresh
 # red build here leaves the last good capture committed and the last good page
 # live, which is the correct failure.
 #
+# THE PUSH TO MAIN CAN RACE. The concurrency group serializes runs, but two
+# of them can still pass each other between their checks and their pushes
+# (observed 2026-09-28: runs 287/288, seven seconds apart; the loser died on
+# a non-fast-forward rejection). The commit step treats a rejected push as a
+# race, not a failure: fetch the moved main, rebase onto it, and push once
+# more. A rebase conflict means the concurrent run pushed a different
+# capture for the same hour, so the loser CONCEDES -- green, publish=false,
+# nothing committed or published -- because the concurrent run's capture
+# stands and publishing it is that run's job. The retry is the final
+# attempt: a second rejection fails the run red rather than looping.
+#
 # fetch_aa.py exits nonzero when the flight payload or the model schema changes
 # shape, when AA bumps the Intelligence Index version build.py is written
 # against, when the cost breakdown drops a slug build.py reads, or when the
@@ -229,7 +240,37 @@ jobs:
           git commit -F commit-msg.txt
           # No co-author trailer: no model authored this commit. A refresh that
           # a person or an agent drives by hand still carries one.
-          git push "https://x-access-token:${GH_TOKEN}@github.com/${REPO}" HEAD:main
+          #
+          # The push races a concurrent run of this same workflow: the
+          # concurrency group serializes jobs, but two runs can still pass
+          # each other between their checks and their pushes (observed
+          # 2026-09-28, runs 287/288, seven seconds apart; the loser died on
+          # a non-fast-forward rejection). A rejection is a race, not a
+          # failure: fetch the moved main, rebase, push once more. The retry
+          # is the FINAL attempt -- a second rejection fails the run red
+          # rather than looping.
+          if ! git push "https://x-access-token:${GH_TOKEN}@github.com/${REPO}" HEAD:main; then
+            git fetch --depth=1 origin main
+            if ! git rebase origin/main; then
+              # A conflict means the concurrent run pushed a different
+              # capture for the same hour -- the capture files are what
+              # both commits touch, so they collide. Concede: the
+              # concurrent run's capture stands, and publishing it is that
+              # run's job. Green, publishes nothing.
+              git rebase --abort
+              {
+                echo 'Lost the race: a concurrent refresh run pushed first, and its capture stands.'
+                echo 'Nothing committed or published by this run.'
+              } >> "$GITHUB_STEP_SUMMARY"
+              echo "publish=false" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+            # The suite is not re-run over the rebased commit: a
+            # conflict-free rebase touches disjoint files, so the rebased
+            # commit is data-only by construction and carries exactly the
+            # page this suite run passed.
+            git push "https://x-access-token:${GH_TOKEN}@github.com/${REPO}" HEAD:main
+          fi
           echo "publish=true" >> "$GITHUB_OUTPUT"
 
       - name: Publish to docs-hub
