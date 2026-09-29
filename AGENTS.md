@@ -141,6 +141,9 @@ retry or to hand-fix JSON — when any of these move:
   factors of 2–3 for a day. The pin is the only place that can be caught;
 - the cost breakdown drops a slug `build.py` reads, or the per-evaluation costs
   stop summing to the published total;
+- the leaderboard and model-detail routes disagree on a shared field's value —
+  `check_route_agreement` runs before the gap-fill merge and names the slug,
+  the field path and both values;
 - the Coding Agent Index collapses below `CODING_ROW_FLOOR` paired rows.
 
 `build.py` additionally refuses to write a page where a rendered axis has no
