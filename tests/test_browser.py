@@ -751,6 +751,23 @@ class BrowserInteractionTests(unittest.TestCase):
         self.assertEqual(page.evaluate(duration), "0.12s")
         page.close()
 
+    def test_footer_carries_a_licence_note_linking_the_licence(self):
+        # #69 (page half): the generated page ships under the repo's MIT
+        # licence but never said so. The footer now carries the one-line
+        # copyright/licence note, linking the licence blob on GitHub.
+        page = self.browser.new_page(viewport={"width": 1280, "height": 900})
+        page.goto(build.OUT.as_uri())
+        foot = page.locator(".foot")
+        link = foot.locator(
+            "a[href='https://github.com/Nitjsefnie/ai-researcher"
+            "/blob/main/LICENSE']")
+        self.assertEqual(link.count(), 1)
+        self.assertEqual(link.inner_text(), "MIT licence")
+        text = foot.inner_text()
+        self.assertIn("© 2026 Peter Z (Nitjsefnie)", text)
+        self.assertIn("MIT licence", text)
+        page.close()
+
     @staticmethod
     def _srgb_to_linear(channel):
         c = channel / 255.0
