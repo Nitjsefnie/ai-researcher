@@ -4,10 +4,10 @@
 #
 # Why a requirements file when the install is one step in a workflow:
 # Dependabot's pip ecosystem reads manifest files and never the pins inside a
-# workflow `run:` block. As an inline `pip install zizmor==1.29.0` this pin
+# workflow `run:` block. As an inline `pip install zizmor==1.30.1` this pin
 # was invisible to automation and could only go stale (issue #50); here it
 # joins the manifests the weekly Dependabot pass already watches.
 #
 # Transitives still resolve fresh per run — deliberate, so audit.yml sees the
 # tree as it exists today; the trade-off is recorded in audit.yml's header.
-zizmor==1.29.0
+zizmor==1.30.1
