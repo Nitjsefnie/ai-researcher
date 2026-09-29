@@ -322,6 +322,95 @@ def undominated(rows, metric="intelligence"):
     ]
 
 
+# The page's footer states the leaderboard route and the model detail route
+# "agree exactly on every value they share", and the gap-fill merge only holds
+# that claim while it is true: fill-only-absent keeps the leaderboard's copy
+# of any shared value, so a divergence would ship silently under a footer that
+# denies it (issue #44). scripts/fetch_aa.py runs this check on the two routes
+# while they are still separate, before merge_captures.
+def check_route_agreement(leaderboard: list, detail: list) -> int:
+    """Every value the two routes share, compared exactly, before the merge.
+
+    Shared means the model (joined by slug, as merge_captures joins them) is
+    present on both routes AND the same field path is reachable on both, with
+    neither side holding "$undefined" -- the string AA writes for an absent
+    field, the reading fetch_aa.py itself applies. Values are compared as
+    parsed structures -- recursive value equality over dicts, lists and
+    scalars -- never as display strings. The leaderboard's flattened
+    intelligenceIndexCostPerTask scalar is its cost.total: a number against an
+    object at a shared key is compared against the object's "total", the same
+    reshape merge_captures applies when it lets the object win.
+
+    Returns the number of shared values compared, so the caller can show the
+    check ran; raises SystemExit listing every divergence -- model slug, field
+    path, both raw values -- when any disagree. Never repairs.
+    """
+    detail_by_slug = {
+        m["slug"]: m for m in detail if isinstance(m.get("slug"), str)
+    }
+    divergences: list[tuple[str, str, object, object]] = []
+    compared = 0
+
+    def is_number(value: object) -> bool:
+        return isinstance(value, (int, float)) and not isinstance(value, bool)
+
+    def walk(leaderboard_value: object, detail_value: object,
+             path: str, owner: str) -> None:
+        nonlocal compared
+        if isinstance(leaderboard_value, dict) and isinstance(detail_value, dict):
+            for key in sorted(set(leaderboard_value) & set(detail_value)):
+                walk(leaderboard_value[key], detail_value[key],
+                     f"{path}.{key}" if path else key, owner)
+            return
+        if isinstance(leaderboard_value, list) and isinstance(detail_value, list):
+            if len(leaderboard_value) != len(detail_value):
+                divergences.append((owner, path, leaderboard_value, detail_value))
+                return
+            for index, (lb_item, dt_item) in enumerate(
+                    zip(leaderboard_value, detail_value)):
+                walk(lb_item, dt_item, f"{path}[{index}]", owner)
+            return
+        if leaderboard_value == "$undefined" or detail_value == "$undefined":
+            # Absent on either route is a field the routes do not share, not
+            # a disagreeing value.
+            return
+        if is_number(leaderboard_value) and isinstance(detail_value, dict):
+            # The leaderboard's flattened scalar is its cost.total; wrap it
+            # into that shape and let the recursion below compare it against
+            # the detail object's own cost.total -- the same reshape
+            # merge_captures applies when it lets the object win.
+            walk({"cost": {"total": leaderboard_value}}, detail_value,
+                 path, owner)
+            return
+        if is_number(detail_value) and isinstance(leaderboard_value, dict):
+            walk(leaderboard_value, {"cost": {"total": detail_value}},
+                 path, owner)
+            return
+        compared += 1
+        if leaderboard_value != detail_value:
+            divergences.append((owner, path, leaderboard_value, detail_value))
+
+    for model in leaderboard:
+        slug = model.get("slug")
+        if not isinstance(slug, str) or slug not in detail_by_slug:
+            continue
+        detail_record = detail_by_slug[slug]
+        for key in sorted(set(model) & set(detail_record)):
+            walk(model[key], detail_record[key], key, slug)
+
+    if divergences:
+        lines = "\n".join(
+            f"  {slug}: {path}: leaderboard {lb_value!r}, detail {dt_value!r}"
+            for slug, path, lb_value, dt_value in sorted(divergences)
+        )
+        raise SystemExit(
+            f"{len(divergences)} shared value(s) disagree between the "
+            "leaderboard route and the model detail route; the gap-fill merge "
+            f"keeps the leaderboard's copy:\n{lines}"
+        )
+    return compared
+
+
 # The capture stamp is interpolated into the rendered page without escaping
 # (the header, the method grid, and the copy-as-Markdown and copy-as-JSON
 # clips, all fed by one value). scripts/fetch_aa.py:415 writes it as

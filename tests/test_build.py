@@ -97,6 +97,40 @@ def agent_fixture(
     }
 
 
+def route_pair() -> tuple[dict, dict]:
+    """(leaderboard, detail) records for one model, shaped as AA's two routes
+    split one record: the leaderboard kept shortName, context and a FLATTENED
+    cost total, while the detail page carries name, licence, the parameter
+    count and the full cost object with its per-evaluation breakdown. Shared
+    values agree exactly; contextWindowTokens is "$undefined" on the
+    leaderboard route -- AA's encoding of an absent field -- where the detail
+    route has measured it."""
+    return (
+        {
+            "slug": "fixture-model",
+            "shortName": "Fixture Model (high)",
+            "isOpenWeights": False,
+            "intelligenceIndex": 51,
+            "intelligenceIndexCostPerTask": 0.75,
+            "contextWindowTokens": "$undefined",
+        },
+        {
+            "slug": "fixture-model",
+            "name": "Fixture Model (high)",
+            "isOpenWeights": False,
+            "intelligenceIndex": 51,
+            "intelligenceIndexCostPerTask": {
+                "cost": {"total": 0.75},
+                "evaluations": [
+                    {"slug": "gdpval-aa", "weightedCostPerTask": 0.30},
+                    {"slug": "scicode", "weightedCostPerTask": 0.45},
+                ],
+            },
+            "contextWindowTokens": 400000,
+        },
+    )
+
+
 def measured_cost(model, metric) -> float:
     """`capability_cost_per_task` returns None when a component is unmeasured.
 
@@ -499,6 +533,107 @@ class CaptureStampTests(unittest.TestCase):
         self.assertIn("captured-at.txt", message)
         self.assertIn("YYYY-MM-DD", message)
         self.assertIn("\\xff", message)
+
+
+class RouteAgreementTests(unittest.TestCase):
+    """Issue #44: the page's cross-route agreement claim, enforced at capture.
+
+    The page footer states the leaderboard route and the model detail route
+    "agree exactly on every value they share"; the gap-fill merge
+    (scripts/fetch_aa.py merge_captures) keeps the leaderboard's copy of any
+    shared value, so only a check run BEFORE the merge can see a divergence.
+    build.check_route_agreement is that check -- scripts/fetch_aa.py calls it
+    between loading the two routes and the merge -- and these pins hold it to:
+    exact recursive value equality over the parsed structures, every
+    divergence collected and raised in one message naming model slug, field
+    path and both values, "$undefined" read as absent (a field absent on one
+    route is not shared), and the leaderboard's flattened cost scalar compared
+    against the detail object's cost.total -- the reshape the merge itself
+    applies.
+    """
+
+    def test_agreeing_routes_pass_and_the_comparison_ran_non_vacuously(self):
+        # The healthy control. The comparison's own count of compared values
+        # is the liveness oracle: 4 means it descended the shared record --
+        # slug, isOpenWeights, intelligenceIndex, and the flattened 0.75
+        # against the detail object's cost.total -- and skipped only what one
+        # route does not carry: contextWindowTokens ($undefined is absent,
+        # not a disagreeing value), the detail-only evaluations and name/
+        # licence/parameter fields, and the two single-route models (the
+        # detail host, which has no row on its own page, and a detail-only
+        # record, which the merge would drop).
+        leaderboard, detail_route = route_pair()
+        leaderboard = [
+            leaderboard, {"slug": "detail-host-model", "shortName": "Host Model"}]
+        detail_route = [detail_route, {"slug": "detail-only-model", "name": "Detail Only"}]
+
+        compared = build.check_route_agreement(leaderboard, detail_route)
+
+        self.assertEqual(compared, 4)
+
+    def test_a_leaderboard_value_that_diverges_fails_naming_model_field_and_both_values(self):
+        # One delta from the healthy pair: the leaderboard's copy moves.
+        leaderboard, detail_route = route_pair()
+        leaderboard["intelligenceIndex"] = 52
+
+        with self.assertRaises(SystemExit) as raised:
+            build.check_route_agreement([leaderboard], [detail_route])
+
+        message = str(raised.exception)
+        self.assertIn("1 shared value", message)
+        self.assertIn(
+            "fixture-model: intelligenceIndex: leaderboard 52, detail 51",
+            message)
+
+    def test_the_detail_value_being_the_odd_one_fails_identically(self):
+        # The same one delta, carried by the other route: symmetric in which
+        # side is wrong.
+        leaderboard, detail_route = route_pair()
+        detail_route["intelligenceIndex"] = 52
+
+        with self.assertRaises(SystemExit) as raised:
+            build.check_route_agreement([leaderboard], [detail_route])
+
+        message = str(raised.exception)
+        self.assertIn("1 shared value", message)
+        self.assertIn(
+            "fixture-model: intelligenceIndex: leaderboard 51, detail 52",
+            message)
+
+    def test_a_divergence_behind_the_flattened_cost_scalar_fails_at_its_field(self):
+        # One delta, nested: the detail route's cost.total moves while the
+        # leaderboard's flattened scalar stays. The canonicalized comparison
+        # (scalar against cost.total) must catch it, and the divergence line
+        # names the logical field path with the two compared values.
+        leaderboard, detail_route = route_pair()
+        detail_route["intelligenceIndexCostPerTask"]["cost"]["total"] = 0.99
+
+        with self.assertRaises(SystemExit) as raised:
+            build.check_route_agreement([leaderboard], [detail_route])
+
+        message = str(raised.exception)
+        self.assertIn("1 shared value", message)
+        self.assertIn(
+            "fixture-model: intelligenceIndexCostPerTask.cost.total: "
+            "leaderboard 0.75, detail 0.99", message)
+
+    def test_every_divergence_is_collected_before_the_raise(self):
+        # Two shared fields diverge: one raise, both listed, in a stable
+        # (sorted) order.
+        leaderboard, detail_route = route_pair()
+        leaderboard["intelligenceIndex"] = 52
+        leaderboard["isOpenWeights"] = True
+
+        with self.assertRaises(SystemExit) as raised:
+            build.check_route_agreement([leaderboard], [detail_route])
+
+        message = str(raised.exception)
+        self.assertIn("2 shared value", message)
+        score_line = "fixture-model: intelligenceIndex: leaderboard 52, detail 51"
+        weights_line = "fixture-model: isOpenWeights: leaderboard True, detail False"
+        self.assertIn(score_line, message)
+        self.assertIn(weights_line, message)
+        self.assertLess(message.index(score_line), message.index(weights_line))
 
 
 if __name__ == "__main__":

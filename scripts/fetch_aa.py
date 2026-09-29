@@ -33,7 +33,7 @@ import urllib.request
 ROOT_FOR_IMPORT = pathlib.Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT_FOR_IMPORT))
 
-from build import GDPVAL_SLUG, INDEX_VERSION  # noqa: E402  # pylint: disable=wrong-import-position
+from build import GDPVAL_SLUG, INDEX_VERSION, check_route_agreement  # noqa: E402  # pylint: disable=wrong-import-position
 
 URL = "https://artificialanalysis.ai/leaderboards/models"
 # The leaderboard's payload was trimmed to 50 fields: it kept identity, price,
@@ -403,6 +403,11 @@ def main() -> None:
         flight_payload(fetch_html(args.detail_html,
                                   MODEL_DETAIL_URL.format(slug=host)))
     )
+    # The page claims the two routes agree exactly on every value they share;
+    # only a check run while they are still separate can see a divergence --
+    # after the merge, the leaderboard's copy shadows the detail's (issue
+    # #44).
+    shared_values = check_route_agreement(base, detail)
     models = merge_captures(base, detail)
     priced = check_cost_breakdown(models)
     agents = coding_agent_rows(
@@ -417,7 +422,8 @@ def main() -> None:
     scored = sum(1 for m in models if isinstance(m.get("intelligenceIndex"), (int, float)))
     print(f"wrote {OUT.relative_to(ROOT)}: {len(models)} models, {scored} with an "
           f"intelligence index, {priced} with a v{version} cost breakdown "
-          f"(detail merged from /models/{host})")
+          f"(detail merged from /models/{host}; {shared_values} shared values "
+          "cross-checked)")
     print(f"wrote {AGENTS_OUT.relative_to(ROOT)}: {len(agents)} agent+model rows "
           f"with a paired index score and cost per task")
 
