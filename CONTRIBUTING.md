@@ -145,10 +145,27 @@ those.
 
 Three run only on GitHub. `codeql` is gated on repository visibility, because
 code scanning is free on public repositories and needs Code Security on private
-ones. `refresh` is the hourly capture → commit → publish of the page. `claim`
+ones. `claim`
 watches issue comments: `/claim` assigns the commenter to an unassigned open
 issue, and `/unclaim` and `/release` remove the commenter's own assignment —
 self-service issue claiming for contributors without write access.
+
+`refresh` is the capture → commit → publish of the page, and it fires two
+ways, which are not equivalent. The workflow's own `schedule` trigger asks
+for hourly (`11 * * * *`), but GitHub delivers scheduled runs best-effort:
+measured over the 37 days ending 2026-09-28, it averaged five runs a day.
+The hourly cadence is actually carried by an out-of-repository scheduler on
+the maintainer's side, which calls the workflow's `workflow_dispatch` API
+once an hour (24 runs a day since it started on 2026-09-25; dispatching
+needs write access, so a contributor cannot reproduce this trigger — you
+can only read its runs). **If that external dispatcher stops, nothing in
+this repository changes and nothing alerts: the cadence silently degrades
+to the schedule trigger's few runs a day.** `workflow_dispatch` is also
+the only path a build-only change has to the live page: run the workflow
+with `force: true` to rebuild and republish even when the capture is
+byte-identical — the page the code produces has moved while the data has
+not, and only a forced run publishes that (the workflow header explains
+the stale-page case in full).
 
 **Actions are hash-pinned**, with the version in a trailing comment. Do not
 "tidy" one back to `@v4`: a tag is a moving pointer, and these jobs hold a
