@@ -131,6 +131,12 @@ jobs:
   coverage:
     runs-on: ubuntu-latest
 
+    # Per-job ceiling, like the matrix cells' 20 above, sized up for what
+    # this job carries that they do not: the Chromium install and the FULL
+    # suite under coverage. A hung job fails in 30 minutes instead of
+    # holding GitHub's 6-hour default.
+    timeout-minutes: 30
+
     permissions:
       # One step below pushes the automated ratchet raise to main, which the
       # default read-only token cannot do; refresh.yml's commit step runs

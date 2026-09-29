@@ -51,6 +51,13 @@ on:
     - cron: '47 3 * * 3'
   workflow_dispatch:
 
+# The workflow-level floor. A workflow with no permissions block at all hands
+# every job the repository's default token scopes — potentially read/write —
+# so the read-only baseline is declared here even though the single job below
+# overrides it wholesale with its own block (issue #52).
+permissions:
+  contents: read
+
 concurrency:
   group: codeql-${{ github.ref }}
   cancel-in-progress: true
@@ -61,6 +68,9 @@ jobs:
     runs-on: ubuntu-latest
     # See the header: private repositories cannot upload the results.
     if: ${{ github.repository_visibility == 'public' }}
+    # A hung analysis fails in 30 minutes instead of holding GitHub's 6-hour
+    # default.
+    timeout-minutes: 30
 
     permissions:
       # Writing the analysis results is the whole point; everything else stays

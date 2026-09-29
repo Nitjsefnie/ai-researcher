@@ -33,6 +33,9 @@ concurrency:
 jobs:
   pyright:
     runs-on: ubuntu-latest
+    # A hung job fails in 15 minutes instead of holding GitHub's 6-hour
+    # default.
+    timeout-minutes: 15
 
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1

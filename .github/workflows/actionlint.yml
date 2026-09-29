@@ -51,6 +51,9 @@ concurrency:
 jobs:
   actionlint:
     runs-on: ubuntu-latest
+    # A hung job fails in 15 minutes instead of holding GitHub's 6-hour
+    # default.
+    timeout-minutes: 15
 
     env:
       # THE MANUAL UPDATE PATH (issue #50). actionlint ships as a
