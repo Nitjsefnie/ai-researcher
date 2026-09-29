@@ -1025,5 +1025,65 @@ class BuildArgvTests(unittest.TestCase):
             "a refused argument still rebuilt out/frontier-models.html")
 
 
+class CorruptCaptureTests(unittest.TestCase):
+    """Issue #66: a truncated capture must fail red naming the reason.
+
+    A capture written by a crashed runner can end mid-file; parsed anyway,
+    build.py died with a raw JSONDecodeError traceback that named no file.
+    These pins drive the REAL command line -- build.py copied into a
+    throwaway tree beside a data/ directory holding the truncated capture,
+    exactly the layout the hourly refresh runs -- and judge the process
+    observables: nonzero exit, stderr naming the capture and the designed
+    re-capture instruction, and no Python traceback. Nothing outside the
+    temp tree is touched; the copy resolves its own ROOT there and fails
+    before any output could be written.
+    """
+
+    CAPTURES = ("aa-raw-models.json", "aa-raw-coding-agents.json")
+
+    def run_build_with_capture(self, truncate: str) -> tuple[subprocess.CompletedProcess, pathlib.Path]:
+        """Run build.py from a temp copy of the tree, with every capture
+        present and the named one cut mid-file. -> (process, tree root)."""
+        with tempfile.TemporaryDirectory(prefix=".issue-66-build-", dir=build.ROOT) as tmp:
+            root = pathlib.Path(tmp)
+            (root / "data").mkdir()
+            (root / "build.py").write_text(
+                (build.ROOT / "build.py").read_text(encoding="utf-8"),
+                encoding="utf-8")
+            for name in self.CAPTURES:
+                raw = (build.ROOT / "data" / name).read_bytes()
+                if name == truncate:
+                    raw = raw[: len(raw) // 2]  # valid capture JSON, cut mid-file
+                (root / "data" / name).write_bytes(raw)
+            proc = subprocess.run(
+                [sys.executable, str(root / "build.py")],
+                capture_output=True, text=True, timeout=120, check=False)
+            return proc, root
+
+    def test_a_truncated_model_capture_fails_naming_the_file_not_a_traceback(self):
+        proc, root = self.run_build_with_capture("aa-raw-models.json")
+
+        self.assertNotEqual(proc.returncode, 0)
+        self.assertNotIn("Traceback", proc.stderr,
+                         "the corrupt capture surfaced as a raw traceback")
+        self.assertIn("aa-raw-models.json", proc.stderr)
+        self.assertIn("corrupt capture", proc.stderr)
+        self.assertIn("fetch_aa.py", proc.stderr,
+                      "the refusal does not say what to do about it")
+        self.assertFalse(
+            (root / "out" / "frontier-models.html").exists(),
+            "a corrupt capture still produced a page")
+
+    def test_a_truncated_agents_capture_is_named_by_its_own_file(self):
+        # The agents capture is read second; its guard must name IT, not the
+        # model capture that parsed fine.
+        proc, _ = self.run_build_with_capture("aa-raw-coding-agents.json")
+
+        self.assertNotEqual(proc.returncode, 0)
+        self.assertNotIn("Traceback", proc.stderr)
+        self.assertIn("aa-raw-coding-agents.json", proc.stderr)
+        self.assertNotIn("aa-raw-models.json", proc.stderr.splitlines()[-1])
+
+
 if __name__ == "__main__":
     unittest.main()
