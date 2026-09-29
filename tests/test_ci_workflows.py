@@ -73,6 +73,11 @@ def test_dependabot_groups_action_updates_into_one_pr():
         "the github-actions entry must group its updates — ungrouped, "
         "Dependabot files one half-bump PR per codeql-action pin"
     )
+    # the group only bundles VERSION updates; flipped to security-updates it
+    # never applies to the regular weekly bump and the half-bumps return
+    assert re.search(r"^ {8}applies-to: version-updates$", actions[0], re.M), (
+        "the group must apply to version-updates"
+    )
     assert re.search(r'^\s+- "\*"$', actions[0], re.M), (
         "the group must match every action so init and analyze move together"
     )
