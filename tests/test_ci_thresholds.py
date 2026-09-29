@@ -24,22 +24,22 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 THRESHOLDS_PATH = REPO_ROOT / ".github" / "ci-thresholds.json"
 
 
-def _load():
-    """Import scripts/ci/thresholds.py by path.
+def _load(name):
+    """Import a scripts/ci module by path.
 
     scripts/ci is not a package and deliberately has no __init__.py — it
     holds standalone CI entry points, not an importable library.
     """
-    path = REPO_ROOT / "scripts" / "ci" / "thresholds.py"
-    spec = importlib.util.spec_from_file_location("thresholds", path)
+    path = REPO_ROOT / "scripts" / "ci" / f"{name}.py"
+    spec = importlib.util.spec_from_file_location(name, path)
     assert spec and spec.loader
     module = importlib.util.module_from_spec(spec)
-    sys.modules["thresholds"] = module
+    sys.modules[name] = module
     spec.loader.exec_module(module)
     return module
 
 
-thresholds = _load()
+thresholds = _load("thresholds")
 
 GAP = Decimal("1.5")
 
@@ -68,6 +68,12 @@ def _written_document(tmp_path, **kwargs):
 
 
 def _git(repo, *args):
+    """Git plumbing for the fixtures — NOT the script under test.
+
+    The fixtures build real repositories; only the script's own code has
+    to run in-process, so coverage.py can trace it (the script invocation
+    is ``thresholds.main(...)``, never a subprocess).
+    """
     return subprocess.run(("git", "-C", str(repo)) + args, check=True,
                           capture_output=True, text=True)
 
@@ -85,15 +91,9 @@ def _seed_repo(tmp_path):
     return repo
 
 
-def _run_check(target):
-    """Run thresholds.py --check on ``target`` in a fresh process.
-
-    No check=True: the return code is itself the assertion subject.
-    """
-    return subprocess.run(  # pylint: disable=subprocess-run-check
-        [sys.executable, str(REPO_ROOT / "scripts" / "ci" / "thresholds.py"),
-         "--check", "--thresholds", str(target)],
-        capture_output=True, text=True)
+def _ratchet():
+    """Load scripts/ci/ratchet.py the same way, for the raise-path test."""
+    return _load("ratchet")
 
 
 def test_committed_document_loads():
@@ -337,9 +337,14 @@ def test_check_cli_rejects_broken_document(tmp_path):
 
 
 # --- the --check history component (issue #53) -------------------------------
+#
+# These run thresholds.main() IN-PROCESS, not through a subprocess: the
+# coverage job traces the pytest process only, so a subprocess invocation
+# would leave the history component uncounted and drag the ratchet total
+# below its floor (PR #72's coverage-gate failure).
 
 
-def test_check_cli_rejects_working_tree_lowering(tmp_path):
+def test_check_rejects_working_tree_lowering(tmp_path, capsys):
     # Issue #53: a lowered document that keeps the 1.5 calibration gap is
     # self-consistent, so the structural check alone accepts it. --check
     # must also judge the working tree against the committed copy.
@@ -347,49 +352,71 @@ def test_check_cli_rejects_working_tree_lowering(tmp_path):
     target = repo / ".github" / "ci-thresholds.json"
     thresholds.write(
         target, _document(measured="90.0", floor="88.5"))
-    result = _run_check(target)
-    assert result.returncode == 1
-    assert "coverage.python.measured" in result.stderr
-    assert "lowered; it may only rise" in result.stderr
-    assert "coverage.python.floor" in result.stderr
+    assert thresholds.main(["--check", "--thresholds", str(target)]) == 1
+    captured = capsys.readouterr()
+    assert "coverage.python.measured" in captured.err
+    assert "lowered; it may only rise" in captured.err
+    assert "coverage.python.floor" in captured.err
 
 
-def test_check_cli_accepts_working_tree_raise(tmp_path):
+def test_check_accepts_working_tree_raise(tmp_path, capsys):
     # A raise lifts values only, so it is never a relaxation.
     repo = _seed_repo(tmp_path)
     target = repo / ".github" / "ci-thresholds.json"
     thresholds.write(
         target, _document(measured="94.2", floor="92.7"))
-    result = _run_check(target)
-    assert result.returncode == 0, result.stderr
-    assert "thresholds valid" in result.stdout
+    assert thresholds.main(["--check", "--thresholds", str(target)]) == 0
+    assert "thresholds valid" in capsys.readouterr().out
 
 
-def test_check_cli_outside_any_repository_skips_history(tmp_path):
+def test_check_outside_any_repository_skips_history(tmp_path, capsys):
     # No repository around the file: there is no committed copy to be
     # lowered against, and the purely structural check decides.
     target = _written_document(tmp_path)
-    result = _run_check(target)
-    assert result.returncode == 0, result.stderr
-    assert "thresholds valid" in result.stdout
+    assert thresholds.main(["--check", "--thresholds", str(target)]) == 0
+    assert "thresholds valid" in capsys.readouterr().out
 
 
-def test_check_cli_accepts_the_automated_raise_path(tmp_path):
+def test_check_skips_history_when_git_is_missing(tmp_path, capsys,
+                                                 monkeypatch):
+    # git unavailable: the history component cannot run, and --check
+    # stays a purely structural check rather than failing.
+    def _raise(*_args, **_kwargs):
+        raise OSError("no git binary")
+
+    monkeypatch.setattr(thresholds.subprocess, "run", _raise)
+    target = _written_document(tmp_path)
+    assert thresholds.main(["--check", "--thresholds", str(target)]) == 0
+    assert "thresholds valid" in capsys.readouterr().out
+
+
+def test_check_accepts_the_automated_raise_path(tmp_path, capsys):
     # The "Ratchet the thresholds" CI step raises the working-tree copy
     # with ratchet.py and then runs --check; that order must stay clean.
     repo = _seed_repo(tmp_path)
     target = repo / ".github" / "ci-thresholds.json"
-    raised = subprocess.run(
-        [sys.executable, str(REPO_ROOT / "scripts" / "ci" / "ratchet.py"),
-         "--measured", "94.2", "--thresholds", str(target)],
-        capture_output=True, text=True, check=True)
-    assert "raised" in raised.stdout
-    result = _run_check(target)
-    assert result.returncode == 0, result.stderr
-    assert "thresholds valid" in result.stdout
+    ratchet = _ratchet()
+    assert ratchet.main(
+        ["--measured", "94.2", "--thresholds", str(target)]) == 0
+    assert thresholds.main(["--check", "--thresholds", str(target)]) == 0
+    assert "thresholds valid" in capsys.readouterr().out
 
 
-def test_check_cli_skips_history_when_absent_at_head(tmp_path):
+def test_check_skips_history_when_head_is_unborn(tmp_path, capsys):
+    # A repository with no commits has no copy at HEAD to be lowered
+    # against: the first document cannot be lowered.
+    repo = Path(tmp_path) / "repo"
+    (repo / ".github").mkdir(parents=True)
+    _git(repo, "init", "-q", "-b", "main")
+    _git(repo, "config", "user.email", "tests@example.invalid")
+    _git(repo, "config", "user.name", "Tests")
+    target = repo / ".github" / "ci-thresholds.json"
+    thresholds.write(target, _document())
+    assert thresholds.main(["--check", "--thresholds", str(target)]) == 0
+    assert "thresholds valid" in capsys.readouterr().out
+
+
+def test_check_skips_history_when_absent_at_head(tmp_path, capsys):
     # A first document cannot be lowered: with no copy of the file at
     # HEAD (here it was never committed) the history component is skipped
     # and the structural check alone decides.
@@ -403,12 +430,12 @@ def test_check_cli_skips_history_when_absent_at_head(tmp_path):
     _git(repo, "commit", "-qm", "seed without the document")
     target = repo / ".github" / "ci-thresholds.json"
     thresholds.write(target, _document())
-    result = _run_check(target)
-    assert result.returncode == 0, result.stderr
-    assert "thresholds valid" in result.stdout
+    assert thresholds.main(["--check", "--thresholds", str(target)]) == 0
+    assert "thresholds valid" in capsys.readouterr().out
 
 
-def test_check_cli_fails_closed_when_committed_copy_is_unreadable(tmp_path):
+def test_check_fails_closed_when_committed_copy_is_unreadable(tmp_path,
+                                                              capsys):
     # A committed copy exists but cannot be parsed: never-lower cannot be
     # certified, so --check refuses instead of passing.
     repo = Path(tmp_path) / "repo"
@@ -421,9 +448,8 @@ def test_check_cli_fails_closed_when_committed_copy_is_unreadable(tmp_path):
     _git(repo, "add", ".github/ci-thresholds.json")
     _git(repo, "commit", "-qm", "commit a broken document")
     thresholds.write(target, _document())
-    result = _run_check(target)
-    assert result.returncode == 1
-    assert "not valid JSON" in result.stderr
+    assert thresholds.main(["--check", "--thresholds", str(target)]) == 1
+    assert "not valid JSON" in capsys.readouterr().err
 
 
 def test_invalid_json_text_refused(tmp_path):
