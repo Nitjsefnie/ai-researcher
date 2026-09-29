@@ -323,6 +323,13 @@ class SanitizeTests(unittest.TestCase):
         out = diff_aa.one_line("```\n\ninjected markdown\n```")
 
         self.assertNotIn("\n", out)
+        # A name that merely STARTS with a fence still needs the backticks
+        # gone: the changed-models header indents it two spaces, and
+        # CommonMark opens a fence at up to three.
+        self.assertEqual(diff_aa.one_line("```open"), "open")
+        self.assertEqual(diff_aa.one_line("`tick"), "tick")
+        # Interior backticks are inert and stay.
+        self.assertEqual(diff_aa.one_line("just `quoted`"), "just `quoted`")
 
     def test_a_long_value_is_capped_and_marked_with_an_ellipsis(self):
         self.assertEqual(diff_aa.one_line("n" * 200), "n" * 160 + "…")

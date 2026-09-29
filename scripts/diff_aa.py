@@ -281,6 +281,10 @@ def one_line(value):
     """Any captured value, as one physical line of at most ONE_LINE_MAX chars
     (an ellipsis marks a cut)."""
     text = LINE_BREAKING.sub(" ", str(value)).strip()
+    # A leading fence marker must go too: in the changed-models header it
+    # lands two columns in, where CommonMark still opens a code fence --
+    # which would close the step summary's block early.
+    text = text.lstrip("`").strip()
     if len(text) > ONE_LINE_MAX:
         text = text[:ONE_LINE_MAX] + "…"
     return text

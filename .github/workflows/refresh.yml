@@ -132,6 +132,10 @@ jobs:
           # step's ref push.
           live_stale=false
           if [ "$changed" = false ] && [ "${{ inputs.force }}" != 'true' ]; then
+            # Anonymous fetch: relies on the repo being public. If it ever
+            # goes private, this gate degrades to an hourly republish --
+            # self-consistent, since the ref push still authenticates via
+            # the token URL.
             if git fetch --depth=1 origin \
                  refs/heads/published:refs/remotes/origin/published 2>/dev/null; then
               if ! git diff --quiet origin/published HEAD -- out/frontier-models.html; then
@@ -263,6 +267,9 @@ jobs:
           # is the FINAL attempt -- a second rejection fails the run red
           # rather than looping.
           if ! git push "https://x-access-token:${GH_TOKEN}@github.com/${REPO}" HEAD:main; then
+            # Anonymous fetch (the repo is public); on a private repo this
+            # fetch fails the run red rather than skipping the retry. The
+            # pushes themselves authenticate via the token URL.
             git fetch --depth=1 origin main
             if ! git rebase origin/main; then
               # A conflict means the concurrent run pushed a different
@@ -278,10 +285,14 @@ jobs:
               echo "publish=false" >> "$GITHUB_OUTPUT"
               exit 0
             fi
-            # The suite is not re-run over the rebased commit: a
-            # conflict-free rebase touches disjoint files, so the rebased
-            # commit is data-only by construction and carries exactly the
-            # page this suite run passed.
+            # The suite is not re-run over the rebased commit: a conflict-
+            # free rebase means the concurrent commit edited different
+            # regions than ours -- same-region edits to the page would have
+            # conflicted -- so the rebased commit is overwhelmingly the page
+            # this suite run passed. The retry below is the final attempt;
+            # if it succeeds over a main that moved by a build-code commit,
+            # the documented force-input contract covers the staleness and
+            # the next moved-data run heals it.
             git push "https://x-access-token:${GH_TOKEN}@github.com/${REPO}" HEAD:main
           fi
           echo "publish=true" >> "$GITHUB_OUTPUT"
