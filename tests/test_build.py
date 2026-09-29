@@ -104,7 +104,9 @@ def route_pair() -> tuple[dict, dict]:
     count and the full cost object with its per-evaluation breakdown. Shared
     values agree exactly; contextWindowTokens is "$undefined" on the
     leaderboard route -- AA's encoding of an absent field -- where the detail
-    route has measured it."""
+    route has measured it. intelligenceIndexEvaluations is a shared LIST: the
+    real corpus ships it empty on both routes (678/679 records in the merged
+    capture), so the fixture carries elements to pin the walk's list limb."""
     return (
         {
             "slug": "fixture-model",
@@ -113,6 +115,7 @@ def route_pair() -> tuple[dict, dict]:
             "intelligenceIndex": 51,
             "intelligenceIndexCostPerTask": 0.75,
             "contextWindowTokens": "$undefined",
+            "intelligenceIndexEvaluations": ["gdpval-aa", "scicode"],
         },
         {
             "slug": "fixture-model",
@@ -127,6 +130,7 @@ def route_pair() -> tuple[dict, dict]:
                 ],
             },
             "contextWindowTokens": 400000,
+            "intelligenceIndexEvaluations": ["gdpval-aa", "scicode"],
         },
     )
 
@@ -547,21 +551,24 @@ class RouteAgreementTests(unittest.TestCase):
     exact recursive value equality over the parsed structures, every
     divergence collected and raised in one message naming model slug, field
     path and both values, "$undefined" read as absent (a field absent on one
-    route is not shared), and the leaderboard's flattened cost scalar compared
+    route is not shared), the leaderboard's flattened cost scalar compared
     against the detail object's cost.total -- the reshape the merge itself
-    applies.
+    applies, symmetrically in whichever direction the shapes sit -- and
+    shared lists walked element-wise with length mismatches refused at the
+    field.
     """
 
     def test_agreeing_routes_pass_and_the_comparison_ran_non_vacuously(self):
         # The healthy control. The comparison's own count of compared values
-        # is the liveness oracle: 4 means it descended the shared record --
-        # slug, isOpenWeights, intelligenceIndex, and the flattened 0.75
-        # against the detail object's cost.total -- and skipped only what one
-        # route does not carry: contextWindowTokens ($undefined is absent,
-        # not a disagreeing value), the detail-only evaluations and name/
-        # licence/parameter fields, and the two single-route models (the
-        # detail host, which has no row on its own page, and a detail-only
-        # record, which the merge would drop).
+        # is the liveness oracle: 6 means it descended the shared record --
+        # slug, isOpenWeights, intelligenceIndex, the flattened 0.75 against
+        # the detail object's cost.total, and both elements of the shared
+        # list -- and skipped only what one route does not carry:
+        # contextWindowTokens ($undefined is absent, not a disagreeing
+        # value), the detail-only evaluations and name/licence/parameter
+        # fields, and the two single-route models (the detail host, which has
+        # no row on its own page, and a detail-only record, which the merge
+        # would drop).
         leaderboard, detail_route = route_pair()
         leaderboard = [
             leaderboard, {"slug": "detail-host-model", "shortName": "Host Model"}]
@@ -569,7 +576,7 @@ class RouteAgreementTests(unittest.TestCase):
 
         compared = build.check_route_agreement(leaderboard, detail_route)
 
-        self.assertEqual(compared, 4)
+        self.assertEqual(compared, 6)
 
     def test_a_leaderboard_value_that_diverges_fails_naming_model_field_and_both_values(self):
         # One delta from the healthy pair: the leaderboard's copy moves.
@@ -616,6 +623,72 @@ class RouteAgreementTests(unittest.TestCase):
         self.assertIn(
             "fixture-model: intelligenceIndexCostPerTask.cost.total: "
             "leaderboard 0.75, detail 0.99", message)
+
+    def test_a_divergent_element_of_a_shared_list_fails_at_its_indexed_path(self):
+        # One delta: element [1] of the shared list moves on the detail side.
+        # The walk must compare lists element-wise and name the divergence at
+        # its indexed path -- not as one whole-list blob.
+        leaderboard, detail_route = route_pair()
+        detail_route["intelligenceIndexEvaluations"][1] = "terminal-bench-v4-0"
+
+        with self.assertRaises(SystemExit) as raised:
+            build.check_route_agreement([leaderboard], [detail_route])
+
+        message = str(raised.exception)
+        self.assertIn("1 shared value", message)
+        self.assertIn(
+            "fixture-model: intelligenceIndexEvaluations[1]: "
+            "leaderboard 'scicode', detail 'terminal-bench-v4-0'", message)
+
+    def test_shared_lists_of_different_lengths_are_refused_at_the_field(self):
+        # One delta: the detail route's copy of the shared list loses an
+        # element. A shorter list is not a prefix -- element-wise comparison
+        # would silently skip the tail -- so the length mismatch is the
+        # divergence, named at the field itself.
+        leaderboard, detail_route = route_pair()
+        detail_route["intelligenceIndexEvaluations"] = ["gdpval-aa"]
+
+        with self.assertRaises(SystemExit) as raised:
+            build.check_route_agreement([leaderboard], [detail_route])
+
+        message = str(raised.exception)
+        self.assertIn("1 shared value", message)
+        self.assertIn(
+            "fixture-model: intelligenceIndexEvaluations: "
+            "leaderboard ['gdpval-aa', 'scicode'], detail ['gdpval-aa']",
+            message)
+
+    def test_the_cost_scalar_on_the_detail_side_is_canonicalized_symmetrically(self):
+        # The mirror of the flattened-scalar pin: the LEADERBOARD carries the
+        # cost object (total 0.80) while the detail route carries the bare
+        # scalar. The canonicalization is shape-driven, not side-driven --
+        # the same reshape applies with the routes swapped. The mirror-healthy
+        # pair (equal totals, shapes swapped) passes with the same compared
+        # count as the healthy control; the delta below moves exactly one
+        # value from it.
+        leaderboard, detail_route = route_pair()
+        detail_route["intelligenceIndexCostPerTask"] = 0.80
+        leaderboard["intelligenceIndexCostPerTask"] = {
+            "cost": {"total": 0.80},
+            "evaluations": [
+                {"slug": "gdpval-aa", "weightedCostPerTask": 0.30},
+                {"slug": "scicode", "weightedCostPerTask": 0.50},
+            ],
+        }
+
+        self.assertEqual(
+            build.check_route_agreement([leaderboard], [detail_route]), 6)
+
+        detail_route["intelligenceIndexCostPerTask"] = 0.75
+
+        with self.assertRaises(SystemExit) as raised:
+            build.check_route_agreement([leaderboard], [detail_route])
+
+        message = str(raised.exception)
+        self.assertIn("1 shared value", message)
+        self.assertIn(
+            "fixture-model: intelligenceIndexCostPerTask.cost.total: "
+            "leaderboard 0.8, detail 0.75", message)
 
     def test_every_divergence_is_collected_before_the_raise(self):
         # Two shared fields diverge: one raise, both listed, in a stable
