@@ -254,21 +254,42 @@ jobs:
             "--fail-under=${js_floor}" --format=total
 
       - name: Ratchet documents
-        if: ${{ github.event_name == 'pull_request' }}
-        # A pull request must not relax its own ratchet data: the recorded
-        # measured values and their floors may only rise. The merge ref
-        # merges the head into the base, so HEAD^1 is the base tip and
-        # HEAD^2 the head, and the check compares the document at their
-        # merge base with the head's copy — never the working tree. The
-        # history is still shallow by the time this runs, and a shallow
-        # history can make git merge-base return a wrong base without
-        # erroring, so the step completes the history of both sides first.
+        if: ${{ github.event_name == 'pull_request' || github.event_name == 'push' }}
+        # Nobody may relax the ratchet data: the recorded measured values
+        # and their floors may only rise. The guard used to run on pull
+        # requests only, and a direct push to main could ship a lowered
+        # document that keeps the 1.5 calibration gap — self-consistent,
+        # so thresholds --check alone accepted it (issue #53). The guard
+        # now runs on push too. The automated raise is unaffected: a raise
+        # only lifts values, so its own push run is clean, and this step
+        # runs BEFORE "Ratchet the thresholds", so a lowered document
+        # fails the job before any raise could paper over it.
+        #
+        # On a pull request the merge ref merges the head into the base,
+        # so HEAD^1 is the base tip and HEAD^2 the head, and the check
+        # compares the document at their merge base with the head's copy
+        # — never the working tree. On a push, BEFORE is the previous tip
+        # of main and HEAD the new one. The history is still shallow by
+        # the time this runs, and a shallow history can make git
+        # merge-base return a wrong base without erroring, so the step
+        # completes the history of both sides first. A branch-creation
+        # push carries the all-zero BEFORE — nothing to compare against.
         env:
           PR_NUMBER: ${{ github.event.pull_request.number }}
+          BEFORE: ${{ github.event.before }}
         run: |
-          git fetch --unshallow origin main \
-            "+refs/pull/${PR_NUMBER}/head:refs/remotes/pr/head"
-          python3 scripts/ci/check_ratchets.py HEAD^1 HEAD^2
+          if [ "${GITHUB_EVENT_NAME}" = "pull_request" ]; then
+            git fetch --unshallow origin main \
+              "+refs/pull/${PR_NUMBER}/head:refs/remotes/pr/head"
+            python3 scripts/ci/check_ratchets.py HEAD^1 HEAD^2
+          else
+            if [ "${BEFORE}" = "0000000000000000000000000000000000000000" ]; then
+              echo "branch creation: no previous main tip to compare against"
+              exit 0
+            fi
+            git fetch --unshallow origin main "${BEFORE}"
+            python3 scripts/ci/check_ratchets.py "${BEFORE}" HEAD
+          fi
 
       - name: Ratchet the thresholds
         # Only measurements from a main push may move the recorded

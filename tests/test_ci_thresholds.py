@@ -18,6 +18,8 @@ from pathlib import Path
 
 import pytest
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts" / "ci"))
+
 REPO_ROOT = Path(__file__).resolve().parents[1]
 THRESHOLDS_PATH = REPO_ROOT / ".github" / "ci-thresholds.json"
 
@@ -63,6 +65,35 @@ def _written_document(tmp_path, **kwargs):
     payload = json.loads(json.dumps(_document(**kwargs), default=float))
     target.write_text(json.dumps(payload), encoding="utf-8")
     return target
+
+
+def _git(repo, *args):
+    return subprocess.run(("git", "-C", str(repo)) + args, check=True,
+                          capture_output=True, text=True)
+
+
+def _seed_repo(tmp_path):
+    """A git repo whose HEAD commits the document at the canonical path."""
+    repo = Path(tmp_path) / "repo"
+    (repo / ".github").mkdir(parents=True)
+    _git(repo, "init", "-q", "-b", "main")
+    _git(repo, "config", "user.email", "tests@example.invalid")
+    _git(repo, "config", "user.name", "Tests")
+    thresholds.write(repo / ".github" / "ci-thresholds.json", _document())
+    _git(repo, "add", ".github/ci-thresholds.json")
+    _git(repo, "commit", "-qm", "seed")
+    return repo
+
+
+def _run_check(target):
+    """Run thresholds.py --check on ``target`` in a fresh process.
+
+    No check=True: the return code is itself the assertion subject.
+    """
+    return subprocess.run(  # pylint: disable=subprocess-run-check
+        [sys.executable, str(REPO_ROOT / "scripts" / "ci" / "thresholds.py"),
+         "--check", "--thresholds", str(target)],
+        capture_output=True, text=True)
 
 
 def test_committed_document_loads():
@@ -303,6 +334,96 @@ def test_check_cli_rejects_broken_document(tmp_path):
         capture_output=True, text=True)
     assert result.returncode == 1
     assert "schema_version" in result.stderr
+
+
+# --- the --check history component (issue #53) -------------------------------
+
+
+def test_check_cli_rejects_working_tree_lowering(tmp_path):
+    # Issue #53: a lowered document that keeps the 1.5 calibration gap is
+    # self-consistent, so the structural check alone accepts it. --check
+    # must also judge the working tree against the committed copy.
+    repo = _seed_repo(tmp_path)
+    target = repo / ".github" / "ci-thresholds.json"
+    thresholds.write(
+        target, _document(measured="90.0", floor="88.5"))
+    result = _run_check(target)
+    assert result.returncode == 1
+    assert "coverage.python.measured" in result.stderr
+    assert "lowered; it may only rise" in result.stderr
+    assert "coverage.python.floor" in result.stderr
+
+
+def test_check_cli_accepts_working_tree_raise(tmp_path):
+    # A raise lifts values only, so it is never a relaxation.
+    repo = _seed_repo(tmp_path)
+    target = repo / ".github" / "ci-thresholds.json"
+    thresholds.write(
+        target, _document(measured="94.2", floor="92.7"))
+    result = _run_check(target)
+    assert result.returncode == 0, result.stderr
+    assert "thresholds valid" in result.stdout
+
+
+def test_check_cli_outside_any_repository_skips_history(tmp_path):
+    # No repository around the file: there is no committed copy to be
+    # lowered against, and the purely structural check decides.
+    target = _written_document(tmp_path)
+    result = _run_check(target)
+    assert result.returncode == 0, result.stderr
+    assert "thresholds valid" in result.stdout
+
+
+def test_check_cli_accepts_the_automated_raise_path(tmp_path):
+    # The "Ratchet the thresholds" CI step raises the working-tree copy
+    # with ratchet.py and then runs --check; that order must stay clean.
+    repo = _seed_repo(tmp_path)
+    target = repo / ".github" / "ci-thresholds.json"
+    raised = subprocess.run(
+        [sys.executable, str(REPO_ROOT / "scripts" / "ci" / "ratchet.py"),
+         "--measured", "94.2", "--thresholds", str(target)],
+        capture_output=True, text=True, check=True)
+    assert "raised" in raised.stdout
+    result = _run_check(target)
+    assert result.returncode == 0, result.stderr
+    assert "thresholds valid" in result.stdout
+
+
+def test_check_cli_skips_history_when_absent_at_head(tmp_path):
+    # A first document cannot be lowered: with no copy of the file at
+    # HEAD (here it was never committed) the history component is skipped
+    # and the structural check alone decides.
+    repo = Path(tmp_path) / "repo"
+    (repo / ".github").mkdir(parents=True)
+    _git(repo, "init", "-q", "-b", "main")
+    _git(repo, "config", "user.email", "tests@example.invalid")
+    _git(repo, "config", "user.name", "Tests")
+    (repo / "README.md").write_text("x", encoding="utf-8")
+    _git(repo, "add", "README.md")
+    _git(repo, "commit", "-qm", "seed without the document")
+    target = repo / ".github" / "ci-thresholds.json"
+    thresholds.write(target, _document())
+    result = _run_check(target)
+    assert result.returncode == 0, result.stderr
+    assert "thresholds valid" in result.stdout
+
+
+def test_check_cli_fails_closed_when_committed_copy_is_unreadable(tmp_path):
+    # A committed copy exists but cannot be parsed: never-lower cannot be
+    # certified, so --check refuses instead of passing.
+    repo = Path(tmp_path) / "repo"
+    (repo / ".github").mkdir(parents=True)
+    _git(repo, "init", "-q", "-b", "main")
+    _git(repo, "config", "user.email", "tests@example.invalid")
+    _git(repo, "config", "user.name", "Tests")
+    target = repo / ".github" / "ci-thresholds.json"
+    target.write_text("{not json", encoding="utf-8")
+    _git(repo, "add", ".github/ci-thresholds.json")
+    _git(repo, "commit", "-qm", "commit a broken document")
+    thresholds.write(target, _document())
+    result = _run_check(target)
+    assert result.returncode == 1
+    assert "not valid JSON" in result.stderr
 
 
 def test_invalid_json_text_refused(tmp_path):
