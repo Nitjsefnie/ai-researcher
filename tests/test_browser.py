@@ -554,7 +554,10 @@ class BrowserInteractionTests(unittest.TestCase):
             "slug": "audit-model",
             "intelligenceIndex": 51,
             "gdpvalNormalized": 0.47,
-            "totalParameters": 27,
+            # The CURRENT field name: the empty-axis guard refuses a capture
+            # still carrying the pre-rename `totalParameters` (issue #60), so
+            # a stale name here would fail the build before the browser opens.
+            "parameters": 27,
             "intelligenceIndexCostPerTask": {
                 "cost": {"total": 0.75},
                 "evaluations": [
