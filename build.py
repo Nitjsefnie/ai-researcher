@@ -557,11 +557,16 @@ TEMPLATE = r"""<!DOCTYPE html>
   .legend .swatch.hollow{background:none !important;border:2px solid var(--series-prop);box-sizing:border-box}
   .legend .line{width:20px;height:0;border-top:2px dashed var(--frontier-line);display:inline-block}
 
-  .tip{position:absolute;pointer-events:none;opacity:0;transition:opacity 120ms ease;
+  .tip{position:absolute;pointer-events:none;opacity:0;
     background:var(--surface-1);border:1px solid var(--border);border-radius:9px;
     padding:9px 12px;font-size:12.5px;min-width:190px;max-width:280px;
     box-shadow:0 6px 22px rgba(0,0,0,.18);z-index:50}
   .tip.on{opacity:1}
+  /* The fade is a nicety, not information: under prefers-reduced-motion the
+     tooltip must appear and vanish instantly rather than animate. */
+  @media (prefers-reduced-motion: no-preference) {
+    .tip{transition:opacity 120ms ease}
+  }
   .tip .tname{color:var(--text-primary);font-weight:600;font-size:13px;margin-bottom:5px}
   .tip .trow{display:flex;justify-content:space-between;gap:14px;font-family:var(--mono);font-size:11.5px}
   .tip .trow .tv{color:var(--text-primary);font-weight:600}

@@ -714,6 +714,20 @@ class BrowserInteractionTests(unittest.TestCase):
             build.RAW, build.AGENTS_RAW, build.OUT = saved
             tmp.cleanup()
 
+    def test_tooltip_transition_honours_prefers_reduced_motion(self):
+        # #57: the tooltip's opacity fade ran unconditionally. Under
+        # prefers-reduced-motion the transition must be gone entirely so the
+        # tooltip appears and vanishes instantly.
+        page = self.browser.new_page(viewport={"width": 1280, "height": 900})
+        page.goto(build.OUT.as_uri())
+        duration = ("getComputedStyle(document.getElementById"
+                    "('tip-intelligence')).transitionDuration")
+        page.emulate_media(reduced_motion="reduce")
+        self.assertEqual(page.evaluate(duration), "0s")
+        page.emulate_media(reduced_motion="no-preference")
+        self.assertEqual(page.evaluate(duration), "0.12s")
+        page.close()
+
     @staticmethod
     def _srgb_to_linear(channel):
         c = channel / 255.0
