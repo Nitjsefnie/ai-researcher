@@ -456,8 +456,10 @@ jobs:
           # rejected every update with "(fetch first)" even though it was
           # one -- issue #77. The API checks server-side, where the full
           # graph lives:
-          #   - GET first: a 404 means the ref does not exist, so CREATE it
-          #     (POST) -- creation needs no fast-forward proof.
+          #   - GET first: the shell branches on the GET's exit code, so a
+          #     404 -- or ANY failed GET -- routes to CREATE (POST); a POST
+          #     against an existing ref fails there with 422 "already
+          #     exists", so a transient GET error cannot mis-create.
           #   - Otherwise PATCH without `force`: the API default is the
           #     server-side fast-forward check, and a 422 "not a fast
           #     forward" fails the run -- the same red a rejected push
