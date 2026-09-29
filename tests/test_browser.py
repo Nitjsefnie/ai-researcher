@@ -892,41 +892,38 @@ class BrowserInteractionTests(unittest.TestCase):
                     f"labels not at their nearest clear slot on {chart}: "
                     f"{[(w['text'], (w['x'], w['y'])) for w in unmatched]}"
                     f"{[(d['text'], (d['x'], d['y'])) for d in leftover]}")
-        page.close()
 
-    def test_no_op_clicks_leave_label_positions_unchanged(self):
-        # #84, the issue's first invariant: a click that does not change
+        # #84's first invariant, same page: a click that does not change
         # which points are drawn must leave every label exactly where it
-        # was. Table sort is the page's pure no-op control; a Hide-superseded
-        # round trip must restore the identical layout, because the placer
-        # is a pure function of the drawn state.
-        page = self.browser.new_page(viewport={"width": 1280, "height": 900})
-        page.goto(build.OUT.as_uri())
-        snap = ("charts => Object.fromEntries(charts.map(c => [c, "
-                "Object.fromEntries([...document.querySelectorAll("
-                "`#svg-${c} text.lbl`)].map(t => "
-                "[t.textContent, [t.getAttribute('x'), "
-                "t.getAttribute('y')]]))]))")
-        charts = ["coding", "intelligence", "agentic", "parameters"]
-        before = page.evaluate(snap, charts)
-        # an empty snapshot compares vacuously equal to everything -- the
-        # page must have rendered labels before any click is judged
-        self.assertTrue(any(before[c] for c in charts),
-                        "no chart rendered any label; nothing to compare")
+        # was. Table sort is the page's pure no-op control; a
+        # Hide-superseded round trip must restore the identical layout,
+        # because the placer is a pure function of the drawn state.
+        with self.subTest(phase="no-op clicks"):
+            snap = ("charts => Object.fromEntries(charts.map(c => [c, "
+                    "Object.fromEntries([...document.querySelectorAll("
+                    "`#svg-${c} text.lbl`)].map(t => "
+                    "[t.textContent, [t.getAttribute('x'), "
+                    "t.getAttribute('y')]]))]))")
+            charts = ["coding", "intelligence", "agentic", "parameters"]
+            before = page.evaluate(snap, charts)
+            # an empty snapshot compares vacuously equal to everything --
+            # the page must have rendered labels before any click is judged
+            self.assertTrue(any(before[c] for c in charts),
+                            "no chart rendered any label; nothing to compare")
 
-        header = page.locator("#tbl th[data-k='ii']")
-        header.click()
-        self.assertEqual(page.evaluate(snap, charts), before,
-                         "a table-sort click moved chart labels")
-        header.click()
-        self.assertEqual(page.evaluate(snap, charts), before,
-                         "the second sort click moved chart labels")
+            header = page.locator("#tbl th[data-k='ii']")
+            header.click()
+            self.assertEqual(page.evaluate(snap, charts), before,
+                             "a table-sort click moved chart labels")
+            header.click()
+            self.assertEqual(page.evaluate(snap, charts), before,
+                             "the second sort click moved chart labels")
 
-        page.locator("#fSup").click()
-        page.locator("#fSup").click()
-        self.assertEqual(page.evaluate(snap, charts), before,
-                         "a Hide-superseded round trip did not restore the "
-                         "identical label layout")
+            page.locator("#fSup").click()
+            page.locator("#fSup").click()
+            self.assertEqual(page.evaluate(snap, charts), before,
+                             "a Hide-superseded round trip did not restore "
+                             "the identical label layout")
         page.close()
 
     def test_footer_carries_a_licence_note_linking_the_licence(self):
