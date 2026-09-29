@@ -509,9 +509,26 @@ def read_capture_stamp(stamp_path: pathlib.Path) -> str:
     return value
 
 
+def read_capture(path):
+    """The capture at path, parsed -- or a guarded exit naming the file.
+
+    A capture written by a crashed runner can end mid-file (issue #66), and
+    parsing it anyway died with a raw JSONDecodeError traceback that named no
+    file. A corrupt capture is the same signal as a schema change -- fail red
+    with one actionable line -- never a traceback and never a partial build.
+    """
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise SystemExit(
+            f"{path.relative_to(ROOT)}: corrupt capture ({exc}) -- re-capture "
+            "with scripts/fetch_aa.py rather than building from a half-written file"
+        ) from exc
+
+
 def main():
-    models = json.loads(RAW.read_text(encoding="utf-8"))
-    agents = json.loads(AGENTS_RAW.read_text(encoding="utf-8"))
+    models = read_capture(RAW)
+    agents = read_capture(AGENTS_RAW)
     rows = build_rows(models) + build_agent_rows(agents, models)
     intelligence_rows = [r for r in rows if r["metrics"]["intelligence"]]
 
