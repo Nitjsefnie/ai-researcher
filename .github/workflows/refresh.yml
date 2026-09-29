@@ -232,6 +232,12 @@ jobs:
 
       - name: Rebuild the page
         if: steps.capture.outputs.proceed == 'true'
+        # The page prints the SHA of the tree it was actually built from
+        # (only when this is set). When the push races and the rebase lands
+        # the same build in a later commit, the printed SHA still names the
+        # build's source — that is the honest claim.
+        env:
+          AA_SOURCE_COMMIT: ${{ github.sha }}
         run: python3 build.py
 
       - name: Run the suite against the new capture
