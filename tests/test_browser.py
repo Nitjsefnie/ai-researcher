@@ -1,4 +1,5 @@
 import contextlib
+import hashlib
 import io
 import json
 import os
@@ -6,6 +7,7 @@ import pathlib
 import re
 import tempfile
 import unittest
+from unittest import mock
 
 from playwright.sync_api import sync_playwright
 
@@ -711,6 +713,72 @@ class BrowserInteractionTests(unittest.TestCase):
             page.close()
             build.RAW, build.AGENTS_RAW, build.OUT = saved
             tmp.cleanup()
+
+
+class BuildProvenanceTests(unittest.TestCase):
+    """#49: the footer's provenance — source commit when the build
+    environment carries one, and a sha256 over the two capture files that a
+    reader can verify today, by hashing the committed files."""
+
+    COMMIT = "e5e10f1c0ffee4215deadbeefcafe0123456789a"
+
+    def _build(self, destination, commit=None):
+        """Run build.main() to `destination`, with AA_SOURCE_COMMIT set or
+        unset, and return the page bytes."""
+        old_out = build.OUT
+        build.OUT = destination
+        try:
+            env = {} if commit is None else {"AA_SOURCE_COMMIT": commit}
+            with mock.patch.dict(os.environ, env, clear=False):
+                if commit is None:
+                    os.environ.pop("AA_SOURCE_COMMIT", None)
+                with contextlib.redirect_stdout(io.StringIO()):
+                    build.main()
+            return destination.read_bytes()
+        finally:
+            build.OUT = old_out
+
+    def test_footer_carries_the_source_commit_and_the_content_hash(self):
+        with tempfile.TemporaryDirectory(prefix=".issue-49-build-",
+                                         dir=build.ROOT) as tmp:
+            output = pathlib.Path(tmp) / "frontier-models.html"
+            html = self._build(output, commit=self.COMMIT).decode("utf-8")
+
+            # verbatim in the footer, not merely somewhere in the payload
+            foot = html[html.index('class="foot"'):]
+            self.assertIn(self.COMMIT, foot)
+            # the content hash equals an independently computed sha256 over
+            # the two capture files, read straight off the data directory
+            digest = hashlib.sha256()
+            digest.update(build.RAW.read_bytes())
+            digest.update(build.AGENTS_RAW.read_bytes())
+            self.assertIn(digest.hexdigest(), foot)
+
+    def test_footer_omits_the_source_commit_when_the_environment_is_unset(self):
+        with tempfile.TemporaryDirectory(prefix=".issue-49-build-",
+                                         dir=build.ROOT) as tmp:
+            output = pathlib.Path(tmp) / "frontier-models.html"
+            html = self._build(output).decode("utf-8")
+
+            self.assertNotIn(self.COMMIT, html)
+            foot = html[html.index('class="foot"'):]
+            self.assertNotIn("source commit", foot)
+            # the content hash is verifiable today without any workflow
+            # change, so it renders with or without the commit
+            digest = hashlib.sha256()
+            digest.update(build.RAW.read_bytes())
+            digest.update(build.AGENTS_RAW.read_bytes())
+            self.assertIn(digest.hexdigest(), foot)
+
+    def test_rebuild_without_the_env_var_stays_byte_identical(self):
+        with tempfile.TemporaryDirectory(prefix=".issue-49-build-",
+                                         dir=build.ROOT) as tmp:
+            first = pathlib.Path(tmp) / "first.html"
+            second = pathlib.Path(tmp) / "second.html"
+            self._build(first)
+            self._build(second)
+
+            self.assertEqual(first.read_bytes(), second.read_bytes())
 
 
 if __name__ == "__main__":

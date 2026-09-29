@@ -10,7 +10,10 @@ Usage:  python3 build.py
 from __future__ import annotations
 
 import datetime as dt
+import hashlib
+import html
 import json
+import os
 import pathlib
 import re
 
@@ -399,7 +402,24 @@ def main():
     )
 
     OUT.parent.mkdir(parents=True, exist_ok=True)
-    OUT.write_text(TEMPLATE.replace("__CAPTURED__", captured).replace("__DATA__", payload),
+    # Provenance. The content hash is a sha256 over the two capture files,
+    # whole bytes concatenated models-then-agents -- a reader holding the
+    # committed data directory can verify it today, with no workflow change.
+    # The source commit is known only to the build's caller, so it renders
+    # only when the environment carries one; unset renders nothing extra.
+    # Replaced FIRST so the payload, still inserted last, can never be
+    # re-substituted by a captured string carrying this marker.
+    digest = hashlib.sha256()
+    for capture in (RAW, AGENTS_RAW):
+        digest.update(capture.read_bytes())
+    commit = os.environ.get("AA_SOURCE_COMMIT", "")
+    commit_note = (f" Source commit <code>{html.escape(commit)}</code>."
+                   if commit else "")
+    provenance = ("Capture <code>" + digest.hexdigest() + "</code> &mdash; sha256 over "
+                  "data/aa-raw-models.json then data/aa-raw-coding-agents.json, "
+                  "whole files concatenated in that order." + commit_note)
+    OUT.write_text(TEMPLATE.replace("__PROVENANCE__", provenance)
+                   .replace("__CAPTURED__", captured).replace("__DATA__", payload),
                    encoding="utf-8")
     dep = sum(1 for r in intelligence_rows if r["dep"])
     print(f"wrote {OUT.relative_to(ROOT)}")
@@ -788,6 +808,7 @@ TEMPLATE = r"""<!DOCTYPE html>
       the components sum exactly to the published total. No score, token price or task measurement is
       estimated, and nothing is filled in from another source. Rebuild with
       <code>python3 scripts/fetch_aa.py &amp;&amp; python3 build.py</code>.</p>
+    <p>__PROVENANCE__</p>
   </div>
 </div>
 
