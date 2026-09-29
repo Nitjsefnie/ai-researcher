@@ -145,10 +145,9 @@ those.
 
 Three run only on GitHub. `codeql` is gated on repository visibility, because
 code scanning is free on public repositories and needs Code Security on private
-ones. `claim`
-watches issue comments: `/claim` assigns the commenter to an unassigned open
-issue, and `/unclaim` and `/release` remove the commenter's own assignment —
-self-service issue claiming for contributors without write access.
+ones. `claim` watches issue comments: `/claim` assigns the commenter to an
+unassigned open issue, and `/unclaim` and `/release` remove the commenter's own
+assignment — self-service issue claiming for contributors without write access.
 
 `refresh` is the capture → commit → publish of the page, and it fires two
 ways, which are not equivalent. The workflow's own `schedule` trigger asks
