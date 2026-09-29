@@ -603,6 +603,9 @@ TEMPLATE = r"""<!DOCTYPE html>
   .toast.show{opacity:1}
   .foot{color:var(--muted);font-size:12.5px;margin-top:56px;padding-top:20px;
     border-top:1px solid var(--border)}
+  /* The global reset removes paragraph margins, so the footer's stacked
+     lines would butt together without re-spacing them here. */
+  .foot p+p{margin-top:8px}
 </style>
 </head>
 <body class="viz-root">
@@ -824,6 +827,8 @@ TEMPLATE = r"""<!DOCTYPE html>
       estimated, and nothing is filled in from another source. Rebuild with
       <code>python3 scripts/fetch_aa.py &amp;&amp; python3 build.py</code>.</p>
     <p>__PROVENANCE__</p>
+    <p>&copy; 2026 Peter Z (Nitjsefnie) &middot;
+      <a href="https://github.com/Nitjsefnie/ai-researcher/blob/main/LICENSE">MIT licence</a></p>
   </div>
 </div>
 
