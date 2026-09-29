@@ -714,6 +714,58 @@ class BrowserInteractionTests(unittest.TestCase):
             build.RAW, build.AGENTS_RAW, build.OUT = saved
             tmp.cleanup()
 
+    @staticmethod
+    def _srgb_to_linear(channel):
+        c = channel / 255.0
+        return c / 12.92 if c <= 0.03928 else ((c + 0.055) / 1.055) ** 2.4
+
+    @classmethod
+    def _wcag_contrast(cls, fg, bg):
+        """WCAG 2.x contrast ratio between two [r, g, b] byte triples."""
+        def luminance(rgb):
+            return (0.2126 * cls._srgb_to_linear(rgb[0])
+                    + 0.7152 * cls._srgb_to_linear(rgb[1])
+                    + 0.0722 * cls._srgb_to_linear(rgb[2]))
+        l1, l2 = luminance(fg), luminance(bg)
+        hi, lo = max(l1, l2), min(l1, l2)
+        return (hi + 0.05) / (lo + 0.05)
+
+    def test_light_theme_text_surfaces_meet_wcag_aa_contrast(self):
+        # #56: light-theme table headers (--muted on --surface-1) and the
+        # frontier tags (--accent on the same surface) sat below the 4.5:1
+        # WCAG AA floor for their sizes. The ratio is computed here from the
+        # computed styles over the WCAG 2.x relative-luminance formula -- the
+        # test never trusts a pinned number.
+        page = self.browser.new_page(viewport={"width": 1280, "height": 900})
+        page.goto(build.OUT.as_uri())
+        page.evaluate("document.documentElement.dataset.theme = 'light'")
+        pairs = page.evaluate("""() => {
+          const bgOf = el => {
+            for (let cur = el; cur; cur = cur.parentElement) {
+              const bg = getComputedStyle(cur).backgroundColor;
+              if (bg && bg !== 'transparent' && !/rgba\\([^)]+, 0\\)/.test(bg))
+                return bg;
+            }
+            return 'rgb(255, 255, 255)';
+          };
+          const pick = sel => {
+            const el = document.querySelector(sel);
+            return el ? {fg: getComputedStyle(el).color, bg: bgOf(el)} : null;
+          };
+          return {th: pick('#tbl th'), tag: pick('#tbl td .tag.f')};
+        }""")
+        page.close()
+        self.assertIsNotNone(pairs["th"], "no table header rendered")
+        self.assertIsNotNone(pairs["tag"], "no frontier tag rendered in the table")
+        for name, pair in pairs.items():
+            fg = [int(v) for v in re.findall(r"\d+", pair["fg"])][:3]
+            bg = [int(v) for v in re.findall(r"\d+", pair["bg"])][:3]
+            ratio = self._wcag_contrast(fg, bg)
+            self.assertGreaterEqual(
+                ratio, 4.5,
+                f"light-theme {name} measures {ratio:.2f}:1, below the WCAG "
+                f"AA 4.5:1 floor (fg={pair['fg']}, bg={pair['bg']})")
+
 
 class BuildProvenanceTests(unittest.TestCase):
     """#49: the footer's provenance — source commit when the build
