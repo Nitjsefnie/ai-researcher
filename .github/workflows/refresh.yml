@@ -79,6 +79,14 @@ concurrency:
   group: refresh
   cancel-in-progress: false
 
+# Least-privilege floor (issue #52 review): every job here declares its own
+# permissions block today, but a job added later WITHOUT one would silently
+# inherit the repository default. The floor caps what that inheritance can
+# leak; the refresh job's own contents: write overrides it where the pushes
+# happen.
+permissions:
+  contents: read
+
 jobs:
   refresh:
     runs-on: ubuntu-latest
@@ -86,8 +94,8 @@ jobs:
     # Job-level rather than workflow-level (issue #52): only this job pushes
     # — the commit step to main, the publish step to refs/heads/published,
     # both under the explicit token URL — so the write scope sits where the
-    # pushes are. A workflow-level block would hand contents: write to any
-    # job added to this file later.
+    # pushes are. The workflow-level floor above is contents: read, so this
+    # block is the file's only elevation to write.
     permissions:
       # This job commits the capture it takes. Everything else stays read-only.
       contents: write

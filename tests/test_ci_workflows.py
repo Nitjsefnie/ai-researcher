@@ -1,6 +1,9 @@
-"""Tripwires for the codeql-action pin coupling (issue #45).
+"""Tripwires for the workflow catalogue.
 
-github/codeql-action/init and github/codeql-action/analyze must run the same
+The codeql-action coupling (issue #45) and the job-ceiling invariant
+(issue #52) live here: contracts that span the workflows directory, not one
+file's step gating. github/codeql-action/init and
+github/codeql-action/analyze must run the same
 version inside one workflow run: the action records its version at init and
 refuses a later step at a different one — "Loaded a configuration file for
 version 'X', but running version 'Y'" — which fails every CodeQL run of the
@@ -9,17 +12,22 @@ dependencies, so ungrouped it files one half-bump per pin and every
 action-pin bump went red (12 of 13 failed codeql push runs were on
 dependabot/* branches). The dependabot.yml groups block keeps the pins in one
 atomic PR; these tests are the in-tree layer that fails if a single-pin bump
-ever lands, and that fails loudly if the group is ever removed.
+ever lands, and that fails loudly if the group is ever removed. The ceiling
+tripwire pins that every job across .github/workflows/*.yml declares
+timeout-minutes, so a new job cannot silently hold GitHub's 6-hour default.
 """
 from __future__ import annotations
 
 import re
 from pathlib import Path
 
+import yaml
+
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
 CODEQL_WORKFLOW = REPO_ROOT / ".github" / "workflows" / "codeql.yml"
 DEPENDABOT = REPO_ROOT / ".github" / "dependabot.yml"
+WORKFLOWS = sorted((REPO_ROOT / ".github" / "workflows").glob("*.yml"))
 
 # `uses: github/codeql-action/<step>@<40-hex sha>  # vX.Y.Z`
 _PIN = re.compile(
@@ -81,3 +89,16 @@ def test_dependabot_groups_action_updates_into_one_pr():
     assert re.search(r'^\s+- "\*"$', actions[0], re.M), (
         "the group must match every action so init and analyze move together"
     )
+
+
+def test_every_job_declares_timeout_minutes():
+    # Issue #52: a hung job fails in its declared ceiling instead of holding
+    # GitHub's 6-hour default. The invariant rides on the whole catalogue —
+    # a new workflow or job starts with it, and dropping the declaration
+    # from an existing job fails here rather than in a 6-hour hang.
+    for path in WORKFLOWS:
+        workflow = yaml.safe_load(path.read_text(encoding="utf-8"))
+        for name, job in (workflow.get("jobs") or {}).items():
+            assert "timeout-minutes" in job, (
+                f"{path.name}: job {name!r} declares no timeout-minutes"
+            )
