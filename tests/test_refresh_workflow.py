@@ -47,6 +47,15 @@ class GateTests(unittest.TestCase):
     def setUp(self):
         self.wf = load()
 
+    def test_workflow_permissions_floor_and_job_write_scope(self):
+        # Issue #52 fold: the workflow-level floor is contents: read, so a
+        # job added later without its own permissions block inherits read
+        # instead of the repository default; the refresh job alone elevates
+        # to write, where its two pushes happen.
+        self.assertEqual(self.wf.get("permissions"), {"contents": "read"})
+        self.assertEqual(self.wf["jobs"]["refresh"]["permissions"],
+                         {"contents": "write"})
+
     def test_publish_requires_proceed_and_the_commit_steps_publish_output(self):
         # A commit step can finish green WITHOUT a publishable state (a lost
         # push race concedes with exit 0), so the publish step must read the
