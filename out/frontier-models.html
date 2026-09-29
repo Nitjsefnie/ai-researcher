@@ -958,9 +958,15 @@ const DATA = {"rows":[{"name":"Claude Opus 5.5 (Adaptive Reasoning, Max Effort, 
       const candidates=[];
       const dyMax=pin?192:16, dxs=pin?[10,60,120]:[10];
       for(let dy=-dyMax;dy<=dyMax;dy+=16) for(const dx of dxs){
-        candidates.push([x+dx,y+dy]);
-        candidates.push([x-tw-dx,y+dy]);
+        candidates.push([x+dx,y+dy,Math.hypot(dx,dy)]);          // right
+        candidates.push([x-tw-dx,y+dy,Math.hypot(tw+dx,dy)]);   // left
       }
+      // Candidates ordered by how far they sit from the dot -- the rule the
+      // intelligence chart's placer has used since 9c74397 -- so a label only
+      // drifts as far as the crowd genuinely forces it. Walking generation
+      // order instead let one blocked slot throw a label to the far side of
+      // its dot while nearer slots on the same side sat clear (#84).
+      candidates.sort((a,b)=>a[2]-b[2]);
       let chosen=null;
       for(const [bx,by] of candidates){
         const box={x:bx-3,y:by-th+3,w:tw+6,h:th};
