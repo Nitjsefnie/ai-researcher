@@ -587,6 +587,10 @@ TEMPLATE = r"""<!DOCTYPE html>
     border:1px solid var(--border);color:var(--text-secondary);white-space:nowrap}
   .tag.f{border-color:var(--accent);color:var(--accent)}
   .scroll{max-height:560px;overflow:auto;border:1px solid var(--border);border-radius:var(--radius)}
+  /* An empty filtered slice says so inside the table region instead of
+     leaving a silent zero-row body; aria-live announces the change. */
+  .empty-state{padding:28px 16px;font-size:13.5px;color:var(--text-secondary)}
+  .empty-state[hidden]{display:none}
 
   h2{font-size:22px;color:var(--text-primary);font-weight:600;margin-bottom:6px;letter-spacing:-.01em}
   .sub{font-size:14px;margin-bottom:16px;max-width:880px}
@@ -805,6 +809,7 @@ TEMPLATE = r"""<!DOCTYPE html>
         <th data-k="rel">Released <span class="ar" aria-hidden="true">&#8597;</span></th>
         <th data-k="open">Weights <span class="ar" aria-hidden="true">&#8597;</span></th>
       </tr></thead><tbody></tbody></table>
+      <div class="empty-state" id="tblEmpty" aria-live="polite" hidden></div>
     </div>
   </section>
 
@@ -1522,6 +1527,12 @@ const DATA = __DATA__;
     });
     const tb=$("tbl").querySelector("tbody");
     tb.innerHTML="";
+    // An empty filtered slice must say so where the table was: a silent
+    // zero-row body reads as a broken page. The live region announces the
+    // state change rather than leaving the reader to count headers.
+    const empty=$("tblEmpty");
+    if(sorted.length){ empty.hidden=true; empty.textContent=""; }
+    else { empty.textContent="No models match the current filters"; empty.hidden=false; }
     for(const r of sorted){
       const tr=document.createElement("tr");
       const add=(txt,cls)=>{const td=document.createElement("td");

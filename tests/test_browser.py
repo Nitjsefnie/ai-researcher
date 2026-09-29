@@ -714,6 +714,29 @@ class BrowserInteractionTests(unittest.TestCase):
             build.RAW, build.AGENTS_RAW, build.OUT = saved
             tmp.cleanup()
 
+    def test_empty_filter_result_renders_an_announced_empty_state(self):
+        # #58: an empty filtered slice used to render a silent zero-row table
+        # -- the reader could not tell "nothing matches" from a broken page.
+        # The table region now carries an aria-live empty state, announced
+        # when the filtered slice empties and gone when rows return.
+        page = self.browser.new_page(viewport={"width": 1280, "height": 900})
+        page.goto(build.OUT.as_uri())
+        empty = page.locator("#tblEmpty")
+        self.assertGreater(page.locator("#tbl tbody tr").count(), 0)
+        self.assertFalse(empty.is_visible())
+
+        page.locator("#fQ").fill("zzqq-no-model-matches-this")
+        self.assertTrue(empty.is_visible())
+        self.assertEqual(empty.get_attribute("aria-live"), "polite")
+        self.assertEqual(empty.inner_text(),
+                         "No models match the current filters")
+        self.assertEqual(page.locator("#tbl tbody tr").count(), 0)
+
+        page.locator("#fQ").fill("")
+        self.assertFalse(empty.is_visible())
+        self.assertGreater(page.locator("#tbl tbody tr").count(), 0)
+        page.close()
+
     def test_tooltip_transition_honours_prefers_reduced_motion(self):
         # #57: the tooltip's opacity fade ran unconditionally. Under
         # prefers-reduced-motion the transition must be gone entirely so the
