@@ -1,6 +1,9 @@
+import contextlib
+import io
 import json
 import pathlib
 import sys
+import tempfile
 import unittest
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent / "scripts"))
@@ -412,6 +415,122 @@ class FetchHtmlTests(unittest.TestCase):
                 "<html>cached</html>")
         finally:
             path.unlink()
+
+
+def leaderboard_record(**overrides: object) -> dict:
+    """fixture-model as the leaderboard route carries it: the flattened cost
+    total plus the filler fields AA still ships there. The filler is
+    identical on both routes -- only a deliberate delta may make a shared
+    field disagree."""
+    return {**model(21, "shared"), "slug": "fixture-model",
+            "intelligenceIndex": 51, "intelligenceIndexCostPerTask": 0.75,
+            **overrides}
+
+
+def detail_record(**overrides: object) -> dict:
+    """fixture-model as the model-detail route carries it: the full cost
+    object with its per-evaluation breakdown, plus the same filler fields."""
+    return {**model(21, "shared"), "slug": "fixture-model",
+            "intelligenceIndex": 51,
+            "intelligenceIndexCostPerTask": {
+                "cost": {"total": 0.75},
+                "evaluations": [
+                    {"slug": "gdpval-aa", "weightedCostPerTask": 0.30},
+                    {"slug": "scicode", "weightedCostPerTask": 0.45},
+                ]},
+            **overrides}
+
+
+def leaderboard_payload() -> str:
+    """A leaderboard flight payload: the pinned index version and the model
+    array, one unpriced detail host plus the shared model. Compact JSON --
+    the extractor anchors on that shape."""
+    host = {"slug": "detail-host-model",
+            "intelligenceIndexCostPerTask": "$undefined"}
+    return json.dumps({
+        "intro": f"Intelligence Index v{fetch_aa.INDEX_VERSION}",
+        "models": [host, leaderboard_record()],
+    }, separators=(",", ":"))
+
+
+def detail_payload(**record_overrides: object) -> str:
+    return json.dumps({"models": [detail_record(**record_overrides)]},
+                      separators=(",", ":"))
+
+
+class CaptureAgreementWiringTests(unittest.TestCase):
+    """Issue #44: the pre-merge agreement check is wired into the capture.
+
+    build.check_route_agreement protects the page's claim only while
+    scripts/fetch_aa.py actually calls it between loading the two routes and
+    merge_captures -- a call site no unit test observes, which is exactly the
+    gap a refactor could delete silently. These pins drive fetch_aa.main()
+    over three cached pages: a divergent capture is refused by the real
+    entry path before the merge, and a healthy one runs through to its
+    writes with the compared count in the capture log. All three caches are
+    always passed, whatever a test asserts: no test here may reach the
+    network.
+    """
+
+    def run_capture(self, leaderboard: str, detail: str, agents: str) -> str:
+        """Drive fetch_aa.main() over cached pages; -> the captured stdout."""
+        with tempfile.TemporaryDirectory(prefix=".issue-44-capture-") as tmp:
+            root = pathlib.Path(tmp)
+            pages = [root / name for name in
+                     ("leaderboard.html", "detail.html", "agents.html")]
+            for path, payload in zip(pages, (leaderboard, detail, agents)):
+                path.write_text(flight_html(payload), encoding="utf-8")
+            old = (fetch_aa.ROOT, fetch_aa.OUT, fetch_aa.AGENTS_OUT,
+                   fetch_aa.STAMP)
+            argv = sys.argv
+            try:
+                fetch_aa.ROOT = root
+                fetch_aa.OUT = root / "aa-raw-models.json"
+                fetch_aa.AGENTS_OUT = root / "aa-raw-coding-agents.json"
+                fetch_aa.STAMP = root / "captured-at.txt"
+                sys.argv = ["fetch_aa.py", "--html", str(pages[0]),
+                            "--detail-html", str(pages[1]),
+                            "--agents-html", str(pages[2])]
+                buffer = io.StringIO()
+                with contextlib.redirect_stdout(buffer):
+                    fetch_aa.main()
+                return buffer.getvalue()
+            finally:
+                sys.argv = argv
+                (fetch_aa.ROOT, fetch_aa.OUT, fetch_aa.AGENTS_OUT,
+                 fetch_aa.STAMP) = old
+
+    def test_a_cross_route_divergence_refuses_the_real_capture_before_the_merge(self):
+        # One delta from the healthy capture: the detail route's copy of
+        # intelligenceIndex moves. The refusal must name the model, the field
+        # and both values -- the agreement check's own message, not a
+        # downstream schema guard's.
+        with self.assertRaises(SystemExit) as caught:
+            self.run_capture(
+                leaderboard_payload(),
+                detail_payload(intelligenceIndex=52),
+                agent_payload([agent_row(f"Agent - Model {i}") for i in range(5)]))
+
+        message = str(caught.exception)
+        self.assertIn("shared value(s) disagree", message)
+        self.assertIn(
+            "fixture-model: intelligenceIndex: leaderboard 51, detail 52",
+            message)
+
+    def test_a_capture_whose_routes_agree_runs_the_check_and_writes_through(self):
+        # The healthy control: the fixture capture is valid end to end, the
+        # check passes over it, and the capture log carries the compared
+        # count -- the observable that shows the call ran. 24 = the 21 filler
+        # fields the routes share, slug, intelligenceIndex, and the
+        # leaderboard's flattened 0.75 against the detail object's
+        # cost.total.
+        stdout = self.run_capture(
+            leaderboard_payload(), detail_payload(),
+            agent_payload([agent_row(f"Agent - Model {i}") for i in range(5)]))
+
+        self.assertIn("24 shared values cross-checked", stdout)
+        self.assertIn("wrote aa-raw-models.json", stdout)
+        self.assertIn("wrote aa-raw-coding-agents.json", stdout)
 
 
 if __name__ == "__main__":
