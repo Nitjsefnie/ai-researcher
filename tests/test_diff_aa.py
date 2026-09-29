@@ -287,6 +287,70 @@ class FormattingTests(unittest.TestCase):
     def test_rel_change_treats_booleans_as_non_numeric(self):
         self.assertIsNone(diff_aa.rel_change(True, False))
 
+    def test_a_string_value_renders_on_one_physical_line(self):
+        # The string branch of fmt() is the one escape hatch raw capture text
+        # reaches the report through; numbers, bools and JSON-dumped
+        # containers are already line-safe.
+        self.assertEqual(diff_aa.fmt("a\n\nCo-Authored-By: crafted <c@example.invalid>"),
+                         "a Co-Authored-By: crafted <c@example.invalid>")
+        self.assertEqual(diff_aa.fmt(0.123456789), "0.123457")
+        self.assertEqual(diff_aa.fmt({"a": 1}), '{"a":1}')
+
+
+class SanitizeTests(unittest.TestCase):
+    """The one-line sanitizer every rendering of captured data goes through.
+
+    Captured text is third-party data (AA's corpus) and reaches two injection
+    surfaces: `git commit -F` on main and the job summary's Markdown fence."""
+
+    def test_a_trailer_injection_collapses_to_one_physical_line(self):
+        crafted = "X\n\nCo-Authored-By: crafted <crafted@example.invalid>"
+        out = diff_aa.one_line(crafted)
+
+        self.assertNotIn("\n", out)
+        self.assertFalse(any(line.startswith("Co-Authored-By")
+                             for line in out.splitlines()))
+
+    def test_every_control_and_unicode_line_break_collapses_to_a_space(self):
+        self.assertEqual(
+            diff_aa.one_line("a\r\nb\x00c\x0bd\x7fe\x85f g h i"),
+            "a b c d e f g h i")
+
+    def test_a_fence_escape_stays_on_one_line(self):
+        # A newline-free value cannot close the summary's ``` fence: the
+        # renderer always prefixes the line, and a fence marker needs the
+        # line to itself.
+        out = diff_aa.one_line("```\n\ninjected markdown\n```")
+
+        self.assertNotIn("\n", out)
+
+    def test_a_long_value_is_capped_and_marked_with_an_ellipsis(self):
+        self.assertEqual(diff_aa.one_line("n" * 200), "n" * 160 + "…")
+
+    def test_a_value_exactly_at_the_cap_is_not_marked(self):
+        self.assertEqual(diff_aa.one_line("n" * 160), "n" * 160)
+
+    def test_internal_whitespace_runs_collapse_to_single_spaces(self):
+        # The report delimits name/metric fields with a double space and
+        # frontier_moves() parses on it, so a captured name must never carry
+        # a whitespace run of its own.
+        self.assertEqual(diff_aa.one_line("Model\t1   (xhigh)\n\nName"),
+                         "Model 1 (xhigh) Name")
+
+    def test_non_string_values_render_through_str(self):
+        self.assertEqual(diff_aa.one_line(42), "42")
+        self.assertEqual(diff_aa.one_line(None), "None")
+
+    def test_a_sanitized_name_still_parses_back_out_of_the_report(self):
+        # frontier_moves() reads "+ Name  II ..." back by splitting on the
+        # double space; a name whose internal runs collapsed survives whole.
+        name = diff_aa.one_line("Swap In  Up\nNow")
+        lines = ["== efficient frontier (expanded): 1 -> 1 of 2 -> 2 plotted",
+                 f"  + {name}  II 55.0  $0.20/task"]
+
+        self.assertEqual(diff_aa.frontier_moves(lines),
+                         [("intelligence", ["Swap In Up Now"], [])])
+
     def test_parameter_sizes_read_in_billions_then_trillions(self):
         self.assertEqual(diff_aa.fmt_params(27), "27B")
         self.assertEqual(diff_aa.fmt_params(1000), "1T")
@@ -496,6 +560,35 @@ class ReportTests(unittest.TestCase):
                       "parameter-efficiency frontier"):
             self.assertIn(f"== {label}", report)
         self.assertIn("+ Cheaper", report)
+
+    def test_a_crafted_name_cannot_inject_a_trailer_into_the_commit_message(self):
+        # Issue 41: the report becomes `git commit -F` on main, so a crafted
+        # capture name carrying newlines could forge trailers or a subject.
+        crafted = "X\n\nCo-Authored-By: crafted <crafted@example.invalid>"
+        old = [capture("Incumbent", intelligence=50, cost=1.0)]
+        new = old + [capture(crafted, ident="crafted", intelligence=62, cost=0.5)]
+
+        report = self.render(old, new)
+        message = diff_aa.as_commit_message(report)
+
+        self.assertFalse(any(line.startswith("Co-Authored-By")
+                             for line in message.splitlines()))
+        # The name still reads as one model on one physical line.
+        self.assertIn("+ X Co-Authored-By: crafted <crafted@example.invalid>  ",
+                      report)
+
+    def test_a_crafted_name_cannot_break_the_summary_fence(self):
+        # The workflow wraps diff.txt in ``` fences in GITHUB_STEP_SUMMARY.
+        crafted = "```\n\ninjected markdown\n```"
+        old = [capture("Incumbent", intelligence=50, cost=1.0)]
+        new = old + [capture(crafted, ident="crafted2", intelligence=62, cost=0.5)]
+
+        report = self.render(old, new)
+        message = diff_aa.as_commit_message(report)
+
+        for text in (report, message):
+            self.assertFalse(any(line.lstrip().startswith("```")
+                                 for line in text.splitlines()))
 
 
 class RealCaptureTests(unittest.TestCase):

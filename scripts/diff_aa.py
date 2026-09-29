@@ -261,7 +261,29 @@ def fmt(v):
         return f"{v:.6g}"
     if isinstance(v, (dict, list)):
         return json.dumps(v, separators=(",", ":"))
-    return str(v)
+    return one_line(v)
+
+
+# Captured data is third-party input (AA's corpus), and it reaches two
+# injection surfaces: the report becomes `git commit -F` on main, and the
+# workflow fences `cat diff.txt` into GITHUB_STEP_SUMMARY. A crafted name
+# carrying newlines could forge trailers or a subject; one carrying a fence
+# marker could break out of the block. Every rendering of captured data goes
+# through one_line(): runs of control characters and whitespace collapse to
+# single spaces -- which also keeps the report's own double-space delimiters
+# unambiguous for frontier_moves() to parse back -- and the line is capped so
+# one absurd name cannot bloat a subject line.
+LINE_BREAKING = re.compile(r"[\x00-\x1f\x7f-\x9f\u0085\s]+")
+ONE_LINE_MAX = 160
+
+
+def one_line(value):
+    """Any captured value, as one physical line of at most ONE_LINE_MAX chars
+    (an ellipsis marks a cut)."""
+    text = LINE_BREAKING.sub(" ", str(value)).strip()
+    if len(text) > ONE_LINE_MAX:
+        text = text[:ONE_LINE_MAX] + "…"
+    return text
 
 
 def delta_note(a, b):
@@ -521,7 +543,7 @@ def print_report(args):
         r = rows.get(m.get("name"))
         ii = f"{r['ii']:.1f}" if r else fmt(m.get("intelligenceIndex"))
         cost = f"${r['cost']:.2f}" if r else "—"
-        return (f"{m.get('name')}  [{m.get('modelCreatorName')}]  "
+        return (f"{one_line(m.get('name'))}  [{one_line(m.get('modelCreatorName'))}]  "
                 f"II {ii}  cost/task {cost}"
                 f"{'  open-weights' if m.get('isOpenWeights') else ''}"
                 f"{'  RETIRED' if m.get('deprecated') else ''}")
@@ -567,10 +589,12 @@ def print_report(args):
         if not hits:
             continue
         changed_models += 1
-        print(f"\n  {new_by_id[i].get('name')}  [{new_by_id[i].get('modelCreatorName')}]")
+        print(f"\n  {one_line(new_by_id[i].get('name'))}  "
+              f"[{one_line(new_by_id[i].get('modelCreatorName'))}]")
         for path, cls, a, b in hits:
             tag = "" if cls == "significant" else f" <{cls}>"
-            print(f"    {path}{tag}: {fmt(a)} -> {fmt(b)}{delta_note(a, b)}")
+            print(f"    {one_line(path)}{tag}: "
+                  f"{fmt(a)} -> {fmt(b)}{delta_note(a, b)}")
     if not changed_models:
         print("  (none)")
 
@@ -579,8 +603,9 @@ def print_report(args):
               f"{args.speed_tol * 100:.0f}%: {len(speed_moves)} value(s), "
               f"{len({key(m) for m, _, _, _ in speed_moves})} model(s)")
         for m, path, a, b in speed_moves:
-            print(f"  {m.get('name')}  [{m.get('modelCreatorName')}]  "
-                  f"{path}: {fmt(a)} -> {fmt(b)}{delta_note(a, b)}")
+            print(f"  {one_line(m.get('name'))}  "
+                  f"[{one_line(m.get('modelCreatorName'))}]  "
+                  f"{one_line(path)}: {fmt(a)} -> {fmt(b)}{delta_note(a, b)}")
 
     for collapse, label in ((False, "expanded"), (True, "effort-collapsed")):
         fo, rows_o = frontier_names(old, collapse)
@@ -595,10 +620,10 @@ def print_report(args):
               f"of {len(rows_o)} -> {len(rows_n)} plotted")
         for n in sorted(entered, key=lambda n, d=fn: -d[n]["ii"]):
             r = fn[n]
-            print(f"  + {n}  II {r['ii']:.1f}  ${r['cost']:.2f}/task")
+            print(f"  + {one_line(n)}  II {r['ii']:.1f}  ${r['cost']:.2f}/task")
         for n in sorted(left, key=lambda n, d=fo: -d[n]["ii"]):
             r = fo[n]
-            print(f"  - {n}  II {r['ii']:.1f}  ${r['cost']:.2f}/task")
+            print(f"  - {one_line(n)}  II {r['ii']:.1f}  ${r['cost']:.2f}/task")
 
     for label, metric, fmt_x in CHART_FRONTIERS:
         fo, rows_o = chart_frontier(old, old_agents, metric)
@@ -614,7 +639,7 @@ def print_report(args):
                             key=lambda n, d=side, k=metric:
                             -d[n]["metrics"][k]["score"]):
                 m = side[n]["metrics"][metric]
-                print(f"  {sign} {n}  {m['score']:.1f}  {fmt_x(m['cost'])}")
+                print(f"  {sign} {one_line(n)}  {m['score']:.1f}  {fmt_x(m['cost'])}")
 
     if not args.all:
         print(f"\ndiscarded: {suppressed['jitter-unused']} re-sampled speed/latency "
