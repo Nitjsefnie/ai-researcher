@@ -1005,6 +1005,219 @@ class DisplayLabelTests(unittest.TestCase):
             self.assertEqual(row["label"], build.display_label(row["name"]))
 
 
+class DisplayNameTests(unittest.TestCase):
+    """Issue #88: the reader-facing FULL name, with AA's dict form decoded.
+
+    #85 cleaned only the short chart labels (`display_label`); the full name
+    still carried "({'reasoning_effort': 'max'})" to every reader. Per group,
+    per comma-part, `display_name` keeps a plain effort part verbatim, DROPS a
+    dict-form effort part whose effort word already appears as a plain effort
+    part anywhere in the name, REWRITES such a part to the bare effort word
+    otherwise, and keeps everything else verbatim. The drop reads only the
+    raw name's plain parts, so it is order-independent by design.
+    """
+
+    def test_a_dict_echo_after_the_plain_effort_drops(self):
+        self.assertEqual(
+            build.display_name("X (max) ({'reasoning_effort': 'max'})"),
+            "X (max)")
+
+    def test_a_dict_without_a_plain_twin_rewrites_to_the_bare_word(self):
+        self.assertEqual(
+            build.display_name("X ({'reasoning_effort': 'max'})"), "X (max)")
+
+    def test_a_dict_whose_effort_differs_from_the_plain_one_rewrites(self):
+        # A different effort word is not an echo of the plain part: it
+        # decodes in place and the plain part stays verbatim.
+        self.assertEqual(
+            build.display_name("X (high) ({'reasoning_effort': 'low'})"),
+            "X (high) (low)")
+
+    def test_a_dict_part_inside_a_mixed_group_rewrites_in_place(self):
+        # No plain effort part anywhere, so the dict decodes where it sits
+        # and the kept group re-renders around it.
+        self.assertEqual(
+            build.display_name(
+                "X (Adaptive Reasoning, {'reasoning_effort': 'max'})"),
+            "X (Adaptive Reasoning, max)")
+
+    def test_the_drop_decision_is_order_independent(self):
+        # The dict group cleans the same on either side of its plain twin.
+        self.assertEqual(
+            build.display_name("X ({'reasoning_effort': 'max'}) (max)"),
+            "X (max)")
+        self.assertEqual(
+            build.display_name("X (max) ({'reasoning_effort': 'max'})"),
+            "X (max)")
+
+    def test_the_drop_and_the_key_are_case_insensitive(self):
+        # EFFORT/EFFORT_DICT match case-insensitively: an XHIGH dict value
+        # drops against a plain (xhigh), and an uppercased key is still the
+        # knob. The rewritten word itself stays as captured -- the verbatim
+        # rule every kept part follows.
+        self.assertEqual(
+            build.display_name("X (xhigh) ({'reasoning_effort': 'XHIGH'})"),
+            "X (xhigh)")
+        self.assertEqual(
+            build.display_name("X ({'REASONING_EFFORT': 'max'})"), "X (max)")
+        self.assertEqual(
+            build.display_name("X ({'reasoning_effort': 'XHIGH'})"),
+            "X (XHIGH)")
+
+    def test_a_dict_that_is_not_an_effort_dict_survives_verbatim(self):
+        self.assertEqual(
+            build.display_name("X ({'temperature': 'high'})"),
+            "X ({'temperature': 'high'})")
+
+    def test_kept_groups_and_parens_free_names_are_unchanged(self):
+        for name in ("X (Adaptive Reasoning)", "X (Reasoning)", "X (Jan '25)",
+                     "X", "X (high)"):
+            with self.subTest(name=name):
+                self.assertEqual(build.display_name(name), name)
+
+    def test_multiple_dict_groups_decode_independently(self):
+        # Two dicts, no plain effort anywhere: each decodes to its own word.
+        self.assertEqual(
+            build.display_name(
+                "X ({'reasoning_effort': 'low'}) (Reasoning) "
+                "({'reasoning_effort': 'high'})"),
+            "X (low) (Reasoning) (high)")
+
+    def test_an_effort_phrase_counts_as_the_word_for_the_drop(self):
+        # split_effort reads "(Max Effort)" and "(max)" as the same knob, so
+        # the dict echo of either drops against the other; the kept phrase
+        # stays verbatim.
+        self.assertEqual(
+            build.display_name("X (Max Effort) ({'reasoning_effort': 'max'})"),
+            "X (Max Effort)")
+
+    def test_whitespace_renders_like_the_effort_scan(self):
+        # A kept group renders with a one-space lead; an emptied group takes
+        # its whitespace with it -- the same rules _effort_scan renders by.
+        self.assertEqual(
+            build.display_name("X   (max)   ({'reasoning_effort': 'max'})"),
+            "X (max)")
+        self.assertEqual(
+            build.display_name(
+                "X (max)   ({'reasoning_effort': 'max'})   (Reasoning)"),
+            "X (max) (Reasoning)")
+
+    def test_unclosed_parens_are_kept_verbatim(self):
+        # The #47 input class: a "(" with no ")" after it opens no group, so
+        # the scan stops there and dict text inside it is not decoded.
+        raw = "X (max) ({'reasoning_effort': 'max'"
+        self.assertEqual(build.display_name(raw), raw)
+
+
+class DisplayNameRowTests(unittest.TestCase):
+    """Issue #88 at the row builders: `"name"` is the cleaned display name.
+
+    Every reader-facing sink -- the JS tooltip, popup, table cells,
+    aria-labels, search, the copy-as-Markdown / copy-as-JSON exports -- reads
+    the payload's `name`, so cleaning it at the two builders cleans them all.
+    Nothing else about a row may move: `base`, `eff` and `label` keep their
+    exact current semantics, computed from the RAW label, because the
+    Dump-effort collapse keys on `base`.
+    """
+
+    # The live capture's dict rows (issue #88), with the plain form each
+    # cleans to. The first rewrites (no plain effort part to echo); the other
+    # two drop the dict echo of the plain part in front of them.
+    REAL_DICT_LABELS = (
+        ("Opencode - GLM-5.3 ({'reasoning_effort': 'max'})",
+         "Opencode - GLM-5.3 (max)"),
+        ("Codex - GPT-6 Luna (max) ({'reasoning_effort': 'max'})",
+         "Codex - GPT-6 Luna (max)"),
+        ("Codex - GPT-5.6 Sol (max) ({'reasoning_effort': 'max'})",
+         "Codex - GPT-5.6 Sol (max)"),
+    )
+
+    @staticmethod
+    def without_name(row):
+        return {k: v for k, v in row.items() if k != "name"}
+
+    def test_model_rows_carry_the_cleaned_name_and_nothing_else_moves(self):
+        dict_model = model_fixture()
+        dict_model["name"] = "Fixture Model (high) ({'reasoning_effort': 'high'})"
+        clean_model = model_fixture()
+        clean_model["name"] = "Fixture Model (high)"
+
+        dict_rows = build.build_rows([dict_model])
+        clean_rows = build.build_rows([clean_model])
+
+        self.assertEqual(dict_rows[0]["name"], "Fixture Model (high)")
+        self.assertEqual(
+            self.without_name(dict_rows[0]), self.without_name(clean_rows[0]))
+
+    def test_agent_rows_carry_the_cleaned_name_and_nothing_else_moves(self):
+        dict_agent = agent_fixture(
+            label="Fixture Agent - Fixture Model (high) "
+                  "({'reasoning_effort': 'high'})")
+        clean_agent = agent_fixture(
+            label="Fixture Agent - Fixture Model (high)")
+
+        dict_rows = build.build_agent_rows([dict_agent], [model_fixture()])
+        clean_rows = build.build_agent_rows([clean_agent], [model_fixture()])
+
+        self.assertEqual(
+            dict_rows[0]["name"], "Fixture Agent - Fixture Model (high)")
+        self.assertEqual(
+            self.without_name(dict_rows[0]), self.without_name(clean_rows[0]))
+
+    def test_no_emitted_row_name_carries_the_dict_text(self):
+        models = [model_fixture(slug="m1"), model_fixture(slug="m2")]
+        models[0]["name"] = "Fixture Model ({'reasoning_effort': 'low'})"
+        agents = [
+            agent_fixture(
+                label="Agent One - Model ({'reasoning_effort': 'xhigh'})"),
+            agent_fixture(
+                label="Agent Two - Model (high) "
+                      "({'reasoning_effort': 'high'})"),
+        ]
+
+        rows = build.build_rows(models) + build.build_agent_rows(agents, models)
+
+        self.assertTrue(rows)
+        for row in rows:
+            self.assertNotIn("reasoning_effort", row["name"])
+
+    def test_sort_order_is_unchanged_by_the_cleaning(self):
+        # The name is the rows' final sort tiebreaker, so rows built from
+        # dict-form names must order exactly as rows built from hand-cleaned
+        # names do -- here two rows tie on (II, cost) and separate on the
+        # name alone.
+        def pair(names):
+            models = []
+            for i, name in enumerate(names):
+                m = model_fixture(slug=f"m{i}", intelligence=51)
+                m["name"] = name
+                models.append(m)
+            return [r["name"] for r in build.build_rows(models)]
+
+        self.assertEqual(
+            pair(("Zeta ({'reasoning_effort': 'high'})", "Alpha (high)")),
+            pair(("Zeta (high)", "Alpha (high)")))
+
+    def test_the_real_capture_rows_clean_to_their_plain_form(self):
+        for raw, cleaned in self.REAL_DICT_LABELS:
+            with self.subTest(raw=raw):
+                rows = build.build_agent_rows(
+                    [agent_fixture(label=raw)], [model_fixture()])
+
+                self.assertEqual(len(rows), 1)
+                self.assertEqual(rows[0]["name"], cleaned)
+
+    def test_the_built_page_carries_no_dict_effort_text_anywhere(self):
+        # The issue's own pin, page-wide: the embedded payload feeds the
+        # tooltip, popup, table, aria-labels, search and both copy exports,
+        # so one occurrence anywhere means a reader can see the dict.
+        with contextlib.redirect_stdout(io.StringIO()):
+            build.main()
+
+        self.assertNotIn(
+            "reasoning_effort", build.OUT.read_text(encoding="utf-8"))
+
+
 class SplitEffortScalingTests(unittest.TestCase):
     """Issue #47: a pathological name must degrade to fast processing.
 

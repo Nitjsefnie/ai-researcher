@@ -700,9 +700,16 @@ class BrowserInteractionTests(unittest.TestCase):
             page.locator("#copyMd").click()
             md = page.evaluate("() => window.__copied")
             self.assertIsNotNone(md)
-            escaped = (self.HOSTILE_NAME.replace("\\", "\\\\")
-                                        .replace("|", "\\|")
-                                        .replace("`", "\\`"))
+            # The exported name is the page's display name now (#88), not the
+            # raw capture string: display_name's kept-group rule renders the
+            # fixture's glued "alert(1)" as "alert (1)". This updates the #48
+            # pin's expected NAME value deliberately -- issue #88 changed the
+            # name rule; every escaping assertion below is untouched.
+            expected = build.display_name(self.HOSTILE_NAME)
+            self.assertNotEqual(expected, self.HOSTILE_NAME)
+            escaped = (expected.replace("\\", "\\\\")
+                               .replace("|", "\\|")
+                               .replace("`", "\\`"))
             rows = [line for line in md.split("\n") if escaped in line]
             self.assertTrue(
                 rows,
@@ -724,7 +731,7 @@ class BrowserInteractionTests(unittest.TestCase):
             self.assertEqual(len(self._markdown_cells(table[0])), 13)
             cells = self._markdown_cells(row)
             self.assertEqual(len(cells), 13)
-            self.assertEqual(cells[0], self.HOSTILE_NAME)
+            self.assertEqual(cells[0], expected)
             self.assertEqual(cells[1], "Hostile Lab")
             self.assertEqual(cells[12], "open")
         finally:
@@ -740,10 +747,15 @@ class BrowserInteractionTests(unittest.TestCase):
         try:
             page.locator("#copyJson").click()
             exported = json.loads(page.evaluate("() => window.__copied"))
+            # The name field carries the page's display name now (#88) -- the
+            # same value the table and tooltips show; the rawness this pin
+            # holds the export to applies to every value the page carries,
+            # and every other assertion here is untouched.
+            expected = build.display_name(self.HOSTILE_NAME)
             rows = [m for m in exported["models"]
-                    if m["name"] == self.HOSTILE_NAME]
+                    if m["name"] == expected]
             self.assertEqual(len(rows), 1)
-            self.assertEqual(rows[0]["name"], self.HOSTILE_NAME)
+            self.assertEqual(rows[0]["name"], expected)
             self.assertEqual(rows[0]["creator"], "Hostile Lab")
 
             title = page.locator("#copyJson").get_attribute("title")
@@ -982,6 +994,20 @@ class BrowserInteractionTests(unittest.TestCase):
                 self.assertEqual(
                     duplicates, [],
                     f"duplicate chart labels on {chart}")
+        page.close()
+
+    def test_table_name_cells_carry_no_dict_effort_text(self):
+        # #88: AA's dict-form effort text must not reach the table -- the
+        # accessible twin of the tooltip, and the surface readers who cannot
+        # hover get their names from. The pin runs over every rendered name
+        # cell, so one dict row in the payload fails it.
+        page = self.browser.new_page(viewport={"width": 1280, "height": 900})
+        page.goto(build.OUT.as_uri())
+        cells = page.locator("#tbl td.name")
+        self.assertGreater(cells.count(), 0,
+                           "the table rendered no name cells")
+        for cell in cells.all_text_contents():
+            self.assertNotIn("reasoning_effort", cell)
         page.close()
 
     def test_footer_carries_a_licence_note_linking_the_licence(self):

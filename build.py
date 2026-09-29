@@ -153,6 +153,79 @@ def display_label(name):
     return label.strip()
 
 
+def display_name(name):
+    """The reader-facing full name: AA's dict-form effort text decoded (#88).
+
+    #85 moved the effort knob out of the chart labels; the dict-repr group
+    AA puts on some agent runs still reached every full-name sink -- the
+    payload's `name` field the tooltip, popup, table, aria-labels, search and
+    the copy exports read, and diff_aa.py's report lines. The rule, per
+    group, per comma-part:
+
+    - a plain effort part ("(max)", "(Max Effort)") stays verbatim;
+    - a dict-form effort part DROPS when its effort word already appears as a
+      plain effort part anywhere in the name -- a decision over the raw
+      name's plain parts only, so it is order-independent by design: the
+      group cleans the same on either side of its plain twin;
+    - otherwise the dict part REWRITES to its bare effort word;
+    - anything else survives verbatim, case included.
+
+    Group and whitespace rules are _effort_scan's (a kept group renders with
+    a one-space lead, an emptied group takes its whitespace with it, a "("
+    with no ")" after it stops the scan and keeps the rest verbatim), and the
+    walk stays #47-linear. Case-insensitive like EFFORT/EFFORT_DICT, on both
+    the dict key and the effort word the drop compares.
+    """
+    # Pass 1: the effort words the name carries as PLAIN parts, normalized
+    # the way split_effort normalizes them ("Max Effort" and "max" are one
+    # word). The drop test reads all of them, wherever they sit, so a dict
+    # group before its plain twin drops all the same.
+    plain = set()
+    i = 0
+    while True:
+        p = name.find("(", i)
+        if p == -1:
+            break
+        close = name.find(")", p + 1)
+        if close == -1:
+            break
+        for part in name[p + 1:close].split(","):
+            part = part.strip()
+            if EFFORT.match(part):
+                plain.add(part.lower().replace(" effort", ""))
+        i = close + 1
+    # Pass 2: render. Two linear walks, never a regex over the whole name --
+    # the shape that cost issue #47 its ~54 s.
+    out = []
+    i = 0
+    while True:
+        p = name.find("(", i)
+        if p == -1:
+            break
+        close = name.find(")", p + 1)
+        if close == -1:
+            break
+        lead = p
+        while lead > i and name[lead - 1].isspace():
+            lead -= 1
+        out.append(name[i:lead])
+        kept = []
+        for part in name[p + 1:close].split(","):
+            part = part.strip()
+            dict_effort = EFFORT_DICT.match(part)
+            if EFFORT.match(part) or dict_effort is None:
+                kept.append(part)
+            elif dict_effort.group(1).lower() in plain:
+                pass  # the plain part already says it; the dict echo drops
+            else:
+                kept.append(dict_effort.group(1))
+        if kept:
+            out.append(" (" + ", ".join(kept) + ")")
+        i = close + 1
+    out.append(name[i:])
+    return "".join(out).strip()
+
+
 def num(v):
     return v if isinstance(v, (int, float)) else None
 
@@ -248,7 +321,10 @@ def build_rows(models):
         # model carrying both across the rename agreed exactly.
         parameters = num(m.get("parameters"))
         rows.append({
-            "name": label,
+            # The reader-facing name (#88): AA's dict-form effort text is
+            # decoded out of it. The RAW label survives only in the capture;
+            # base/eff/label below keep their raw-label semantics.
+            "name": display_name(label),
             "base": base,
             "eff": eff,
             # The compact chart label (#85): the effort word re-attached right
@@ -334,7 +410,10 @@ def build_agent_rows(agents, models):
         creators = display.get("creator")
         creators = creators if isinstance(creators, dict) else {}
         rows.append({
-            "name": label,
+            # The reader-facing name (#88), same as model rows: the dict-form
+            # effort text is decoded out of it, and the RAW label survives
+            # only in the capture.
+            "name": display_name(label),
             "base": base,
             "eff": eff,
             # The compact chart label (#85), same as model rows.
