@@ -539,6 +539,131 @@ class CaptureStampTests(unittest.TestCase):
         self.assertIn("\\xff", message)
 
 
+class EmptyAxisGuardTests(unittest.TestCase):
+    """Issues #54 + #60: the guard refusing a capture that leaves a rendered
+    axis with nothing on it.
+
+    The page renders FOUR axes -- coding, intelligence and agentic against
+    their measured cost per task, plus parameters against the Intelligence
+    Index -- and an emptied scatter reads as "nothing qualifies" rather than
+    "the pipeline broke" (the guard's own comment in build.py). One pin per
+    axis: a capture whose rows carry no pair for that axis is refused naming
+    it, and the refusal leaves no page behind to publish. The parameters pin
+    uses the pre-rename capture shape (`totalParameters`, which AA renamed to
+    `parameters`) as its empty input: a stale capture must fail red and force
+    a re-capture, never be resuscitated by a reader fallback (the rename is
+    fetch_aa.py's gap-fill job).
+    """
+
+    # The stamp fetch_aa.py writes, so a refusal below can only come from the
+    # axis guard and not from the stamp guard that runs ahead of it.
+    STAMP = "2026-09-29\n"
+
+    @contextlib.contextmanager
+    def capture(self, models, agents):
+        """A hermetic capture of the given model/agent records.
+
+        Yields the output path inside the live temp directory (so a refusal
+        test can assert nothing was written to it) and restores the module
+        paths in `finally`, the same redirection convention the stamp and
+        escaping tests use.
+        """
+        with tempfile.TemporaryDirectory(prefix=".issue-54-build-", dir=build.ROOT) as tmp:
+            root = pathlib.Path(tmp)
+            raw = root / "aa-raw-models.json"
+            agents_raw = root / "aa-raw-coding-agents.json"
+            output = root / "frontier-models.html"
+            raw.write_text(json.dumps(models), encoding="utf-8")
+            agents_raw.write_text(json.dumps(agents), encoding="utf-8")
+            (root / "captured-at.txt").write_text(self.STAMP, encoding="utf-8")
+            old_raw, old_agents, old_out = build.RAW, build.AGENTS_RAW, build.OUT
+            try:
+                build.RAW, build.AGENTS_RAW, build.OUT = raw, agents_raw, output
+                yield output
+            finally:
+                build.RAW, build.AGENTS_RAW, build.OUT = old_raw, old_agents, old_out
+
+    @staticmethod
+    def run_build():
+        with contextlib.redirect_stdout(io.StringIO()):
+            build.main()
+
+    @staticmethod
+    def payload_of(output: pathlib.Path) -> dict:
+        html = output.read_text(encoding="utf-8")
+        marker = "const DATA = "
+        start = html.index(marker) + len(marker)
+        end = html.index(";\n(function(){", start)
+        return json.loads(html[start:end])
+
+    def test_a_capture_with_no_coding_pair_is_refused_naming_coding(self):
+        # The agent record lost its cost half: `indexScore` without
+        # `mean.costUsd` is dropped by the extractor, so no row renders on the
+        # coding chart. The three metric axes are enumerated from the model
+        # side too, but coding comes only from agent rows.
+        with self.capture([model_fixture()], [agent_fixture(cost=None)]) as output:
+            with self.assertRaises(SystemExit) as raised:
+                self.run_build()
+
+            self.assertIn("no rows carry a score/cost pair for: coding", str(raised.exception))
+            self.assertFalse(output.exists(), "refusal still wrote the page")
+
+    def test_a_capture_with_no_intelligence_pair_is_refused_naming_intelligence(self):
+        # A model record with no intelligenceIndex. The refusal also names
+        # parameters once the guard enumerates all four axes -- the parameters
+        # chart plots the Intelligence Index, so an intelligence-less capture
+        # empties that axis too -- but the pin holds the guard only to naming
+        # THIS axis, the behavior that predates the four-axis enumeration.
+        with self.capture([model_fixture(intelligence=None)], [agent_fixture()]) as output:
+            with self.assertRaises(SystemExit) as raised:
+                self.run_build()
+
+            message = str(raised.exception)
+            self.assertIn("no rows carry a score/cost pair for: intelligence", message)
+            self.assertFalse(output.exists(), "refusal still wrote the page")
+
+    def test_a_capture_with_no_agentic_pair_is_refused_naming_agentic(self):
+        # A model record with no GDPval measurement. Intelligence and the
+        # parameter count survive, so agentic is the only axis named.
+        with self.capture([model_fixture(gdpval=None)], [agent_fixture()]) as output:
+            with self.assertRaises(SystemExit) as raised:
+                self.run_build()
+
+            self.assertIn("no rows carry a score/cost pair for: agentic", str(raised.exception))
+            self.assertFalse(output.exists(), "refusal still wrote the page")
+
+    def test_a_capture_with_no_parameters_is_refused_naming_parameters(self):
+        # Issue #60, in the exact shape it was reproduced: a stale capture in
+        # AA's pre-rename shape, where the parameter count rode `totalParameters`.
+        # The row is otherwise fully measured, so the three metric axes stay
+        # alive and parameters is the only axis named -- the refusal must come
+        # from the guard, not from a reader quietly falling back to the old
+        # field, which would publish a chart that looks fine and is empty.
+        stale = model_fixture()
+        del stale["parameters"]
+        stale["totalParameters"] = 27
+        with self.capture([stale], [agent_fixture()]) as output:
+            with self.assertRaises(SystemExit) as raised:
+                self.run_build()
+
+            self.assertIn("no rows carry a score/cost pair for: parameters", str(raised.exception))
+            self.assertFalse(output.exists(), "refusal still wrote the page")
+
+    def test_a_fully_measured_capture_builds_and_names_all_four_axes_nonzero(self):
+        # The healthy control: the guard enumerates the same stats the page
+        # renders, so a fully measured capture must build -- and its payload
+        # must show every rendered axis nonzero, the exact numbers the guard
+        # reads. (One model row carrying intelligence + gdpval + parameters,
+        # one agent row carrying the coding pair.)
+        with self.capture([model_fixture()], [agent_fixture()]) as output:
+            self.run_build()
+
+            stats = self.payload_of(output)["stats"]
+            self.assertEqual(
+                stats["metricCounts"], {"coding": 1, "intelligence": 1, "agentic": 1})
+            self.assertEqual(stats["parameterCount"], 1)
+
+
 class RouteAgreementTests(unittest.TestCase):
     """Issue #44: the page's cross-route agreement claim, enforced at capture.
 

@@ -548,8 +548,14 @@ def main():
     # a renamed field, a dropped cost slug. The page must not be published in
     # that state: an empty scatter reads as "nothing qualifies" rather than
     # "the pipeline broke", and the browser tests can only report it as an
-    # opaque locator timeout.
-    empty = [metric for metric, n in stats["metricCounts"].items() if not n]
+    # opaque locator timeout. The page renders FOUR axes: metricCounts
+    # quantifies the three score/cost ones, parameterCount the fourth, which
+    # pairs the Intelligence Index with model size rather than with a cost
+    # (issue #60) -- so the enumeration here covers both stats, and a stale
+    # capture (AA's totalParameters rename) fails red instead of publishing
+    # an empty parameters chart.
+    rendered = {**stats["metricCounts"], "parameters": stats["parameterCount"]}
+    empty = [axis for axis, n in rendered.items() if not n]
     if empty:
         raise SystemExit(
             "no rows carry a score/cost pair for: " + ", ".join(sorted(empty))
