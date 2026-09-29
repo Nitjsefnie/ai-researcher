@@ -347,5 +347,101 @@ class GeneratedArtifactTests(unittest.TestCase):
         self.assertIn(("model", upper), rows)
 
 
+class CaptureStampTests(unittest.TestCase):
+    """Issue #40: the capture stamp reaches the page unescaped.
+
+    build.py reads data/captured-at.txt and splices the value into four
+    template sinks -- the header, the method grid, and the copy-as-Markdown
+    and copy-as-JSON clips -- besides the inline payload's stats, all
+    downstream of the single read at the top of main(). One guard at that
+    read accepts exactly what scripts/fetch_aa.py writes -- a single ISO
+    date -- and refuses everything else.
+    """
+
+    def build_with_stamp(self, stamp_text: str) -> str:
+        """Build a hermetic capture whose stamp file holds `stamp_text`.
+
+        Returns the rendered HTML; a stamp the guard refuses raises
+        SystemExit out of build.main() for the refusal tests to assert on.
+        """
+        with tempfile.TemporaryDirectory(prefix=".issue-40-build-", dir=build.ROOT) as tmp:
+            root = pathlib.Path(tmp)
+            raw = root / "models.json"
+            agents_raw = root / "coding-agents.json"
+            output = root / "frontier-models.html"
+            raw.write_text(json.dumps([model_fixture()]), encoding="utf-8")
+            agents_raw.write_text(json.dumps([agent_fixture()]), encoding="utf-8")
+            (root / "captured-at.txt").write_text(stamp_text, encoding="utf-8")
+            old_raw, old_agents, old_out = build.RAW, build.AGENTS_RAW, build.OUT
+            try:
+                build.RAW, build.AGENTS_RAW, build.OUT = raw, agents_raw, output
+                with contextlib.redirect_stdout(io.StringIO()):
+                    build.main()
+                return output.read_text(encoding="utf-8")
+            finally:
+                build.RAW, build.AGENTS_RAW, build.OUT = old_raw, old_agents, old_out
+
+    def test_a_stamp_in_the_written_format_builds_and_reaches_the_page_unmodified(self):
+        # scripts/fetch_aa.py writes exactly date.today().isoformat() + "\n";
+        # the guard must accept that shape untouched, and the page must carry
+        # the stamp through every sink it feeds.
+        html = self.build_with_stamp("2026-09-29\n")
+
+        self.assertIn("captured 2026-09-29", html)
+        self.assertIn('<div class="v">2026-09-29</div>', html)
+        self.assertIn('"captured":"2026-09-29"', html)
+
+    def test_a_markup_stamp_is_refused_naming_file_format_and_content(self):
+        # The stamp lands in HTML text nodes and JS string literals; markup in
+        # it would execute when the page opens.
+        with self.assertRaises(SystemExit) as raised:
+            self.build_with_stamp("2026-09-29<script>alert(1)</script>\n")
+
+        message = str(raised.exception)
+        self.assertIn("captured-at.txt", message)
+        self.assertIn("YYYY-MM-DD", message)
+        self.assertIn("<script>alert(1)</script>", message)
+
+    def test_a_payload_placeholder_stamp_is_refused_naming_file_format_and_content(self):
+        # __DATA__ in the stamp would be replaced by the JSON payload itself,
+        # splicing the payload (quotes included) out of its template slot.
+        with self.assertRaises(SystemExit) as raised:
+            self.build_with_stamp("__DATA__")
+
+        message = str(raised.exception)
+        self.assertIn("captured-at.txt", message)
+        self.assertIn("YYYY-MM-DD", message)
+        self.assertIn("__DATA__", message)
+
+    def test_an_empty_stamp_file_is_refused(self):
+        # fetch_aa.py never writes an empty stamp, and the missing-file
+        # fallback must not swallow a present-but-empty one: refusing states
+        # the capture is broken instead of relabelling the page with a guess.
+        with self.assertRaises(SystemExit) as raised:
+            self.build_with_stamp("")
+
+        message = str(raised.exception)
+        self.assertIn("captured-at.txt", message)
+        self.assertIn("YYYY-MM-DD", message)
+        self.assertIn("found ''", message)
+
+    def test_near_miss_date_shapes_are_refused(self):
+        # The writer emits a zero-padded ISO date only; every near-miss means
+        # the file was not written by fetch_aa.py and must fall.
+        for stamp_text, why in (
+            ("2026-9-29", "unpadded month"),
+            ("20260929", "compact ISO"),
+            ("29/09/2026", "reordered with slashes"),
+            ("2026-W39-4", "ISO week date"),
+            ("2026-13-99", "date-shaped but not a calendar date"),
+            ("2026-09-29\n2026-09-29", "two stamp lines"),
+        ):
+            with self.subTest(stamp_text=stamp_text, why=why):
+                with self.assertRaises(SystemExit) as raised:
+                    self.build_with_stamp(stamp_text)
+
+                self.assertIn("YYYY-MM-DD", str(raised.exception))
+
+
 if __name__ == "__main__":
     unittest.main()

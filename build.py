@@ -322,6 +322,47 @@ def undominated(rows, metric="intelligence"):
     ]
 
 
+# The capture stamp is interpolated into the rendered page without escaping
+# (the header, the method grid, and the copy-as-Markdown and copy-as-JSON
+# clips, all fed by one value). scripts/fetch_aa.py:415 writes it as
+# dt.date.today().isoformat() + "\n" -- a single zero-padded ISO date, nothing
+# else -- so a stamp in any other shape did not come from fetch_aa.py: markup
+# in it would execute when the page opens, and a __DATA__ in it would splice
+# the JSON payload out of its template slot. The read is the chokepoint every
+# sink is downstream of, so it accepts that one shape and refuses the rest.
+CAPTURE_STAMP_RE = re.compile(r"[0-9]{4}-[0-9]{2}-[0-9]{2}")
+
+
+def read_capture_stamp(stamp_path: pathlib.Path) -> str:
+    """The stamp exactly as fetch_aa.py wrote it, or a refusal.
+
+    fetch_aa.py writes dt.date.today().isoformat() + "\\n" -- a zero-padded
+    ISO date and a trailing newline, nothing else. Whitespace around the date
+    stays accepted: the existing strip() tolerance already removed it, and the
+    accepted character set (digits and hyphens) cannot carry markup or a
+    payload placeholder whatever pads it.
+    """
+    if not stamp_path.exists():
+        # A checkout predating the stamp has no capture to relabel; today's
+        # date is in the accepted shape by construction.
+        return dt.date.today().isoformat()
+    value = stamp_path.read_text(encoding="utf-8").strip()
+    valid = CAPTURE_STAMP_RE.fullmatch(value) is not None
+    if valid:
+        # The writer can only emit a real calendar date, so a date-shaped
+        # non-date (2026-13-99) is refused too.
+        try:
+            dt.date.fromisoformat(value)
+        except ValueError:
+            valid = False
+    if not valid:
+        raise SystemExit(
+            f"{stamp_path} does not hold the stamp fetch_aa.py writes -- a "
+            f"single zero-padded ISO date, YYYY-MM-DD: found {value!r}"
+        )
+    return value
+
+
 def main():
     models = json.loads(RAW.read_text(encoding="utf-8"))
     agents = json.loads(AGENTS_RAW.read_text(encoding="utf-8"))
@@ -356,10 +397,9 @@ def main():
 
     # Written by fetch_aa.py when the capture was taken. Falling back to today
     # only covers a checkout predating the stamp; a rebuild must never relabel
-    # an existing capture with the day it happened to be rebuilt.
-    stamp = RAW.parent / "captured-at.txt"
-    captured = (stamp.read_text(encoding="utf-8").strip()
-                if stamp.exists() else dt.date.today().isoformat())
+    # an existing capture with the day it happened to be rebuilt. The stamp is
+    # interpolated unescaped downstream, so the read validates it (issue #40).
+    captured = read_capture_stamp(RAW.parent / "captured-at.txt")
     stats = {
         "total": len(models),
         "plotted": len(intelligence_rows),
