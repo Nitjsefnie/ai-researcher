@@ -14,9 +14,10 @@ command-line argument, because arguments are visible in the process list and
 land in CI logs when a step echoes its own command.
 
 The base URL (DOCS_HUB_URL, or the https default) is validated before
-anything is sent: a base that does not parse as an https URL with a host is
-refused with exit code 2 and no network call, rather than followed — an
-environment override cannot point the credential at a cleartext destination.
+anything is sent: a base that does not parse as an https URL on the hub's
+own host is refused with exit code 2 and no network call, rather than
+followed — an environment override cannot point the credential at a
+cleartext destination or a different host.
 """
 from __future__ import annotations
 
@@ -30,6 +31,9 @@ import urllib.request
 import uuid
 
 DEFAULT_URL = "https://docs.nitjsefni.eu"
+# The only host the credential may be sent to, derived from the default —
+# never restated as a literal that could drift away from it.
+DEFAULT_HOST = urllib.parse.urlsplit(DEFAULT_URL).hostname
 
 
 def multipart(fields: dict[str, str], filename: str,
@@ -52,12 +56,20 @@ def multipart(fields: dict[str, str], filename: str,
 
 def publish(path: str, fields: dict[str, str], key: str, base: str) -> int:
     # The credential must never be sent over a connection the caller did not
-    # pin to https: an environment override to a cleartext or unparseable URL
-    # would otherwise carry the key in a request header to that destination.
-    parsed = urllib.parse.urlsplit(base)
-    if parsed.scheme != "https" or not parsed.netloc:
-        print(f"refusing to send the credential to {base!r}: "
-              "an https base URL is required", file=sys.stderr)
+    # pin to the https hub: an environment override to a cleartext, broken
+    # or foreign-host URL would otherwise carry the key in a request header
+    # to that destination. An unparseable URL refuses too (parsed=None),
+    # rather than escaping as a traceback. hostname (not netloc) is
+    # compared, so userinfo tricks and case spelling cannot smuggle a
+    # different host through.
+    try:
+        parsed = urllib.parse.urlsplit(base)
+    except ValueError:
+        parsed = None
+    if (parsed is None or parsed.scheme != "https" or not parsed.netloc
+            or parsed.hostname != DEFAULT_HOST):
+        print(f"refusing to send the credential to {base!r}: an https base "
+              f"URL at {DEFAULT_HOST} is required", file=sys.stderr)
         return 2
 
     with open(path, "rb") as handle:
