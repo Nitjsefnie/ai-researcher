@@ -4,6 +4,7 @@ import io
 import json
 import pathlib
 import tempfile
+import time
 import unittest
 from html.parser import HTMLParser
 import build
@@ -835,6 +836,141 @@ class RouteAgreementTests(unittest.TestCase):
         self.assertIn(score_line, message)
         self.assertIn(weights_line, message)
         self.assertLess(message.index(score_line), message.index(weights_line))
+
+
+class SplitEffortTests(unittest.TestCase):
+    """Issue #47: what `split_effort` may strip, pinned before speeding it up.
+
+    AA encodes the effort knob in the model name and there is no field for it
+    (AGENTS.md "Effort levels"), so the strip is load-bearing: only the effort
+    component may go -- `(Adaptive Reasoning, Max Effort)` keeps its config
+    list -- while `(Reasoning)`, `(Non-reasoning)` and date snapshots like
+    `(Jan '25)` identify genuinely different models and must survive. Every
+    expected pair below was read off the pre-fix implementation, so these
+    pins pass on main and must keep passing after it is replaced.
+    """
+
+    def test_only_the_effort_component_is_stripped_from_a_config_list(self):
+        # The AGENTS.md example verbatim: the effort clause goes, the rest of
+        # the parenthetical stays.
+        self.assertEqual(
+            build.split_effort("Model (Adaptive Reasoning, Max Effort)"),
+            ("Model (Adaptive Reasoning)", "max"))
+
+    def test_reasoning_marks_survive(self):
+        # A reasoning marker names a different model, not a setting of one.
+        for suffix, why in ((" (Reasoning)", "reasoning"),
+                            (" (Non-reasoning)", "non-reasoning")):
+            with self.subTest(why=why):
+                self.assertEqual(
+                    build.split_effort("Model" + suffix), ("Model" + suffix, None))
+
+    def test_a_date_snapshot_survives(self):
+        self.assertEqual(
+            build.split_effort("Model (Jan '25)"), ("Model (Jan '25)", None))
+
+    def test_every_bare_effort_level_is_stripped_as_the_label(self):
+        for level in ("minimal", "low", "medium", "high", "xhigh", "max"):
+            for written in (level, level + " effort", level.upper(),
+                            level.capitalize() + " EFFORT"):
+                with self.subTest(level=level, written=written):
+                    self.assertEqual(
+                        build.split_effort(f"Model ({written})"),
+                        ("Model", level))
+
+    def test_an_all_effort_group_disappears_whole(self):
+        # Every part of the parenthetical is an effort word, so nothing is
+        # kept and the group goes with them; the label is the first effort
+        # found, which is what the page's effort filter reads.
+        self.assertEqual(build.split_effort("Model (high, low)"), ("Model", "high"))
+
+    def test_effort_is_pulled_out_of_a_mixed_group_from_either_end(self):
+        self.assertEqual(
+            build.split_effort("Model (Reasoning, high)"), ("Model (Reasoning)", "high"))
+        self.assertEqual(
+            build.split_effort("Model (high, Reasoning)"), ("Model (Reasoning)", "high"))
+
+    def test_the_first_effort_across_groups_names_the_label(self):
+        self.assertEqual(
+            build.split_effort("Model (low) (Reasoning)"), ("Model (Reasoning)", "low"))
+        self.assertEqual(
+            build.split_effort("Model (medium) (Jan '25)"), ("Model (Jan '25)", "medium"))
+        self.assertEqual(
+            build.split_effort("M (a, low, b, xhigh)"), ("M (a, b)", "low"))
+
+    def test_an_empty_group_is_kept_untouched(self):
+        # Nothing is stripped from "()" -- it carries no effort word, and the
+        # regex-shaped reader it replaces also kept it.
+        self.assertEqual(build.split_effort("Model ()"), ("Model ()", None))
+
+    def test_unclosed_parens_are_kept_verbatim(self):
+        # The input class behind issue #47's slow case: a "(" with no ")"
+        # after it can never form a group, so the name must come back exactly
+        # as it went in.
+        self.assertEqual(build.split_effort("a ( b ( c"), ("a ( b ( c", None))
+
+    def test_surrounding_whitespace_normalizes_to_one_space(self):
+        # Whatever the reader between the name and a kept group, one space is
+        # what lands in the base name -- and a stripped all-effort group takes
+        # its preceding whitespace with it.
+        self.assertEqual(
+            build.split_effort("Model   (high)  (Reasoning)"),
+            ("Model (Reasoning)", "high"))
+        self.assertEqual(build.split_effort("Model\t(minimal)"), ("Model", "minimal"))
+
+
+class SplitEffortScalingTests(unittest.TestCase):
+    """Issue #47: a pathological name must degrade to fast processing.
+
+    The pre-fix implementation drove the EFFORT regex over the whole name,
+    and a "(" with no ")" to its right makes `[^)]*\\)` scan to the end of
+    the string and backtrack -- O(parens x remaining length), measured
+    ~62x CPU for 8x the groups at the sizes below (18 s for one 20,000-group
+    name). A crafted capture carrying such a name passes every schema check
+    and lands in `split_effort` through `build_rows`, so the hourly refresh
+    runs it ~680 times and times out.
+
+    The pin is a growth ratio, not a wall-clock number: CPU time (immune to
+    other processes on the box) for a pathological name at N and 8N, with a
+    40x ceiling. A linear scan ratios ~8-12x here; the quadratic it replaces
+    ratios ~47-70x across repeated runs. The absolute ceiling on the large
+    sample is a belt-and-suspenders gross-regression trip, not the mechanism.
+    """
+
+    SIZES = (2500, 20000)
+    RATIO_CEILING = 40
+    LARGE_CPU_CEILING = 5.0
+
+    @staticmethod
+    def pathological(groups: int) -> str:
+        # Unclosed parens: the shape that drove the quadratic backtracking.
+        return "Model (" * groups
+
+    @classmethod
+    def fastest_cpu(cls, groups: int, repeats: int = 3) -> float:
+        best = float("inf")
+        for _ in range(repeats):
+            name = cls.pathological(groups)
+            start = time.process_time()
+            build.split_effort(name)
+            best = min(best, time.process_time() - start)
+        return best
+
+    def test_pathological_names_scale_sub_quadratically(self):
+        small = self.fastest_cpu(self.SIZES[0])
+        large = self.fastest_cpu(self.SIZES[1])
+
+        ratio = large / small
+        self.assertLess(
+            ratio, self.RATIO_CEILING,
+            f"split_effort grew {ratio:.1f}x for 8x the groups "
+            f"(t({self.SIZES[0]})={small:.4f}s cpu, "
+            f"t({self.SIZES[1]})={large:.4f}s cpu) -- super-linear; a crafted "
+            "capture can stall the hourly refresh (issue #47)")
+        self.assertLess(
+            large, self.LARGE_CPU_CEILING,
+            f"t({self.SIZES[1]}) took {large:.4f}s cpu on one name -- "
+            "split_effort is too slow on a pathological input")
 
 
 if __name__ == "__main__":
