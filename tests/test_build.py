@@ -900,6 +900,29 @@ class SplitEffortTests(unittest.TestCase):
         self.assertEqual(
             build.split_effort("M (a, low, b, xhigh)"), ("M (a, b)", "low"))
 
+    def test_a_dict_repr_effort_group_is_effort(self):
+        # #85: AA's own displayLabel carries a dict-repr effort group on some
+        # agent runs -- "Codex - GPT-6 Luna (max) ({'reasoning_effort':
+        # 'max'})". The dict is the same effort knob in AA's encoding, so it
+        # strips like the bare-word group before it instead of riding into
+        # the base name and eating 28 of the chart label's 34 characters.
+        self.assertEqual(
+            build.split_effort(
+                "Codex - GPT-6 Luna (max) ({'reasoning_effort': 'max'})"),
+            ("Codex - GPT-6 Luna", "max"))
+
+    def test_a_dict_group_that_is_not_an_effort_dict_is_kept(self):
+        # A typo'd key or a non-effort value is not the knob: the group stays
+        # verbatim and no effort label is read off it.
+        self.assertEqual(
+            build.split_effort(
+                "Opencode - GLM-5.3 ({'reasoning_gpt_effort': 'max'})"),
+            ("Opencode - GLM-5.3 ({'reasoning_gpt_effort': 'max'})", None))
+        self.assertEqual(
+            build.split_effort(
+                "Model ({'reasoning_effort': 'widescreen'})"),
+            ("Model ({'reasoning_effort': 'widescreen'})", None))
+
     def test_an_empty_group_is_kept_untouched(self):
         # Nothing is stripped from "()" -- it carries no effort word, and the
         # regex-shaped reader it replaces also kept it.
@@ -919,6 +942,67 @@ class SplitEffortTests(unittest.TestCase):
             build.split_effort("Model   (high)  (Reasoning)"),
             ("Model (Reasoning)", "high"))
         self.assertEqual(build.split_effort("Model\t(minimal)"), ("Model", "minimal"))
+
+
+class DisplayLabelTests(unittest.TestCase):
+    """Issue #85: the compact chart label `display_label` builds.
+
+    Chart labels truncate at 34 characters, and the effort knob -- the one
+    word that distinguishes variants of one model -- sat at the END of long
+    names: four Claude Opus 5.5 effort variants shared a 33-char prefix, so
+    the intelligence chart rendered all four identically. `display_label`
+    re-attaches the first effort word immediately after the model name,
+    BEFORE any kept groups, so the distinguishing word survives the cap;
+    everything that is not effort keeps its place.
+    """
+
+    def test_the_effort_word_moves_before_the_kept_groups(self):
+        # The live capture's long shape: the effort word lands well inside
+        # the 34-char cap and the config list keeps its place after it.
+        self.assertEqual(
+            build.display_label(
+                "Claude Opus 5.5 (Adaptive Reasoning, Max Effort, "
+                "Default Fallback)"),
+            "Claude Opus 5.5 (max) (Adaptive Reasoning, Default Fallback)")
+
+    def test_a_dict_repr_effort_group_compacts_to_the_bare_word(self):
+        self.assertEqual(
+            build.display_label(
+                "Codex - GPT-6 Luna (max) ({'reasoning_effort': 'max'})"),
+            "Codex - GPT-6 Luna (max)")
+
+    def test_the_effort_word_moves_in_front_of_a_kept_group(self):
+        self.assertEqual(
+            build.display_label("Model (Reasoning, high)"),
+            "Model (high) (Reasoning)")
+
+    def test_names_without_a_moving_effort_knob_are_unchanged(self):
+        # A date snapshot, a reasoning marker, a bare name and an already
+        # bare-effort name all round-trip exactly.
+        for name in ("Model (Jan '25)", "Model (Reasoning)", "Model",
+                     "Model (max)"):
+            with self.subTest(name=name):
+                self.assertEqual(build.display_label(name), name)
+
+    def test_the_first_effort_across_groups_names_the_compact_label(self):
+        self.assertEqual(
+            build.display_label("M (a, low, b, xhigh)"), "M (low) (a, b)")
+
+    def test_both_row_builders_carry_the_compact_label(self):
+        # The page's chart labels render from r.label (assignLabels, #85),
+        # so the field must reach the payload from BOTH row universes and
+        # equal display_label of the row's own name.
+        model = model_fixture()
+        model["name"] = (
+            "Fixture Model (Adaptive Reasoning, Max Effort, Default Fallback)")
+        agent = agent_fixture(
+            label="Fixture Agent - Model (max) "
+                  "({'reasoning_effort': 'max'})")
+        rows = build.build_rows([model])
+        rows += build.build_agent_rows([agent], [model])
+        self.assertEqual(len(rows), 2)
+        for row in rows:
+            self.assertEqual(row["label"], build.display_label(row["name"]))
 
 
 class SplitEffortScalingTests(unittest.TestCase):

@@ -63,25 +63,38 @@ GDPVAL_INDEX_WEIGHT = 0.10
 
 
 # AA encodes the effort knob in the model name; there is no field for it. The
-# trailing parenthetical is one of three things -- a bare effort level "(high)",
-# an effort clause inside a config list "(Adaptive Reasoning, Max Effort)", or
-# something that is not effort at all "(Reasoning)", "(Non-reasoning)",
-# "(Jan '25)". Only the effort component is stripped; the rest identifies a
-# genuinely different configuration and must survive.
+# trailing parenthetical is one of four things -- a bare effort level "(high)",
+# an effort clause inside a config list "(Adaptive Reasoning, Max Effort)",
+# AA's dict-repr display label "('reasoning_effort': 'max')", or something
+# that is not effort at all "(Reasoning)", "(Non-reasoning)", "(Jan '25)".
+# Only the effort component is stripped; the rest identifies a genuinely
+# different configuration and must survive.
 EFFORT = re.compile(r"^(minimal|low|medium|high|xhigh|max)(\s+effort)?$", re.I)
+# The dict-repr form AA's own displayLabel carries on some agent runs --
+# "Codex - GPT-6 Luna (max) ({'reasoning_effort': 'max'})". The inner value
+# is the same effort word the other two shapes carry; a typo'd key or a
+# non-effort value must NOT match (issue #85).
+EFFORT_DICT = re.compile(
+    r"^\{\s*'reasoning_effort'\s*:\s*"
+    r"'(minimal|low|medium|high|xhigh|max)'\s*\}$", re.I)
 
 
-def split_effort(name):
-    """-> (base name without the effort knob, effort label or None)
+def _effort_scan(name):
+    r"""-> (segments, found): one linear scan over `name`'s groups.
 
-    One linear scan, left to right, over the same matches the EFFORT
-    regex-with-callback walk produced: the next "(" that has a ")" after it
-    opens a group, its content is split on commas, effort words are pulled
-    out and everything else is kept. A "(" with no ")" after it can never
-    open a group, so the scan stops there and the rest is kept verbatim --
-    which is what keeps a pathological name (issue #47: a capture-crafted
-    name of ~80k parens cost ~54 s of regex backtracking) linear instead of
-    quadratic in the parens' count.
+    The next "(" that has a ")" after it opens a group, its content is split
+    on commas, effort words are pulled out and everything else is kept. A "("
+    with no ")" after it can never open a group, so the scan stops there and
+    the rest is kept verbatim -- which is what keeps a pathological name
+    (issue #47: a capture-crafted name of ~80k parens cost ~54 s of regex
+    backtracking) linear instead of quadratic in the parens' count.
+
+    `segments` is the name re-rendered without the effort words: the leading
+    text, then for each group either its kept remainder with the one-space
+    lead-in a kept group renders back with, or nothing when the group was
+    all-effort and takes its whitespace with it (same as the regex's \s*
+    prefix). The scan appends the tail unconditionally, so `segments[0]`
+    always exists. `found` carries every effort word in order of appearance.
     """
     found = []
     out = []
@@ -103,17 +116,41 @@ def split_effort(name):
         kept = []
         for part in name[p + 1:close].split(","):
             part = part.strip()
+            dict_effort = EFFORT_DICT.match(part)
             if EFFORT.match(part):
                 found.append(part)
+            elif dict_effort:
+                found.append(dict_effort.group(1))
             else:
                 kept.append(part)
         if kept:
             out.append(" (" + ", ".join(kept) + ")")
         i = close + 1
     out.append(name[i:])
-    base = "".join(out).strip()
+    return out, found
+
+
+def split_effort(name):
+    """-> (base name without the effort knob, effort label or None)"""
+    segments, found = _effort_scan(name)
+    base = "".join(segments).strip()
     label = found[0].lower().replace(" effort", "") if found else None
     return base, label
+
+
+def display_label(name):
+    """The compact chart label: the name with the effort knob moved forward.
+
+    Identifies an effort variant within a 34-character chart cap (#85): the
+    effort groups drop out of place and the FIRST effort re-attaches
+    immediately after the leading text segment -- BEFORE any kept groups, so
+    the one word that distinguishes effort variants of one model survives a
+    truncation -- and the non-effort groups keep their place after it.
+    """
+    segments, found = _effort_scan(name)
+    eff = found[0].lower().replace(" effort", "") if found else None
+    label = segments[0] + (f" ({eff})" if eff else "") + "".join(segments[1:])
+    return label.strip()
 
 
 def num(v):
@@ -214,6 +251,10 @@ def build_rows(models):
             "name": label,
             "base": base,
             "eff": eff,
+            # The compact chart label (#85): the effort word re-attached right
+            # after the model name, so effort variants of one model stay
+            # distinguishable under the page's 34-character chart cap.
+            "label": display_label(label),
             # Which capture the row came from. Model rows carry the
             # intelligence, agentic and parameter axes; agent rows carry
             # coding. Neither universe has the other's columns, and the page
@@ -296,6 +337,8 @@ def build_agent_rows(agents, models):
             "name": label,
             "base": base,
             "eff": eff,
+            # The compact chart label (#85), same as model rows.
+            "label": display_label(label),
             "kind": "agent",
             "agent": a.get("agentName") or None,
             # The LAB filter groups by who made the MODEL, so a Claude Code run
@@ -1215,6 +1258,48 @@ const DATA = __DATA__;
     return frontierMetric(rows,"intelligence");
   }
 
+  // A chart label identifies exactly one row (#85): two rows on one chart
+  // never render the same text. Labels prefer the build-time compact form
+  // (r.label: effort re-attached right after the model name, so the word that
+  // distinguishes effort variants survives the 34-char cap); a row whose
+  // compact form is ambiguous (two rows compact to the same text) or whose
+  // truncated text is already taken on this chart is re-truncated from the
+  // full AA name; if that collides too, a numeric suffix disambiguates.
+  const truncLabel = n => n.length > 34 ? n.slice(0, 33) + "…" : n;
+  function assignLabels(queue, wideOf){
+    // Wide labels render the full r.name, never clipped -- current behaviour
+    // for pins and the frontier-only view, preserved. Seeding `taken` with
+    // every wide row's full name is what stops a narrow label from
+    // duplicating one.
+    const taken = new Set();
+    const compactCounts = new Map();
+    for(const q of queue){
+      if(wideOf(q)) taken.add(q.r.name);
+      else{
+        const c = q.r.label || q.r.name;
+        compactCounts.set(c, (compactCounts.get(c)||0)+1);
+      }
+    }
+    // One text per queue entry, aligned to queue order: pins first, then the
+    // frontier -- the queue array order is the deterministic allocation
+    // order, and every decision is over the chart's own queue.
+    return queue.map(q => {
+      if(wideOf(q)) return q.r.name;
+      const compact = q.r.label || q.r.name;
+      let text = truncLabel(compact);
+      if(compactCounts.get(compact) > 1 || taken.has(text)){
+        text = truncLabel(q.r.name);
+        if(taken.has(text)){
+          let n = 2;                          // first free number, queue order
+          while(taken.has(text + " (" + n + ")")) n++;
+          text = text + " (" + n + ")";
+        }
+      }
+      taken.add(text);
+      return text;
+    });
+  }
+
   let pts=[], frontSet=new Set();
   function draw(rows){
     const svg = $("svg-intelligence");
@@ -1378,13 +1463,15 @@ const DATA = __DATA__;
       ...[...fr].sort((a,b)=> b.ii-a.ii)
                 .filter(r=>!pins.has(r.name)).map(r=>({r,pin:false})),
     ];
+    // The wide flag is pin||full (full = the st.sup frontier-only view) --
+    // same predicate the capability charts spell pin||st.sup.
+    const texts=assignLabels(queue, q=>q.pin||full);
     let dropped=0;
-    for(const {r,pin} of queue){
+    for(const [i,{r,pin}] of queue.entries()){
       const cx=X(r.cost), cy=Y(r.ii), own=pts.find(p=>p.r===r);
       const wide=pin||full;                    // pinned names are never clipped
       const t=el("text",{class:"lbl"});
-      t.textContent = wide ? r.name
-                     : (r.name.length>34 ? r.name.slice(0,33)+"…" : r.name);
+      t.textContent = texts[i];
       svg.appendChild(t);
       const w=t.getComputedTextLength(), h=11;
 
@@ -1599,10 +1686,14 @@ const DATA = __DATA__;
       ...[...frontier].sort((a,b)=>metricOf(b,key).score-metricOf(a,key).score)
         .filter(r=>!pins.has(r.name)).map(r=>({r,pin:false})),
     ];
-    for(const {r,pin} of queue){
+    // Same predicate as the intelligence chart: pin||st.sup. Only the text
+    // source changes here -- placement (candidates, clear-checks, wide
+    // offsets, drop-if-no-clear-slot) is untouched (#85).
+    const texts=assignLabels(queue, q=>q.pin||st.sup);
+    for(const [i,{r,pin}] of queue.entries()){
       const m=metricOf(r,key), x=X(m.cost), y=Y(m.score);
       const label=el("text",{class:"lbl"});
-      label.textContent=pin||st.sup?r.name:(r.name.length>34?r.name.slice(0,33)+"…":r.name);
+      label.textContent=texts[i];
       chart.appendChild(label);
       const tw=label.getComputedTextLength(), th=15;
       const candidates=[];
