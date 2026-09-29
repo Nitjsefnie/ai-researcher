@@ -22,6 +22,9 @@ CHROMIUM_EXECUTABLE = CHROMIUM if pathlib.Path(CHROMIUM).exists() else None
 
 
 class BrowserInteractionTests(unittest.TestCase):
+    # pylint: disable=too-many-public-methods
+    # One behaviour, one test: #85's per-chart label-distinctness guarantee is
+    # a 21st method here, not a subTest of an unrelated test.
     # V8 coverage for the JavaScript ratchet. With JS_COVERAGE_OUT set (the
     # coverage job sets it), every page this class creates records V8 block
     # coverage and its dump joins a class-level list written out when the
@@ -805,6 +808,18 @@ class BrowserInteractionTests(unittest.TestCase):
     # rules mirror the placer exactly -- a measuring text element takes
     # getComputedTextLength() under the same .lbl class so the font metrics
     # match to the pixel.
+    #
+    # The text rule mirrors assignLabels' narrow path (#85), which REPLACES
+    # the plain 34-char name truncation the #84 pin replayed: the compact
+    # build-time label (r.label) first, the full AA name re-truncated when
+    # the compact form is ambiguous (two rows compacting alike) or its
+    # truncated text is already taken on this chart, a numeric suffix when
+    # that collides too. This updates the #84 pin deliberately -- issue #85
+    # changed the text rule; the placement rule is untouched. The replay runs
+    # with no pins and st.sup off, so every replayed label is narrow and the
+    # queue IS the whole allocation order. r.label is read from the page's
+    # top-level `const DATA` -- a global lexical binding, reachable from
+    # page.evaluate -- matched to replay points by name.
     _REPLAY_NEAREST_CLEAR_SLOT = """(chartId) => {
       const svg = document.getElementById(chartId);
       const dom = [...svg.querySelectorAll("text.lbl")].map(t => ({
@@ -826,10 +841,30 @@ class BrowserInteractionTests(unittest.TestCase):
       const boxes = [];
       const queue = pts.filter(p => p.r === "6").map((p, j) => ({p, j}))
         .sort((a, b) => (a.p.y - b.p.y) || (a.j - b.j));
+      const trunc = n => n.length > 34 ? n.slice(0, 33) + "\\u2026" : n;
+      const labelOf = name => {
+        const row = DATA.rows.find(r => r.name === name);
+        return (row && row.label) || name;
+      };
+      const compactCounts = new Map();
+      for (const {p} of queue) {
+        const c = labelOf(p.name);
+        compactCounts.set(c, (compactCounts.get(c) || 0) + 1);
+      }
+      const taken = new Set();
       const out = [];
       for (const {p} of queue) {
-        const text = p.name.length > 34
-          ? p.name.slice(0, 33) + "\\u2026" : p.name;
+        const compact = labelOf(p.name);
+        let text = trunc(compact);
+        if (compactCounts.get(compact) > 1 || taken.has(text)) {
+          text = trunc(p.name);
+          if (taken.has(text)) {
+            let n = 2;                      // first free number, queue order
+            while (taken.has(text + " (" + n + ")")) n++;
+            text = text + " (" + n + ")";
+          }
+        }
+        taken.add(text);
         meas.textContent = text;
         const tw = meas.getComputedTextLength();
         const cands = [];
@@ -924,6 +959,29 @@ class BrowserInteractionTests(unittest.TestCase):
             self.assertEqual(page.evaluate(snap, charts), before,
                              "a Hide-superseded round trip did not restore "
                              "the identical label layout")
+        page.close()
+
+    def test_chart_labels_are_distinct_on_every_chart(self):
+        # #85: a chart label identifies exactly one row. Four effort variants
+        # of Claude Opus 5.5 shared a 33-char name prefix, so all four
+        # frontier rows rendered the identical truncated text on the
+        # intelligence chart, and a Codex row's dict-repr effort group ate 28
+        # of the 34 label characters. A collision means a reader cannot tell
+        # which row a label names, so every chart's rendered label list must
+        # be non-empty (the assertion must not pass vacuously on an emptied
+        # chart) and all-distinct.
+        page = self.browser.new_page(viewport={"width": 1280, "height": 900})
+        page.goto(build.OUT.as_uri())
+        for chart in ("coding", "intelligence", "agentic", "parameters"):
+            with self.subTest(chart=chart):
+                labels = page.locator(
+                    f"#svg-{chart} text.lbl").all_text_contents()
+                self.assertTrue(labels, f"{chart} rendered no labels")
+                duplicates = sorted(
+                    t for t in set(labels) if labels.count(t) > 1)
+                self.assertEqual(
+                    duplicates, [],
+                    f"duplicate chart labels on {chart}")
         page.close()
 
     def test_footer_carries_a_licence_note_linking_the_licence(self):
