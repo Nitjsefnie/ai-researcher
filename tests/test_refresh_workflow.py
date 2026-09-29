@@ -136,6 +136,66 @@ class GateTests(unittest.TestCase):
             if "refs/heads/published" in flattened(raw):
                 self.assertNotIn("git push", commands(raw))
 
+    def test_the_publish_step_aborts_when_a_newer_run_already_published(self):
+        # Issue 74: two overlapping runs can both reach the publish step, and
+        # if the OLDER run's upload lands after the newer run's, the hub ends
+        # up serving the older page while the `published` ref records the
+        # newer commit — an inversion the heal gate's ref comparison cannot
+        # see. Immediately before the upload the step fresh-fetches the ref
+        # (anonymous, same shape as the heal gate) and, when the tip is not
+        # this run's own HEAD, asks the compare API, whose status names the
+        # TIP side relative to the BASE side. Only a tip that is AHEAD (a
+        # newer run already published) aborts: green, exit 0, no upload, no
+        # ref move. `behind` is the normal heal and publishes; a failed or
+        # unrankable answer retries once and then publishes anyway behind a
+        # warning, because availability of publish beats the residual
+        # seconds-wide window. The newest run NEVER aborts, so within any
+        # overlap the newest page always wins.
+        run = flattened(step(self.wf, "Publish to docs-hub")["run"])
+
+        # The gate stands between the step's start and the upload: the
+        # anonymous ref fetch and the compare call precede publish_docs.py,
+        # and the abort leaves through exit 0 before anything is uploaded.
+        self.assertLess(run.index("git fetch --depth=1 origin"),
+                        run.index("publish_docs.py"))
+        self.assertLess(
+            run.index("refs/heads/published:refs/remotes/origin/published"),
+            run.index("publish_docs.py"))
+        self.assertLess(run.index("repos/$REPO/compare/"),
+                        run.index("publish_docs.py"))
+        self.assertLess(run.index("exit 0"), run.index("publish_docs.py"))
+        # The gate reads the status field, breaks its retry loop only on a
+        # real ranking, and aborts on ahead alone. Two attempts total, then a
+        # warning and a publish anyway.
+        self.assertIn("--jq .status", run)
+        self.assertIn("ahead|behind|identical) break", run)
+        self.assertIn('"$status" = ahead', run)
+        self.assertIn("for _ in 1 2", run)
+        self.assertIn("WARNING: the compare API", run)
+        self.assertIn("already published", run)
+
+    def test_the_unchanged_path_also_checks_the_hubs_live_page(self):
+        # Issue 74: the ref comparison cannot see an upload that landed AFTER
+        # the published ref moved — the ref agrees with HEAD while the HUB
+        # serves the older page. On the unchanged path the gate therefore
+        # also fetches the hub's live page (the public /d/ route serves the
+        # stored bytes verbatim) and compares it byte-for-byte against HEAD's
+        # committed page. Divergence sets hub_stale, and so does a failed
+        # fetch — same stance as the ref fetch: an extra republish costs one
+        # hub version, a real outage fails red at the publish step.
+        run = flattened(step(self.wf, "Did anything move?")["run"])
+
+        # The check stands on the unchanged path, after the ref check, and
+        # feeds the same proceed decision.
+        self.assertLess(run.index('[ "$changed" = false ]'),
+                        run.index("docs.nitjsefni.eu/d/ai-researcher"))
+        self.assertIn("git show HEAD:out/frontier-models.html", run)
+        self.assertIn('cmp -s - "$hub_page" || hub_stale=true', run)
+        self.assertIn("else hub_stale=true", run)
+        self.assertIn('[ "$hub_stale" = true ]', run)
+        # The new divergence cause gets its own truthful summary line.
+        self.assertIn("differs from HEAD", run)
+
     def test_the_commit_step_carries_an_explicit_publish_verdict(self):
         # Issue 42: the byte-identical early exit commits nothing but must
         # still publish; issue 46 adds a concede path that must publish

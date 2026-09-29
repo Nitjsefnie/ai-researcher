@@ -34,6 +34,19 @@ name: refresh
 # instead of being skipped forever. A green no-op now means "the live page
 # is current", not merely "the data did not move".
 #
+# TWO OVERLAPPING RUNS CAN STILL INVERT THE UPLOAD ORDER (issue #74). The
+# concurrency group serializes runs, but an OLDER run can still reach the
+# publish step after a newer one and land its upload LAST, leaving the hub
+# serving the older page under a ref that names the newer commit — an
+# inversion neither the heal gate's ref comparison nor the commit step can
+# see. Two guards close it: the publish step compares the freshly fetched
+# `published` ref against this run's HEAD via the GitHub compare API and
+# ABORTS green when the ref is ahead (a newer run already published; the
+# newest run never aborts, so within any overlap the newest page always
+# wins), and the heal gate also compares the hub's live page against HEAD
+# byte-for-byte, so even the residual seconds-wide window heals on the next
+# unchanged-capture run.
+#
 # THE SUITE RUNS BEFORE THE COMMIT, NOT AFTER. A capture can break the page —
 # a new field shape, a model with a null AA never emitted before — and the
 # whole point of a scheduled publish is that nobody is watching it happen. A
@@ -150,6 +163,7 @@ jobs:
           # version, while a real outage still fails red at the publish
           # step's ref update.
           live_stale=false
+          hub_stale=false
           if [ "$changed" = false ] && [ "${{ inputs.force }}" != 'true' ]; then
             # Anonymous fetch: relies on the repo being public. If it ever
             # goes private, this gate degrades to an hourly republish --
@@ -163,24 +177,51 @@ jobs:
             else
               live_stale=true
             fi
+            # The hub check (issue #74). The ref comparison above cannot see
+            # one inversion: an upload that lands AFTER the published ref
+            # moved (two overlapping runs, the older upload arriving last).
+            # The ref then agrees with HEAD while the HUB serves the older
+            # page, and nothing would ever republish. So the unchanged path
+            # also fetches the hub's live page — the public /d/ route serves
+            # the stored bytes verbatim, proven byte-identical to the
+            # committed page (2026-09-29) — and compares it byte-for-byte
+            # against HEAD's page. Divergence sets hub_stale, as does a
+            # failed fetch: same stance as the ref fetch above, an extra
+            # republish costs one hub version, and a real outage fails red
+            # at the publish step.
+            hub_page="$(mktemp)"
+            if curl -fsS --connect-timeout 10 --max-time 30 \
+                 https://docs.nitjsefni.eu/d/ai-researcher/frontier-models \
+                 -o "$hub_page"; then
+              git show HEAD:out/frontier-models.html | cmp -s - "$hub_page" || hub_stale=true
+            else
+              hub_stale=true
+            fi
+            rm -f "$hub_page"
           fi
           echo "changed=$changed" >> "$GITHUB_OUTPUT"
           # `changed` answers "did the data move", `proceed` answers "should
           # we rebuild and publish" — a forced run says yes to the second
-          # alone, and so does a run that only heals the live page.
-          # `inputs.force` is the empty string on a schedule run, so no second
-          # condition is needed to keep the scheduled path unchanged.
+          # alone, and so does a run that only heals the live page, whether
+          # the `published` ref's page or the hub's live page is what is
+          # behind. `inputs.force` is the empty string on a schedule run, so
+          # no second condition is needed to keep the scheduled path
+          # unchanged.
           if [ "$changed" = true ] || [ "${{ inputs.force }}" = 'true' ] \
-             || [ "$live_stale" = true ]; then
+             || [ "$live_stale" = true ] || [ "$hub_stale" = true ]; then
             echo "proceed=true" >> "$GITHUB_OUTPUT"
           else
             echo "proceed=false" >> "$GITHUB_OUTPUT"
           fi
-          if [ "$changed" = false ] && [ "$live_stale" = false ]; then
+          if [ "$changed" = false ] && [ "$live_stale" = false ] \
+             && [ "$hub_stale" = false ]; then
             echo 'AA capture unchanged and the live page is current — nothing committed, nothing published.' \
               >> "$GITHUB_STEP_SUMMARY"
-          elif [ "$changed" = false ]; then
+          elif [ "$changed" = false ] && [ "$live_stale" = true ]; then
             echo 'AA capture unchanged, but the live page is stale — republishing it.' \
+              >> "$GITHUB_STEP_SUMMARY"
+          elif [ "$changed" = false ] && [ "$hub_stale" = true ]; then
+            echo 'AA capture unchanged, but the hub serves a page that differs from HEAD — republishing it.' \
               >> "$GITHUB_STEP_SUMMARY"
           fi
 
@@ -343,6 +384,52 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
         run: |
+          # The compare-and-abort gate (issue #74). Two overlapping runs can
+          # both reach this step, and if the OLDER run's upload lands after
+          # the newer run's, the hub serves the older page while the
+          # `published` ref records the newer commit — an inversion the heal
+          # gate's ref comparison cannot see (the ref agrees with HEAD; the
+          # HUB is what is behind). So the upload itself is gated: fresh-
+          # fetch the ref anonymously (same shape as the heal gate's fetch),
+          # and when the tip is not already this run's HEAD, ask the compare
+          # API. Its status names the TIP side relative to the BASE side:
+          # `behind` — the tip is an ancestor of this run's HEAD, the normal
+          # heal situation — publishes; `ahead` — the tip is a descendant, a
+          # newer run already published — ABORTS green: a summary line, no
+          # upload, no ref move, exit 0. The newest run NEVER aborts, so
+          # within any overlap the newest page always wins; the abort only
+          # stops the older run from regressing the hub afterwards. A missing
+          # ref means nothing was ever published; anything else, or a failed
+          # API call retried once, publishes anyway with a warning —
+          # availability of publish beats the residual seconds-wide window,
+          # which the heal gate's hub check then heals within one run.
+          if git fetch --depth=1 origin \
+               refs/heads/published:refs/remotes/origin/published 2>/dev/null; then
+            tip="$(git rev-parse origin/published)"
+            mine="$(git rev-parse HEAD)"
+            if [ "$tip" != "$mine" ]; then
+              status=""
+              for _ in 1 2; do
+                status="$(gh api "repos/$REPO/compare/$mine...$tip" --jq .status)" || status=""
+                case "$status" in
+                  ahead|behind|identical) break ;;
+                  *) status="" ;;
+                esac
+              done
+              if [ "$status" = ahead ]; then
+                echo "A newer refresh run already published: the published ref names a commit past this run's HEAD — nothing uploaded, no ref moved." \
+                  >> "$GITHUB_STEP_SUMMARY"
+                exit 0
+              fi
+              if [ -z "$status" ]; then
+                echo "WARNING: the compare API could not rank refs/heads/published against this run's HEAD; publishing anyway." \
+                  >> "$GITHUB_STEP_SUMMARY"
+              fi
+              # `behind` (or `identical`, a ref that moved to exactly this
+              # HEAD while the gate ran) is the normal heal: fall through to
+              # the upload.
+            fi
+          fi
           python3 scripts/publish_docs.py out/frontier-models.html \
             --slug ai-researcher/frontier-models \
             --title "Frontier models — intelligence vs cost per task" \
