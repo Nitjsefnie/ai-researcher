@@ -22,8 +22,10 @@
 !/AGENTS.md
 !/CLAUDE.md
 !/CONTRIBUTING.md
+!/GOVERNANCE.md
 !/LICENSE
 !/README.md
+!/SECURITY.md
 !/build.py
 !/pyrightconfig.json
 !/requirements-dev.txt

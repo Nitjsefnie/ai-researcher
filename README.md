@@ -92,6 +92,13 @@ named back. A new file does not show up in `git status` as untracked — it simp
 never appears. Add its rule, and `git check-ignore -v <path>` will name the rule
 hiding it if it still doesn't.
 
+## Security
+
+The published page executes JavaScript built from third-party captured
+data. If you find a way to make it do something its author did not
+intend, report it privately — see [SECURITY.md](SECURITY.md). Please do
+not open a public issue for it.
+
 ## What this repo is not
 
 Not a benchmark harness — AA runs the evals, we read their numbers. Not a
