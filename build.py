@@ -71,20 +71,46 @@ EFFORT = re.compile(r"^(minimal|low|medium|high|xhigh|max)(\s+effort)?$", re.I)
 
 
 def split_effort(name):
-    """-> (base name without the effort knob, effort label or None)"""
-    found = []
+    """-> (base name without the effort knob, effort label or None)
 
-    def fix(m):
+    One linear scan, left to right, over the same matches the EFFORT
+    regex-with-callback walk produced: the next "(" that has a ")" after it
+    opens a group, its content is split on commas, effort words are pulled
+    out and everything else is kept. A "(" with no ")" after it can never
+    open a group, so the scan stops there and the rest is kept verbatim --
+    which is what keeps a pathological name (issue #47: a capture-crafted
+    name of ~80k parens cost ~54 s of regex backtracking) linear instead of
+    quadratic in the parens' count.
+    """
+    found = []
+    out = []
+    i = 0
+    while True:
+        p = name.find("(", i)
+        if p == -1:
+            break
+        close = name.find(")", p + 1)
+        if close == -1:
+            break
+        # The reader between the previous match and the group: one space is
+        # what a kept group renders back with, and an all-effort group takes
+        # the whitespace with it (same as the regex's \s* prefix).
+        lead = p
+        while lead > i and name[lead - 1].isspace():
+            lead -= 1
+        out.append(name[i:lead])
         kept = []
-        for part in m.group(1).split(","):
+        for part in name[p + 1:close].split(","):
             part = part.strip()
             if EFFORT.match(part):
                 found.append(part)
             else:
                 kept.append(part)
-        return " (" + ", ".join(kept) + ")" if kept else ""
-
-    base = re.sub(r"\s*\(([^)]*)\)", fix, name).strip()
+        if kept:
+            out.append(" (" + ", ".join(kept) + ")")
+        i = close + 1
+    out.append(name[i:])
+    base = "".join(out).strip()
     label = found[0].lower().replace(" effort", "") if found else None
     return base, label
 
