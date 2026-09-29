@@ -9,6 +9,7 @@ Usage:  python3 build.py
 """
 from __future__ import annotations
 
+import argparse
 import datetime as dt
 import hashlib
 import html
@@ -1904,4 +1905,11 @@ const DATA = __DATA__;
 
 
 if __name__ == "__main__":
+    # Argparse lives here rather than in main() so that the direct main()
+    # callers -- the test suite drives it with pytest's argv still live --
+    # keep building whatever capture they point the module paths at.
+    ap = argparse.ArgumentParser(
+        description="Build out/frontier-models.html from the AA captures "
+                    "in data/ (no arguments needed).")
+    ap.parse_args()
     main()
