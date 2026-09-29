@@ -12,7 +12,10 @@
 #
 #   playwright — tests/test_browser.py drives the built page in a real
 #   headless Chromium. The browser binary itself is not a pip package;
-#   CI installs it with `python3 -m playwright install --with-deps chromium`.
+#   CI installs it through scripts/ci/install_chromium.py, which verifies
+#   the browser archives against committed sha256 digests before playwright
+#   may execute them (a bare `playwright install` performs no integrity
+#   check; the script's DIGESTS table is keyed to this playwright pin).
 #
 #   pyyaml — tests/test_refresh_workflow.py parses the publish workflow with
 #   it, pinning the gating contracts between steps structurally.

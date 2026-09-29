@@ -167,11 +167,19 @@ jobs:
           python3 -m pip install -r requirements-test.txt
 
       - name: Install Chromium for playwright
-        # The browser binary is not a pip package. --with-deps pulls the
-        # shared libraries headless Chromium needs on a bare runner; without
-        # it the launch fails with a missing-library error that reads like a
+        # The browser binary is not a pip package, and playwright's own
+        # installer performs no integrity check: browsers.json publishes no
+        # digest and the installer never hashes a byte, so a bare install
+        # executes whatever the CDN hands over -- in a job that pushes the
+        # ratchet to main. scripts/ci/install_chromium.py verifies every
+        # archive against a committed sha256 first, pre-seeds the browsers
+        # directory so playwright's install has nothing left to download,
+        # and fails the run if anything was re-downloaded anyway. The
+        # --with-deps step inside the script still apt-installs the shared
+        # libraries headless Chromium needs on a bare runner; without them
+        # the launch fails with a missing-library error that reads like a
         # test failure.
-        run: python3 -m playwright install --with-deps chromium
+        run: python3 scripts/ci/install_chromium.py
 
       - name: Run tests
         id: pytest

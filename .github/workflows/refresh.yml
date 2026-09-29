@@ -187,7 +187,15 @@ jobs:
 
       - name: Install Chromium for playwright
         if: steps.capture.outputs.proceed == 'true'
-        run: python3 -m playwright install --with-deps chromium
+        # The browser binary is not a pip package, and playwright's own
+        # installer performs no integrity check: browsers.json publishes no
+        # digest and the installer never hashes a byte, so a bare install
+        # executes whatever the CDN hands over -- in a job that holds
+        # contents:write. scripts/ci/install_chromium.py verifies every
+        # archive against a committed sha256 first, pre-seeds the browsers
+        # directory so playwright's install has nothing left to download,
+        # and fails the run if anything was re-downloaded anyway.
+        run: python3 scripts/ci/install_chromium.py
 
       - name: Summarise what changed
         # Runs on `proceed`, not `changed`: this is the ONLY step that executes
