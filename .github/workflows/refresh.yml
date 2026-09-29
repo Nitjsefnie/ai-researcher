@@ -218,8 +218,9 @@ jobs:
           # Each cause prints its own line, so every outcome is summarised.
           # (Either flag being true already implies changed=false: they are
           # only ever set under the unchanged path above.)
-          if [ "$changed" = false ] && [ "$live_stale" = false ] \
-             && [ "$hub_stale" = false ]; then
+          # A forced run always proceeds, so it must never print the quiet line (#80).
+          if [ "$changed" = false ] && [ "${{ inputs.force }}" != 'true' ] \
+             && [ "$live_stale" = false ] && [ "$hub_stale" = false ]; then
             echo 'AA capture unchanged and the live page is current — nothing committed, nothing published.' \
               >> "$GITHUB_STEP_SUMMARY"
           fi

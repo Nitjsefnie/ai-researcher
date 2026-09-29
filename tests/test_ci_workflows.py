@@ -27,6 +27,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 
 CODEQL_WORKFLOW = REPO_ROOT / ".github" / "workflows" / "codeql.yml"
 DEPENDABOT = REPO_ROOT / ".github" / "dependabot.yml"
+TESTS_WORKFLOW = REPO_ROOT / ".github" / "workflows" / "tests.yml"
 WORKFLOWS = sorted((REPO_ROOT / ".github" / "workflows").glob("*.yml"))
 
 # `uses: github/codeql-action/<step>@<40-hex sha>  # vX.Y.Z`
@@ -102,3 +103,11 @@ def test_every_job_declares_timeout_minutes():
             assert "timeout-minutes" in job, (
                 f"{path.name}: job {name!r} declares no timeout-minutes"
             )
+
+
+def test_coverage_job_installs_chromium_through_the_digest_gate():
+    # Issue #51: reverting this step to a bare `playwright install` unwires the digest gate.
+    workflow = yaml.safe_load(TESTS_WORKFLOW.read_text(encoding="utf-8"))
+    [chromium] = [s for s in workflow["jobs"]["coverage"]["steps"]
+                  if s.get("name") == "Install Chromium for playwright"]
+    assert chromium["run"] == "python3 scripts/ci/install_chromium.py"
