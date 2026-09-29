@@ -633,6 +633,48 @@ class AtomicCaptureWritesTests(unittest.TestCase):
                 [p.name for p in root.iterdir() if p.name.endswith(".tmp")], [],
                 "a failed write left staging litter behind")
 
+    def test_a_failed_second_replace_leaves_the_agents_capture_byte_identical(self):
+        # The mirror limb: an injector that raises on EVERY replace dies at
+        # the first write_atomic (OUT) and never reaches the AGENTS_OUT
+        # boundary, so a one-site revert of that write to a bare write_text
+        # would survive the suite. This injector lets replace #1 (OUT) land
+        # and raises on #2, holding each capture's failure limb to its own
+        # control.
+        real_replace = os.replace
+        seen = []
+
+        def fail_on_second(staged, dest):
+            seen.append(dest)
+            if len(seen) == 2:
+                raise OSError(28, "No space left on device")
+            return real_replace(staged, dest)
+
+        with self.capture_over_existing(fail_on_second) as (root, run):
+            with self.assertRaises(OSError):
+                run()
+
+            self.assertEqual(
+                seen,
+                [root / "aa-raw-models.json", root / "aa-raw-coding-agents.json"],
+                "the fault did not land on the AGENTS_OUT boundary")
+            # OUT's own boundary already succeeded, so ITS capture landed:
+            self.assertEqual(
+                [m["slug"] for m in json.loads(
+                    (root / "aa-raw-models.json").read_text(encoding="utf-8"))],
+                ["detail-host-model", "fixture-model"])
+            # ...while the failed AGENTS_OUT boundary leaves the previous
+            # capture byte-intact, the stamp unmoved and no litter behind.
+            self.assertEqual(
+                (root / "aa-raw-coding-agents.json").read_bytes(),
+                b"PREVIOUS AGENTS CAPTURE")
+            self.assertEqual(
+                (root / "captured-at.txt").read_text(encoding="utf-8"),
+                "2020-01-01\n",
+                "the stamp moved even though the agents capture did not land")
+            self.assertEqual(
+                [p.name for p in root.iterdir() if p.name.endswith(".tmp")], [],
+                "a failed write left staging litter behind")
+
     def test_a_healthy_capture_replaces_both_files_and_lands_no_litter(self):
         with self.capture_over_existing() as (root, run):
             stdout = run()
