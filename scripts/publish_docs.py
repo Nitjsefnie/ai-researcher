@@ -12,6 +12,11 @@ beyond publishing belongs in the canonical CLI, not here.
 The key is read from the environment only (DOCS_HUB_API_KEY); it is never a
 command-line argument, because arguments are visible in the process list and
 land in CI logs when a step echoes its own command.
+
+The base URL (DOCS_HUB_URL, or the https default) is validated before
+anything is sent: a base that does not parse as an https URL with a host is
+refused with exit code 2 and no network call, rather than followed — an
+environment override cannot point the credential at a cleartext destination.
 """
 from __future__ import annotations
 
@@ -20,6 +25,7 @@ import json
 import os
 import sys
 import urllib.error
+import urllib.parse
 import urllib.request
 import uuid
 
@@ -45,6 +51,15 @@ def multipart(fields: dict[str, str], filename: str,
 
 
 def publish(path: str, fields: dict[str, str], key: str, base: str) -> int:
+    # The credential must never be sent over a connection the caller did not
+    # pin to https: an environment override to a cleartext or unparseable URL
+    # would otherwise carry the key in a request header to that destination.
+    parsed = urllib.parse.urlsplit(base)
+    if parsed.scheme != "https" or not parsed.netloc:
+        print(f"refusing to send the credential to {base!r}: "
+              "an https base URL is required", file=sys.stderr)
+        return 2
+
     with open(path, "rb") as handle:
         blob = handle.read()
     body, content_type = multipart(fields, os.path.basename(path), blob)

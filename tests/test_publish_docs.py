@@ -57,6 +57,45 @@ class PublishTests(unittest.TestCase):
             return publish_docs.publish(str(self.page), {"slug": "a/b"},
                                         "secret-key", "https://hub.example")
 
+    def publish_to(self, base, urlopen):
+        with mock.patch.object(publish_docs.urllib.request, "urlopen", urlopen), \
+                mock.patch.object(sys, "stderr", io.StringIO()) as err:
+            return publish_docs.publish(str(self.page), {"slug": "a/b"},
+                                        "secret-key", base), err.getvalue()
+
+    def assert_refused(self, base):
+        """The credential never leaves: no network call, exit 2, a one-line
+        diagnostic naming the URL and requiring https."""
+        urlopen = mock.MagicMock(return_value=Response(200, b"{}"))
+
+        code, err = self.publish_to(base, urlopen)
+
+        self.assertEqual(code, 2)
+        self.assertIn(base, err)
+        self.assertIn("https", err)
+        urlopen.assert_not_called()
+
+    def test_http_base_url_is_refused_before_any_network_call(self):
+        self.assert_refused("http://127.0.0.1:9999")
+
+    def test_schemeless_base_url_is_refused_before_any_network_call(self):
+        # No scheme: urlsplit finds neither a scheme nor a netloc to trust.
+        self.assert_refused("127.0.0.1:9999")
+
+    def test_ftp_base_url_is_refused_before_any_network_call(self):
+        self.assert_refused("ftp://host")
+
+    def test_empty_base_url_is_refused_before_any_network_call(self):
+        self.assert_refused("")
+
+    def test_uppercase_https_scheme_is_accepted(self):
+        # urlsplit lowercases the scheme, so HTTPS:// is a healthy path.
+        def urlopen(req, timeout=None):
+            return Response(200, json.dumps({"ok": True, "version": 7}).encode())
+
+        code, _ = self.publish_to("HTTPS://hub.example", urlopen)
+        self.assertEqual(code, 0)
+
     def test_sends_the_key_as_a_header_and_reports_success(self):
         seen = {}
 
@@ -109,6 +148,15 @@ class PublishTests(unittest.TestCase):
 
 
 class MainTests(unittest.TestCase):
+    def setUp(self):
+        self.page = pathlib.Path(__file__).resolve().parent / "_page.html"
+        self.page.write_bytes(PAGE)
+        self.addCleanup(self.page.unlink)
+
+    def argv(self):
+        return ["publish_docs.py", str(self.page), "--slug", "a/b",
+                "--title", "T", "--from", "ai-researcher"]
+
     def test_missing_key_exits_2_without_touching_the_network(self):
         argv = ["publish_docs.py", "page.html", "--slug", "a/b",
                 "--title", "T", "--from", "ai-researcher"]
@@ -118,6 +166,40 @@ class MainTests(unittest.TestCase):
             self.assertEqual(publish_docs.main(), 2)
 
         self.assertIn("DOCS_HUB_API_KEY", err.getvalue())
+
+    def test_default_url_is_the_https_one_and_reaches_the_network(self):
+        seen = {}
+
+        def urlopen(req, timeout=None):
+            seen["url"] = req.full_url
+            return Response(200, json.dumps({"ok": True, "version": 7}).encode())
+
+        with mock.patch.object(sys, "argv", self.argv()), \
+                mock.patch.dict(publish_docs.os.environ,
+                                {"DOCS_HUB_API_KEY": "secret-key"}), \
+                mock.patch.object(publish_docs.urllib.request, "urlopen", urlopen):
+            # Absent from the environment, not merely blank: the override is
+            # the attack surface, so the default must survive its absence.
+            publish_docs.os.environ.pop("DOCS_HUB_URL", None)
+            code = publish_docs.main()
+
+        self.assertEqual(code, 0)
+        self.assertEqual(seen["url"], publish_docs.DEFAULT_URL + "/api/publish")
+
+    def test_http_url_override_is_refused_before_the_network(self):
+        urlopen = mock.MagicMock(return_value=Response(200, b"{}"))
+
+        with mock.patch.object(sys, "argv", self.argv()), \
+                mock.patch.dict(publish_docs.os.environ,
+                                {"DOCS_HUB_API_KEY": "secret-key",
+                                 "DOCS_HUB_URL": "http://127.0.0.1:9999"}), \
+                mock.patch.object(publish_docs.urllib.request, "urlopen", urlopen), \
+                mock.patch.object(sys, "stderr", io.StringIO()) as err:
+            code = publish_docs.main()
+
+        self.assertEqual(code, 2)
+        self.assertIn("http://127.0.0.1:9999", err.getvalue())
+        urlopen.assert_not_called()
 
 
 if __name__ == "__main__":
