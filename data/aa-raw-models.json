@@ -89383,10 +89383,12 @@
    "financeAndAccounting": 53.9844924520062,
    "strategyAndOps": 56.9785355034937,
    "legal": 57.6948991540986,
+   "healthcareAndMedical": 51.1786037255156,
    "engineering": 53.9031392342597,
    "economics": 59.2824044253939
   },
   "omniscienceHallucinationRate": 0.5426561125769569,
+  "mlcrOverall": 0.338888888888889,
   "gdpPdfAllPass": 0.31,
   "gdpval": 1575.09,
   "itBenchSre": null,
