@@ -213,14 +213,21 @@ jobs:
           else
             echo "proceed=false" >> "$GITHUB_OUTPUT"
           fi
+          # Independent ifs, not an elif chain: live_stale and hub_stale can
+          # both fire in one run, and the chain printed only the first line.
+          # Each cause prints its own line, so every outcome is summarised.
+          # (Either flag being true already implies changed=false: they are
+          # only ever set under the unchanged path above.)
           if [ "$changed" = false ] && [ "$live_stale" = false ] \
              && [ "$hub_stale" = false ]; then
             echo 'AA capture unchanged and the live page is current — nothing committed, nothing published.' \
               >> "$GITHUB_STEP_SUMMARY"
-          elif [ "$changed" = false ] && [ "$live_stale" = true ]; then
+          fi
+          if [ "$live_stale" = true ]; then
             echo 'AA capture unchanged, but the live page is stale — republishing it.' \
               >> "$GITHUB_STEP_SUMMARY"
-          elif [ "$changed" = false ] && [ "$hub_stale" = true ]; then
+          fi
+          if [ "$hub_stale" = true ]; then
             echo 'AA capture unchanged, but the hub serves a page that differs from HEAD — republishing it.' \
               >> "$GITHUB_STEP_SUMMARY"
           fi
