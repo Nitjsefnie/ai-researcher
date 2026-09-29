@@ -258,7 +258,12 @@ def _never_lower_findings(path, working):
     top = _toplevel(target.parent)
     if top is None:
         return []
-    relpath = Path(os.path.relpath(os.path.abspath(target), top)).as_posix()
+    # Both sides resolved: git reports the real path of the toplevel, so a
+    # file reached through a symlinked directory (macOS /tmp, say) must be
+    # resolved the same way or the relative path would not start where the
+    # repository does.
+    relpath = Path(os.path.relpath(
+        os.path.realpath(target), os.path.realpath(top))).as_posix()
     if relpath.startswith('..'):
         return []  # outside the work tree: no committable path to compare
     try:
