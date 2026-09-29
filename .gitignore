@@ -29,7 +29,9 @@
 !/build.py
 !/pyrightconfig.json
 !/requirements-dev.txt
+!/requirements-pip-audit.txt
 !/requirements-test.txt
+!/requirements-zizmor.txt
 !/setup.cfg
 
 # ---- .github/ — CI workflows, dependabot, issue and PR templates ----------

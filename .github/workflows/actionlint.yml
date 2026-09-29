@@ -53,6 +53,16 @@ jobs:
     runs-on: ubuntu-latest
 
     env:
+      # THE MANUAL UPDATE PATH (issue #50). actionlint ships as a
+      # GitHub-release binary, which Dependabot cannot see — its pip
+      # ecosystem reads requirements files and its github-actions ecosystem
+      # reads `uses:` pins, and a curl-downloaded release tarball is neither
+      # — so unlike every other tool pin in the repo, nothing bumps this one
+      # automatically. Updating the tool is a deliberate act: take the
+      # linux_amd64 checksum from the new release's own checksums file
+      # (actionlint_<version>_checksums.txt) and land VERSION and SHA256
+      # together, in one commit, so the pin never names a version its
+      # checksum does not match.
       ACTIONLINT_VERSION: 1.7.12
       # sha256 of actionlint_1.7.12_linux_amd64.tar.gz, from the release's own
       # checksums file. Bump both together.
@@ -84,9 +94,12 @@ jobs:
 
       - name: Install zizmor
         id: install_zizmor
+        # From requirements-zizmor.txt rather than an inline pin: Dependabot's
+        # pip ecosystem reads manifest files, never a `run:` block, so the
+        # inline pin was a version nothing ever bumped (issue #50).
         run: |
           python3 -m pip install --upgrade pip
-          python3 -m pip install zizmor==1.29.0
+          python3 -m pip install -r requirements-zizmor.txt
 
       - name: actionlint
         id: actionlint

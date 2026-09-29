@@ -1,0 +1,15 @@
+# The dependency-advisory gate, pip-audit, installed by
+# .github/workflows/audit.yml — which then audits this file's tree along with
+# the rest. Pinned like every other tool in the repo so a release cannot turn
+# CI red on an unchanged commit.
+#
+# Why a requirements file when the install is one step in a workflow:
+# Dependabot's pip ecosystem reads manifest files and never the pins inside a
+# workflow `run:` block. As an inline `pip install pip-audit==2.10.1` this
+# pin was invisible to automation and could only go stale (issue #50); here
+# it joins the manifests the weekly Dependabot pass already watches.
+#
+# Transitives still resolve fresh per run — deliberate, so this very gate
+# audits the tree as it exists today; the trade-off is recorded in
+# audit.yml's header.
+pip-audit==2.10.1

@@ -6,10 +6,13 @@
 
 version: 2
 updates:
-  # requirements-dev.txt (lint/type toolchain) and requirements-test.txt
-  # (pytest, coverage, playwright). There is no runtime entry: build.py and
-  # the scripts import nothing off PyPI, so these tool pins are the entire pip
-  # surface.
+  # requirements-dev.txt (lint/type toolchain), requirements-test.txt
+  # (pytest, coverage, playwright), requirements-zizmor.txt and
+  # requirements-pip-audit.txt (the two gate tools, installed by
+  # actionlint.yml and audit.yml — they became requirements files precisely
+  # so this entry can bump them, issue #50). There is no runtime entry:
+  # build.py and the scripts import nothing off PyPI, so these tool pins are
+  # the entire pip surface.
   - package-ecosystem: pip
     directory: "/"
     schedule:
