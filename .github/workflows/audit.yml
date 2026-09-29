@@ -6,12 +6,22 @@ name: audit
 #
 # There is no requirements.txt here: the runtime is pure stdlib, with zero
 # third-party imports. So this gate covers the toolchain — the lint, type,
-# coverage and playwright pins — which is a smaller surface than the sibling
-# repos have but not an empty one: those tools run in CI with the repository
-# token, and a compromised one is a supply-chain problem even though it never
-# ships. Resolution is still the point rather than reading the pinned lines: a
-# linter drags in a dependency tree of its own, and that is where an advisory
-# lands.
+# coverage and playwright pins, plus the two gate tools themselves (zizmor
+# and pip-audit, requirements-zizmor.txt / requirements-pip-audit.txt) —
+# which is a smaller surface than the sibling repos have but not an empty
+# one: those tools run in CI with the repository token, and a compromised one
+# is a supply-chain problem even though it never ships. Resolution is still
+# the point rather than reading the pinned lines: a linter drags in a
+# dependency tree of its own, and that is where an advisory lands.
+#
+# NOT HERMETIC, ON PURPOSE. The requirements files pin the direct tools only
+# — no lockfile, no hashes — so every install resolves its transitive tree
+# fresh at run time. That is what gives this gate its subject: the
+# transitives are exactly where an advisory lands, and a frozen tree would go
+# stale exactly when an advisory did. The recorded cost (issue #50): with
+# zero repository change, a transitive release can turn CI red — here, or in
+# any gate that installs from these files — or alter the coverage numbers
+# that feed the ratchet in tests.yml.
 #
 # WHY THE CRON IS THE IMPORTANT TRIGGER. Every other gate here answers "did
 # this commit break something", so push is the natural trigger. This one
@@ -70,14 +80,22 @@ jobs:
           cache-dependency-path: requirements-*.txt
 
       - name: Install pip-audit
+        # From requirements-pip-audit.txt rather than an inline pin:
+        # Dependabot's pip ecosystem reads manifest files, never a `run:`
+        # block, so the inline pin was a version nothing ever bumped
+        # (issue #50).
         run: |
           python3 -m pip install --upgrade pip
-          python3 -m pip install pip-audit==2.10.1
+          python3 -m pip install -r requirements-pip-audit.txt
 
       - name: Audit dependencies
-        # Both requirements files in one invocation so a package constrained
+        # All four requirements files in one invocation: a package constrained
         # by two of them is resolved once, consistently — the same way an
-        # install would see it.
+        # install would see it. The two gate tools' own trees join the audit
+        # with this change (requirements-zizmor.txt,
+        # requirements-pip-audit.txt): both run in CI with the repository
+        # token, and until they grew manifest files neither was audited at
+        # all (issue #50).
         #
         # No --ignore-vuln entries at present.
         #
@@ -94,6 +112,8 @@ jobs:
                  --progress-spinner off \
                  --requirement requirements-dev.txt \
                  --requirement requirements-test.txt \
+                 --requirement requirements-zizmor.txt \
+                 --requirement requirements-pip-audit.txt \
                  > audit.out 2>&1; then
               cat audit.out
               exit 0
