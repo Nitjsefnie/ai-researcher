@@ -442,14 +442,19 @@ TEMPLATE = r"""<!DOCTYPE html>
   .viz-root, body {
     color-scheme: light;
     --surface-1:#fcfcfb; --plane:#f9f9f7;
-    --text-primary:#0b0b0b; --text-secondary:#52514e; --muted:#898781;
+    /* --muted and --accent are darkened one step from their original values
+       (#898781, #2a78d6): at those values the table headers measured 3.50:1
+       and the frontier tag 4.30:1, under the 4.5:1 WCAG AA floor. The dark
+       theme keeps the originals and passes there. */
+    --text-primary:#0b0b0b; --text-secondary:#52514e; --muted:#706e67;
     --grid:#e1e0d9; --axis:#c3c2b7; --border:rgba(11,11,11,0.10);
     --series-prop:#2a78d6; --series-open:#eb6834; --dim:#a9a7a0;
-    --accent:#2a78d6;
+    --accent:#2468c0;
     /* Dedicated token for the dashed frontier line: the line used to borrow
        --muted, which now also fills every superseded point on every chart.
-       Same value today, so nothing shifts visually -- the point is that
-       retuning the de-emphasis gray no longer silently restyles the line. */
+       It keeps the original gray -- --muted itself was darkened to 4.5:1 for
+       AA text contrast, which is exactly the retuning this token exists to
+       absorb without silently restyling the line. */
     --frontier-line:#898781;
     --sans:system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;
     --mono:ui-monospace,'SF Mono',Menlo,Monaco,monospace;
