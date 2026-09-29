@@ -228,22 +228,6 @@ def classify(path):
     return "significant"
 
 
-def significant_families(models):
-    """Top-level families that would be REPORTED if they moved.
-
-    The triage surface: every entry here is either something the page reads,
-    a component eval score that explains an index move, or a field AA added
-    that nobody has classified yet. The real-capture test pins this set so
-    the third kind is caught by the suite, named, before it can flood a
-    commit message."""
-    families = set()
-    for m in models:
-        for path in flatten(m):
-            if classify(path) == "significant":
-                families.add(path.split(".", 1)[0])
-    return families
-
-
 def rel_change(a, b):
     if isinstance(a, (int, float)) and isinstance(b, (int, float)) and not isinstance(a, bool):
         if a == 0:
