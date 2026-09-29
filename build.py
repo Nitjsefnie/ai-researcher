@@ -413,6 +413,12 @@ def main():
     for capture in (RAW, AGENTS_RAW):
         digest.update(capture.read_bytes())
     commit = os.environ.get("AA_SOURCE_COMMIT", "")
+    # Only a SHA-shaped value renders. The env is build-machine input, and a
+    # value carrying a template marker would otherwise be spliced by the
+    # later __CAPTURED__/__DATA__ substitutions -- anything else renders
+    # nothing, exactly as if the variable were unset.
+    if not re.fullmatch(r"[0-9a-f]{7,40}", commit, re.I):
+        commit = ""
     commit_note = (f" Source commit <code>{html.escape(commit)}</code>."
                    if commit else "")
     provenance = ("Capture <code>" + digest.hexdigest() + "</code> &mdash; sha256 over "
@@ -562,10 +568,12 @@ TEMPLATE = r"""<!DOCTYPE html>
     padding:9px 12px;font-size:12.5px;min-width:190px;max-width:280px;
     box-shadow:0 6px 22px rgba(0,0,0,.18);z-index:50}
   .tip.on{opacity:1}
-  /* The fade is a nicety, not information: under prefers-reduced-motion the
-     tooltip must appear and vanish instantly rather than animate. */
+  /* The fades are a nicety, not information: under prefers-reduced-motion
+     the tooltip and the copy toast must appear and vanish instantly rather
+     than animate. */
   @media (prefers-reduced-motion: no-preference) {
     .tip{transition:opacity 120ms ease}
+    .toast{transition:opacity .2s}
   }
   .tip .tname{color:var(--text-primary);font-weight:600;font-size:13px;margin-bottom:5px}
   .tip .trow{display:flex;justify-content:space-between;gap:14px;font-family:var(--mono);font-size:11.5px}
@@ -599,7 +607,7 @@ TEMPLATE = r"""<!DOCTYPE html>
     color:var(--accent);border:1px solid var(--accent);border-radius:8px;cursor:pointer}
   button.action:hover{background:var(--plane)}
   .toast{font-family:var(--mono);font-size:11.5px;color:var(--muted);margin-left:10px;
-    opacity:0;transition:opacity .2s}
+    opacity:0}
   .toast.show{opacity:1}
   .foot{color:var(--muted);font-size:12.5px;margin-top:56px;padding-top:20px;
     border-top:1px solid var(--border)}
