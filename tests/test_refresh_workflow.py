@@ -248,6 +248,11 @@ class GateTests(unittest.TestCase):
                 step(self.wf, name)["if"],
                 "steps.capture.outputs.proceed == 'true'")
 
+        # Issue #51: a revert to the bare `playwright install` unwires the digest gate.
+        self.assertEqual(
+            flattened(step(self.wf, "Install Chromium for playwright")["run"]),
+            "python3 scripts/ci/install_chromium.py")
+
         setup = [s for s in self.wf["jobs"]["refresh"]["steps"]
                  if s.get("uses", "").startswith("actions/setup-python@")]
         self.assertEqual(len(setup), 1)
