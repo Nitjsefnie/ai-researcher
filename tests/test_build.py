@@ -936,12 +936,26 @@ class SplitEffortScalingTests(unittest.TestCase):
     other processes on the box) for a pathological name at N and 8N, with a
     40x ceiling. A linear scan ratios ~8-12x here; the quadratic it replaces
     ratios ~47-70x across repeated runs. The absolute ceiling on the large
-    sample is a belt-and-suspenders gross-regression trip, not the mechanism.
+    block is a belt-and-suspenders gross-regression trip, not the mechanism.
+
+    The measurement is CALIBRATED against the host's clock (fix round 2):
+    each size is timed as k repeats inside one block, with k doubled until
+    the smaller size's total clears CLOCK_FLOOR -- well above the coarsest
+    tick in the CI fleet (Windows process_time ~15.6 ms), whose hosts read a
+    bare microsecond-scale sample as 0.0 and turned the ratio into a
+    ZeroDivisionError. Both sizes run the SAME k, so the totals' ratio is
+    the per-operation ratio and the ceiling comparison is unchanged. A
+    clock that cannot resolve even the calibrated smaller block fails
+    loudly naming the clock -- never a division by zero -- and that path
+    is pinned with an injected zero-returning clock.
     """
 
     SIZES = (2500, 20000)
     RATIO_CEILING = 40
-    LARGE_CPU_CEILING = 5.0
+    # Well above the coarsest host clock tick in the CI fleet (Windows
+    # process_time ~15.6 ms): every accepted measurement clears this.
+    CLOCK_FLOOR = 0.05
+    LARGE_TOTAL_CPU_CEILING = 5.0
 
     @staticmethod
     def pathological(groups: int) -> str:
@@ -949,30 +963,73 @@ class SplitEffortScalingTests(unittest.TestCase):
         return "Model (" * groups
 
     @classmethod
-    def fastest_cpu(cls, groups: int, repeats: int = 3) -> float:
-        best = float("inf")
-        for _ in range(repeats):
-            name = cls.pathological(groups)
-            start = time.process_time()
+    def block_total(cls, groups: int, k: int, clock) -> float:
+        """CPU seconds to split the pathological name k times."""
+        name = cls.pathological(groups)
+        start = clock()
+        for _ in range(k):
             build.split_effort(name)
-            best = min(best, time.process_time() - start)
-        return best
+        return clock() - start
+
+    @classmethod
+    def calibrated_totals(cls, clock=time.process_time,
+                          k_limit: int = 2 ** 22) -> tuple[float, float, int]:
+        """-> (small, large, k): CPU totals for the two sizes at the SAME
+        repeat count k, calibrated on the smaller size until its total
+        clears CLOCK_FLOOR.
+
+        Raises AssertionError naming the clock when it cannot resolve even
+        the calibrated smaller block: a ratio over such a reading would be
+        a ZeroDivisionError, not a measurement.
+        """
+        clock_name = getattr(clock, "__qualname__", None) or repr(clock)
+        k = 1
+        small = cls.block_total(cls.SIZES[0], k, clock)
+        while small <= cls.CLOCK_FLOOR:
+            if k >= k_limit:
+                raise AssertionError(
+                    f"the clock ({clock_name}) cannot resolve the smaller "
+                    f"scaling sample ({cls.SIZES[0]}-group name at k={k} "
+                    f"repeats reads {small:.4f}s) -- its tick is too coarse "
+                    "for the work and the growth ratio would divide by zero")
+            k *= 2
+            small = cls.block_total(cls.SIZES[0], k, clock)
+        large = cls.block_total(cls.SIZES[1], k, clock)
+        return small, large, k
 
     def test_pathological_names_scale_sub_quadratically(self):
-        small = self.fastest_cpu(self.SIZES[0])
-        large = self.fastest_cpu(self.SIZES[1])
+        small, large, k = self.calibrated_totals()
 
         ratio = large / small
         self.assertLess(
             ratio, self.RATIO_CEILING,
             f"split_effort grew {ratio:.1f}x for 8x the groups "
-            f"(t({self.SIZES[0]})={small:.4f}s cpu, "
-            f"t({self.SIZES[1]})={large:.4f}s cpu) -- super-linear; a crafted "
+            f"(same k={k} repeats per size, small block {small:.3f}s cpu, "
+            f"large block {large:.3f}s cpu) -- super-linear; a crafted "
             "capture can stall the hourly refresh (issue #47)")
         self.assertLess(
-            large, self.LARGE_CPU_CEILING,
-            f"t({self.SIZES[1]}) took {large:.4f}s cpu on one name -- "
-            "split_effort is too slow on a pathological input")
+            large, self.LARGE_TOTAL_CPU_CEILING,
+            f"the large-size block took {large:.3f}s cpu for k={k} repeats "
+            "-- split_effort is too slow on a pathological input")
+
+    def test_a_clock_that_cannot_resolve_the_work_fails_loudly(self):
+        # The ZeroDivisionError that broke CI on coarse-clock hosts, pinned
+        # shut: a clock that never advances must trip the loud refusal
+        # naming the clock -- never reach the division.
+        class ZeroClock:
+            """Every measurement reads 0.0: the coarse-tick failure at its
+            limit."""
+
+            def __call__(self):
+                return 0.0
+
+        with self.assertRaises(AssertionError) as caught:
+            self.calibrated_totals(clock=ZeroClock(), k_limit=8)
+
+        message = str(caught.exception)
+        self.assertIn("ZeroClock", message)
+        self.assertIn("too coarse", message)
+        self.assertNotIsInstance(caught.exception, ZeroDivisionError)
 
 
 class BuildArgvTests(unittest.TestCase):
