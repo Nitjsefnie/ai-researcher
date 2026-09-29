@@ -659,6 +659,31 @@ class BrowserInteractionTests(unittest.TestCase):
         }""")
         return tmp, (old_raw, old_agents, old_out), page
 
+    @staticmethod
+    def _markdown_cells(row):
+        """A markdown table row -> its cell texts, by the table's own
+        grammar: cells separate on UNESCAPED pipes, a backslash escapes the
+        next character, and a renderer trims the padding around a cell.
+        The round-trip the payload must survive."""
+        assert row.startswith("| ") and row.endswith(" |"), row
+        body = row[2:-2]
+        cells, buf, i = [], [], 0
+        while i < len(body):
+            ch = body[i]
+            if ch == "\\" and i + 1 < len(body):
+                buf.append(body[i + 1])
+                i += 2
+                continue
+            if ch == "|":
+                cells.append("".join(buf).strip())
+                buf = []
+                i += 1
+                continue
+            buf.append(ch)
+            i += 1
+        cells.append("".join(buf).strip())
+        return cells
+
     def test_copy_as_markdown_escapes_markdown_significant_cell_text(self):
         # #48: the markdown export interpolated raw captured strings into a
         # markdown table, where a literal pipe closes the cell, a backtick
@@ -684,6 +709,18 @@ class BrowserInteractionTests(unittest.TestCase):
             self.assertIn("P\\|ipe", row)
             self.assertIn("\\`Tick\\`", row)
             self.assertNotIn(self.HOSTILE_NAME, row)
+
+            # the payload must also survive its own grammar: parsed back as
+            # a markdown table -- rows on newlines, cells on unescaped pipes
+            # -- every original display text comes back per cell
+            table = [line for line in md.split("\n") if line.startswith("|")]
+            self.assertGreaterEqual(len(table), 3)
+            self.assertEqual(len(self._markdown_cells(table[0])), 13)
+            cells = self._markdown_cells(row)
+            self.assertEqual(len(cells), 13)
+            self.assertEqual(cells[0], self.HOSTILE_NAME)
+            self.assertEqual(cells[1], "Hostile Lab")
+            self.assertEqual(cells[12], "open")
         finally:
             page.close()
             build.RAW, build.AGENTS_RAW, build.OUT = saved
@@ -740,15 +777,21 @@ class BrowserInteractionTests(unittest.TestCase):
     def test_tooltip_transition_honours_prefers_reduced_motion(self):
         # #57: the tooltip's opacity fade ran unconditionally. Under
         # prefers-reduced-motion the transition must be gone entirely so the
-        # tooltip appears and vanishes instantly.
+        # tooltip appears and vanishes instantly. The bound is page-wide:
+        # the copy toast's fade is the same class of motion and is held to
+        # the same rule.
         page = self.browser.new_page(viewport={"width": 1280, "height": 900})
         page.goto(build.OUT.as_uri())
         duration = ("getComputedStyle(document.getElementById"
                     "('tip-intelligence')).transitionDuration")
+        toast = ("getComputedStyle(document.getElementById"
+                 "('toast')).transitionDuration")
         page.emulate_media(reduced_motion="reduce")
         self.assertEqual(page.evaluate(duration), "0s")
+        self.assertEqual(page.evaluate(toast), "0s")
         page.emulate_media(reduced_motion="no-preference")
         self.assertEqual(page.evaluate(duration), "0.12s")
+        self.assertEqual(page.evaluate(toast), "0.2s")
         page.close()
 
     def test_footer_carries_a_licence_note_linking_the_licence(self):
@@ -828,6 +871,14 @@ class BuildProvenanceTests(unittest.TestCase):
 
     COMMIT = "e5e10f1c0ffee4215deadbeefcafe0123456789a"
 
+    @staticmethod
+    def _foot(html):
+        """The footer div's text, and nothing else -- slicing to end-of-file
+        would drag in the payload <script> the footer is not responsible
+        for."""
+        start = html.index('class="foot"')
+        return html[start:html.index("<script>", start)]
+
     def _build(self, destination, commit=None):
         """Run build.main() to `destination`, with AA_SOURCE_COMMIT set or
         unset, and return the page bytes."""
@@ -851,7 +902,7 @@ class BuildProvenanceTests(unittest.TestCase):
             html = self._build(output, commit=self.COMMIT).decode("utf-8")
 
             # verbatim in the footer, not merely somewhere in the payload
-            foot = html[html.index('class="foot"'):]
+            foot = self._foot(html)
             self.assertIn(self.COMMIT, foot)
             # the content hash equals an independently computed sha256 over
             # the two capture files, read straight off the data directory
@@ -866,15 +917,36 @@ class BuildProvenanceTests(unittest.TestCase):
             output = pathlib.Path(tmp) / "frontier-models.html"
             html = self._build(output).decode("utf-8")
 
+            foot = self._foot(html)
+            # the SHA itself is the thing that would render on regression, so
+            # its absence -- here and page-wide -- is the absence oracle
+            self.assertNotIn(self.COMMIT, foot)
             self.assertNotIn(self.COMMIT, html)
-            foot = html[html.index('class="foot"'):]
-            self.assertNotIn("source commit", foot)
             # the content hash is verifiable today without any workflow
             # change, so it renders with or without the commit
             digest = hashlib.sha256()
             digest.update(build.RAW.read_bytes())
             digest.update(build.AGENTS_RAW.read_bytes())
             self.assertIn(digest.hexdigest(), foot)
+
+    def test_a_malformed_source_commit_renders_no_stamp_and_no_marker_splice(self):
+        # AA_SOURCE_COMMIT is build-machine input, so only SHA-shaped values
+        # (7-40 hex chars) render. Anything else must be treated exactly like
+        # an unset variable -- otherwise a value carrying a template marker
+        # would be spliced by the later __CAPTURED__/__DATA__ substitutions.
+        malformed = "__CAPTURED__ <script>__DATA__</script>"
+        with tempfile.TemporaryDirectory(prefix=".issue-49-build-",
+                                         dir=build.ROOT) as tmp:
+            output = pathlib.Path(tmp) / "frontier-models.html"
+            html = self._build(output, commit=malformed).decode("utf-8")
+
+            foot = self._foot(html)
+            self.assertNotIn("Source commit", foot)
+            self.assertNotIn(malformed, foot)
+            # nothing the env carried survived into the page, spliced or not
+            self.assertNotIn("__CAPTURED__", foot)
+            self.assertNotIn("__DATA__", foot)
+            self.assertNotIn("<script>", foot)
 
     def test_rebuild_without_the_env_var_stays_byte_identical(self):
         with tempfile.TemporaryDirectory(prefix=".issue-49-build-",
