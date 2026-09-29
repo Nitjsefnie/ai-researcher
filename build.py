@@ -753,7 +753,8 @@ TEMPLATE = r"""<!DOCTYPE html>
       This is the accessible twin of all four plots: nothing is reachable only by hovering.</p>
     <div style="margin-bottom:12px">
       <button class="action" id="copyMd">Copy as Markdown</button>
-      <button class="action" id="copyJson">Copy as JSON</button>
+      <button class="action" id="copyJson"
+        title="Raw captured data, unescaped — strings are copied exactly as AA published them, so names and labs may carry pipes, backticks or script tags">Copy as JSON</button>
       <span class="toast" id="toast"></span>
     </div>
     <div class="scroll">
@@ -803,6 +804,13 @@ const DATA = __DATA__;
   const fmtCtx  = v => v == null ? "—" : v >= 1e6 ? (v/1e6).toFixed(v%1e6?1:0)+"M"
                                             : v >= 1e3 ? Math.round(v/1e3)+"K" : String(v);
   const show = v => (v == null || v === "") ? "—" : String(v);
+  // A markdown table cell cannot carry a literal pipe (it would close the
+  // cell), backtick (it would open a code span), backslash (it would read as
+  // an escape) or newline (it would break the row). The backslash goes first
+  // so the escapes added here are not themselves re-escaped, and a newline
+  // becomes the space a markdown renderer folds it to inside a cell.
+  const mdCell = s => String(s).replace(/\\/g, "\\\\").replace(/\|/g, "\\|")
+    .replace(/`/g, "\\`").replace(/\r?\n/g, " ");
 
   $("mStat").textContent = S.plotted + " of " + S.total;
   $("cTotal").textContent = S.total;
@@ -1560,13 +1568,16 @@ const DATA = __DATA__;
     const val=(r,key,field)=>metricOf(r,key)?(field==="score"?metricOf(r,key).score.toFixed(1):fmtCost(metricOf(r,key).cost)):"—";
     const head="| Model | Lab | Coding Agent | Coding Agent $/task | Intelligence | Intelligence $/task | Parameters | GDPval-AA | GDPval $/task | $/1M in | $/1M out | Context | Weights |\n"
               +"|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|\n";
+    // Every cell goes through mdCell, so a captured name or lab carrying a
+    // pipe, backtick or newline round-trips as text instead of restructuring
+    // the pasted row.
     const body=rows.map(r=>"| "+[r.name,show(r.creator),
       val(r,"coding","score"),val(r,"coding","cost"),
       val(r,"intelligence","score"),val(r,"intelligence","cost"),
       fmtParams(r.params),
       val(r,"agentic","score"),val(r,"agentic","cost"),
       r.pin==null?"—":"$"+r.pin, r.pout==null?"—":"$"+r.pout,
-      fmtCtx(r.ctx), weightsOf(r)].join(" | ")+" |").join("\n");
+      fmtCtx(r.ctx), weightsOf(r)].map(mdCell).join(" | ")+" |").join("\n");
     clip(head+body+"\n\nSource: Artificial Analysis (artificialanalysis.ai), captured __CAPTURED__.",
          "✓ "+rows.length+" rows copied");
   });
