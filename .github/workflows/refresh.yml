@@ -100,14 +100,12 @@ jobs:
           cache: pip
           cache-dependency-path: requirements-*.txt
 
-      - name: Install the test toolchain
-        run: |
-          python3 -m pip install --upgrade pip
-          python3 -m pip install -r requirements-test.txt
-
-      - name: Install Chromium for playwright
-        run: python3 -m playwright install --with-deps chromium
-
+      # fetch_aa.py is pure stdlib (build.py, whose pins it reads, is too),
+      # so the capture runs before the toolchain exists: on the quiet
+      # majority of runs the capture is unchanged and `proceed` is false,
+      # and the two installs below are skipped entirely -- the gate decides
+      # whether the toolchain is needed at all, instead of paying 40-50 s of
+      # pip + Chromium on every no-op hour.
       - name: Capture the leaderboard
         run: python3 scripts/fetch_aa.py
 
@@ -160,6 +158,19 @@ jobs:
             echo 'AA capture unchanged, but the live page is stale — republishing it.' \
               >> "$GITHUB_STEP_SUMMARY"
           fi
+
+      # Both installs gate on `proceed`, not `changed`: a heal run has an
+      # unchanged capture but still rebuilds and runs the suite, so it needs
+      # the toolchain exactly when a moved-capture run does.
+      - name: Install the test toolchain
+        if: steps.capture.outputs.proceed == 'true'
+        run: |
+          python3 -m pip install --upgrade pip
+          python3 -m pip install -r requirements-test.txt
+
+      - name: Install Chromium for playwright
+        if: steps.capture.outputs.proceed == 'true'
+        run: python3 -m playwright install --with-deps chromium
 
       - name: Summarise what changed
         # Runs on `proceed`, not `changed`: this is the ONLY step that executes

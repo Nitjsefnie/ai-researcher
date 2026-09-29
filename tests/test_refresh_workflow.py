@@ -113,3 +113,29 @@ class GateTests(unittest.TestCase):
         # which is the final one -- a second rejection fails the run red
         # rather than looping.
         self.assertEqual(run.count("HEAD:main"), 2)
+
+    def test_the_fetch_runs_above_the_installs_which_gate_on_proceed(self):
+        # Issue 59: pip + Chromium install burned 40-50 s on the large
+        # majority of runs whose capture is unchanged. fetch_aa.py is pure
+        # stdlib (it imports build.py, which is too), so it captures first,
+        # above the installs; the installs gate on `proceed` -- not
+        # `changed` -- so a heal run still installs the toolchain the suite
+        # runs under.
+        names = [s.get("name") for s in self.wf["jobs"]["refresh"]["steps"]]
+
+        self.assertLess(names.index("Capture the leaderboard"),
+                        names.index("Install the test toolchain"))
+        self.assertLess(names.index("Capture the leaderboard"),
+                        names.index("Install Chromium for playwright"))
+        for name in ("Install the test toolchain",
+                     "Install Chromium for playwright"):
+            self.assertEqual(
+                step(self.wf, name)["if"],
+                "steps.capture.outputs.proceed == 'true'")
+
+        setup = [s for s in self.wf["jobs"]["refresh"]["steps"]
+                 if s.get("uses", "").startswith("actions/setup-python@")]
+        self.assertEqual(len(setup), 1)
+        # setup-python stays unconditional: it is cheap, and fetch_aa.py
+        # runs on it.
+        self.assertNotIn("if", setup[0])
