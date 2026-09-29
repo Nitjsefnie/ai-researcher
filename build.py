@@ -1611,11 +1611,15 @@ const DATA = __DATA__;
         candidates.push([x+dx,y+dy,Math.hypot(dx,dy)]);          // right
         candidates.push([x-tw-dx,y+dy,Math.hypot(tw+dx,dy)]);   // left
       }
-      // Candidates ordered by how far they sit from the dot -- the rule the
-      // intelligence chart's placer has used since 9c74397 -- so a label only
+      // Candidates ordered by how far they sit from the dot, so a label only
       // drifts as far as the crowd genuinely forces it. Walking generation
       // order instead let one blocked slot throw a label to the far side of
-      // its dot while nearer slots on the same side sat clear (#84).
+      // its dot while nearer slots on the same side sat clear (#84). Unlike
+      // the intelligence chart's placer (9c74397), a left candidate scores
+      // its far end rather than its near edge -- deliberate: these charts
+      // draw no leader lines, so a label reaching across its dot to name it
+      // from the left reads as another point's label, and stays the last
+      // resort here.
       candidates.sort((a,b)=>a[2]-b[2]);
       let chosen=null;
       for(const [bx,by] of candidates){
