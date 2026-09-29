@@ -199,3 +199,8 @@ a reviewer cannot see in a diff of string literals.
 If you are unsure whether something is a bug or intended, open an issue and
 ask. A wrong premise caught early is cheaper than a correct fix to the wrong
 problem.
+
+## License
+
+The repository and the page it builds are MIT-licensed — see
+[LICENSE](LICENSE).
