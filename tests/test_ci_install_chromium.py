@@ -7,7 +7,7 @@ itself, and fail loudly when playwright re-downloads anything anyway. The
 cases below pin the registry resolution (revision/browserVersion/digest,
 trust-on-first-use recipe on a miss), the URL templates, the streaming
 downloader's mirror fallback, the extractor's refusals (symlink entries,
-zip-slip) and its world-bit mask, the seed/replace/skip lifecycle around the
+zip-slip) and its owner-only mode mask, the seed/replace/skip lifecycle around the
 DIGEST_VERIFIED provenance marker, the no-re-download assertion, and the
 CLI's exit codes. No test touches the network: downloads are file:// URLs
 of local files or a stubbed download_archive.
@@ -363,10 +363,10 @@ def test_extract_archive_extracts_content_and_nesting(tmp_path):
                     reason="mode semantics are POSIX-only and the browser "
                            "consumers are ubuntu-latest")
 def test_extract_archive_modes_mask_world_bits(tmp_path):
-    # Extraction fidelity, modulo the world-bit mask: the extractor honors
-    # the archive's unix modes with world bits stripped (CodeQL
-    # py/overly-permissive-file), so a 0755 entry lands 0750 and a 0644
-    # entry lands 0640.
+    # Extraction fidelity, modulo the owner-only mask: the extractor honors
+    # the archive's unix modes with everything past the owner bits stripped
+    # (CodeQL py/overly-permissive-file flags group bits too), so a 0755
+    # entry lands 0700 and a 0644 entry lands 0600.
     archive = write_zip(tmp_path / "a.zip", [
         ("top/", b"", 0),
         ("top/bin", b"binary", 0o755),
@@ -374,9 +374,9 @@ def test_extract_archive_modes_mask_world_bits(tmp_path):
     ])
     destination = tmp_path / "out"
     install_chromium.extract_archive(archive, destination)
-    assert (destination / "top" / "bin").stat().st_mode & 0o777 == 0o750
+    assert (destination / "top" / "bin").stat().st_mode & 0o777 == 0o700
     assert (destination / "top" / "dir" / "nested.txt") \
-        .stat().st_mode & 0o777 == 0o640
+        .stat().st_mode & 0o777 == 0o600
 
 
 def test_extract_archive_refuses_symlink_entries(tmp_path):
