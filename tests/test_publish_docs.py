@@ -16,7 +16,9 @@ PAGE = b"<html>frontier</html>"
 
 # The only host the credential may be sent to, derived from the production
 # default the same way the client must derive it — never a second literal.
+# `hostname` is typed Optional; the production default always carries a host.
 HUB_HOST = urllib.parse.urlsplit(publish_docs.DEFAULT_URL).hostname
+assert isinstance(HUB_HOST, str)
 
 
 class Response:
@@ -84,13 +86,23 @@ class PublishTests(unittest.TestCase):
     def test_http_base_url_is_refused_before_any_network_call(self):
         self.assert_refused("http://127.0.0.1:9999")
 
+    def test_cleartext_to_the_hub_host_is_refused_before_any_network_call(self):
+        # Cleartext to the RIGHT host: netloc is fine and the hostname pin
+        # passes, so this row alone decides the scheme limb — without it,
+        # every wrong-scheme row is also wrong-host and deleting the scheme
+        # check stays green.
+        self.assert_refused(f"http://{HUB_HOST}")
+
     def test_schemeless_base_url_is_refused_before_any_network_call(self):
         # No scheme: urlsplit finds neither a scheme nor a netloc to trust.
         self.assert_refused("127.0.0.1:9999")
 
     def test_https_scheme_with_no_netloc_is_refused_before_any_network_call(self):
-        # The one case the scheme limb passes and the netloc limb alone
-        # decides: without this, deleting the netloc check stays green.
+        # The empty-netloc shape (`https:` parses with hostname=None) refuses
+        # observably. The netloc limb deciding it is defense-in-depth — the
+        # hostname pin co-refuses this input, so deleting the netloc limb
+        # alone stays green — and is kept deliberately; this row pins the
+        # refusal, not which limb produces it.
         self.assert_refused("https:")
 
     def test_wrong_host_is_refused_before_any_network_call(self):
