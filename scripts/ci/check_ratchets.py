@@ -111,17 +111,17 @@ def leaves(value, parts=None, out=None):
     return out
 
 
-def _finding(key, base, head, why):
-    return (f'{DOCUMENT}: {key}: merge base {_show(base)}, '
+def _finding(document, key, base, head, why):
+    return (f'{document}: {key}: merge base {_show(base)}, '
             f'head {_show(head)} — {why}')
 
 
-def _deleted():
-    return _finding('(document)', 'present', None,
+def _deleted(document):
+    return _finding(document, '(document)', 'present', None,
                     'the document was deleted')
 
 
-def _implied_floor_findings(before, after):
+def _implied_floor_findings(before, after, document):
     """A changed measurement must carry the floor it implies.
 
     The ratchet writes ``floor = measured - 1.5`` on every raise, so a
@@ -142,51 +142,58 @@ def _implied_floor_findings(before, after):
             continue
         if _decimal(floor) != _decimal(measured) - GAP:
             findings.append(_finding(
-                floor_key, before.get(floor_key), floor,
+                document, floor_key, before.get(floor_key), floor,
                 f'is not the floor implied by measured {measured}: a '
                 f'changed measurement must carry floor = measured - '
                 f'{GAP}'))
     return findings
 
 
-def coverage_relaxations(base, head):
-    """Findings for a head document that relaxes the merge base's."""
+def coverage_relaxations(base, head, document=DOCUMENT):
+    """Findings for a head document that relaxes the merge base's.
+
+    ``document`` names the checked path in the finding lines; the default
+    is the canonical ratchet document, and ``thresholds.py --check``
+    passes the path it compared so a finding always names the file it is
+    about.
+    """
     if base is None:
         return []
     if head is None:
-        return [_deleted()]
+        return [_deleted(document)]
     findings = []
     before = leaves(base)
     after = leaves(head)
     for key, was in before.items():
         if key not in after:
-            findings.append(_finding(key, was, None, 'key removed'))
+            findings.append(_finding(document, key, was, None, 'key removed'))
     for key, now in after.items():
         if key not in before:
-            findings.append(_finding(key, None, now, 'key added'))
+            findings.append(_finding(document, key, None, now, 'key added'))
             continue
         was = before[key]
         if not _is_number(now):
-            findings.append(_finding(key, was, now, 'not a finite number'))
+            findings.append(
+                _finding(document, key, was, now, 'not a finite number'))
             continue
         if was == now:
             continue
         direction = _DIRECTIONS.get(key)
         if direction is None:
             findings.append(_finding(
-                key, was, now,
+                document, key, was, now,
                 'changed, and has no tightening direction'))
         elif not _is_number(was):
             findings.append(_finding(
-                key, was, now,
+                document, key, was, now,
                 'merge-base value is not a finite number'))
         elif direction == 'up' and now < was:
             findings.append(_finding(
-                key, was, now, 'lowered; it may only rise'))
+                document, key, was, now, 'lowered; it may only rise'))
         elif direction == 'fixed':
             findings.append(_finding(
-                key, was, now, 'schema_version changed'))
-    findings.extend(_implied_floor_findings(before, after))
+                document, key, was, now, 'schema_version changed'))
+    findings.extend(_implied_floor_findings(before, after, document))
     return findings
 
 
@@ -283,7 +290,8 @@ def check_ratchets(cwd, base_rev, head_rev):
     kind = entry_kind(cwd, head, DOCUMENT)
     if kind is not None and kind != REGULAR_FILE:
         findings.append(_finding(
-            '(document)', REGULAR_FILE, kind, 'not a regular file'))
+            DOCUMENT, '(document)', REGULAR_FILE, kind,
+            'not a regular file'))
     else:
         base_document = read_document(cwd, fork, DOCUMENT)
         head_document = read_document(cwd, head, DOCUMENT)

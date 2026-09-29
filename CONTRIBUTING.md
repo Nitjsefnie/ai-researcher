@@ -134,9 +134,11 @@ and JavaScript physical code-line coverage of the page's inline script,
 measured through the browser suite (`tests/test_browser.py` records V8
 coverage when `JS_COVERAGE_OUT` is set, and `scripts/ci/js_coverage.py` folds
 the dump). A push to `main` whose coverage climbs more than 1.5 points past
-the recorded measurement raises the floor automatically; a pull request
-cannot relax the file — a guard step compares it against the merge base and
-refuses any change that lowers a value.
+the recorded measurement raises the floor automatically; nothing can relax
+the file — a guard step compares it against the merge base and refuses any
+change that lowers a value, on a pull request and on a direct push to
+`main` alike, and `thresholds.py --check` refuses a working-tree copy below
+the committed one.
 Scripts are counted deliberately — `--omit` leaves out only `tests/*` —
 because they run unattended in CI. Note what the numbers can and cannot speak
 to: `build.py` is ~1400 lines but only ~100 statements, because most of it is

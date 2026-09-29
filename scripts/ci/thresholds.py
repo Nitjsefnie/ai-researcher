@@ -1,15 +1,30 @@
 #!/usr/bin/env python3
-"""Read, validate, and atomically publish CI threshold state."""
+"""Read, validate, and atomically publish CI threshold state.
+
+``--check`` validates the document's structure AND its history: the
+working-tree copy is judged against the copy committed at HEAD with the
+same never-lower rule the pull-request guard applies, so a lowered
+document that keeps the calibration gap cannot slip a direct push past
+``--check`` on its own.
+"""
 from __future__ import annotations
 
 import argparse
+import importlib
 import json
 import os
 import stat
+import subprocess
 import sys
 import tempfile
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
+
+if __package__:
+    # pylint: disable-next=relative-beyond-top-level,no-name-in-module
+    from . import check_ratchets
+else:
+    check_ratchets = importlib.import_module('check_ratchets')
 
 THRESHOLDS = (Path(__file__).resolve().parents[2]
               / '.github' / 'ci-thresholds.json')
@@ -209,11 +224,65 @@ def write(path, data):
             _remove_temp(temporary_path)
 
 
+def _toplevel(directory):
+    """The work-tree root containing ``directory``, or None when unanchored.
+
+    A file outside any repository has no committed copy to be lowered
+    against, so the history component is skipped and the structural check
+    alone judges the document.
+    """
+    try:
+        result = subprocess.run(
+            ['git', '-C', str(directory), 'rev-parse', '--show-toplevel'],
+            capture_output=True, text=True, check=False)
+    except OSError:
+        return None  # git is missing: no history to compare against
+    if result.returncode != 0:
+        return None  # not a repository (or a broken one)
+    return Path(result.stdout.strip())
+
+
+def _never_lower_findings(path, working):
+    """Findings for a working-tree document below the copy at HEAD.
+
+    Reuses the guard's relaxation logic so the two tools cannot drift:
+    the same leaves, the same directions, the same implied-floor rule.
+    The history component is skipped — and never-lower holds — when the
+    file sits outside any repository, when HEAD is unborn, or when no
+    copy of the file is committed at HEAD, because a first document
+    cannot be lowered. A committed copy that cannot be read raises: with
+    it unreadable never-lower cannot be certified, so the check fails
+    closed.
+    """
+    target = Path(path)
+    top = _toplevel(target.parent)
+    if top is None:
+        return []
+    relpath = Path(os.path.relpath(os.path.abspath(target), top)).as_posix()
+    if relpath.startswith('..'):
+        return []  # outside the work tree: no committable path to compare
+    try:
+        commit = check_ratchets.resolve_commit(top, 'HEAD')
+    except ValueError:
+        return []  # unborn HEAD: no committed copy exists yet
+    try:
+        committed = check_ratchets.read_document(top, commit, relpath)
+    except ValueError as error:
+        raise ValueError(
+            f'cannot certify never-lower for {relpath}: {error}') from None
+    if committed is None:
+        return []
+    return check_ratchets.coverage_relaxations(
+        committed, working, document=relpath)
+
+
 def _parser():
     parser = argparse.ArgumentParser(description=__doc__)
     modes = parser.add_mutually_exclusive_group(required=True)
     modes.add_argument('--check', action='store_true',
-                       help='validate the threshold document')
+                       help='validate the threshold document: structure, '
+                            'and that no value sits below its committed '
+                            'copy at HEAD')
     modes.add_argument('--coverage-floor', choices=COVERAGE_LANGUAGES,
                        help='print one language floor')
     modes.add_argument('--coverage-measured', choices=COVERAGE_LANGUAGES,
@@ -233,6 +302,11 @@ def main(argv=None):
             measured, _floor = coverage(data, args.coverage_measured)
             print(f'{measured:.1f}')
         else:
+            findings = _never_lower_findings(args.thresholds, data)
+            if findings:
+                for line in findings:
+                    print(line, file=sys.stderr)
+                return 1
             print('thresholds valid')
     except (OSError, ValueError) as error:
         print(str(error), file=sys.stderr)

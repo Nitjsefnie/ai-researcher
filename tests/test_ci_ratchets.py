@@ -480,3 +480,37 @@ def test_end_to_end_unknown_revision_is_exit_2(tmp_path):
     _seed_repo(tmp_path, _document())
     guard = _guard()
     assert guard.main(["main", "no-such-revision"]) == 2
+
+
+def test_end_to_end_push_lowering_on_main_is_flagged(tmp_path):
+    """The push path's shape: BEFORE..HEAD, both tips of main.
+
+    The workflow's push branch invokes the guard as
+    ``check_ratchets.py "${BEFORE}" HEAD`` with the previous main tip and
+    the new one; a direct-push lowering must be flagged exactly as a
+    branch's lowering is.
+    """
+    repo = _seed_repo(tmp_path, _document())
+    before = _git(repo, "rev-parse", "main").stdout.strip()
+    head = _commit_here(repo, _document(measured="90.0", floor="88.5"),
+                        "lower the calibration by direct push")
+    guard = _guard()
+    _fork, findings = guard.check_ratchets(repo, before, head)
+    assert len(findings) == 2
+    assert all("lowered" in line for line in findings)
+
+
+def test_end_to_end_push_raise_on_main_is_clean(tmp_path):
+    """The automated raise's own push run must stay green.
+
+    The raise commit only lifts values, so against its parent it relaxes
+    nothing — the push branch of the guard step cannot break the very
+    commits the ratchet itself produces.
+    """
+    repo = _seed_repo(tmp_path, _document())
+    before = _git(repo, "rev-parse", "main").stdout.strip()
+    head = _commit_here(repo, _document(measured="94.2", floor="92.7"),
+                        "raise (automated)")
+    guard = _guard()
+    _fork, findings = guard.check_ratchets(repo, before, head)
+    assert findings == []
