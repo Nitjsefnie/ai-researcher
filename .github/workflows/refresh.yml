@@ -129,13 +129,13 @@ jobs:
           # way this run republishes. ANY fetch failure is treated as stale:
           # republishing a page that was already current costs one hub
           # version, while a real outage still fails red at the publish
-          # step's ref push.
+          # step's ref update.
           live_stale=false
           if [ "$changed" = false ] && [ "${{ inputs.force }}" != 'true' ]; then
             # Anonymous fetch: relies on the repo being public. If it ever
             # goes private, this gate degrades to an hourly republish --
-            # self-consistent, since the ref push still authenticates via
-            # the token URL.
+            # self-consistent, since the ref update still authenticates
+            # via GH_TOKEN in the publish step.
             if git fetch --depth=1 origin \
                  refs/heads/published:refs/remotes/origin/published 2>/dev/null; then
               if ! git diff --quiet origin/published HEAD -- out/frontier-models.html; then
@@ -319,8 +319,29 @@ jobs:
           # Record the published state only once the upload succeeded: this
           # ref is what the heal gate compares against, so it must never
           # claim a page the hub does not serve. HEAD sits on main's history
-          # and the ref only ever moves along it, so the update is a
-          # fast-forward; a failed ref update fails the run, because a
-          # silently stale ref would make every later hour republish.
-          git push "https://x-access-token:${GH_TOKEN}@github.com/${REPO}" \
-            HEAD:refs/heads/published
+          # and the ref only ever moves along it, so the update is always a
+          # fast-forward.
+          #
+          # The ref moves through the GitHub refs API, not `git push`: the
+          # checkout is shallow (actions/checkout's default depth-1), so git
+          # holds too little ancestry to prove a fast-forward locally and
+          # rejected every update with "(fetch first)" even though it was
+          # one -- issue #77. The API checks server-side, where the full
+          # graph lives:
+          #   - GET first: a 404 means the ref does not exist, so CREATE it
+          #     (POST) -- creation needs no fast-forward proof.
+          #   - Otherwise PATCH without `force`: the API default is the
+          #     server-side fast-forward check, and a 422 "not a fast
+          #     forward" fails the run -- the same red a rejected push
+          #     produced, now only when the update genuinely is not a
+          #     fast-forward.
+          # Any other API failure fails the run too: a silently stale ref
+          # would make every later hour republish.
+          head_sha=$(git rev-parse HEAD)
+          if gh api "repos/$REPO/git/refs/heads/published" > /dev/null; then
+            gh api --method PATCH "repos/$REPO/git/refs/heads/published" \
+              -f sha="$head_sha"
+          else
+            gh api --method POST "repos/$REPO/git/refs/heads/published" \
+              -f ref=refs/heads/published -f sha="$head_sha"
+          fi

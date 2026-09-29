@@ -36,6 +36,13 @@ def flattened(text):
     return " ".join(text.split())
 
 
+def commands(text):
+    """The flattened run block minus its comment lines, so a pin on what
+    EXECUTES cannot be satisfied by -- or tripped by -- the prose."""
+    return flattened("\n".join(line for line in text.splitlines()
+                               if not line.lstrip().startswith("#")))
+
+
 class GateTests(unittest.TestCase):
     def setUp(self):
         self.wf = load()
@@ -75,11 +82,50 @@ class GateTests(unittest.TestCase):
     def test_the_publish_step_updates_the_published_ref_after_a_successful_publish(self):
         # The ref records the last successfully published state, so the heal
         # check has something to compare against. It must move only after
-        # publish_docs.py succeeded, in the same step.
+        # publish_docs.py succeeded, in the same step -- the first refs-API
+        # command is the GET probe that decides create-vs-update.
         run = flattened(step(self.wf, "Publish to docs-hub")["run"])
 
-        self.assertLess(run.index("publish_docs.py"), run.index("git push"))
-        self.assertIn("refs/heads/published", run)
+        self.assertLess(
+            run.index("publish_docs.py"),
+            run.index('gh api "repos/$REPO/git/refs/heads/published"'))
+
+    def test_the_published_ref_moves_through_the_refs_api(self):
+        # Issue 77: the checkout is shallow (actions/checkout's default
+        # depth-1), so a local `git push` cannot walk enough ancestry to
+        # prove the ref update is a fast-forward and was rejected "(fetch
+        # first)" on every publishing run -- even though it was one. The
+        # refs API runs the check server-side, where the full graph lives:
+        # a 404 on GET means CREATE (POST needs no fast-forward proof),
+        # otherwise PATCH, whose default non-forced update IS GitHub's
+        # fast-forward check. The step must document that a non-forced
+        # PATCH is the point, so a future reader does not "fix" the 422 by
+        # adding force.
+        raw = step(self.wf, "Publish to docs-hub")["run"]
+        run = flattened(raw)
+
+        # The GET probe decides create-vs-update.
+        self.assertIn('gh api "repos/$REPO/git/refs/heads/published"', run)
+        self.assertIn("--method PATCH", run)
+        self.assertIn("--method POST", run)
+        self.assertIn("-f sha=", run)
+        # The non-forced fast-forward semantics are documented in the step,
+        # not incidental -- and no executed call carries a `force` field at
+        # all (the API default is the check).
+        self.assertIn("without `force`", run)
+        self.assertNotIn("force", commands(raw))
+
+    def test_no_git_push_touches_the_published_ref(self):
+        # Issue 77: the git push behind the ref update was rejected
+        # "(fetch first)" on every publishing run while the upload itself
+        # succeeded, so the run went red and the ref stayed stale. The refs
+        # API owns this ref now: no step may git-push to it. (The heal
+        # gate's `git fetch` of the same ref only reads it; the prose may
+        # still name the retired mechanism.)
+        for s in self.wf["jobs"]["refresh"]["steps"]:
+            raw = s.get("run", "")
+            if "refs/heads/published" in flattened(raw):
+                self.assertNotIn("git push", commands(raw))
 
     def test_the_commit_step_carries_an_explicit_publish_verdict(self):
         # Issue 42: the byte-identical early exit commits nothing but must
