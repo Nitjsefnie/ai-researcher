@@ -481,7 +481,7 @@
   "slug": "mimo-v2-5-pro",
   "name": "MiMo-V2.5-Pro",
   "shortName": "MiMo-V2.5-Pro",
-  "deprecated": false,
+  "deprecated": true,
   "isReasoning": true,
   "isOpenWeights": true,
   "paramClass": "large",
@@ -591,7 +591,7 @@
   "release": {
    "slug": "mimo-v2-5-pro",
    "name": "MiMo-V2.5-Pro",
-   "deprecatedTo": null
+   "deprecatedTo": "mimo-v2-6-pro"
   },
   "openSourceCategorization": "permissive",
   "parameters": 1023,
@@ -11652,7 +11652,7 @@
   "slug": "claude-sonnet-5-low",
   "name": "Claude Sonnet 5 (Adaptive Reasoning, Low Effort)",
   "shortName": "Claude Sonnet 5 (low)",
-  "deprecated": false,
+  "deprecated": true,
   "isReasoning": true,
   "isOpenWeights": false,
   "paramClass": null,
@@ -11767,7 +11767,7 @@
   "release": {
    "slug": "claude-sonnet-5",
    "name": "Claude Sonnet 5",
-   "deprecatedTo": null
+   "deprecatedTo": "claude-sonnet-5-5"
   },
   "openSourceCategorization": "proprietary",
   "parameters": null,
@@ -11993,7 +11993,7 @@
   "slug": "mimo-v2-0206",
   "name": "MiMo-V2-Flash (Feb 2026)",
   "shortName": "MiMo-V2-Flash (Feb 2026)",
-  "deprecated": false,
+  "deprecated": true,
   "isReasoning": true,
   "isOpenWeights": true,
   "paramClass": "large",
@@ -12050,7 +12050,7 @@
   "release": {
    "slug": "mimo-v2-0206",
    "name": "MiMo-V2-Flash (Feb 2026)",
-   "deprecatedTo": null
+   "deprecatedTo": "mimo-v2-6-flash"
   },
   "openSourceCategorization": "permissive",
   "parameters": 309,
@@ -17848,7 +17848,7 @@
   "slug": "mimo-v2-5-0424",
   "name": "MiMo-V2.5",
   "shortName": "MiMo-V2.5",
-  "deprecated": false,
+  "deprecated": true,
   "isReasoning": true,
   "isOpenWeights": true,
   "paramClass": "large",
@@ -17905,7 +17905,7 @@
   "release": {
    "slug": "mimo-v2-5-0424",
    "name": "MiMo-V2.5",
-   "deprecatedTo": null
+   "deprecatedTo": "mimo-v2-6-pro"
   },
   "openSourceCategorization": "permissive",
   "parameters": 310,
@@ -18442,7 +18442,7 @@
   "slug": "claude-sonnet-5",
   "name": "Claude Sonnet 5 (Adaptive Reasoning, Max Effort)",
   "shortName": "Claude Sonnet 5 (max)",
-  "deprecated": false,
+  "deprecated": true,
   "isReasoning": true,
   "isOpenWeights": false,
   "paramClass": null,
@@ -18557,7 +18557,7 @@
   "release": {
    "slug": "claude-sonnet-5",
    "name": "Claude Sonnet 5",
-   "deprecatedTo": null
+   "deprecatedTo": "claude-sonnet-5-5"
   },
   "openSourceCategorization": "proprietary",
   "parameters": null,
@@ -19766,7 +19766,7 @@
   "slug": "grok-4-6-medium",
   "name": "Grok 4.6 (medium)",
   "shortName": "Grok 4.6 (medium)",
-  "deprecated": false,
+  "deprecated": true,
   "isReasoning": true,
   "isOpenWeights": false,
   "paramClass": null,
@@ -19881,7 +19881,7 @@
   "release": {
    "slug": "grok-4-6",
    "name": "Grok 4.6",
-   "deprecatedTo": null
+   "deprecatedTo": "grok-4-7"
   },
   "openSourceCategorization": "proprietary",
   "parameters": null,
@@ -37089,7 +37089,7 @@
   "slug": "mimo-v2-5-pro-non-reasoning",
   "name": "MiMo-V2.5-Pro (Non-reasoning)",
   "shortName": "MiMo-V2.5-Pro (Non-reasoning)",
-  "deprecated": false,
+  "deprecated": true,
   "isReasoning": false,
   "isOpenWeights": true,
   "paramClass": "large",
@@ -37146,7 +37146,7 @@
   "release": {
    "slug": "mimo-v2-5-pro",
    "name": "MiMo-V2.5-Pro",
-   "deprecatedTo": null
+   "deprecatedTo": "mimo-v2-6-pro"
   },
   "openSourceCategorization": "permissive",
   "parameters": 1023,
@@ -53619,7 +53619,7 @@
   "slug": "step-3-7-flash",
   "name": "Step 3.7 Flash",
   "shortName": "Step 3.7 Flash",
-  "deprecated": false,
+  "deprecated": true,
   "isReasoning": true,
   "isOpenWeights": true,
   "paramClass": "large",
@@ -53681,7 +53681,7 @@
   "release": {
    "slug": "step-3-7-flash",
    "name": "Step 3.7 Flash",
-   "deprecatedTo": null
+   "deprecatedTo": "step-5-preview"
   },
   "openSourceCategorization": "permissive",
   "parameters": 198,
@@ -76014,7 +76014,7 @@
   "slug": "claude-sonnet-5-xhigh",
   "name": "Claude Sonnet 5 (Adaptive Reasoning, Xhigh Effort)",
   "shortName": "Claude Sonnet 5 (xhigh)",
-  "deprecated": false,
+  "deprecated": true,
   "isReasoning": true,
   "isOpenWeights": false,
   "paramClass": null,
@@ -76129,7 +76129,7 @@
   "release": {
    "slug": "claude-sonnet-5",
    "name": "Claude Sonnet 5",
-   "deprecatedTo": null
+   "deprecatedTo": "claude-sonnet-5-5"
   },
   "openSourceCategorization": "proprietary",
   "parameters": null,
@@ -80041,7 +80041,7 @@
   "slug": "motif-0714",
   "name": "Motif 3 (Beta)",
   "shortName": "Motif 3 (Beta)",
-  "deprecated": false,
+  "deprecated": true,
   "isReasoning": true,
   "isOpenWeights": false,
   "paramClass": "large",
@@ -80098,7 +80098,7 @@
   "release": {
    "slug": "motif-0714",
    "name": "Motif 3 (Beta)",
-   "deprecatedTo": null
+   "deprecatedTo": "motif-3"
   },
   "openSourceCategorization": "proprietary",
   "parameters": 314,
@@ -90952,7 +90952,7 @@
   "slug": "claude-sonnet-5-high",
   "name": "Claude Sonnet 5 (Adaptive Reasoning, High Effort)",
   "shortName": "Claude Sonnet 5 (high)",
-  "deprecated": false,
+  "deprecated": true,
   "isReasoning": true,
   "isOpenWeights": false,
   "paramClass": null,
@@ -91067,7 +91067,7 @@
   "release": {
    "slug": "claude-sonnet-5",
    "name": "Claude Sonnet 5",
-   "deprecatedTo": null
+   "deprecatedTo": "claude-sonnet-5-5"
   },
   "openSourceCategorization": "proprietary",
   "parameters": null,
@@ -94674,7 +94674,7 @@
   "slug": "grok-4-6-low",
   "name": "Grok 4.6 (low)",
   "shortName": "Grok 4.6 (low)",
-  "deprecated": false,
+  "deprecated": true,
   "isReasoning": true,
   "isOpenWeights": false,
   "paramClass": null,
@@ -94789,7 +94789,7 @@
   "release": {
    "slug": "grok-4-6",
    "name": "Grok 4.6",
-   "deprecatedTo": null
+   "deprecatedTo": "grok-4-7"
   },
   "openSourceCategorization": "proprietary",
   "parameters": null,
@@ -98258,7 +98258,7 @@
   "slug": "grok-4-6",
   "name": "Grok 4.6 (high)",
   "shortName": "Grok 4.6 (high)",
-  "deprecated": false,
+  "deprecated": true,
   "isReasoning": true,
   "isOpenWeights": false,
   "paramClass": null,
@@ -98373,7 +98373,7 @@
   "release": {
    "slug": "grok-4-6",
    "name": "Grok 4.6",
-   "deprecatedTo": null
+   "deprecatedTo": "grok-4-7"
   },
   "openSourceCategorization": "proprietary",
   "parameters": null,
@@ -103972,7 +103972,7 @@
   "slug": "claude-sonnet-5-non-reasoning",
   "name": "Claude Sonnet 5 (Non-reasoning, High Effort)",
   "shortName": "Claude Sonnet 5 (Non-reasoning)",
-  "deprecated": false,
+  "deprecated": true,
   "isReasoning": false,
   "isOpenWeights": false,
   "paramClass": null,
@@ -104029,7 +104029,7 @@
   "release": {
    "slug": "claude-sonnet-5",
    "name": "Claude Sonnet 5",
-   "deprecatedTo": null
+   "deprecatedTo": "claude-sonnet-5-5"
   },
   "openSourceCategorization": "proprietary",
   "parameters": null,
@@ -104674,7 +104674,7 @@
   "slug": "grok-4-6-xhigh",
   "name": "Grok 4.6 (xhigh)",
   "shortName": "Grok 4.6 (xhigh)",
-  "deprecated": false,
+  "deprecated": true,
   "isReasoning": true,
   "isOpenWeights": false,
   "paramClass": null,
@@ -104789,7 +104789,7 @@
   "release": {
    "slug": "grok-4-6",
    "name": "Grok 4.6",
-   "deprecatedTo": null
+   "deprecatedTo": "grok-4-7"
   },
   "openSourceCategorization": "proprietary",
   "parameters": null,
@@ -115142,7 +115142,7 @@
   "slug": "claude-sonnet-5-medium",
   "name": "Claude Sonnet 5 (Adaptive Reasoning, Medium Effort)",
   "shortName": "Claude Sonnet 5 (medium)",
-  "deprecated": false,
+  "deprecated": true,
   "isReasoning": true,
   "isOpenWeights": false,
   "paramClass": null,
@@ -115257,7 +115257,7 @@
   "release": {
    "slug": "claude-sonnet-5",
    "name": "Claude Sonnet 5",
-   "deprecatedTo": null
+   "deprecatedTo": "claude-sonnet-5-5"
   },
   "openSourceCategorization": "proprietary",
   "parameters": null,
