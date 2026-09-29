@@ -1,4 +1,5 @@
 import contextlib
+import datetime
 import io
 import json
 import pathlib
@@ -355,23 +356,32 @@ class CaptureStampTests(unittest.TestCase):
     and copy-as-JSON clips -- besides the inline payload's stats, all
     downstream of the single read at the top of main(). One guard at that
     read accepts exactly what scripts/fetch_aa.py writes -- a single ISO
-    date -- and refuses everything else.
+    date -- and refuses everything else: a stamp-less capture (issue #64)
+    and undecodable bytes included, with the today-fallback surviving only
+    for a data directory that holds no capture at all.
     """
 
-    def build_with_stamp(self, stamp_text: str) -> str:
+    def build_with_stamp(self, stamp_text: str | bytes | None) -> str:
         """Build a hermetic capture whose stamp file holds `stamp_text`.
 
-        Returns the rendered HTML; a stamp the guard refuses raises
-        SystemExit out of build.main() for the refusal tests to assert on.
+        None leaves the stamp file absent -- a capture that lost its stamp
+        (issue #64). Bytes are written raw, so a non-UTF-8 stamp is
+        expressible. Returns the rendered HTML; a stamp the guard refuses
+        raises SystemExit out of build.main() for the refusal tests to
+        assert on.
         """
         with tempfile.TemporaryDirectory(prefix=".issue-40-build-", dir=build.ROOT) as tmp:
             root = pathlib.Path(tmp)
-            raw = root / "models.json"
-            agents_raw = root / "coding-agents.json"
+            raw = root / "aa-raw-models.json"
+            agents_raw = root / "aa-raw-coding-agents.json"
             output = root / "frontier-models.html"
             raw.write_text(json.dumps([model_fixture()]), encoding="utf-8")
             agents_raw.write_text(json.dumps([agent_fixture()]), encoding="utf-8")
-            (root / "captured-at.txt").write_text(stamp_text, encoding="utf-8")
+            stamp = root / "captured-at.txt"
+            if isinstance(stamp_text, bytes):
+                stamp.write_bytes(stamp_text)
+            elif stamp_text is not None:
+                stamp.write_text(stamp_text, encoding="utf-8")
             old_raw, old_agents, old_out = build.RAW, build.AGENTS_RAW, build.OUT
             try:
                 build.RAW, build.AGENTS_RAW, build.OUT = raw, agents_raw, output
@@ -384,12 +394,20 @@ class CaptureStampTests(unittest.TestCase):
     def test_a_stamp_in_the_written_format_builds_and_reaches_the_page_unmodified(self):
         # scripts/fetch_aa.py writes exactly date.today().isoformat() + "\n";
         # the guard must accept that shape untouched, and the page must carry
-        # the stamp through every sink it feeds.
-        html = self.build_with_stamp("2026-09-29\n")
+        # the stamp through every sink it feeds. Whitespace padding around the
+        # date is the reader's strip() tolerance, held open because the
+        # accepted charset (digits and hyphens) cannot carry an attack.
+        for stamp_text in ("2026-09-29\n", "  2026-09-29  "):
+            with self.subTest(stamp_text=stamp_text):
+                html = self.build_with_stamp(stamp_text)
 
-        self.assertIn("captured 2026-09-29", html)
-        self.assertIn('<div class="v">2026-09-29</div>', html)
-        self.assertIn('"captured":"2026-09-29"', html)
+                self.assertIn("captured 2026-09-29", html)
+                self.assertIn('<div class="v">2026-09-29</div>', html)
+                self.assertIn('"captured":"2026-09-29"', html)
+                # The copy clips carry the same value into their JS string and
+                # Markdown contexts -- the two sinks the first pin missed.
+                self.assertIn('source:"artificialanalysis.ai",captured:"2026-09-29"', html)
+                self.assertIn("captured 2026-09-29.", html)
 
     def test_a_markup_stamp_is_refused_naming_file_format_and_content(self):
         # The stamp lands in HTML text nodes and JS string literals; markup in
@@ -435,12 +453,52 @@ class CaptureStampTests(unittest.TestCase):
             ("2026-W39-4", "ISO week date"),
             ("2026-13-99", "date-shaped but not a calendar date"),
             ("2026-09-29\n2026-09-29", "two stamp lines"),
+            ("  \n", "whitespace-only, strips to empty"),
         ):
             with self.subTest(stamp_text=stamp_text, why=why):
                 with self.assertRaises(SystemExit) as raised:
                     self.build_with_stamp(stamp_text)
 
                 self.assertIn("YYYY-MM-DD", str(raised.exception))
+
+    def test_a_capture_without_its_stamp_is_refused_not_relabelled_with_today(self):
+        # Issue #64: fetch_aa.py writes the stamp beside the capture on every
+        # capture, so capture data without a stamp is a capture that lost it,
+        # not a pre-stamp checkout -- falling back to today would relabel the
+        # page with the build date, silently.
+        with self.assertRaises(SystemExit) as raised:
+            self.build_with_stamp(None)
+
+        message = str(raised.exception)
+        self.assertIn("captured-at.txt", message)
+        self.assertIn("aa-raw-models.json", message)
+        self.assertIn("fetch_aa.py", message)
+
+    def test_a_data_directory_without_capture_data_still_falls_back_to_today(self):
+        # The surviving fallback arm, pinned: with no capture input beside the
+        # stamp there is no capture to relabel, so a genuinely empty
+        # (pre-stamp) data directory builds with today's date. Unreachable
+        # through main(), which reads the capture inputs before the stamp --
+        # which is exactly why the old fallback could only ever mask a lost
+        # stamp (issue #64).
+        with tempfile.TemporaryDirectory(prefix=".issue-64-build-", dir=build.ROOT) as tmp:
+            stamp = pathlib.Path(tmp) / "captured-at.txt"
+
+            self.assertEqual(
+                build.read_capture_stamp(stamp), datetime.date.today().isoformat()
+            )
+
+    def test_non_utf8_stamp_bytes_get_the_designed_refusal(self):
+        # read_text(encoding="utf-8") would raise UnicodeDecodeError ahead of
+        # the guard's message -- still fail-closed, but a traceback instead of
+        # the designed refusal naming file, format, and offending content.
+        with self.assertRaises(SystemExit) as raised:
+            self.build_with_stamp(b"2026-09-29 \xff\xfe<\x00script\x00>")
+
+        message = str(raised.exception)
+        self.assertIn("captured-at.txt", message)
+        self.assertIn("YYYY-MM-DD", message)
+        self.assertIn("\\xff", message)
 
 
 if __name__ == "__main__":

@@ -332,6 +332,21 @@ def undominated(rows, metric="intelligence"):
 # sink is downstream of, so it accepts that one shape and refuses the rest.
 CAPTURE_STAMP_RE = re.compile(r"[0-9]{4}-[0-9]{2}-[0-9]{2}")
 
+# fetch_aa.py writes the stamp beside the capture it stamps, and this build
+# reads that capture from RAW and AGENTS_RAW -- so the capture is present
+# exactly when one of these input files sits beside the stamp (issue #64).
+# Fixed at import: a test that redirects RAW must not rename what the guard
+# looks for.
+CAPTURE_INPUTS = (RAW.name, AGENTS_RAW.name)
+
+
+def _stamp_refusal(stamp_path: pathlib.Path, found: str) -> SystemExit:
+    """The one refusal, shared so every exit names the same observation."""
+    return SystemExit(
+        f"{stamp_path} does not hold the stamp fetch_aa.py writes -- a "
+        f"single zero-padded ISO date, YYYY-MM-DD: found {found}"
+    )
+
 
 def read_capture_stamp(stamp_path: pathlib.Path) -> str:
     """The stamp exactly as fetch_aa.py wrote it, or a refusal.
@@ -343,10 +358,28 @@ def read_capture_stamp(stamp_path: pathlib.Path) -> str:
     payload placeholder whatever pads it.
     """
     if not stamp_path.exists():
-        # A checkout predating the stamp has no capture to relabel; today's
-        # date is in the accepted shape by construction.
+        # A capture that lost its stamp must not be silently relabelled with
+        # the build date (issue #64): refuse when capture data is present.
+        capture = [
+            name for name in CAPTURE_INPUTS if (stamp_path.parent / name).exists()
+        ]
+        if capture:
+            raise SystemExit(
+                f"{stamp_path} is missing while the capture it stamps is "
+                f"present ({', '.join(capture)}) -- fetch_aa.py writes the "
+                f"stamp on capture; re-run the capture"
+            )
+        # No capture data beside the stamp: a genuinely empty (pre-stamp)
+        # data directory, with nothing to relabel. Today's date is in the
+        # accepted shape by construction.
         return dt.date.today().isoformat()
-    value = stamp_path.read_text(encoding="utf-8").strip()
+    raw = stamp_path.read_bytes()
+    try:
+        value = raw.decode("utf-8").strip()
+    except UnicodeDecodeError:
+        # Still fail-closed, but the designed refusal rather than a
+        # traceback: the offending bytes themselves are the content named.
+        raise _stamp_refusal(stamp_path, repr(raw)) from None
     valid = CAPTURE_STAMP_RE.fullmatch(value) is not None
     if valid:
         # The writer can only emit a real calendar date, so a date-shaped
@@ -356,10 +389,7 @@ def read_capture_stamp(stamp_path: pathlib.Path) -> str:
         except ValueError:
             valid = False
     if not valid:
-        raise SystemExit(
-            f"{stamp_path} does not hold the stamp fetch_aa.py writes -- a "
-            f"single zero-padded ISO date, YYYY-MM-DD: found {value!r}"
-        )
+        raise _stamp_refusal(stamp_path, repr(value))
     return value
 
 
@@ -395,10 +425,11 @@ def main():
     )
     front_collapsed = undominated(list(ceiling.values()))
 
-    # Written by fetch_aa.py when the capture was taken. Falling back to today
-    # only covers a checkout predating the stamp; a rebuild must never relabel
-    # an existing capture with the day it happened to be rebuilt. The stamp is
-    # interpolated unescaped downstream, so the read validates it (issue #40).
+    # Written by fetch_aa.py when the capture was taken. The today-fallback
+    # covers only a data directory with no capture in it; a capture that lost
+    # its stamp is refused rather than relabelled with the build date (issue
+    # #64), and the read validates the format because the stamp is
+    # interpolated unescaped downstream (issue #40).
     captured = read_capture_stamp(RAW.parent / "captured-at.txt")
     stats = {
         "total": len(models),
