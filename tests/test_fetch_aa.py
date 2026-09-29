@@ -1,13 +1,18 @@
 import contextlib
 import datetime
+import email.message
 import io
 import json
 import os
 import pathlib
+import socket
+import subprocess
 import sys
 import tempfile
 import unittest
 import unittest.mock
+import urllib.error
+import urllib.request
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent / "scripts"))
 
@@ -648,6 +653,155 @@ class AtomicCaptureWritesTests(unittest.TestCase):
             self.assertEqual(
                 (root / "captured-at.txt").read_text(encoding="utf-8"),
                 datetime.date.today().isoformat() + "\n")
+
+
+class _FakeResponse:
+    """The urlopen context-manager result, for a modeled healthy page."""
+
+    def __init__(self, body: str):
+        self._body = body
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        return False
+
+    def read(self) -> bytes:
+        return self._body.encode("utf-8")
+
+
+class LoudUrlopenStub:
+    """Stand-in for urllib.request.urlopen that models only what a test
+    wires. Every other URL fails LOUDLY -- an AssertionError, not an empty
+    response -- so a test cannot pass by accident against an unmodeled
+    boundary, and a wiring mistake cannot reach the real network."""
+
+    def __init__(self, routes: dict):
+        self.routes = routes
+        self.calls: list[str] = []
+
+    def __call__(self, request, timeout=None):
+        url = (request.full_url if isinstance(request, urllib.request.Request)
+               else str(request))
+        self.calls.append(url)
+        handler = self.routes.get(url)
+        if handler is None:
+            raise AssertionError(f"urlopen stub: unmodeled call to {url}")
+        return handler()
+
+
+class TransportErrorTests(unittest.TestCase):
+    """Issue #66: raw transport errors must exit guarded, not as tracebacks.
+
+    fetch_html let URLError, HTTPError and socket.timeout escape raw: the
+    hourly refresh logged a traceback and the workflow page showed the
+    stack, instead of the one actionable line every schema-change refusal
+    produces. The boundary itself -- urllib.request.urlopen -- is stubbed
+    here, never an internal function, and the stub refuses unmodeled URLs
+    so no test can reach the real network.
+    """
+
+    DETAIL_URL = fetch_aa.MODEL_DETAIL_URL.format(slug="detail-host-model")
+
+    def run_capture_through_boundary(self, routes: dict):
+        """fetch_aa.main() over the stubbed urlopen, no cache flags: every
+        page comes through the stub. -> (stub, SystemExit-free stdout)."""
+        stub = LoudUrlopenStub(routes)
+        with tempfile.TemporaryDirectory(prefix=".issue-66-transport-") as tmp:
+            root = pathlib.Path(tmp)
+            old = (fetch_aa.ROOT, fetch_aa.OUT, fetch_aa.AGENTS_OUT,
+                   fetch_aa.STAMP)
+            argv = sys.argv
+            try:
+                fetch_aa.ROOT = root
+                fetch_aa.OUT = root / "aa-raw-models.json"
+                fetch_aa.AGENTS_OUT = root / "aa-raw-coding-agents.json"
+                fetch_aa.STAMP = root / "captured-at.txt"
+                sys.argv = ["fetch_aa.py"]
+                with unittest.mock.patch.object(
+                        urllib.request, "urlopen", stub):
+                    buffer = io.StringIO()
+                    with contextlib.redirect_stdout(buffer):
+                        fetch_aa.main()
+                    return stub, buffer.getvalue()
+            finally:
+                sys.argv = argv
+                (fetch_aa.ROOT, fetch_aa.OUT, fetch_aa.AGENTS_OUT,
+                 fetch_aa.STAMP) = old
+
+    def healthy_routes(self) -> dict:
+        agents = flight_html(agent_payload(
+            [agent_row(f"Agent - Model {i}") for i in range(5)]))
+        return {
+            fetch_aa.URL: lambda: _FakeResponse(flight_html(leaderboard_payload())),
+            self.DETAIL_URL: lambda: _FakeResponse(flight_html(detail_payload())),
+            fetch_aa.AGENTS_URL: lambda: _FakeResponse(agents),
+        }
+
+    def test_a_healthy_fetch_still_succeeds_through_the_boundary(self):
+        # The control: the wrap must catch transport failures only, and the
+        # healthy capture runs all three modeled pages through the real
+        # urlopen call shape (leaderboard, detail, agents) to its writes.
+        stub, stdout = self.run_capture_through_boundary(self.healthy_routes())
+
+        self.assertEqual(stub.calls, [fetch_aa.URL, self.DETAIL_URL,
+                                      fetch_aa.AGENTS_URL])
+        self.assertIn("wrote aa-raw-models.json", stdout)
+
+    def test_transport_failures_exit_as_a_guarded_refusal(self):
+        # URLError covers DNS/connect failures, HTTPError (its subclass)
+        # refused status codes, socket.timeout (an OSError) a dead read --
+        # each becomes the same clean exit shape the schema guards use,
+        # naming the URL and carrying the underlying reason.
+        raisers = (
+            ("URLError", urllib.error.URLError("Connection refused")),
+            ("HTTPError", urllib.error.HTTPError(
+                fetch_aa.URL, 503, "Service Unavailable",
+                email.message.Message(), None)),
+            ("timeout", socket.timeout("The read operation timed out")),
+        )
+        for why, error in raisers:
+            with self.subTest(why=why):
+                def raiser(e=error):
+                    raise e
+
+                with self.assertRaises(SystemExit) as caught:
+                    self.run_capture_through_boundary({fetch_aa.URL: raiser})
+
+                message = str(caught.exception)
+                self.assertIn(fetch_aa.URL, message)
+                self.assertIn("fetch failed", message)
+                self.assertIn(str(error), message)
+
+    def test_the_guarded_refusal_is_the_whole_of_stderr_at_exit_one(self):
+        # End to end: a subprocess whose urlopen is stubbed before fetch_aa
+        # loads. The observable is the process's -- exit 1, stderr exactly
+        # the actionable line, and no traceback anywhere.
+        with tempfile.TemporaryDirectory(prefix=".issue-66-subproc-") as tmp:
+            runner = pathlib.Path(tmp) / "runner.py"
+            runner.write_text(
+                "import sys, urllib.request, urllib.error\n"
+                "sys.path.insert(0, " +
+                repr(str(pathlib.Path(fetch_aa.__file__).parent)) + ")\n"
+                "def refused(request, timeout=None):\n"
+                "    raise urllib.error.URLError('Connection refused')\n"
+                "urllib.request.urlopen = refused\n"
+                "sys.argv = ['fetch_aa.py']\n"
+                "import fetch_aa\n"
+                "fetch_aa.main()\n",
+                encoding="utf-8")
+            proc = subprocess.run(
+                [sys.executable, str(runner)],
+                capture_output=True, text=True, timeout=120, check=False)
+
+        self.assertEqual(proc.returncode, 1)
+        self.assertNotIn("Traceback", proc.stderr)
+        self.assertEqual(len(proc.stderr.strip().splitlines()), 1,
+                         proc.stderr)
+        self.assertIn("fetch failed", proc.stderr)
+        self.assertIn("Connection refused", proc.stderr)
+        self.assertEqual(proc.stdout, "")
 
 
 if __name__ == "__main__":

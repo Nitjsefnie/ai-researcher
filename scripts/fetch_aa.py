@@ -29,6 +29,7 @@ import os
 import pathlib
 import re
 import sys
+import urllib.error
 import urllib.request
 
 ROOT_FOR_IMPORT = pathlib.Path(__file__).resolve().parent.parent
@@ -86,8 +87,17 @@ def fetch_html(cached: str | None, url: str = URL) -> str:
     if cached:
         return pathlib.Path(cached).read_text(encoding="utf-8", errors="replace")
     req = urllib.request.Request(url, headers={"User-Agent": UA})
-    with urllib.request.urlopen(req, timeout=90) as r:
-        return r.read().decode("utf-8", errors="replace")
+    try:
+        with urllib.request.urlopen(req, timeout=90) as r:
+            return r.read().decode("utf-8", errors="replace")
+    except (urllib.error.URLError, OSError) as exc:
+        # HTTPError subclasses URLError and socket.timeout subclasses OSError,
+        # so this is every transport shape: DNS, connect, refused status, a
+        # dead read. Same shape as the schema-change refusals -- one
+        # actionable stderr line and a nonzero exit, not a traceback
+        # (issue #66). Nothing has been written.
+        sys.exit(f"{url}: fetch failed: {exc} -- nothing was captured; "
+                 "check connectivity or the site, then re-run")
 
 
 def flight_payload(html: str) -> str:
