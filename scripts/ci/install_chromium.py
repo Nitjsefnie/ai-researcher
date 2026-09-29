@@ -278,10 +278,24 @@ def browsers_root() -> Path:
     """The browsers directory, exactly as playwright itself resolves it.
 
     PLAYWRIGHT_BROWSERS_PATH wins; otherwise the platform cache directory
-    (XDG_CACHE_HOME or ~/.cache on Linux) plus ms-playwright.
+    (XDG_CACHE_HOME or ~/.cache on Linux) plus ms-playwright. The value
+    "0" is refused: playwright reserves it for the package-local
+    .local-browsers directory (verified in 1.63.0's registry, where
+    ``envDefined === "0"`` redirects the install), so honouring it as a
+    literal path would seed and verify ./0 while playwright downloaded
+    unverified browsers elsewhere -- exactly where the no-re-download
+    assertion never looks.
     """
     override = os.environ.get("PLAYWRIGHT_BROWSERS_PATH")
     if override:
+        if override == "0":
+            raise InstallError(
+                'PLAYWRIGHT_BROWSERS_PATH="0" is a playwright-reserved '
+                "value, not a path: it makes playwright install resolve "
+                "the package-local .local-browsers directory, while this "
+                "script would seed and verify ./0 -- the browsers would "
+                "land unverified where the no-re-download assertion never "
+                "looks. Unset the variable or name a real directory.")
         return Path(override)
     cache = os.environ.get("XDG_CACHE_HOME") \
         or Path.home() / ".cache"
@@ -500,7 +514,13 @@ def assert_seeded_intact(root: Path, products: list,
         product_dir = install_dir(root, product)
         seeded.add(product_dir.name)
         expected = inodes.get(product_dir.name)
-        actual = product_dir.stat().st_ino
+        try:
+            actual = product_dir.stat().st_ino
+        except FileNotFoundError as error:
+            raise InstallError(
+                f"{product.spec.name}: the seeded directory vanished during "
+                f"playwright install ({product_dir}) -- the digest-verified "
+                "browser is gone and nothing replaced it") from error
         if actual != expected:
             raise InstallError(
                 f"{product.spec.name}: the seeded directory was replaced "

@@ -616,3 +616,17 @@ def test_main_exit_2_without_playwright(browsers_root, monkeypatch, capsys):
                         lambda: None)
     assert install_chromium.main([]) == 2
     assert "not importable" in capsys.readouterr().err
+
+
+def test_main_refuses_the_reserved_browsers_path_zero(fake_spec, monkeypatch,
+                                                      capsys):
+    # The playwright-reserved value "0" (package-local .local-browsers)
+    # must be refused, not honoured as a literal ./0 the script verifies
+    # while playwright downloads unverified browsers elsewhere.
+    monkeypatch.setenv("PLAYWRIGHT_BROWSERS_PATH", "0")
+    patch_spec(monkeypatch, fake_spec)
+    assert install_chromium.main([]) == 2
+    captured = capsys.readouterr()
+    assert 'PLAYWRIGHT_BROWSERS_PATH="0"' in captured.err
+    assert "reserved" in captured.err
+    assert ".local-browsers" in captured.err
