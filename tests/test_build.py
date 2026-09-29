@@ -3,6 +3,8 @@ import datetime
 import io
 import json
 import pathlib
+import subprocess
+import sys
 import tempfile
 import time
 import unittest
@@ -971,6 +973,56 @@ class SplitEffortScalingTests(unittest.TestCase):
             large, self.LARGE_CPU_CEILING,
             f"t({self.SIZES[1]}) took {large:.4f}s cpu on one name -- "
             "split_effort is too slow on a pathological input")
+
+
+class BuildArgvTests(unittest.TestCase):
+    """Issue #55: `python3 build.py --help` must print usage, not rebuild.
+
+    build.py handled argv not at all -- a `--help` ran the whole build and
+    rewrote out/frontier-models.html. The parser lives in the __main__ guard
+    (main() keeps its no-argument signature, which the direct callers in this
+    suite depend on), so these pins drive the real command line as a
+    subprocess and judge it by process observables: exit status, stdout, and
+    the output page's mtime -- the side effect the issue is about.
+    """
+
+    PAGE = build.ROOT / "out" / "frontier-models.html"
+
+    def page_mtime(self):
+        return self.PAGE.stat().st_mtime_ns if self.PAGE.exists() else None
+
+    def run_build(self, *argv: str) -> subprocess.CompletedProcess:
+        return subprocess.run(
+            [sys.executable, str(build.ROOT / "build.py"), *argv],
+            cwd=build.ROOT, capture_output=True, text=True, timeout=120,
+            check=False)
+
+    def test_help_prints_usage_and_performs_no_build(self):
+        before = self.page_mtime()
+
+        proc = self.run_build("--help")
+
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        self.assertIn("usage:", proc.stdout.lower())
+        self.assertIn("frontier-models.html", proc.stdout)
+        self.assertEqual(
+            self.page_mtime(), before,
+            "--help rebuilt out/frontier-models.html")
+
+    def test_an_unknown_flag_is_refused_without_building(self):
+        # The negative control for the parser being attached at all: today an
+        # unrecognized argument silently built the page, which is how --help
+        # got to ship a rebuild. argparse's own refusal (exit 2, usage on
+        # stderr) must replace that, still with no page written.
+        before = self.page_mtime()
+
+        proc = self.run_build("--definitely-not-a-flag")
+
+        self.assertEqual(proc.returncode, 2)
+        self.assertIn("unrecognized arguments", proc.stderr)
+        self.assertEqual(
+            self.page_mtime(), before,
+            "a refused argument still rebuilt out/frontier-models.html")
 
 
 if __name__ == "__main__":
