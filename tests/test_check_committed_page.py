@@ -60,14 +60,18 @@ def committed_at_head() -> str:
 
 
 class CheckCommittedPageTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        # One stamp-less rebuild serves the whole class: the rebuild is
+        # deterministic over a fixed data/, so building once here is the
+        # same page every method would build for itself.
+        cls.rebuilt = check_committed_page.rebuild_page()
+
     def setUp(self):
         # Whatever a test does to build's module globals or the environment,
         # the check must hand them back exactly as it found them: the suite
         # runs other tests against the real data/ and the real out/.
         self._saved = (build.RAW, build.AGENTS_RAW, build.OUT)
-        # One stamp-less rebuild serves the whole class: the rebuild is
-        # deterministic over a fixed data/.
-        self.rebuilt = check_committed_page.rebuild_page()
 
     def tearDown(self):
         self.assertEqual((build.RAW, build.AGENTS_RAW, build.OUT), self._saved)
@@ -236,6 +240,27 @@ class CheckCommittedPageTests(unittest.TestCase):
         self.assertNotEqual(code, 0)
         self.assertIn("red, never a silent pass", err.getvalue())
         self.assertIn("the tree does not build", err.getvalue())
+
+    def test_rebuild_page_restores_state_when_the_inner_build_fails(self):
+        # The failing control for rebuild_page's own finally limb: the INNER
+        # build raises -- with AA_SOURCE_COMMIT deliberately set, so the
+        # env-restore has real work to do -- and the real rebuild_page runs,
+        # not a mock of it. The exception must propagate (a build failure is
+        # red, never a silent pass) and the environment and build's module
+        # globals must come back exactly as they went in.
+        def broken():
+            raise ValueError("the inner build failed")
+
+        with mock.patch.dict(os.environ,
+                             {check_committed_page.STAMP_ENV: COMMIT}), \
+             mock.patch.object(build, "main", side_effect=broken):
+            with self.assertRaises(ValueError):
+                check_committed_page.rebuild_page()
+            self.assertEqual(
+                os.environ.get(check_committed_page.STAMP_ENV), COMMIT)
+
+        self.assertEqual((build.RAW, build.AGENTS_RAW, build.OUT),
+                         self._saved)
 
 
 class HeadStateTests(unittest.TestCase):
