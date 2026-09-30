@@ -12,6 +12,17 @@ Both sides are built with build.py itself, so "the page" is the page: a
 changed render function IS a real page change, and a field the builder never
 reads is invisible to the gate -- which is the point.
 
+One refinement keeps the gate agreeing with the differ's own definition of
+news: the rendered speed fields are compared with diff_aa.py's own
+--speed-tol test -- a re-sample within SPEED_TOL of the last COMMITTED
+value is jitter and is reconciled to it (see reconcile_speed). A
+sub-threshold re-sample of output tokens/sec or time per task compares
+equal, so a quiet month of speed jitter commits nothing. The cost, stated
+plainly: the page's speed columns can lag AA's live re-sampling by just
+under the threshold -- and they cannot lag further, because each hour
+compares against the last committed value, so a sustained crawl crosses
+the threshold cumulatively and commits.
+
 Exit codes:
   0   an answer was reached: stdout carries `true` (moved) or `false`.
   1   broken, not unchanged: a fresh capture file is missing, or the build
@@ -24,17 +35,22 @@ from __future__ import annotations
 
 import contextlib
 import io
+import json
 import os
 import pathlib
 import re
 import subprocess
 import sys
 import tempfile
+from typing import Any
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
+if str(ROOT / "scripts") not in sys.path:
+    sys.path.insert(0, str(ROOT / "scripts"))
 
+from diff_aa import SPEED_TOL  # noqa: E402  # pylint: disable=wrong-import-position,wrong-import-order
 import build  # noqa: E402  # pylint: disable=wrong-import-position
 
 MODELS_NAME = "aa-raw-models.json"
@@ -70,6 +86,88 @@ class HeadCaptureError(Exception):
 
 class FreshCaptureError(Exception):
     """A fresh capture file is missing or unreadable."""
+
+
+# --- speed quantization ------------------------------------------------------
+
+
+# The rendered speed fields the gate reconciles, and where each is rendered:
+# build.py:356-357 carries the models capture's medianOutputTokensPerSecond
+# ("tps") and intelligenceIndexTimePerTask ("secs") onto model rows, and
+# build.py:443-444 carries the coding capture's agentWallTimeSec ("secs")
+# onto agent rows -- the same render sites scripts/diff_aa.py's SPEED_SHOWN
+# names when it thresholds re-samples as news-only-past-SPEED_TOL.
+SPEED_KEYS_MODELS = frozenset(
+    {"medianOutputTokensPerSecond", "intelligenceIndexTimePerTask"})
+SPEED_KEYS_AGENTS = frozenset({"agentWallTimeSec"})
+
+
+def _is_number(value) -> bool:
+    """A JSON number -- bools are Python ints and are not numbers here."""
+    return isinstance(value, (int, float)) and not isinstance(value, bool)
+
+
+def within_tolerance(value, head_value):
+    """HEAD's value when this re-sample is sub-threshold relative to it.
+
+    This is diff_aa.py's --speed-tol test applied to one rendered cell:
+    |fresh/committed - 1| <= SPEED_TOL means the re-sample is jitter, and
+    the cell is made to compare equal by carrying HEAD's committed value.
+    Anything else -- a move past the threshold, a zeroed or vanished
+    committed value, a non-number on either side -- is left verbatim.
+    """
+    if not (_is_number(value) and _is_number(head_value)) or head_value == 0:
+        return value
+    if abs(value / head_value - 1) <= SPEED_TOL:
+        return head_value
+    return value
+
+
+def reconcile_tree(head, fresh, keys) -> Any:
+    """The fresh tree with sub-threshold speed cells overwritten by HEAD's.
+
+    Walks both trees jointly, position by position. A speed key present
+    numerically on BOTH sides is reconciled (within_tolerance); anything
+    else -- a key missing or re-typed on either side, a fresh-only subtree,
+    a fresh-only list tail -- is left verbatim, so a structural change
+    commits by simply falling out of the overwrite.
+    """
+    if isinstance(fresh, dict) and isinstance(head, dict):
+        reconciled = {}
+        for key, value in fresh.items():
+            if key not in head:
+                reconciled[key] = value
+            elif key in keys:
+                reconciled[key] = within_tolerance(value, head[key])
+            else:
+                reconciled[key] = reconcile_tree(head[key], value, keys)
+        return reconciled
+    if isinstance(fresh, list) and isinstance(head, list):
+        return ([reconcile_tree(h, v, keys) for h, v in zip(head, fresh)]
+                + fresh[len(head):])
+    return fresh
+
+
+def reconcile_speed(head: tuple[bytes, bytes],
+                    fresh: tuple[bytes, bytes]) -> tuple[bytes, bytes]:
+    """The fresh captures with sub-threshold speed re-samples reconciled.
+
+    Runs on the gate's TEMP COPIES ONLY -- data/ keeps the verbatim capture,
+    and nothing reconciled is ever written back or committed. HEAD's temp
+    copies stay verbatim (the synthetic captured-at stamp aside), so the two
+    pages can only differ on non-speed fields, on speed cells beyond
+    SPEED_TOL relative to the last committed value, or on structure.
+
+    Drift accumulates by construction: each hour compares against the last
+    COMMITTED value, so a sustained crawl crosses the threshold cumulatively
+    and commits rather than hiding inside successive sub-threshold steps.
+    """
+    models = reconcile_tree(json.loads(head[0]), json.loads(fresh[0]),
+                            SPEED_KEYS_MODELS)
+    agents = reconcile_tree(json.loads(head[1]), json.loads(fresh[1]),
+                            SPEED_KEYS_AGENTS)
+    return (json.dumps(models, indent=1).encode("utf-8"),
+            json.dumps(agents, indent=1).encode("utf-8"))
 
 
 # --- reads -------------------------------------------------------------------
@@ -156,10 +254,15 @@ def build_page_pair(head: tuple[bytes, bytes],
                     fresh: tuple[bytes, bytes]) -> tuple[str, str]:
     """Build the page from HEAD's captures and from the fresh ones.
 
+    The fresh side is reconciled against HEAD's first (reconcile_speed):
+    sub-threshold speed drift compares equal, a move past SPEED_TOL relative
+    to the last committed value (or a structural change) stays and differs.
+
     Returns the two pages UNMASKED, in that order; the caller applies the
     digest mask before comparing. Raises whatever the build raises (SystemExit
     for a capture build.py refuses) -- a build failure is red, not "changed".
     """
+    fresh = reconcile_speed(head, fresh)
     with tempfile.TemporaryDirectory(prefix=".capture-gate-",
                                      dir=build.ROOT) as tmp:
         tmp_root = pathlib.Path(tmp)

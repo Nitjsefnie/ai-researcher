@@ -68,6 +68,13 @@ JITTER = re.compile(
 # so a change in one cannot alter the artifact and is dropped without a threshold.
 SPEED_SHOWN = {"medianOutputTokensPerSecond", "intelligenceIndexTimePerTask"}
 
+# Where a SPEED_SHOWN re-sample stops being jitter and starts being news: the
+# single source for --speed-tol below AND for the capture gate's quantization
+# ladder (scripts/capture_gate.py snaps rendered speed fields to a ladder with
+# this step before comparing), so the differ and the gate cannot disagree
+# about where jitter ends.
+SPEED_TOL = 0.25
+
 # Lab branding churn and AA's own UI state -- never a finding.
 COSMETIC = {
     "modelCreatorColor", "modelCreatorLogo",
@@ -488,10 +495,11 @@ def main():
     ap.add_argument("--new-agents", metavar="SPEC",
                     help="coding-agents capture for the new side "
                          "(default: the sibling of `new`)")
-    ap.add_argument("--speed-tol", type=float, default=0.25, metavar="X",
+    ap.add_argument("--speed-tol", type=float, default=SPEED_TOL, metavar="X",
                     help=f"report a rendered speed field "
                          f"({', '.join(sorted(SPEED_SHOWN))}) only when it moved by "
-                         "more than X relative (default 0.25 = 25%%; 0 shows all). "
+                         f"more than X relative (default {SPEED_TOL} = "
+                         f"{SPEED_TOL * 100:.0f}%%; 0 shows all). "
                          "Speed fields the page never renders are dropped regardless.")
     ap.add_argument("--tol", type=float, default=DEFAULT_TOL, metavar="X",
                     help="same threshold for significant numeric fields (default "
