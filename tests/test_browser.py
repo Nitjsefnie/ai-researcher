@@ -21,6 +21,20 @@ CHROMIUM = os.environ.get("CHROMIUM_PATH") or "/usr/bin/chromium"
 CHROMIUM_EXECUTABLE = CHROMIUM if pathlib.Path(CHROMIUM).exists() else None
 
 
+def _data_payload(page_html):
+    """The `const DATA = {...}` payload parsed out of the built page.
+
+    Sliced at the same two landmarks the payload tests use -- the `const
+    DATA = ` assignment and the IIFE that follows it -- so the row count the
+    static tbody is held to is the payload's own count, not a hand-kept
+    number that drifts from the capture.
+    """
+    marker = "const DATA = "
+    start = page_html.index(marker) + len(marker)
+    end = page_html.index(";\n(function(){", start)
+    return json.loads(page_html[start:end])
+
+
 class BrowserInteractionTests(unittest.TestCase):
     # pylint: disable=too-many-public-methods
     # One behaviour, one test: #85's per-chart label-distinctness guarantee is
@@ -49,6 +63,12 @@ class BrowserInteractionTests(unittest.TestCase):
 
         def new_page(**kwargs):
             page = original_new_page(**kwargs)
+            if kwargs.get("java_script_enabled") is False:
+                # A JavaScript-disabled page compiles no script, so it has no
+                # V8 block coverage to give: wiring a Profiler session onto it
+                # would only add empty records to the dump js_coverage.py
+                # folds. Skipped, the dump stays the JS-enabled run's.
+                return page
             # playwright-python ships no page.coverage wrapper, so the V8
             # block coverage comes straight from Chromium's Profiler domain
             # over a CDP session — the same {url, source,
@@ -1009,6 +1029,65 @@ class BrowserInteractionTests(unittest.TestCase):
         for cell in cells.all_text_contents():
             self.assertNotIn("reasoning_effort", cell)
         page.close()
+
+    def test_the_static_tbody_serves_the_data_without_javascript(self):
+        # #97: both tbody elements used to ship empty -- every data row was
+        # built client-side, so a visitor with JavaScript disabled got page
+        # chrome and no data. build.py now renders both bodies at build time
+        # in the page's default state, so the documented accessible twin is
+        # reachable without JS.
+        page = self.browser.new_page(
+            viewport={"width": 1280, "height": 900}, java_script_enabled=False)
+        page.goto(build.OUT.as_uri())
+        payload = _data_payload(build.OUT.read_text(encoding="utf-8"))
+
+        for table in ("fTable", "tbl"):
+            self.assertGreater(
+                page.locator(f"#{table} tbody tr").count(), 0,
+                f"#{table} shipped an empty tbody -- no data without JS")
+        self.assertEqual(
+            page.locator("#tbl tbody tr").count(), len(payload["rows"]))
+        first_cells = page.locator("#tbl tbody tr").first.locator(
+            "td").all_text_contents()
+        self.assertEqual(first_cells[0], payload["rows"][0]["name"] + " ")
+        # an absent value renders as the page's em dash, never blank
+        self.assertIn("—", page.locator("#tbl tbody td").all_text_contents())
+        # the noscript notice covers the charts, filters and sorting; the
+        # tables themselves are static and must say nothing of the sort
+        self.assertIn("JavaScript", page.locator("noscript").inner_text())
+        page.close()
+
+    # Both tables' tbody DOM, cell-for-cell: className and textContent per
+    # td, row order preserved. evaluate() runs even with script execution
+    # disabled, so one expression reads both pages the same way.
+    _TBODY_DOM = """(tid) => [...document.querySelectorAll(`#${tid} tbody tr`)]
+      .map(tr => [...tr.children].map(td => [td.className, td.textContent]))"""
+
+    def _tbody_dom(self, page, table_id):
+        return page.evaluate(self._TBODY_DOM, table_id)
+
+    def test_the_static_tbody_matches_the_js_rendered_tbody_cell_for_cell(self):
+        # #97's drift guard: the rows build.py renders statically must be
+        # exactly the rows the page's own script builds in its default state
+        # -- same cells, same classes, same order. Any Python/JS formatter
+        # drift fails here cell-for-cell rather than shipping a static table
+        # that disagrees with the interactive one.
+        on = self.browser.new_page(viewport={"width": 1280, "height": 900})
+        off = self.browser.new_page(
+            viewport={"width": 1280, "height": 900}, java_script_enabled=False)
+        on.goto(build.OUT.as_uri())
+        off.goto(build.OUT.as_uri())
+        # render()'s most visible act is the filter count line, which the
+        # static HTML ships as an em dash -- so a non-em-dash counter proves
+        # the initial render() has settled.
+        on.wait_for_function(
+            "document.getElementById('count').textContent !== '—'")
+        for table in ("fTable", "tbl"):
+            with self.subTest(table=table):
+                self.assertEqual(
+                    self._tbody_dom(on, table), self._tbody_dom(off, table))
+        on.close()
+        off.close()
 
     def test_footer_carries_a_licence_note_linking_the_licence(self):
         # #69 (page half): the generated page ships under the repo's MIT

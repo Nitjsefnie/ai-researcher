@@ -27,6 +27,7 @@
 !/README.md
 !/SECURITY.md
 !/build.py
+!/page_format.py
 !/pyrightconfig.json
 !/requirements-dev.txt
 !/requirements-pip-audit.txt

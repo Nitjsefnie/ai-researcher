@@ -18,6 +18,12 @@ import os
 import pathlib
 import re
 
+# The page's formatting rules live beside the build that renders them into
+# the static table bodies, not inside it: build.py is one line-budgeted HTML
+# emitter, and these mirrors are the page's own, shared shape (#97).
+from page_format import (EM_DASH, fmt_cost, fmt_ctx, fmt_params, js_number,
+                         js_to_fixed, show_text, weights_text)
+
 ROOT = pathlib.Path(__file__).resolve().parent
 RAW = ROOT / "data" / "aa-raw-models.json"
 AGENTS_RAW = ROOT / "data" / "aa-raw-coding-agents.json"
@@ -450,21 +456,37 @@ def build_agent_rows(agents, models):
     return rows
 
 
+def metric_of(row, metric):
+    """The score/cost pair a metric renders for a row, mirroring the page's
+    metricOf(). The parameters axis is not a pair in the payload -- it pairs
+    the Intelligence Index with the parameter count, so it exists where both
+    do -- and every other metric is the pair the payload carries.
+    """
+    if metric == "parameters":
+        if row["params"] is not None and row["ii"] is not None:
+            return {"score": row["ii"], "cost": row["params"]}
+        return None
+    return row.get("metrics", {}).get(metric)
+
+
 def undominated(rows, metric="intelligence"):
     """The single Pareto layer -- the page's one and only definition of
     'superseded'. A model is superseded when some other model is at least as
     smart AND at least as cheap (strictly better on one of the two). Exact ties
-    survive together: neither strictly beats the other."""
-    eligible = [r for r in rows if r.get("metrics", {}).get(metric)]
+    survive together: neither strictly beats the other. Pairs come from
+    metric_of(), so the parameters axis is a metric like any other here, as
+    it is in the page's frontierMetric()."""
+    pairs = {id(r): pair for r in rows if (pair := metric_of(r, metric))}
+    eligible = [r for r in rows if id(r) in pairs]
     return [
         r for r in eligible
         if not any(
             o is not r
-            and o["metrics"][metric]["score"] >= r["metrics"][metric]["score"]
-            and o["metrics"][metric]["cost"] <= r["metrics"][metric]["cost"]
+            and pairs[id(o)]["score"] >= pairs[id(r)]["score"]
+            and pairs[id(o)]["cost"] <= pairs[id(r)]["cost"]
             and (
-                o["metrics"][metric]["score"] > r["metrics"][metric]["score"]
-                or o["metrics"][metric]["cost"] < r["metrics"][metric]["cost"]
+                pairs[id(o)]["score"] > pairs[id(r)]["score"]
+                or pairs[id(o)]["cost"] < pairs[id(r)]["cost"]
             )
             for o in eligible
         )
@@ -648,6 +670,180 @@ def read_capture(path):
         ) from exc
 
 
+# The two table bodies rendered at build time (#97). The page's script fills
+# #fTable and #tbl on load; with JavaScript disabled a visitor got page
+# chrome and no data. main() now renders both bodies into the template in the
+# page's DEFAULT state -- every filter chip on except superseded/effort, no
+# lab, no query, no pins, sorted by Intelligence Index descending -- by
+# running the same pipeline the script runs. The functions below mirror the
+# page's JavaScript one for one; the browser drift test loads the page with
+# and without JavaScript and holds the two renders equal cell-for-cell.
+
+METRIC_LABELS = {
+    "coding": "Coding Agent Index",
+    "intelligence": "Intelligence Index",
+    "agentic": "GDPval-AA v2",
+}
+
+# The metric views the page unions for the full table, in Object.keys()
+# order -- the order the script's Set-union preserves for ties.
+VIEW_ORDER = ("coding", "intelligence", "parameters", "agentic")
+
+# A marker in a rendered tbody would be spliced by a substitution that runs
+# after the tbody replacements -- "__DATA__" in a name would have the JSON
+# payload written into its cell -- so a build carrying one refuses, naming
+# the marker, the same fail-red culture as the stamp and commit-shape
+# validations.
+TEMPLATE_MARKERS = ("__DATA__", "__PROVENANCE__", "__CAPTURED__", "__TBODY_")
+
+
+def frontier_layer(rows, metric):
+    """The frontier in the page's display order: cost ascending, score
+    descending, stable -- the page's frontierMetric() comparator, over the
+    undominated layer `undominated` computes."""
+    front = undominated(rows, metric)
+
+    def order_key(row):
+        # undominated() already filtered this layer to rows carrying the
+        # metric, so the pair is present by construction; the assertion is
+        # the type narrowing, not a runtime check that can fire.
+        pair = metric_of(row, metric)
+        assert pair is not None, f"{metric} pair missing for {row['name']}"
+        return (pair["cost"], -pair["score"])
+
+    return sorted(front, key=order_key)
+
+
+def default_state_rows(rows):
+    """The #tbl rows in the page's default state, in render order.
+
+    The script's metricViews() with every filter chip on but
+    superseded/effort off, no lab, no query and no pins, is the full
+    unfiltered slices: one view per axis in VIEW_ORDER, the order
+    Object.keys() hands the script and its Set-union preserves for ties.
+    Rows deduplicate by identity across the views, then the default header
+    sorts: Intelligence Index descending, missing values last, stable for
+    ties (Array.prototype.sort is stable, and so is sorted()).
+    """
+    union = []
+    seen = set()
+    for metric in VIEW_ORDER:
+        for row in rows:
+            if metric_of(row, metric) and id(row) not in seen:
+                seen.add(id(row))
+                union.append(row)
+
+    def order_key(row):
+        pair = metric_of(row, "intelligence")
+        return (pair is None, -(pair["score"] if pair else 0.0))
+
+    return sorted(union, key=order_key)
+
+
+def render_frontier_tbody(rows):
+    """#fTable's body: per metric in METRIC_ORDER, its frontier rows in
+    cost-DESCENDING order -- the page renders frontierMetric() (cost
+    ascending, score descending) reversed, so the $/point read runs the
+    same way a sorted column does."""
+    parts = []
+    for metric in METRIC_ORDER:
+        for row in reversed(frontier_layer(rows, metric)):
+            # The rows came through frontier_layer(), so the pair is
+            # present; the assertion narrows for the reader below.
+            pair = metric_of(row, metric)
+            assert pair is not None, f"{metric} pair missing for {row['name']}"
+            parts.append(
+                "<tr>"
+                + f"<td>{html.escape(METRIC_LABELS[metric])}</td>"
+                + f'<td class="name">{html.escape(row["name"])}</td>'
+                + f"<td>{html.escape(show_text(row['creator']))}</td>"
+                + f'<td class="n">{js_to_fixed(pair["score"], 1)}</td>'
+                + f'<td class="n">{fmt_cost(pair["cost"])}</td>'
+                + '<td class="n">$'
+                + js_to_fixed(pair["cost"] / pair["score"], 4)
+                + "</td>"
+                + f"<td>{_tag(weights_text(row), 'tag')}</td>"
+                + "</tr>"
+            )
+    return "".join(parts)
+
+
+def _tag(text, cls):
+    """A pill span, the page's only inline tag shape."""
+    return f'<span class="{cls}">{html.escape(text)}</span>'
+
+
+def render_main_tbody(rows):
+    """#tbl's body: the default-state rows through fillTable's cell rules."""
+    front_sets = {
+        metric: {id(r) for r in frontier_layer(rows, metric)}
+        for metric in (*METRIC_ORDER, "parameters")
+    }
+    parts = []
+    for row in default_state_rows(rows):
+        cells = ['<tr>', f'<td class="name">{html.escape(row["name"])} ']
+        if row["dep"]:
+            cells.append(_tag("vendor-retired", "tag"))
+        cells.append("</td>")
+        cells.append(f"<td>{html.escape(show_text(row['creator']))}</td>")
+        for metric in METRIC_ORDER:
+            pair = metric_of(row, metric)
+            if pair:
+                score = js_to_fixed(pair["score"], 1)
+                cost = fmt_cost(pair["cost"])
+            else:
+                score = cost = EM_DASH
+            if pair and id(row) in front_sets[metric]:
+                score += " " + _tag("frontier", "tag f")
+            cells.append(f'<td class="n">{score}</td>')
+            cells.append(f'<td class="n">{cost}</td>')
+            if metric == "intelligence":
+                params = fmt_params(row["params"])
+                if metric_of(row, "parameters") and id(row) in front_sets["parameters"]:
+                    params += " " + _tag("parameter frontier", "tag f")
+                cells.append(f'<td class="n">{params}</td>')
+        cells.append(
+            "<td class=\"n\">"
+            + (EM_DASH if row["pin"] is None else "$" + js_number(row["pin"]))
+            + "</td>")
+        cells.append(
+            "<td class=\"n\">"
+            + (EM_DASH if row["pout"] is None else "$" + js_number(row["pout"]))
+            + "</td>")
+        cells.append(
+            "<td class=\"n\">"
+            + (EM_DASH if row["tps"] is None else js_number(row["tps"]))
+            + "</td>")
+        cells.append(f'<td class="n">{fmt_ctx(row["ctx"])}</td>')
+        cells.append(f"<td>{html.escape(show_text(row['rel']))}</td>")
+        cells.append(f"<td>{html.escape(weights_text(row))}</td>")
+        cells.append("</tr>")
+        parts.append("".join(cells))
+    return "".join(parts)
+
+
+def render_static_tbodies(rows):
+    """Both static tbody strings, in template order, guarded.
+
+    A captured string carrying a template marker would be spliced by a
+    substitution that runs after the tbody replacements -- so a build
+    carrying one refuses here rather than shipping a page with a marker
+    left in it, exactly as the stamp read refuses a stamp-shaped attack.
+    """
+    rendered = (("the frontier table", render_frontier_tbody(rows)),
+                ("the full table", render_main_tbody(rows)))
+    for name, tbody in rendered:
+        for marker in TEMPLATE_MARKERS:
+            if marker in tbody:
+                raise SystemExit(
+                    f"the static {name} carries the template marker "
+                    f"{marker} -- a captured string reached the rendered "
+                    "tbody and the later substitutions would splice it; "
+                    "refusing to build"
+                )
+    return rendered[0][1], rendered[1][1]
+
+
 def main():
     models = read_capture(RAW)
     agents = read_capture(AGENTS_RAW)
@@ -756,8 +952,18 @@ def main():
     provenance = ("Capture <code>" + digest.hexdigest() + "</code> &mdash; sha256 over "
                   "data/aa-raw-models.json then data/aa-raw-coding-agents.json, "
                   "whole files concatenated in that order." + commit_note)
+    # The tbody substitutions run between the captured stamp and the payload:
+    # the stamp's value is a validated ISO date and the provenance commit a
+    # validated SHA, so nothing either carries can splice the bodies, and the
+    # payload -- inserted LAST, exactly because captured strings flow through
+    # it -- can never re-splice a rendered tbody. render_static_tbodies has
+    # already refused any rendered body that carries a marker.
+    frontier_tbody, main_tbody = render_static_tbodies(rows)
     OUT.write_text(TEMPLATE.replace("__PROVENANCE__", provenance)
-                   .replace("__CAPTURED__", captured).replace("__DATA__", payload),
+                   .replace("__CAPTURED__", captured)
+                   .replace("__TBODY_FRONTIER__", frontier_tbody)
+                   .replace("__TBODY_MAIN__", main_tbody)
+                   .replace("__DATA__", payload),
                    encoding="utf-8")
     dep = sum(1 for r in intelligence_rows if r["dep"])
     print(f"wrote {OUT.relative_to(ROOT)}")
@@ -1020,6 +1226,14 @@ TEMPLATE = r"""<!DOCTYPE html>
     <span class="count" id="count">&mdash;</span>
   </div>
 
+  <noscript>
+    <p class="sub">The charts, the filters and the sortable headers on this
+      page require JavaScript; without it they do not render or respond. The
+      two tables below are the fallback: both were rendered in full when this
+      page was built, in the default view &mdash; every filter chip on, sorted
+      by Intelligence Index, superseded models included.</p>
+  </noscript>
+
   <section id="coding">
     <h2>1 &middot; Coding Agent Index</h2>
     <p class="sub">DeepSWE, Terminal-Bench v2.1 and SWE-Atlas-QnA, equally weighted. The unit here is an
@@ -1120,7 +1334,7 @@ TEMPLATE = r"""<!DOCTYPE html>
       <table id="fTable"><thead><tr>
         <th>Metric</th><th>Model</th><th>Lab</th><th style="text-align:right">Index</th>
         <th style="text-align:right">$ / task</th><th style="text-align:right">$ per index point</th><th>Weights</th>
-      </tr></thead><tbody></tbody></table>
+      </tr></thead><tbody>__TBODY_FRONTIER__</tbody></table>
     </div>
   </section>
 
@@ -1151,7 +1365,7 @@ TEMPLATE = r"""<!DOCTYPE html>
         <th data-k="ctx" style="text-align:right">Context <span class="ar" aria-hidden="true">&#8597;</span></th>
         <th data-k="rel">Released <span class="ar" aria-hidden="true">&#8597;</span></th>
         <th data-k="open">Weights <span class="ar" aria-hidden="true">&#8597;</span></th>
-      </tr></thead><tbody></tbody></table>
+      </tr></thead><tbody>__TBODY_MAIN__</tbody></table>
       <div class="empty-state" id="tblEmpty" aria-live="polite" hidden></div>
     </div>
   </section>
