@@ -240,10 +240,10 @@ jobs:
         # the hub with a credential: nobody is watching either at 01:11 UTC.
         # Omitting them was measuring the half that a person checks anyway.
         #
-        # Note what the number can and cannot speak to: build.py is 1400 lines
-        # but only ~100 statements, because most of it is HTML/JS/SVG string
-        # literals no line-coverage number reaches. The browser tests are what
-        # actually exercise those.
+        # Note what the number can and cannot speak to: what coverage counts
+        # as statements in build.py is a small fraction of its size, because
+        # most of its lines are HTML/JS/SVG string literals no line-coverage
+        # number reaches. The browser tests are what actually exercise those.
         run: |
           floor="$(python3 scripts/ci/thresholds.py --coverage-floor python)"
           python3 -m coverage report "--fail-under=${floor}" --precision=1
