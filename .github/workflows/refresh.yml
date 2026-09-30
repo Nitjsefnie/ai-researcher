@@ -299,6 +299,13 @@ jobs:
 
       - name: Run the suite against the new capture
         if: steps.capture.outputs.proceed == 'true'
+        # The suite's browser tests rebuild the page over the REAL
+        # out/frontier-models.html (tests/test_browser.py's setUpClass calls
+        # build.main()), so this step must carry the same env the Rebuild
+        # step has: unstamped, that rewrite would throw the stamp away and
+        # the commit below would stage an unstamped page (issue #92).
+        env:
+          AA_SOURCE_COMMIT: ${{ github.sha }}
         run: python3 -m pytest -q -ra
 
       - name: Commit the capture
