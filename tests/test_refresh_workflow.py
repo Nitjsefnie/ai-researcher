@@ -338,3 +338,141 @@ class GateTests(unittest.TestCase):
         # setup-python stays unconditional: it is cheap, and fetch_aa.py
         # runs on it.
         self.assertNotIn("if", setup[0])
+
+
+class RouteDisagreementSkipTests(unittest.TestCase):
+    """Issue #100: the capture's route-disagreement refusal (exit 3) must not
+    fail the hour while AA's cache-stagger window is young, but a window that
+    outlasts three hours must fail red again. The Capture step is pinned
+    here on mechanism words and ordering -- substrings, never line numbers
+    or whole-block equality, in this file's existing style.
+
+    The three-colour contract: exit 0 proceeds as before (retiring any stamp
+    a skipped stretch left behind), exit 3 green-skips behind a committed
+    stamp, every other code re-raises its own stderr and fails red exactly
+    as before.
+    """
+
+    def setUp(self):
+        self.wf = load()
+        self.step = step(self.wf, "Capture the leaderboard")
+        self.block = flattened(self.step["run"])
+
+    def test_the_fetch_runs_behind_an_rc_trap_so_the_step_can_classify_it(self):
+        # The capture's stderr is parked in a file because every branch
+        # below needs it: the stamp carries it, the red paths re-emit it.
+        for piece in ("set +e",
+                      "python3 scripts/fetch_aa.py 2> /tmp/fetch-err.txt",
+                      "rc=$?",
+                      "set -e",
+                      "stamp=data/aa-route-disagreement.txt",
+                      "alert_after=$((3*3600))",
+                      "now=$(date -u +%s)"):
+            self.assertIn(piece, self.block)
+
+    def test_the_capture_step_holds_the_push_credentials(self):
+        # The stamp commit pushes from THIS step, so the token sits here --
+        # the same explicit env the commit and publish steps carry.
+        self.assertEqual(self.step.get("env", {}).get("GH_TOKEN"),
+                         "${{ github.token }}")
+        self.assertEqual(self.step.get("env", {}).get("REPO"),
+                         "${{ github.repository }}")
+
+    def test_the_three_exit_colours_are_classified_in_order(self):
+        # Recovery (rc 0) stands first, then the skip (rc 3), then the
+        # designed red re-raise for everything else.
+        self.assertLess(self.block.index('[ "$rc" -eq 0 ]'),
+                        self.block.index('[ "$rc" -eq 3 ]'))
+        self.assertLess(self.block.index('[ "$rc" -eq 3 ]'),
+                        self.block.index('exit "$rc"'))
+        self.assertIn("cat /tmp/fetch-err.txt >&2", self.block)
+
+    def test_a_first_refusal_writes_commits_and_pushes_the_stamp(self):
+        # The stamp is the window's start epoch (line 1) plus the capture's
+        # own diagnostic (line 2+); it is added by EXPLICIT path and pushed
+        # inside this step, so no later data/ restore can see it
+        # uncommitted.
+        idx_write = self.block.index('> "$stamp"')
+        idx_add = self.block.index("git add data/aa-route-disagreement.txt")
+        idx_commit = self.block.index(
+            "AA routes disagree; skipping this hour (issue #100)")
+        idx_push = self.block.index("push_head || true")
+
+        self.assertLess(idx_write, idx_add)
+        self.assertLess(idx_add, idx_commit)
+        self.assertLess(idx_commit, idx_push)
+        # Both stamp contents, in order: the epoch, then the capture stderr.
+        idx_epoch = self.block.index("echo \"$now\"")
+        self.assertLess(idx_epoch,
+                        self.block.index("cat /tmp/fetch-err.txt", idx_epoch))
+        self.assertIn("} > \"$stamp\"", self.block)
+
+    def test_a_young_window_skips_green_without_touching_anything(self):
+        # The stamp-exists branch stands BEFORE the write (a fresh stamp is
+        # never rewritten), and the skip is green: summary line, exit 0.
+        self.assertLess(self.block.index('[ -f "$stamp" ]'),
+                        self.block.index('> "$stamp"'))
+        self.assertIn(
+            "AA's routes disagree (window began", self.block)
+        self.assertIn("skipping this hour; fails red past 3 h (issue #100)",
+                      self.block)
+
+    def test_a_window_older_than_three_hours_fails_red(self):
+        idx_compare = self.block.index('[ "$((now - start))" -gt "$alert_after" ]')
+        idx_alarm = self.block.index("Re-read artificialanalysis.ai by hand")
+
+        self.assertEqual(self.block.count("3*3600"), 1)
+        # The alarm names the window start, re-emits the capture's own
+        # stderr, and fails the step.
+        self.assertLess(idx_compare,
+                        self.block.index('date -u -d "@$start"', idx_compare))
+        self.assertLess(
+            idx_alarm, self.block.index("cat /tmp/fetch-err.txt >&2",
+                                        idx_alarm))
+        self.assertIn("exit 1", self.block)
+
+    def test_a_corrupt_stamp_fails_red_rather_than_skipping(self):
+        # A stamp whose first line is empty or non-numeric cannot date the
+        # window, so the alarm's premise is unprovable -- red, not a guess.
+        self.assertIn("start=$(head -n 1 \"$stamp\")", self.block)
+        self.assertIn("''|*[!0-9]*", self.block)
+
+    def test_a_recovered_capture_retires_the_stamp_and_stays_green(self):
+        # rc == 0 with a tracked stamp: delete, commit the retirement, push.
+        # A push lost to the race concedes silently -- the next successful
+        # capture retires the stamp again.
+        self.assertIn('git ls-files --error-unmatch "$stamp"', self.block)
+        self.assertIn("git rm -q", self.block)
+        self.assertIn("Route agreement restored; resume captures (issue #100)",
+                      self.block)
+        idx_rm = self.block.index("git rm -q")
+        self.assertLess(idx_rm, self.block.index(
+            "Route agreement restored; resume captures (issue #100)"))
+        self.assertIn("if push_head;", self.block)
+
+    def test_both_stamp_paths_retry_the_push_race_then_concede(self):
+        # The retry is one shared helper: push, and on a rejection fetch +
+        # rebase + push once more, with a conflict conceding (return 1).
+        # Both the stamp-write and the stamp-retire paths go through it, and
+        # both pushes live ONLY inside the helper.
+        self.assertIn("push_head () {", self.block)
+        # The rebase carries the inline identity (this step never git-config's
+        # the checkout), so the pin is on the rebase itself.
+        self.assertIn("rebase origin/main", self.block)
+        self.assertIn("git rebase --abort", self.block)
+        self.assertEqual(self.block.count("HEAD:main"), 2)
+        self.assertIn("push_head || true", self.block)
+        self.assertIn("if push_head;", self.block)
+
+    def test_the_header_documents_the_third_deliberate_failure_mode(self):
+        # The file's contract lives in its header; a reader must find the
+        # exit-3 semantics there, not reconstruct them from the step.
+        header = self.wf["jobs"]["refresh"]["steps"]  # anchor only
+        del header
+        raw = WORKFLOW.read_text(encoding="utf-8")
+        head = raw.split("\njobs:", 1)[0]
+
+        self.assertIn("EXIT 3 IS THE ONE DELIBERATE NON-RED", head)
+        self.assertIn("issue #100", head)
+        self.assertIn("data/aa-route-disagreement.txt", head)
+        self.assertIn("older than 3 h", head)

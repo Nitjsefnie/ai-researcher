@@ -241,11 +241,16 @@ The scheduled commits are authored by `github-actions[bot]` and carry **no**
 model co-author trailer, because no model wrote them. A refresh a person or an
 agent drives by hand still carries one.
 
-Two failure modes are deliberate. `fetch_aa.py` exiting nonzero on a schema
+Three failure modes are deliberate. `fetch_aa.py` exiting nonzero on a schema
 change turns the scheduled run red rather than committing a mangled capture —
-that is the signal to go re-read the leaderboard by hand. And the suite runs
-BEFORE the commit, so a capture that breaks the page leaves the last good
-capture committed and the last good page live.
+that is the signal to go re-read the leaderboard by hand. A persistent
+cross-route disagreement is different: AA's two routes are independently
+cached and its data lands on them at different times, so that refusal exits
+with code 3 and the refresh green-skips the hour and stamps
+`data/aa-route-disagreement.txt`, going red once the window exceeds three
+hours (issue #100). And the suite runs BEFORE the commit, so a capture that
+breaks the page leaves the last good capture committed and the last good page
+live.
 
 ## Commit / co-author trailer
 

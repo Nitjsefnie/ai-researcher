@@ -53,6 +53,10 @@
 !/data/aa-raw-models.json
 !/data/aa-raw-coding-agents.json
 !/data/captured-at.txt
+# The refresh's route-disagreement window stamp (issue #100): committed by
+# the Capture step, retired when the routes agree again, so it is tracked,
+# not junk.
+!/data/aa-route-disagreement.txt
 
 # ---- out/ — the published page --------------------------------------------
 !/out/
