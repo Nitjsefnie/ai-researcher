@@ -69,10 +69,14 @@ JITTER = re.compile(
 SPEED_SHOWN = {"medianOutputTokensPerSecond", "intelligenceIndexTimePerTask"}
 
 # Where a SPEED_SHOWN re-sample stops being jitter and starts being news: the
-# single source for --speed-tol below AND for the capture gate's quantization
-# ladder (scripts/capture_gate.py snaps rendered speed fields to a ladder with
-# this step before comparing), so the differ and the gate cannot disagree
-# about where jitter ends.
+# single source for --speed-tol below AND for the capture gate's speed
+# comparison of these same two fields (scripts/capture_gate.py tests each
+# rendered cell against the last committed value at this threshold), so the
+# differ and the gate cannot disagree about where jitter ends FOR THESE
+# FIELDS. The gate also applies the threshold to the coding capture's
+# agentWallTimeSec, which this differ never reports (its classifier files
+# that path as derived and drops it) -- gate-side strictness because the
+# page renders it (build.py:443-444), not a second definition here.
 SPEED_TOL = 0.25
 
 # Lab branding churn and AA's own UI state -- never a finding.

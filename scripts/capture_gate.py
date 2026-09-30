@@ -91,12 +91,16 @@ class FreshCaptureError(Exception):
 # --- speed quantization ------------------------------------------------------
 
 
-# The rendered speed fields the gate reconciles, and where each is rendered:
-# build.py:356-357 carries the models capture's medianOutputTokensPerSecond
-# ("tps") and intelligenceIndexTimePerTask ("secs") onto model rows, and
-# build.py:443-444 carries the coding capture's agentWallTimeSec ("secs")
-# onto agent rows -- the same render sites scripts/diff_aa.py's SPEED_SHOWN
-# names when it thresholds re-samples as news-only-past-SPEED_TOL.
+# The rendered speed fields the gate reconciles, and where each is rendered.
+# Two of them are diff_aa.py's own SPEED_SHOWN fields -- build.py:356-357
+# carries the models capture's medianOutputTokensPerSecond ("tps") and
+# intelligenceIndexTimePerTask ("secs") onto model rows, and the differ
+# thresholds those re-samples as news-only-past-SPEED_TOL. agentWallTimeSec
+# (build.py:443-444, the coding capture's "secs") is NOT in SPEED_SHOWN: the
+# differ's report never carries it (its classifier files it as derived and
+# drops it). The gate reconciles it anyway, under the same threshold,
+# because the page renders it -- an intentional gate-side strictness, not
+# tool agreement.
 SPEED_KEYS_MODELS = frozenset(
     {"medianOutputTokensPerSecond", "intelligenceIndexTimePerTask"})
 SPEED_KEYS_AGENTS = frozenset({"agentWallTimeSec"})
