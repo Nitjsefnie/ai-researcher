@@ -562,17 +562,29 @@ class ForceOverrideTests(unittest.TestCase):
         self.assertLess(idx_summary2, self.capture.index("exit 0",
                                                          idx_summary2))
 
+    def test_the_captured_verdict_travels_through_env_not_template(self):
+        # zizmor's template-injection audit fails any direct `${{ }}` into
+        # `run:` text (issue #103's CI gate), so the Capture step's verdict
+        # reaches this step's shell only through the env mapping -- never
+        # interpolated inline, wherever the value actually comes from (our
+        # own step output; the env form is the sanctioned convention).
+        self.assertEqual(
+            step(self.wf, "Did anything move?")["env"]["CAPTURED"],
+            "${{ steps.fetch.outputs.captured }}")
+        self.assertNotIn("steps.fetch.outputs.captured", self.moved)
+
     def test_force_alone_cannot_set_proceed_behind_a_refused_capture(self):
         # THE pin that fails on current main: the proceed decision gates
         # the force term on the Capture step's verdict. `!= "false"` (not
-        # `= "true"`) keeps force honored whenever the output is absent --
+        # `= "true"`) keeps force honored whenever the verdict is absent --
         # the safe default for any run shape older than the output -- so
         # refused (false) is the only value that vetoes it, and the brace
         # group keeps that veto scoped to the force term alone (changed and
-        # the heal flags are untouched by it).
-        self.assertIn("steps.fetch.outputs.captured", self.moved)
+        # the heal flags are untouched by it). The verdict arrives as the
+        # env var $CAPTURED, the zizmor-required form (see the env-mapping
+        # pin above).
         self.assertIn(
-            '{ [ "${{ steps.fetch.outputs.captured }}" != "false" ] '
+            '{ [ "$CAPTURED" != "false" ] '
             "&& [ \"${{ inputs.force }}\" = 'true' ]; }",
             self.moved)
 
@@ -583,18 +595,20 @@ class ForceOverrideTests(unittest.TestCase):
         # label. Same guard, same `!= "false"` spelling, on the quiet
         # line's condition -- pinned with the flag it feeds, the substring
         # that distinguishes it from the proceed decision (whose guard is
-        # followed by the force term, not live_stale).
+        # followed by the force term, not live_stale). $CAPTURED is the
+        # zizmor-required env form of the verdict (see the env-mapping pin).
         self.assertIn(
-            '[ "${{ steps.fetch.outputs.captured }}" != "false" ] '
-            '&& [ "$live_stale" = false ]',
+            '[ "$CAPTURED" != "false" ] && [ "$live_stale" = false ]',
             self.moved)
 
     def test_an_ignored_force_is_reported_in_the_summary(self):
         # The refused-and-forced hour must be explained, not silent: its
         # own summary line stands immediately before the proceed decision,
-        # names force, names the refusal, and names the issue.
+        # names force, names the refusal, and names the issue. The verdict
+        # arrives as the env var $CAPTURED, the zizmor-required form (see
+        # the env-mapping pin).
         self.assertIn(
-            "[ \"${{ steps.fetch.outputs.captured }}\" = false ] "
+            "[ \"$CAPTURED\" = false ] "
             "&& [ \"${{ inputs.force }}\" = 'true' ]; then "
             "echo 'Force dispatch ignored:",
             self.moved)
@@ -602,8 +616,7 @@ class ForceOverrideTests(unittest.TestCase):
         self.assertIn("issue #103", self.moved)
         # It is the last word before the decision: nothing executes between
         # the summary and the proceed-if it explains.
-        idx = self.moved.index(
-            '[ "${{ steps.fetch.outputs.captured }}" = false ]')
+        idx = self.moved.index('[ "$CAPTURED" = false ]')
         self.assertLess(idx, self.moved.index('[ "$changed" = true ]'))
 
     def test_the_header_documents_force_terminality_on_a_skipped_hour(self):
