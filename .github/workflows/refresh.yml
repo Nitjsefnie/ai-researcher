@@ -297,6 +297,14 @@ jobs:
 
       - name: Did anything move?
         id: capture
+        # The Capture step's verdict travels through env, not an inline
+        # template: zizmor's template-injection audit fails any direct
+        # `${{ }}` into `run:` text (issue #103's gate), and the env
+        # mapping is its sanctioned route. The value is our own step
+        # output, not attacker-controlled -- the env form is still the
+        # convention.
+        env:
+          CAPTURED: ${{ steps.fetch.outputs.captured }}
         run: |
           # The rendered gate (see the header): build the page from HEAD's
           # captures and from the fresh ones, normalize the build-machine
@@ -373,17 +381,20 @@ jobs:
           # mislabelled as an ordinary forced no-op. A run that only heals
           # the live page still proceeds, whether the `published` ref's page
           # or the hub's live page is what is behind. `inputs.force` is the
-          # empty string on a schedule run, and `captured` is empty only for
-          # run shapes older than the output, so both defaults keep the
-          # scheduled path unchanged.
+          # empty string on a schedule run, and `$CAPTURED` is empty only
+          # for run shapes older than the output, so both defaults keep the
+          # scheduled path unchanged. (The verdict reaches this shell as
+          # the env var $CAPTURED, not an inline template expression --
+          # zizmor's template-injection audit fails those in run text, and
+          # the env mapping is its sanctioned route.)
           #
           # A refused capture under a forced dispatch gets its own truthful
           # summary line (issue #103) -- the hour must not pass silently.
-          if [ "${{ steps.fetch.outputs.captured }}" = false ] && [ "${{ inputs.force }}" = 'true' ]; then
+          if [ "$CAPTURED" = false ] && [ "${{ inputs.force }}" = 'true' ]; then
             echo 'Force dispatch ignored: the capture was refused this hour (AA'"'"'s routes disagree), so there is nothing to rebuild or publish (issue #103).' >> "$GITHUB_STEP_SUMMARY"
           fi
           if [ "$changed" = true ] \
-             || { [ "${{ steps.fetch.outputs.captured }}" != "false" ] && [ "${{ inputs.force }}" = 'true' ]; } \
+             || { [ "$CAPTURED" != "false" ] && [ "${{ inputs.force }}" = 'true' ]; } \
              || [ "$live_stale" = true ] || [ "$hub_stale" = true ]; then
             echo "proceed=true" >> "$GITHUB_OUTPUT"
           else
@@ -399,7 +410,7 @@ jobs:
           # #103): the Capture step's own skip line already explains the
           # hour, and "AA capture unchanged" would mislabel it.
           if [ "$changed" = false ] && [ "${{ inputs.force }}" != 'true' ] \
-             && [ "${{ steps.fetch.outputs.captured }}" != "false" ] && [ "$live_stale" = false ] && [ "$hub_stale" = false ]; then
+             && [ "$CAPTURED" != "false" ] && [ "$live_stale" = false ] && [ "$hub_stale" = false ]; then
             echo 'AA capture unchanged and the live page is current — nothing committed, nothing published.' \
               >> "$GITHUB_STEP_SUMMARY"
           fi
