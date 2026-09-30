@@ -141,9 +141,9 @@ change that lowers a value, on a pull request and on a direct push to
 the committed one.
 Scripts are counted deliberately — `--omit` leaves out only `tests/*` —
 because they run unattended in CI. Note what the numbers can and cannot speak
-to: `build.py` is ~1400 lines but only ~100 statements, because most of it is
-HTML, CSS and JavaScript in string literals. The browser tests are what cover
-those.
+to: what coverage counts as statements in `build.py` is a small fraction of
+its size, because most of its lines are HTML, CSS and JavaScript in string
+literals. The browser tests are what cover those.
 
 Three run only on GitHub. `codeql` is gated on repository visibility, because
 code scanning is free on public repositories and needs Code Security on private
