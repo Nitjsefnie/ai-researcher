@@ -490,3 +490,128 @@ class RouteDisagreementSkipTests(unittest.TestCase):
         self.assertIn("issue #100", head)
         self.assertIn("data/aa-route-disagreement.txt", head)
         self.assertIn("older than 3 h", head)
+
+
+class ForceOverrideTests(unittest.TestCase):
+    """Issue #103: a `force: true` dispatch must not override a refused
+    capture. Run 36746895412 dispatched force minutes after run 36746060709
+    had stamped a live route-disagreement window: the Capture step
+    green-skipped, but "Did anything move?" derived `proceed` from the force
+    input alone, and the run rebuilt and published HEAD's stale captures as
+    "AA capture unchanged". The Capture step now publishes its verdict as a
+    `captured` step output, and the force term in the proceed decision --
+    and the quiet line -- is gated on it. Pins on substrings and ordering
+    over the flattened blocks, never line numbers, in this file's style.
+    """
+
+    def setUp(self):
+        self.wf = load()
+        self.capture_step = step(self.wf, "Capture the leaderboard")
+        self.capture = flattened(self.capture_step["run"])
+        self.moved = flattened(step(self.wf, "Did anything move?")["run"])
+        self.header = WORKFLOW.read_text(
+            encoding="utf-8").split("\njobs:", 1)[0]
+
+    def test_the_capture_step_declares_the_id_the_force_gate_reads(self):
+        # "Did anything move?" reads the Capture step's verdict through the
+        # step id, so the id must be pinned to exactly the name the
+        # expression spells.
+        self.assertEqual(self.capture_step.get("id"), "fetch")
+
+    def test_captured_is_set_on_every_green_path_before_its_exit(self):
+        # Three green paths leave this step, and each must have declared
+        # its verdict before exiting, or the force gate below reads an
+        # empty output and honors force against a refused capture.
+        #
+        # rc == 0: captured=true, and it is the branch's FIRST statement --
+        # the verdict exists even when there was no stamp to retire.
+        # (The between-slice is comment-stripped, so this pin fails if any
+        # executable statement precedes the echo.)
+        raw = self.capture_step["run"]
+        opener = 'if [ "$rc" -eq 0 ]; then'
+        idx_open = raw.index(opener)
+        idx_true = raw.index('echo "captured=true"', idx_open)
+        between = raw[idx_open + len(opener):idx_true]
+        self.assertEqual(commands(between), "")
+        self.assertLess(idx_true, raw.index("exit 0", idx_true))
+
+        # Both rc == 3 green paths set captured=false before they exit.
+        self.assertEqual(self.capture.count('echo "captured=false"'), 2)
+
+        # The young-window skip: the verdict precedes the path's summary
+        # line and its exit 0, and the exit precedes the first-refusal
+        # write (the skip must never fall through into it).
+        idx_f = self.capture.index('[ -f "$stamp" ]')
+        idx_false = self.capture.index('echo "captured=false"', idx_f)
+        idx_summary = self.capture.index(
+            "skipping this hour; fails red past 3 h (issue #100)", idx_false)
+        self.assertLess(idx_false, idx_summary)
+        idx_green = self.capture.index("exit 0", idx_summary)
+        self.assertLess(idx_summary, idx_green)
+        self.assertLess(idx_green, self.capture.index('> "$stamp"'))
+
+        # The first refusal: the verdict precedes the stamp write, the
+        # push, and the path's own summary + exit.
+        idx_false2 = self.capture.index('echo "captured=false"',
+                                        idx_false + 1)
+        self.assertLess(idx_false2, self.capture.index('> "$stamp"'))
+        self.assertLess(idx_false2, self.capture.index("push_head || true"))
+        idx_summary2 = self.capture.index(
+            "skipping this hour; fails red past 3 h (issue #100)", idx_false2)
+        self.assertLess(idx_false2, idx_summary2)
+        self.assertLess(idx_summary2, self.capture.index("exit 0",
+                                                         idx_summary2))
+
+    def test_force_alone_cannot_set_proceed_behind_a_refused_capture(self):
+        # THE pin that fails on current main: the proceed decision gates
+        # the force term on the Capture step's verdict. `!= "false"` (not
+        # `= "true"`) keeps force honored whenever the output is absent --
+        # the safe default for any run shape older than the output -- so
+        # refused (false) is the only value that vetoes it, and the brace
+        # group keeps that veto scoped to the force term alone (changed and
+        # the heal flags are untouched by it).
+        self.assertIn("steps.fetch.outputs.captured", self.moved)
+        self.assertIn(
+            '{ [ "${{ steps.fetch.outputs.captured }}" != "false" ] '
+            "&& [ \"${{ inputs.force }}\" = 'true' ]; }",
+            self.moved)
+
+    def test_the_quiet_line_carries_the_same_refusal_guard(self):
+        # A skipped hour's summary already carries the Capture step's own
+        # skip line, so the quiet line must never additionally claim "AA
+        # capture unchanged" -- a forced-and-refused hour used to wear that
+        # label. Same guard, same `!= "false"` spelling, on the quiet
+        # line's condition -- pinned with the flag it feeds, the substring
+        # that distinguishes it from the proceed decision (whose guard is
+        # followed by the force term, not live_stale).
+        self.assertIn(
+            '[ "${{ steps.fetch.outputs.captured }}" != "false" ] '
+            '&& [ "$live_stale" = false ]',
+            self.moved)
+
+    def test_an_ignored_force_is_reported_in_the_summary(self):
+        # The refused-and-forced hour must be explained, not silent: its
+        # own summary line stands immediately before the proceed decision,
+        # names force, names the refusal, and names the issue.
+        self.assertIn(
+            "[ \"${{ steps.fetch.outputs.captured }}\" = false ] "
+            "&& [ \"${{ inputs.force }}\" = 'true' ]; then "
+            "echo 'Force dispatch ignored:",
+            self.moved)
+        self.assertIn("the capture was refused this hour", self.moved)
+        self.assertIn("issue #103", self.moved)
+        # It is the last word before the decision: nothing executes between
+        # the summary and the proceed-if it explains.
+        idx = self.moved.index(
+            '[ "${{ steps.fetch.outputs.captured }}" = false ]')
+        self.assertLess(idx, self.moved.index('[ "$changed" = true ]'))
+
+    def test_the_header_documents_force_terminality_on_a_skipped_hour(self):
+        # The file's contract lives in its header (same pin shape as
+        # RouteDisagreementSkipTests's header test): the force-input
+        # terminality of a green-skipped hour is stated where the exit-3
+        # semantics are, not reconstructed from the steps.
+        self.assertIn("issue #103", self.header)
+        self.assertIn("force", self.header.lower())
+        self.assertIn("terminal", self.header.lower())
+        self.assertIn("3 h red bound", self.header)

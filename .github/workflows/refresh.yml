@@ -111,6 +111,13 @@ name: refresh
 # pushes; a stamp push lost to the push race concedes green either way, and
 # a lost stamp is self-healing on the next run. Exit 1 still fails red
 # immediately, exactly as before.
+#
+# A GREEN-SKIPPED HOUR IS TERMINAL AGAINST THE `force` INPUT (issue #103).
+# Force exists to republish the current BUILD, and behind a refused capture
+# there is nothing to republish -- the last published page already stands --
+# so a forced dispatch during a live window publishes nothing, the hour is
+# not mislabelled "AA capture unchanged", and the stamp keeps aging to its
+# own 3 h red bound.
 
 on:
   schedule:
@@ -189,6 +196,9 @@ jobs:
       # succeeds within the hour. This step green-skips that hour behind a
       # committed stamp and fails red only when the disagreement is OLD.
       - name: Capture the leaderboard
+        # The id is the force gate's handle: "Did anything move?" reads this
+        # step's `captured` verdict through it (issue #103).
+        id: fetch
         env:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
@@ -220,6 +230,10 @@ jobs:
           }
 
           if [ "$rc" -eq 0 ]; then
+            # captured=true is this step's verdict for the force gate in
+            # "Did anything move?" (issue #103): only a capture that ran
+            # may honor a forced rebuild.
+            echo "captured=true" >> "$GITHUB_OUTPUT"
             # Agreement restored after a skipped stretch: retire the stamp
             # so its age can never trip the red alarm. A push lost to the
             # race concedes SILENTLY -- the next successful capture retires
@@ -249,8 +263,11 @@ jobs:
                 exit 1
               fi
               # A young window: skip the hour green. Nothing is written --
-              # neither the stamp nor the capture -- and `proceed` is never
-              # set, so no later step runs.
+              # neither the stamp nor the capture. captured=false makes
+              # this terminal against the force input (issue #103); only
+              # the heal gate (live_stale/hub_stale) may still set proceed,
+              # as on any unchanged hour (issue #100).
+              echo "captured=false" >> "$GITHUB_OUTPUT"
               echo "AA's routes disagree (window began $(date -u -d "@$start")); skipping this hour; fails red past 3 h (issue #100)" \
                 >> "$GITHUB_STEP_SUMMARY"
               exit 0
@@ -258,7 +275,9 @@ jobs:
             # First refusal: stamp the window's start (line 1) plus the
             # capture's own diagnostic (line 2+), and commit + push it IN
             # THIS STEP -- a later step's data/ restore must never see it
-            # uncommitted.
+            # uncommitted. captured=false (issue #103) makes this hour
+            # terminal against force, exactly like the young-window skip.
+            echo "captured=false" >> "$GITHUB_OUTPUT"
             {
               echo "$now"
               cat /tmp/fetch-err.txt
@@ -347,12 +366,24 @@ jobs:
           fi
           # `changed` answers "did the data move", `proceed` answers "should
           # we rebuild and publish" — a forced run says yes to the second
-          # alone, and so does a run that only heals the live page, whether
-          # the `published` ref's page or the hub's live page is what is
-          # behind. `inputs.force` is the empty string on a schedule run, so
-          # no second condition is needed to keep the scheduled path
-          # unchanged.
-          if [ "$changed" = true ] || [ "${{ inputs.force }}" = 'true' ] \
+          # alone, but ONLY when the capture actually ran (issue #103): a
+          # refused capture is terminal against force, so a forced dispatch
+          # during a live disagreement window has nothing to rebuild -- the
+          # last published page already stands -- and the hour is not
+          # mislabelled as an ordinary forced no-op. A run that only heals
+          # the live page still proceeds, whether the `published` ref's page
+          # or the hub's live page is what is behind. `inputs.force` is the
+          # empty string on a schedule run, and `captured` is empty only for
+          # run shapes older than the output, so both defaults keep the
+          # scheduled path unchanged.
+          #
+          # A refused capture under a forced dispatch gets its own truthful
+          # summary line (issue #103) -- the hour must not pass silently.
+          if [ "${{ steps.fetch.outputs.captured }}" = false ] && [ "${{ inputs.force }}" = 'true' ]; then
+            echo 'Force dispatch ignored: the capture was refused this hour (AA'"'"'s routes disagree), so there is nothing to rebuild or publish (issue #103).' >> "$GITHUB_STEP_SUMMARY"
+          fi
+          if [ "$changed" = true ] \
+             || { [ "${{ steps.fetch.outputs.captured }}" != "false" ] && [ "${{ inputs.force }}" = 'true' ]; } \
              || [ "$live_stale" = true ] || [ "$hub_stale" = true ]; then
             echo "proceed=true" >> "$GITHUB_OUTPUT"
           else
@@ -363,9 +394,12 @@ jobs:
           # Each cause prints its own line, so every outcome is summarised.
           # (Either flag being true already implies changed=false: they are
           # only ever set under the unchanged path above.)
-          # A forced run always proceeds, so it must never print the quiet line (#80).
+          # A run that proceeds on force alone must never print the quiet
+          # line (#80), and a refused capture never earns it either (issue
+          # #103): the Capture step's own skip line already explains the
+          # hour, and "AA capture unchanged" would mislabel it.
           if [ "$changed" = false ] && [ "${{ inputs.force }}" != 'true' ] \
-             && [ "$live_stale" = false ] && [ "$hub_stale" = false ]; then
+             && [ "${{ steps.fetch.outputs.captured }}" != "false" ] && [ "$live_stale" = false ] && [ "$hub_stale" = false ]; then
             echo 'AA capture unchanged and the live page is current — nothing committed, nothing published.' \
               >> "$GITHUB_STEP_SUMMARY"
           fi
