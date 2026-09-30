@@ -93,6 +93,24 @@ name: refresh
 # per-evaluation costs stop summing to the published total. Those are the
 # designed signals to go re-read the leaderboard and the methodology page by
 # hand; a red run here means read them, not retry.
+#
+# EXIT 3 IS THE ONE DELIBERATE NON-RED (issue #100). AA's two routes are
+# independently cached Vercel pages whose data lands at different times --
+# measured windows up to ~1 h, cache-busting query params and no-cache
+# headers serve the SAME entry, and re-reads never converge inside any retry
+# bound -- so a capture that straddles an update cannot be made consistent
+# by retrying, but the SAME capture usually succeeds within the hour. That
+# refusal gets its own exit code, 3: the Capture step green-skips the hour,
+# stamping data/aa-route-disagreement.txt with the window's start (epoch,
+# line 1) and the capture's own stderr (line 2+), committed AND pushed in
+# the Capture step itself so no later step's data/ restore can see it
+# uncommitted. While the stamp is young the same run shape green-skips
+# again; once the window is older than 3 h the step fails red -- go re-read
+# AA by hand. When a capture succeeds again, the step removes the stamp,
+# commits "Route agreement restored; resume captures (issue #100)" and
+# pushes; a stamp push lost to the push race concedes green either way, and
+# a lost stamp is self-healing on the next run. Exit 1 still fails red
+# immediately, exactly as before.
 
 on:
   schedule:
@@ -161,8 +179,102 @@ jobs:
       # and the two installs below are skipped entirely -- the gate decides
       # whether the toolchain is needed at all, instead of paying 40-50 s of
       # pip + Chromium on every no-op hour.
+      #
+      # The refusals are not all the same colour (issue #100). Exit 1 is the
+      # designed red: schema change, index bump, fetch failure -- go re-read
+      # AA by hand. Exit 3 is the route-disagreement refusal: the two routes
+      # straddled AA's update (independently cached Vercel pages whose data
+      # lands at different times -- measured windows up to ~1 h, and re-reads
+      # never converge inside any retry bound), so the SAME capture usually
+      # succeeds within the hour. This step green-skips that hour behind a
+      # committed stamp and fails red only when the disagreement is OLD.
       - name: Capture the leaderboard
-        run: python3 scripts/fetch_aa.py
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          set +e
+          python3 scripts/fetch_aa.py 2> /tmp/fetch-err.txt
+          rc=$?
+          set -e
+          stamp=data/aa-route-disagreement.txt
+          alert_after=$((3*3600))
+          now=$(date -u +%s)
+
+          # The push races a concurrent run exactly as the commit step's
+          # does; a stamp push lost to it is self-healing (the next run
+          # rewrites or retires the stamp), so a conflict or a second
+          # rejection concedes green rather than failing the hour. Identity
+          # is passed inline (-c) because this step never git-config's the
+          # checkout, and the rebase re-creates OUR commit, so it needs a
+          # committer identity too.
+          push_head () {
+            if ! git push "https://x-access-token:${GH_TOKEN}@github.com/${REPO}" HEAD:main; then
+              git fetch --depth=1 origin main
+              if ! git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' rebase origin/main; then
+                git rebase --abort
+                return 1
+              fi
+              git push "https://x-access-token:${GH_TOKEN}@github.com/${REPO}" HEAD:main
+            fi
+          }
+
+          if [ "$rc" -eq 0 ]; then
+            # Agreement restored after a skipped stretch: retire the stamp
+            # so its age can never trip the red alarm. A push lost to the
+            # race concedes SILENTLY -- the next successful capture retires
+            # the stamp again.
+            if git ls-files --error-unmatch "$stamp" > /dev/null 2>&1; then
+              git rm -q "$stamp"
+              git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m "Route agreement restored; resume captures (issue #100)"
+              if push_head; then
+                echo "AA's routes agree again — disagreement stamp removed; captures resume." \
+                  >> "$GITHUB_STEP_SUMMARY"
+              fi
+            fi
+            exit 0
+          fi
+
+          if [ "$rc" -eq 3 ]; then
+            if [ -f "$stamp" ]; then
+              start=$(head -n 1 "$stamp")
+              case "$start" in
+                ''|*[!0-9]*)
+                  echo "AA route-disagreement stamp is corrupt (first line: '$start') -- go re-read AA by hand (issue #100)." >&2
+                  exit 1 ;;
+              esac
+              if [ "$((now - start))" -gt "$alert_after" ]; then
+                echo "AA's routes have disagreed since $(date -u -d "@$start") -- past the 3 h bound. Re-read artificialanalysis.ai by hand (issue #100)." >&2
+                cat /tmp/fetch-err.txt >&2
+                exit 1
+              fi
+              # A young window: skip the hour green. Nothing is written --
+              # neither the stamp nor the capture -- and `proceed` is never
+              # set, so no later step runs.
+              echo "AA's routes disagree (window began $(date -u -d "@$start")); skipping this hour; fails red past 3 h (issue #100)" \
+                >> "$GITHUB_STEP_SUMMARY"
+              exit 0
+            fi
+            # First refusal: stamp the window's start (line 1) plus the
+            # capture's own diagnostic (line 2+), and commit + push it IN
+            # THIS STEP -- a later step's data/ restore must never see it
+            # uncommitted.
+            {
+              echo "$now"
+              cat /tmp/fetch-err.txt
+            } > "$stamp"
+            git add data/aa-route-disagreement.txt
+            git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m "AA routes disagree; skipping this hour (issue #100)"
+            push_head || true
+            echo "AA's routes disagree (window began $(date -u -d "@$now")); skipping this hour; fails red past 3 h (issue #100)" \
+              >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          # Every other exit code is the designed red -- schema change,
+          # index bump, fetch failure -- exactly as before issue #100.
+          cat /tmp/fetch-err.txt >&2
+          exit "$rc"
 
       - name: Did anything move?
         id: capture
