@@ -66734,7 +66734,7 @@
   "omniscience": -8.233333333333333,
   "omniscienceAccuracy": 0.18616666666666667,
   "omniscienceNonHallucination": 0.670079868933033,
-  "gdpvalNormalized": null,
+  "gdpvalNormalized": 0.22676,
   "analystAgent": null,
   "terminalbenchHard": null,
   "terminalBench21": 0.389513108614232,
@@ -66790,11 +66790,12 @@
   "capabilities": {},
   "omniscienceHallucinationRate": 0.32992013106696705,
   "gdpPdfAllPass": 0.064,
-  "gdpval": null,
+  "gdpval": 953.52,
   "itBenchSre": null,
   "terminalBenchScience": null,
   "livecodebench": null,
   "aime25": null,
+  "automationBenchPartialScore": 0.02479417400536003,
   "cacheHitDiscountPercent": null,
   "pricePer1k1mpImages": null,
   "price1mBlended0To3To1": null,
@@ -87270,7 +87271,7 @@
   "omniscience": 10.183333333333334,
   "omniscienceAccuracy": 0.3006666666666667,
   "omniscienceNonHallucination": 0.7156816015252622,
-  "gdpvalNormalized": null,
+  "gdpvalNormalized": 0.30933000000000005,
   "analystAgent": null,
   "terminalbenchHard": null,
   "terminalBench21": 0.749063670411985,
@@ -87323,10 +87324,12 @@
   "licenseUrl": null,
   "modelWeightsSourceUrl": null,
   "microevalsEnabled": false,
-  "capabilities": {},
+  "capabilities": {
+   "economics": 42.2978518883225
+  },
   "omniscienceHallucinationRate": 0.28431839847473783,
   "gdpPdfAllPass": 0.052,
-  "gdpval": null,
+  "gdpval": 1118.66,
   "itBenchSre": null,
   "terminalBenchScience": null,
   "livecodebench": null,
@@ -87348,20 +87351,20 @@
   },
   "briefcaseBreakdown": {
    "overall": {
-    "elo": 988.19,
-    "lower95ci": 977.81,
-    "upper95ci": 999.28
+    "elo": 991.76,
+    "lower95ci": 982.11,
+    "upper95ci": 1002.05
    },
    "rubricPassRate": 0.24462640736949848,
    "analyticalQuality": {
-    "elo": 909,
-    "lower95ci": 889.48,
-    "upper95ci": 928.69
+    "elo": 908.3,
+    "lower95ci": 889.36,
+    "upper95ci": 927.38
    },
    "presentation": {
-    "elo": 1077.56,
-    "lower95ci": 1059.08,
-    "upper95ci": 1095.84
+    "elo": 1086.63,
+    "lower95ci": 1068.88,
+    "upper95ci": 1104.16
    }
   },
   "timescaleData": {},
