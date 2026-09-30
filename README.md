@@ -31,6 +31,15 @@ nothing is reweighted to line the two axes up.
 The **efficient frontier** — nothing cheaper matches or beats it — is the
 analytical payload. Everything off it is strictly dominated.
 
+## Without JavaScript
+
+The charts, the filters and the sortable headers need JavaScript. The two
+tables — the efficient frontiers and the full table — do not: `build.py`
+renders their rows into the HTML at build time, in the page's default view,
+so every model and every column is readable with JavaScript disabled. The
+static rows are the fallback; there is no separate `<noscript>` copy of the
+data.
+
 ## Pipeline
 
 AA ships the leaderboard as a Next.js RSC flight payload; there is no public

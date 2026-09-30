@@ -3,6 +3,7 @@ import datetime
 import io
 import json
 import pathlib
+import re
 import subprocess
 import sys
 import tempfile
@@ -10,6 +11,7 @@ import time
 import unittest
 from html.parser import HTMLParser
 import build
+import page_format
 
 
 class ArtifactParser(HTMLParser):
@@ -317,18 +319,24 @@ class GeneratedArtifactTests(unittest.TestCase):
         )
 
     def test_remote_strings_are_inert_in_the_inline_json_script(self):
-        lower = "</script><script>document.documentElement.dataset.auditLower=1</script> __CAPTURED__"
-        mixed = "</ScRiPt><ScRiPt>document.documentElement.dataset.auditMixed=1</sCrIpT> __DATA__ / __DATA__"
-        upper = "</SCRIPT><SCRIPT>document.documentElement.dataset.auditUpper=1</SCRIPT> __CAPTURED____DATA__"
+        # Template markers deliberately stay OUT of these strings: since #97
+        # the captured strings also render into the STATIC table bodies,
+        # where a marker would be spliced by a later substitution -- so a
+        # build carrying one now refuses outright
+        # (test_a_template_marker_in_a_captured_string_refuses_the_build),
+        # and a marker here would die before the payload assertions this
+        # test exists for ever ran.
+        lower = "</script><script>document.documentElement.dataset.auditLower=1</script>"
+        mixed = "</ScRiPt><ScRiPt>document.documentElement.dataset.auditMixed=1</sCrIpT>"
+        upper = "</SCRIPT><SCRIPT>document.documentElement.dataset.auditUpper=1</SCRIPT>"
         ordinary = "".join([
             "ordinary <tag> & 'quotes' \"slashes",
             "\\",
             "\" \n",
             "\u2028",
             "\u2029",
-            " __DATA____CAPTURED__",
         ])
-        exact = "__DATA__"
+        exact = "2026-09-30"
         model = model_fixture()
         model.update({
             "name": lower,
@@ -390,6 +398,187 @@ class GeneratedArtifactTests(unittest.TestCase):
         self.assertEqual(row["rel"], exact)
         # The fallback carries its hostile string through the same escaping.
         self.assertIn(("model", upper), rows)
+
+
+class StaticTableRenderTests(unittest.TestCase):
+    """Issue #97: build.py renders both table bodies into the page.
+
+    The static rows must be the page's own default-state render -- the same
+    cells the JS `fillTable`/`fillFrontiers` produce, from the same
+    formatters -- so the browser drift test holds them equal cell-for-cell
+    at load time. These unit tests pin the pieces exactly: escaping,
+    em-dashes, tags, V8-exact rounding, the default sort and the marker
+    guard that refuses to splice a captured string into the template.
+    """
+
+    def test_a_full_row_renders_the_exact_cells_the_page_renders(self):
+        rows = build.build_rows([model_fixture()])
+        frontier, main = build.render_static_tbodies(rows)
+
+        self.assertEqual(frontier, (
+            '<tr><td>Intelligence Index</td><td class="name">'
+            'Fixture Model (high)</td><td>Fixture Lab</td>'
+            '<td class="n">51.0</td><td class="n">$0.750</td>'
+            '<td class="n">$0.0147</td>'
+            '<td><span class="tag">proprietary</span></td></tr>'
+            '<tr><td>GDPval-AA v2</td><td class="name">Fixture Model (high)</td>'
+            '<td>Fixture Lab</td><td class="n">47.0</td><td class="n">$8.00</td>'
+            '<td class="n">$0.1702</td>'
+            '<td><span class="tag">proprietary</span></td></tr>'
+        ))
+        self.assertEqual(main, (
+            '<tr><td class="name">Fixture Model (high) </td><td>Fixture Lab</td>'
+            '<td class="n">—</td><td class="n">—</td>'
+            '<td class="n">51.0 <span class="tag f">frontier</span></td>'
+            '<td class="n">$0.750</td>'
+            '<td class="n">27B <span class="tag f">parameter frontier</span></td>'
+            '<td class="n">47.0 <span class="tag f">frontier</span></td>'
+            '<td class="n">$8.00</td>'
+            '<td class="n">—</td><td class="n">—</td><td class="n">—</td>'
+            '<td class="n">—</td><td>—</td><td>proprietary</td></tr>'
+        ))
+
+    def test_an_agent_row_renders_em_dashes_for_the_model_only_columns(self):
+        rows = build.build_agent_rows([agent_fixture()], [model_fixture()])
+        frontier, main = build.render_static_tbodies(rows)
+
+        self.assertEqual(frontier, (
+            '<tr><td>Coding Agent Index</td><td class="name">'
+            'Fixture Agent - Fixture Model (high)</td><td>Fixture Lab</td>'
+            '<td class="n">64.0</td><td class="n">$2.50</td>'
+            '<td class="n">$0.0391</td>'
+            '<td><span class="tag">proprietary</span></td></tr>'
+        ))
+        self.assertEqual(main, (
+            '<tr><td class="name">Fixture Agent - Fixture Model (high) </td>'
+            '<td>Fixture Lab</td>'
+            '<td class="n">64.0 <span class="tag f">frontier</span></td>'
+            '<td class="n">$2.50</td>'
+            '<td class="n">—</td><td class="n">—</td>'
+            '<td class="n">—</td>'
+            '<td class="n">—</td><td class="n">—</td>'
+            '<td class="n">—</td><td class="n">—</td><td class="n">—</td>'
+            '<td class="n">—</td><td>—</td><td>proprietary</td></tr>'
+        ))
+
+    def test_missing_values_render_as_the_em_dash(self):
+        # A model with no parameters, prices, speed, context or release date:
+        # every absent column renders the page's em dash -- never blank, and
+        # the parameters cell is fmtParams(params) regardless of the
+        # intelligence pair, so only a truly absent count renders the dash.
+        model = model_fixture(intelligence=None, gdpval=0.9, parameters=None)
+        rows = build.build_rows([model])
+        _, main = build.render_static_tbodies(rows)
+
+        self.assertEqual(main, (
+            '<tr><td class="name">Fixture Model (high) </td><td>Fixture Lab</td>'
+            '<td class="n">—</td><td class="n">—</td>'
+            '<td class="n">—</td><td class="n">—</td>'
+            '<td class="n">—</td>'
+            '<td class="n">90.0 <span class="tag f">frontier</span></td>'
+            '<td class="n">$8.00</td>'
+            '<td class="n">—</td><td class="n">—</td><td class="n">—</td>'
+            '<td class="n">—</td><td>—</td><td>proprietary</td></tr>'
+        ))
+
+    def test_to_fixed_matches_v8_on_exact_ties(self):
+        # toFixed rounds the number's exact binary value, and an exact tie
+        # picks the LARGER candidate -- 2.25 and 0.25 are exact binary values
+        # whose tie goes up, while 2.675 is really 2.67499999... and rounds
+        # down. Decimal(float) reproduces the exact binary expansion.
+        self.assertEqual(page_format.js_to_fixed(2.25, 1), "2.3")
+        self.assertEqual(page_format.js_to_fixed(0.25, 1), "0.3")
+        self.assertEqual(page_format.js_to_fixed(2.675, 2), "2.67")
+        self.assertEqual(page_format.js_to_fixed(51, 1), "51.0")
+        self.assertEqual(page_format.js_to_fixed(0.75, 3), "0.750")
+        self.assertEqual(page_format.js_to_fixed(8.0, 2), "8.00")
+
+    def test_the_number_and_context_formatters_cover_their_small_value_branches(self):
+        # js_number's exponent branch, fmt_params' sub-billion branch and
+        # fmt_ctx's sub-thousand branch: the shapes the committed corpus
+        # happens not to carry, pinned so the branches stay V8-exact.
+        self.assertEqual(page_format.js_number(1.5e-05), "0.000015")
+        self.assertEqual(page_format.fmt_params(0.5), "500M")
+        self.assertEqual(page_format.fmt_ctx(500), "500")
+        self.assertEqual(page_format.fmt_ctx(1_500_000), "1.5M")
+
+    def test_a_vendor_retired_model_carries_its_tag_in_the_static_row(self):
+        model = model_fixture()
+        model["deprecated"] = True
+        rows = build.build_rows([model])
+        _, main = build.render_static_tbodies(rows)
+
+        self.assertIn(
+            '<td class="name">Fixture Model (high) '
+            '<span class="tag">vendor-retired</span></td>', main)
+
+    def test_a_hostile_name_reaches_the_static_row_escaped(self):
+        model = model_fixture()
+        hostile = 'P|ipe <script>x</script> & "q"'
+        model["name"] = hostile
+        rows = build.build_rows([model])
+        _, main = build.render_static_tbodies(rows)
+
+        self.assertIn("&lt;script&gt;", main)
+        self.assertNotIn("<script>", main)
+        self.assertIn("&amp;", main)
+        self.assertNotIn(hostile, main)
+
+    def test_the_default_sort_is_intelligence_descending_missing_last(self):
+        top = model_fixture(intelligence=70, slug="top")
+        top["name"] = "Top Model (high)"
+        twin = model_fixture(intelligence=70, slug="twin")
+        twin["name"] = "Twin Model (high)"
+        mid = model_fixture(intelligence=50, slug="mid")
+        mid["name"] = "Mid Model (high)"
+        gap = model_fixture(intelligence=None, gdpval=0.9, slug="gap")
+        gap["name"] = "Gap Model"
+        rows = build.build_rows([top, twin, mid, gap])
+        rows.reverse()  # tie order now CONTRADICTS the name order
+        rows = [build.build_agent_rows([agent_fixture()], [])[0]] + rows
+        _, main = build.render_static_tbodies(rows)
+
+        names = re.findall(r'<td class="name">(.*?)</td>', main)
+        self.assertEqual(names, [
+            "Twin Model (high) ", "Top Model (high) ",  # the preserved tie
+            "Mid Model (high) ",                        # 50 below 70
+            "Fixture Agent - Fixture Model (high) ",    # no ii: union order
+            "Gap Model ",                               # ...payload order
+        ])
+
+    def test_a_template_marker_in_a_captured_string_refuses_the_build(self):
+        # A captured string carrying a template marker would be spliced by
+        # the payload substitution that runs after the tbody replacement --
+        # the build must fail red rather than splice it into the page.
+        model = model_fixture()
+        model["name"] = "Marker __DATA__ Model (high)"
+        with tempfile.TemporaryDirectory(prefix=".issue-97-build-",
+                                         dir=build.ROOT) as tmp:
+            root = pathlib.Path(tmp)
+            raw, agents_raw = root / "models.json", root / "coding-agents.json"
+            output = root / "frontier-models.html"
+            raw.write_text(json.dumps([model]), encoding="utf-8")
+            # the coding axis needs a row of its own, or the empty-axis
+            # guard fires before the marker guard ever runs
+            agents_raw.write_text(json.dumps([{
+                "id": "marker-agent", "displayLabel": "Marker Agent (high)",
+                "agentName": "Marker Agent",
+                "hostModelSlug": "vendor_fixture-model",
+                "display": {"creator": {"agent": "Marker Agents",
+                                        "model": "Fixture Lab"}},
+                "indexScore": 0.64,
+                "mean": {"costUsd": 2.5, "agentWallTimeSec": 900.0},
+            }]), encoding="utf-8")
+            old_raw, old_agents, old_out = build.RAW, build.AGENTS_RAW, build.OUT
+            try:
+                build.RAW, build.AGENTS_RAW, build.OUT = raw, agents_raw, output
+                with self.assertRaises(SystemExit) as raised:
+                    with contextlib.redirect_stdout(io.StringIO()):
+                        build.main()
+                self.assertIn("__DATA__", str(raised.exception))
+                self.assertFalse(output.exists())
+            finally:
+                build.RAW, build.AGENTS_RAW, build.OUT = old_raw, old_agents, old_out
 
 
 class CaptureStampTests(unittest.TestCase):
@@ -1401,9 +1590,12 @@ class CorruptCaptureTests(unittest.TestCase):
         with tempfile.TemporaryDirectory(prefix=".issue-66-build-", dir=build.ROOT) as tmp:
             root = pathlib.Path(tmp)
             (root / "data").mkdir()
-            (root / "build.py").write_text(
-                (build.ROOT / "build.py").read_text(encoding="utf-8"),
-                encoding="utf-8")
+            # The builder is build.py plus the module it imports, so the
+            # temp tree carries both, the way the checkout lays them out.
+            for module in ("build.py", "page_format.py"):
+                (root / module).write_text(
+                    (build.ROOT / module).read_text(encoding="utf-8"),
+                    encoding="utf-8")
             for name in self.CAPTURES:
                 raw = (build.ROOT / "data" / name).read_bytes()
                 if name == truncate:
