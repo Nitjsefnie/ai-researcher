@@ -174,9 +174,19 @@ def main(page_path: pathlib.Path | None = None) -> int:
         for line in violations:
             print(line, file=sys.stderr)
         return 1
+    # Defensive: verify() passing means the page carries exactly one
+    # well-shaped stamp, so search() cannot return None here. The branch
+    # exists to keep the Optional honest -- and to fail loudly rather than
+    # trust that invariant, should the two ever drift apart.
+    match = STAMP_RE.search(committed)
+    if match is None:
+        print(f"{_CHECK}: {PAGE} passed verify() but carries no source-"
+              "commit stamp -- the verifier and the stamp pattern disagree",
+              file=sys.stderr)
+        return 1
     print(f"{_CHECK}: {PAGE} carries one source-commit stamp "
-          f"({STAMP_RE.search(committed).group(0).strip()}) and matches its "
-          "stamp-less rebuild -- ok")
+          f"({match.group(0).strip()}) and matches its stamp-less rebuild "
+          "-- ok")
     return 0
 
 
