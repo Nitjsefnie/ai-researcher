@@ -245,17 +245,16 @@ class CaptureGateTests(unittest.TestCase):
         self.assertEqual(out, "")
 
     def test_the_cli_answers_exactly_one_word(self):
-        # The workflow consumes stdout verbatim into a step output, so the
-        # process entry point must answer `true`/`false` and nothing else,
-        # with exit 0 either way. Run for real against this checkout: on a
-        # clean tree the answer is false, on a moved-capture tree true --
-        # the gate step has already decided by the time the suite runs.
+        # The workflow consumes stdout via $(...), which strips trailing
+        # newlines, so the contract is the WORD, not the EOL: assert on the
+        # stripped answer, which is platform-neutral where the raw bytes
+        # carry \n on POSIX and \r\n on Windows text mode.
         proc = subprocess.run(
             [sys.executable, "scripts/capture_gate.py"],
             cwd=str(build.ROOT), capture_output=True, check=False)
 
         self.assertEqual(proc.returncode, 0, proc.stderr)
-        self.assertIn(proc.stdout, (b"true\n", b"false\n"))
+        self.assertIn(proc.stdout.strip(), (b"true", b"false"))
 
 
 class ReconcileSpeedTests(unittest.TestCase):
