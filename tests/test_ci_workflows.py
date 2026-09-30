@@ -111,3 +111,20 @@ def test_coverage_job_installs_chromium_through_the_digest_gate():
     [chromium] = [s for s in workflow["jobs"]["coverage"]["steps"]
                   if s.get("name") == "Install Chromium for playwright"]
     assert chromium["run"] == "python3 scripts/ci/install_chromium.py"
+
+
+def test_page_job_runs_the_committed_page_check():
+    # Issue #105: the committed-page check's only CI surface is this job, so
+    # a rename or removal must fail here the way an unwired chromium
+    # install fails above. The job runs on pull requests, so it must stay
+    # read-only and credential-free: the checkout persists no token and the
+    # job asks for nothing beyond contents: read.
+    workflow = yaml.safe_load(TESTS_WORKFLOW.read_text(encoding="utf-8"))
+    job = workflow["jobs"]["page"]
+    [check] = [s for s in job["steps"]
+               if s.get("name") == "Check the committed page"]
+    assert check["run"] == "python3 scripts/ci/check_committed_page.py"
+    assert job["permissions"] == {"contents": "read"}
+    [checkout] = [s for s in job["steps"] if "uses" in s and
+                  s["uses"].startswith("actions/checkout@")]
+    assert checkout["with"]["persist-credentials"] is False

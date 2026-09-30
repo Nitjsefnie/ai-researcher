@@ -90,6 +90,18 @@ python3 build.py                # → out/frontier-models.html
 `diff_aa.py` takes `git:REV` for either side, so `python3 scripts/diff_aa.py
 git:HEAD~5` diffs the working capture against an older one.
 
+**A page committed to the repository carries its source-commit stamp.** The
+footer stamp is rendered only when `AA_SOURCE_COMMIT` is set at build time,
+and nothing but the refresh workflow sets it for you. Build with
+
+```sh
+AA_SOURCE_COMMIT="$(git rev-parse HEAD)" python3 build.py
+```
+
+immediately before committing, and change no build input afterwards. CI (the
+`page` job) refuses a committed page that lacks the stamp or differs from its
+own stamp-less rebuild (issue #105).
+
 ## Tests
 
 ```sh

@@ -4,7 +4,7 @@ name: tests
 # tests/test_browser.py, drives the built HTML in a real headless Chromium
 # through playwright.
 #
-# TWO JOBS, split on purpose. `suites` is a 3-OS x 3-Python matrix running the
+# THREE JOBS, split on purpose. `suites` is a 3-OS x 3-Python matrix running the
 # non-browser suite on every cell — that is what buys portability coverage of
 # the tooling itself. `coverage` is the dedicated Linux job: the full suite
 # (browser included) under the coverage ratchet. The browser suite stays OUT
@@ -13,7 +13,11 @@ name: tests
 # near-zero signal, and (b) the page under test is OS-independent text (HTML/
 # JS built by build.py), so a second OS adds no behavioral coverage the matrix
 # misses. The coverage job installs playwright and Chromium; the matrix job
-# does not. That asymmetry is deliberate.
+# does not. That asymmetry is deliberate. `page` is the committed-page check
+# (issue #105): the source-commit stamp is set only on the refresh path, so a
+# page a PR commits by hand could go out stamp-less and the #94 heal run
+# would publish it — that job refuses a committed page lacking the stamp or
+# differing from its own stamp-less rebuild.
 #
 # THE RUNNER IS ALWAYS THE `-m` FORM — `python -m pytest`, which the coverage
 # job spells `python3 -m pytest` — NOT `pytest`, AND
@@ -372,3 +376,40 @@ jobs:
           fi
           echo 'Main moved while this run measured; the next push raises instead.' \
             >> "$GITHUB_STEP_SUMMARY"
+
+  # --- The committed-page check -------------------------------------------
+  # Issue #105: out/frontier-models.html gets its "Source commit <code>…
+  # </code>" stamp only when AA_SOURCE_COMMIT is set at build time, and only
+  # refresh.yml sets it — so a page a pull request builds and commits by
+  # hand goes out stamp-less, and the #94 hourly heal run republishes HEAD's
+  # committed page byte for byte, stamp-less. This job refuses a committed
+  # page that (i) lacks exactly one well-shaped source-commit stamp or
+  # (ii) differs from a stamp-less rebuild of the same tree once build
+  # provenance is masked. The check imports its masking from capture_gate,
+  # so the two gates cannot disagree on what provenance is.
+  page:
+    runs-on: ubuntu-latest
+
+    # Per-job ceiling, like every other job's: a hung check fails in 20
+    # minutes instead of holding GitHub's 6-hour default.
+    timeout-minutes: 20
+
+    permissions:
+      # The check only reads the tree and rebuilds into a temp dir under it.
+      contents: read
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # Nothing in this workflow pushes. Leaving the job token in
+          # .git/config lets any later step — or anything a dependency pulls
+          # in — reuse it.
+          persist-credentials: false
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.13"
+          # No pip cache: the check is pure stdlib — nothing to install, so
+          # nothing to key a cache off.
+      - name: Check the committed page
+        run: python3 scripts/ci/check_committed_page.py

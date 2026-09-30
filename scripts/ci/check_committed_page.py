@@ -1,0 +1,184 @@
+#!/usr/bin/env python3
+"""Refuse a committed page that lacks its stamp or differs from a rebuild.
+
+    python3 scripts/ci/check_committed_page.py
+
+out/frontier-models.html gets its `Source commit <code>...</code>` footer
+stamp only when AA_SOURCE_COMMIT is set at build time, and only the refresh
+workflow sets it -- so a page a contributor builds and commits by hand goes
+out stamp-less, and the hourly heal run then republishes that stamp-less
+page byte for byte (issue #105). This check runs in CI on every commit of
+the page and refuses one that
+
+  (i)   does not carry exactly one well-shaped source-commit stamp, or
+  (ii)  differs from a stamp-less rebuild of the same tree once build
+        provenance (the capture digest and the stamp itself) is masked out.
+
+Exit 0 when the committed page is well-stamped and byte-equal to its masked
+rebuild; 1 with one line per violated invariant otherwise -- a missing page,
+a missing, duplicated or malformed stamp, a rebuild that failed, or a
+content difference. A build failure is red, never a silent pass: the page
+must be rebuildable from what is committed, or the commit is broken.
+"""
+from __future__ import annotations
+
+import contextlib
+import io
+import os
+import pathlib
+import re
+import sys
+import tempfile
+
+ROOT = pathlib.Path(__file__).resolve().parent.parent.parent
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+if str(ROOT / "scripts") not in sys.path:
+    sys.path.insert(0, str(ROOT / "scripts"))
+
+from capture_gate import mask_digest  # noqa: E402  # pylint: disable=wrong-import-position,wrong-import-order
+import build  # noqa: E402  # pylint: disable=wrong-import-position
+
+PAGE = "out/frontier-models.html"
+
+# The env var build.py reads the stamp value from, and that the rebuild
+# below pops so the rebuilt page is stamp-less.
+STAMP_ENV = "AA_SOURCE_COMMIT"
+
+# A well-shaped stamp: the exact span build.py renders into the provenance
+# line when AA_SOURCE_COMMIT holds a SHA-shaped value. Exactly-once is
+# sound: build.py html-escapes the value and escapes `<` to \\u003c in the
+# embedded JSON payload, so the marker cannot occur in data -- the same
+# argument capture_gate.py's DIGEST_RE comment makes for the digest. The
+# stamp VALUE is deliberately not compared to any commit: a page cannot
+# contain its own commit's sha (the commit exists only after the page is
+# built), the refresh bot's value is correct by construction (github.sha),
+# and a hand build's is correct by convention (CONTRIBUTING.md). The shape
+# is the invariant; the value is not.
+STAMP_RE = re.compile(r" Source commit <code>[0-9a-fA-F]{7,40}</code>\.")
+
+# The marker without the shape requirement: any occurrence of the stamp's
+# prose. A page carrying a marker that STAMP_RE does not accept carries a
+# malformed stamp, which is its own violation -- distinct from carrying
+# none, because the fix differs (rebuild with the env set vs re-read what
+# wrote a bad span).
+STAMP_MARKER_RE = re.compile(r" Source commit <code>")
+
+# Chars of context shown either side of the first masked difference.
+CONTEXT = 80
+
+_CHECK = "committed-page check"
+
+
+def stamp_mask(page: str) -> str:
+    """The page with the source-commit stamp removed.
+
+    Removal, not substitution: only the committed side can carry a stamp --
+    the rebuild is forced stamp-less -- so a non-empty constant would stand
+    on one masked side alone and vote as a difference. Erasing the span
+    normalizes the committed page to exactly the stamp-less rendering the
+    rebuild produces, which is the comparison's own definition.
+    """
+    return STAMP_RE.sub("", page)
+
+
+def mask(page: str) -> str:
+    """The page with every build-provenance span normalized out."""
+    return stamp_mask(mask_digest(page))
+
+
+def rebuild_page() -> str:
+    """The page the checkout's own data/ builds, stamp-less.
+
+    Mirrors capture_gate._render_side: the temp dir lives under build.ROOT
+    because build.main() prints OUT.relative_to(ROOT) and would raise on a
+    page outside it. build's module globals and AA_SOURCE_COMMIT are
+    restored no matter how the build ends, so a failed rebuild cannot
+    poison the caller's tree state. No captures are staged here -- data/
+    is the tree's own, and this check judges the page against it, not the
+    captures against HEAD.
+    """
+    with tempfile.TemporaryDirectory(prefix=".committed-page-",
+                                     dir=build.ROOT) as tmp:
+        page_path = pathlib.Path(tmp) / "frontier-models.html"
+        saved = (build.RAW, build.AGENTS_RAW, build.OUT)
+        env_saved = os.environ.pop(STAMP_ENV, None)
+        try:
+            build.OUT = page_path
+            with contextlib.redirect_stdout(io.StringIO()):
+                build.main()
+        finally:
+            build.RAW, build.AGENTS_RAW, build.OUT = saved
+            if env_saved is not None:
+                os.environ[STAMP_ENV] = env_saved
+        return page_path.read_text(encoding="utf-8")
+
+
+def _snippet(text: str, at: int) -> str:
+    """A bounded window around `at`, newlines escaped so one finding line
+    stays one line however the page wraps."""
+    lo = max(0, at - CONTEXT)
+    hi = min(len(text), at + CONTEXT + 1)
+    return text[lo:hi].replace("\n", "\\n")
+
+
+def verify(committed: str, rebuilt: str) -> list[str]:
+    """The invariants a committed page violates against its rebuild.
+
+    Pure: strings in, human-readable violations out -- file IO and exit
+    codes live in main(), so tests can pin every failure mode without a
+    filesystem.
+    """
+    markers = STAMP_MARKER_RE.findall(committed)
+    if not markers:
+        return [f"{_CHECK}: {PAGE} carries no source-commit stamp; build "
+                f"with {STAMP_ENV}=\"$(git rev-parse HEAD)\" immediately "
+                "before committing"]
+    if len(markers) > 1:
+        return [f"{_CHECK}: {PAGE} carries {len(markers)} source-commit "
+                f"stamps; exactly one is well-formed"]
+    if not STAMP_RE.search(committed):
+        return [f"{_CHECK}: {PAGE} carries a malformed source-commit stamp "
+                f"(expected {STAMP_RE.pattern!r})"]
+
+    left, right = mask(committed), mask(rebuilt)
+    if left == right:
+        return []
+    index = next((i for i, (a, b) in enumerate(zip(left, right)) if a != b),
+                 min(len(left), len(right)))
+    return [f"{_CHECK}: {PAGE} differs from a stamp-less rebuild of the "
+            f"same tree once provenance is masked: masked lengths "
+            f"{len(left)} vs {len(right)}, first difference at index "
+            f"{index}: committed[...] {_snippet(left, index)} | "
+            f"rebuilt[...] {_snippet(right, index)}"]
+
+
+def main(page_path: pathlib.Path | None = None) -> int:
+    path = page_path if page_path is not None else build.ROOT / PAGE
+    try:
+        committed = path.read_text(encoding="utf-8")
+    except OSError as exc:
+        print(f"{_CHECK}: {PAGE} is missing or unreadable: {exc}",
+              file=sys.stderr)
+        return 1
+
+    try:
+        rebuilt = rebuild_page()
+    except (SystemExit, Exception) as exc:  # pylint: disable=broad-exception-caught
+        print(f"{_CHECK}: rebuilding {PAGE} from the committed data failed "
+              f"({exc}) -- red, never a silent pass", file=sys.stderr)
+        return 1
+
+    violations = verify(committed, rebuilt)
+    if violations:
+        for line in violations:
+            print(line, file=sys.stderr)
+        return 1
+    print(f"{_CHECK}: {PAGE} carries one source-commit stamp "
+          f"({STAMP_RE.search(committed).group(0).strip()}) and matches its "
+          "stamp-less rebuild -- ok")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
