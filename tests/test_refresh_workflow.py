@@ -97,14 +97,23 @@ class GateTests(unittest.TestCase):
         # "nothing the page renders". The gate step must invoke the rendered
         # gate, which builds the page from HEAD's captures and from the fresh
         # ones and compares with provenance normalized out; its single word
-        # of stdout is the step output everything downstream reads. (The
-        # heal gate's `git diff --quiet origin/published HEAD -- out/...`
-        # stays: it compares pages, not captures.)
-        run = flattened(step(self.wf, "Did anything move?")["run"])
+        # of stdout is the step output everything downstream reads.
+        s = step(self.wf, "Did anything move?")
+        raw = s["run"]
+        run = flattened(raw)
 
         self.assertIn('changed="$(python3 scripts/capture_gate.py)"', run)
         self.assertIn('echo "changed=$changed" >> "$GITHUB_OUTPUT"', run)
-        self.assertNotIn("git diff --quiet -- data/", run)
+        # No raw-VCS view of data/ may leak back into this step, whatever
+        # the spelling: any `git diff` or `git status` here must not name
+        # data/. (The heal gate's `git diff origin/published HEAD --
+        # out/frontier-models.html` stays: it compares pages, not captures.)
+        joined = raw.replace("\\\n", " ")
+        for line in joined.splitlines():
+            if line.lstrip().startswith("#"):
+                continue
+            if "git diff" in line or "git status" in line:
+                self.assertNotIn("data/", line, line.strip())
 
     def test_the_unchanged_path_drops_the_whole_data_directory(self):
         # Issue #94: captures the gate found rendered-equivalent must not sit

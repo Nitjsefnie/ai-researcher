@@ -17,14 +17,20 @@ name: refresh
 # 23 of the last 30 refresh commits carried "nothing the page renders".
 #
 # Rendered speed columns get one refinement, so the gate agrees with
-# diff_aa.py's own definition of news: each fresh speed cell is tested
-# directly against the last COMMITTED value at the differ's news threshold
-# (SPEED_TOL, --speed-tol's default) -- within it, the cell is jitter and
-# carries the committed value; past it (or missing on either side) it
-# stands and commits. The cost is stated in the gate: the page's speed
-# columns can lag AA's live re-sampling by just under the threshold -- and
-# no further, because each hour compares against the last committed value,
-# so a sustained crawl crosses the threshold cumulatively and commits.
+# diff_aa.py's own definition of news for the two speed fields the differ
+# thresholds (SPEED_SHOWN: medianOutputTokensPerSecond,
+# intelligenceIndexTimePerTask): each fresh cell is tested directly against
+# the last COMMITTED value at the differ's news threshold (SPEED_TOL,
+# --speed-tol's default) -- within it, the cell is jitter and carries the
+# committed value; past it (or missing on either side) it stands and
+# commits. agentWallTimeSec (build.py:443-444) is reconciled under the same
+# threshold even though the differ's report never carries it (its classifier
+# files it as derived and drops it): the page renders it, so gate-side
+# strictness covers it -- intentional, not tool agreement. The cost is
+# stated in the gate: the page's speed columns can lag AA's live
+# re-sampling by just under the threshold -- and no further, because each
+# hour compares against the last committed value, so a sustained crawl
+# crosses the threshold cumulatively and commits.
 #
 # There are two captures because the page draws two AA products: the model
 # leaderboard and the Coding Agent Index. The OR survives inside the rendered
