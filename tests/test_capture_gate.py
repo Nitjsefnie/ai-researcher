@@ -22,6 +22,7 @@ from unittest import mock
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent / "scripts"))
 
 import capture_gate  # noqa: E402  # pylint: disable=wrong-import-position
+import diff_aa  # noqa: E402  # pylint: disable=wrong-import-position
 import build  # noqa: E402  # pylint: disable=wrong-import-position,wrong-import-order
 
 # The real captures work as fixtures and are fast (a full build measures
@@ -67,6 +68,21 @@ def rendered_field_changed(models: bytes) -> bytes:
     raise AssertionError("no rendered intelligence row in the fixture capture")
 
 
+def with_tps(models: bytes, value: float) -> bytes:
+    """The capture with one rendered model's output-tokens/sec set to `value`.
+
+    Pinned to a round 100.0 so the pair tests sit unambiguously on one side
+    or the other of the per-cell threshold: 110 is +10% (jitter), 150 is
+    +50% (news).
+    """
+    parsed = json.loads(models)
+    for m in parsed:
+        if build.metric_record(m, "intelligence") is not None:
+            m["medianOutputTokensPerSecond"] = value
+            return json.dumps(parsed, indent=1).encode()
+    raise AssertionError("no rendered model row in the fixture capture")
+
+
 class CaptureGateTests(unittest.TestCase):
     def setUp(self):
         # Whatever a test does to build's module globals or the environment,
@@ -85,6 +101,50 @@ class CaptureGateTests(unittest.TestCase):
 
     def test_a_rendered_change_is_a_change(self):
         with head_serving(rendered_field_changed(REAL_MODELS), REAL_AGENTS):
+            code, out = run_gate()
+
+        self.assertEqual((code, out), (0, "true\n"))
+
+    def test_sub_threshold_speed_drift_is_not_a_change(self):
+        # The ruling's contract: a sub-25% re-sample of a rendered speed
+        # field is jitter, not news -- the gate must agree with diff_aa's
+        # --speed-tol or the repo keeps producing commits whose own subject
+        # says "nothing the page renders". 100 -> 110 tokens/sec sits inside
+        # one ladder rung; the page compares equal.
+        head = with_tps(REAL_MODELS, 100.0)
+        fresh = with_tps(REAL_MODELS, 110.0)
+        with head_serving(head, REAL_AGENTS), \
+             mock.patch.object(capture_gate, "read_fresh_captures",
+                               return_value=(fresh, REAL_AGENTS)):
+            code, out = run_gate()
+
+        self.assertEqual((code, out), (0, "false\n"))
+
+    def test_a_threshold_speed_move_is_a_change(self):
+        # 100 -> 150 tokens/sec is a 50% relative move: past the differ's
+        # threshold, a different rendered cell, news.
+        head = with_tps(REAL_MODELS, 100.0)
+        fresh = with_tps(REAL_MODELS, 150.0)
+        with head_serving(head, REAL_AGENTS), \
+             mock.patch.object(capture_gate, "read_fresh_captures",
+                               return_value=(fresh, REAL_AGENTS)):
+            code, out = run_gate()
+
+        self.assertEqual((code, out), (0, "true\n"))
+
+    def test_a_speed_field_vanishing_commits(self):
+        # A structural presence change commits even on a speed field:
+        # nothing is reconciled when the cell exists on one side only, so
+        # the fresh page renders an em-dash where HEAD renders a number.
+        head = with_tps(REAL_MODELS, 100.0)
+        parsed = json.loads(with_tps(REAL_MODELS, 110.0))
+        for m in parsed:
+            if m.get("medianOutputTokensPerSecond") == 110.0:
+                del m["medianOutputTokensPerSecond"]
+        fresh = json.dumps(parsed, indent=1).encode()
+        with head_serving(head, REAL_AGENTS), \
+             mock.patch.object(capture_gate, "read_fresh_captures",
+                               return_value=(fresh, REAL_AGENTS)):
             code, out = run_gate()
 
         self.assertEqual((code, out), (0, "true\n"))
@@ -196,3 +256,117 @@ class CaptureGateTests(unittest.TestCase):
 
         self.assertEqual(proc.returncode, 0, proc.stderr)
         self.assertIn(proc.stdout, (b"true\n", b"false\n"))
+
+
+class ReconcileSpeedTests(unittest.TestCase):
+    """The per-cell relative test: threshold sourced from the differ,
+    pass-throughs exact, structure never reconciled."""
+
+    def test_threshold_has_a_single_source(self):
+        # The gate imports the differ's threshold -- a re-declared constant
+        # here would let the two tools drift apart, which is the exact
+        # disagreement this gate exists to end.
+        self.assertIs(capture_gate.SPEED_TOL, diff_aa.SPEED_TOL)
+        self.assertEqual(capture_gate.SPEED_TOL, 0.25)
+
+    def test_non_numbers_and_a_zero_committed_value_pass_through(self):
+        for value in (None, 0, 0.0, -3.5, True, False, "fast"):
+            self.assertIs(
+                capture_gate.within_tolerance(value, 100.0), value)
+        # No committed value to compare against: nothing to reconcile, the
+        # fresh value stands (and the structural or from-zero move commits).
+        for head_value in (None, 0, 0.0, True, "fast"):
+            self.assertIs(
+                capture_gate.within_tolerance(50.0, head_value), 50.0)
+
+    def test_sub_threshold_moves_carry_the_committed_value(self):
+        self.assertEqual(
+            capture_gate.within_tolerance(110.0, 100.0), 100.0)
+        self.assertEqual(
+            capture_gate.within_tolerance(90.0, 100.0), 100.0)
+
+    def test_exactly_at_the_threshold_is_jitter_just_past_is_news(self):
+        # |fresh/committed - 1| <= SPEED_TOL, from the formula: 100 * 1.25
+        # is exactly at the threshold and reconciles; one hair past it is a
+        # real move and stands.
+        self.assertEqual(
+            capture_gate.within_tolerance(
+                100.0 * (1 + capture_gate.SPEED_TOL), 100.0), 100.0)
+        self.assertEqual(
+            capture_gate.within_tolerance(
+                100.0 * (1 + capture_gate.SPEED_TOL) * 1.0001, 100.0),
+            100.0 * (1 + capture_gate.SPEED_TOL) * 1.0001)
+
+    def test_the_joint_walk_reaches_nested_values_and_scopes_keys(self):
+        head = {"a": [{"medianOutputTokensPerSecond": 100.0}],
+                "intelligenceIndexTimePerTask": 40.0,
+                "b": {"cost": 1.2}}
+        fresh = {"a": [{"medianOutputTokensPerSecond": 110.0}],
+                 "intelligenceIndexTimePerTask": 41.0,
+                 "b": {"agentWallTimeSec": 901.0, "cost": 1.2}}
+        out = capture_gate.reconcile_tree(
+            head, fresh, capture_gate.SPEED_KEYS_MODELS)
+
+        # Sub-threshold cells carry HEAD's value, wherever they sit.
+        self.assertEqual(out["a"][0]["medianOutputTokensPerSecond"], 100.0)
+        self.assertEqual(out["intelligenceIndexTimePerTask"], 40.0)
+        self.assertEqual(out["b"]["cost"], 1.2)
+        # Key scoping is per capture: the models set does not touch the
+        # coding capture's field, so the fresh value stands.
+        self.assertEqual(out["b"]["agentWallTimeSec"], 901.0)
+
+    def test_structure_is_never_reconciled(self):
+        keys = capture_gate.SPEED_KEYS_MODELS
+        # Fresh-only key or subtree: kept verbatim (commits).
+        self.assertEqual(
+            capture_gate.reconcile_tree({"a": 1}, {"a": 1, "b": 2}, keys),
+            {"a": 1, "b": 2})
+        # Fresh-only list tail: kept verbatim (commits).
+        self.assertEqual(
+            capture_gate.reconcile_tree([{"x": 1.0}],
+                                        [{"x": 1.1}, {"x": 2.0}], {"x"}),
+            [{"x": 1.0}, {"x": 2.0}])
+        # A key present in HEAD but missing fresh is simply absent -- the
+        # fresh tree is never given values it did not have.
+        self.assertEqual(
+            capture_gate.reconcile_tree({"medianOutputTokensPerSecond": 9.0},
+                                        {}, keys),
+            {})
+        # Type-mismatched positions: fresh stands (commits).
+        self.assertEqual(
+            capture_gate.reconcile_tree({"a": {"b": 1}}, {"a": [1]}, keys),
+            {"a": [1]})
+
+
+class OscillationTests(unittest.TestCase):
+    """The drift property the per-cell test buys: jitter around one value
+    never compounds into a commit, but a sustained crawl does."""
+
+    def test_jitter_around_a_value_stays_silent_across_gates(self):
+        # Hour 1: 100 committed, 99 measured. Hour 2: 99 committed, 101
+        # measured. Both are sub-threshold relative to their own committed
+        # value -- no accumulation, no commit, either hour.
+        for head_value, fresh_value in ((100.0, 99.0), (99.0, 101.0)):
+            head = with_tps(REAL_MODELS, head_value)
+            fresh = with_tps(REAL_MODELS, fresh_value)
+            with head_serving(head, REAL_AGENTS), \
+                 mock.patch.object(capture_gate, "read_fresh_captures",
+                                   return_value=(fresh, REAL_AGENTS)):
+                code, out = run_gate()
+
+            self.assertEqual((code, out), (0, "false\n"),
+                             f"{head_value} -> {fresh_value}")
+
+    def test_a_sustained_crawl_crosses_the_threshold_and_commits(self):
+        # The same jitter, one step further: 101 committed, 127 measured is
+        # +25.7% relative to the last COMMITTED value. Each hourly step was
+        # sub-threshold, and the drift accumulated into news anyway --
+        # exactly what the per-cell comparison guarantees.
+        head = with_tps(REAL_MODELS, 101.0)
+        fresh = with_tps(REAL_MODELS, 101.0 * 1.27)
+        with head_serving(head, REAL_AGENTS), \
+             mock.patch.object(capture_gate, "read_fresh_captures",
+                               return_value=(fresh, REAL_AGENTS)):
+            code, out = run_gate()
+
+        self.assertEqual((code, out), (0, "true\n"))

@@ -218,8 +218,10 @@ unclamped and allowed to hang outside the plot rather than be squeezed inside.
   leaderboard and the Coding Agent Index, and when the page the fresh capture
   would build differs from the live one — compared by building the page from
   both captures with provenance (source stamp, capture date, raw-byte digest)
-  normalized out, since AA's payload also churns in fields the page never
-  renders — it rebuilds, runs the suite, commits both with `diff_aa.py`'s
+  normalized out and sub-threshold speed re-samples reconciled against the
+  last committed values at `diff_aa.py`'s news threshold (`--speed-tol`),
+  since AA's payload also churns in fields the page never renders — it
+  rebuilds, runs the suite, commits both with `diff_aa.py`'s
   summary in the message body, and publishes to docs-hub. The hourly cadence
   is carried by an out-of-repository dispatcher on the maintainer's side,
   which calls the workflow's `workflow_dispatch` API hourly — GitHub's own

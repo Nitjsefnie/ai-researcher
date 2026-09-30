@@ -16,6 +16,16 @@ name: refresh
 # hourly sub-render churn commit and publish content the page never renders:
 # 23 of the last 30 refresh commits carried "nothing the page renders".
 #
+# Rendered speed columns get one refinement, so the gate agrees with
+# diff_aa.py's own definition of news: each fresh speed cell is tested
+# directly against the last COMMITTED value at the differ's news threshold
+# (SPEED_TOL, --speed-tol's default) -- within it, the cell is jitter and
+# carries the committed value; past it (or missing on either side) it
+# stands and commits. The cost is stated in the gate: the page's speed
+# columns can lag AA's live re-sampling by just under the threshold -- and
+# no further, because each hour compares against the last committed value,
+# so a sustained crawl crosses the threshold cumulatively and commits.
+#
 # There are two captures because the page draws two AA products: the model
 # leaderboard and the Coding Agent Index. The OR survives inside the rendered
 # gate -- it builds from both files, so either one moving is news.
@@ -153,11 +163,12 @@ jobs:
         run: |
           # The rendered gate (see the header): build the page from HEAD's
           # captures and from the fresh ones, normalize the build-machine
-          # provenance out of both, and call it moved only when the pages
-          # differ. A nonzero exit fails this step under bash -e -- a capture
-          # the builder cannot parse turns the run red here, never silently
-          # "changed" -- while no capture at HEAD (the first capture ever)
-          # fails OPEN as changed, so the first run publishes.
+          # provenance out of both, reconcile sub-threshold speed re-samples
+          # against HEAD's committed values, and call it moved only when the
+          # pages differ. A nonzero exit fails this step under bash -e -- a
+          # capture the builder cannot parse turns the run red here, never
+          # silently "changed" -- while no capture at HEAD (the first capture
+          # ever) fails OPEN as changed, so the first run publishes.
           changed="$(python3 scripts/capture_gate.py)"
           echo "changed=$changed" >> "$GITHUB_OUTPUT"
           if [ "$changed" = false ]; then
