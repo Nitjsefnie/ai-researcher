@@ -409,13 +409,19 @@ class RouteDisagreementSkipTests(unittest.TestCase):
 
     def test_a_young_window_skips_green_without_touching_anything(self):
         # The stamp-exists branch stands BEFORE the write (a fresh stamp is
-        # never rewritten), and the skip is green: summary line, exit 0.
-        self.assertLess(self.block.index('[ -f "$stamp" ]'),
-                        self.block.index('> "$stamp"'))
-        self.assertIn(
-            "AA's routes disagree (window began", self.block)
-        self.assertIn("skipping this hour; fails red past 3 h (issue #100)",
-                      self.block)
+        # never rewritten), and the skip is green: the branch's own summary
+        # line exits 0 BEFORE the first-refusal write can run, so flipping
+        # the skip's exit fails here rather than being satisfied by a later
+        # branch's exit 0 (verified against that mutant).
+        idx_f = self.block.index('[ -f "$stamp" ]')
+        idx_summary = self.block.index(
+            "skipping this hour; fails red past 3 h (issue #100)", idx_f)
+        idx_green = self.block.index("exit 0", idx_summary)
+
+        self.assertLess(idx_f, self.block.index('> "$stamp"'))
+        self.assertIn("AA's routes disagree (window began", self.block)
+        self.assertLess(idx_summary, idx_green)
+        self.assertLess(idx_green, self.block.index('> "$stamp"'))
 
     def test_a_window_older_than_three_hours_fails_red(self):
         idx_compare = self.block.index('[ "$((now - start))" -gt "$alert_after" ]')
@@ -423,19 +429,29 @@ class RouteDisagreementSkipTests(unittest.TestCase):
 
         self.assertEqual(self.block.count("3*3600"), 1)
         # The alarm names the window start, re-emits the capture's own
-        # stderr, and fails the step.
+        # stderr, and fails the step -- the exit 1 pinned HERE, after the
+        # alarm's own words, so flipping the alarm green fails this pin even
+        # though the corrupt branch still carries one.
         self.assertLess(idx_compare,
                         self.block.index('date -u -d "@$start"', idx_compare))
         self.assertLess(
             idx_alarm, self.block.index("cat /tmp/fetch-err.txt >&2",
                                         idx_alarm))
-        self.assertIn("exit 1", self.block)
+        self.assertLess(idx_alarm, self.block.index("exit 1", idx_alarm))
 
     def test_a_corrupt_stamp_fails_red_rather_than_skipping(self):
         # A stamp whose first line is empty or non-numeric cannot date the
         # window, so the alarm's premise is unprovable -- red, not a guess.
+        # The pin runs case-pattern -> the corrupt echo -> that branch's OWN
+        # `exit 1 ;;`: a bare pattern-before-any-exit-1 pin survives turning
+        # this branch green, because the alarm's exit 1 sits later in the
+        # block and satisfies it anyway (verified against that mutant).
         self.assertIn("start=$(head -n 1 \"$stamp\")", self.block)
-        self.assertIn("''|*[!0-9]*", self.block)
+        idx_case = self.block.index("''|*[!0-9]*")
+        idx_echo = self.block.index("stamp is corrupt")
+
+        self.assertLess(idx_case, idx_echo)
+        self.assertLess(idx_echo, self.block.index("exit 1 ;;", idx_echo))
 
     def test_a_recovered_capture_retires_the_stamp_and_stays_green(self):
         # rc == 0 with a tracked stamp: delete, commit the retirement, push.
@@ -467,8 +483,6 @@ class RouteDisagreementSkipTests(unittest.TestCase):
     def test_the_header_documents_the_third_deliberate_failure_mode(self):
         # The file's contract lives in its header; a reader must find the
         # exit-3 semantics there, not reconstruct them from the step.
-        header = self.wf["jobs"]["refresh"]["steps"]  # anchor only
-        del header
         raw = WORKFLOW.read_text(encoding="utf-8")
         head = raw.split("\njobs:", 1)[0]
 
