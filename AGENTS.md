@@ -215,17 +215,19 @@ unclamped and allowed to hang outside the plot rather than be squeezed inside.
 ## Update cadence
 
 - **Automated, every hour** — `.github/workflows/refresh.yml` captures the
-  leaderboard and the Coding Agent Index, and when either capture actually
-  changed it rebuilds, runs the suite, commits both with `diff_aa.py`'s summary
-  in the message
-  body, and publishes to docs-hub. The hourly cadence is carried by an
-  out-of-repository dispatcher on the maintainer's side, which calls the
-  workflow's `workflow_dispatch` API hourly — GitHub's own schedule trigger
-  delivers only a few runs a day (measured rates in CONTRIBUTING.md). A capture
-  that returns identical data is silent — no commit, no version, no
-  notification — as long as the live page is current; when a publish failed or
-  was missed, the next run's `published`-ref check republishes instead. The
-  stamp file therefore moves
+  leaderboard and the Coding Agent Index, and when the page the fresh capture
+  would build differs from the live one — compared by building the page from
+  both captures with provenance (source stamp, capture date, raw-byte digest)
+  normalized out, since AA's payload also churns in fields the page never
+  renders — it rebuilds, runs the suite, commits both with `diff_aa.py`'s
+  summary in the message body, and publishes to docs-hub. The hourly cadence
+  is carried by an out-of-repository dispatcher on the maintainer's side,
+  which calls the workflow's `workflow_dispatch` API hourly — GitHub's own
+  schedule trigger delivers only a few runs a day (measured rates in
+  CONTRIBUTING.md). A capture that would render the identical page is silent
+  — no commit, no version, no notification — as long as the live page is
+  current; when a publish failed or was missed, the next run's
+  `published`-ref check republishes instead. The stamp file therefore moves
   when the DATA moves, not every calendar day.
 - **On-demand refresh** when asked ("update the table", "did GPT-6 land yet").
   Run the same three commands by hand; the workflow is not the only route.

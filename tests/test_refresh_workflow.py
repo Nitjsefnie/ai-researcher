@@ -90,6 +90,62 @@ class GateTests(unittest.TestCase):
                              "steps.capture.outputs.proceed == 'true'")
             self.assertEqual(flattened(s["run"]), run)
 
+    def test_the_gate_compares_the_rendered_page_not_the_raw_capture_bytes(self):
+        # Issue #94: the raw-byte comparison (`git diff --quiet -- data/...`)
+        # answered "did the bytes move", and AA's payload churns hourly in
+        # fields the page never renders -- 23 of 30 refresh commits carried
+        # "nothing the page renders". The gate step must invoke the rendered
+        # gate, which builds the page from HEAD's captures and from the fresh
+        # ones and compares with provenance normalized out; its single word
+        # of stdout is the step output everything downstream reads. (The
+        # heal gate's `git diff --quiet origin/published HEAD -- out/...`
+        # stays: it compares pages, not captures.)
+        run = flattened(step(self.wf, "Did anything move?")["run"])
+
+        self.assertIn('changed="$(python3 scripts/capture_gate.py)"', run)
+        self.assertIn('echo "changed=$changed" >> "$GITHUB_OUTPUT"', run)
+        self.assertNotIn("git diff --quiet -- data/", run)
+
+    def test_the_unchanged_path_drops_the_whole_data_directory(self):
+        # Issue #94: captures the gate found rendered-equivalent must not sit
+        # in the tree -- the commit step's `git add data/ ...` would stage
+        # them on a later heal run. The restore widens from the stamp file to
+        # the directory, which also restores captured-at.txt: the stamp still
+        # moves only when the data moves, and a quiet fetch still leaves the
+        # tree clean.
+        run = flattened(step(self.wf, "Did anything move?")["run"])
+
+        self.assertIn("git checkout -- data/", run)
+        self.assertNotIn("git checkout -- data/captured-at.txt", run)
+        # The restore stands on the unchanged path: after the gate's answer,
+        # before the heal gate's ref fetch.
+        self.assertLess(run.index("git checkout -- data/"),
+                        run.index("refs/heads/published"))
+
+    def test_the_commit_step_restores_heads_page_when_the_capture_did_not_move(self):
+        # Issue #94, second half: on a heal run the suite's rebuild is now
+        # stamped with THIS run's github.sha (issue #92's env fix), while
+        # HEAD's committed page carries the previous tip's sha -- the commit
+        # a page lands in always postdates the stamp it carries -- so
+        # committing the rebuilt page would be stamp-only churn. The commit
+        # step must restore HEAD's page before `git add` whenever the capture
+        # did not change and the run is not forced; a forced run may commit
+        # stamp churn, accepted because force is manual and rare.
+        s = step(self.wf, "Commit the capture")
+        run = flattened(s["run"])
+
+        self.assertEqual(s["env"]["CHANGED"],
+                         "${{ steps.capture.outputs.changed }}")
+        self.assertEqual(s["env"]["FORCE"], "${{ inputs.force }}")
+        self.assertIn(
+            'if [ "$CHANGED" != "true" ] && [ "$FORCE" != "true" ]; then', run)
+        self.assertIn(
+            "git show HEAD:out/frontier-models.html > out/frontier-models.html",
+            run)
+        self.assertLess(
+            run.index("git show HEAD:out/frontier-models.html"),
+            run.index("git add data/"))
+
     def test_the_unchanged_path_checks_whether_the_live_page_is_current(self):
         # Issue 42: `changed=false` used to skip both commit and publish
         # forever, so a failed or missed publish never healed. The unchanged
