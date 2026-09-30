@@ -1,27 +1,34 @@
 name: refresh
 
-# The automated capture: fetch AA's leaderboard every hour, and when the
-# numbers actually moved, commit the new capture and publish the rebuilt page
-# to docs-hub.
+# The automated capture: fetch AA's leaderboard every hour, and when the page
+# built from the new capture would differ from the one it replaces, commit the
+# new capture and publish the rebuilt page to docs-hub.
 #
-# WHAT COUNTS AS "MOVED" IS THE TWO CAPTURE FILES, NOT data/. The stamp file
-# beside them records today's date on every fetch, so gating on the directory
-# would commit and publish a date-only change every calendar day whether or not
-# AA measured anything new. Gating on the captures themselves means the stamp
-# moves when the data moves, and a quiet day is silent.
+# WHAT COUNTS AS "MOVED" IS THE RENDERED PAGE, NOT THE RAW CAPTURE BYTES
+# (issue #94). The gate (scripts/capture_gate.py) builds the page twice --
+# once from HEAD's two captures, once from the fresh ones -- and compares the
+# two files with build-machine provenance normalized out, because none of it
+# is rendered data: the source-commit stamp (both gate builds run stamp-less),
+# the capture date (both temp data dirs carry one synthetic captured-at.txt),
+# and the raw-byte digest over the capture files (masked from both pages
+# before comparing -- it moves with every sub-render byte AA wobbles).
+# "Moved" means the masked pages differ. The old raw-byte comparison let AA's
+# hourly sub-render churn commit and publish content the page never renders:
+# 23 of the last 30 refresh commits carried "nothing the page renders".
 #
 # There are two captures because the page draws two AA products: the model
-# leaderboard and the Coding Agent Index. Either one moving is news, so the
-# gate is an OR over both.
+# leaderboard and the Coding Agent Index. The OR survives inside the rendered
+# gate -- it builds from both files, so either one moving is news.
 #
-# THAT GATE ANSWERS "DID THE DATA MOVE", WHICH IS NOT THE SAME QUESTION AS
-# "IS THE LIVE PAGE STALE". A change to build.py changes the page while the
-# capture stays byte-identical, so every step here would skip and docs-hub
-# would keep serving the old render until AA happened to move on its own --
-# indefinitely, on a quiet weekend. Two paths bring a build-only change to
-# the hub: the `force` dispatch input, which rebuilds and publishes in one
-# run, and the heal gate below, which republishes whenever the live page is
-# behind main.
+# THE GATE ANSWERS "WOULD THE RENDERED PAGE MOVE", WHICH IS NOT THE SAME
+# QUESTION AS "IS THE LIVE PAGE STALE". A change to build.py changes the page
+# while the capture stays byte-identical -- and the gate builds BOTH sides
+# with the new code, so it still reports no change -- and every step here
+# would skip, leaving docs-hub serving the old render until AA happened to
+# move on its own, indefinitely, on a quiet weekend. Two paths bring a
+# build-only change to the hub: the `force` dispatch input, which rebuilds
+# and publishes in one run, and the heal gate below, which republishes
+# whenever the live page is behind main.
 #
 # THE `published` REF IS THE HEAL GATE'S MEMORY. The branch
 # refs/heads/published on the remote points at the main commit whose
@@ -144,13 +151,23 @@ jobs:
       - name: Did anything move?
         id: capture
         run: |
-          if git diff --quiet -- data/aa-raw-models.json data/aa-raw-coding-agents.json; then
-            changed=false
-            # Drop the date-only stamp change so the tree is clean. The stamp
-            # records when the DATA moved, so a quiet fetch must not bump it.
-            git checkout -- data/captured-at.txt
-          else
-            changed=true
+          # The rendered gate (see the header): build the page from HEAD's
+          # captures and from the fresh ones, normalize the build-machine
+          # provenance out of both, and call it moved only when the pages
+          # differ. A nonzero exit fails this step under bash -e -- a capture
+          # the builder cannot parse turns the run red here, never silently
+          # "changed" -- while no capture at HEAD (the first capture ever)
+          # fails OPEN as changed, so the first run publishes.
+          changed="$(python3 scripts/capture_gate.py)"
+          echo "changed=$changed" >> "$GITHUB_OUTPUT"
+          if [ "$changed" = false ]; then
+            # The fresh captures render identically to HEAD's, so restore the
+            # whole directory, not only the stamp: leaving either capture in
+            # the tree would stage it on a later heal run's `git add data/`
+            # in the commit step. This also restores captured-at.txt -- the
+            # stamp records when the DATA moved, so a quiet fetch must not
+            # bump it.
+            git checkout -- data/
           fi
           # The heal gate: a run whose publish failed or never ran left the
           # hub stale while every later capture stayed identical, and plain
@@ -199,7 +216,6 @@ jobs:
             fi
             rm -f "$hub_page"
           fi
-          echo "changed=$changed" >> "$GITHUB_OUTPUT"
           # `changed` answers "did the data move", `proceed` answers "should
           # we rebuild and publish" — a forced run says yes to the second
           # alone, and so does a run that only heals the live page, whether
@@ -314,9 +330,27 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
+          # The two flags the stamp-churn guard below reads. On a heal run
+          # (capture unchanged, not forced) this run's rebuild is stamped
+          # with THIS run's github.sha, while HEAD's committed page carries
+          # the PREVIOUS tip's sha -- the commit that page lands in always
+          # postdates the stamp it carries -- so committing the rebuilt page
+          # would be stamp-only churn: the exact hourly churn issue #94
+          # removes, reintroduced through the suite's rebuild.
+          CHANGED: ${{ steps.capture.outputs.changed }}
+          FORCE: ${{ inputs.force }}
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          # A quiet run restores HEAD's page before anything is staged: the
+          # rebuild above is stamped with this run's own sha (issue #92), and
+          # on a heal run that stamp is the only thing that differs from
+          # HEAD. A FORCED run skips the restore, so an unchanged capture can
+          # commit stamp-only churn -- accepted, because force is manual and
+          # rare, and its whole point is to republish the current build.
+          if [ "$CHANGED" != "true" ] && [ "$FORCE" != "true" ]; then
+            git show HEAD:out/frontier-models.html > out/frontier-models.html
+          fi
           git add data/aa-raw-models.json data/aa-raw-coding-agents.json \
                   data/captured-at.txt out/frontier-models.html
           # The message is diff_aa.py's own rendering, subject line included —
@@ -332,13 +366,14 @@ jobs:
               'The build moved, the data did not. Republished so the live page matches main.' \
               > commit-msg.txt
           fi
-          # A forced run can produce a byte-identical page; committing nothing
-          # is the correct outcome, and `git commit` would fail on it. The
-          # publish still happens (publish=true): this is exactly the shape
-          # of a heal run, where the rebuilt page matches main but the hub
-          # is behind it.
+          # A quiet run stages nothing here (the gate restored data/ and the
+          # guard above restored the page), and a forced run can produce a
+          # page identical to HEAD's; committing nothing is the correct
+          # outcome, and `git commit` would fail on it. The publish still
+          # happens (publish=true): this is exactly the shape of a heal run,
+          # where the page to serve is HEAD's but the hub is behind it.
           if git diff --cached --quiet; then
-            echo 'Rebuilt page is byte-identical — nothing committed.' \
+            echo 'Staged tree matches HEAD — nothing committed.' \
               >> "$GITHUB_STEP_SUMMARY"
             echo "publish=true" >> "$GITHUB_OUTPUT"
             exit 0
