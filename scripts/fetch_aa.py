@@ -24,6 +24,8 @@ from __future__ import annotations
 
 import argparse
 import datetime as dt
+import email.message
+import email.utils
 import json
 import os
 import pathlib
@@ -104,6 +106,13 @@ CHUNK_RE = re.compile(r'self\.__next_f\.push\(\[1,("(?:[^"\\]|\\.)*")\]\)')
 ATTEMPTS = 4
 WAIT_SECONDS = 120
 FETCH_TIMEOUT_SECONDS = 90
+# The exit code for a route disagreement that outlasts every re-read attempt
+# (issue #100). AA's two routes are independently cached Vercel pages whose
+# data lands at different times -- measured windows up to ~1 h -- so this
+# refusal is usually gone within the hour and must not fail the refresh run
+# the way a schema change (exit 1) does. refresh.yml green-skips on exactly
+# this code and raises its own red alarm once the window is older than 3 h.
+DISAGREEMENT_EXIT_CODE = 3
 
 
 def _sleep(seconds: float) -> None:
@@ -127,13 +136,53 @@ VERSION_RE = re.compile(r"Intelligence Index v(\d+\.\d+)")
 SUM_TOLERANCE = 1e-6
 
 
-def fetch_html(cached: str | None, url: str = URL) -> str:
+def _generated_epoch(headers: email.message.Message) -> int | None:
+    """When the route's cached copy was generated, as an epoch.
+
+    Measured on every probed shape (200 HIT and 404 MISS alike), Vercel's
+    `Date` header equals the entry's generation time (`date == now - age`
+    exactly, within clock drift), which is the only observable that says HOW
+    OLD the disagreeing snapshots are. The value is a diagnostic and nothing
+    else: no behavior is gated on it, and a response that does not carry a
+    parseable Date -- the cached-file path, an absent or malformed header --
+    yields None rather than a guess.
+    """
+    raw = headers.get("Date")
+    if not raw:
+        return None
+    try:
+        parsed = email.utils.parsedate_to_datetime(raw)
+    except (TypeError, ValueError):
+        return None
+    if parsed.tzinfo is None:
+        # HTTP dates are GMT by definition; a format that still parses to a
+        # naive datetime ("-0000") is read as UTC, not local time.
+        parsed = parsed.replace(tzinfo=dt.timezone.utc)
+    return int(parsed.timestamp())
+
+
+def _iso_utc(epoch: int | None) -> str:
+    """A generation epoch as ISO-8601 UTC, or the explicit unknown marker.
+
+    Rendered into diagnostics only -- an unparseable time must degrade to a
+    readable placeholder, never to "None" or a bare blank."""
+    if epoch is None:
+        return "(generation time unknown)"
+    return dt.datetime.fromtimestamp(
+        epoch, tz=dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def fetch_html(cached: str | None, url: str = URL) -> tuple[str, int | None]:
+    """The page text, plus the epoch the route's copy was generated at (or
+    None -- see _generated_epoch)."""
     if cached:
-        return pathlib.Path(cached).read_text(encoding="utf-8", errors="replace")
+        return (pathlib.Path(cached).read_text(encoding="utf-8",
+                                               errors="replace"), None)
     req = urllib.request.Request(url, headers={"User-Agent": UA})
     try:
         with urllib.request.urlopen(req, timeout=FETCH_TIMEOUT_SECONDS) as r:
-            return r.read().decode("utf-8", errors="replace")
+            text = r.read().decode("utf-8", errors="replace")
+            return text, _generated_epoch(r.headers)
     except (urllib.error.URLError, OSError) as exc:
         # HTTPError subclasses URLError and socket.timeout subclasses OSError,
         # so this is every transport shape: DNS, connect, refused status, a
@@ -477,20 +526,36 @@ class _RouteDisagreement(SystemExit):
     retried with this code none the wiser.
 
     Tagging keeps the scoping true without matching on the message. The
-    message is untouched, so on the last attempt the process still exits 1
-    with exactly the diagnostic the check has always raised (issue #89).
+    message is untouched: on the last attempt the refusal propagates out of
+    the retry helper to main(), which prints it verbatim and exits
+    DISAGREEMENT_EXIT_CODE (issue #100) -- the distinct code the refresh
+    workflow green-skips on, since a straddled pair is usually AA's cache
+    stagger and not a broken extractor.
+
+    The two generation epochs ride along for the diagnostics only: the
+    stderr lines name how old each disagreeing copy was. No behavior is
+    gated on them, and either may be None.
     """
+
+    def __init__(self, message: object, base_generated: int | None = None,
+                 detail_generated: int | None = None) -> None:
+        super().__init__(message)
+        self.base_generated = base_generated
+        self.detail_generated = detail_generated
 
 
 class CapturePair(typing.NamedTuple):
-    """One capture attempt's agreed (leaderboard, detail) pair, plus what
-    the capture log quotes from the attempt that produced it."""
+    """One capture attempt's agreed (leaderboard, detail) pair, what the
+    capture log quotes from the attempt that produced it, and when each
+    route said its copy was generated (epoch, or None)."""
 
     base: list
     detail: list
     host: str
     version: str
     shared_values: int
+    base_generated: int | None
+    detail_generated: int | None
 
 
 def capture_pair(cached_base: str | None, cached_detail: str | None) -> CapturePair:
@@ -502,17 +567,19 @@ def capture_pair(cached_base: str | None, cached_detail: str | None) -> CaptureP
     pair attempt N's leaderboard with attempt N-1's host. Everything the
     caller keeps comes from the attempt that returns from here -- no parsed
     value crosses attempts, so the written capture cannot mix one attempt's
-    score with another's cost.
+    score with another's cost. The generation epochs are the one exception,
+    and only on the refusal path: they ride the tagged exit to the stderr
+    diagnostics, never into the capture.
     """
-    payload = flight_payload(fetch_html(cached_base))
+    base_text, base_generated = fetch_html(cached_base)
+    payload = flight_payload(base_text)
     version = check_index_version(payload)
     base = richest_models_array(payload)
 
     host = detail_host_slug(base)
-    detail = richest_models_array(
-        flight_payload(fetch_html(cached_detail,
-                                  MODEL_DETAIL_URL.format(slug=host)))
-    )
+    detail_text, detail_generated = fetch_html(
+        cached_detail, MODEL_DETAIL_URL.format(slug=host))
+    detail = richest_models_array(flight_payload(detail_text))
     # The page claims the two routes agree exactly on every value they share;
     # only a check run while they are still separate can see a divergence --
     # after the merge, the leaderboard's copy shadows the detail's (issue
@@ -520,8 +587,20 @@ def capture_pair(cached_base: str | None, cached_detail: str | None) -> CaptureP
     try:
         shared_values = check_route_agreement(base, detail)
     except SystemExit as exc:
-        raise _RouteDisagreement(exc.code) from None
-    return CapturePair(base, detail, host, version, shared_values)
+        raise _RouteDisagreement(exc.code, base_generated,
+                                 detail_generated) from None
+    return CapturePair(base, detail, host, version, shared_values,
+                       base_generated, detail_generated)
+
+
+def _generation_note(exc: _RouteDisagreement) -> str:
+    """The parenthetical appended to an intermediate retry line: how old each
+    disagreeing copy was, when either route reported it. Empty when neither
+    did, so the quiet case keeps the exact line shape issue #89 shipped."""
+    if exc.base_generated is None and exc.detail_generated is None:
+        return ""
+    return (f" (leaderboard generated {_iso_utc(exc.base_generated)}, "
+            f"detail generated {_iso_utc(exc.detail_generated)})")
 
 
 def capture_pair_retrying(cached_base: str | None,
@@ -531,8 +610,9 @@ def capture_pair_retrying(cached_base: str | None,
     Each refusal costs one stderr line and one bounded wait, then a fully
     fresh pair -- fresh bytes, fresh parse, nothing carried over. The loop
     covers attempts 1..ATTEMPTS-1; the LAST attempt runs outside the try, so
-    its refusal propagates uncaught: the exact unchanged diagnostic, exit 1,
-    nothing written.
+    its refusal propagates to main() unchanged: the exact diagnostic the
+    check has always raised, nothing written. main() alone turns it into
+    exit DISAGREEMENT_EXIT_CODE (issue #100).
 
     A capture whose pages BOTH come from --html/--detail-html files is
     exempt: those bytes are pinned, so a re-read would return the identical
@@ -544,9 +624,10 @@ def capture_pair_retrying(cached_base: str | None,
     for attempt in range(1, attempts):
         try:
             return capture_pair(cached_base, cached_detail)
-        except _RouteDisagreement:
+        except _RouteDisagreement as exc:
             print(f"routes disagree on attempt {attempt} of {attempts}; "
-                  f"re-reading both routes in {WAIT_SECONDS}s",
+                  f"re-reading both routes in {WAIT_SECONDS}s"
+                  f"{_generation_note(exc)}",
                   file=sys.stderr)
             _sleep(WAIT_SECONDS)
     return capture_pair(cached_base, cached_detail)
@@ -559,12 +640,25 @@ def main() -> None:
     ap.add_argument("--agents-html", help="use a cached copy of the coding-agents HTML")
     args = ap.parse_args()
 
-    pair = capture_pair_retrying(args.html, args.detail_html)
+    try:
+        pair = capture_pair_retrying(args.html, args.detail_html)
+    except _RouteDisagreement as exc:
+        # The divergence diagnostic is the original, verbatim: a straddled
+        # pair and a broken extractor must stay distinguishable by eye. The
+        # appended line explains WHY the exit code differs from every other
+        # refusal and what the refresh will do about it (issue #100).
+        print(str(exc), file=sys.stderr)
+        print(f"leaderboard generated {_iso_utc(exc.base_generated)}, "
+              f"detail generated {_iso_utc(exc.detail_generated)} — "
+              "Vercel serves the two routes from independent caches and "
+              "AA's data lands on them at different times (issue #100); "
+              "refresh green-skips this hour and retries (persistent > 3 h "
+              "fails red)", file=sys.stderr)
+        sys.exit(DISAGREEMENT_EXIT_CODE)
     models = merge_captures(pair.base, pair.detail)
     priced = check_cost_breakdown(models)
-    agents = coding_agent_rows(
-        flight_payload(fetch_html(args.agents_html, AGENTS_URL))
-    )
+    agents_text, _ = fetch_html(args.agents_html, AGENTS_URL)
+    agents = coding_agent_rows(flight_payload(agents_text))
 
     OUT.parent.mkdir(parents=True, exist_ok=True)
     write_atomic(OUT, json.dumps(models, indent=1))
