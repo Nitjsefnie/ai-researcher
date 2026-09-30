@@ -1047,9 +1047,28 @@ class BrowserInteractionTests(unittest.TestCase):
                 f"#{table} shipped an empty tbody -- no data without JS")
         self.assertEqual(
             page.locator("#tbl tbody tr").count(), len(payload["rows"]))
+        # The expected lead row comes from the payload through the page's
+        # default sort -- Intelligence Index descending, missing values
+        # last, stable -- not from assuming payload row 0 leads the render:
+        # build_rows' own ordering is a separate concern, and coupling the
+        # two would false-red the hourly refresh on a capture whose top
+        # model is not its first row.
+        lead = sorted(
+            payload["rows"],
+            key=lambda row: (row["ii"] is None,
+                             -(row["ii"] if row["ii"] is not None else 0.0)),
+        )[0]
         first_cells = page.locator("#tbl tbody tr").first.locator(
             "td").all_text_contents()
-        self.assertEqual(first_cells[0], payload["rows"][0]["name"] + " ")
+        # The name cell is the name, a trailing space, and a vendor-retired
+        # tag when the lead row carries one -- strip the tag's text rather
+        # than couple the pin to its presence.
+        rendered = first_cells[0]
+        if rendered.endswith("vendor-retired"):
+            rendered = rendered[: -len("vendor-retired")]
+        self.assertEqual(
+            rendered, lead["name"] + " ",
+            "the static table's first row is not the default sort's top row")
         # an absent value renders as the page's em dash, never blank
         self.assertIn("—", page.locator("#tbl tbody td").all_text_contents())
         # the noscript notice covers the charts, filters and sorting; the

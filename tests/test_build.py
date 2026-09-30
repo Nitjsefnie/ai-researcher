@@ -502,6 +502,21 @@ class StaticTableRenderTests(unittest.TestCase):
         self.assertEqual(page_format.fmt_ctx(500), "500")
         self.assertEqual(page_format.fmt_ctx(1_500_000), "1.5M")
 
+    def test_js_number_matches_v8_up_to_its_documented_boundaries(self):
+        # String(number) parity is contractual only inside 1e-6 <= |v| < 1e21,
+        # the range the page's prices, speeds and parameter counts can reach.
+        # AT both edges the two spellings still agree; outside them they
+        # diverge on purpose -- Python reaches for e-notation at 1e-4 where
+        # V8 holds out until 1e-6, and V8 goes exponential at 1e21 while
+        # js_number keeps spelling digits -- and js_number's docstring
+        # carries the rationale. These pins turn any change to that contract
+        # into a deliberate diff rather than a silent spelling drift.
+        self.assertEqual(page_format.js_number(1e-06), "0.000001")
+        self.assertEqual(page_format.js_number(1e-07), "0.0000001")  # V8: "1e-7"
+        self.assertEqual(page_format.js_number(1e20), "100000000000000000000")
+        self.assertEqual(
+            page_format.js_number(1e21), "1000000000000000000000")  # V8: "1e+21"
+
     def test_a_vendor_retired_model_carries_its_tag_in_the_static_row(self):
         model = model_fixture()
         model["deprecated"] = True

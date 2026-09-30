@@ -39,6 +39,11 @@ def js_number(value):
     Python switches to exponent notation at 1e-4 where V8 holds out until
     1e-6, so an e-notation repr is written back out in full; a value that
     small cannot reach the page's prices and speeds.
+
+    Parity with V8 is contractual for 1e-6 <= |v| < 1e21 -- the range the
+    page's prices, speeds and parameter counts can reach -- and the
+    spellings outside it diverge on purpose; StaticTableRenderTests pins
+    both boundaries, so changing this contract is a deliberate diff.
     """
     if value == int(value) and abs(value) < 1e21:
         return str(int(value))
