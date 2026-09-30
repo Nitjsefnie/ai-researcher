@@ -65,6 +65,20 @@ class GateTests(unittest.TestCase):
         self.assertIn("steps.capture.outputs.proceed == 'true'", gate)
         self.assertIn("steps.commit.outputs.publish == 'true'", gate)
 
+    def test_the_suite_step_rebuilds_the_page_stamped_too(self):
+        # Issue #92: the suite's browser tests call build.main() over the REAL
+        # out/frontier-models.html, and that rebuild used to run with
+        # AA_SOURCE_COMMIT unset -- so the commit step staged an unstamped
+        # page and the Rebuild step's stamp was thrown away. The suite step
+        # must carry the same env the Rebuild step has, or the suite's
+        # real-out rewrite silently destamps whatever the rebuild stamped.
+        suite = step(self.wf, "Run the suite against the new capture")
+        rebuild = step(self.wf, "Rebuild the page")
+
+        self.assertEqual(suite["env"]["AA_SOURCE_COMMIT"],
+                         rebuild["env"]["AA_SOURCE_COMMIT"])
+        self.assertEqual(suite["env"]["AA_SOURCE_COMMIT"], "${{ github.sha }}")
+
     def test_rebuild_and_suite_stay_gated_on_proceed(self):
         # The uniform guarantee: nothing is rebuilt or published that the
         # suite did not pass.
