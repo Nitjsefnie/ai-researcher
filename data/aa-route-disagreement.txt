@@ -1,7 +1,0 @@
-1790804874
-routes disagree on attempt 1 of 4; re-reading both routes in 120s (leaderboard generated 2026-09-30T21:41:25Z, detail generated 2026-09-30T21:41:51Z)
-routes disagree on attempt 2 of 4; re-reading both routes in 120s (leaderboard generated 2026-09-30T21:41:25Z, detail generated 2026-09-30T21:41:51Z)
-routes disagree on attempt 3 of 4; re-reading both routes in 120s (leaderboard generated 2026-09-30T21:41:25Z, detail generated 2026-09-30T21:41:51Z)
-1 shared value(s) disagree between the leaderboard route and the model detail route; the gap-fill merge keeps the leaderboard's copy:
-  step-5: apexAgents: leaderboard 0.379793510324484, detail None
-leaderboard generated 2026-09-30T21:41:25Z, detail generated 2026-09-30T21:41:51Z — Vercel serves the two routes from independent caches and AA's data lands on them at different times (issue #100); refresh green-skips this hour and retries (persistent > 3 h fails red)
