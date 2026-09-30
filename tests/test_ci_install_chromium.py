@@ -567,8 +567,18 @@ def test_assert_seeded_intact_catches_a_replaced_directory(
         install_chromium.seed_product(browsers_root, product)
     inodes = inodes_of(browsers_root, seeded)
     chromium_dir = install_chromium.install_dir(browsers_root, seeded[0])
+    # A re-download materializes the new directory elsewhere and moves it
+    # in, so build the replacement BEFORE removing the original: both
+    # directories then exist at once, and two simultaneously existing
+    # directories never share an inode — the replacement's inode differs
+    # from the recorded one on every filesystem. (Creating it after the
+    # rmtree instead lets the filesystem hand the freed inode straight
+    # back, which ext4 usually does, so this test's outcome depended on
+    # the allocator state the ~400 preceding tests left behind.)
+    replacement = browsers_root / "replacement"
+    replacement.mkdir()
     shutil.rmtree(chromium_dir)
-    chromium_dir.mkdir()  # a re-download replaces the directory: new inode
+    replacement.rename(chromium_dir)
     with pytest.raises(install_chromium.InstallError, match="replaced"):
         install_chromium.assert_seeded_intact(browsers_root, seeded, inodes)
 
