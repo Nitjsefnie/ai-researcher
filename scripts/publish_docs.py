@@ -61,9 +61,13 @@ def publish(path: str, fields: dict[str, str], key: str, base: str) -> int:
     # to that destination. An unparseable URL refuses too (parsed=None),
     # rather than escaping as a traceback. hostname (not netloc) is
     # compared, so userinfo tricks and case spelling cannot smuggle a
-    # different host through.
+    # different host through. A malformed port (nonnumeric or out of
+    # range) refuses the same way: urlsplit accepts it and .hostname
+    # silently drops it, so parsed.port is read here to surface the
+    # ValueError instead of letting the request die in urlopen.
     try:
         parsed = urllib.parse.urlsplit(base)
+        _ = parsed.port
     except ValueError:
         parsed = None
     if (parsed is None or parsed.scheme != "https" or not parsed.netloc

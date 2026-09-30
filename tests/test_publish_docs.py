@@ -54,6 +54,9 @@ class MultipartTests(unittest.TestCase):
 
 
 class PublishTests(unittest.TestCase):
+    # pylint: disable=too-many-public-methods
+    # One behaviour, one test: each refusal row is a named test sharing the
+    # same assert_refused contract, as in test_browser.py.
     def setUp(self):
         self.page = pathlib.Path(__file__).resolve().parent / "_page.html"
         self.page.write_bytes(PAGE)
@@ -121,6 +124,15 @@ class PublishTests(unittest.TestCase):
         # documented refusal, not propagate urlsplit's ValueError.
         self.assert_refused("http://[::1")
 
+    def test_nonnumeric_port_is_refused_before_any_network_call(self):
+        # urlsplit accepts a nonnumeric port and .hostname silently drops
+        # it, so the pinned-host check passed and the request died in
+        # urlopen as an http.client.InvalidURL traceback.
+        self.assert_refused(f"https://{HUB_HOST}:notaport")
+
+    def test_out_of_range_port_is_refused_before_any_network_call(self):
+        self.assert_refused(f"https://{HUB_HOST}:99999")
+
     def test_uppercase_https_scheme_is_accepted(self):
         # urlsplit lowercases the scheme, so HTTPS:// is a healthy path.
         def urlopen(req, timeout=None):
@@ -136,6 +148,16 @@ class PublishTests(unittest.TestCase):
             return Response(200, json.dumps({"ok": True, "version": 7}).encode())
 
         code, _ = self.publish_to("https://DOCS.NITJSEFNI.EU", urlopen)
+        self.assertEqual(code, 0)
+
+    def test_explicit_valid_port_is_accepted(self):
+        # The port read must refuse only MALFORMED ports: an explicit valid
+        # one is an ordinary https base, so a fix that refuses every port
+        # cannot pass this row.
+        def urlopen(req, timeout=None):
+            return Response(200, json.dumps({"ok": True, "version": 7}).encode())
+
+        code, _ = self.publish_to(f"https://{HUB_HOST}:443", urlopen)
         self.assertEqual(code, 0)
 
     def test_sends_the_key_as_a_header_and_reports_success(self):
