@@ -113,6 +113,27 @@ def test_coverage_job_installs_chromium_through_the_digest_gate():
     assert chromium["run"] == "python3 scripts/ci/install_chromium.py"
 
 
+def test_instruction_budgets_gate_runs_only_in_the_coverage_job():
+    # Issue #110: the instruction-count gate needs valgrind and four
+    # callgrind runs, so it must never appear in a matrix cell (three
+    # OSes would triple the install and the cells' 20-minute ceiling is
+    # standing). Its only CI surface is the coverage job, conditional on
+    # the pytest step like every gate there, invoking the gate script.
+    workflow = yaml.safe_load(TESTS_WORKFLOW.read_text(encoding="utf-8"))
+    for name, job in workflow["jobs"].items():
+        named = [s for s in job.get("steps", [])
+                 if s.get("name") == "Instruction budgets gate"]
+        if name != "coverage":
+            assert not named, (
+                f"{name} must not run the instruction budgets gate")
+            continue
+        [gate] = named
+        assert "instruction_budgets.py" in gate["run"], gate["run"]
+        assert gate.get("if") is not None and "pytest" in gate["if"], (
+            "the gate is conditional on the pytest step, like every gate "
+            "in this job")
+
+
 def test_page_job_runs_the_committed_page_check():
     # Issue #105: the committed-page check's only CI surface is this job, so
     # a rename or removal must fail here the way an unwired chromium
