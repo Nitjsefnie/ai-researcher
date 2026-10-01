@@ -7,13 +7,20 @@ hand (`perf_budgets.py --measure`), never from pytest here.
 """
 from __future__ import annotations
 
+import contextlib
 import importlib.util
+import io
 import json
+import os
+import shutil
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 
 import pytest
+
+import build
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
@@ -37,27 +44,36 @@ perf = _load("perf_budgets")
 
 
 def _document():
-    """A valid budgets document: maxima over every budgetable metric."""
+    """A valid budgets document: maxima over every gated metric.
+
+    The load/filter/sort records carry NO dom_nodes_mutated budget --
+    those counts are measured and reported only (issue #112, option A).
+    """
     return {
         "schema_version": 1,
-        "bytes": {"raw": 600000, "gzip": 120000},
+        "bytes": {"code_bytes": 72000},
         "journeys": {
-            "load": {"dom_nodes_mutated": 5000, "long_task_count": 2},
-            "filter": {"dom_nodes_mutated": 3000, "long_task_count": 1},
-            "sort": {"dom_nodes_mutated": 8000, "long_task_count": 1},
+            "load": {"long_task_count": 2},
+            "filter": {"long_task_count": 1},
+            "sort": {"long_task_count": 1},
             "hover": {"dom_nodes_mutated": 40, "long_task_count": 0},
         },
     }
 
 
 def _measurement(**overrides):
-    """A synthetic measurement matching _document, at or under budget."""
+    """A synthetic measurement matching _document, at or under budget.
+
+    The measurement carries every metric the harness reports -- raw and
+    gzip bytes and the load/filter/sort DOM counts ride along and are
+    never judged.
+    """
     journeys = {
-        "load": {"dom_nodes_mutated": 4800, "long_task_count": 2,
+        "load": {"dom_nodes_mutated": 8600, "long_task_count": 2,
                  "wall_ms_median": 61.0},
-        "filter": {"dom_nodes_mutated": 2900, "long_task_count": 0,
+        "filter": {"dom_nodes_mutated": 1290, "long_task_count": 0,
                    "wall_ms_median": 9.5},
-        "sort": {"dom_nodes_mutated": 7900, "long_task_count": 1,
+        "sort": {"dom_nodes_mutated": 470, "long_task_count": 1,
                  "wall_ms_median": 12.0},
         "hover": {"dom_nodes_mutated": 38, "long_task_count": 0,
                   "wall_ms_median": 2.5},
@@ -65,7 +81,7 @@ def _measurement(**overrides):
     data = {
         "schema_version": 1,
         "page": {"output": "frontier-models.html", "sha256": "ab" * 32},
-        "bytes": {"raw": 599000, "gzip": 119000},
+        "bytes": {"raw": 248000, "gzip": 41000, "code_bytes": 71500},
         "journeys": journeys,
     }
     for path, value in overrides.items():
@@ -90,9 +106,40 @@ def _written(tmp_path, payload, name="perf-budgets.json"):
 def test_valid_document_loads(tmp_path):
     doc = perf.load_budgets(_written(tmp_path, _document()))
     assert doc["schema_version"] == 1
-    assert doc["bytes"] == {"raw": 600000, "gzip": 120000}
+    assert doc["bytes"] == {"code_bytes": 72000}
+    assert doc["journeys"]["load"] == {"long_task_count": 2}
     assert doc["journeys"]["hover"] == {
         "dom_nodes_mutated": 40, "long_task_count": 0}
+
+
+def test_report_only_byte_counts_are_unknown_fields_in_a_budget(tmp_path):
+    # bytes.raw / bytes.gzip are dominated by the capture: the ratchet
+    # must refuse to budget them, exactly like wall_ms_median (issue
+    # #112 -- data-coupled leaves never enter the document).
+    payload = _document()
+    payload["bytes"]["raw"] = 248000
+    with pytest.raises(ValueError, match="unknown field: raw"):
+        perf.load_budgets(_written(tmp_path, payload))
+
+
+def test_load_dom_budget_is_an_unknown_field(tmp_path):
+    # The load journey's mutation count carries the capture's frontier
+    # geometry (fillFrontiers' frontier rows): it is measured and
+    # reported, never gated (issue #112, option A).
+    payload = _document()
+    payload["journeys"]["load"]["dom_nodes_mutated"] = 8700
+    with pytest.raises(ValueError,
+                       match="unknown field.*dom_nodes_mutated"):
+        perf.load_budgets(_written(tmp_path, payload))
+
+
+def test_filter_and_sort_dom_budgets_are_unknown_fields_too(tmp_path):
+    for journey in ("filter", "sort"):
+        payload = _document()
+        payload["journeys"][journey]["dom_nodes_mutated"] = 1
+        with pytest.raises(ValueError,
+                           match="unknown field.*dom_nodes_mutated"):
+            perf.load_budgets(_written(tmp_path, payload))
 
 
 def test_unknown_top_level_field_refused(tmp_path):
@@ -143,38 +190,38 @@ def test_missing_metric_refused(tmp_path):
 
 def test_float_budget_refused(tmp_path):
     payload = _document()
-    payload["journeys"]["filter"]["dom_nodes_mutated"] = 3000.5
+    payload["journeys"]["filter"]["long_task_count"] = 1.5
     with pytest.raises(ValueError, match="must be an integer"):
         perf.load_budgets(_written(tmp_path, payload))
 
 
 def test_integral_float_budget_refused(tmp_path):
-    # 3000.0 is a whole number but not the canonical spelling: a budget
+    # 1.0 is a whole number but not the canonical spelling: a budget
     # is an integer in the document, exactly like the thresholds doc's
     # one-decimal-place rule for coverage numbers.
     payload = _document()
-    payload["journeys"]["filter"]["dom_nodes_mutated"] = 3000.0
+    payload["journeys"]["filter"]["long_task_count"] = 1.0
     with pytest.raises(ValueError, match="must be an integer"):
         perf.load_budgets(_written(tmp_path, payload))
 
 
 def test_negative_budget_refused(tmp_path):
     payload = _document()
-    payload["bytes"]["gzip"] = -1
+    payload["bytes"]["code_bytes"] = -1
     with pytest.raises(ValueError, match="must not be negative"):
         perf.load_budgets(_written(tmp_path, payload))
 
 
 def test_boolean_budget_refused(tmp_path):
     payload = _document()
-    payload["bytes"]["raw"] = True
+    payload["bytes"]["code_bytes"] = True
     with pytest.raises(ValueError, match="must be an integer"):
         perf.load_budgets(_written(tmp_path, payload))
 
 
 def test_string_budget_refused(tmp_path):
     payload = _document()
-    payload["bytes"]["raw"] = "600000"
+    payload["bytes"]["code_bytes"] = "72000"
     with pytest.raises(ValueError, match="must be a JSON number"):
         perf.load_budgets(_written(tmp_path, payload))
 
@@ -240,20 +287,20 @@ def test_non_object_document_refused(tmp_path):
 
 def test_gate_exceeded_names_journey_metric_and_both_values():
     findings = perf.gate(perf.validate_budgets(_document()), _measurement(
-        **{"journeys.filter.dom_nodes_mutated": 3001}))
-    assert findings == ["journeys.filter.dom_nodes_mutated: "
-                        "head 3001 exceeds base 3000"]
+        **{"journeys.hover.dom_nodes_mutated": 41}))
+    assert findings == ["journeys.hover.dom_nodes_mutated: "
+                        "head 41 exceeds base 40"]
 
 
 def test_gate_bytes_exceeded():
     findings = perf.gate(perf.validate_budgets(_document()), _measurement(
-        **{"bytes.gzip": 120001}))
-    assert findings == ["bytes.gzip: head 120001 exceeds base 120000"]
+        **{"bytes.code_bytes": 72001}))
+    assert findings == ["bytes.code_bytes: head 72001 exceeds base 72000"]
 
 
 def test_gate_equal_budget_passes():
     assert perf.gate(perf.validate_budgets(_document()), _measurement(
-        **{"bytes.raw": 600000})) == []
+        **{"bytes.code_bytes": 72000})) == []
 
 
 def test_gate_below_budget_passes():
@@ -263,19 +310,24 @@ def test_gate_below_budget_passes():
 
 def test_gate_ignores_report_only_metrics():
     # wall_ms_median rides along in every measurement journey and is
-    # never gated -- even a huge wall cannot produce a finding.
-    measurement = _measurement(**{"journeys.load.wall_ms_median": 99999.0})
+    # never gated -- even a huge wall cannot produce a finding. The
+    # load/filter/sort DOM counts are the same class of report-only
+    # number (issue #112): measured, reported, never judged.
+    measurement = _measurement(**{"journeys.load.wall_ms_median": 99999.0},
+                               **{"journeys.load.dom_nodes_mutated": 999999},
+                               **{"journeys.filter.dom_nodes_mutated": 9999},
+                               **{"journeys.sort.dom_nodes_mutated": 999})
     assert perf.gate(perf.validate_budgets(_document()), measurement) == []
 
 
 def test_gate_reports_every_exceeded_budget_in_order():
     measurement = _measurement(
-        **{"bytes.gzip": 200000},
+        **{"bytes.code_bytes": 99000},
         **{"journeys.load.long_task_count": 9},
         **{"journeys.hover.dom_nodes_mutated": 41})
     findings = perf.gate(perf.validate_budgets(_document()), measurement)
     assert findings == [
-        "bytes.gzip: head 200000 exceeds base 120000",
+        "bytes.code_bytes: head 99000 exceeds base 72000",
         "journeys.load.long_task_count: head 9 exceeds base 2",
         "journeys.hover.dom_nodes_mutated: head 41 exceeds base 40",
     ]
@@ -292,6 +344,14 @@ def test_gate_missing_bytes_section_is_loud():
     measurement = _measurement()
     del measurement["bytes"]
     with pytest.raises(ValueError, match="missing section: bytes"):
+        perf.gate(perf.validate_budgets(_document()), measurement)
+
+
+def test_gate_missing_code_bytes_field_is_loud():
+    measurement = _measurement()
+    del measurement["bytes"]["code_bytes"]
+    with pytest.raises(ValueError,
+                       match="missing field: bytes.code_bytes"):
         perf.gate(perf.validate_budgets(_document()), measurement)
 
 
@@ -335,7 +395,10 @@ def test_check_exit_0_1_2_contract_holds(tmp_path, capsys, monkeypatch):
     doc = _written(tmp_path, _document())
 
     # 0: every budget met by a fresh synthetic measurement.
-    monkeypatch.setattr(perf, "measure", lambda: _measurement())
+    def fresh_measurement():
+        return _measurement()
+
+    monkeypatch.setattr(perf, "measure", fresh_measurement)
     assert perf.main(["--check", "--budgets", str(doc)]) == 0
 
     # 1: at least one budget exceeded.
@@ -372,14 +435,17 @@ def _measurement_at(budgets):
 def test_the_committed_budgets_document_loads_and_normalises():
     # The REAL committed ratchet document (issue #109): the structure,
     # integer and finite rules hold against the file CI gates on -- not
-    # only against synthetic fixtures.
+    # only against synthetic fixtures. Option A's shape (issue #112):
+    # one code-only byte budget, absolute long-task maxima, and hover
+    # DOM; the report-only metrics are absent.
     budgets = perf.load_budgets(REAL_BUDGETS)
     assert budgets["schema_version"] == 1
-    assert set(budgets["bytes"]) == {"raw", "gzip"}
+    assert set(budgets["bytes"]) == {"code_bytes"}
     assert set(budgets["journeys"]) == {"load", "filter", "sort", "hover"}
-    for record in budgets["journeys"].values():
-        assert set(record) == {"dom_nodes_mutated", "long_task_count"}
-    for value in [budgets["bytes"]["raw"], budgets["bytes"]["gzip"],
+    assert set(budgets["journeys"]["load"]) == {"long_task_count"}
+    assert set(budgets["journeys"]["hover"]) == {
+        "dom_nodes_mutated", "long_task_count"}
+    for value in [budgets["bytes"]["code_bytes"],
                   *[v for r in budgets["journeys"].values()
                     for v in r.values()]]:
         assert isinstance(value, int) and not isinstance(value, bool)
@@ -396,12 +462,11 @@ def test_gate_over_the_committed_budgets_at_their_own_values_is_clean():
 def test_gate_one_over_a_committed_budget_names_the_path():
     budgets = perf.load_budgets(REAL_BUDGETS)
     measurement = _measurement_at(budgets)
-    measurement["journeys"]["sort"]["dom_nodes_mutated"] += 1
-    budget = budgets["journeys"]["sort"]["dom_nodes_mutated"]
+    measurement["bytes"]["code_bytes"] += 1
+    budget = budgets["bytes"]["code_bytes"]
     findings = perf.gate(budgets, measurement)
     assert findings == [
-        f"journeys.sort.dom_nodes_mutated: head {budget + 1} exceeds "
-        f"base {budget}"]
+        f"bytes.code_bytes: head {budget + 1} exceeds base {budget}"]
 
 
 # --- module-level laziness, subprocess-isolated ------------------------------
@@ -444,3 +509,67 @@ def test_check_never_reaches_the_browser_path_for_a_missing_document():
         [sys.executable, "-c", _LAZY_CHECK_PROBE, str(REPO_ROOT)],
         cwd=REPO_ROOT, capture_output=True, text=True, check=True)
     assert result.stdout.strip() == "ok"
+
+
+# --- the decoupling proof: the 686 -> 688 capture growth (issue #112) --------
+
+# The commit whose TREE carries the 686-model capture: the parent of the
+# refresh that grew the capture to 688. main's history, so a shallow CI
+# checkout cannot reach it -- this test skips there, and the fixture
+# proof in tests/test_browser.py carries the property everywhere.
+_PRE_GROWTH_COMMIT = "875d024"
+
+
+def _git_blob(rev_path):
+    """The blob at `<rev>:<path>`, or None when the history is absent."""
+    result = subprocess.run(  # pylint: disable=subprocess-run-check
+        ["git", "show", rev_path], cwd=str(REPO_ROOT), capture_output=True,
+        check=False)
+    return result.stdout if result.returncode == 0 else None
+
+
+def _build_bytes(raw_path, agents_path):
+    """build.main() with the capture patched to `raw_path`/`agents_path`,
+    stamp-less, to a temp output; returns the page bytes. Never writes
+    the repo's out/frontier-models.html."""
+    saved_raw, saved_agents, saved_out = (
+        build.RAW, build.AGENTS_RAW, build.OUT)
+    output = Path(tempfile.mkdtemp(prefix=".build-bytes-",
+                                   dir=str(REPO_ROOT))) / "page.html"
+    build.RAW, build.AGENTS_RAW = Path(raw_path), Path(agents_path)
+    build.OUT = output
+    try:
+        saved_stamp = os.environ.pop("AA_SOURCE_COMMIT", None)
+        try:
+            with contextlib.redirect_stdout(io.StringIO()):
+                build.main()
+        finally:
+            if saved_stamp is not None:
+                os.environ["AA_SOURCE_COMMIT"] = saved_stamp
+    finally:
+        build.RAW, build.AGENTS_RAW, build.OUT = (
+            saved_raw, saved_agents, saved_out)
+    return output.read_bytes()
+
+
+def test_code_bytes_is_identical_across_the_686_688_capture_growth():
+    """The live repro of issue #112: same code, capture 686 -> 688, and
+    the budgeted byte count must not have moved."""
+    models_686 = _git_blob(_PRE_GROWTH_COMMIT + ":data/aa-raw-models.json")
+    agents_686 = _git_blob(
+        _PRE_GROWTH_COMMIT + ":data/aa-raw-coding-agents.json")
+    if models_686 is None or agents_686 is None:
+        pytest.skip("shallow checkout: the pre-growth capture blob is not "
+                    "reachable; the fixture proof in tests/test_browser.py "
+                    "carries the property")
+    tmp = Path(tempfile.mkdtemp(prefix=".capture-growth-", dir=str(REPO_ROOT)))
+    try:
+        models = tmp / "models.json"
+        agents = tmp / "coding-agents.json"
+        models.write_bytes(models_686)
+        agents.write_bytes(agents_686)
+        grown = perf.code_bytes(_build_bytes(models, agents))
+        live = perf.code_bytes(_build_bytes(build.RAW, build.AGENTS_RAW))
+        assert grown == live
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)

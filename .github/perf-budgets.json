@@ -1,25 +1,21 @@
 {
   "schema_version": 1,
   "bytes": {
-    "gzip": 40986,
-    "raw": 247941
+    "code_bytes": 71627
   },
   "journeys": {
     "filter": {
-      "dom_nodes_mutated": 1320,
-      "long_task_count": 1
+      "long_task_count": 2
     },
     "hover": {
       "dom_nodes_mutated": 33,
       "long_task_count": 1
     },
     "load": {
-      "dom_nodes_mutated": 8831,
       "long_task_count": 2
     },
     "sort": {
-      "dom_nodes_mutated": 480,
-      "long_task_count": 1
+      "long_task_count": 2
     }
   }
 }

@@ -552,14 +552,19 @@ def test_end_to_end_push_raise_on_main_is_clean(tmp_path, capsys,
 
 
 def _budgets_document(schema=1):
-    """The committed budgets document's shape, as test values."""
+    """The committed budgets document's shape, as test values.
+
+    Option A's shape (issue #112): one code-only byte budget, absolute
+    long-task maxima, and hover DOM -- the load/filter/sort DOM counts
+    have no leaves because they are never gated.
+    """
     return {
         "schema_version": schema,
-        "bytes": {"raw": 247941, "gzip": 40986},
+        "bytes": {"code_bytes": 71627},
         "journeys": {
-            "load": {"dom_nodes_mutated": 8831, "long_task_count": 2},
-            "filter": {"dom_nodes_mutated": 1320, "long_task_count": 1},
-            "sort": {"dom_nodes_mutated": 480, "long_task_count": 1},
+            "load": {"long_task_count": 2},
+            "filter": {"long_task_count": 2},
+            "sort": {"long_task_count": 2},
             "hover": {"dom_nodes_mutated": 33, "long_task_count": 1},
         },
     }
@@ -578,11 +583,11 @@ def test_budgets_guard_identical_documents_are_clean():
 def test_budgets_guard_raised_budget_is_a_finding():
     guard = _guard()
     base, head = _budgets_document(), _budgets_document()
-    head["journeys"]["sort"]["dom_nodes_mutated"] = 481
+    head["bytes"]["code_bytes"] = 71628
     findings = guard.budgets_relaxations(base, head)
     assert len(findings) == 1
     assert "raised; it may only fall" in findings[0]
-    assert "journeys.sort.dom_nodes_mutated" in findings[0]
+    assert "bytes.code_bytes" in findings[0]
     assert ".github/perf-budgets.json" in findings[0]
 
 
@@ -590,21 +595,20 @@ def test_budgets_guard_lowered_budget_is_clean():
     guard = _guard()
     base, head = _budgets_document(), _budgets_document()
     head["journeys"]["filter"]["long_task_count"] = 0
-    head["bytes"]["gzip"] = 40000
+    head["bytes"]["code_bytes"] = 71000
     assert guard.budgets_relaxations(base, head) == []
 
 
 def test_budgets_guard_every_budget_may_only_fall():
     guard = _guard()
     base, head = _budgets_document(), _budgets_document()
-    # every budget raised by one: ten findings, one per raised leaf
+    # every budget raised by one: six findings, one per raised leaf
+    head["bytes"]["code_bytes"] += 1
     for journey in head["journeys"].values():
-        journey["dom_nodes_mutated"] += 1
-        journey["long_task_count"] += 1
-    head["bytes"]["raw"] += 1
-    head["bytes"]["gzip"] += 1
+        for metric in journey:
+            journey[metric] += 1
     findings = guard.budgets_relaxations(base, head)
-    assert len(findings) == 10
+    assert len(findings) == 6
     assert all("raised; it may only fall" in line for line in findings)
 
 
@@ -643,7 +647,7 @@ def test_budgets_guard_key_added_is_a_finding():
 def test_budgets_guard_string_value_is_not_a_finite_number():
     guard = _guard()
     base, head = _budgets_document(), _budgets_document()
-    head["bytes"]["raw"] = "247941"
+    head["bytes"]["code_bytes"] = "71627"
     findings = guard.budgets_relaxations(base, head)
     assert len(findings) == 1
     assert "not a finite number" in findings[0]
@@ -679,7 +683,7 @@ def test_end_to_end_budgets_raise_is_flagged(tmp_path, capsys, monkeypatch):
     """Raising a perf budget relaxes the ratchet: one finding, exit 1."""
     repo = _seed_repo(tmp_path, _document(), budgets=_budgets_document())
     raised = _budgets_document()
-    raised["journeys"]["sort"]["dom_nodes_mutated"] = 481
+    raised["bytes"]["code_bytes"] = 71628
     head = _commit_budgets_on_branch(repo, raised, "raise a budget")
     guard = _guard()
     _fork, findings = guard.check_ratchets(repo, "main", head)
@@ -697,7 +701,7 @@ def test_end_to_end_budgets_tighten_is_clean(tmp_path, capsys, monkeypatch):
     repo = _seed_repo(tmp_path, _document(), budgets=_budgets_document())
     tightened = _budgets_document()
     tightened["journeys"]["load"]["long_task_count"] = 1
-    tightened["bytes"]["raw"] = 240000
+    tightened["bytes"]["code_bytes"] = 71000
     head = _commit_budgets_on_branch(repo, tightened, "tighten the budgets")
     guard = _guard()
     _fork, findings = guard.check_ratchets(repo, "main", head)
@@ -744,7 +748,7 @@ def test_end_to_end_both_documents_are_guarded_in_one_run(tmp_path):
     _git(repo, "add", ".github/ci-thresholds.json")
     _git(repo, "commit", "-qm", "lower the calibration")
     raised = _budgets_document()
-    raised["bytes"]["gzip"] += 100
+    raised["bytes"]["code_bytes"] += 100
     _budgets_written(repo, raised)
     _git(repo, "add", ".github/perf-budgets.json")
     _git(repo, "commit", "-qm", "raise a budget")
@@ -788,13 +792,13 @@ def test_guard_nan_and_infinity_leaves_fail_closed_in_both_walks():
         doc["coverage"]["javascript"]["measured"] = value
 
     def poison_bytes_raw(doc, value):
-        doc["bytes"]["raw"] = value
+        doc["bytes"]["code_bytes"] = value
 
     cases = (
         (guard.coverage_relaxations, _document,
          poison_javascript_measured, "coverage.javascript.measured"),
         (guard.budgets_relaxations, _budgets_document,
-         poison_bytes_raw, "bytes.raw"),
+         poison_bytes_raw, "bytes.code_bytes"),
     )
     for relaxations, build_doc, poison_leaf, path in cases:
         for poison in (float("nan"), float("inf"), float("-inf")):
@@ -813,7 +817,7 @@ def test_end_to_end_non_finite_budget_head_fails_closed(tmp_path, capsys,
     repo = _seed_repo(tmp_path, _document(), budgets=_budgets_document())
     _git(repo, "checkout", "-q", "-b", "pr")
     poisoned = _budgets_document()
-    poisoned["bytes"]["gzip"] = float("nan")
+    poisoned["bytes"]["code_bytes"] = float("nan")
     # json.dumps writes the NaN literal here, and the guard's reader
     # parses it back to a non-finite float — the exact shape a poisoned
     # commit would carry.
@@ -826,7 +830,7 @@ def test_end_to_end_non_finite_budget_head_fails_closed(tmp_path, capsys,
     monkeypatch.chdir(repo)
     assert guard.main(["main", head]) == 1
     out = capsys.readouterr().out
-    assert "bytes.gzip" in out
+    assert "bytes.code_bytes" in out
     assert "not a finite number" in out
     assert "relaxation(s)" in out
 
