@@ -9,8 +9,11 @@ without the floor it implies. The perf-budgets document
 (.github/perf-budgets.json, issue #109) gets the same guard with the
 opposite value direction: every budget is an integer maximum, so the
 relaxation is the RAISE, schema_version is fixed, and key add/remove are
-findings there too. The cases pin both tools' behaviour, and the guard
-also gets end-to-end git cases in temporary repositories.
+findings there too. The instruction-budgets document
+(.github/instruction-budgets.json, issue #110) — integer maxima of the
+pipeline targets' startup-subtracted callgrind totals — shares the
+budgets' direction rules verbatim. The cases pin both tools' behaviour,
+and the guard also gets end-to-end git cases in temporary repositories.
 """
 from __future__ import annotations
 
@@ -329,22 +332,34 @@ def _git(repo, *args):
                           capture_output=True, text=True)
 
 
-def _seed_repo(tmp_path, document, budgets=None):
+def _seed_repo(tmp_path, document, budgets=None, instruction_budgets=None):
     """Seed a repo with the thresholds document and, optionally, the
-    committed budgets document."""
+    committed budgets and instruction-budgets documents."""
     repo = Path(tmp_path) / "repo"
     (repo / ".github").mkdir(parents=True)
     _thresholds().write(repo / ".github" / "ci-thresholds.json", document)
     if budgets is not None:
         _budgets_written(repo, budgets)
+    if instruction_budgets is not None:
+        _instruction_budgets_written(repo, instruction_budgets)
     _git(repo, "init", "-q", "-b", "main")
     _git(repo, "config", "user.email", "tests@example.invalid")
     _git(repo, "config", "user.name", "Tests")
     _git(repo, "add", ".github/ci-thresholds.json")
     if budgets is not None:
         _git(repo, "add", ".github/perf-budgets.json")
+    if instruction_budgets is not None:
+        _git(repo, "add", ".github/instruction-budgets.json")
     _git(repo, "commit", "-qm", "base")
     return repo
+
+
+def _instruction_budgets_written(repo, document):
+    """Write the instruction budgets document into a repo's .github/."""
+    target = Path(repo) / ".github" / "instruction-budgets.json"
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(json.dumps(document), encoding="utf-8")
+    return target
 
 
 def _budgets_written(repo, document):
@@ -696,8 +711,8 @@ def test_end_to_end_budgets_raise_is_flagged(tmp_path, capsys, monkeypatch):
 
 
 def test_end_to_end_budgets_tighten_is_clean(tmp_path, capsys, monkeypatch):
-    """Lowering budgets tightens: clean, and BOTH documents report ok in
-    one run — the guard checks both in the same pass."""
+    """Lowering budgets tightens: clean, and ALL THREE documents report ok
+    in one run — the guard checks all three in the same pass."""
     repo = _seed_repo(tmp_path, _document(), budgets=_budgets_document())
     tightened = _budgets_document()
     tightened["journeys"]["load"]["long_task_count"] = 1
@@ -709,7 +724,7 @@ def test_end_to_end_budgets_tighten_is_clean(tmp_path, capsys, monkeypatch):
     monkeypatch.chdir(repo)
     assert guard.main(["main", head]) == 0
     out = capsys.readouterr().out
-    assert out.count("not relaxed") == 2
+    assert out.count("not relaxed") == 3
 
 
 def test_end_to_end_budgets_schema_version_is_fixed(tmp_path):
@@ -770,6 +785,204 @@ def test_end_to_end_budgets_absent_from_history_is_clean(tmp_path):
     guard = _guard()
     _fork, findings = guard.check_ratchets(repo, "main", head)
     assert findings == []
+
+
+# --- the guard: the instruction budgets document (issue #110) -----------------
+
+
+def _instruction_budgets_document(schema=1):
+    """The committed instruction budgets document's shape, as test values.
+
+    Three integer maxima, one per pipeline target; these are the values
+    this branch committed -- the measured medians plus 3%, rounded up to
+    the next million (the basis lives in
+    tests/test_ci_instruction_budgets.py and CONTRIBUTING.md)."""
+    return {
+        "schema_version": schema,
+        "scripts": {
+            "build": 161000000,
+            "capture_gate": 248000000,
+            "diff_aa": 208000000,
+        },
+    }
+
+
+def test_instruction_budgets_guard_identical_documents_are_clean():
+    guard = _guard()
+    base = _instruction_budgets_document()
+    # round-trip the way the guard itself reads a document: JSON text
+    # parsed back with numbers as Decimals
+    round_trip = json.loads(json.dumps(base), parse_float=Decimal,
+                            parse_int=Decimal)
+    assert guard.instruction_budgets_relaxations(base, round_trip) == []
+
+
+def test_instruction_budgets_guard_raised_budget_is_a_finding():
+    guard = _guard()
+    base, head = _instruction_budgets_document(), _instruction_budgets_document()
+    head["scripts"]["build"] += 1
+    findings = guard.instruction_budgets_relaxations(base, head)
+    assert len(findings) == 1
+    assert "raised; it may only fall" in findings[0]
+    assert "scripts.build" in findings[0]
+    assert ".github/instruction-budgets.json" in findings[0]
+
+
+def test_instruction_budgets_guard_lowered_budget_is_clean():
+    """A lowered budget is the ratchet tightening itself: clean."""
+    guard = _guard()
+    base, head = _instruction_budgets_document(), _instruction_budgets_document()
+    head["scripts"]["diff_aa"] -= 1
+    head["scripts"]["build"] -= 1000
+    assert guard.instruction_budgets_relaxations(base, head) == []
+
+
+def test_instruction_budgets_guard_every_budget_may_only_fall():
+    guard = _guard()
+    base, head = _instruction_budgets_document(), _instruction_budgets_document()
+    # every budget raised by one: three findings, one per raised leaf
+    for name in head["scripts"]:
+        head["scripts"][name] += 1
+    findings = guard.instruction_budgets_relaxations(base, head)
+    assert len(findings) == 3
+    assert all("raised; it may only fall" in line for line in findings)
+
+
+def test_instruction_budgets_guard_schema_version_is_fixed():
+    guard = _guard()
+    base, head = _instruction_budgets_document(), _instruction_budgets_document(
+        schema=2)
+    findings = guard.instruction_budgets_relaxations(base, head)
+    assert len(findings) == 1
+    assert "schema_version changed" in findings[0]
+
+
+def test_instruction_budgets_guard_key_removed_and_added_are_findings():
+    """A PR must not be able to mask a raise behind a reshuffle: removing
+    a target's budget and adding another one are each findings."""
+    guard = _guard()
+    base, head = _instruction_budgets_document(), _instruction_budgets_document()
+    del head["scripts"]["capture_gate"]
+    head["scripts"]["fetch_aa"] = 1
+    findings = guard.instruction_budgets_relaxations(base, head)
+    assert len(findings) == 2
+    assert all("scripts.capture_gate" in f for f in findings[:1])
+    assert all("key removed" in f for f in findings[:1])
+    assert all("scripts.fetch_aa" in f for f in findings[1:])
+    assert all("key added" in f for f in findings[1:])
+
+
+def test_instruction_budgets_guard_absent_at_merge_base_is_clean():
+    guard = _guard()
+    assert guard.instruction_budgets_relaxations(
+        None, _instruction_budgets_document()) == []
+
+
+def test_instruction_budgets_guard_non_finite_leaf_fails_closed():
+    """A NaN/Infinity literal leaf is a finding, never a crash, a silent
+    pass or a misjudged raise -- the same fail-closed walk the other two
+    documents get."""
+    guard = _guard()
+    for poison in (float("nan"), float("inf"), float("-inf")):
+        base, head = _instruction_budgets_document(), _instruction_budgets_document()
+        head["scripts"]["build"] = poison
+        findings = guard.instruction_budgets_relaxations(base, head)
+        assert len(findings) == 1, (poison, findings)
+        assert "scripts.build" in findings[0]
+        assert "not a finite number" in findings[0]
+
+
+# --- the instruction budgets guard: end-to-end git cases ----------------------
+
+
+def test_end_to_end_instruction_budgets_raise_is_flagged(tmp_path, capsys,
+                                                         monkeypatch):
+    """Raising an instruction budget relaxes the ratchet: one finding,
+    exit 1, named against the third document."""
+    repo = _seed_repo(tmp_path, _document(),
+                      instruction_budgets=_instruction_budgets_document())
+    raised = _instruction_budgets_document()
+    raised["scripts"]["build"] += 100
+    _git(repo, "checkout", "-q", "-b", "pr")
+    _instruction_budgets_written(repo, raised)
+    _git(repo, "add", ".github/instruction-budgets.json")
+    _git(repo, "commit", "-qm", "raise an instruction budget")
+    head = _git(repo, "rev-parse", "HEAD").stdout.strip()
+    guard = _guard()
+    _fork, findings = guard.check_ratchets(repo, "main", head)
+    assert len(findings) == 1
+    assert ".github/instruction-budgets.json" in findings[0]
+    assert "raised; it may only fall" in findings[0]
+    monkeypatch.chdir(repo)
+    assert guard.main(["main", head]) == 1
+    assert "relaxation(s)" in capsys.readouterr().out
+
+
+def test_end_to_end_instruction_budgets_tighten_is_clean(tmp_path, capsys,
+                                                         monkeypatch):
+    """Lowering an instruction budget tightens: clean, and the guard's
+    clean run reports all three documents ok in one pass."""
+    repo = _seed_repo(tmp_path, _document(),
+                      instruction_budgets=_instruction_budgets_document())
+    tightened = _instruction_budgets_document()
+    tightened["scripts"]["build"] -= 1_000_000
+    _git(repo, "checkout", "-q", "-b", "pr")
+    _instruction_budgets_written(repo, tightened)
+    _git(repo, "add", ".github/instruction-budgets.json")
+    _git(repo, "commit", "-qm", "tighten an instruction budget")
+    head = _git(repo, "rev-parse", "HEAD").stdout.strip()
+    guard = _guard()
+    _fork, findings = guard.check_ratchets(repo, "main", head)
+    assert findings == []
+    monkeypatch.chdir(repo)
+    assert guard.main(["main", head]) == 0
+    assert capsys.readouterr().out.count("not relaxed") == 3
+
+
+def test_end_to_end_instruction_budgets_absent_from_history_is_clean(tmp_path):
+    """A repo predating the third document: absent at the merge base,
+    the branch's new document relaxes nothing."""
+    repo = _seed_repo(tmp_path, _document())
+    _git(repo, "checkout", "-q", "-b", "pr")
+    _instruction_budgets_written(repo, _instruction_budgets_document())
+    _git(repo, "add", ".github/instruction-budgets.json")
+    _git(repo, "commit", "-qm", "introduce the instruction budgets")
+    head = _git(repo, "rev-parse", "HEAD").stdout.strip()
+    guard = _guard()
+    _fork, findings = guard.check_ratchets(repo, "main", head)
+    assert findings == []
+
+
+def test_end_to_end_all_three_documents_guarded_in_one_run(tmp_path):
+    """One branch lowers the calibration, raises a perf budget AND raises
+    an instruction budget: the guard reports all three documents'
+    findings in the same pass."""
+    repo = _seed_repo(tmp_path, _document(), budgets=_budgets_document(),
+                      instruction_budgets=_instruction_budgets_document())
+    _git(repo, "checkout", "-q", "-b", "pr")
+    _thresholds().write(repo / ".github" / "ci-thresholds.json",
+                        _document(measured="90.0", floor="88.5"))
+    _git(repo, "add", ".github/ci-thresholds.json")
+    _git(repo, "commit", "-qm", "lower the calibration")
+    raised = _budgets_document()
+    raised["bytes"]["code_bytes"] += 100
+    _budgets_written(repo, raised)
+    _git(repo, "add", ".github/perf-budgets.json")
+    _git(repo, "commit", "-qm", "raise a perf budget")
+    raised_instructions = _instruction_budgets_document()
+    raised_instructions["scripts"]["capture_gate"] += 1_000_000
+    _instruction_budgets_written(repo, raised_instructions)
+    _git(repo, "add", ".github/instruction-budgets.json")
+    _git(repo, "commit", "-qm", "raise an instruction budget")
+    head = _git(repo, "rev-parse", "HEAD").stdout.strip()
+    guard = _guard()
+    _fork, findings = guard.check_ratchets(repo, "main", head)
+    assert any(".github/ci-thresholds.json" in f and "lowered" in f
+               for f in findings)
+    assert any(".github/perf-budgets.json" in f and "raised; it may only "
+               "fall" in f for f in findings)
+    assert any(".github/instruction-budgets.json" in f and "raised; it may "
+               "only fall" in f for f in findings)
 
 
 # --- the guard: non-finite float leaves fail closed --------------------------

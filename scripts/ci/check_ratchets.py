@@ -22,7 +22,7 @@ content. A non-regular entry at the head is a finding (exit 1) — it is
 the branch's own change; a non-regular entry at the merge base is a git
 error (exit 2).
 
-Two documents are guarded, each with its own direction rules:
+Three documents are guarded, each with its own direction rules:
 
 - ``.github/ci-thresholds.json`` — every coverage value (``measured``
   and ``floor``, for both languages) may only rise, and
@@ -34,9 +34,14 @@ Two documents are guarded, each with its own direction rules:
 - ``.github/perf-budgets.json`` — every value is an integer MAXIMUM the
   gates hold a measurement under, so every numeric leaf except
   ``schema_version`` may only FALL: lowering a budget tightens, raising
-  one relaxes. ``schema_version`` may not change at all. Key added and
-  key removed are findings in both documents — a PR must not be able to
-  mask a raise behind a reshuffle.
+  one relaxes. ``schema_version`` may not change at all.
+- ``.github/instruction-budgets.json`` — the pipeline's instruction
+  counts (issue #110), under the perf budgets' direction rules: every
+  value is an integer MAXIMUM of a target's startup-subtracted callgrind
+  total, so every leaf except ``schema_version`` may only fall.
+
+  Key added and key removed are findings in every guarded document — a
+  PR must not be able to mask a raise behind a reshuffle.
 """
 from __future__ import annotations
 
@@ -50,6 +55,7 @@ from pathlib import Path
 
 DOCUMENT = '.github/ci-thresholds.json'
 BUDGETS = '.github/perf-budgets.json'
+INSTRUCTION_BUDGETS = '.github/instruction-budgets.json'
 REGULAR_FILE = '100644 blob'
 GAP = Decimal('1.5')
 # Direction each leaf may move: "up" means it may only rise, "down" means
@@ -258,11 +264,23 @@ def budgets_relaxations(base, head, document=BUDGETS):
     return _relaxations(base, head, document, _budget_direction, ())
 
 
+def instruction_budgets_relaxations(base, head, document=INSTRUCTION_BUDGETS):
+    """Findings for a head instruction-budgets document that relaxes the
+    base's (issue #110).
+
+    Same shape as the perf budgets -- integer maxima the gate holds a
+    measured instruction count under -- so the same direction resolver
+    applies: the relaxation is the RAISE.
+    """
+    return _relaxations(base, head, document, _budget_direction, ())
+
+
 # The guarded documents, in the order the guard walks and reports them:
 # each entry is (path, direction resolver, cross-checks).
 DOCUMENTS = (
     (DOCUMENT, _DIRECTIONS.get, (_implied_floor_findings,)),
     (BUDGETS, _budget_direction, ()),
+    (INSTRUCTION_BUDGETS, _budget_direction, ()),
 )
 
 
