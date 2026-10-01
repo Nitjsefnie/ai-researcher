@@ -53,8 +53,24 @@ class BrowserInteractionTests(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        with contextlib.redirect_stdout(io.StringIO()):
-            build.main()
+        # The class builds its page into a temp dir under ROOT (build.main()
+        # prints OUT.relative_to(ROOT)) and keeps build.OUT pointed there for
+        # the class's lifetime, since every test navigates
+        # build.OUT.as_uri(). The real out/frontier-models.html is never
+        # touched (#114); tearDownClass restores the module path.
+        cls._saved_out = build.OUT
+        # The directory outlives this setup -- tearDownClass cleans it up
+        # after the browser closes -- so it cannot live in a with.
+        cls._page_dir = tempfile.TemporaryDirectory(  # pylint: disable=consider-using-with
+            prefix=".issue-114-browser-", dir=build.ROOT)
+        build.OUT = pathlib.Path(cls._page_dir.name) / "frontier-models.html"
+        try:
+            with contextlib.redirect_stdout(io.StringIO()):
+                build.main()
+        except BaseException:
+            build.OUT = cls._saved_out
+            cls._page_dir.cleanup()
+            raise
         cls.playwright = sync_playwright().start()
         cls.browser = cls.playwright.chromium.launch(
             executable_path=CHROMIUM_EXECUTABLE,
@@ -125,6 +141,11 @@ class BrowserInteractionTests(unittest.TestCase):
 
     @classmethod
     def tearDownClass(cls):
+        # Restore the module path first: every later step here may raise,
+        # and a stale build.OUT would send the NEXT class's build.main()
+        # into this class's deleted temp dir.
+        build.OUT = cls._saved_out
+        cls._page_dir.cleanup()
         # A test that failed mid-way leaves its page open; take its coverage
         # here so the dump still describes the whole run.
         for _page, session in list(cls._open_pages):
@@ -1215,16 +1236,28 @@ class PerfBudgetTests(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        # BrowserInteractionTests.setUpClass already built the standard
-        # out/ page; build.main() is idempotent, so this class simply
-        # calls it again. The source stamp is stripped for the build so
-        # the bytes this class gates are the canonical stamp-less build
-        # the budgets were seeded from, whatever the ambient environment
-        # carries.
+        # The class builds its own page into a temp dir under ROOT and
+        # keeps build.OUT pointed there for the class's lifetime -- the
+        # journey test navigates build.OUT.as_uri() and gates
+        # build.OUT.read_bytes(). The real out/frontier-models.html is
+        # never touched (#114); tearDownClass restores the module path.
+        # The source stamp is stripped for the build so the bytes this
+        # class gates are the canonical stamp-less build the budgets were
+        # seeded from, whatever the ambient environment carries.
+        cls._saved_out = build.OUT
+        # The directory outlives this setup -- tearDownClass cleans it up
+        # after the browser closes -- so it cannot live in a with.
+        cls._page_dir = tempfile.TemporaryDirectory(  # pylint: disable=consider-using-with
+            prefix=".issue-114-perf-", dir=build.ROOT)
+        build.OUT = pathlib.Path(cls._page_dir.name) / "frontier-models.html"
         saved_stamp = os.environ.pop("AA_SOURCE_COMMIT", None)
         try:
             with contextlib.redirect_stdout(io.StringIO()):
                 build.main()
+        except BaseException:
+            build.OUT = cls._saved_out
+            cls._page_dir.cleanup()
+            raise
         finally:
             if saved_stamp is not None:
                 os.environ["AA_SOURCE_COMMIT"] = saved_stamp
@@ -1241,6 +1274,10 @@ class PerfBudgetTests(unittest.TestCase):
 
     @classmethod
     def tearDownClass(cls):
+        # Restore the module path first, mirroring BrowserInteractionTests:
+        # a browser-close failure must not leave build.OUT at the temp path.
+        build.OUT = cls._saved_out
+        cls._page_dir.cleanup()
         cls.browser.close()
         cls.playwright.stop()
 

@@ -8,13 +8,12 @@ the mechanism: every failure mode yields its own distinct violation, a
 correct page yields none, the mask removes exactly the provenance spans,
 and the stamp shape stays coupled to what build.py actually renders.
 
-Nothing here reads the working out/frontier-models.html:
-tests/test_browser.py rebuilds that file stamp-less during the suite, and
-pytest collects files alphabetically, so the browser file runs first and the
-working copy is stamp-less by the time this file runs. Both sides are read
-from HEAD with `git show`: the committed page directly, and the data/ the
-rebuild stages from HEAD into a temp path, so a fresh uncommitted capture
-in the working data/ cannot move the rebuilt side (issue #108).
+Nothing here reads the working out/frontier-models.html: since #114 the
+suite builds every page into temp dirs and never rewrites the working copy,
+and these checks read both sides from HEAD with `git show` regardless: the
+committed page directly, and the data/ the rebuild stages from HEAD into a
+temp path, so a fresh uncommitted capture in the working data/ cannot move
+the rebuilt side (issue #108).
 """
 import contextlib
 import io
