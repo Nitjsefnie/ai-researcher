@@ -1594,7 +1594,14 @@ const DATA = __DATA__;
   }
 
   let pts=[], frontSet=new Set();
-  function draw(rows){
+  // The row each chart's tooltip was last built for, keyed by chart
+  // ("intelligence" for the main chart). A tooltip's content is a pure
+  // function of the chart and its row between renders, so a pointermove that
+  // resolves to the same row re-fades and re-positions but skips the DOM
+  // rebuild (#109). Nulled by the hide paths, which every render calls, so a
+  // fresh pass always rebuilds once.
+  const lastHovered={};
+  function draw(rows,frontier){
     const svg = $("svg-intelligence");
     while (svg.firstChild) svg.removeChild(svg.firstChild);
     const NS="http://www.w3.org/2000/svg";
@@ -1654,14 +1661,16 @@ const DATA = __DATA__;
     // staircase is the technically truer "attainment surface" -- at a given
     // budget, the most you can get -- but it reads as broken rather than as a
     // trend, so the direct line wins.)
-    const fr=frontierOf(rows);
-    frontSet=new Set(fr);
+    // The pass's frontier arrives already computed (#109): frontierMetric is a
+    // pure function of (rows, key), and render used to re-run it here over the
+    // very rows this receives.
+    frontSet=new Set(frontier);
     const segs=[];
-    if(fr.length>1){
-      let d="M "+X(fr[0].cost)+" "+Y(fr[0].ii);
-      for(let i=1;i<fr.length;i++){
-        const x1=X(fr[i-1].cost), y1=Y(fr[i-1].ii);
-        const x2=X(fr[i].cost),   y2=Y(fr[i].ii);
+    if(frontier.length>1){
+      let d="M "+X(frontier[0].cost)+" "+Y(frontier[0].ii);
+      for(let i=1;i<frontier.length;i++){
+        const x1=X(frontier[i-1].cost), y1=Y(frontier[i-1].ii);
+        const x2=X(frontier[i].cost),   y2=Y(frontier[i].ii);
         segs.push([x1,y1,x2,y2]);
         d+=" L "+x2+" "+y2;
       }
@@ -1753,7 +1762,7 @@ const DATA = __DATA__;
     // first claim on space; then the frontier, smartest first.
     const queue=[
       ...rows.filter(r=>pins.has(r.name)).map(r=>({r,pin:true})),
-      ...[...fr].sort((a,b)=> b.ii-a.ii)
+      ...[...frontier].sort((a,b)=> b.ii-a.ii)
                 .filter(r=>!pins.has(r.name)).map(r=>({r,pin:false})),
     ];
     // The wide flag is pin||full (full = the st.sup frontier-only view) --
@@ -1846,19 +1855,22 @@ const DATA = __DATA__;
     const b=svg.getBoundingClientRect();
     for(const p of pts) p.el.classList.toggle("fade", p!==best);
     const r=best.r;
-    tip.innerHTML="";
-    const n=document.createElement("div"); n.className="tname";
-    n.textContent=r.name; tip.appendChild(n);
-    const rows=[["Intelligence Index",r.ii.toFixed(1)],
-                ["Cost per task",fmtCost(r.cost)],
-                ...secondaryRows(r)];
-    rows.push(["On frontier", frontSet.has(r) ? "yes" : "no — superseded"]);
-    if(r.dep) rows.push(["Vendor status","retired"]);
-    for(const [k,v] of rows){
-      const d=document.createElement("div"); d.className="trow";
-      const a=document.createElement("span"); a.textContent=k;
-      const c=document.createElement("span"); c.className="tv"; c.textContent=v;
-      d.appendChild(a); d.appendChild(c); tip.appendChild(d);
+    if(lastHovered.intelligence!==r){
+      lastHovered.intelligence=r;
+      tip.innerHTML="";
+      const n=document.createElement("div"); n.className="tname";
+      n.textContent=r.name; tip.appendChild(n);
+      const rows=[["Intelligence Index",r.ii.toFixed(1)],
+                  ["Cost per task",fmtCost(r.cost)],
+                  ...secondaryRows(r)];
+      rows.push(["On frontier", frontSet.has(r) ? "yes" : "no — superseded"]);
+      if(r.dep) rows.push(["Vendor status","retired"]);
+      for(const [k,v] of rows){
+        const d=document.createElement("div"); d.className="trow";
+        const a=document.createElement("span"); a.textContent=k;
+        const c=document.createElement("span"); c.className="tv"; c.textContent=v;
+        d.appendChild(a); d.appendChild(c); tip.appendChild(d);
+      }
     }
     tip.classList.add("on");
     // Snap to the quadrant furthest from the pointer. The box therefore never
@@ -1875,6 +1887,7 @@ const DATA = __DATA__;
   function hideTip(){
     tip.classList.remove("on");
     for(const p of pts) p.el.classList.remove("fade");
+    lastHovered.intelligence=null;
   }
   svg.addEventListener("pointermove",moveTip);
   svg.addEventListener("pointerleave",hideTip);
@@ -1896,7 +1909,7 @@ const DATA = __DATA__;
 
   /* ---------- coding, parameter-efficiency + agentic scatters ---------- */
   const extraPlots={};
-  function drawCapability(key,rows){
+  function drawCapability(key,rows,frontier){
     const cfg=PLOTS[key], chart=$(cfg.svg), NS="http://www.w3.org/2000/svg";
     while(chart.firstChild) chart.removeChild(chart.firstChild);
     const el=(n,a)=>{const e=document.createElementNS(NS,n);
@@ -1946,7 +1959,9 @@ const DATA = __DATA__;
       : "Cost per "+cfg.label+" task (USD, log scale) →";
     chart.appendChild(xlabel);
 
-    const frontier=frontierMetric(rows,key), front=new Set(frontier);
+    // The pass's frontier arrives already computed (#109); the Set keeps the
+    // row-object membership the marks and tooltips read.
+    const front=new Set(frontier);
     if(frontier.length>1){
       let d="M "+X(metricOf(frontier[0],key).cost)+" "+Y(metricOf(frontier[0],key).score);
       for(let i=1;i<frontier.length;i++){
@@ -2043,6 +2058,7 @@ const DATA = __DATA__;
   function hideCapabilityTip(key){
     $(PLOTS[key].tip).classList.remove("on");
     const plot=extraPlots[key]; if(plot) for(const p of plot.pts) p.el.classList.remove("fade");
+    lastHovered[key]=null;
   }
 
   function moveCapabilityTip(key,ev){
@@ -2050,21 +2066,24 @@ const DATA = __DATA__;
     if(!hit){hideCapabilityTip(key);return;}
     const plot=extraPlots[key], m=metricOf(hit.r,key), popup=$(cfg.tip);
     for(const p of plot.pts) p.el.classList.toggle("fade",p!==hit);
-    popup.innerHTML="";
-    const name=document.createElement("div"); name.className="tname"; name.textContent=hit.r.name; popup.appendChild(name);
-    const lines=key==="parameters"
-      ? [["Intelligence Index",m.score.toFixed(1)],["Parameters",fmtParams(m.cost)],
-         ...secondaryRows(hit.r),
-         ["On parameter frontier",plot.front.has(hit.r)?"yes":"no — superseded"]]
-      : [[cfg.label,m.score.toFixed(1)],["Cost per task",fmtCost(m.cost)],
-         ...secondaryRows(hit.r),
-         ["On frontier",plot.front.has(hit.r)?"yes":"no — superseded"]];
-    if(hit.r.dep) lines.push(["Vendor status","retired"]);
-    for(const [k,v] of lines){
-      const row=document.createElement("div"); row.className="trow";
-      const a=document.createElement("span"); a.textContent=k;
-      const b=document.createElement("span"); b.className="tv"; b.textContent=v;
-      row.appendChild(a); row.appendChild(b); popup.appendChild(row);
+    if(lastHovered[key]!==hit.r){
+      lastHovered[key]=hit.r;
+      popup.innerHTML="";
+      const name=document.createElement("div"); name.className="tname"; name.textContent=hit.r.name; popup.appendChild(name);
+      const lines=key==="parameters"
+        ? [["Intelligence Index",m.score.toFixed(1)],["Parameters",fmtParams(m.cost)],
+           ...secondaryRows(hit.r),
+           ["On parameter frontier",plot.front.has(hit.r)?"yes":"no — superseded"]]
+        : [[cfg.label,m.score.toFixed(1)],["Cost per task",fmtCost(m.cost)],
+           ...secondaryRows(hit.r),
+           ["On frontier",plot.front.has(hit.r)?"yes":"no — superseded"]];
+      if(hit.r.dep) lines.push(["Vendor status","retired"]);
+      for(const [k,v] of lines){
+        const row=document.createElement("div"); row.className="trow";
+        const a=document.createElement("span"); a.textContent=k;
+        const b=document.createElement("span"); b.className="tv"; b.textContent=v;
+        row.appendChild(a); row.appendChild(b); popup.appendChild(row);
+      }
     }
     popup.classList.add("on");
     const margin=14, right=(ev.clientX-box.left)<box.width/2, down=(ev.clientY-box.top)<box.height/2;
@@ -2093,11 +2112,11 @@ const DATA = __DATA__;
   }
 
   /* ---------- tables ---------- */
-  function fillFrontiers(metricRows){
+  function fillFrontiers(metricRows,fronts){
     const tb=$("fTable").querySelector("tbody");
     tb.innerHTML="";
     for(const key of Object.keys(METRICS)){
-      for(const r of frontierMetric(metricRows[key],key).slice().reverse()){
+      for(const r of fronts[key].slice().reverse()){
         const m=metricOf(r,key), tr=document.createElement("tr");
         const add=(txt,cls)=>{const td=document.createElement("td");
           if(cls) td.className=cls; td.textContent=txt; tr.appendChild(td);};
@@ -2126,10 +2145,12 @@ const DATA = __DATA__;
     return r[key];
   }
 
-  function fillTable(metricRows){
+  function fillTable(metricRows,fronts){
+    // The pass's frontier arrives already computed (#109); one Set per metric
+    // over the threaded arrays replaces fillTable's own four recomputations
+    // (it used to run the parameters frontier twice on its own).
     const frontSets={};
-    for(const key of Object.keys(METRICS)) frontSets[key]=new Set(frontierMetric(metricRows[key],key));
-    frontSets.parameters=new Set(frontierMetric(metricRows.parameters,"parameters"));
+    for(const key of Object.keys(fronts)) frontSets[key]=new Set(fronts[key]);
     const rows=[...new Set(Object.values(metricRows).flat())];
     const k=st.sortK, dir=st.sortDir;
     $("tbl").querySelectorAll("th[data-k]").forEach(th=>
@@ -2199,7 +2220,15 @@ const DATA = __DATA__;
       const k=th.dataset.k;
       if(st.sortK===k) st.sortDir*=-1;
       else { st.sortK=k; st.sortDir = (k==="name"||k==="creator"||k==="rel") ? 1 : -1; }
-      render();
+      // A sort reorders rows, not points: the four charts are a pure function
+      // of the filter state, which a sort never touches, so their DOM is
+      // provably identical and redrawing it is pure loss (#84's no-op pin --
+      // labels must not move -- holds trivially). Only the tables refill
+      // here; fillTable rewrites aria-sort, and the count line is
+      // sort-invariant. The chips, lab, search and pin paths keep the full
+      // render(), which stays the only place charts are drawn.
+      const {views,fronts}=computePass();
+      fillFrontiers(views,fronts); fillTable(views,fronts);
     };
     th.addEventListener("click",activate);
     th.addEventListener("keydown",ev=>{
@@ -2258,13 +2287,28 @@ const DATA = __DATA__;
     };
   }
 
+  // One frontier computation per metric per render pass (#109). frontierMetric
+  // is a pure function of (rows, key), and every consumer used to recompute it
+  // over the very views this reads -- draw, each drawCapability, fillFrontiers
+  // and fillTable (twice for parameters) -- so threading the result down
+  // changes where the work runs, not which rows it returns: a subset of the
+  // same row objects reaches every consumer, and the Set-of-row-objects
+  // semantics are untouched. The pure function itself is unchanged; only the
+  // recomputation went away.
+  function computePass(){
+    const views=metricViews();
+    const fronts={};
+    for(const key of Object.keys(views)) fronts[key]=frontierMetric(views[key],key);
+    return {views,fronts};
+  }
+
   function render(){
     // Unpinning the last model would leave "Only pinned" showing an empty plot
     // with no visible way out, since the chip itself hides with the pins.
     if(!pins.size && st.only){
       st.only=false; $("fOnly").setAttribute("aria-pressed","false");
     }
-    const views=metricViews(), union=[...new Set(Object.values(views).flat())];
+    const {views,fronts}=computePass(), union=[...new Set(Object.values(views).flat())];
     const bits=[views.coding.length+" coding",views.intelligence.length+" intelligence",
       views.parameters.length+" parameter",views.agentic.length+" agentic"];
     if(st.eff) bits.push("effort levels dumped per metric");
@@ -2279,11 +2323,11 @@ const DATA = __DATA__;
     $("fClear").hidden = pins.size===0;
     $("fOnly").hidden  = pins.size===0;
     $("count").textContent=bits.join(" · ");
-    drawCapability("coding",views.coding);
-    draw(views.intelligence);
-    drawCapability("parameters",views.parameters);
-    drawCapability("agentic",views.agentic);
-    fillFrontiers(views); fillTable(views); hideTip();
+    drawCapability("coding",views.coding,fronts.coding);
+    draw(views.intelligence,fronts.intelligence);
+    drawCapability("parameters",views.parameters,fronts.parameters);
+    drawCapability("agentic",views.agentic,fronts.agentic);
+    fillFrontiers(views,fronts); fillTable(views,fronts); hideTip();
     hideCapabilityTip("coding"); hideCapabilityTip("parameters"); hideCapabilityTip("agentic");
     if(focusAfterRender){
       const request=focusAfterRender;
