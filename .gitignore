@@ -18,6 +18,7 @@
 
 # ---- repository root — the builder, the instruction files, the toolchain --
 !/.gitignore
+!/.gitattributes
 !/.pylintrc
 !/AGENTS.md
 !/CLAUDE.md
