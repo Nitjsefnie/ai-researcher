@@ -283,7 +283,8 @@ class CheckCommittedPageTests(unittest.TestCase):
             ["git", "show"], returncode=128, stdout=b"",
             stderr=b"fatal: bad object HEAD")
         with mock.patch("subprocess.run", return_value=failed):
-            with self.assertRaises(Exception) as caught:
+            with self.assertRaises(
+                    check_committed_page.HeadCaptureError) as caught:
                 check_committed_page.rebuild_page()
 
         self.assertIn("data/aa-raw-models.json", str(caught.exception))
