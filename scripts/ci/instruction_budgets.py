@@ -32,10 +32,11 @@ PYTHONDONTWRITEBYTECODE the first run compiles and writes .pyc files and
 the second loads them -- a 1.6% run-to-run swing on a bare pair of runs;
 PYTHONHASHSEED=0 removes dict-order jitter; PYTHONNOUSERSITE=1 keeps
 user-site .pth execution out of every count. Under the pins the observed
-run-to-run spread was under 0.1% (the exact spreads this branch measured
-are recorded in CONTRIBUTING.md); the 3% margin covers CI's different
-CPython and valgrind builds, and the budgets themselves are calibrated by
-CI's own first runs -- the check mode always prints its measured counts.
+run-to-run spread was under 0.002% (the exact spreads this branch
+measured are recorded in CONTRIBUTING.md); the 3% margin covers CI's
+different CPython and valgrind builds, and the budgets themselves are
+calibrated by CI's own first runs -- the check mode always prints its
+measured counts.
 
 Every run executes under ``nice -n 19 timeout <seconds>``: nice, so the
 measurement yields to everything else on the box, timeout, so a hung
@@ -350,7 +351,9 @@ def measure():
         totals = {}
         for name, argv in (*TARGETS, ("baseline", BASELINE_ARGV)):
             out_file = tmp / f"cg-{name}.out"
-            result = _callgrind(out_file, mini, argv, quiet=(name == "build"))
+            # build.py's page summary is devnulled; see _callgrind.
+            quiet = name == "build"
+            result = _callgrind(out_file, mini, argv, quiet=quiet)
             if result.returncode != 0:
                 detail = _tail(result.stderr)
                 if result.returncode == 124:
