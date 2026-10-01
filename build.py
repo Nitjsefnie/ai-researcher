@@ -2127,7 +2127,8 @@ const DATA = __DATA__;
   function fillTable(metricRows,fronts){
     // The pass's frontier arrives already computed (#109); one Set per metric
     // over the threaded arrays replaces fillTable's own four recomputations
-    // (it used to run the parameters frontier twice on its own).
+    // (coding, intelligence and agentic in the METRICS loop, parameters
+    // spelled out after it).
     const frontSets={};
     for(const key of Object.keys(fronts)) frontSets[key]=new Set(fronts[key]);
     const rows=[...new Set(Object.values(metricRows).flat())];
@@ -2204,10 +2205,14 @@ const DATA = __DATA__;
       // provably identical and redrawing it is pure loss (#84's no-op pin --
       // labels must not move -- holds trivially). Only the tables refill
       // here; fillTable rewrites aria-sort, and the count line is
-      // sort-invariant. The chips, lab, search and pin paths keep the full
-      // render(), which stays the only place charts are drawn.
+      // sort-invariant. An open tooltip closes exactly as render() closes
+      // it -- row identity is sort-invariant, but a reader who just
+      // reordered the table is no longer pointing at a chart. The chips,
+      // lab, search and pin paths keep the full render(), which stays the
+      // only place charts are drawn.
       const {views,fronts}=computePass();
       fillFrontiers(views,fronts); fillTable(views,fronts);
+      hideTip(); hideCapabilityTip("coding"); hideCapabilityTip("parameters"); hideCapabilityTip("agentic");
     };
     th.addEventListener("click",activate);
     th.addEventListener("keydown",ev=>{
