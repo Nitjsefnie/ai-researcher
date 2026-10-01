@@ -794,15 +794,15 @@ def _instruction_budgets_document(schema=1):
     """The committed instruction budgets document's shape, as test values.
 
     Three integer maxima, one per pipeline target; these are the values
-    this branch committed -- the measured medians plus 3%, rounded up to
-    the next million (the basis lives in
-    tests/test_ci_instruction_budgets.py and CONTRIBUTING.md)."""
+    this branch committed -- the CI coverage cell's first measured counts
+    plus 3%, rounded up to the next million (the basis lives in
+    CONTRIBUTING.md)."""
     return {
         "schema_version": schema,
         "scripts": {
-            "build": 161000000,
-            "capture_gate": 248000000,
-            "diff_aa": 208000000,
+            "build": 177000000,
+            "capture_gate": 276000000,
+            "diff_aa": 230000000,
         },
     }
 

@@ -32,11 +32,16 @@ PYTHONDONTWRITEBYTECODE the first run compiles and writes .pyc files and
 the second loads them -- a 1.6% run-to-run swing on a bare pair of runs;
 PYTHONHASHSEED=0 removes dict-order jitter; PYTHONNOUSERSITE=1 keeps
 user-site .pth execution out of every count. Under the pins the observed
-run-to-run spread was under 0.002% (the exact spreads this branch
-measured are recorded in CONTRIBUTING.md); the 3% margin covers CI's
-different CPython and valgrind builds, and the budgets themselves are
-calibrated by CI's own first runs -- the check mode always prints its
-measured counts.
+run-to-run spread was under 0.002% (recorded in CONTRIBUTING.md); the
+3% margin covers that jitter. The budgets are pinned to the CI cell
+that runs this gate -- the coverage job's ubuntu-latest runner,
+CPython 3.13.15 / valgrind 3.22.0 -- and were seeded from its first
+measured counts (build 171,504,264, capture_gate 267,669,619,
+diff_aa 222,551,193 startup-subtracted Ir), each plus 3% rounded up to
+the next million; the authoring box's counts (Python 3.13.14 /
+valgrind 3.24.0) sit about 10% lower. The check mode always prints its
+measured counts, so a later tighten-only PR calibrates against fresh
+CI numbers.
 
 Every run executes under ``nice -n 19 timeout <seconds>``: nice, so the
 measurement yields to everything else on the box, timeout, so a hung

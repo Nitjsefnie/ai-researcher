@@ -190,14 +190,19 @@ startup (`python3 -c pass` under the same harness) from every count, and
 holds each target under its integer maximum. Tighten-only like the perf
 budgets: the default check mode fails on any budget exceeded, the ratchet
 guard refuses a pull request that raises a budget, and there is no
-automated raise. Budgets are seeded at the median of three measured runs
-plus 3%, rounded up to the next million; the observed run-to-run spread
-under the pinned environment (`PYTHONDONTWRITEBYTECODE`,
-`PYTHONHASHSEED=0`, `PYTHONNOUSERSITE=1` — without the first, a .pyc
-compile-then-load pair was measured swinging 1.6%) was under 0.002%, and
-the margin covers CI's different CPython and valgrind builds. CI's
-coverage job prints its own measured counts in the step summary, so a
-tighten-only PR calibrates against real CI numbers. Re-measure with
+automated raise. Budgets are pinned to the CI cell that runs the gate —
+the coverage job's ubuntu-latest runner, CPython 3.13.15 / valgrind
+3.22.0 — and were seeded from that cell's own first measured counts
+(build 171,504,264, capture_gate 267,669,619, diff_aa 222,551,193
+startup-subtracted Ir), each plus 3% rounded up to the next million.
+Authoring-box counts (CPython 3.13.14 / valgrind 3.24.0) sit about 10%
+lower; the budgets follow the CI cell because it is the only place the
+gate runs. The observed run-to-run spread under the pinned environment
+(`PYTHONDONTWRITEBYTECODE`, `PYTHONHASHSEED=0`, `PYTHONNOUSERSITE=1` —
+without the first, a .pyc compile-then-load pair was measured swinging
+1.6%) was under 0.002%; the 3% margin covers that jitter. CI's coverage
+job still prints its own measured counts in the step summary, so a
+tighten-only PR calibrates against fresh CI numbers. Re-measure with
 `python3 scripts/ci/instruction_budgets.py --measure`. The fixture is
 regenerated only through the generator functions in
 `tests/test_ci_instruction_budgets.py` (a test pins its exact bytes) and
