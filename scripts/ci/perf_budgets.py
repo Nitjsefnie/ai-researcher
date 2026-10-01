@@ -87,7 +87,9 @@ budgeted journey is a loud error, never a pass.
 
 Exit codes: --measure 0 on success (failures raise); --check 0 when
 every budget is met, 1 when at least one is exceeded, 2 when the budgets
-document is missing or invalid.
+document is missing or invalid, 3 when the measure path itself fails
+(the browser is missing or crashes, any exception escapes the
+measurement) — a broken harness must never read as a budget breach.
 """
 from __future__ import annotations
 
@@ -496,6 +498,35 @@ def _build_page(build_module, output):
     return output.read_bytes()
 
 
+def measure_journeys(browser, uri):
+    """Every journey's record, measured against an already-open browser.
+
+    The same protocol measure() uses -- MEASURE_RUNS fresh-page runs per
+    journey, budgetable metrics from run 1, walls the median (report
+    only). `browser` must be launched the way measure() launches its own
+    (``--js-flags=--expose-gc`` included): the journeys place the load's
+    garbage collection through window.gc(), which the flag is what
+    provides.
+    """
+    load_walls = []
+    load_read = None
+    for _ in range(MEASURE_RUNS):
+        wall_ms, read = _run_load(browser, uri)
+        load_walls.append(wall_ms)
+        if load_read is None:
+            load_read = read
+    if load_read is None:
+        raise RuntimeError('the load journey measured no run')
+    return {
+        'load': _journey_record(
+            (load_read['added'] + load_read['removed'],
+             len(load_read['tasks'])), load_walls),
+        'filter': _click_journey(browser, uri, '#fSup'),
+        'sort': _click_journey(browser, uri, "#tbl th[data-k='ii']"),
+        'hover': _hover_journey(browser, uri),
+    }
+
+
 def measure():
     """Build the page to a temp output and measure every journey."""
     build_module = _load_build()
@@ -516,27 +547,9 @@ def measure():
                 headless=True,
                 args=['--no-sandbox', '--js-flags=--expose-gc'])
             try:
-                load_walls = []
-                load_read = None
-                for _ in range(MEASURE_RUNS):
-                    wall_ms, read = _run_load(browser, uri)
-                    load_walls.append(wall_ms)
-                    if load_read is None:
-                        load_read = read
-                click_journeys = {
-                    'filter': _click_journey(browser, uri, '#fSup'),
-                    'sort': _click_journey(
-                        browser, uri, "#tbl th[data-k='ii']"),
-                    'hover': _hover_journey(browser, uri),
-                }
+                journeys = measure_journeys(browser, uri)
             finally:
                 browser.close()
-    if load_read is None:
-        raise RuntimeError('the load journey measured no run')
-    load_metrics = (load_read['added'] + load_read['removed'],
-                    len(load_read['tasks']))
-    journeys = {'load': _journey_record(load_metrics, load_walls)}
-    journeys.update(click_journeys)
     return {
         'schema_version': SCHEMA_VERSION,
         'page': {'output': PAGE_NAME,
@@ -597,7 +610,15 @@ def main(argv=None):
     except ValueError as error:
         print(str(error), file=sys.stderr)
         return 2
-    findings = gate(budgets, measure())
+    try:
+        findings = gate(budgets, measure())
+    except Exception as error:  # pylint: disable=broad-except
+        # Deliberately broad: whatever escapes the measure path (a missing
+        # playwright, a crashed browser, a degenerate chart) is a broken
+        # HARNESS, and its exit code must not collide with "exceeded" --
+        # CI would otherwise read a broken gate as a budget breach.
+        print(f'measurement failed: {error}', file=sys.stderr)
+        return 3
     if findings:
         for line in findings:
             print(line, file=sys.stderr)
