@@ -7,6 +7,7 @@ import json
 import os
 import pathlib
 import re
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -1253,6 +1254,7 @@ class PerfBudgetTests(unittest.TestCase):
             "bytes": {
                 "raw": len(raw),
                 "gzip": len(gzip.compress(raw, 9, mtime=0)),
+                "code_bytes": perf_budgets.code_bytes(raw),
             },
             "journeys": journeys,
         }
@@ -1262,6 +1264,172 @@ class PerfBudgetTests(unittest.TestCase):
             "the page regressed past its committed performance budgets "
             "(path: head exceeds base) -- make the page meet the budget "
             "again; re-seeding a budget is the lead's explicit call")
+
+    def _fixture_measurement(self, root, models, agents):
+        """Build a fixture page under `root` (never out/) and measure it
+        through the harness: {code_bytes, gated journey metrics}."""
+        raw = root / "models.json"
+        agents_raw = root / "coding-agents.json"
+        page = root / "frontier-models.html"
+        raw.write_text(json.dumps(models), encoding="utf-8")
+        agents_raw.write_text(json.dumps(agents), encoding="utf-8")
+        old_raw, old_agents, old_out = (
+            build.RAW, build.AGENTS_RAW, build.OUT)
+        build.RAW, build.AGENTS_RAW, build.OUT = raw, agents_raw, page
+        try:
+            saved_stamp = os.environ.pop("AA_SOURCE_COMMIT", None)
+            try:
+                with contextlib.redirect_stdout(io.StringIO()):
+                    build.main()
+            finally:
+                if saved_stamp is not None:
+                    os.environ["AA_SOURCE_COMMIT"] = saved_stamp
+        finally:
+            build.RAW, build.AGENTS_RAW, build.OUT = (
+                old_raw, old_agents, old_out)
+        journeys = perf_budgets.measure_journeys(
+            self.browser, page.as_uri())
+        gated = {"bytes": perf_budgets.code_bytes(page.read_bytes())}
+        for journey, metrics in perf_budgets.GATED_JOURNEY_METRICS.items():
+            for metric in metrics:
+                gated[f"journeys.{journey}.{metric}"] = \
+                    journeys[journey][metric]
+        return gated
+
+    def test_row_free_metrics_are_identical_across_capture_sizes(self):
+        """Decoupling proof (issue #112): the SAME code built against a
+        small (~8 rows) and a large (~60 rows) synthetic capture must
+        weigh the same in code bytes and cost the same in hover tooltip
+        work -- the two gated metrics that are row-free by construction
+        cannot be moved by capture growth. The long-task counts are
+        deliberately absent: they are threshold physics (the 60-row
+        page's render crosses the 50 ms task threshold, the 8-row
+        page's does not), so their decoupling proof is the live
+        686 -> 688 capture growth below, not a size fixture."""
+        small_models, large_models = _probe_models(6), _probe_models(58)
+        with tempfile.TemporaryDirectory(
+                prefix=".decouple-small-", dir=build.ROOT) as small_dir:
+            with tempfile.TemporaryDirectory(
+                    prefix=".decouple-large-", dir=build.ROOT) as large_dir:
+                small = self._fixture_measurement(
+                    pathlib.Path(small_dir), small_models, _PROBE_AGENTS)
+                large = self._fixture_measurement(
+                    pathlib.Path(large_dir), large_models, _PROBE_AGENTS)
+        row_free = ("bytes", "journeys.hover.dom_nodes_mutated")
+        self.assertEqual(
+            {k: small[k] for k in row_free},
+            {k: large[k] for k in row_free},
+            "a row-free gated metric moved with the capture's size")
+
+    def _preceding_capture_blobs(self):
+        """The 686-model capture that preceded main's 688 refresh, or
+        None on a checkout whose history cannot reach it (shallow CI):
+        the fixture proof above carries the property there."""
+        result = subprocess.run(  # pylint: disable=subprocess-run-check
+            ["git", "show", "875d024^:data/aa-raw-models.json"],
+            cwd=str(build.ROOT), capture_output=True, check=False)
+        models = result.stdout if result.returncode == 0 else None
+        result = subprocess.run(  # pylint: disable=subprocess-run-check
+            ["git", "show", "875d024^:data/aa-raw-coding-agents.json"],
+            cwd=str(build.ROOT), capture_output=True, check=False)
+        agents = result.stdout if result.returncode == 0 else None
+        return models, agents
+
+    def test_the_gate_passes_on_the_preceding_capture_without_budget_edit(
+            self):
+        """Decoupling proof, live repro (issue #112): --check over the
+        686-model capture that preceded main's growth passes against the
+        committed budgets with no budget edit."""
+        models_686, agents_686 = self._preceding_capture_blobs()
+        if models_686 is None or agents_686 is None:
+            self.skipTest("shallow checkout: the pre-growth capture blob "
+                          "is not reachable; the fixture proof carries "
+                          "the property")
+        with tempfile.TemporaryDirectory(
+                prefix=".gate-686-", dir=build.ROOT) as tmp:
+            root = pathlib.Path(tmp)
+            (root / "models.json").write_bytes(models_686)
+            (root / "coding-agents.json").write_bytes(agents_686)
+            old_raw, old_agents = build.RAW, build.AGENTS_RAW
+            build.RAW, build.AGENTS_RAW = (root / "models.json",
+                                           root / "coding-agents.json")
+            try:
+                # The class browser is already live (playwright's sync
+                # API refuses a second instance in one thread), so the
+                # proof drives the harness's own runners against the
+                # 686-built page and its own gate -- the same functions
+                # `--check` runs, without a second sync_playwright.
+                with tempfile.TemporaryDirectory(
+                        prefix=".gate-686-build-", dir=build.ROOT) as bld:
+                    page = pathlib.Path(bld) / "frontier-models.html"
+                    old_out = build.OUT
+                    build.OUT = page
+                    try:
+                        with contextlib.redirect_stdout(io.StringIO()):
+                            build.main()
+                    finally:
+                        build.OUT = old_out
+                    measurement = {
+                        "bytes": {
+                            "code_bytes": perf_budgets.code_bytes(
+                                page.read_bytes()),
+                        },
+                        "journeys": perf_budgets.measure_journeys(
+                            self.browser, page.as_uri()),
+                    }
+            finally:
+                build.RAW, build.AGENTS_RAW = old_raw, old_agents
+        findings = perf_budgets.gate(
+            perf_budgets.load_budgets(
+                build.ROOT / ".github" / "perf-budgets.json"), measurement)
+        self.assertEqual(
+            findings, [],
+            "the gate red on a capture whose growth it was rebuilt to "
+            "survive -- a budget moved with the data")
+
+
+def _probe_models(count):
+    """A deterministic live-like synthetic capture: scores descend as
+    costs rise, so the frontier stays compact like the real page's."""
+    out = []
+    for i in range(count):
+        score = round(80.0 - i * 0.04, 2)
+        cost = round(0.5 + i * 0.9, 3)
+        out.append({
+            "name": f"Probe Model {i:04d}",
+            "modelCreatorName": "Probe Lab",
+            "isOpenWeights": i % 3 == 0,
+            "slug": f"probe-model-{i:04d}",
+            "intelligenceIndex": score,
+            "gdpvalNormalized": 0.4 + (i % 20) * 0.01,
+            "parameters": 20 + (i % 40) * 3,
+            "intelligenceIndexCostPerTask": {
+                "cost": {"total": cost},
+                "evaluations": [
+                    {"slug": "gdpval-aa",
+                     "weightedCostPerTask": round(cost / 10.0, 4)},
+                ],
+            },
+        })
+    return out
+
+
+_PROBE_AGENTS = [
+    {"id": "probe-agent-1", "displayLabel": "Probe Agent One",
+     "agentName": "Probe Agent One CLI",
+     "hostModelSlug": "probe-model-0000",
+     "display": {"creator": {"agent": "Probe Agent Lab",
+                             "model": "Probe Lab"}},
+     "indexScore": 0.64, "mean": {"costUsd": 2.5,
+                                  "agentWallTimeSec": 900.0}},
+    {"id": "probe-agent-2", "displayLabel": "Probe Agent Two",
+     "agentName": "Probe Agent Two CLI",
+     "hostModelSlug": "probe-model-0001",
+     "display": {"creator": {"agent": "Probe Agent Lab",
+                             "model": "Probe Lab"}},
+     "indexScore": 0.55, "mean": {"costUsd": 1.9,
+                                  "agentWallTimeSec": 700.0}},
+]
 
 
 class BuildProvenanceTests(unittest.TestCase):

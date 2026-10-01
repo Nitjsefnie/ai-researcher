@@ -158,19 +158,27 @@ its size, because most of its lines are HTML, CSS and JavaScript in string
 literals. The browser tests are what cover those.
 
 The page carries a second ratchet: **performance budgets** in
-`.github/perf-budgets.json` — the bytes the page ships, and for each reader
-journey (load, filter, sort, hover) how many DOM nodes it may mutate and how
-many >50 ms main-thread tasks it may take. They are maxima and the ratchet is
-**tighten-only**: `scripts/ci/perf_budgets.py --check` measures fresh and
-fails on any budget exceeded, and a budget may only fall — the guard step
-refuses a pull request that raises one, exactly like the coverage document.
-They are seeded from a fresh measurement of the tree they gate, with headroom
-by rule: bytes at the measured value exactly (builds are byte-deterministic),
-DOM-node counts at measured + 2% (rounded up), long-task counts at measured +
-1 (the count is machine-load-sensitive). The browser suite's
-`PerfBudgetTests` is the gate CI actually runs — it measures the same
-journeys through the same harness and asserts the same committed budgets, so
-the ratchet and its gate cannot drift.
+`.github/perf-budgets.json`, and every budgeted number is code-only. The
+page's budgeted byte count is `code_bytes` — the page's weight once every
+build-time-rendered row region (the `const DATA` payload and the two static
+tbody bodies) is excised — so capture growth moves nothing the ratchet gates.
+Of the reader journeys (load, filter, sort, hover) only hover's DOM mutation
+count and every journey's long-task count are gated; the load/filter/sort DOM
+counts are measured and reported by `scripts/ci/perf_budgets.py --measure`
+but never gated, because they carry the capture's frontier geometry (the
+frontier tables refill one node-set per frontier row, and frontier sizes are
+data, not code). Long-task budgets are absolute: a count is threshold physics,
+not a per-row cost, and normalizing it would blind the guard to real
+regressions. The ratchet is **tighten-only**: `--check` measures fresh and
+fails on any budget exceeded, a budget may only fall (the guard step refuses
+a pull request that raises one), and **there is no automated raise** — the
+coverage ratchet's auto-raise has no perf analogue, by design. Seeding
+headroom: code_bytes at the measured value exactly (builds are
+byte-deterministic), hover DOM at measured + 2% (rounded up), long tasks at
+measured + 1 (machine-load flap). The browser suite's `PerfBudgetTests` is
+the gate CI actually runs — it measures the same journeys through the same
+harness and asserts the same committed budgets, so the ratchet and its gate
+cannot drift.
 
 Three run only on GitHub. `codeql` is gated on repository visibility, because
 code scanning is free on public repositories and needs Code Security on private
