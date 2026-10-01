@@ -271,6 +271,35 @@ jobs:
           python3 scripts/ci/js_coverage.py "$JS_COVERAGE_OUT" \
             "--fail-under=${js_floor}" --format=total
 
+      - name: Instruction budgets gate
+        if: ${{ !cancelled() && steps.pytest.conclusion != 'skipped' }}
+        # The pipeline's CPU ratchet (issue #110): build.py, capture_gate.py
+        # and diff_aa.py are measured under valgrind callgrind on the
+        # COMMITTED fixture capture (tests/fixtures/pipeline/) and held
+        # against the integer maxima in .github/instruction-budgets.json --
+        # never against the live data/ captures, so the budgets stay
+        # invariant to capture size. Tighten-only, like every ratchet here:
+        # the "Ratchet documents" step below refuses a PR that raises a
+        # budget, and there is no automated raise.
+        #
+        # COVERAGE JOB ONLY. The measurement needs valgrind (installed
+        # below when the runner lacks it) and four callgrind runs, which
+        # run 20-50x slower than the targets alone; the 3x3 matrix neither
+        # installs valgrind nor has the minutes to spare, and its cells'
+        # 20-minute ceiling is standing. This job already carries the
+        # dedicated tooling and the 30-minute ceiling.
+        #
+        # The gate ALWAYS prints its measured counts: the step summary is
+        # where the next tighten-only PR reads the numbers to calibrate
+        # against.
+        run: |
+          if ! command -v valgrind >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install -y --no-install-recommends valgrind
+          fi
+          set -o pipefail
+          python3 scripts/ci/instruction_budgets.py | tee -a "$GITHUB_STEP_SUMMARY"
+
       - name: Ratchet documents
         if: ${{ github.event_name == 'pull_request' || github.event_name == 'push' }}
         # Nobody may relax the ratchet data: the recorded measured values
