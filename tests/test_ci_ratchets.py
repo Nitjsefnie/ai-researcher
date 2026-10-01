@@ -766,3 +766,77 @@ def test_end_to_end_budgets_absent_from_history_is_clean(tmp_path):
     guard = _guard()
     _fork, findings = guard.check_ratchets(repo, "main", head)
     assert findings == []
+
+
+# --- the guard: non-finite float leaves fail closed --------------------------
+
+
+def test_guard_nan_and_infinity_leaves_fail_closed_in_both_walks():
+    """A NaN/Infinity literal leaf is a finding, never a crash, a silent
+    pass or a misjudged raise — in both documents' walks.
+
+    json's reader hands NaN/Infinity literals back as FLOATS, past the
+    parse_float hook that would have made them Decimals, so _is_number's
+    float arm must finite-check them. Before that check a poisoned
+    budget compared as a number and passed the down-only walk clean
+    (NaN, -Infinity never compare greater) or read as a genuine raise
+    (+Infinity).
+    """
+    guard = _guard()
+
+    def poison_javascript_measured(doc, value):
+        doc["coverage"]["javascript"]["measured"] = value
+
+    def poison_bytes_raw(doc, value):
+        doc["bytes"]["raw"] = value
+
+    cases = (
+        (guard.coverage_relaxations, _document,
+         poison_javascript_measured, "coverage.javascript.measured"),
+        (guard.budgets_relaxations, _budgets_document,
+         poison_bytes_raw, "bytes.raw"),
+    )
+    for relaxations, build_doc, poison_leaf, path in cases:
+        for poison in (float("nan"), float("inf"), float("-inf")):
+            base, head = build_doc(), build_doc()
+            poison_leaf(head, poison)
+            findings = relaxations(base, head)
+            assert len(findings) == 1, (path, poison, findings)
+            assert path in findings[0], findings[0]
+            assert "not a finite number" in findings[0]
+
+
+def test_end_to_end_non_finite_budget_head_fails_closed(tmp_path, capsys,
+                                                        monkeypatch):
+    """A head budgets document carrying a NaN literal: exit 1 through the
+    normal findings path — never a crash, never a silent pass."""
+    repo = _seed_repo(tmp_path, _document(), budgets=_budgets_document())
+    _git(repo, "checkout", "-q", "-b", "pr")
+    poisoned = _budgets_document()
+    poisoned["bytes"]["gzip"] = float("nan")
+    # json.dumps writes the NaN literal here, and the guard's reader
+    # parses it back to a non-finite float — the exact shape a poisoned
+    # commit would carry.
+    (repo / ".github" / "perf-budgets.json").write_text(
+        json.dumps(poisoned), encoding="utf-8")
+    _git(repo, "add", ".github/perf-budgets.json")
+    _git(repo, "commit", "-qm", "poison a budget with NaN")
+    head = _git(repo, "rev-parse", "HEAD").stdout.strip()
+    guard = _guard()
+    monkeypatch.chdir(repo)
+    assert guard.main(["main", head]) == 1
+    out = capsys.readouterr().out
+    assert "bytes.gzip" in out
+    assert "not a finite number" in out
+    assert "relaxation(s)" in out
+
+
+def test_guard_finite_unchanged_leaves_stay_clean():
+    """The poison tests' control: finite unchanged inputs produce zero
+    findings in both walks."""
+    guard = _guard()
+    for relaxations, build_doc in ((guard.coverage_relaxations, _document),
+                                   (guard.budgets_relaxations,
+                                    _budgets_document)):
+        base, head = build_doc(), build_doc()
+        assert relaxations(base, head) == []

@@ -42,6 +42,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import subprocess
 import sys
 from decimal import Decimal
@@ -80,7 +81,16 @@ def _is_number(value):
         return False
     if isinstance(value, Decimal):
         return value.is_finite()
-    return isinstance(value, (int, float))
+    if isinstance(value, int):
+        return True
+    # A float here is a JSON NaN/Infinity literal: the reader's
+    # parse_constant hands those back as floats, past the parse_float
+    # hook that would have made them Decimals. They must fail closed --
+    # NaN and -Infinity never compare greater, so a poisoned budget
+    # would pass the down-only walk silently, and +Infinity would
+    # masquerade as a genuine raise instead of naming the non-finite
+    # leaf.
+    return isinstance(value, float) and math.isfinite(value)
 
 
 def _decimal(value):
