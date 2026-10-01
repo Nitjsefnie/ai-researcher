@@ -12,6 +12,7 @@ import importlib.util
 import io
 import json
 import os
+import pathlib
 import shutil
 import subprocess
 import sys
@@ -365,8 +366,134 @@ def test_check_with_missing_budgets_fails_closed(tmp_path, capsys):
     missing = tmp_path / "absent.json"
     assert perf.main(["--check", "--budgets", str(missing)]) == 2
     captured = capsys.readouterr()
-    assert str(missing) in captured.err
+    # The message prefix and the file's basename, not raw-path
+    # containment: on Windows the OSError line renders the path
+    # repr-escaped (backslashes doubled), so the full path as spelled
+    # here cannot be matched portably. The basename survives both
+    # spellings.
     assert "cannot read budgets" in captured.err
+    assert missing.name in captured.err
+
+
+# --- the pure coverage: decode, validate, gate, slice, dispatch --------------
+
+
+def test_decode_rejects_budgets_that_are_not_utf8(tmp_path):
+    target = tmp_path / "perf-budgets.json"
+    target.write_bytes(b"\xff\xfe not utf-8 at all")
+    with pytest.raises(ValueError, match="invalid budgets JSON"):
+        perf.load_budgets(target)
+
+
+def test_integer_rejects_a_non_finite_float_budget():
+    payload = _document()
+    payload["bytes"]["code_bytes"] = float("inf")
+    with pytest.raises(ValueError, match="must be finite"):
+        perf.validate_budgets(payload)
+
+
+def test_gate_rejects_a_non_object_measurement():
+    budgets = perf.validate_budgets(_document())
+    with pytest.raises(ValueError, match="measurement must be an object"):
+        perf.gate(budgets, "not a measurement")
+
+
+def test_gate_rejects_a_measurement_without_a_journeys_section():
+    budgets = perf.validate_budgets(_document())
+    measurement = _measurement()
+    del measurement["journeys"]
+    with pytest.raises(ValueError, match="missing section: journeys"):
+        perf.gate(budgets, measurement)
+
+
+def test_chromium_executable_prefers_the_env_path(monkeypatch):
+    # white-box: the discovery helper is the contract under test
+    # pylint: disable=protected-access
+    monkeypatch.setenv("CHROMIUM_PATH", "/nonexistent-browser")
+    assert perf._chromium_executable() is None
+    monkeypatch.setenv("CHROMIUM_PATH", str(REPO_ROOT / "build.py"))
+    assert perf._chromium_executable() == REPO_ROOT / "build.py"
+
+
+def test_load_build_imports_when_the_module_is_absent():
+    # white-box: both fallback arms are the contract under test
+    # pylint: disable=protected-access
+    # _load_build's fallback arms: ROOT pushed onto sys.path when the
+    # loader runs from somewhere it is not, and the importlib import
+    # when no prior build module is cached. Restore both, exactly.
+    saved_module = sys.modules.pop("build", None)
+    saved_path = sys.path[:]
+    try:
+        sys.path[:] = [p for p in sys.path
+                       if p != str(REPO_ROOT) and p != ""]
+        module = perf._load_build()
+        assert hasattr(module, "main")
+    finally:
+        sys.path[:] = saved_path
+        if saved_module is not None:
+            sys.modules["build"] = saved_module
+
+
+def test_build_page_strips_the_stamp_and_restores_everything(
+        monkeypatch):
+    # white-box: the stamp/OUT restore contract IS the test
+    # pylint: disable=protected-access
+    # _build_page: the page it writes is the canonical stamp-less build
+    # whatever the environment carried, and the environment + build.OUT
+    # are restored afterwards -- both arms of each conditional. The temp
+    # output lives under the repo root: build.main() prints
+    # OUT.relative_to(ROOT), which refuses an outside path.
+    old_out = build.OUT
+    with tempfile.TemporaryDirectory(
+            prefix=".build-page-", dir=str(REPO_ROOT)) as tmp:
+        out = pathlib.Path(tmp) / "page.html"
+        monkeypatch.setenv("AA_SOURCE_COMMIT", "a" * 40)
+        page = perf._build_page(build, out)
+        assert "a" * 40 not in page.decode("utf-8")
+        assert build.OUT == old_out
+        assert os.environ.get("AA_SOURCE_COMMIT") == "a" * 40
+
+        monkeypatch.delenv("AA_SOURCE_COMMIT", raising=False)
+        page = perf._build_page(build, out)
+        assert "a" * 40 not in page.decode("utf-8")
+        assert build.OUT == old_out
+        assert "AA_SOURCE_COMMIT" not in os.environ
+
+
+def test_measure_journeys_refuses_a_run_count_of_zero(monkeypatch):
+    # the load journey's defensive guard: a harness configured to take
+    # no runs has measured nothing, and must say so loudly rather than
+    # fabricate a record
+    monkeypatch.setattr(perf, "MEASURE_RUNS", 0)
+    with pytest.raises(RuntimeError, match="measured no run"):
+        perf.measure_journeys(None, "file:///unused")
+
+
+def test_main_measure_writes_and_prints_the_measurement(tmp_path, capsys,
+                                                        monkeypatch):
+    sent = {"schema_version": 1, "bytes": {"code_bytes": 71627},
+            "journeys": {}}
+
+    def fresh_measurement():
+        return sent
+
+    monkeypatch.setattr(perf, "measure", fresh_measurement)
+    out = tmp_path / "measurement.json"
+    assert perf.main(["--measure", "--out", str(out)]) == 0
+    assert json.loads(out.read_text(encoding="utf-8")) == sent
+    assert json.loads(capsys.readouterr().out) == sent
+
+
+def test_main_measure_prints_without_an_out_file(capsys, monkeypatch):
+    sent = {"schema_version": 1, "bytes": {"code_bytes": 71627},
+            "journeys": {}}
+
+    def fresh_measurement():
+        return sent
+
+    monkeypatch.setattr(perf, "measure", fresh_measurement)
+    assert perf.main(["--measure"]) == 0
+    assert json.loads(capsys.readouterr().out) == sent
 
 
 # --- the exit-code contract --------------------------------------------------
