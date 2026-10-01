@@ -14,6 +14,27 @@ import build
 import page_format
 
 
+def _build_in_temp_dir() -> str:
+    """Run build.main() with OUT redirected into a temp dir and return the
+    page text, leaving the real out/frontier-models.html untouched (#114).
+
+    The temp dir lives under build.ROOT because build.main() prints
+    OUT.relative_to(ROOT) and would raise on a page outside it -- the same
+    convention the stamp and escaping tests use for their capture paths.
+    """
+    with tempfile.TemporaryDirectory(
+            prefix=".issue-114-build-", dir=build.ROOT) as tmp:
+        page = pathlib.Path(tmp) / "frontier-models.html"
+        saved = build.OUT
+        build.OUT = page
+        try:
+            with contextlib.redirect_stdout(io.StringIO()):
+                build.main()
+        finally:
+            build.OUT = saved
+        return page.read_text(encoding="utf-8")
+
+
 class ArtifactParser(HTMLParser):
     def __init__(self):
         super().__init__()
@@ -267,9 +288,7 @@ class AgentRowTests(unittest.TestCase):
 
 class GeneratedArtifactTests(unittest.TestCase):
     def test_contains_parameter_chart_in_requested_order_and_accessible_columns(self):
-        with contextlib.redirect_stdout(io.StringIO()):
-            build.main()
-        html = build.OUT.read_text(encoding="utf-8")
+        html = _build_in_temp_dir()
         parser = ArtifactParser()
         parser.feed(html)
 
@@ -1415,11 +1434,9 @@ class DisplayNameRowTests(unittest.TestCase):
         # The issue's own pin, page-wide: the embedded payload feeds the
         # tooltip, popup, table, aria-labels, search and both copy exports,
         # so one occurrence anywhere means a reader can see the dict.
-        with contextlib.redirect_stdout(io.StringIO()):
-            build.main()
+        html = _build_in_temp_dir()
 
-        self.assertNotIn(
-            "reasoning_effort", build.OUT.read_text(encoding="utf-8"))
+        self.assertNotIn("reasoning_effort", html)
 
 
 class SplitEffortScalingTests(unittest.TestCase):
