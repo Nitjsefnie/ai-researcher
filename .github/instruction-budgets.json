@@ -1,0 +1,8 @@
+{
+  "schema_version": 1,
+  "scripts": {
+    "build": 161000000,
+    "capture_gate": 248000000,
+    "diff_aa": 208000000
+  }
+}
