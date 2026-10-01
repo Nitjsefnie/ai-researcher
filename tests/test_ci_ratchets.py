@@ -5,8 +5,12 @@ whose measured coverage sits at most the hysteresis above the recorded
 measured justifies no raise, and a measurement below the recorded value
 never lowers anything. The guard refuses a head document that removes a
 key, lowers a value, changes schema_version, or rewrites a measurement
-without the floor it implies. The cases pin both tools' behaviour, and
-the guard also gets end-to-end git cases in temporary repositories.
+without the floor it implies. The perf-budgets document
+(.github/perf-budgets.json, issue #109) gets the same guard with the
+opposite value direction: every budget is an integer maximum, so the
+relaxation is the RAISE, schema_version is fixed, and key add/remove are
+findings there too. The cases pin both tools' behaviour, and the guard
+also gets end-to-end git cases in temporary repositories.
 """
 from __future__ import annotations
 
@@ -325,16 +329,40 @@ def _git(repo, *args):
                           capture_output=True, text=True)
 
 
-def _seed_repo(tmp_path, document):
+def _seed_repo(tmp_path, document, budgets=None):
+    """Seed a repo with the thresholds document and, optionally, the
+    committed budgets document."""
     repo = Path(tmp_path) / "repo"
     (repo / ".github").mkdir(parents=True)
     _thresholds().write(repo / ".github" / "ci-thresholds.json", document)
+    if budgets is not None:
+        _budgets_written(repo, budgets)
     _git(repo, "init", "-q", "-b", "main")
     _git(repo, "config", "user.email", "tests@example.invalid")
     _git(repo, "config", "user.name", "Tests")
     _git(repo, "add", ".github/ci-thresholds.json")
+    if budgets is not None:
+        _git(repo, "add", ".github/perf-budgets.json")
     _git(repo, "commit", "-qm", "base")
     return repo
+
+
+def _budgets_written(repo, document):
+    """Write the budgets document into a repo's .github/."""
+    target = Path(repo) / ".github" / "perf-budgets.json"
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(json.dumps(document), encoding="utf-8")
+    return target
+
+
+def _commit_budgets_on_branch(repo, document, message):
+    """Commit the budgets document on a `pr` branch forked from main, as
+    a pull request does."""
+    _git(repo, "checkout", "-q", "-b", "pr")
+    _budgets_written(repo, document)
+    _git(repo, "add", ".github/perf-budgets.json")
+    _git(repo, "commit", "-qm", message)
+    return _git(repo, "rev-parse", "HEAD").stdout.strip()
 
 
 def _commit_here(repo, document, message):
@@ -518,3 +546,223 @@ def test_end_to_end_push_raise_on_main_is_clean(tmp_path, capsys,
     monkeypatch.chdir(repo)
     assert guard.main([before, head]) == 0
     assert "not relaxed" in capsys.readouterr().out
+
+
+# --- the guard: the budgets document (issue #109) ----------------------------
+
+
+def _budgets_document(schema=1):
+    """The committed budgets document's shape, as test values."""
+    return {
+        "schema_version": schema,
+        "bytes": {"raw": 247941, "gzip": 40986},
+        "journeys": {
+            "load": {"dom_nodes_mutated": 8831, "long_task_count": 2},
+            "filter": {"dom_nodes_mutated": 1320, "long_task_count": 1},
+            "sort": {"dom_nodes_mutated": 480, "long_task_count": 1},
+            "hover": {"dom_nodes_mutated": 33, "long_task_count": 1},
+        },
+    }
+
+
+def test_budgets_guard_identical_documents_are_clean():
+    guard = _guard()
+    base, head = _budgets_document(), _budgets_document()
+    # round-trip the way the guard itself reads a document: JSON text
+    # parsed back with numbers as Decimals
+    round_trip = json.loads(json.dumps(head), parse_float=Decimal,
+                            parse_int=Decimal)
+    assert guard.budgets_relaxations(base, round_trip) == []
+
+
+def test_budgets_guard_raised_budget_is_a_finding():
+    guard = _guard()
+    base, head = _budgets_document(), _budgets_document()
+    head["journeys"]["sort"]["dom_nodes_mutated"] = 481
+    findings = guard.budgets_relaxations(base, head)
+    assert len(findings) == 1
+    assert "raised; it may only fall" in findings[0]
+    assert "journeys.sort.dom_nodes_mutated" in findings[0]
+    assert ".github/perf-budgets.json" in findings[0]
+
+
+def test_budgets_guard_lowered_budget_is_clean():
+    guard = _guard()
+    base, head = _budgets_document(), _budgets_document()
+    head["journeys"]["filter"]["long_task_count"] = 0
+    head["bytes"]["gzip"] = 40000
+    assert guard.budgets_relaxations(base, head) == []
+
+
+def test_budgets_guard_every_budget_may_only_fall():
+    guard = _guard()
+    base, head = _budgets_document(), _budgets_document()
+    # every budget raised by one: ten findings, one per raised leaf
+    for journey in head["journeys"].values():
+        journey["dom_nodes_mutated"] += 1
+        journey["long_task_count"] += 1
+    head["bytes"]["raw"] += 1
+    head["bytes"]["gzip"] += 1
+    findings = guard.budgets_relaxations(base, head)
+    assert len(findings) == 10
+    assert all("raised; it may only fall" in line for line in findings)
+
+
+def test_budgets_guard_schema_version_is_fixed():
+    guard = _guard()
+    base, head = _budgets_document(), _budgets_document(schema=2)
+    findings = guard.budgets_relaxations(base, head)
+    assert len(findings) == 1
+    assert "schema_version changed" in findings[0]
+
+
+def test_budgets_guard_key_removed_is_a_finding():
+    guard = _guard()
+    base, head = _budgets_document(), _budgets_document()
+    del head["journeys"]["hover"]
+    findings = guard.budgets_relaxations(base, head)
+    assert len(findings) == 2  # the journey's two budget leaves
+    assert all("key removed" in line for line in findings)
+    assert all("journeys.hover" in line for line in findings)
+
+
+def test_budgets_guard_key_added_is_a_finding():
+    guard = _guard()
+    base, head = _budgets_document(), _budgets_document()
+    # a PR adding a journey budget is a change -- it must not be able to
+    # mask a raise elsewhere, so additions are refused, matching the
+    # coverage document's shape
+    head["journeys"]["scroll"] = {"dom_nodes_mutated": 1,
+                                  "long_task_count": 0}
+    findings = guard.budgets_relaxations(base, head)
+    assert len(findings) == 2
+    assert all("key added" in line for line in findings)
+    assert all("journeys.scroll" in line for line in findings)
+
+
+def test_budgets_guard_string_value_is_not_a_finite_number():
+    guard = _guard()
+    base, head = _budgets_document(), _budgets_document()
+    head["bytes"]["raw"] = "247941"
+    findings = guard.budgets_relaxations(base, head)
+    assert len(findings) == 1
+    assert "not a finite number" in findings[0]
+
+
+def test_budgets_guard_boolean_value_is_not_a_finite_number():
+    guard = _guard()
+    base, head = _budgets_document(), _budgets_document()
+    head["journeys"]["load"]["long_task_count"] = True
+    findings = guard.budgets_relaxations(base, head)
+    assert len(findings) == 1
+    assert "not a finite number" in findings[0]
+
+
+def test_budgets_guard_deleted_document_is_a_finding():
+    guard = _guard()
+    findings = guard.budgets_relaxations(_budgets_document(), None)
+    assert findings == [
+        '.github/perf-budgets.json: (document): merge base "present", '
+        'head absent — the document was deleted'
+    ]
+
+
+def test_budgets_guard_absent_at_merge_base_is_clean():
+    guard = _guard()
+    assert guard.budgets_relaxations(None, _budgets_document()) == []
+
+
+# --- the budgets guard: end-to-end git cases ---------------------------------
+
+
+def test_end_to_end_budgets_raise_is_flagged(tmp_path, capsys, monkeypatch):
+    """Raising a perf budget relaxes the ratchet: one finding, exit 1."""
+    repo = _seed_repo(tmp_path, _document(), budgets=_budgets_document())
+    raised = _budgets_document()
+    raised["journeys"]["sort"]["dom_nodes_mutated"] = 481
+    head = _commit_budgets_on_branch(repo, raised, "raise a budget")
+    guard = _guard()
+    _fork, findings = guard.check_ratchets(repo, "main", head)
+    assert len(findings) == 1
+    assert "raised; it may only fall" in findings[0]
+    assert ".github/perf-budgets.json" in findings[0]
+    monkeypatch.chdir(repo)
+    assert guard.main(["main", head]) == 1
+    assert "relaxation(s)" in capsys.readouterr().out
+
+
+def test_end_to_end_budgets_tighten_is_clean(tmp_path, capsys, monkeypatch):
+    """Lowering budgets tightens: clean, and BOTH documents report ok in
+    one run — the guard checks both in the same pass."""
+    repo = _seed_repo(tmp_path, _document(), budgets=_budgets_document())
+    tightened = _budgets_document()
+    tightened["journeys"]["load"]["long_task_count"] = 1
+    tightened["bytes"]["raw"] = 240000
+    head = _commit_budgets_on_branch(repo, tightened, "tighten the budgets")
+    guard = _guard()
+    _fork, findings = guard.check_ratchets(repo, "main", head)
+    assert findings == []
+    monkeypatch.chdir(repo)
+    assert guard.main(["main", head]) == 0
+    out = capsys.readouterr().out
+    assert out.count("not relaxed") == 2
+
+
+def test_end_to_end_budgets_schema_version_is_fixed(tmp_path):
+    repo = _seed_repo(tmp_path, _document(), budgets=_budgets_document())
+    head = _commit_budgets_on_branch(
+        repo, _budgets_document(schema=2), "bump the schema version")
+    guard = _guard()
+    _fork, findings = guard.check_ratchets(repo, "main", head)
+    assert len(findings) == 1
+    assert "schema_version changed" in findings[0]
+
+
+def test_end_to_end_budgets_key_add_and_remove_are_findings(tmp_path):
+    repo = _seed_repo(tmp_path, _document(), budgets=_budgets_document())
+    reshaped = _budgets_document()
+    del reshaped["journeys"]["hover"]
+    reshaped["journeys"]["scroll"] = {"dom_nodes_mutated": 1,
+                                      "long_task_count": 0}
+    head = _commit_budgets_on_branch(repo, reshaped, "swap a journey")
+    guard = _guard()
+    _fork, findings = guard.check_ratchets(repo, "main", head)
+    assert len(findings) == 4
+    assert all("journeys.hover" in f for f in findings[:2])
+    assert all("key removed" in f for f in findings[:2])
+    assert all("journeys.scroll" in f for f in findings[2:])
+    assert all("key added" in f for f in findings[2:])
+
+
+def test_end_to_end_both_documents_are_guarded_in_one_run(tmp_path):
+    """One branch lowers the calibration AND raises a budget: the guard
+    reports both documents' findings in the same pass."""
+    repo = _seed_repo(tmp_path, _document(), budgets=_budgets_document())
+    _git(repo, "checkout", "-q", "-b", "pr")
+    _thresholds().write(repo / ".github" / "ci-thresholds.json",
+                        _document(measured="90.0", floor="88.5"))
+    _git(repo, "add", ".github/ci-thresholds.json")
+    _git(repo, "commit", "-qm", "lower the calibration")
+    raised = _budgets_document()
+    raised["bytes"]["gzip"] += 100
+    _budgets_written(repo, raised)
+    _git(repo, "add", ".github/perf-budgets.json")
+    _git(repo, "commit", "-qm", "raise a budget")
+    head = _git(repo, "rev-parse", "HEAD").stdout.strip()
+    guard = _guard()
+    _fork, findings = guard.check_ratchets(repo, "main", head)
+    assert any(".github/ci-thresholds.json" in f and "lowered" in f
+               for f in findings)
+    assert any(".github/perf-budgets.json" in f and "raised; it may only "
+               "fall" in f for f in findings)
+
+
+def test_end_to_end_budgets_absent_from_history_is_clean(tmp_path):
+    """A repo (or an old tag) predating the budgets document: absent on
+    both sides relaxes nothing."""
+    repo = _seed_repo(tmp_path, _document())
+    head = _commit_budgets_on_branch(repo, _budgets_document(),
+                                     "introduce the budgets document")
+    guard = _guard()
+    _fork, findings = guard.check_ratchets(repo, "main", head)
+    assert findings == []

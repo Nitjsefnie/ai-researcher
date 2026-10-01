@@ -1,13 +1,14 @@
 #!/usr/bin/env python3
-"""Refuse a change that relaxes the coverage ratchet document.
+"""Refuse a change that relaxes a ratchet document.
 
     python3 scripts/ci/check_ratchets.py <base-rev> <head-rev>
 
-Both sides of the document are read as data with ``git show <rev>:<path>``
-at the merge base of the two revisions and at the head — never from the
-working tree, and no head code is executed. The merge base, not the base
-tip, is the reference: the automated raise lands on main after a branch
-forks, and the branch did not loosen anything by missing that raise.
+Both sides of each document are read as data with ``git show
+<rev>:<path>`` at the merge base of the two revisions and at the head —
+never from the working tree, and no head code is executed. The merge
+base, not the base tip, is the reference: the automated raise lands on
+main after a branch forks, and the branch did not loosen anything by
+missing that raise.
 
 Exit 0 when nothing is relaxed, 1 with one line per relaxation, 2 on a
 usage error, an unknown revision, a shallow clone — refused up front,
@@ -16,16 +17,26 @@ wrong base without erroring, and the fix is to fetch full history
 (``git fetch --unshallow``) — a merge base that cannot be computed
 (unrelated histories), or a document that is not valid JSON. A document
 absent at the merge base cannot be relaxed; the sibling checks (thresholds
-``--check``, the coverage gates) judge its content. A non-regular entry at
-the head is a finding (exit 1) — it is the branch's own change; a
-non-regular entry at the merge base is a git error (exit 2).
+``--check``, the coverage gates, the perf budgets gate) judge its
+content. A non-regular entry at the head is a finding (exit 1) — it is
+the branch's own change; a non-regular entry at the merge base is a git
+error (exit 2).
 
-In this document every coverage value (``measured`` and ``floor``, for both
-languages) may only rise, and ``schema_version`` may not change at all.
-The one value-direction subtlety is the raise itself: the ratchet rewrites
-the document so ``floor = measured - 1.5``, so a changed measurement must
-carry the floor it implies — a measured that rose while its floor stayed
-below ``measured - 1.5`` would lower the effective floor, and is a finding.
+Two documents are guarded, each with its own direction rules:
+
+- ``.github/ci-thresholds.json`` — every coverage value (``measured``
+  and ``floor``, for both languages) may only rise, and
+  ``schema_version`` may not change at all. The one value-direction
+  subtlety is the raise itself: the ratchet rewrites the document so
+  ``floor = measured - 1.5``, so a changed measurement must carry the
+  floor it implies — a measured that rose while its floor stayed below
+  ``measured - 1.5`` would lower the effective floor, and is a finding.
+- ``.github/perf-budgets.json`` — every value is an integer MAXIMUM the
+  gates hold a measurement under, so every numeric leaf except
+  ``schema_version`` may only FALL: lowering a budget tightens, raising
+  one relaxes. ``schema_version`` may not change at all. Key added and
+  key removed are findings in both documents — a PR must not be able to
+  mask a raise behind a reshuffle.
 """
 from __future__ import annotations
 
@@ -37,10 +48,11 @@ from decimal import Decimal
 from pathlib import Path
 
 DOCUMENT = '.github/ci-thresholds.json'
+BUDGETS = '.github/perf-budgets.json'
 REGULAR_FILE = '100644 blob'
 GAP = Decimal('1.5')
-# Direction each leaf may move: "up" means it may only rise, "fixed" means
-# it may not change at all.
+# Direction each leaf may move: "up" means it may only rise, "down" means
+# it may only fall, "fixed" means it may not change at all.
 _DIRECTIONS = {
     'schema_version': 'fixed',
     'coverage.python.measured': 'up',
@@ -49,6 +61,18 @@ _DIRECTIONS = {
     'coverage.javascript.floor': 'up',
 }
 _LANGUAGES = ('python', 'javascript')
+
+
+def _budget_direction(key):
+    """The budgets document's direction for one leaf path.
+
+    Every other value in the perf-budgets document is an integer maximum
+    a gate holds a measurement under: lowering it tightens the ratchet,
+    raising it relaxes. schema_version alone may not change at all.
+    """
+    if key == 'schema_version':
+        return 'fixed'
+    return 'down'
 
 
 def _is_number(value):
@@ -149,13 +173,14 @@ def _implied_floor_findings(before, after, document):
     return findings
 
 
-def coverage_relaxations(base, head, document=DOCUMENT):
+def _relaxations(base, head, document, direction_of, cross_checks):
     """Findings for a head document that relaxes the merge base's.
 
-    ``document`` names the checked path in the finding lines; the default
-    is the canonical ratchet document, and ``thresholds.py --check``
-    passes the path it compared so a finding always names the file it is
-    about.
+    ``document`` names the checked path in the finding lines;
+    ``direction_of`` answers a leaf's dotted path with the one direction
+    that leaf may move in (None: any change at all is a finding); each
+    cross-check receives ``(before, after, document)`` and adds the
+    document's own shape rules on top of the direction walk.
     """
     if base is None:
         return []
@@ -178,7 +203,7 @@ def coverage_relaxations(base, head, document=DOCUMENT):
             continue
         if was == now:
             continue
-        direction = _DIRECTIONS.get(key)
+        direction = direction_of(key)
         if direction is None:
             findings.append(_finding(
                 document, key, was, now,
@@ -190,11 +215,45 @@ def coverage_relaxations(base, head, document=DOCUMENT):
         elif direction == 'up' and now < was:
             findings.append(_finding(
                 document, key, was, now, 'lowered; it may only rise'))
+        elif direction == 'down' and now > was:
+            findings.append(_finding(
+                document, key, was, now, 'raised; it may only fall'))
         elif direction == 'fixed':
             findings.append(_finding(
                 document, key, was, now, 'schema_version changed'))
-    findings.extend(_implied_floor_findings(before, after, document))
+    for cross_check in cross_checks:
+        findings.extend(cross_check(before, after, document))
     return findings
+
+
+def coverage_relaxations(base, head, document=DOCUMENT):
+    """Findings for a head thresholds document that relaxes the base's.
+
+    ``document`` names the checked path in the finding lines; the default
+    is the canonical ratchet document, and ``thresholds.py --check``
+    passes the path it compared so a finding always names the file it is
+    about.
+    """
+    return _relaxations(base, head, document, _DIRECTIONS.get,
+                        (_implied_floor_findings,))
+
+
+def budgets_relaxations(base, head, document=BUDGETS):
+    """Findings for a head budgets document that relaxes the base's.
+
+    Every budget is an integer maximum, so the relaxation is the RAISE:
+    a budget that moved up lets worse measurements through the gates; a
+    lowered budget is the ratchet tightening itself and is clean.
+    """
+    return _relaxations(base, head, document, _budget_direction, ())
+
+
+# The guarded documents, in the order the guard walks and reports them:
+# each entry is (path, direction resolver, cross-checks).
+DOCUMENTS = (
+    (DOCUMENT, _DIRECTIONS.get, (_implied_floor_findings,)),
+    (BUDGETS, _budget_direction, ()),
+)
 
 
 def _git(cwd, args):
@@ -287,15 +346,18 @@ def check_ratchets(cwd, base_rev, head_rev):
     head = resolve_commit(cwd, head_rev)
     fork = merge_base(cwd, base, head)
     findings = []
-    kind = entry_kind(cwd, head, DOCUMENT)
-    if kind is not None and kind != REGULAR_FILE:
-        findings.append(_finding(
-            DOCUMENT, '(document)', REGULAR_FILE, kind,
-            'not a regular file'))
-    else:
-        base_document = read_document(cwd, fork, DOCUMENT)
-        head_document = read_document(cwd, head, DOCUMENT)
-        findings.extend(coverage_relaxations(base_document, head_document))
+    for document, direction_of, cross_checks in DOCUMENTS:
+        kind = entry_kind(cwd, head, document)
+        if kind is not None and kind != REGULAR_FILE:
+            findings.append(_finding(
+                document, '(document)', REGULAR_FILE, kind,
+                'not a regular file'))
+        else:
+            base_document = read_document(cwd, fork, document)
+            head_document = read_document(cwd, head, document)
+            findings.extend(_relaxations(
+                base_document, head_document, document, direction_of,
+                cross_checks))
     return fork, findings
 
 
@@ -311,8 +373,9 @@ def main(argv=None):
         print(f'ratchet check: {error}', file=sys.stderr)
         return 2
     if not findings:
-        print(f'ratchet check: {DOCUMENT} not relaxed against merge base '
-              f'{fork} — ok')
+        for document, _direction_of, _cross_checks in DOCUMENTS:
+            print(f'ratchet check: {document} not relaxed against merge '
+                  f'base {fork} — ok')
         return 0
     for line in findings:
         print(line)

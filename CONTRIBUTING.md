@@ -157,6 +157,21 @@ to: what coverage counts as statements in `build.py` is a small fraction of
 its size, because most of its lines are HTML, CSS and JavaScript in string
 literals. The browser tests are what cover those.
 
+The page carries a second ratchet: **performance budgets** in
+`.github/perf-budgets.json` — the bytes the page ships, and for each reader
+journey (load, filter, sort, hover) how many DOM nodes it may mutate and how
+many >50 ms main-thread tasks it may take. They are maxima and the ratchet is
+**tighten-only**: `scripts/ci/perf_budgets.py --check` measures fresh and
+fails on any budget exceeded, and a budget may only fall — the guard step
+refuses a pull request that raises one, exactly like the coverage document.
+They are seeded from a fresh measurement of the tree they gate, with headroom
+by rule: bytes at the measured value exactly (builds are byte-deterministic),
+DOM-node counts at measured + 2% (rounded up), long-task counts at measured +
+1 (the count is machine-load-sensitive). The browser suite's
+`PerfBudgetTests` is the gate CI actually runs — it measures the same
+journeys through the same harness and asserts the same committed budgets, so
+the ratchet and its gate cannot drift.
+
 Three run only on GitHub. `codeql` is gated on repository visibility, because
 code scanning is free on public repositories and needs Code Security on private
 ones. `claim` watches issue comments: `/claim` assigns the commenter to an

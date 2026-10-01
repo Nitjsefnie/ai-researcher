@@ -299,14 +299,109 @@ def test_gate_missing_bytes_section_is_loud():
 
 
 def test_check_with_missing_budgets_fails_closed(tmp_path, capsys):
-    # Task 1 ships no budgets document yet: --check must refuse with
-    # exit 2 and a line naming the missing path -- never measure first
-    # and never pass for want of a document.
+    # A --check whose budgets path does not exist must refuse with exit 2
+    # and a line naming the path -- never measure first and never pass
+    # for want of a document.
     missing = tmp_path / "absent.json"
     assert perf.main(["--check", "--budgets", str(missing)]) == 2
     captured = capsys.readouterr()
     assert str(missing) in captured.err
     assert "cannot read budgets" in captured.err
+
+
+# --- the exit-code contract --------------------------------------------------
+
+
+def test_check_returns_3_when_the_measure_path_fails(tmp_path, capsys,
+                                                     monkeypatch):
+    # Addition 1 (the Task 1 review, binding): a broken harness -- a
+    # missing browser, a crashed Chromium, any exception escaping the
+    # measure path -- exits 3, never 1: CI would otherwise read a broken
+    # gate as a budget breach.
+    doc = _written(tmp_path, _document())
+
+    def broken_measure():
+        raise RuntimeError("chromium crashed")
+    monkeypatch.setattr(perf, "measure", broken_measure)
+    assert perf.main(["--check", "--budgets", str(doc)]) == 3
+    captured = capsys.readouterr()
+    assert "measurement failed" in captured.err
+    assert "chromium crashed" in captured.err
+
+
+def test_check_exit_0_1_2_contract_holds(tmp_path, capsys, monkeypatch):
+    # The full contract in one place, so the new exit 3 cannot crowd out
+    # the codes the gate already returned.
+    doc = _written(tmp_path, _document())
+
+    # 0: every budget met by a fresh synthetic measurement.
+    monkeypatch.setattr(perf, "measure", lambda: _measurement())
+    assert perf.main(["--check", "--budgets", str(doc)]) == 0
+
+    # 1: at least one budget exceeded.
+    monkeypatch.setattr(
+        perf, "measure",
+        lambda: _measurement(**{"journeys.hover.dom_nodes_mutated": 999}))
+    assert perf.main(["--check", "--budgets", str(doc)]) == 1
+    assert "exceeds base" in capsys.readouterr().err
+
+    # 2: the budgets document is missing.
+    assert perf.main(
+        ["--check", "--budgets", str(tmp_path / "absent.json")]) == 2
+    assert "cannot read budgets" in capsys.readouterr().err
+
+
+# --- the committed budgets document ------------------------------------------
+
+REAL_BUDGETS = REPO_ROOT / ".github" / "perf-budgets.json"
+
+
+def _measurement_at(budgets):
+    """A synthetic measurement exactly at every budget of `budgets`."""
+    return {
+        "schema_version": 1,
+        "page": {"output": "frontier-models.html", "sha256": "ab" * 32},
+        "bytes": dict(budgets["bytes"]),
+        "journeys": {
+            journey: {**record, "wall_ms_median": 1.0}
+            for journey, record in budgets["journeys"].items()
+        },
+    }
+
+
+def test_the_committed_budgets_document_loads_and_normalises():
+    # The REAL committed ratchet document (issue #109): the structure,
+    # integer and finite rules hold against the file CI gates on -- not
+    # only against synthetic fixtures.
+    budgets = perf.load_budgets(REAL_BUDGETS)
+    assert budgets["schema_version"] == 1
+    assert set(budgets["bytes"]) == {"raw", "gzip"}
+    assert set(budgets["journeys"]) == {"load", "filter", "sort", "hover"}
+    for record in budgets["journeys"].values():
+        assert set(record) == {"dom_nodes_mutated", "long_task_count"}
+    for value in [budgets["bytes"]["raw"], budgets["bytes"]["gzip"],
+                  *[v for r in budgets["journeys"].values()
+                    for v in r.values()]]:
+        assert isinstance(value, int) and not isinstance(value, bool)
+        assert value >= 0
+
+
+def test_gate_over_the_committed_budgets_at_their_own_values_is_clean():
+    # A measurement AT every committed budget passes: budgets are maxima,
+    # and equal is met.
+    budgets = perf.load_budgets(REAL_BUDGETS)
+    assert perf.gate(budgets, _measurement_at(budgets)) == []
+
+
+def test_gate_one_over_a_committed_budget_names_the_path():
+    budgets = perf.load_budgets(REAL_BUDGETS)
+    measurement = _measurement_at(budgets)
+    measurement["journeys"]["sort"]["dom_nodes_mutated"] += 1
+    budget = budgets["journeys"]["sort"]["dom_nodes_mutated"]
+    findings = perf.gate(budgets, measurement)
+    assert findings == [
+        f"journeys.sort.dom_nodes_mutated: head {budget + 1} exceeds "
+        f"base {budget}"]
 
 
 # --- module-level laziness, subprocess-isolated ------------------------------
@@ -328,7 +423,7 @@ assert "playwright" not in sys.modules, "module import pulled in playwright"
 
 _LAZY_CHECK_PROBE = _LAZY_IMPORT_PROBE + """
 rc = module.main(["--check", "--budgets",
-                  str(root / ".github" / "perf-budgets.json")])
+                  str(root / ".github" / "absent-perf-budgets.json")])
 assert rc == 2, rc
 assert "playwright" not in sys.modules, (
     "--check on a missing budgets file reached the browser path")

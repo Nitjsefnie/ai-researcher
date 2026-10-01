@@ -1,10 +1,13 @@
 import contextlib
+import gzip
 import hashlib
 import io
+import importlib.util
 import json
 import os
 import pathlib
 import re
+import sys
 import tempfile
 import unittest
 from unittest import mock
@@ -1176,6 +1179,89 @@ class BrowserInteractionTests(unittest.TestCase):
                 ratio, 4.5,
                 f"light-theme {name} measures {ratio:.2f}:1, below the WCAG "
                 f"AA 4.5:1 floor (fg={pair['fg']}, bg={pair['bg']})")
+
+
+def _load_perf_budgets():
+    """Import scripts/ci/perf_budgets.py by path.
+
+    scripts/ci is not a package and deliberately has no __init__.py --
+    it holds standalone CI entry points, not an importable library.
+    """
+    path = (pathlib.Path(__file__).resolve().parents[1]
+            / "scripts" / "ci" / "perf_budgets.py")
+    spec = importlib.util.spec_from_file_location("perf_budgets", path)
+    assert spec and spec.loader
+    module = importlib.util.module_from_spec(spec)
+    sys.modules["perf_budgets"] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+perf_budgets = _load_perf_budgets()
+
+
+class PerfBudgetTests(unittest.TestCase):
+    """The CI gate for issue #109's tighten-only perf ratchet.
+
+    This class runs in the coverage job; the 3x3 matrix --ignores
+    tests/test_browser.py, so this is where CI enforces the committed
+    budgets in .github/perf-budgets.json on every pull request. Nothing
+    about the journeys or the verdict is re-implemented here: the
+    journeys come from the harness's own runners
+    (scripts/ci/perf_budgets.py) and the verdict from its own gate, so
+    this class and `perf_budgets.py --check` cannot drift.
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        # BrowserInteractionTests.setUpClass already built the standard
+        # out/ page; build.main() is idempotent, so this class simply
+        # calls it again. The source stamp is stripped for the build so
+        # the bytes this class gates are the canonical stamp-less build
+        # the budgets were seeded from, whatever the ambient environment
+        # carries.
+        saved_stamp = os.environ.pop("AA_SOURCE_COMMIT", None)
+        try:
+            with contextlib.redirect_stdout(io.StringIO()):
+                build.main()
+        finally:
+            if saved_stamp is not None:
+                os.environ["AA_SOURCE_COMMIT"] = saved_stamp
+        # A second browser launch, mirroring the harness's recipe over
+        # this module's existing discovery: --js-flags=--expose-gc is
+        # load-bearing -- the journeys place the load's garbage
+        # collection through window.gc(), which the flag provides.
+        cls.playwright = sync_playwright().start()
+        cls.browser = cls.playwright.chromium.launch(
+            executable_path=CHROMIUM_EXECUTABLE,
+            headless=True,
+            args=["--no-sandbox", "--js-flags=--expose-gc"],
+        )
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.browser.close()
+        cls.playwright.stop()
+
+    def test_every_journey_meets_its_committed_budget(self):
+        budgets = perf_budgets.load_budgets(
+            build.ROOT / ".github" / "perf-budgets.json")
+        journeys = perf_budgets.measure_journeys(
+            self.browser, build.OUT.as_uri())
+        raw = build.OUT.read_bytes()
+        measurement = {
+            "bytes": {
+                "raw": len(raw),
+                "gzip": len(gzip.compress(raw, 9, mtime=0)),
+            },
+            "journeys": journeys,
+        }
+        findings = perf_budgets.gate(budgets, measurement)
+        self.assertEqual(
+            findings, [],
+            "the page regressed past its committed performance budgets "
+            "(path: head exceeds base) -- make the page meet the budget "
+            "again; re-seeding a budget is the lead's explicit call")
 
 
 class BuildProvenanceTests(unittest.TestCase):
