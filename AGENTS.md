@@ -185,10 +185,10 @@ frontier, and the frontier can drop a model the vendor still sells.
 is a finding to report, not a bug to fix.
 
 **One function computes this layer** — the chart's dashed line, the frontier
-table, the table's frontier tag and the Hide-superseded chip all call it, over
-the same slice. Never precompute it into the data: a build-time flag silently
-disagreed with the live chart under a lab filter (the chart marked 6 Anthropic
-models, the table tagged 4).
+table, the table's frontier tag and the Hide-superseded chip all render from
+the single per-pass computation, over the same slice. Never precompute it into
+the data: a build-time flag silently disagreed with the live chart under a lab
+filter (the chart marked 6 Anthropic models, the table tagged 4).
 
 ### Effort levels
 
