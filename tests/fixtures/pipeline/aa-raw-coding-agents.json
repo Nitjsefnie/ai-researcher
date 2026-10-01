@@ -1,0 +1,53 @@
+[
+ {
+  "agentName": "Fixture Code",
+  "display": {
+   "creator": {
+    "agent": "Fixture Code",
+    "model": "Alpha Fixtures"
+   }
+  },
+  "displayLabel": "Fixture Code - Alpha One",
+  "hostModelSlug": "alphafixtures_alpha-1",
+  "id": "Fixture Code - Alpha One",
+  "indexScore": 0.741,
+  "mean": {
+   "agentWallTimeSec": 900.0,
+   "costUsd": 2.4
+  }
+ },
+ {
+  "agentName": "Fixture Code",
+  "display": {
+   "creator": {
+    "agent": "Fixture Code",
+    "model": "Beta Fixtures"
+   }
+  },
+  "displayLabel": "Fixture Code - Beta Two",
+  "hostModelSlug": "betafixtures_beta-2",
+  "id": "Fixture Code - Beta Two",
+  "indexScore": 0.662,
+  "mean": {
+   "agentWallTimeSec": 840.0,
+   "costUsd": 1.1
+  }
+ },
+ {
+  "agentName": "Fixture Code",
+  "display": {
+   "creator": {
+    "agent": "Fixture Code",
+    "model": "Alpha Fixtures"
+   }
+  },
+  "displayLabel": "Fixture Code - Gamma Three",
+  "hostModelSlug": "alphafixtures_gamma-3",
+  "id": "Fixture Code - Gamma Three",
+  "indexScore": 0.588,
+  "mean": {
+   "agentWallTimeSec": 780.0,
+   "costUsd": 0.42
+  }
+ }
+]

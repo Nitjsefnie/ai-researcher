@@ -1,0 +1,146 @@
+[
+ {
+  "gdpvalNormalized": 0.58,
+  "intelligenceIndex": 62.1,
+  "intelligenceIndexCostPerTask": {
+   "cost": {
+    "total": 1.2
+   },
+   "evaluations": [
+    {
+     "slug": "gdpval-aa",
+     "weightedCostPerTask": 0.42
+    },
+    {
+     "slug": "scicode",
+     "weightedCostPerTask": 0.3
+    }
+   ]
+  },
+  "isOpenWeights": false,
+  "modelCreatorName": "Alpha Fixtures",
+  "name": "Alpha One",
+  "parameters": 405,
+  "slug": "alpha-1"
+ },
+ {
+  "gdpvalNormalized": 0.51,
+  "intelligenceIndex": 55.4,
+  "intelligenceIndexCostPerTask": {
+   "cost": {
+    "total": 0.8
+   },
+   "evaluations": [
+    {
+     "slug": "gdpval-aa",
+     "weightedCostPerTask": 0.38
+    },
+    {
+     "slug": "scicode",
+     "weightedCostPerTask": 0.22
+    }
+   ]
+  },
+  "isOpenWeights": true,
+  "modelCreatorName": "Beta Fixtures",
+  "name": "Beta Two",
+  "parameters": 235,
+  "slug": "beta-2"
+ },
+ {
+  "gdpvalNormalized": 0.44,
+  "intelligenceIndex": 48.9,
+  "intelligenceIndexCostPerTask": {
+   "cost": {
+    "total": 0.5
+   },
+   "evaluations": [
+    {
+     "slug": "gdpval-aa",
+     "weightedCostPerTask": 0.31
+    },
+    {
+     "slug": "scicode",
+     "weightedCostPerTask": 0.18
+    }
+   ]
+  },
+  "isOpenWeights": true,
+  "modelCreatorName": "Alpha Fixtures",
+  "name": "Gamma Three",
+  "parameters": 72,
+  "slug": "gamma-3"
+ },
+ {
+  "gdpvalNormalized": 0.39,
+  "intelligenceIndex": 43.2,
+  "intelligenceIndexCostPerTask": {
+   "cost": {
+    "total": 0.28
+   },
+   "evaluations": [
+    {
+     "slug": "gdpval-aa",
+     "weightedCostPerTask": 0.25
+    },
+    {
+     "slug": "scicode",
+     "weightedCostPerTask": 0.12
+    }
+   ]
+  },
+  "isOpenWeights": false,
+  "modelCreatorName": "Gamma Fixtures",
+  "name": "Delta Four",
+  "parameters": 32,
+  "slug": "delta-4"
+ },
+ {
+  "gdpvalNormalized": 0.3,
+  "intelligenceIndex": 38.6,
+  "intelligenceIndexCostPerTask": {
+   "cost": {
+    "total": 0.14
+   },
+   "evaluations": [
+    {
+     "slug": "gdpval-aa",
+     "weightedCostPerTask": 0.19
+    },
+    {
+     "slug": "scicode",
+     "weightedCostPerTask": 0.07
+    }
+   ]
+  },
+  "isOpenWeights": true,
+  "modelCreatorName": "Beta Fixtures",
+  "name": "Epsilon Five",
+  "parameters": 8,
+  "slug": "epsilon-5"
+ },
+ {
+  "gdpvalNormalized": 0.21,
+  "intelligenceIndex": 33.0,
+  "intelligenceIndexCostPerTask": {
+   "cost": {
+    "total": 0.06
+   },
+   "evaluations": [
+    {
+     "slug": "gdpval-aa",
+     "weightedCostPerTask": 0.14
+    },
+    {
+     "slug": "scicode",
+     "weightedCostPerTask": 0.04
+    }
+   ]
+  },
+  "isOpenWeights": false,
+  "modelCreatorName": "Gamma Fixtures",
+  "name": "Zeta Six",
+  "parameters": 3,
+  "slug": "zeta-6"
+ }
+]
