@@ -180,6 +180,29 @@ the gate CI actually runs — it measures the same journeys through the same
 harness and asserts the same committed budgets, so the ratchet and its gate
 cannot drift.
 
+The pipeline carries a third ratchet: **instruction budgets** in
+`.github/instruction-budgets.json`. `scripts/ci/instruction_budgets.py`
+measures `build.py`, `scripts/capture_gate.py` and `scripts/diff_aa.py`
+under valgrind callgrind on the committed miniature capture in
+`tests/fixtures/pipeline/` — never the live `data/` captures, so the
+budgets are invariant to capture size — subtracts the bare interpreter
+startup (`python3 -c pass` under the same harness) from every count, and
+holds each target under its integer maximum. Tighten-only like the perf
+budgets: the default check mode fails on any budget exceeded, the ratchet
+guard refuses a pull request that raises a budget, and there is no
+automated raise. Budgets are seeded at the median of three measured runs
+plus 3%, rounded up to the next million; the observed run-to-run spread
+under the pinned environment (`PYTHONDONTWRITEBYTECODE`,
+`PYTHONHASHSEED=0`, `PYTHONNOUSERSITE=1` — without the first, a .pyc
+compile-then-load pair was measured swinging 1.6%) was under 0.002%, and
+the margin covers CI's different CPython and valgrind builds. CI's
+coverage job prints its own measured counts in the step summary, so a
+tighten-only PR calibrates against real CI numbers. Re-measure with
+`python3 scripts/ci/instruction_budgets.py --measure`. The fixture is
+regenerated only through the generator functions in
+`tests/test_ci_instruction_budgets.py` (a test pins its exact bytes) and
+is never hand-edited.
+
 Three run only on GitHub. `codeql` is gated on repository visibility, because
 code scanning is free on public repositories and needs Code Security on private
 ones. `claim` watches issue comments: `/claim` assigns the commenter to an
