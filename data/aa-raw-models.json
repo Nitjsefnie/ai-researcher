@@ -479,7 +479,7 @@
  },
  {
   "slug": "mimo-v2-5-pro",
-  "name": "MiMo-V2.5-Pro",
+  "name": "MiMo-V2.5-Pro (Reasoning)",
   "shortName": "MiMo-V2.5-Pro",
   "deprecated": true,
   "isReasoning": true,
@@ -8962,7 +8962,7 @@
  },
  {
   "slug": "kimi-k2-6",
-  "name": "Kimi K2.6",
+  "name": "Kimi K2.6 (Reasoning)",
   "shortName": "Kimi K2.6",
   "deprecated": true,
   "isReasoning": true,
@@ -37928,7 +37928,7 @@
  },
  {
   "slug": "jt236b",
-  "name": "JT-4.1 Flash 236B A21B",
+  "name": "JT-4.1 Flash 236B A21B (Reasoning)",
   "shortName": "JT-4.1 Flash 236B A21B",
   "deprecated": false,
   "isReasoning": true,
@@ -40698,7 +40698,7 @@
  },
  {
   "slug": "exaone-4-5-33b",
-  "name": "EXAONE 4.5 33B",
+  "name": "EXAONE 4.5 33B (Reasoning)",
   "shortName": "EXAONE 4.5 33B",
   "deprecated": false,
   "isReasoning": true,
@@ -44061,7 +44061,7 @@
   "omniscience": -13.183333333333334,
   "omniscienceAccuracy": 0.407,
   "omniscienceNonHallucination": 0.09134345137717814,
-  "gdpvalNormalized": 0.309095,
+  "gdpvalNormalized": 0.31645500000000004,
   "analystAgent": null,
   "terminalbenchHard": null,
   "terminalBench21": 0.531835205992509,
@@ -44183,7 +44183,7 @@
   "omniscienceHallucinationRate": 0.9086565486228219,
   "mlcrOverall": 0.0833333333333333,
   "gdpPdfAllPass": 0.152,
-  "gdpval": 1118.19,
+  "gdpval": 1132.91,
   "itBenchSre": null,
   "terminalBenchScience": null,
   "livecodebench": null,
@@ -44221,14 +44221,14 @@
   "intelligenceIndexEvaluations": [
    {
     "slug": "aa-briefcase",
-    "score": 934.64,
+    "score": 934.11,
     "outputTokensPerTask": 9415.098901098901,
     "costPerTask": 0.029337873600120943,
     "timePerTask": 85.45264608674451
    },
    {
     "slug": "gdpval-aa",
-    "score": 1118.19,
+    "score": 1132.91,
     "outputTokensPerTask": 6928.572727272727,
     "costPerTask": 0.014815766091229893,
     "timePerTask": 62.884615378899795
@@ -44292,20 +44292,20 @@
   ],
   "briefcaseBreakdown": {
    "overall": {
-    "elo": 934.64,
-    "lower95ci": 926.25,
-    "upper95ci": 942.8
+    "elo": 934.11,
+    "lower95ci": 925.9,
+    "upper95ci": 942.87
    },
    "rubricPassRate": 0.20202020202020202,
    "analyticalQuality": {
-    "elo": 814.28,
-    "lower95ci": 798.97,
-    "upper95ci": 829.22
+    "elo": 814.85,
+    "lower95ci": 799.46,
+    "upper95ci": 829.54
    },
    "presentation": {
-    "elo": 1095.32,
-    "lower95ci": 1079.42,
-    "upper95ci": 1110.71
+    "elo": 1093.05,
+    "lower95ci": 1077.6,
+    "upper95ci": 1108.61
    }
   },
   "briefcaseTotalCost": 2.6697464976110057,
