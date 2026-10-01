@@ -844,3 +844,82 @@ def test_guard_finite_unchanged_leaves_stay_clean():
                                     _budgets_document)):
         base, head = build_doc(), build_doc()
         assert relaxations(base, head) == []
+
+
+# --- the guard's git and rendering helpers, pinned directly ------------------
+
+
+def test_guard_unit_helpers_pin_their_contract():
+    # white-box: these rendering helpers are the contract under test
+    # pylint: disable=protected-access
+    guard = _guard()
+    assert guard._decimal(94.2) == Decimal("94.2")
+    # an unserializable value falls back to its repr, never a crash
+    assert guard._show(object()).startswith("<")
+    assert guard._key_path([]) == "(document)"
+    # a key part that is not a plain identifier renders as JSON text
+    assert guard._key_path(["a b"]) == '["a b"]'
+
+
+def test_guard_changed_leaf_without_a_direction_is_a_finding():
+    # a coverage leaf outside the direction map must not slip through
+    # unjudged when it changes: no direction means any change is a
+    # finding
+    guard = _guard()
+    base, head = _document(), _document()
+    base["coverage"]["ruby"] = {"measured": Decimal("1.0")}
+    head["coverage"]["ruby"] = {"measured": Decimal("2.0")}
+    findings = guard.coverage_relaxations(base, head)
+    assert len(findings) == 1
+    assert "changed, and has no tightening direction" in findings[0]
+
+
+def test_guard_merge_base_non_number_is_a_finding():
+    guard = _guard()
+    base, head = _budgets_document(), _budgets_document()
+    base["bytes"]["code_bytes"] = "corrupt"
+    head["bytes"]["code_bytes"] = 5
+    findings = guard.budgets_relaxations(base, head)
+    assert len(findings) == 1
+    assert "merge-base value is not a finite number" in findings[0]
+
+
+def test_guard_git_failure_outside_a_repository_is_refused(tmp_path):
+    guard = _guard()
+    with pytest.raises(ValueError, match="cannot tell whether"):
+        guard.require_full_history(tmp_path)
+
+
+def test_end_to_end_unrelated_histories_are_refused(tmp_path):
+    """Orphan histories share no merge base: the guard refuses rather
+    than guessing a comparison."""
+    repo = _seed_repo(tmp_path, _document(), budgets=_budgets_document())
+    _git(repo, "checkout", "-q", "--orphan", "isolated")
+    (repo / ".github" / "ci-thresholds.json").write_text(
+        json.dumps({"schema_version": 1}), encoding="utf-8")
+    _git(repo, "add", ".github/ci-thresholds.json")
+    _git(repo, "commit", "-qm", "an unrelated history")
+    head = _git(repo, "rev-parse", "HEAD").stdout.strip()
+    guard = _guard()
+    with pytest.raises(ValueError, match="no merge base"):
+        guard.check_ratchets(repo, "main", head)
+
+
+def test_entry_kind_refuses_an_unreadable_object(tmp_path):
+    repo = _seed_repo(tmp_path, _document(), budgets=_budgets_document())
+    guard = _guard()
+    with pytest.raises(ValueError, match="cannot list"):
+        guard.entry_kind(repo, "f" * 40, ".github/ci-thresholds.json")
+
+
+def test_read_document_refuses_a_non_regular_entry(tmp_path):
+    repo = _seed_repo(tmp_path, _document(), budgets=_budgets_document())
+    _git(repo, "checkout", "-q", "-b", "pr")
+    target = repo / ".github" / "ci-thresholds.json"
+    target.unlink()
+    target.symlink_to("elsewhere.json")
+    _git(repo, "add", ".github/ci-thresholds.json")
+    _git(repo, "commit", "-qm", "swap the document for a symlink")
+    guard = _guard()
+    with pytest.raises(ValueError, match="not a regular file"):
+        guard.read_document(repo, "HEAD", ".github/ci-thresholds.json")
