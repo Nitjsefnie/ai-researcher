@@ -1447,26 +1447,9 @@ const DATA = __DATA__;
 
   // "Superseded" is decided by the metric, evaluated against whatever the other
   // filters left -- so it always means "beaten inside the view you are looking
-  // at", never "retired by its vendor".
-  // Collapse a model's effort settings to one row: its ceiling (highest index,
-  // cheapest variant if two tie there). Deliberately runs BEFORE the dominance
-  // test, so "superseded" is judged between models rather than between a model
-  // and its own turned-down settings -- otherwise every low-effort variant is
-  // trivially beaten by its high-effort twin and the frontier says nothing.
-  function collapse(rows){
-    const by=new Map();
-    for(const r of rows){
-      const cur=by.get(r.base);
-      if(!cur || r.ii>cur.ii || (r.ii===cur.ii && r.cost<cur.cost)) by.set(r.base,r);
-    }
-    return [...by.values()];
-  }
-
-  function slice(){
-    let b = baseSlice();
-    if(st.eff) b = collapse(b);
-    return st.sup ? frontierOf(b) : b;
-  }
+  // at", never "retired by its vendor". A model is superseded when another is
+  // at least as smart AND at least as cheap, strictly better on one of the two;
+  // exact ties survive together.
 
   const METRICS={
     coding:{label:"Coding Agent Index",svg:"svg-coding",tip:"tip-coding"},
@@ -1482,6 +1465,11 @@ const DATA = __DATA__;
     ? (r.params!=null && r.ii!=null ? {score:r.ii,cost:r.params} : null)
     : r.metrics[key];
 
+  // Collapse a model's effort settings to one row: its ceiling (highest index,
+  // cheapest variant if two tie there). Deliberately runs BEFORE the dominance
+  // test, so "superseded" is judged between models rather than between a model
+  // and its own turned-down settings -- otherwise every low-effort variant is
+  // trivially beaten by its high-effort twin and the frontier says nothing.
   function collapseMetric(rows,key){
     const by=new Map();
     for(const r of rows){
@@ -1541,15 +1529,6 @@ const DATA = __DATA__;
   // buys a WIDER chart rather than a proportionally taller one -- and the extra
   // horizontal room is exactly what the label placer needs.
   let W=980, H=560; const L=62, Rr=22, T=20, B=52;
-
-  // The single definition of the undominated layer, shared by the chart line,
-  // the frontier table, the table tag and the Hide-superseded chip -- so they
-  // cannot disagree the way a separately precomputed flag could. A model is
-  // superseded when another is at least as smart AND at least as cheap, strictly
-  // better on one of the two; exact ties survive together.
-  function frontierOf(rows){
-    return frontierMetric(rows,"intelligence");
-  }
 
   // A chart label identifies exactly one row (#85): two rows on one chart
   // never render the same text. Labels prefer the build-time compact form
@@ -2287,14 +2266,17 @@ const DATA = __DATA__;
     };
   }
 
-  // One frontier computation per metric per render pass (#109). frontierMetric
-  // is a pure function of (rows, key), and every consumer used to recompute it
-  // over the very views this reads -- draw, each drawCapability, fillFrontiers
-  // and fillTable (twice for parameters) -- so threading the result down
-  // changes where the work runs, not which rows it returns: a subset of the
-  // same row objects reaches every consumer, and the Set-of-row-objects
-  // semantics are untouched. The pure function itself is unchanged; only the
-  // recomputation went away.
+  // One frontier computation per metric per render pass (#109). These arrays
+  // are the page's single definition of the undominated layer -- the chart
+  // line, the frontier table, the table tag and the Hide-superseded chip all
+  // read them, so they cannot disagree the way a separately precomputed flag
+  // could. frontierMetric is a pure function of (rows, key), and every
+  // consumer used to recompute it over the very views this reads -- draw, each
+  // drawCapability, fillFrontiers and fillTable (twice for parameters) -- so
+  // threading the result down changes where the work runs, not which rows it
+  // returns: a subset of the same row objects reaches every consumer, and the
+  // Set-of-row-objects semantics are untouched. The pure function itself is
+  // unchanged; only the recomputation went away.
   function computePass(){
     const views=metricViews();
     const fronts={};
