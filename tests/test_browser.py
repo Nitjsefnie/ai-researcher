@@ -67,16 +67,20 @@ class BrowserInteractionTests(unittest.TestCase):
         try:
             with contextlib.redirect_stdout(io.StringIO()):
                 build.main()
+            # The launch is inside the handler's reach too: setUpClass
+            # failure skips tearDownClass, so a raise from playwright's
+            # start or the launch itself would strand build.OUT at the
+            # temp path and leave the dir on disk.
+            cls.playwright = sync_playwright().start()
+            cls.browser = cls.playwright.chromium.launch(
+                executable_path=CHROMIUM_EXECUTABLE,
+                headless=True,
+                args=["--no-sandbox"],
+            )
         except BaseException:
             build.OUT = cls._saved_out
             cls._page_dir.cleanup()
             raise
-        cls.playwright = sync_playwright().start()
-        cls.browser = cls.playwright.chromium.launch(
-            executable_path=CHROMIUM_EXECUTABLE,
-            headless=True,
-            args=["--no-sandbox"],
-        )
         cls._coverage_entries = []
         cls._open_pages = []
         original_new_page = cls.browser.new_page
@@ -1254,6 +1258,20 @@ class PerfBudgetTests(unittest.TestCase):
         try:
             with contextlib.redirect_stdout(io.StringIO()):
                 build.main()
+            # The launch is inside the handler's reach too (mirrors
+            # BrowserInteractionTests): setUpClass failure skips
+            # tearDownClass, so a raise from playwright's start or the
+            # launch itself would strand build.OUT at the temp path.
+            cls.playwright = sync_playwright().start()
+            # A second browser launch, mirroring the harness's recipe over
+            # this module's existing discovery: --js-flags=--expose-gc is
+            # load-bearing -- the journeys place the load's garbage
+            # collection through window.gc(), which the flag provides.
+            cls.browser = cls.playwright.chromium.launch(
+                executable_path=CHROMIUM_EXECUTABLE,
+                headless=True,
+                args=["--no-sandbox", "--js-flags=--expose-gc"],
+            )
         except BaseException:
             build.OUT = cls._saved_out
             cls._page_dir.cleanup()
@@ -1261,16 +1279,6 @@ class PerfBudgetTests(unittest.TestCase):
         finally:
             if saved_stamp is not None:
                 os.environ["AA_SOURCE_COMMIT"] = saved_stamp
-        # A second browser launch, mirroring the harness's recipe over
-        # this module's existing discovery: --js-flags=--expose-gc is
-        # load-bearing -- the journeys place the load's garbage
-        # collection through window.gc(), which the flag provides.
-        cls.playwright = sync_playwright().start()
-        cls.browser = cls.playwright.chromium.launch(
-            executable_path=CHROMIUM_EXECUTABLE,
-            headless=True,
-            args=["--no-sandbox", "--js-flags=--expose-gc"],
-        )
 
     @classmethod
     def tearDownClass(cls):
