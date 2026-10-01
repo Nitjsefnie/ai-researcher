@@ -531,25 +531,33 @@ def _git_blob(rev_path):
 def _build_bytes(raw_path, agents_path):
     """build.main() with the capture patched to `raw_path`/`agents_path`,
     stamp-less, to a temp output; returns the page bytes. Never writes
-    the repo's out/frontier-models.html."""
+    the repo's out/frontier-models.html, and cleans its own scratch
+    directory -- an ignore-file-hidden leak here would sit in the
+    worktree root invisible to git status."""
     saved_raw, saved_agents, saved_out = (
         build.RAW, build.AGENTS_RAW, build.OUT)
-    output = Path(tempfile.mkdtemp(prefix=".build-bytes-",
-                                   dir=str(REPO_ROOT))) / "page.html"
+    tmp = Path(tempfile.mkdtemp(prefix=".build-bytes-", dir=str(REPO_ROOT)))
+    output = tmp / "page.html"
     build.RAW, build.AGENTS_RAW = Path(raw_path), Path(agents_path)
     build.OUT = output
     try:
         saved_stamp = os.environ.pop("AA_SOURCE_COMMIT", None)
         try:
             with contextlib.redirect_stdout(io.StringIO()):
+                # astroid cannot infer build.py's members from this
+                # module (test_browser.py calls the same name clean);
+                # the member exists and the suite exercises it.
+                # pylint: disable-next=no-member
                 build.main()
+            page_bytes = output.read_bytes()
         finally:
             if saved_stamp is not None:
                 os.environ["AA_SOURCE_COMMIT"] = saved_stamp
     finally:
         build.RAW, build.AGENTS_RAW, build.OUT = (
             saved_raw, saved_agents, saved_out)
-    return output.read_bytes()
+        shutil.rmtree(tmp, ignore_errors=True)
+    return page_bytes
 
 
 def test_code_bytes_is_identical_across_the_686_688_capture_growth():

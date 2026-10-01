@@ -43,10 +43,13 @@ Measurement JSON (``--measure [--out FILE]``, schema_version 1):
        ``id="tbl"`` through its ``</tbody>``.
 
   The tbody regions are the static tables issue #97 ships so the data
-  is readable without JavaScript; the page's only remaining
-  data-derived bytes are fixed-length (the footer's capture digest).
-  code_bytes is the page's ONLY budgeted byte count, seeded at the
-  measured value exactly (builds are byte-deterministic).
+  is readable without JavaScript; the data-derived bytes OUTSIDE the
+  three regions are all fixed-width at any capture size -- the footer's
+  capture digest, four fixed-width capture-date strings and the 40-hex
+  source-commit stamp (present only when the build environment carries
+  one) -- so none of them scales with the capture. code_bytes is the
+  page's ONLY budgeted byte count, seeded at the measured value exactly
+  (builds are byte-deterministic).
 - dom_nodes_mutated: total added+removed nodes over childList mutation
   records in the journey window. The observer is installed from an init
   script added to the page context BEFORE navigation, so the load window
