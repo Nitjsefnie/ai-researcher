@@ -2,21 +2,23 @@
 
 The check runs in CI against out/frontier-models.html as committed, and
 refuses a page that carries no exactly-one well-shaped source-commit stamp
-or differs from a stamp-less rebuild of the same tree once build provenance
-is masked out (issue #105). These pins are on the DECISION, not the
-mechanism: every failure mode yields its own distinct violation, a correct
-page yields none, the mask removes exactly the provenance spans, and the
-stamp shape stays coupled to what build.py actually renders.
+or differs from a stamp-less rebuild of HEAD's committed data once build
+provenance is masked out (issue #105). These pins are on the DECISION, not
+the mechanism: every failure mode yields its own distinct violation, a
+correct page yields none, the mask removes exactly the provenance spans,
+and the stamp shape stays coupled to what build.py actually renders.
 
 Nothing here reads the working out/frontier-models.html:
 tests/test_browser.py rebuilds that file stamp-less during the suite, and
 pytest collects files alphabetically, so the browser file runs first and the
-working copy is stamp-less by the time this file runs. The committed side is
-read with `git show HEAD:...`, the rebuilt side from the tree's own data/
-into a temp path.
+working copy is stamp-less by the time this file runs. Both sides are read
+from HEAD with `git show`: the committed page directly, and the data/ the
+rebuild stages from HEAD into a temp path, so a fresh uncommitted capture
+in the working data/ cannot move the rebuilt side (issue #108).
 """
 import contextlib
 import io
+import json
 import os
 import pathlib
 import re
@@ -83,6 +85,37 @@ class CheckCommittedPageTests(unittest.TestCase):
         self.assertEqual(
             check_committed_page.verify(committed_at_head(), self.rebuilt),
             [])
+
+    def test_a_changed_working_capture_does_not_move_the_rebuild(self):
+        # The refresh's exact shape (issue #108): fetch_aa.py has just
+        # written a fresh capture into the working data/ and the suite runs
+        # BEFORE the commit. The check's subject is the committed tree, so
+        # pointing build's capture paths at that fresh capture -- the state
+        # the working data/ sits in at that moment -- must leave the rebuilt
+        # side at HEAD's page: staging a rendered change and a future
+        # capture stamp, HEAD's page still passes.
+        fresh = json.loads(
+            (build.ROOT / "data" / "aa-raw-models.json")
+            .read_text(encoding="utf-8"))
+        fresh[0]["intelligenceIndex"] += 0.5
+        with tempfile.TemporaryDirectory(prefix=".refresh-shape-") as tmp:
+            staged = pathlib.Path(tmp)
+            (staged / "aa-raw-models.json").write_text(
+                json.dumps(fresh), encoding="utf-8")
+            (staged / "aa-raw-coding-agents.json").write_bytes(
+                (build.ROOT / "data" / "aa-raw-coding-agents.json")
+                .read_bytes())
+            (staged / "captured-at.txt").write_text("2030-01-01\n",
+                                                    encoding="utf-8")
+            with mock.patch.object(build, "RAW",
+                                   staged / "aa-raw-models.json"), \
+                 mock.patch.object(build, "AGENTS_RAW",
+                                   staged / "aa-raw-coding-agents.json"):
+                self.assertEqual(
+                    check_committed_page.verify(
+                        committed_at_head(),
+                        check_committed_page.rebuild_page()),
+                    [])
 
     def test_a_green_pair_yields_no_violation(self):
         self.assertEqual(
@@ -240,6 +273,20 @@ class CheckCommittedPageTests(unittest.TestCase):
         self.assertNotEqual(code, 0)
         self.assertIn("red, never a silent pass", err.getvalue())
         self.assertIn("the tree does not build", err.getvalue())
+
+    def test_a_failed_git_show_is_red_not_silent(self):
+        # No data at HEAD -- the first capture ever, or a broken git: the
+        # rebuild cannot run, so it must raise rather than hand back a page
+        # built from nothing. main() turns the raise into exit 1 (pinned
+        # above); here the raise itself is the contract.
+        failed = subprocess.CompletedProcess(
+            ["git", "show"], returncode=128, stdout=b"",
+            stderr=b"fatal: bad object HEAD")
+        with mock.patch("subprocess.run", return_value=failed):
+            with self.assertRaises(Exception) as caught:
+                check_committed_page.rebuild_page()
+
+        self.assertIn("data/aa-raw-models.json", str(caught.exception))
 
     def test_rebuild_page_restores_state_when_the_inner_build_fails(self):
         # The failing control for rebuild_page's own finally limb: the INNER

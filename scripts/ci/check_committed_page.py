@@ -11,8 +11,18 @@ page byte for byte (issue #105). This check runs in CI on every commit of
 the page and refuses one that
 
   (i)   does not carry exactly one well-shaped source-commit stamp, or
-  (ii)  differs from a stamp-less rebuild of the same tree once build
-        provenance (the capture digest and the stamp itself) is masked out.
+  (ii)  differs from a stamp-less rebuild of HEAD's committed data once
+        build provenance (the capture digest and the stamp itself) is
+        masked out.
+
+The check's subject is the COMMITTED tree. The rebuild stages data/ from
+HEAD (`git show HEAD:data/...`) rather than reading the working tree's,
+because the refresh runs this suite after capture but before the commit:
+during a refresh the working data/ holds the fresh uncommitted capture, and
+building from it judged HEAD's page against data it was never built from,
+going red on exactly the runs that had something to commit (issue #108).
+In CI the checkout IS the committed tree, so the `page` job judges the same
+thing it always has.
 
 Exit 0 when the committed page is well-stamped and byte-equal to its masked
 rebuild; 1 with one line per violated invariant otherwise -- a missing page,
@@ -27,6 +37,7 @@ import io
 import os
 import pathlib
 import re
+import subprocess
 import sys
 import tempfile
 
@@ -87,23 +98,65 @@ def mask(page: str) -> str:
     return stamp_mask(mask_digest(page))
 
 
-def rebuild_page() -> str:
-    """The page the checkout's own data/ builds, stamp-less.
+# The data files the rebuild stages from HEAD, named as build.py and
+# capture_gate.py name them: the two captures plus the stamp file beside
+# them, which build reads from RAW.parent -- staging all three fully
+# determines the build.
+MODELS_NAME = "aa-raw-models.json"
+AGENTS_NAME = "aa-raw-coding-agents.json"
+STAMP_NAME = "captured-at.txt"
 
-    Mirrors capture_gate._render_side: the temp dir lives under build.ROOT
-    because build.main() prints OUT.relative_to(ROOT) and would raise on a
-    page outside it. build's module globals and AA_SOURCE_COMMIT are
-    restored no matter how the build ends, so a failed rebuild cannot
-    poison the caller's tree state. No captures are staged here -- data/
-    is the tree's own, and this check judges the page against it, not the
-    captures against HEAD.
+
+class HeadCaptureError(Exception):
+    """No readable data at HEAD -- the rebuild cannot run, so it is red."""
+
+
+def _git_show(path: str) -> bytes:
+    """One file exactly as HEAD committed it.
+
+    Mirrors capture_gate._git_show but fails red: the gate asks a question
+    about a world where data may not exist yet and fails open, while a
+    check that cannot rebuild has no answer and must not pass.
+    """
+    proc = subprocess.run(
+        ["git", "show", f"HEAD:{path}"],
+        cwd=str(build.ROOT), capture_output=True, check=False)
+    if proc.returncode != 0:
+        raise HeadCaptureError(
+            f"git show HEAD:{path} failed: "
+            + (proc.stderr or b"").decode("utf-8", "replace").strip())
+    return proc.stdout or b""
+
+
+def rebuild_page() -> str:
+    """The page HEAD's committed data/ builds, stamp-less.
+
+    The check's subject is the committed tree (issue #108): the refresh
+    runs this suite after capture but before the commit, so during a
+    refresh the working data/ holds the fresh uncommitted capture, and a
+    rebuild that honored it judged HEAD's page against data it was never
+    built from. HEAD's two captures and their captured-at stamp are staged
+    into a temp data/ dir -- build reads the stamp from RAW.parent -- and
+    build.RAW/AGENTS_RAW/OUT are pointed at the staged copies. Mirrors
+    capture_gate._render_side: the temp dir lives under build.ROOT because
+    build.main() prints OUT.relative_to(ROOT) and would raise on a page
+    outside it. build's module globals and AA_SOURCE_COMMIT are restored no
+    matter how the build ends, so a failed rebuild cannot poison the
+    caller's tree state. A failed `git show` raises -- red, never a silent
+    pass.
     """
     with tempfile.TemporaryDirectory(prefix=".committed-page-",
                                      dir=build.ROOT) as tmp:
+        data_dir = pathlib.Path(tmp) / "data"
+        data_dir.mkdir()
+        for name in (MODELS_NAME, AGENTS_NAME, STAMP_NAME):
+            (data_dir / name).write_bytes(_git_show(f"data/{name}"))
         page_path = pathlib.Path(tmp) / "frontier-models.html"
         saved = (build.RAW, build.AGENTS_RAW, build.OUT)
         env_saved = os.environ.pop(STAMP_ENV, None)
         try:
+            build.RAW = data_dir / MODELS_NAME
+            build.AGENTS_RAW = data_dir / AGENTS_NAME
             build.OUT = page_path
             with contextlib.redirect_stdout(io.StringIO()):
                 build.main()
