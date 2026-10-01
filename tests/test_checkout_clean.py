@@ -15,9 +15,14 @@ checkout state to be identical before and after, where the state is BOTH
   content as before the subprocess started moves neither side -- run 1
   against broken code dirties out/, and run 2's before/after text
   snapshots are then equal (observed: rc 0 on the second run). The
-  sha256 of out/frontier-models.html folds the content into the oracle,
-  and the AA_SOURCE_COMMIT marker below makes every dirtying build
-  produce bytes nothing else could have written, so the digest moves.
+  sha256 of out/frontier-models.html folds the content into the oracle:
+  three of the four writers build with the ambient stamp, so the fresh
+  marker below makes their dirtying builds produce bytes nothing else
+  could have written; the fourth (PerfBudgetTests) pops AA_SOURCE_COMMIT
+  and emits deterministic stamp-less bytes, so a regression isolated to
+  that writer alone can digest-match across consecutive runs and is
+  caught on the first dirtying run, where both oracle sides move off the
+  committed state.
 - What the text snapshot includes, deliberately: `--porcelain` reports
   tracked modifications and untracked NON-ignored files. It does not
   report ignored paths, and this repo's deny-by-default .gitignore
