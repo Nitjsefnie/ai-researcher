@@ -101,7 +101,12 @@ def mask(page: str) -> str:
 # The data files the rebuild stages from HEAD, named as build.py and
 # capture_gate.py name them: the two captures plus the stamp file beside
 # them, which build reads from RAW.parent -- staging all three fully
-# determines the build.
+# determines the build. The count has no drift-sensing control: a fourth
+# data/ input in build.py would mix HEAD's staged files with the working
+# tree's. The refresh-shape test is the one guard it has -- its staged dir
+# holds ONLY these three, so a required input beside the captures fails
+# that build loudly; optional or elsewhere-read inputs stay on this
+# comment and the reader.
 MODELS_NAME = "aa-raw-models.json"
 AGENTS_NAME = "aa-raw-coding-agents.json"
 STAMP_NAME = "captured-at.txt"
