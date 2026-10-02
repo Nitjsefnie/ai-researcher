@@ -13,7 +13,9 @@ import tempfile
 import unittest
 from unittest import mock
 
-from playwright.sync_api import sync_playwright
+from playwright.sync_api import (
+    TimeoutError as PlaywrightTimeoutError,
+    sync_playwright)
 
 import test_build
 
@@ -192,12 +194,41 @@ class BrowserInteractionTests(unittest.TestCase):
             "every interaction below would time out instead of failing here")
         return points.first
 
+    def _hoverable_point(self, page, selector, attempts=8):
+        """The first point at `selector` playwright can actually hover.
+
+        A point's action point can be covered by a later-drawn neighbour --
+        a disputed build redraws every frontier (disputed models sit out
+        while a window lasts, #122), so which point sits on top moves with
+        the window and the DOM-first point is not hoverable on every page
+        shape. Candidates are tried in DOM order; the first that hovers
+        carries the pin, and exhaustion fails naming the selector.
+        """
+        points = page.locator(selector)
+        self.assertGreater(
+            points.count(), 0,
+            f"no points matched {selector!r} -- the chart rendered empty, so "
+            "every interaction below would time out instead of failing here")
+        last = None
+        for index in range(min(attempts, points.count())):
+            point = points.nth(index)
+            try:
+                point.hover(timeout=2000)
+            except PlaywrightTimeoutError as exc:
+                last = exc
+                continue
+            return point
+        self.fail(
+            f"no point at {selector!r} was hoverable in {attempts} candidates "
+            f"(last error: {last})")
+
     def test_non_frontier_points_pin_a_visible_name_on_capability_charts(self):
         for metric in ("coding", "agentic"):
             with self.subTest(metric=metric):
                 page = self.browser.new_page(viewport={"width": 1280, "height": 900})
                 page.goto(build.OUT.as_uri())
-                point = self.first_point(page, f"#svg-{metric} circle.pt[r='5']")
+                point = self._hoverable_point(
+                    page, f"#svg-{metric} circle.pt[r='5']")
                 point.hover()
                 model_name = page.locator(f"#tip-{metric} .tname").inner_text()
 
@@ -286,18 +317,37 @@ class BrowserInteractionTests(unittest.TestCase):
 
     def test_superseded_points_draw_de_emphasis_gray_on_all_four_charts(self):
         # The colour rule is stated once for the page (AGENTS.md: superseded
-        # models draw in de-emphasis gray), so every off-frontier point draws
-        # var(--muted) on every chart, and every legend documents the swatch.
+        # models draw in de-emphasis gray), so every off-frontier point
+        # draws var(--muted) on every chart, and every legend documents the
+        # swatch. On a disputed build the off-frontier set gains the
+        # disputed points (#122): they sit out the frontiers and draw
+        # hollow-in-gray -- var(--surface-1), the disputed marker's fill,
+        # present on a chart exactly when that chart carries disputed
+        # markers and never on a plain build -- while a frontier point
+        # carries neither verdict's fill.
         page = self.browser.new_page(viewport={"width": 1280, "height": 900})
         page.goto(build.OUT.as_uri())
+        disputed_build = page.locator("#disputed").count() > 0
         for chart in ("coding", "intelligence", "agentic", "parameters"):
             with self.subTest(chart=chart):
+                markers = page.locator(
+                    f"#svg-{chart} [aria-label*='disputed values']")
                 off_frontier = page.evaluate(
                     "sel => [...new Set([...document.querySelectorAll(sel)]"
                     ".map(c => c.getAttribute('fill')))]",
                     f"#svg-{chart} circle.pt[r='5']",
                 )
-                self.assertEqual(off_frontier, ["var(--muted)"])
+                allowed = {"var(--muted)"}
+                if disputed_build:
+                    allowed.add("var(--surface-1)")
+                self.assertTrue(
+                    off_frontier and set(off_frontier) <= allowed,
+                    f"{chart}: off-frontier fills {off_frontier} leave the "
+                    f"legit set {sorted(allowed)}")
+                self.assertEqual(
+                    "var(--surface-1)" in off_frontier, markers.count() > 0,
+                    f"{chart}: the disputed fill appears exactly when the "
+                    "chart carries disputed markers")
 
                 # frontier points keep their weights fill -- the gray is a
                 # superseded verdict, not a repainting of the whole chart
@@ -1491,8 +1541,13 @@ _PROBE_AGENTS = [
 
 class BuildProvenanceTests(unittest.TestCase):
     """#49: the footer's provenance — source commit when the build
-    environment carries one, and a sha256 over the two capture files that a
-    reader can verify today, by hashing the committed files."""
+    environment carries one, and a sha256 over the build's inputs that a
+    reader can verify today, by hashing the committed files. On a disputed
+    build the page's content includes the disputed layer (#122), so the
+    content hash covers the snapshot then the coding-agents capture --
+    exactly what the footer's own inputs note names -- and the models
+    capture is not an input at all (it may not even exist in a disputed
+    hour)."""
 
     COMMIT = "e5e10f1c0ffee4215deadbeefcafe0123456789a"
 
@@ -1503,6 +1558,21 @@ class BuildProvenanceTests(unittest.TestCase):
         for."""
         start = html.index('class="foot"')
         return html[start:html.index("<script>", start)]
+
+    @staticmethod
+    def _expected_digest(data_dir):
+        """The sha256 a reader recomputes from the data directory: the two
+        capture files when the build is plain, snapshot-then-agents when
+        the directory carries a disagreement snapshot (#122) -- the same
+        rule build.py states in the footer's inputs note."""
+        digest = hashlib.sha256()
+        snapshot = data_dir / build.DISPUTED_SNAPSHOT_NAME
+        if snapshot.exists():
+            digest.update(snapshot.read_bytes())
+        else:
+            digest.update((data_dir / "aa-raw-models.json").read_bytes())
+        digest.update((data_dir / "aa-raw-coding-agents.json").read_bytes())
+        return digest.hexdigest()
 
     def _build(self, destination, commit=None):
         """Run build.main() to `destination`, with AA_SOURCE_COMMIT set or
@@ -1530,11 +1600,8 @@ class BuildProvenanceTests(unittest.TestCase):
             foot = self._foot(html)
             self.assertIn(self.COMMIT, foot)
             # the content hash equals an independently computed sha256 over
-            # the two capture files, read straight off the data directory
-            digest = hashlib.sha256()
-            digest.update(build.RAW.read_bytes())
-            digest.update(build.AGENTS_RAW.read_bytes())
-            self.assertIn(digest.hexdigest(), foot)
+            # the build's inputs, read straight off the data directory
+            self.assertIn(self._expected_digest(build.RAW.parent), foot)
 
     def test_footer_omits_the_source_commit_when_the_environment_is_unset(self):
         with tempfile.TemporaryDirectory(prefix=".issue-49-build-",
@@ -1549,10 +1616,43 @@ class BuildProvenanceTests(unittest.TestCase):
             self.assertNotIn(self.COMMIT, html)
             # the content hash is verifiable today without any workflow
             # change, so it renders with or without the commit
+            self.assertIn(self._expected_digest(build.RAW.parent), foot)
+
+    def test_footer_on_a_disputed_build_hashes_snapshot_then_agents(self):
+        # #122: the disputed page's inputs are the snapshot then the agents
+        # capture -- the models capture is not an input at all, so this
+        # build's data dir does not even carry one -- and the footer states
+        # exactly that: the digest recomputes from those two whole files in
+        # that order, the inputs note names them, and the source-commit
+        # stamp renders beside the disputed hash unchanged.
+        with tempfile.TemporaryDirectory(prefix=".issue-122-build-",
+                                         dir=build.ROOT) as tmp:
+            data = pathlib.Path(tmp) / "data"
+            data.mkdir()
+            snapshot = json.dumps(
+                test_build.disputed_snapshot_fixture(),
+                indent=1).encode("utf-8")
+            (data / build.DISPUTED_SNAPSHOT_NAME).write_bytes(snapshot)
+            agents = build.AGENTS_RAW.read_bytes()
+            (data / "aa-raw-coding-agents.json").write_bytes(agents)
+            (data / "captured-at.txt").write_text("2026-10-04\n",
+                                                  encoding="utf-8")
+            saved_raw = build.RAW
+            build.RAW = data / "aa-raw-models.json"  # deliberately absent
+            try:
+                output = pathlib.Path(tmp) / "frontier-models.html"
+                html = self._build(output, commit=self.COMMIT).decode("utf-8")
+            finally:
+                build.RAW = saved_raw
+
+            foot = self._foot(html)
+            self.assertIn(self.COMMIT, foot)
             digest = hashlib.sha256()
-            digest.update(build.RAW.read_bytes())
-            digest.update(build.AGENTS_RAW.read_bytes())
+            digest.update(snapshot)
+            digest.update(agents)
             self.assertIn(digest.hexdigest(), foot)
+            self.assertIn("sha256 over data/" + build.DISPUTED_SNAPSHOT_NAME
+                          + " then data/aa-raw-coding-agents.json", foot)
 
     def test_a_malformed_source_commit_renders_no_stamp_and_no_marker_splice(self):
         # AA_SOURCE_COMMIT is build-machine input, so only SHA-shaped values

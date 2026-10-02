@@ -704,7 +704,19 @@ def test_code_bytes_is_identical_across_the_686_688_capture_growth():
         models.write_bytes(models_686)
         agents.write_bytes(agents_686)
         grown = perf.code_bytes(_build_bytes(models, agents))
-        live = perf.code_bytes(_build_bytes(build.RAW, build.AGENTS_RAW))
+        if (Path(str(build.RAW.parent)) / build.DISPUTED_SNAPSHOT_NAME).exists():
+            # A live window (issue #122): the data/ build is disputed, whose
+            # code region carries the window's own bytes -- a different page
+            # SHAPE, not capture growth, and out of this property's scope.
+            # The live side builds canonical: the same captures, staged
+            # beside no snapshot.
+            live_models = tmp / "live-models.json"
+            live_agents = tmp / "live-agents.json"
+            live_models.write_bytes(build.RAW.read_bytes())
+            live_agents.write_bytes(build.AGENTS_RAW.read_bytes())
+            live = perf.code_bytes(_build_bytes(live_models, live_agents))
+        else:
+            live = perf.code_bytes(_build_bytes(build.RAW, build.AGENTS_RAW))
         assert grown == live
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
