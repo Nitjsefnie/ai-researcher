@@ -28,15 +28,31 @@ import build  # noqa: E402  # pylint: disable=wrong-import-position,wrong-import
 # The real captures work as fixtures and are fast (a full build measures
 # ~0.1 s); the suite already builds from them twice. The FRESH side of the
 # gate reads data/ directly, so tests stay hermetic by monkeypatching the
-# factored HEAD read only -- nothing here writes to the working tree.
+# factored HEAD read only -- nothing here writes to the working tree. The
+# snapshot reads are pinned inside run_gate (issue #122): a snapshot the
+# working tree carries -- fetch_aa.py writes one for every hour of a live
+# window, and the suite runs against exactly that tree -- leaked into every
+# unpinning test's fresh side and voted true on identical captures.
 REAL_MODELS = (build.ROOT / "data" / "aa-raw-models.json").read_bytes()
 REAL_AGENTS = (build.ROOT / "data" / "aa-raw-coding-agents.json").read_bytes()
 
 
-def run_gate() -> tuple[int, str]:
-    """capture_gate.main() with stdout captured; returns (exit, stdout)."""
+def run_gate(*, head_snapshot: bytes | None = None,
+             fresh_snapshot: bytes | None = None) -> tuple[int, str]:
+    """capture_gate.main() with stdout captured; returns (exit, stdout).
+
+    Both snapshot reads are pinned here, to the arguments -- None each by
+    default (no window on either side) -- so every caller is hermetic
+    against whatever sits in data/ while a window is live. Tests pinning
+    the disputed paths pass their snapshot bytes in; None means that side
+    has no snapshot.
+    """
     out = io.StringIO()
-    with contextlib.redirect_stdout(out):
+    with mock.patch.object(capture_gate, "read_head_snapshot",
+                           return_value=head_snapshot), \
+         mock.patch.object(capture_gate, "read_fresh_snapshot",
+                           return_value=fresh_snapshot), \
+         contextlib.redirect_stdout(out):
         code = capture_gate.main()
     return code, out.getvalue()
 
@@ -439,13 +455,10 @@ class DisputedGateTests(unittest.TestCase):
                       fresh=(REAL_MODELS, REAL_AGENTS)):
         with mock.patch.object(capture_gate, "read_head_captures",
                                return_value=head), \
-             mock.patch.object(capture_gate, "read_head_snapshot",
-                               return_value=head_snapshot), \
              mock.patch.object(capture_gate, "read_fresh_captures",
-                               return_value=fresh), \
-             mock.patch.object(capture_gate, "read_fresh_snapshot",
-                               return_value=fresh_snapshot):
-            return run_gate()
+                               return_value=fresh):
+            return run_gate(head_snapshot=head_snapshot,
+                            fresh_snapshot=fresh_snapshot)
 
     def test_a_window_opening_is_a_change(self):
         code, out = self.run_gate_with(
@@ -512,3 +525,70 @@ class DisputedGateTests(unittest.TestCase):
         code, out = self.run_gate_with(head_snapshot=None, fresh_snapshot=None)
 
         self.assertEqual((code, out), (0, "false\n"))
+
+
+class SnapshotReadWiringTests(unittest.TestCase):
+    """The two snapshot reads' real wiring, both ways (issue #122): the
+    fresh read takes data/ -- bytes when a snapshot sits there, None when
+    it does not, FreshCaptureError when the path exists but cannot be read;
+    the HEAD read takes git HEAD, where absence is the normal pre-window
+    hour and reads as None, and presence (a window's committed snapshot) is
+    read back byte-exact. Pinned against throwaway git repos so the pins
+    hold whatever the live repo is carrying: during a window main itself
+    commits the snapshot, so the live HEAD is the wrong oracle."""
+
+    def _git_repo(self) -> tempfile.TemporaryDirectory:
+        """A repo with one empty commit; returns its TemporaryDirectory."""
+        tmp = tempfile.TemporaryDirectory()  # pylint: disable=consider-using-with
+        self.addCleanup(tmp.cleanup)
+
+        def git(*args: str) -> None:
+            subprocess.run(["git", *args], cwd=tmp.name,
+                           check=True, capture_output=True)
+
+        git("init", "-q")
+        git("config", "user.email", "wiring@example.com")
+        git("config", "user.name", "Wiring")
+        git("commit", "--allow-empty", "-m", "seed")
+        return tmp
+
+    def test_read_head_snapshot_reads_HEAD_byte_exact_when_present(self):
+        with self._git_repo() as tmp:
+            data = pathlib.Path(tmp) / "data"
+            data.mkdir()
+            (data / capture_gate.SNAPSHOT_NAME).write_bytes(b"{present}")
+            subprocess.run(["git", "add", "data"], cwd=tmp, check=True,
+                           capture_output=True)
+            subprocess.run(["git", "commit", "-q", "-m", "window"],
+                           cwd=tmp, check=True, capture_output=True)
+            with mock.patch.object(capture_gate, "ROOT", pathlib.Path(tmp)):
+                self.assertEqual(capture_gate.read_head_snapshot(),
+                                 b"{present}")
+
+    def test_read_head_snapshot_is_none_when_absent_at_HEAD(self):
+        with self._git_repo() as tmp:
+            with mock.patch.object(capture_gate, "ROOT", pathlib.Path(tmp)):
+                self.assertIsNone(capture_gate.read_head_snapshot())
+
+    def test_read_fresh_snapshot_reads_data_byte_exact_when_present(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            data = pathlib.Path(tmp) / "data"
+            data.mkdir()
+            (data / capture_gate.SNAPSHOT_NAME).write_bytes(b"{fresh}")
+            with mock.patch.object(capture_gate, "ROOT", pathlib.Path(tmp)):
+                self.assertEqual(capture_gate.read_fresh_snapshot(), b"{fresh}")
+
+    def test_read_fresh_snapshot_is_none_when_absent(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            (pathlib.Path(tmp) / "data").mkdir()
+            with mock.patch.object(capture_gate, "ROOT", pathlib.Path(tmp)):
+                self.assertIsNone(capture_gate.read_fresh_snapshot())
+
+    def test_read_fresh_snapshot_raises_when_unreadable(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            data = pathlib.Path(tmp) / "data"
+            data.mkdir()
+            (data / capture_gate.SNAPSHOT_NAME).mkdir()  # a dir, not a file
+            with mock.patch.object(capture_gate, "ROOT", pathlib.Path(tmp)):
+                with self.assertRaises(capture_gate.FreshCaptureError):
+                    capture_gate.read_fresh_snapshot()
