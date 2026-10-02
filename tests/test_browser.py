@@ -16,6 +16,7 @@ from unittest import mock
 from playwright.sync_api import sync_playwright
 
 import build
+import test_build
 
 # This box has a system Chromium and no playwright-managed browser; CI has the
 # reverse (`playwright install chromium`). Prefer whatever is actually present
@@ -1590,8 +1591,6 @@ class DisputedBrowserTests(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        from test_build import agent_fixture, disputed_snapshot_fixture
-
         cls._saved = (build.RAW, build.AGENTS_RAW, build.OUT)
         # The directory outlives this setup -- tearDownClass cleans it up
         # after the browser closes -- so it cannot live in a with.
@@ -1600,9 +1599,9 @@ class DisputedBrowserTests(unittest.TestCase):
         data = pathlib.Path(cls._dir.name) / "data"
         data.mkdir()
         (data / build.DISPUTED_SNAPSHOT_NAME).write_text(
-            json.dumps(disputed_snapshot_fixture()), encoding="utf-8")
+            json.dumps(test_build.disputed_snapshot_fixture()), encoding="utf-8")
         (data / "aa-raw-coding-agents.json").write_text(
-            json.dumps([agent_fixture()]), encoding="utf-8")
+            json.dumps([test_build.agent_fixture()]), encoding="utf-8")
         (data / "captured-at.txt").write_text("2026-10-04\n",
                                               encoding="utf-8")
         build.RAW = data / "aa-raw-models.json"

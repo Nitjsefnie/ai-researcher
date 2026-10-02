@@ -1524,7 +1524,7 @@ class DisagreementSnapshotTests(unittest.TestCase):
         for why, dated in (("undated", False), ("dated", True)):
             with self.subTest(why=why):
                 with self.refused_capture(self.routes_forever_disagreeing(
-                        dated=dated)) as (root, run, captured):
+                        dated=dated)) as (_root, run, captured):
                     with self.assertRaises(SystemExit) as caught:
                         run()
 
@@ -1567,7 +1567,7 @@ class DisagreementSnapshotTests(unittest.TestCase):
         with self.refused_capture(
                 self.routes_forever_disagreeing(),
                 seed_stamp="1791080000\ncaptured before\n") as (
-                        root, run, _captured):
+                        _root, run, _captured):
             with self.assertRaises(SystemExit):
                 run()
 
@@ -1589,7 +1589,7 @@ class DisagreementSnapshotTests(unittest.TestCase):
                 flight_html(leaderboard_payload())),
             self.DETAIL_URL: lambda: _FakeResponse(detail),
         }
-        with self.refused_capture(routes) as (root, run, captured):
+        with self.refused_capture(routes) as (_root, run, captured):
             with self.assertRaises(SystemExit) as caught:
                 run()
 
@@ -1614,7 +1614,7 @@ class DisagreementSnapshotTests(unittest.TestCase):
                 agent_payload([agent_row(f"Agent - Model {i}")
                                for i in range(5)]))),
         }
-        with self.refused_capture(routes) as (root, run, _captured):
+        with self.refused_capture(routes) as (_root, run, _captured):
             snap = snapshot_path_of()
             snap.write_text('{"schema": 1}', encoding="utf-8")
             stdout, _stderr = run()

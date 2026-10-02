@@ -273,7 +273,7 @@ jobs:
               } > "$stamp"
             else
               {
-                echo "$(head -n 1 "$stamp")"
+                head -n 1 "$stamp"
                 cat /tmp/fetch-err.txt
               } > "$stamp.new" && mv "$stamp.new" "$stamp"
             fi

@@ -412,7 +412,7 @@ class RouteDisagreementPublishTests(unittest.TestCase):
         # The banner names ONE window across hours: an existing stamp's
         # first line is preserved, only the diagnostic body refreshes.
         idx_f = self.block.index('if [ ! -f "$stamp" ]; then')
-        idx_keep = self.block.index('echo "$(head -n 1 "$stamp")"', idx_f)
+        idx_keep = self.block.index('head -n 1 "$stamp"', idx_f)
         self.assertLess(idx_f, idx_keep)
 
     def test_a_refusal_without_a_snapshot_is_red(self):

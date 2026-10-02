@@ -1228,6 +1228,9 @@ def main():
     # captured strings, and still goes through the template-marker guard.
     disputed_stats = None
     if snapshot is not None:
+        # The narrowing assertion is the type narrowing, not a runtime check
+        # that can fire: disputes is assigned in the same branch above.
+        assert disputes is not None
         start = snapshot.get("windowStartEpoch")
         disputed_stats = {
             "models": len(disputes),
@@ -1322,6 +1325,7 @@ def main():
     dep = sum(1 for r in intelligence_rows if r["dep"])
     print(f"wrote {OUT.relative_to(ROOT)}")
     if snapshot is not None:
+        assert disputed_stats is not None
         print(f"  DISPUTED build from {DISPUTED_SNAPSHOT_NAME}: "
               f"{disputed_stats['models']} model(s) carry "
               f"{disputed_stats['values']} disputed value(s); they sit out "
