@@ -1773,7 +1773,7 @@ class DisputedBuildTests(unittest.TestCase):
         return payload
 
     def test_the_banner_renders_with_the_window_and_counts(self):
-        with self.disputed_page() as (page, snapshot):
+        with self.disputed_page() as (page, _snapshot):
             self.assertIn('id="disputed" role="status"', page)
             self.assertIn("Disputed capture", page)
             self.assertIn("2026-10-04T03:20:00Z", page)
@@ -1805,7 +1805,7 @@ class DisputedBuildTests(unittest.TestCase):
         # The disputed model is smarter at the same cost, so were it eligible
         # it would dominate Fixture Model B outright. Sitting out BOTH roles,
         # B keeps its frontier seat and the disputed model has none.
-        with self.disputed_page() as (page, snapshot):
+        with self.disputed_page() as (page, _snapshot):
             payload = self.payload_of(page)
             self.assertEqual(payload["stats"]["metricFrontiers"],
                              {"coding": 1, "intelligence": 1, "agentic": 1})

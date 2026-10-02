@@ -41,7 +41,7 @@ sys.path.insert(0, str(ROOT_FOR_IMPORT))
 
 from build import (  # noqa: E402  # pylint: disable=wrong-import-position
     DISPUTED_SNAPSHOT_NAME, GDPVAL_SLUG, INDEX_VERSION,
-    RouteDisagreement, check_route_agreement, merge_captures,
+    check_route_agreement, merge_captures,
 )
 
 URL = "https://artificialanalysis.ai/leaderboards/models"
@@ -418,43 +418,6 @@ def detail_host_slug(models: list[dict]) -> str:
     return unpriced[0]
 
 
-def merge_captures(base: list[dict], detail: list[dict]) -> list[dict]:
-    """Leaderboard records widened with the detail route's extra fields.
-
-    The leaderboard is the authority on WHICH models exist and on every field
-    it still carries; detail only fills gaps. Overlapping values are identical
-    between the routes, so gap-filling and overwriting would agree -- filling
-    is chosen so a future divergence surfaces on the detail-only fields rather
-    than silently rewriting the leaderboard's own numbers.
-    """
-    def fill(into, extra):
-        """`into` wins; `extra` supplies only what is absent.
-
-        One level deep, because the split runs THROUGH a nested object: the
-        leaderboard kept intelligenceIndexCostPerTask.cost and dropped its
-        .evaluations, so a key-level fill would let the surviving stub shadow
-        the complete breakdown and leave the GDPval axis with no cost.
-        """
-        out = dict(into)
-        for k, v in extra.items():
-            if k not in out:
-                out[k] = v
-            elif isinstance(out[k], dict) and isinstance(v, dict):
-                out[k] = fill(out[k], v)
-            elif isinstance(v, dict) and not isinstance(out[k], dict):
-                # Same key, different SHAPE. The leaderboard flattened
-                # intelligenceIndexCostPerTask to its bare total while the
-                # detail route kept the object with the per-evaluation
-                # breakdown. A scalar cannot hold what the object holds, so
-                # the object wins; the scalar was its `cost.total` anyway.
-                out[k] = v
-        return out
-
-    by_slug = {m["slug"]: m for m in detail if isinstance(m.get("slug"), str)}
-    return [fill(m, by_slug[m["slug"]]) if by_slug.get(m.get("slug")) else m
-            for m in base]
-
-
 def coding_agent_rows(payload: str) -> list[dict]:
     """Every agent+model row in the Coding Agent Index, wherever it is nested.
 
@@ -590,9 +553,9 @@ class _RouteDisagreement(SystemExit):
     without re-fetching or re-deriving anything.
     """
 
-    def __init__(self, message: object, base_generated: int | None = None,
-                 detail_generated: int | None = None, base: list | None = None,
-                 detail: list | None = None, divergences: list | None = None) -> None:
+    def __init__(self, message: object, base_generated: int | None,
+                 detail_generated: int | None, base: list,
+                 detail: list, divergences: list) -> None:
         super().__init__(message)
         self.base_generated = base_generated
         self.detail_generated = detail_generated
@@ -646,7 +609,7 @@ def capture_pair(cached_base: str | None, cached_detail: str | None) -> CaptureP
     except SystemExit as exc:
         raise _RouteDisagreement(exc.code, base_generated,
                                  detail_generated, base, detail,
-                                 getattr(exc, "divergences", None)) from None
+                                 getattr(exc, "divergences") or []) from None
     return CapturePair(base, detail, host, version, shared_values,
                        base_generated, detail_generated)
 
@@ -718,7 +681,7 @@ def main() -> None:
         # generation times -- so the disputed page is exactly the read that
         # was refused, never a second one.
         snapshot = disagreement_snapshot(
-            exc.base, exc.detail, exc.divergences or [],
+            exc.base, exc.detail, exc.divergences,
             exc.base_generated, exc.detail_generated)
         # The schema guards stay red on the disputed merge (issue #118):
         # only the disagreement itself stopped being red. A detail payload
