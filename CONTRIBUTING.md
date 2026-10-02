@@ -203,8 +203,9 @@ budgets: the default check mode fails on any budget exceeded, the ratchet
 guard refuses a budget that rises, and there is no automated raise. A
 deliberate raise follows the perf budgets' route (issue #120): its own
 commit on main, one `Budget-Raise: <document> <key> <from> -> <to>` line
-per raised leaf with the exact values the diff carries; pull requests
-cannot carry a raise. Budgets are pinned to the CI cell that runs the gate —
+per raised leaf with the exact values the diff carries — the lines count
+only on a main push, from a commit touching nothing outside the two
+budget documents. Budgets are pinned to the CI cell that runs the gate —
 the coverage job's ubuntu-latest runner, CPython 3.13.15 / valgrind
 3.22.0 — and were seeded from that cell's own first measured counts
 (build 171,504,264, capture_gate 267,669,619, diff_aa 222,551,193
