@@ -2,6 +2,7 @@
 """Refuse a change that relaxes a ratchet document.
 
     python3 scripts/ci/check_ratchets.py <base-rev> <head-rev>
+        [--allow-declared-raises]
 
 Both sides of each document are read as data with ``git show
 <rev>:<path>`` at the merge base of the two revisions and at the head —
@@ -42,15 +43,35 @@ Three documents are guarded, each with its own direction rules:
 
   Key added and key removed are findings in every guarded document — a
   PR must not be able to mask a raise behind a reshuffle.
+
+A deliberate budget raise has exactly one route onto main (issue #120):
+it lands as its own fast-forward push of main, and the raise commit's
+message carries one declaration line per raised leaf,
+
+    Budget-Raise: <document> <key> <from> -> <to>
+
+with the exact values the diff carries. The workflow's push branch (and
+only it) invokes the guard with --allow-declared-raises; a pull
+request's invocation never does, so a raise riding a pull request
+refuses even a perfectly declared one. The lines are collected from the
+window base..head only when the base is an ancestor of the head — the
+fast-forward shape a main push has. Every raised budget leaf needs a
+declaration naming it exactly: a raise with no declaration refuses, and
+so does a declaration the diff does not carry exactly — a mismatched
+value, a duplicate, a key that did not rise, or one naming the coverage
+document (whose raises are the ratchet's own automated act and whose
+relaxations refuse everywhere; only the two budget documents' raises
+are declarable).
 """
 from __future__ import annotations
 
 import argparse
 import json
 import math
+import re
 import subprocess
 import sys
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 from pathlib import Path
 
 DOCUMENT = '.github/ci-thresholds.json'
@@ -58,6 +79,13 @@ BUDGETS = '.github/perf-budgets.json'
 INSTRUCTION_BUDGETS = '.github/instruction-budgets.json'
 REGULAR_FILE = '100644 blob'
 GAP = Decimal('1.5')
+# The push route for a deliberate raise (issue #120): one line per
+# raised leaf in the raise commit's message, naming the exact values the
+# diff carries. Only these documents' raises may be declared.
+DECLARABLE_DOCUMENTS = (BUDGETS, INSTRUCTION_BUDGETS)
+_DECLARATION_PREFIX = 'Budget-Raise: '
+_DECLARATION_LINE = re.compile(
+    r'^(?P<document>\S+) +(?P<key>.+) +(?P<was>\S+) -> (?P<to>\S+)$')
 # Direction each leaf may move: "up" means it may only rise, "down" means
 # it may only fall, "fixed" means it may not change at all.
 _DIRECTIONS = {
@@ -189,7 +217,8 @@ def _implied_floor_findings(before, after, document):
     return findings
 
 
-def _relaxations(base, head, document, direction_of, cross_checks):
+def _relaxations(base, head, document, direction_of, cross_checks,
+                 declarations=None):
     """Findings for a head document that relaxes the merge base's.
 
     ``document`` names the checked path in the finding lines;
@@ -197,6 +226,11 @@ def _relaxations(base, head, document, direction_of, cross_checks):
     that leaf may move in (None: any change at all is a finding); each
     cross-check receives ``(before, after, document)`` and adds the
     document's own shape rules on top of the direction walk.
+
+    ``declarations`` is the raise route's side of the deal (issue #120):
+    the parsed Budget-Raise lines naming THIS document — a list when the
+    route is open (possibly empty), None when it is closed. A raise a
+    line names exactly is clean; a leftover line is a finding.
     """
     if base is None:
         return []
@@ -232,6 +266,9 @@ def _relaxations(base, head, document, direction_of, cross_checks):
             findings.append(_finding(
                 document, key, was, now, 'lowered; it may only rise'))
         elif direction == 'down' and now > was:
+            if declarations is not None and _consume_declaration(
+                    declarations, key, was, now):
+                continue
             findings.append(_finding(
                 document, key, was, now, 'raised; it may only fall'))
         elif direction == 'fixed':
@@ -239,6 +276,8 @@ def _relaxations(base, head, document, direction_of, cross_checks):
                 document, key, was, now, 'schema_version changed'))
     for cross_check in cross_checks:
         findings.extend(cross_check(before, after, document))
+    for _decl_document, key, was, to in declarations or ():
+        findings.append(_declaration_mismatch(document, key, was, to))
     return findings
 
 
@@ -282,6 +321,100 @@ DOCUMENTS = (
     (BUDGETS, _budget_direction, ()),
     (INSTRUCTION_BUDGETS, _budget_direction, ()),
 )
+
+
+def _declaration_mismatch(document, key, was, to):
+    """The finding for a leftover declaration line.
+
+    A leftover is a declaration the diff does not carry exactly: a
+    mismatched value, a duplicate, or a key that did not rise. A line
+    naming a non-declarable document never reaches a walk — check_ratchets
+    reports that one itself.
+    """
+    return (f'{document}: {key}: declaration {was} -> {to} does not match '
+            'a raise in this diff — a declaration must name the exact from '
+            'and to the diff carries')
+
+
+def _consume_declaration(declarations, key, was, now):
+    """Pop the one declaration naming this raise exactly; True when found.
+
+    ``declarations`` is this walk's own pool, already filtered to the
+    document under check; the pop is what makes a duplicate line a
+    leftover.
+    """
+    for index, (_document, decl_key, decl_was, decl_to) in enumerate(
+            declarations):
+        if decl_key == key and decl_was == was and decl_to == now:
+            del declarations[index]
+            return True
+    return False
+
+
+def _declaration_parse_error(line):
+    return (f'Budget-Raise declaration {line!r} does not parse — the '
+            "format is 'Budget-Raise: <document> <key> <from> -> <to>'")
+
+
+def _parse_declarations(lines):
+    """Parse raw declaration lines to (document, key, was, to) tuples.
+
+    Returns ``(declarations, errors)``: a malformed line is a finding,
+    never a crash, and never a consumable.
+    """
+    declarations = []
+    errors = []
+    for line in lines:
+        match = _DECLARATION_LINE.match(line[len(_DECLARATION_PREFIX):])
+        if match is None:
+            errors.append(_declaration_parse_error(line))
+            continue
+        try:
+            was = Decimal(match.group('was'))
+            to = Decimal(match.group('to'))
+        except InvalidOperation:
+            errors.append(_declaration_parse_error(line))
+            continue
+        declarations.append(
+            (match.group('document'), match.group('key'), was, to))
+    return declarations, errors
+
+
+def _declaration_lines(cwd, base, head):
+    """The Budget-Raise lines in the push window's commit messages.
+
+    The caller opens the window: this runs only when the route is
+    allowed and base is an ancestor of head, so base..head is exactly
+    the push's own commits.
+    """
+    result = _git(cwd, ['log', '--format=%B', f'{base}..{head}'])
+    if result.returncode != 0:
+        raise ValueError(
+            f'cannot walk {base}..{head} for declarations: '
+            f'{result.stderr.strip()}')
+    return [line.strip() for line in result.stdout.splitlines()
+            if line.strip().startswith(_DECLARATION_PREFIX)]
+
+
+def _collect_declarations(cwd, base, head):
+    """The parsed declarations by document, plus the findings for the
+    lines that can never be consumed: a malformed line, or one naming a
+    document outside the declarable two.
+    """
+    parsed, findings = _parse_declarations(
+        _declaration_lines(cwd, base, head))
+    by_document = {
+        document: [declaration for declaration in parsed
+                   if declaration[0] == document]
+        for document in DECLARABLE_DOCUMENTS
+    }
+    for document, key, was, to in parsed:
+        if document not in DECLARABLE_DOCUMENTS:
+            findings.append(
+                f'{document}: {key}: declaration {was} -> {to} names a '
+                "document whose values are not declarable — only the two "
+                "budget documents' raises are")
+    return by_document, findings
 
 
 def _git(cwd, args):
@@ -329,6 +462,24 @@ def merge_base(cwd, base, head):
     return sha
 
 
+def _is_ancestor(cwd, maybe_ancestor, descendant):
+    """Whether ``maybe_ancestor`` is an ancestor of ``descendant``.
+
+    The declaration route rides a fast-forward push: base..head must be
+    exactly the push's own commits, and only an ancestor relationship
+    gives that window a well-defined membership. --is-ancestor answers
+    through its exit code (0 ancestor, 1 not); any other code is a git
+    failure.
+    """
+    result = _git(cwd, ['merge-base', '--is-ancestor',
+                        maybe_ancestor, descendant])
+    if result.returncode not in (0, 1):
+        raise ValueError(
+            f'cannot tell whether {maybe_ancestor} is an ancestor of '
+            f'{descendant}: {result.stderr.strip()}')
+    return result.returncode == 0
+
+
 def entry_kind(cwd, commit, path):
     """The ``<mode> <type>`` of the tree entry at ``path``, or None.
 
@@ -368,12 +519,17 @@ def read_document(cwd, commit, path):
             f'{path} at {commit} is not valid JSON: {error}') from None
 
 
-def check_ratchets(cwd, base_rev, head_rev):
+def check_ratchets(cwd, base_rev, head_rev, allow_declared_raises=False):
     require_full_history(cwd)
     base = resolve_commit(cwd, base_rev)
     head = resolve_commit(cwd, head_rev)
     fork = merge_base(cwd, base, head)
     findings = []
+    by_document = None
+    if allow_declared_raises and _is_ancestor(cwd, base, head):
+        by_document, declaration_findings = _collect_declarations(
+            cwd, base, head)
+        findings.extend(declaration_findings)
     for document, direction_of, cross_checks in DOCUMENTS:
         kind = entry_kind(cwd, head, document)
         if kind is not None and kind != REGULAR_FILE:
@@ -383,9 +539,12 @@ def check_ratchets(cwd, base_rev, head_rev):
         else:
             base_document = read_document(cwd, fork, document)
             head_document = read_document(cwd, head, document)
+            declarations = None
+            if by_document is not None and document in by_document:
+                declarations = by_document[document]
             findings.extend(_relaxations(
                 base_document, head_document, document, direction_of,
-                cross_checks))
+                cross_checks, declarations))
     return fork, findings
 
 
@@ -393,10 +552,16 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('base_rev', help='the base revision (e.g. HEAD^1)')
     parser.add_argument('head_rev', help='the head revision (e.g. HEAD^2)')
+    parser.add_argument(
+        '--allow-declared-raises', action='store_true',
+        help='let a budget raise pass when a Budget-Raise line in '
+             'base..head names it exactly — the push branch\'s '
+             'invocation; a pull request never passes this')
     args = parser.parse_args(argv)
     try:
-        fork, findings = check_ratchets(Path.cwd(), args.base_rev,
-                                        args.head_rev)
+        fork, findings = check_ratchets(
+            Path.cwd(), args.base_rev, args.head_rev,
+            allow_declared_raises=args.allow_declared_raises)
     except ValueError as error:
         print(f'ratchet check: {error}', file=sys.stderr)
         return 2
@@ -409,6 +574,16 @@ def main(argv=None):
         print(line)
     print(f'ratchet check: {len(findings)} relaxation(s) against merge '
           f'base {fork}; the ratchet document may only tighten')
+    saw_raise = any('raised; it may only fall' in line for line in findings)
+    if saw_raise and args.allow_declared_raises:
+        print("ratchet check: a deliberate raise lands on main as its own "
+              "commit with one line per raised leaf — "
+              "'Budget-Raise: <document> <key> <from> -> <to>' "
+              '(CONTRIBUTING.md)')
+    elif saw_raise:
+        print("ratchet check: a budget raise cannot ride a pull request — "
+              "land it on main as its own commit with the Budget-Raise "
+              'line(s) (CONTRIBUTING.md)')
     return 1
 
 

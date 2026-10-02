@@ -1136,3 +1136,297 @@ def test_read_document_refuses_a_non_regular_entry(tmp_path):
     guard = _guard()
     with pytest.raises(ValueError, match="not a regular file"):
         guard.read_document(repo, "HEAD", ".github/ci-thresholds.json")
+
+
+# --- declared budget raises: the push route (issue #120) ---------------------
+
+
+def _declaration(document, key, was, to):
+    return f"Budget-Raise: {document} {key} {was} -> {to}"
+
+
+def _push_message(*lines):
+    """A push commit message body carrying declaration lines."""
+    return "\n".join(["Raise budgets", "", *lines])
+
+
+def _commit_budgets_here(repo, document, message):
+    """Commit the budgets document on the checked-out branch — main, as
+    the raise route's direct push lands it."""
+    _budgets_written(repo, document)
+    _git(repo, "add", ".github/perf-budgets.json")
+    _git(repo, "commit", "-qm", message)
+    return _git(repo, "rev-parse", "HEAD").stdout.strip()
+
+
+def test_end_to_end_push_declared_raise_is_clean(tmp_path, capsys,
+                                                 monkeypatch):
+    """The route issue #120 opens: a deliberate raise lands on main as
+    its own commit, its message carrying one Budget-Raise line per
+    raised leaf with the exact values the diff carries. The push
+    invocation (--allow-declared-raises) passes it; the clean run
+    prints no route hint."""
+    repo = _seed_repo(tmp_path, _document(), budgets=_budgets_document())
+    was = _budgets_document()["bytes"]["code_bytes"]
+    raised = _budgets_document()
+    raised["bytes"]["code_bytes"] = 79700
+    before = _git(repo, "rev-parse", "main").stdout.strip()
+    head = _commit_budgets_here(
+        repo, raised,
+        _push_message(_declaration(".github/perf-budgets.json",
+                                   "bytes.code_bytes", was, 79700)))
+    guard = _guard()
+    monkeypatch.chdir(repo)
+    assert guard.main([before, head, "--allow-declared-raises"]) == 0
+    out = capsys.readouterr().out
+    assert out.count("not relaxed") == 3
+    assert "Budget-Raise: <document>" not in out
+
+
+def test_end_to_end_push_undeclared_raise_refuses_with_the_route_hint(
+        tmp_path, capsys, monkeypatch):
+    """The brief's non-negotiable: a raise with no declaration refuses
+    even on the push path, and the refusal teaches the route."""
+    repo = _seed_repo(tmp_path, _document(), budgets=_budgets_document())
+    raised = _budgets_document()
+    raised["bytes"]["code_bytes"] = 79700
+    before = _git(repo, "rev-parse", "main").stdout.strip()
+    head = _commit_budgets_here(repo, raised, "Raise code_bytes, no line")
+    guard = _guard()
+    monkeypatch.chdir(repo)
+    assert guard.main([before, head, "--allow-declared-raises"]) == 1
+    out = capsys.readouterr().out
+    assert "bytes.code_bytes" in out
+    assert "raised; it may only fall" in out
+    assert "Budget-Raise: <document> <key> <from> -> <to>" in out
+
+
+def test_end_to_end_pull_request_cannot_declare_a_raise(tmp_path, capsys,
+                                                        monkeypatch):
+    """The PR invocation never passes --allow-declared-raises, so a
+    raise riding a pull request refuses even when its commit carries a
+    perfectly formed declaration line."""
+    repo = _seed_repo(tmp_path, _document(), budgets=_budgets_document())
+    was = _budgets_document()["bytes"]["code_bytes"]
+    raised = _budgets_document()
+    raised["bytes"]["code_bytes"] = 79700
+    _commit_budgets_on_branch(
+        repo, raised,
+        _push_message(_declaration(".github/perf-budgets.json",
+                                   "bytes.code_bytes", was, 79700)))
+    head = _git(repo, "rev-parse", "pr").stdout.strip()
+    guard = _guard()
+    monkeypatch.chdir(repo)
+    assert guard.main(["main", head]) == 1
+    out = capsys.readouterr().out
+    assert "raised; it may only fall" in out
+    assert "cannot ride a pull request" in out
+
+
+def test_end_to_end_mismatched_declaration_refuses(tmp_path, capsys,
+                                                   monkeypatch):
+    """A declaration is only as good as its values: a to that differs
+    from the diff's to refuses both the raise and the declaration."""
+    repo = _seed_repo(tmp_path, _document(), budgets=_budgets_document())
+    was = _budgets_document()["bytes"]["code_bytes"]
+    raised = _budgets_document()
+    raised["bytes"]["code_bytes"] = 73000
+    before = _git(repo, "rev-parse", "main").stdout.strip()
+    head = _commit_budgets_here(
+        repo, raised,
+        _push_message(_declaration(".github/perf-budgets.json",
+                                   "bytes.code_bytes", was, 74000)))
+    guard = _guard()
+    monkeypatch.chdir(repo)
+    assert guard.main([before, head, "--allow-declared-raises"]) == 1
+    out = capsys.readouterr().out
+    assert "raised; it may only fall" in out
+    assert ("declaration 71627 -> 74000 does not match a raise in this "
+            "diff" in out)
+
+
+def test_end_to_end_declaration_without_a_raise_refuses(tmp_path, capsys,
+                                                        monkeypatch):
+    """An orphan declaration — well formed, but the diff carries no
+    raise for it — is itself a finding."""
+    repo = _seed_repo(tmp_path, _document(), budgets=_budgets_document())
+    before = _git(repo, "rev-parse", "main").stdout.strip()
+    (repo / "UNRELATED.md").write_text("note", encoding="utf-8")
+    _git(repo, "add", "UNRELATED.md")
+    _git(repo, "commit", "-qm",
+         _push_message(_declaration(".github/perf-budgets.json",
+                                    "bytes.code_bytes", 71627, 79700)))
+    head = _git(repo, "rev-parse", "HEAD").stdout.strip()
+    guard = _guard()
+    monkeypatch.chdir(repo)
+    assert guard.main([before, head, "--allow-declared-raises"]) == 1
+    out = capsys.readouterr().out
+    assert "does not match a raise in this diff" in out
+
+
+def test_end_to_end_duplicate_declaration_refuses(tmp_path, capsys,
+                                                  monkeypatch):
+    """Two identical lines for one raise: the raise passes on the
+    first, the duplicate is a leftover and a finding."""
+    repo = _seed_repo(tmp_path, _document(), budgets=_budgets_document())
+    was = _budgets_document()["bytes"]["code_bytes"]
+    raised = _budgets_document()
+    raised["bytes"]["code_bytes"] = 79700
+    before = _git(repo, "rev-parse", "main").stdout.strip()
+    line = _declaration(".github/perf-budgets.json", "bytes.code_bytes",
+                        was, 79700)
+    head = _commit_budgets_here(repo, raised, _push_message(line, line))
+    guard = _guard()
+    monkeypatch.chdir(repo)
+    assert guard.main([before, head, "--allow-declared-raises"]) == 1
+    out = capsys.readouterr().out
+    assert "raised; it may only fall" not in out
+    assert out.count("does not match a raise in this diff") == 1
+
+
+def test_end_to_end_non_fast_forward_push_cannot_declare(
+        tmp_path, capsys, monkeypatch):
+    """The declaration route rides a fast-forward push: with the base
+    not an ancestor of the head there is no push window to collect
+    from, and the raise refuses."""
+    repo = _seed_repo(tmp_path, _document(), budgets=_budgets_document())
+    was = _budgets_document()["bytes"]["code_bytes"]
+    raised = _budgets_document()
+    raised["bytes"]["code_bytes"] = 79700
+    _git(repo, "checkout", "-q", "-b", "raise")
+    _commit_budgets_here(
+        repo, raised,
+        _push_message(_declaration(".github/perf-budgets.json",
+                                   "bytes.code_bytes", was, 79700)))
+    raise_tip = _git(repo, "rev-parse", "HEAD").stdout.strip()
+    _git(repo, "checkout", "-q", "main")
+    (repo / "UNRELATED.md").write_text("diverged", encoding="utf-8")
+    _git(repo, "add", "UNRELATED.md")
+    _git(repo, "commit", "-qm", "diverge main")
+    diverged_tip = _git(repo, "rev-parse", "main").stdout.strip()
+    guard = _guard()
+    monkeypatch.chdir(repo)
+    assert guard.main([diverged_tip, raise_tip,
+                       "--allow-declared-raises"]) == 1
+    out = capsys.readouterr().out
+    assert "raised; it may only fall" in out
+
+
+def test_end_to_end_push_declared_raises_across_both_documents(
+        tmp_path, capsys, monkeypatch):
+    """One push raises a leaf in each budget document, two declaration
+    lines: both consumed, clean."""
+    repo = _seed_repo(tmp_path, _document(), budgets=_budgets_document(),
+                      instruction_budgets=_instruction_budgets_document())
+    budgets_was = _budgets_document()["bytes"]["code_bytes"]
+    instructions_was = _instruction_budgets_document()["scripts"]["build"]
+    raised_budgets = _budgets_document()
+    raised_budgets["bytes"]["code_bytes"] = 79700
+    raised_instructions = _instruction_budgets_document()
+    raised_instructions["scripts"]["build"] = 999999999
+    before = _git(repo, "rev-parse", "main").stdout.strip()
+    _budgets_written(repo, raised_budgets)
+    _git(repo, "add", ".github/perf-budgets.json")
+    _instruction_budgets_written(repo, raised_instructions)
+    _git(repo, "add", ".github/instruction-budgets.json")
+    _git(repo, "commit", "-qm", _push_message(
+        _declaration(".github/perf-budgets.json", "bytes.code_bytes",
+                     budgets_was, 79700),
+        _declaration(".github/instruction-budgets.json", "scripts.build",
+                     instructions_was, 999999999)))
+    head = _git(repo, "rev-parse", "HEAD").stdout.strip()
+    guard = _guard()
+    monkeypatch.chdir(repo)
+    assert guard.main([before, head, "--allow-declared-raises"]) == 0
+    assert capsys.readouterr().out.count("not relaxed") == 3
+
+
+def test_end_to_end_partially_declared_raises_refuse_the_rest(
+        tmp_path, capsys, monkeypatch):
+    """Exactness is per leaf: a declared raise passes while an
+    undeclared sibling raise in the same push still refuses."""
+    repo = _seed_repo(tmp_path, _document(), budgets=_budgets_document())
+    was = _budgets_document()["bytes"]["code_bytes"]
+    raised = _budgets_document()
+    raised["bytes"]["code_bytes"] = 79700
+    raised["journeys"]["hover"]["long_task_count"] = 9
+    before = _git(repo, "rev-parse", "main").stdout.strip()
+    head = _commit_budgets_here(
+        repo, raised,
+        _push_message(_declaration(".github/perf-budgets.json",
+                                   "bytes.code_bytes", was, 79700)))
+    guard = _guard()
+    monkeypatch.chdir(repo)
+    assert guard.main([before, head, "--allow-declared-raises"]) == 1
+    out = capsys.readouterr().out
+    assert ("journeys.hover.long_task_count" in out
+            and "raised; it may only fall" in out)
+    assert not any("bytes.code_bytes" in line
+                   and "raised; it may only fall" in line
+                   for line in out.splitlines())
+
+
+def test_end_to_end_declaration_naming_the_coverage_document_refuses(
+        tmp_path, capsys, monkeypatch):
+    """Only the two budget documents' raises are declarable: the
+    coverage document's values are the ratchet's own act, and a
+    declaration naming it is a finding of its own."""
+    repo = _seed_repo(tmp_path, _document(), budgets=_budgets_document())
+    before = _git(repo, "rev-parse", "main").stdout.strip()
+    (repo / "UNRELATED.md").write_text("note", encoding="utf-8")
+    _git(repo, "add", "UNRELATED.md")
+    _git(repo, "commit", "-qm",
+         _push_message(_declaration(".github/ci-thresholds.json",
+                                    "coverage.python.measured", "91.1",
+                                    "92.0")))
+    head = _git(repo, "rev-parse", "HEAD").stdout.strip()
+    guard = _guard()
+    monkeypatch.chdir(repo)
+    assert guard.main([before, head, "--allow-declared-raises"]) == 1
+    out = capsys.readouterr().out
+    assert "names a document whose values are not declarable" in out
+
+
+def test_declaration_parser_pins_the_line_shape():
+    """White-box: the parser is the declaration format's contract."""
+    # white-box: the parser is the declaration format's contract
+    # pylint: disable=protected-access
+    guard = _guard()
+    decls, errors = guard._parse_declarations(
+        ["Budget-Raise: .github/perf-budgets.json bytes.code_bytes "
+         "71627 -> 79700"])
+    assert decls == [(".github/perf-budgets.json", "bytes.code_bytes",
+                      Decimal("71627"), Decimal("79700"))]
+    assert errors == []
+    decls, errors = guard._parse_declarations(
+        ['Budget-Raise: .github/perf-budgets.json bytes["odd key"] '
+         "1 -> 2"])
+    assert decls == [(".github/perf-budgets.json", 'bytes["odd key"]',
+                      Decimal("1"), Decimal("2"))]
+    assert errors == []
+    decls, errors = guard._parse_declarations(
+        ["Budget-Raise: .github/perf-budgets.json bytes.code_bytes 71627"])
+    assert decls == []
+    assert len(errors) == 1
+    assert "does not parse" in errors[0]
+
+
+def test_declaration_lines_reads_the_push_window(tmp_path):
+    """White-box: the lines come from the window base..head, and only
+    Budget-Raise-prefixed ones."""
+    # white-box: the collector is the window's contract
+    # pylint: disable=protected-access
+    repo = _seed_repo(tmp_path, _document(), budgets=_budgets_document())
+    was = _budgets_document()["bytes"]["code_bytes"]
+    raised = _budgets_document()
+    raised["bytes"]["code_bytes"] = 79700
+    before = _git(repo, "rev-parse", "main").stdout.strip()
+    _commit_budgets_here(
+        repo, raised,
+        _push_message(_declaration(".github/perf-budgets.json",
+                                   "bytes.code_bytes", was, 79700)))
+    guard = _guard()
+    lines = guard._declaration_lines(repo, before, "HEAD")
+    assert lines == [
+        "Budget-Raise: .github/perf-budgets.json bytes.code_bytes "
+        "71627 -> 79700"]

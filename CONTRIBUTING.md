@@ -170,9 +170,19 @@ frontier tables refill one node-set per frontier row, and frontier sizes are
 data, not code). Long-task budgets are absolute: a count is threshold physics,
 not a per-row cost, and normalizing it would blind the guard to real
 regressions. The ratchet is **tighten-only**: `--check` measures fresh and
-fails on any budget exceeded, a budget may only fall (the guard step refuses
-a pull request that raises one), and **there is no automated raise** — the
-coverage ratchet's auto-raise has no perf analogue, by design. Seeding
+fails on any budget exceeded, a budget may only fall, and **there is no
+automated raise** — the coverage ratchet's auto-raise has no perf analogue, by
+design. A deliberate raise has exactly one route onto `main` (issue #120): it
+lands **as its own commit** — nothing else rides along — and the commit
+message carries one declaration line per raised leaf,
+
+    Budget-Raise: <document> <key> <from> -> <to>
+
+naming the exact values the diff carries. The guard accepts a declared raise
+only on a main **push** (the workflow passes `--allow-declared-raises` on the
+push branch and never on a pull request), so a raise riding a PR refuses even
+a perfectly declared one; a declaration whose values do not match the diff
+exactly refuses too. Seeding
 headroom: code_bytes at the measured value exactly (builds are
 byte-deterministic), hover DOM at measured + 2% (rounded up), long tasks at
 measured + 1 (machine-load flap). The browser suite's `PerfBudgetTests` is
@@ -189,8 +199,11 @@ budgets are invariant to capture size — subtracts the bare interpreter
 startup (`python3 -c pass` under the same harness) from every count, and
 holds each target under its integer maximum. Tighten-only like the perf
 budgets: the default check mode fails on any budget exceeded, the ratchet
-guard refuses a pull request that raises a budget, and there is no
-automated raise. Budgets are pinned to the CI cell that runs the gate —
+guard refuses a budget that rises, and there is no automated raise. A
+deliberate raise follows the perf budgets' route (issue #120): its own
+commit on main, one `Budget-Raise: <document> <key> <from> -> <to>` line
+per raised leaf with the exact values the diff carries; pull requests
+cannot carry a raise. Budgets are pinned to the CI cell that runs the gate —
 the coverage job's ubuntu-latest runner, CPython 3.13.15 / valgrind
 3.22.0 — and were seeded from that cell's own first measured counts
 (build 171,504,264, capture_gate 267,669,619, diff_aa 222,551,193
