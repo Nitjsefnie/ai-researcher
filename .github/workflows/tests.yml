@@ -327,8 +327,9 @@ jobs:
         # lands on main as its own commit whose message carries one
         # "Budget-Raise: <document> <key> <from> -> <to>" line per raised
         # leaf, naming the exact values the diff carries. A pull
-        # request's invocation never passes the flag, so a raise riding
-        # a PR refuses even a perfectly declared one.
+        # request's invocation never passes the flag, and the lines
+        # count only on commits touching nothing outside the two budget
+        # documents — a raise cannot ride feature work onto main.
         env:
           PR_NUMBER: ${{ github.event.pull_request.number }}
           BEFORE: ${{ github.event.before }}

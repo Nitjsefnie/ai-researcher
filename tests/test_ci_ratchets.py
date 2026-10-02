@@ -1150,12 +1150,16 @@ def _push_message(*lines):
     return "\n".join(["Raise budgets", "", *lines])
 
 
-def _commit_budgets_here(repo, document, message):
+def _commit_budgets_here(repo, document, message, allow_empty=False):
     """Commit the budgets document on the checked-out branch — main, as
-    the raise route's direct push lands it."""
+    the raise route's direct push lands it. allow_empty serves the
+    tests whose declaration lines ride a commit that changes nothing."""
     _budgets_written(repo, document)
     _git(repo, "add", ".github/perf-budgets.json")
-    _git(repo, "commit", "-qm", message)
+    if allow_empty:
+        _git(repo, "commit", "-q", "--allow-empty", "-m", message)
+    else:
+        _git(repo, "commit", "-qm", message)
     return _git(repo, "rev-parse", "HEAD").stdout.strip()
 
 
@@ -1247,16 +1251,15 @@ def test_end_to_end_mismatched_declaration_refuses(tmp_path, capsys,
 
 def test_end_to_end_declaration_without_a_raise_refuses(tmp_path, capsys,
                                                         monkeypatch):
-    """An orphan declaration — well formed, but the diff carries no
-    raise for it — is itself a finding."""
+    """An orphan declaration — well formed, on a pure commit, but the
+    diff carries no raise for it — is itself a finding."""
     repo = _seed_repo(tmp_path, _document(), budgets=_budgets_document())
     before = _git(repo, "rev-parse", "main").stdout.strip()
-    (repo / "UNRELATED.md").write_text("note", encoding="utf-8")
-    _git(repo, "add", "UNRELATED.md")
-    _git(repo, "commit", "-qm",
-         _push_message(_declaration(".github/perf-budgets.json",
-                                    "bytes.code_bytes", 71627, 79700)))
-    head = _git(repo, "rev-parse", "HEAD").stdout.strip()
+    head = _commit_budgets_here(
+        repo, _budgets_document(),
+        _push_message(_declaration(".github/perf-budgets.json",
+                                   "bytes.code_bytes", 71627, 79700)),
+        allow_empty=True)
     guard = _guard()
     monkeypatch.chdir(repo)
     assert guard.main([before, head, "--allow-declared-raises"]) == 1
@@ -1310,6 +1313,8 @@ def test_end_to_end_non_fast_forward_push_cannot_declare(
                        "--allow-declared-raises"]) == 1
     out = capsys.readouterr().out
     assert "raised; it may only fall" in out
+    assert ("declarations apply only on a fast-forward push of main"
+            in out)
 
 
 def test_end_to_end_push_declared_raises_across_both_documents(
@@ -1373,13 +1378,12 @@ def test_end_to_end_declaration_naming_the_coverage_document_refuses(
     declaration naming it is a finding of its own."""
     repo = _seed_repo(tmp_path, _document(), budgets=_budgets_document())
     before = _git(repo, "rev-parse", "main").stdout.strip()
-    (repo / "UNRELATED.md").write_text("note", encoding="utf-8")
-    _git(repo, "add", "UNRELATED.md")
-    _git(repo, "commit", "-qm",
-         _push_message(_declaration(".github/ci-thresholds.json",
-                                    "coverage.python.measured", "91.1",
-                                    "92.0")))
-    head = _git(repo, "rev-parse", "HEAD").stdout.strip()
+    head = _commit_budgets_here(
+        repo, _budgets_document(),
+        _push_message(_declaration(".github/ci-thresholds.json",
+                                   "coverage.python.measured", "91.1",
+                                   "92.0")),
+        allow_empty=True)
     guard = _guard()
     monkeypatch.chdir(repo)
     assert guard.main([before, head, "--allow-declared-raises"]) == 1
@@ -1411,9 +1415,10 @@ def test_declaration_parser_pins_the_line_shape():
     assert "does not parse" in errors[0]
 
 
-def test_declaration_lines_reads_the_push_window(tmp_path):
-    """White-box: the lines come from the window base..head, and only
-    Budget-Raise-prefixed ones."""
+def test_declaration_collector_reads_the_push_window(tmp_path):
+    """White-box: the lines come from the window base..head with their
+    carrying commit, and only Budget-Raise-prefixed ones; the paths
+    walk answers the same commit with its touched files."""
     # white-box: the collector is the window's contract
     # pylint: disable=protected-access
     repo = _seed_repo(tmp_path, _document(), budgets=_budgets_document())
@@ -1425,8 +1430,129 @@ def test_declaration_lines_reads_the_push_window(tmp_path):
         repo, raised,
         _push_message(_declaration(".github/perf-budgets.json",
                                    "bytes.code_bytes", was, 79700)))
+    head = _git(repo, "rev-parse", "HEAD").stdout.strip()
     guard = _guard()
-    lines = guard._declaration_lines(repo, before, "HEAD")
+    commits = guard._commits_with_declaration_lines(repo, before, "HEAD")
+    assert len(commits) == 1
+    sha, lines = commits[0]
+    assert sha == head
     assert lines == [
         "Budget-Raise: .github/perf-budgets.json bytes.code_bytes "
         "71627 -> 79700"]
+    assert guard._commit_paths(repo, before, "HEAD") == {
+        head: [".github/perf-budgets.json"]}
+
+
+def test_declaration_parser_rejects_non_finite_values():
+    """A non-finite token — quiet NaN, sNaN, Infinity — is a parse
+    error, never a consumable: an sNaN that parsed would raise on the
+    very comparison the consumption makes."""
+    # white-box: the parser is the declaration format's contract
+    # pylint: disable=protected-access
+    guard = _guard()
+    for token in ("sNaN", "nan", "Infinity", "-Infinity"):
+        decls, errors = guard._parse_declarations(
+            [f"Budget-Raise: .github/perf-budgets.json bytes.code_bytes "
+             f"{token} -> 79700"])
+        assert decls == [], token
+        assert len(errors) == 1, token
+        assert "does not parse" in errors[0]
+
+
+def test_end_to_end_snan_declaration_cannot_crash_the_guard(
+        tmp_path, capsys, monkeypatch):
+    """Regression for the reviewer's crash: a declaration line carrying
+    sNaN must be a finding, never an uncaught decimal.InvalidOperation
+    from the consumption's comparisons."""
+    repo = _seed_repo(tmp_path, _document(), budgets=_budgets_document())
+    raised = _budgets_document()
+    raised["bytes"]["code_bytes"] = 79700
+    before = _git(repo, "rev-parse", "main").stdout.strip()
+    head = _commit_budgets_here(
+        repo, raised,
+        _push_message("Budget-Raise: .github/perf-budgets.json "
+                      "bytes.code_bytes sNaN -> 79700"))
+    guard = _guard()
+    monkeypatch.chdir(repo)
+    assert guard.main([before, head, "--allow-declared-raises"]) == 1
+    out = capsys.readouterr().out
+    assert "does not parse" in out
+    assert "raised; it may only fall" in out
+
+
+def test_end_to_end_impure_commit_cannot_declare(tmp_path, capsys,
+                                                 monkeypatch):
+    """A declaration only counts on its own act: a commit that carries
+    declaration lines and also touches anything outside the two budget
+    documents is inert and a finding, so a raise cannot ride feature
+    work onto main through a squash merge."""
+    repo = _seed_repo(tmp_path, _document(), budgets=_budgets_document())
+    was = _budgets_document()["bytes"]["code_bytes"]
+    raised = _budgets_document()
+    raised["bytes"]["code_bytes"] = 79700
+    before = _git(repo, "rev-parse", "main").stdout.strip()
+    _budgets_written(repo, raised)
+    _git(repo, "add", ".github/perf-budgets.json")
+    (repo / "feature.py").write_text("x = 1\n", encoding="utf-8")
+    _git(repo, "add", "feature.py")
+    _git(repo, "commit", "-qm",
+         _push_message(_declaration(".github/perf-budgets.json",
+                                    "bytes.code_bytes", was, 79700)))
+    head = _git(repo, "rev-parse", "HEAD").stdout.strip()
+    guard = _guard()
+    monkeypatch.chdir(repo)
+    assert guard.main([before, head, "--allow-declared-raises"]) == 1
+    out = capsys.readouterr().out
+    assert "also touches" in out
+    assert "raised; it may only fall" in out
+
+
+def test_end_to_end_declaration_cannot_rescue_schema_version(
+        tmp_path, capsys, monkeypatch):
+    """Pin the exemption predicate: schema_version may not change at
+    all, and a declaration naming it cannot turn the change into a
+    raise."""
+    repo = _seed_repo(tmp_path, _document(), budgets=_budgets_document())
+    raised = _budgets_document(schema=2)
+    before = _git(repo, "rev-parse", "main").stdout.strip()
+    head = _commit_budgets_here(
+        repo, raised,
+        _push_message(_declaration(".github/perf-budgets.json",
+                                   "schema_version", 1, 2)))
+    guard = _guard()
+    monkeypatch.chdir(repo)
+    assert guard.main([before, head, "--allow-declared-raises"]) == 1
+    out = capsys.readouterr().out
+    assert "schema_version changed" in out
+    assert "does not match a raise in this diff" in out
+
+
+def test_end_to_end_declaration_cannot_rescue_a_key_add(
+        tmp_path, capsys, monkeypatch):
+    """Pin the exemption predicate: a key added is a finding a
+    declaration cannot rescue."""
+    repo = _seed_repo(tmp_path, _document(), budgets=_budgets_document())
+    widened = _budgets_document()
+    widened["bytes"]["css_bytes"] = 1000
+    before = _git(repo, "rev-parse", "main").stdout.strip()
+    head = _commit_budgets_here(
+        repo, widened,
+        _push_message(_declaration(".github/perf-budgets.json",
+                                   "bytes.css_bytes", 0, 1000)))
+    guard = _guard()
+    monkeypatch.chdir(repo)
+    assert guard.main([before, head, "--allow-declared-raises"]) == 1
+    out = capsys.readouterr().out
+    assert "key added" in out
+    assert "does not match a raise in this diff" in out
+
+
+def test_workflow_wiring_pins_the_invocations():
+    """Pin the enforcement wiring: the push branch passes the flag, the
+    pull-request invocation never does — the flag's absence there is
+    what refuses a raise riding a PR."""
+    text = (REPO_ROOT / ".github" / "workflows" / "tests.yml").read_text(
+        encoding="utf-8")
+    assert ('check_ratchets.py --allow-declared-raises "${BEFORE}" HEAD'
+            in text)
+    assert "check_ratchets.py HEAD^1 HEAD^2" in text

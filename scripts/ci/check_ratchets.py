@@ -52,16 +52,18 @@ message carries one declaration line per raised leaf,
 
 with the exact values the diff carries. The workflow's push branch (and
 only it) invokes the guard with --allow-declared-raises; a pull
-request's invocation never does, so a raise riding a pull request
-refuses even a perfectly declared one. The lines are collected from the
+request's invocation never does. The lines are collected from the
 window base..head only when the base is an ancestor of the head — the
-fast-forward shape a main push has. Every raised budget leaf needs a
-declaration naming it exactly: a raise with no declaration refuses, and
-so does a declaration the diff does not carry exactly — a mismatched
-value, a duplicate, a key that did not rise, or one naming the coverage
-document (whose raises are the ratchet's own automated act and whose
-relaxations refuse everywhere; only the two budget documents' raises
-are declarable).
+fast-forward shape a main push has — and only from commits touching
+nothing outside the two budget documents: the route is its own act, and
+a raise cannot ride feature work onto main, including through a squash
+merge whose message embeds the PR body. Every raised budget leaf needs
+a declaration naming it exactly: a raise with no declaration refuses,
+and so does a declaration the diff does not carry exactly — a
+mismatched value, a duplicate, a key that did not rise, a non-finite
+token, or one naming the coverage document (whose raises are the
+ratchet's own automated act and whose relaxations refuse everywhere;
+only the two budget documents' raises are declarable).
 """
 from __future__ import annotations
 
@@ -375,34 +377,88 @@ def _parse_declarations(lines):
         except InvalidOperation:
             errors.append(_declaration_parse_error(line))
             continue
+        # A non-finite token — quiet NaN, sNaN, an Infinity — is a
+        # parse error: an sNaN here would raise InvalidOperation on the
+        # very comparison the consumption makes, and a NaN would never
+        # match anything. Neither is a value this format carries.
+        if not (was.is_finite() and to.is_finite()):
+            errors.append(_declaration_parse_error(line))
+            continue
         declarations.append(
             (match.group('document'), match.group('key'), was, to))
     return declarations, errors
 
 
-def _declaration_lines(cwd, base, head):
-    """The Budget-Raise lines in the push window's commit messages.
+def _commits_with_declaration_lines(cwd, base, head):
+    """(sha, raw declaration lines) for each window commit carrying any.
 
     The caller opens the window: this runs only when the route is
     allowed and base is an ancestor of head, so base..head is exactly
-    the push's own commits.
+    the push's own commits. The whole message is scanned; only exact
+    'Budget-Raise: '-prefixed lines count.
     """
-    result = _git(cwd, ['log', '--format=%B', f'{base}..{head}'])
+    result = _git(cwd, ['log', '--format=%x00%H%n%B', f'{base}..{head}'])
     if result.returncode != 0:
         raise ValueError(
             f'cannot walk {base}..{head} for declarations: '
             f'{result.stderr.strip()}')
-    return [line.strip() for line in result.stdout.splitlines()
-            if line.strip().startswith(_DECLARATION_PREFIX)]
+    found = []
+    for record in result.stdout.split('\0'):
+        if not record:
+            continue
+        sha, _newline, body = record.partition('\n')
+        lines = [line.strip() for line in body.splitlines()
+                 if line.strip().startswith(_DECLARATION_PREFIX)]
+        if lines:
+            found.append((sha, lines))
+    return found
+
+
+def _commit_paths(cwd, base, head):
+    """The paths each window commit touches, as {sha: [paths]}.
+
+    A commit that changed nothing lists no paths, and is pure by that
+    answer.
+    """
+    result = _git(cwd, ['log', '--format=%x00%H%n', '--name-only',
+                        f'{base}..{head}'])
+    if result.returncode != 0:
+        raise ValueError(
+            f'cannot walk {base}..{head} for its paths: '
+            f'{result.stderr.strip()}')
+    paths_by_commit = {}
+    for record in result.stdout.split('\0'):
+        if not record:
+            continue
+        lines = [line for line in record.split('\n') if line]
+        paths_by_commit[lines[0]] = lines[1:]
+    return paths_by_commit
 
 
 def _collect_declarations(cwd, base, head):
     """The parsed declarations by document, plus the findings for the
-    lines that can never be consumed: a malformed line, or one naming a
-    document outside the declarable two.
+    lines that can never be consumed: a line on a commit that touches
+    anything outside the two budget documents (the route is its own
+    act — this is what keeps a raise from riding feature work onto main
+    through a squash merge), a malformed line, or one naming a document
+    outside the declarable two.
     """
-    parsed, findings = _parse_declarations(
-        _declaration_lines(cwd, base, head))
+    paths_by_commit = _commit_paths(cwd, base, head)
+    raw = []
+    findings = []
+    for sha, lines in _commits_with_declaration_lines(cwd, base, head):
+        outside = sorted(path for path in paths_by_commit.get(sha, [])
+                         if path not in DECLARABLE_DOCUMENTS)
+        if outside:
+            findings.append(
+                'Budget-Raise: commit '
+                f'{sha[:12]} carries declaration lines but also touches '
+                f'{", ".join(outside)} — a declared raise lands as its own '
+                'commit touching only the two budget documents')
+            continue
+        raw.extend(lines)
+    parsed, errors = _parse_declarations(raw)
+    findings.extend(errors)
     by_document = {
         document: [declaration for declaration in parsed
                    if declaration[0] == document]
@@ -575,11 +631,17 @@ def main(argv=None):
     print(f'ratchet check: {len(findings)} relaxation(s) against merge '
           f'base {fork}; the ratchet document may only tighten')
     saw_raise = any('raised; it may only fall' in line for line in findings)
-    if saw_raise and args.allow_declared_raises:
+    route_open = (args.allow_declared_raises
+                  and _is_ancestor(Path.cwd(), args.base_rev,
+                                   args.head_rev))
+    if saw_raise and route_open:
         print("ratchet check: a deliberate raise lands on main as its own "
               "commit with one line per raised leaf — "
               "'Budget-Raise: <document> <key> <from> -> <to>' "
               '(CONTRIBUTING.md)')
+    elif saw_raise and args.allow_declared_raises:
+        print('ratchet check: Budget-Raise declarations apply only on a '
+              'fast-forward push of main — this comparison is not one')
     elif saw_raise:
         print("ratchet check: a budget raise cannot ride a pull request — "
               "land it on main as its own commit with the Budget-Raise "
