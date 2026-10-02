@@ -41,6 +41,28 @@ def _data_payload(page_html):
     return json.loads(page_html[start:end])
 
 
+def collect_page_coverage(session):
+    """Take and stop precise V8 coverage; one entry per compiled script."""
+    entries = []
+    blocks = session.send("Profiler.takePreciseCoverage")["result"]
+    for block in blocks:
+        try:
+            source = session.send(
+                "Debugger.getScriptSource",
+                {"scriptId": block["scriptId"]})["scriptSource"]
+        except Exception:
+            source = None
+        entries.append({
+            "url": block.get("url", ""),
+            "source": source,
+            "functions": block.get("functions", []),
+        })
+    session.send("Profiler.stopPreciseCoverage")
+    session.send("Profiler.disable")
+    session.detach()
+    return entries
+
+
 class BrowserInteractionTests(unittest.TestCase):
     # pylint: disable=too-many-public-methods
     # One behaviour, one test: #85's per-chart label-distinctness guarantee is
@@ -113,8 +135,7 @@ class BrowserInteractionTests(unittest.TestCase):
                 # second, doomed collection in tearDownClass
                 if (page, session) in cls._open_pages:
                     cls._open_pages.remove((page, session))
-                cls._coverage_entries.extend(
-                    cls._collect_coverage(session))
+                cls._coverage_entries.extend(collect_page_coverage(session))
                 return original_close(**close_kwargs)
 
             page.close = close
@@ -122,28 +143,6 @@ class BrowserInteractionTests(unittest.TestCase):
             return page
 
         cls.browser.new_page = new_page
-
-    @classmethod
-    def _collect_coverage(cls, session):
-        """Take and stop precise V8 coverage; one entry per compiled script."""
-        entries = []
-        blocks = session.send("Profiler.takePreciseCoverage")["result"]
-        for block in blocks:
-            try:
-                source = session.send(
-                    "Debugger.getScriptSource",
-                    {"scriptId": block["scriptId"]})["scriptSource"]
-            except Exception:
-                source = None
-            entries.append({
-                "url": block.get("url", ""),
-                "source": source,
-                "functions": block.get("functions", []),
-            })
-        session.send("Profiler.stopPreciseCoverage")
-        session.send("Profiler.disable")
-        session.detach()
-        return entries
 
     @classmethod
     def tearDownClass(cls):
@@ -156,7 +155,7 @@ class BrowserInteractionTests(unittest.TestCase):
         # here so the dump still describes the whole run.
         for _page, session in list(cls._open_pages):
             try:
-                cls._coverage_entries.extend(cls._collect_coverage(session))
+                cls._coverage_entries.extend(collect_page_coverage(session))
             except Exception:
                 pass
         cls._open_pages.clear()
@@ -1656,8 +1655,7 @@ class DisputedBrowserTests(unittest.TestCase):
             def close(**close_kwargs):
                 if (page, session) in cls._open_pages:
                     cls._open_pages.remove((page, session))
-                cls._coverage_entries.extend(
-                    BrowserInteractionTests._collect_coverage(session))
+                cls._coverage_entries.extend(collect_page_coverage(session))
                 return original_close(**close_kwargs)
 
             page.close = close
@@ -1673,8 +1671,7 @@ class DisputedBrowserTests(unittest.TestCase):
         # here so the dump still describes the whole run.
         for _page, session in list(cls._open_pages):
             try:
-                cls._coverage_entries.extend(
-                    BrowserInteractionTests._collect_coverage(session))
+                cls._coverage_entries.extend(collect_page_coverage(session))
             except Exception:
                 pass
         cls._open_pages.clear()

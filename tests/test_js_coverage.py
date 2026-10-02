@@ -17,7 +17,6 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts" / "ci"))
 
-import js_coverage  # pylint: disable=wrong-import-position  # noqa: E402
 from js_coverage import (  # pylint: disable=wrong-import-position  # noqa: E402
     collect_coverage,
     main,

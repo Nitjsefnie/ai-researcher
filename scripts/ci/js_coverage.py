@@ -192,7 +192,7 @@ def collect_coverage(dump_path, root):
     for record in rebased:
         # The rebased shape scores in its OWN offsets -- line 1 is a
         # different length -- and lands on the script's line numbers,
-        # which coincide from line 2 on (_payload_split).
+        # which coincide from the payload line on (_shape_key).
         source = record['source']
         counts = merge_records([record], len(source))
         covered |= {
