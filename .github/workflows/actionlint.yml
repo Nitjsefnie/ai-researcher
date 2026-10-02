@@ -66,10 +66,18 @@ jobs:
       # (actionlint_<version>_checksums.txt) and land VERSION and SHA256
       # together, in one commit, so the pin never names a version its
       # checksum does not match.
-      ACTIONLINT_VERSION: 1.7.12
-      # sha256 of actionlint_1.7.12_linux_amd64.tar.gz, from the release's own
-      # checksums file.
-      ACTIONLINT_SHA256: 8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8
+      #
+      # The fork, not rhysd's own release: stock 1.7.12 does not know the
+      # `queue:` key in a concurrency group and rejects claim.yml's
+      # reference block with `unexpected key "queue"` (issue #123).
+      # v1.7.12-queue.1 carries upstream rhysd/actionlint#654; the same pin
+      # runs in the claim, pr-gate and daedalus repositories. Return to
+      # rhysd's own release once it ships the key.
+      ACTIONLINT_VERSION: 1.7.12-queue.1
+      ACTIONLINT_REPO: Nitjsefnie-OSC/actionlint
+      # sha256 of actionlint_1.7.12-queue.1_linux_amd64.tar.gz, from the
+      # release's own checksums file. Bump all three together.
+      ACTIONLINT_SHA256: dcc2c42a7caaa197dfe63584a3851f62ef260f80b2cf221baaf05479661e1521
 
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -90,7 +98,7 @@ jobs:
         run: |
           tarball="actionlint_${ACTIONLINT_VERSION}_linux_amd64.tar.gz"
           curl -fsSL --retry 3 --connect-timeout 10 --max-time 120 -o "$tarball" \
-            "https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}/${tarball}"
+            "https://github.com/${ACTIONLINT_REPO}/releases/download/v${ACTIONLINT_VERSION}/${tarball}"
           echo "${ACTIONLINT_SHA256}  ${tarball}" | sha256sum -c -
           tar -xzf "$tarball" actionlint
           ./actionlint --version
