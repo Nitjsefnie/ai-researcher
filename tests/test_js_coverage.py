@@ -17,6 +17,7 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts" / "ci"))
 
+import js_coverage  # pylint: disable=wrong-import-position  # noqa: E402
 from js_coverage import (  # pylint: disable=wrong-import-position  # noqa: E402
     collect_coverage,
     main,
@@ -320,3 +321,65 @@ def test_multiline_function_body_marks_its_statement_lines():
 def test_unterminatable_source_raises(source):
     with pytest.raises(ValueError):
         code_lines(source)
+
+
+# --- the disputed build's second shape (issue #118) -------------------------------
+
+def _page_root(tmp_path, payload: str):
+    """A root carrying a built page whose DATA line is `payload`.
+
+    page_script() extracts from the newline closing <script>, so the
+    script text begins with the blank line the fixture writes there --
+    the same leading shape the real page has.
+    """
+    root = tmp_path / "root"
+    root.mkdir()
+    script = "\n" + payload + "\n" + "let x = 1;\nlet y = 2;\n"
+    (root / "out").mkdir()
+    (root / "out" / "frontier-models.html").write_text(
+        "<script>\n" + script + "</script>\n", encoding="utf-8")
+    return root
+
+
+def _one_range_record(source: str, start: int, end: int, count: int = 1):
+    return {"url": "x", "source": source, "functions": [
+        {"functionName": "f", "isBlockCoverage": True, "ranges": [
+            {"startOffset": start, "endOffset": end, "count": count}]}]}
+
+
+def test_a_different_one_line_payload_attributes_and_scores(tmp_path):
+    # The disputed build (issue #118): a different-length DATA line over the
+    # byte-identical code. Its records must attribute and score -- the
+    # disputed JS paths run on no other page -- landing on the shared line
+    # numbers from line 2 on.
+    payload_a = "const DATA = {\"a\": 1};"
+    payload_b = "const DATA = {\"a\": 1, \"much\": \"longer payload here\"};"
+    root = _page_root(tmp_path, payload_a)
+    code = "\nlet x = 1;\nlet y = 2;\n"
+    body_a = "\n" + payload_a + code
+    body_b = "\n" + payload_b + code
+    # offsets of "let y" in each shape
+    start_a = 1 + len(payload_a) + len("\nlet x = 1;\n")
+    start_b = 1 + len(payload_b) + len("\nlet x = 1;\n")
+    dump = tmp_path / "dump.json"
+    dump.write_text(json.dumps([
+        _one_range_record("\n" + body_a, start_a - 1, start_a + 11),
+        _one_range_record("\n" + body_b, start_b - 1, start_b + 11),
+    ]), encoding="utf-8")
+    report = collect_coverage(str(dump), str(root))
+
+    fc = report.files["out/frontier-models.html"]
+    assert fc.covered_lines == {4, 5}
+    assert report.unattributed_records == 0
+
+
+def test_a_genuinely_different_script_stays_unattributed(tmp_path):
+    # A record whose CODE text differs is not a second shape; attributing it
+    # would score lines the page never shipped.
+    root = _page_root(tmp_path, "const DATA = {\"a\": 1};")
+    other = "const DATA = {\"a\": 1};\nlet x = 1;\nlet DIFFERENT = 2;\n"
+    dump = tmp_path / "dump.json"
+    dump.write_text(json.dumps([_one_range_record(other, 0, len(other))]),
+                    encoding="utf-8")
+    with pytest.raises(ValueError, match="no coverage record attributed"):
+        collect_coverage(str(dump), str(root))

@@ -319,28 +319,6 @@ def metric_record(m, metric):
     return {"score": round(score, 2), "cost": round(cost, 4)}
 
 
-# The disagreement paths the page RENDERS as both-value pairs, mapped to the
-# label the tooltip and table show them under. Everything else a capture's
-# disagreement map can carry collapses to one "+N other fields" line, so the
-# reader still learns the record is wider-disputed without the tooltip
-# becoming a raw dump (issue #118).
-RENDERED_DISPUTES = {
-    "intelligenceIndex": "Intelligence Index",
-    "intelligenceIndexCostPerTask": "Cost per task",
-    "intelligenceIndexCostPerTask.cost.total": "Cost per task",
-    "gdpvalNormalized": "GDPval-AA v2",
-    "parameters": "Parameters",
-    "price1mInputTokens": "$ / 1M in",
-    "price1mOutputTokens": "$ / 1M out",
-    "medianOutputTokensPerSecond": "Output speed",
-    "contextWindowTokens": "Context",
-    "releaseDate": "Released",
-    "licenseName": "Weights licence",
-    "modelCreatorName": "Lab",
-    "name": "Name",
-    "shortName": "AA label",
-}
-
 # The payload fields a disputed cell shows both values for, per metric: the
 # score path first, the cost path second. Coding is absent -- agent rows are
 # not leaderboard records, so a model-route disagreement never reaches them.
@@ -1877,10 +1855,16 @@ const DATA = __DATA__;
   }
 
   function frontierMetric(rows,key){
+    // Disputed rows sit out BOTH roles (issue #118), exactly as the build's
+    // own undominated() does: no disputed model is a frontier candidate, and
+    // no disputed model dominates anyone -- a verdict computed against a
+    // value one of AA's own routes disagrees with is not a verdict the page
+    // can stand behind.
     return rows.filter(r=>{
+      if(r.disp) return false;
       const m=metricOf(r,key);
       return !rows.some(o=>{
-        if(o===r) return false;
+        if(o===r||o.disp) return false;
         const om=metricOf(o,key);
         return om.score>=m.score && om.cost<=m.cost &&
           (om.score>m.score || om.cost<m.cost);
@@ -1945,6 +1929,26 @@ const DATA = __DATA__;
     typeof v === "number" ? v
       : (v && typeof v === "object" && v.cost && typeof v.cost.total === "number"
           ? v.cost.total : null);
+  // The kind a disputed path renders with, mirroring the build's own
+  // _fmt_dispute_value kind-for-kind; the fallback is the page's show() --
+  // a string-valued dispute (a label, a licence, a date) renders as text,
+  // never as a number that is not one.
+  const DISPUTE_KINDS = {
+    "intelligenceIndex": "score",
+    "intelligenceIndexCostPerTask": "cost",
+    "intelligenceIndexCostPerTask.cost.total": "cost",
+    "gdpvalNormalized": "gdpval",
+    "parameters": "params",
+    "price1mInputTokens": "price",
+    "price1mOutputTokens": "price",
+    "medianOutputTokensPerSecond": "num",
+    "contextWindowTokens": "ctx",
+    "releaseDate": "text",
+    "licenseName": "text",
+    "modelCreatorName": "text",
+    "name": "text",
+    "shortName": "text",
+  };
   const fmtDisp = (v, kind) => {
     if (v == null) return "—";
     if (kind === "gdpval") return (v * 100).toFixed(1);
@@ -1953,30 +1957,25 @@ const DATA = __DATA__;
       return t == null ? "—" : fmtCost(t);
     }
     if (kind === "params") return fmtParams(v);
-    return Number(v).toFixed(1);
+    if (kind === "price") return "$" + v;
+    if (kind === "ctx") return fmtCtx(v);
+    if (kind === "score") return typeof v === "number" ? v.toFixed(1) : String(v);
+    if (kind === "num") return String(v);
+    return show(v);
   };
-  const dispPair = (r, path, kind) => {
+  const dispPair = (r, path) => {
     if (!r.disp || !(path in r.disp)) return null;
     const e = r.disp[path];
-    return fmtDisp(e.lb, kind) + " / " + fmtDisp(e.dt, kind);
+    return fmtDisp(e.lb, DISPUTE_KINDS[path]) + " / "
+         + fmtDisp(e.dt, DISPUTE_KINDS[path]);
   };
   // The cost cell's both-routes text: the disagreement map can spell the
   // cost path two ways (the nested shape, or the top-level path when the
   // leaderboard's flattened scalar was compared through the check's
   // reshape), and either side that fails to resolve to a number renders the
   // em dash for that side alone -- never a guess.
-  const dispCostPair = r => {
-    if (!r.disp) return null;
-    for (const path of ["intelligenceIndexCostPerTask.cost.total",
-                        "intelligenceIndexCostPerTask"]) {
-      if (path in r.disp) {
-        const e = r.disp[path];
-        const f = v => { const t = routeCostTotal(v); return t == null ? "—" : fmtCost(t); };
-        return f(e.lb) + " / " + f(e.dt);
-      }
-    }
-    return null;
-  };
+  const dispCostPair = r => dispPair(r, "intelligenceIndexCostPerTask.cost.total")
+    || dispPair(r, "intelligenceIndexCostPerTask");
   const dispTagCell = cell => {
     cell.appendChild(document.createTextNode(" "));
     const tag = document.createElement("span");
@@ -2328,11 +2327,7 @@ const DATA = __DATA__;
         for(const [path,e] of entries){
           const label=DISPUTE_LABELS[path];
           if(!label) continue;
-          const kind= path==="gdpvalNormalized" ? "gdpval"
-            : path.startsWith("intelligenceIndexCostPerTask") ? "cost"
-            : path==="parameters" ? "params" : "score";
-          rows.push([label+" — both routes",
-                     fmtDisp(e.lb,kind)+" / "+fmtDisp(e.dt,kind)]);
+          rows.push([label+" — both routes", dispPair(r, path)]);
           shown++;
         }
         if(entries.length>shown)
@@ -2561,11 +2556,7 @@ const DATA = __DATA__;
         for(const [path,e] of entries){
           const label=DISPUTE_LABELS[path];
           if(!label) continue;
-          const kind= path==="gdpvalNormalized" ? "gdpval"
-            : path.startsWith("intelligenceIndexCostPerTask") ? "cost"
-            : path==="parameters" ? "params" : "score";
-          lines.push([label+" — both routes",
-                      fmtDisp(e.lb,kind)+" / "+fmtDisp(e.dt,kind)]);
+          lines.push([label+" — both routes", dispPair(hit.r, path)]);
           shown++;
         }
         if(entries.length>shown)
@@ -2685,8 +2676,8 @@ const DATA = __DATA__;
       for(const key of Object.keys(METRICS)){
         const m=metricOf(r,key), score=document.createElement("td"), cost=document.createElement("td");
         score.className="n"; cost.className="n";
-        const dsp = key==="intelligence" ? dispPair(r,"intelligenceIndex","score")
-                  : key==="agentic" ? dispPair(r,"gdpvalNormalized","gdpval") : null;
+        const dsp = key==="intelligence" ? dispPair(r,"intelligenceIndex")
+                  : key==="agentic" ? dispPair(r,"gdpvalNormalized") : null;
         const dcost = key!=="coding" ? dispCostPair(r) : null;
         score.textContent = dsp || (m?m.score.toFixed(1):"—");
         cost.textContent = dcost || (m?fmtCost(m.cost):"—");
@@ -2701,7 +2692,7 @@ const DATA = __DATA__;
         if(key==="intelligence"){
           const parameters=document.createElement("td");
           parameters.className="n";
-          const pdp=dispPair(r,"parameters","params");
+          const pdp=dispPair(r,"parameters");
           parameters.textContent = pdp || fmtParams(r.params);
           if(pdp) dispTagCell(parameters);
           else if(metricOf(r,"parameters")&&frontSets.parameters.has(r)){

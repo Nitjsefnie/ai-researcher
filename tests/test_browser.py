@@ -162,8 +162,19 @@ class BrowserInteractionTests(unittest.TestCase):
         cls._open_pages.clear()
         dump = os.environ.get("JS_COVERAGE_OUT")
         if dump:
-            pathlib.Path(dump).write_text(
-                json.dumps(cls._coverage_entries), encoding="utf-8")
+            # The coverage job runs more than one page-building class, and
+            # each dumps at ITS teardown: merge with whatever an earlier
+            # class already wrote, or the later teardown would erase the
+            # earlier class's whole contribution.
+            path = pathlib.Path(dump)
+            entries = cls._coverage_entries
+            if path.exists():
+                try:
+                    entries = json.loads(
+                        path.read_text(encoding="utf-8")) + entries
+                except (OSError, json.JSONDecodeError):
+                    pass
+            path.write_text(json.dumps(entries), encoding="utf-8")
         cls.browser.close()
         cls.playwright.stop()
 
@@ -1600,7 +1611,9 @@ class DisputedBrowserTests(unittest.TestCase):
         data = pathlib.Path(cls._dir.name) / "data"
         data.mkdir()
         (data / build.DISPUTED_SNAPSHOT_NAME).write_text(
-            json.dumps(test_build.disputed_snapshot_fixture()), encoding="utf-8")
+            json.dumps(test_build.disputed_snapshot_fixture(
+                lic_lb="Fixture Licence A", lic_dt="Fixture Licence B")),
+            encoding="utf-8")
         (data / "aa-raw-coding-agents.json").write_text(
             json.dumps([test_build.agent_fixture()]), encoding="utf-8")
         (data / "captured-at.txt").write_text("2026-10-04\n",
@@ -1620,10 +1633,62 @@ class DisputedBrowserTests(unittest.TestCase):
             build.RAW, build.AGENTS_RAW, build.OUT = cls._saved
             cls._dir.cleanup()
             raise
+        # The same V8 block-coverage wiring BrowserInteractionTests uses:
+        # the disputed JS paths run on NO other page, so without this the
+        # JavaScript ratchet reads them as uncovered and reds the coverage
+        # job -- the disputed layer would red every coverage run it should
+        # be proving itself in.
+        cls._coverage_entries = []
+        cls._open_pages = []
+        original_new_page = cls.browser.new_page
+
+        def new_page(**kwargs):
+            page = original_new_page(**kwargs)
+            if kwargs.get("java_script_enabled") is False:
+                return page
+            session = page.context.new_cdp_session(page)
+            session.send("Debugger.enable")
+            session.send("Profiler.enable")
+            session.send("Profiler.startPreciseCoverage",
+                         {"callCount": True, "detailed": True})
+            original_close = page.close
+
+            def close(**close_kwargs):
+                if (page, session) in cls._open_pages:
+                    cls._open_pages.remove((page, session))
+                cls._coverage_entries.extend(
+                    BrowserInteractionTests._collect_coverage(session))
+                return original_close(**close_kwargs)
+
+            page.close = close
+            cls._open_pages.append((page, session))
+            return page
+
+        cls.browser.new_page = new_page
 
     @classmethod
     def tearDownClass(cls):
         build.RAW, build.AGENTS_RAW, build.OUT = cls._saved
+        # A test that failed mid-way leaves its page open; take its coverage
+        # here so the dump still describes the whole run.
+        for _page, session in list(cls._open_pages):
+            try:
+                cls._coverage_entries.extend(
+                    BrowserInteractionTests._collect_coverage(session))
+            except Exception:
+                pass
+        cls._open_pages.clear()
+        dump = os.environ.get("JS_COVERAGE_OUT")
+        if dump:
+            path = pathlib.Path(dump)
+            entries = cls._coverage_entries
+            if path.exists():
+                try:
+                    entries = json.loads(
+                        path.read_text(encoding="utf-8")) + entries
+                except (OSError, json.JSONDecodeError):
+                    pass
+            path.write_text(json.dumps(entries), encoding="utf-8")
         cls.browser.close()
         cls.playwright.stop()
         cls._dir.cleanup()
@@ -1648,5 +1713,50 @@ class DisputedBrowserTests(unittest.TestCase):
             mark = page.locator('[aria-label*="disputed values"]').first
             self.assertEqual(mark.get_attribute("fill"), "var(--surface-1)")
             self.assertEqual(mark.get_attribute("stroke"), "var(--muted)")
+            # Hover it: the tooltip shows both routes' values -- the numeric
+            # pair at one decimal, the string licence dispute as TEXT -- and
+            # never a NaN, which a number-coerced string would render.
+            mark.hover()
+            tip = page.locator("#tip-intelligence")
+            self.assertTrue(tip.locator(".tname").is_visible())
+            tip_text = tip.inner_text()
+            self.assertIn("51.0 / 52.0", tip_text)
+            self.assertIn("Fixture Licence A / Fixture Licence B", tip_text)
+            self.assertNotIn("NaN", tip_text)
+            self.assertIn("excluded — disputed", tip_text)
+            # The LIVE frontier pass (fillTable rewrites the tbody on load)
+            # excludes the disputed row in both directions: no frontier tag
+            # on the disputed model, one on the clean model it dominates.
+            row = page.locator("#tbl tbody tr",
+                               has_text="Fixture Model (high)").first
+            self.assertEqual(row.locator("span.tag.f").count(), 0)
+            clean = page.locator("#tbl tbody tr",
+                                 has_text="Fixture Model B").first
+            self.assertGreaterEqual(clean.locator("span.tag.f").count(), 1)
+            # The parameters chart draws the same disputed row (the fixture
+            # model carries a parameter count): its tooltip runs the
+            # capability-chart disputed branch.
+            pmark = page.locator(
+                '[aria-label*="disputed values"]'
+                '[aria-label*="Parameter efficiency chart"]').first
+            if pmark.count():
+                pmark.hover()
+                ptext = page.locator("#tip-parameters").inner_text()
+                self.assertIn("51.0 / 52.0", ptext)
+                self.assertNotIn("NaN", ptext)
+                page.mouse.move(4, 4)
+            # Hide-superseded: the sup-only view runs the disputed frontier
+            # pass -- the disputed model sits out, so only the clean model
+            # remains on the intelligence chart's frontier slice.
+            page.click("#fSup")
+            page.wait_for_timeout(150)
+            sup_text = page.locator("#count").inner_text()
+            self.assertIn("frontiers only", sup_text)
+            page.click("#fSup")
+            # The copy exports carry the disputed rows' base generation.
+            page.click("#copyMd")
+            page.wait_for_timeout(100)
+            page.click("#copyJson")
+            page.wait_for_timeout(100)
         finally:
             page.close()
