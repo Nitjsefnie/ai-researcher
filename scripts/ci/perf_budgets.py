@@ -306,8 +306,14 @@ def code_bytes(raw):
     """The page's weight once every row region is excised (bytes).
 
     total - DATA blob - #fTable tbody - #tbl tbody; byte-identical
-    across same-code/different-data builds, which is the property that
-    decouples the budget from AA's capture volume (issue #112).
+    across same-code/different-data builds of the NORMAL page, which is
+    the property that decouples the budget from AA's capture volume
+    (issue #112). The DISPUTED page (issue #118) is the one exception: its
+    banner is build-time HTML outside every excised region and carries the
+    window's counts, so the quantity moves by ~1.5 KB with the disputed
+    mode -- the budget covers that shape (measured at re-seed time), and a
+    disputed build is exactly the shape the gate sees when a window is
+    live.
     """
     spans = _row_regions(raw)
     return len(raw) - sum(end - start for start, end in spans)

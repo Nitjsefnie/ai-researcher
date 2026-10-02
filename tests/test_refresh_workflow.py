@@ -399,14 +399,18 @@ class RouteDisagreementPublishTests(unittest.TestCase):
         idx_stamp = self.block.index('> "$stamp"', idx_true)
         idx_summary = self.block.index("building and publishing the disputed capture",
                                        idx_stamp)
-        # No exit between the branch's opening and the `fi` that closes it:
-        # the next `fi` after the summary is the branch's own close.
-        idx_fi = self.block.index(" fi", idx_summary)
-        between = self.block[idx_summary:idx_fi]
-        self.assertNotIn("exit 0", between)
+        # The branch ENDS at its own green exit: a disputed hour must exit 0
+        # and reach the rendered gate -- without it, control falls to the
+        # trailing red handler and exits 3, the exact hold-and-fail this
+        # branch exists to replace (found by review, fixed 2026-10-02).
+        idx_exit = self.block.index("exit 0", idx_summary)
+        idx_fi = self.block.index(" fi", idx_exit)
+        between = self.block[idx_summary:idx_exit]
         self.assertNotIn("exit 1", between)
         self.assertLess(idx_true, idx_stamp)
         self.assertIn("issue #118", self.block[idx_summary:idx_summary + 200])
+        # The exit is the branch's last word before its closing fi.
+        self.assertLess(idx_exit, idx_fi)
 
     def test_the_stamp_is_written_only_when_absent_and_keeps_the_window_start(self):
         # The banner names ONE window across hours: an existing stamp's
@@ -466,9 +470,17 @@ class RouteDisagreementPublishTests(unittest.TestCase):
 
     def test_no_time_bound_remains_on_the_disagreement(self):
         # The banner is the alarm now: no stamp age, no red alarm wording.
+        # The only corrupt-stamp red left names the BANNER's window start --
+        # a non-numeric first line would misname the window, so the refresh
+        # path validates it and reds (issue #118 review, 2026-10-02).
         self.assertNotIn("3*3600", self.block)
         self.assertNotIn("older than 3 h", self.block)
-        self.assertNotIn("stamp is corrupt", self.block)
+        self.assertIn("stamp is corrupt", self.block)
+        idx_case = self.block.index("''|*[!0-9]*)")
+        self.assertLess(idx_case,
+                        self.block.index("exit 1 ;;", idx_case))
+        self.assertLess(self.block.index('start="$(head -n 1 "$stamp")"'),
+                        idx_case)
 
     def test_the_header_documents_the_disputed_publish(self):
         # The file's contract lives in its header; a reader must find the

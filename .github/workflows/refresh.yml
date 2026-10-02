@@ -272,6 +272,13 @@ jobs:
                 cat /tmp/fetch-err.txt
               } > "$stamp"
             else
+              start="$(head -n 1 "$stamp")"
+              case "$start" in
+                ''|*[!0-9]*)
+                  echo "AA route-disagreement stamp is corrupt (first line: '$start') -- the disputed banner could not name the window; re-read AA by hand (issue #118)." >&2
+                  cat /tmp/fetch-err.txt >&2
+                  exit 1 ;;
+              esac
               {
                 head -n 1 "$stamp"
                 cat /tmp/fetch-err.txt
@@ -284,6 +291,11 @@ jobs:
             fi
             echo "AA's routes disagree -- building and publishing the disputed capture (issue #118). The page carries the disputed banner until the routes agree." \
               >> "$GITHUB_STEP_SUMMARY"
+            # The disputed hour is a GREEN hour: the rendered gate below
+            # decides moved vs unchanged. Without this exit the branch would
+            # fall through to the red handler and exit 3 -- the exact
+            # hold-and-fail behavior this branch exists to replace.
+            exit 0
           fi
 
           # Every other exit code is the designed red -- schema change,

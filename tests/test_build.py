@@ -1671,7 +1671,9 @@ if __name__ == "__main__":
 
 def _disputed_route_records(slug: str = "fixture-model", *, ii_lb: float = 51,
                             ii_dt: float = 52,
-                            name: str = "Fixture Model (high)"):
+                            name: str = "Fixture Model (high)",
+                            lic_lb: str | None = None,
+                            lic_dt: str | None = None):
     """(leaderboard, detail) records for one slug, disagreeing on
     intelligenceIndex and agreeing on every other shared value: the
     leaderboard carries its flattened cost scalar and an undefined context,
@@ -1684,11 +1686,15 @@ def _disputed_route_records(slug: str = "fixture-model", *, ii_lb: float = 51,
         "parameters": 27,
         "medianOutputTokensPerSecond": 100.0,
     }
+    if lic_lb is not None:
+        shared["licenseName"] = lic_lb
     leaderboard = {
         **shared, "shortName": name, "intelligenceIndex": ii_lb,
         "intelligenceIndexCostPerTask": 0.75,
         "contextWindowTokens": "$undefined",
     }
+    if lic_dt is not None:
+        shared["licenseName"] = lic_dt
     detail = {
         **shared, "name": name, "intelligenceIndex": ii_dt,
         "intelligenceIndexCostPerTask": {
@@ -1706,7 +1712,8 @@ def disputed_snapshot_fixture(**kwargs) -> dict:
     """The snapshot fetch_aa.py's refusal writes, built the same way: the two
     raw route payloads plus the disagreement map straight out of
     check_route_agreement -- mutated payloads against each other, never an
-    edited data/ file."""
+    edited data/ file. Pass lic_lb/lic_dt to add a shared-string dispute
+    (the licence) beside the intelligence-index one."""
     lb, dt = _disputed_route_records(**kwargs)
     lb_b, dt_b = _disputed_route_records(
         "fixture-model-b", ii_lb=40, ii_dt=40,
@@ -1873,6 +1880,24 @@ class DisputedBuildTests(unittest.TestCase):
                         pass
                 self.assertIn("aa-disagreement-snapshot.json",
                               str(caught.exception))
+
+    def test_the_js_dispute_map_spans_the_mirror_paths(self):
+        # One map per language, and the drift between them is silent: the
+        # JS DISPUTE_KINDS (the tooltip's labels and kinds) must carry every
+        # path the static mirror renders, and the cost path's two spellings
+        # -- the nested shape and the reshape spelling -- must both resolve.
+        # Extracted from TEMPLATE so the assertion spans the two modules'
+        # literals, not a copy of either.
+        match = re.search(
+            r'const DISPUTE_KINDS = \{(.*?)\};', build.TEMPLATE, re.S)
+        assert match is not None, "DISPUTE_KINDS vanished from the template"
+        js_keys = set(re.findall(r'"([^"]+)":', match.group(1)))
+        mirror_paths = {"intelligenceIndex", "gdpvalNormalized", "parameters",
+                        "intelligenceIndexCostPerTask",
+                        "intelligenceIndexCostPerTask.cost.total"}
+        self.assertTrue(mirror_paths <= js_keys,
+                        f"the JS map lost a mirror path: "
+                        f"{sorted(mirror_paths - js_keys)}")
 
     def test_the_provenance_names_the_snapshot_as_an_input(self):
         with self.disputed_page() as (page, _snapshot):

@@ -111,6 +111,52 @@ def merge_records(records, source_length):
     return merged
 
 
+def _shape_key(source):
+    """The code text with the page's one payload line elided, or None.
+
+    The page's script carries the data payload as ONE line (a ``const DATA
+    = {...};`` statement, wherever the compiled text puts it). The
+    disputed build (issue #118) writes a DIFFERENT payload of a different
+    length on that one line -- so both shapes share one code text under
+    one moving header line, and line n of a disputed build's script is
+    line n of the normal build's for every line number: the payload is a
+    single line in both, and everything around it is byte-identical.
+    """
+    if source.startswith("const DATA = "):
+        payload_start = 0
+        j = source.find("\n")
+    else:
+        i = source.find("\nconst DATA = ")
+        if i == -1:
+            return None
+        payload_start = i + 1
+        j = source.find("\n", i + 1)
+    if j == -1 or not source[payload_start:j].rstrip().endswith(";"):
+        return None
+    key = source[:payload_start] + source[j:]
+    # The copy exports embed the capture date in their source strings (the
+    # copyMarkdown prose and the copyJson object literal), and the two
+    # shapes were captured on different days -- one more moving token,
+    # elided like the payload (the shape the gate scores is the CODE, and
+    # a date literal is not code).
+    return re.sub(r"[0-9]{4}-[0-9]{2}-[0-9]{2}", ":", key)
+
+
+def _attributable(source: str, script: str) -> bool:
+    """The record's source scores against the page script.
+
+    Exact equality, or the second shape: a different one-line payload over
+    the byte-identical code text. Anything else -- a genuinely different
+    script, an older build -- stays unattributed and unscored.
+    """
+    if source == script:
+        return True
+    script_key = _shape_key(script)
+    if script_key is None:
+        return False
+    return _shape_key(source) == script_key
+
+
 def collect_coverage(dump_path, root):
     """Read one Playwright dump and score the page script against it."""
     script = page_script(root)
@@ -119,24 +165,40 @@ def collect_coverage(dump_path, root):
         raise ValueError(
             'the coverage dump must be the JSON array '
             'page.coverage.stop_js_coverage() returned')
-    attributed = []
+    exact = []
+    rebased = []
     ignored_other = 0
     for record in entries:
-        if record.get('source') == script:
-            attributed.append(record)
-        else:
+        source = record.get('source')
+        if not _attributable(source, script):
             ignored_other += 1
-    if not attributed:
+        elif source == script:
+            exact.append(record)
+        else:
+            rebased.append(record)
+    if not exact and not rebased:
         raise ValueError(
             'no coverage record attributed to the page script; the dump is '
             'from a run that never loaded the built page, or the page was '
             'rebuilt since the dump was captured')
-    counts = merge_records(attributed, len(script))
     executable = js_lines.code_lines(script, PAGE)
-    covered = {
-        line for line, start, end in _line_spans(script)
-        if line in executable and any(counts[start:end])
-    }
+    covered = set()
+    if exact:
+        counts = merge_records(exact, len(script))
+        covered |= {
+            line for line, start, end in _line_spans(script)
+            if line in executable and any(counts[start:end])
+        }
+    for record in rebased:
+        # The rebased shape scores in its OWN offsets -- line 1 is a
+        # different length -- and lands on the script's line numbers,
+        # which coincide from line 2 on (_payload_split).
+        source = record['source']
+        counts = merge_records([record], len(source))
+        covered |= {
+            line for line, start, end in _line_spans(source)
+            if line in executable and any(counts[start:end])
+        }
     files = {PAGE: FileCoverage(executable, covered)}
     return CoverageReport(files, len(entries), ignored_other)
 
