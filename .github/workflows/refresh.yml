@@ -94,30 +94,36 @@ name: refresh
 # designed signals to go re-read the leaderboard and the methodology page by
 # hand; a red run here means read them, not retry.
 #
-# EXIT 3 IS THE ONE DELIBERATE NON-RED (issue #100). AA's two routes are
-# independently cached Vercel pages whose data lands at different times --
-# measured windows up to ~1 h, cache-busting query params and no-cache
-# headers serve the SAME entry, and re-reads never converge inside any retry
-# bound -- so a capture that straddles an update cannot be made consistent
-# by retrying, but the SAME capture usually succeeds within the hour. That
-# refusal gets its own exit code, 3: the Capture step green-skips the hour,
-# stamping data/aa-route-disagreement.txt with the window's start (epoch,
-# line 1) and the capture's own stderr (line 2+), committed AND pushed in
-# the Capture step itself so no later step's data/ restore can see it
-# uncommitted. While the stamp is young the same run shape green-skips
-# again; once the window is older than 3 h the step fails red -- go re-read
-# AA by hand. When a capture succeeds again, the step removes the stamp,
-# commits "Route agreement restored; resume captures (issue #100)" and
-# pushes; a stamp push lost to the push race concedes green either way, and
-# a lost stamp is self-healing on the next run. Exit 1 still fails red
-# immediately, exactly as before.
+# EXIT 3 IS THE DISPUTED PUBLISH (issue #118, amending #100). AA's two routes
+# are independently cached Vercel pages whose data lands at different times --
+# measured windows from ~20 minutes to 3.5+ hours -- and re-reads never
+# converge inside any retry bound, so a capture that straddles an update
+# cannot be made consistent by retrying. Since #118 the refusal is buildable:
+# fetch_aa.py exits 3 but writes data/aa-disagreement-snapshot.json (both
+# routes' raw payloads plus the disagreement map), the Capture step writes
+# the window stamp and FALLS THROUGH, and the rendered gate decides moved vs
+# unchanged like any hour. The disputed page -- a disputed banner, both
+# routes' values in disputed tooltips and table cells, disputed models
+# sitting out the frontiers -- publishes the same hour and reverts
+# automatically at convergence, when the next agreeing capture retires the
+# stamp and the snapshot. There is NO time bound on this mode: the disputed
+# banner is the visible alarm, so the 3 h red bound of #100 is retired for
+# this exit code. The schema guards run on the disputed merge too, so exit 1
+# (schema change, index bump, transport failure) still fails red immediately
+# -- only the disagreement itself stopped being red. When a capture succeeds
+# again, the step removes the stamp AND the snapshot, commits "Route
+# agreement restored; resume captures (issue #100)" and pushes; a push lost
+# to the race concedes green either way, and a lost stamp is self-healing on
+# the next run.
 #
-# A GREEN-SKIPPED HOUR IS TERMINAL AGAINST THE `force` INPUT (issue #103).
-# Force exists to republish the current BUILD, and behind a refused capture
-# there is nothing to republish -- the last published page already stands --
-# so a forced dispatch during a live window publishes nothing, the hour is
-# not mislabelled "AA capture unchanged", and the stamp keeps aging to its
-# own 3 h red bound.
+# FORCE DURING A WINDOW NOW REBUILDS (issue #118, amending #103). A forced
+# dispatch used to be terminal behind a refused capture because there was
+# nothing to republish -- the last good page already stood while the hour
+# green-skipped. Since #118 a disputed hour captures and builds like any
+# other, so force during a window rebuilds and republishes the disputed
+# page; the Capture step's `captured` verdict stays true on exit 3. (The
+# verdict remains the force gate's input: were an exit ever classified as
+# refused again, force would be vetoed exactly as #103 built it.)
 
 on:
   schedule:
@@ -187,14 +193,13 @@ jobs:
       # whether the toolchain is needed at all, instead of paying 40-50 s of
       # pip + Chromium on every no-op hour.
       #
-      # The refusals are not all the same colour (issue #100). Exit 1 is the
-      # designed red: schema change, index bump, fetch failure -- go re-read
-      # AA by hand. Exit 3 is the route-disagreement refusal: the two routes
-      # straddled AA's update (independently cached Vercel pages whose data
-      # lands at different times -- measured windows up to ~1 h, and re-reads
-      # never converge inside any retry bound), so the SAME capture usually
-      # succeeds within the hour. This step green-skips that hour behind a
-      # committed stamp and fails red only when the disagreement is OLD.
+      # The refusals are not all the same colour (issues #100, #118). Exit 1
+      # is the designed red: schema change, index bump, fetch failure -- go
+      # re-read AA by hand. Exit 3 is the route-disagreement refusal, and
+      # since #118 it is buildable: fetch_aa.py writes the disagreement
+      # snapshot, this step writes the window stamp, and the hour proceeds
+      # to the rendered gate -- the disputed page publishes and carries the
+      # banner until the routes agree. There is no time bound on a window.
       - name: Capture the leaderboard
         # The id is the force gate's handle: "Did anything move?" reads this
         # step's `captured` verdict through it (issue #103).
@@ -208,7 +213,6 @@ jobs:
           rc=$?
           set -e
           stamp=data/aa-route-disagreement.txt
-          alert_after=$((3*3600))
           now=$(date -u +%s)
 
           # The push races a concurrent run exactly as the commit step's
@@ -238,11 +242,14 @@ jobs:
             # so its age can never trip the red alarm. A push lost to the
             # race concedes SILENTLY -- the next successful capture retires
             # the stamp again.
-            if git ls-files --error-unmatch "$stamp" > /dev/null 2>&1; then
-              git rm -q "$stamp"
+            if git ls-files --error-unmatch "$stamp" > /dev/null 2>&1 \
+               || git ls-files --error-unmatch data/aa-disagreement-snapshot.json > /dev/null 2>&1; then
+              # The window closes: the stamp AND the disputed snapshot leave
+              # the tree together, so the next build renders normally.
+              git rm -q --ignore-unmatch "$stamp" data/aa-disagreement-snapshot.json
               git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m "Route agreement restored; resume captures (issue #100)"
               if push_head; then
-                echo "AA's routes agree again — disagreement stamp removed; captures resume." \
+                echo "AA's routes agree again — disagreement stamp and snapshot removed; captures resume (issue #118)." \
                   >> "$GITHUB_STEP_SUMMARY"
               fi
             fi
@@ -250,44 +257,33 @@ jobs:
           fi
 
           if [ "$rc" -eq 3 ]; then
-            if [ -f "$stamp" ]; then
-              start=$(head -n 1 "$stamp")
-              case "$start" in
-                ''|*[!0-9]*)
-                  echo "AA route-disagreement stamp is corrupt (first line: '$start') -- go re-read AA by hand (issue #100)." >&2
-                  exit 1 ;;
-              esac
-              if [ "$((now - start))" -gt "$alert_after" ]; then
-                echo "AA's routes have disagreed since $(date -u -d "@$start") -- past the 3 h bound. Re-read artificialanalysis.ai by hand (issue #100)." >&2
-                cat /tmp/fetch-err.txt >&2
-                exit 1
-              fi
-              # A young window: skip the hour green. Nothing is written --
-              # neither the stamp nor the capture. captured=false makes
-              # this terminal against the force input (issue #103); only
-              # the heal gate (live_stale/hub_stale) may still set proceed,
-              # as on any unchanged hour (issue #100).
-              echo "captured=false" >> "$GITHUB_OUTPUT"
-              echo "AA's routes disagree (window began $(date -u -d "@$start")); skipping this hour; fails red past 3 h (issue #100)" \
-                >> "$GITHUB_STEP_SUMMARY"
-              exit 0
+            # Issue #118: the refusal now carries a buildable disputed
+            # snapshot. The stamp records the window's start once (the
+            # banner names one window across hours) and refreshes the
+            # window's diagnostic after it; the snapshot is the hour's own
+            # capture. Neither is committed HERE anymore -- the rendered
+            # gate decides moved vs unchanged, and the commit step commits
+            # only what the suite passed. From here a disputed hour
+            # proceeds exactly like a moved-capture hour.
+            echo "captured=true" >> "$GITHUB_OUTPUT"
+            if [ ! -f "$stamp" ]; then
+              {
+                echo "$now"
+                cat /tmp/fetch-err.txt
+              } > "$stamp"
+            else
+              {
+                echo "$(head -n 1 "$stamp")"
+                cat /tmp/fetch-err.txt
+              } > "$stamp.new" && mv "$stamp.new" "$stamp"
             fi
-            # First refusal: stamp the window's start (line 1) plus the
-            # capture's own diagnostic (line 2+), and commit + push it IN
-            # THIS STEP -- a later step's data/ restore must never see it
-            # uncommitted. captured=false (issue #103) makes this hour
-            # terminal against force, exactly like the young-window skip.
-            echo "captured=false" >> "$GITHUB_OUTPUT"
-            {
-              echo "$now"
-              cat /tmp/fetch-err.txt
-            } > "$stamp"
-            git add data/aa-route-disagreement.txt
-            git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m "AA routes disagree; skipping this hour (issue #100)"
-            push_head || true
-            echo "AA's routes disagree (window began $(date -u -d "@$now")); skipping this hour; fails red past 3 h (issue #100)" \
+            if [ ! -f data/aa-disagreement-snapshot.json ]; then
+              echo "fetch_aa exited 3 without writing the disagreement snapshot -- go re-read AA by hand (issue #118)." >&2
+              cat /tmp/fetch-err.txt >&2
+              exit 1
+            fi
+            echo "AA's routes disagree -- building and publishing the disputed capture (issue #118). The page carries the disputed banner until the routes agree." \
               >> "$GITHUB_STEP_SUMMARY"
-            exit 0
           fi
 
           # Every other exit code is the designed red -- schema change,
@@ -388,11 +384,9 @@ jobs:
           # zizmor's template-injection audit fails those in run text, and
           # the env mapping is its sanctioned route.)
           #
-          # A refused capture under a forced dispatch gets its own truthful
-          # summary line (issue #103) -- the hour must not pass silently.
-          if [ "$CAPTURED" = false ] && [ "${{ inputs.force }}" = 'true' ]; then
-            echo 'Force dispatch ignored: the capture was refused this hour (AA'"'"'s routes disagree), so there is nothing to rebuild or publish (issue #103).' >> "$GITHUB_STEP_SUMMARY"
-          fi
+          # A forced dispatch during a disputed hour is honored since
+          # #118: there is something to rebuild. The `CAPTURED != "false"`
+          # veto (#103) stays for any future refused classification.
           if [ "$changed" = true ] \
              || { [ "$CAPTURED" != "false" ] && [ "${{ inputs.force }}" = 'true' ]; } \
              || [ "$live_stale" = true ] || [ "$hub_stale" = true ]; then
@@ -527,11 +521,24 @@ jobs:
           fi
           git add data/aa-raw-models.json data/aa-raw-coding-agents.json \
                   data/captured-at.txt out/frontier-models.html
+          [ ! -f data/aa-disagreement-snapshot.json ] || git add data/aa-disagreement-snapshot.json
+          [ ! -f data/aa-route-disagreement.txt ] || git add data/aa-route-disagreement.txt
           # The message is diff_aa.py's own rendering, subject line included —
           # not truncated here. A long one means a lot genuinely moved, and
           # that is the day you want the detail. A run with an unchanged
           # capture never ran the differ, so it writes its own subject.
-          if [ -f commit-msg.txt ]; then
+          # A commit that adds the disagreement snapshot is a DISPUTED
+          # publish (issue #118): its message names that and carries the
+          # capture's own divergence diagnostic from the stamp, never the
+          # differ's "nothing moved" rendering (the differ compares the
+          # last-good captures, which a window does not touch).
+          if git diff --cached --name-only | grep -q '^data/aa-disagreement-snapshot\.json$'; then
+            printf '%s\n\n%s\n' \
+              'Publish disputed capture: AA routes disagree (issue #118)' \
+              'Both routes'"'"' raw payloads and the disagreement map are committed as data/aa-disagreement-snapshot.json; the page renders the disputed layer until the routes agree again.' \
+              > commit-msg.txt
+            sed -n '2,$p' data/aa-route-disagreement.txt >> commit-msg.txt
+          elif [ -f commit-msg.txt ]; then
             printf '\n%s\n' 'Captured by .github/workflows/refresh.yml.' \
               >> commit-msg.txt
           else

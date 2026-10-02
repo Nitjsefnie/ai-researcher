@@ -39,7 +39,10 @@ import urllib.request
 ROOT_FOR_IMPORT = pathlib.Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT_FOR_IMPORT))
 
-from build import GDPVAL_SLUG, INDEX_VERSION, check_route_agreement  # noqa: E402  # pylint: disable=wrong-import-position
+from build import (  # noqa: E402  # pylint: disable=wrong-import-position
+    DISPUTED_SNAPSHOT_NAME, GDPVAL_SLUG, INDEX_VERSION,
+    RouteDisagreement, check_route_agreement, merge_captures,
+)
 
 URL = "https://artificialanalysis.ai/leaderboards/models"
 # The leaderboard's payload was trimmed to 50 fields: it kept identity, price,
@@ -491,6 +494,52 @@ def coding_agent_rows(payload: str) -> list[dict]:
     return priced
 
 
+# The refusal path's output (issue #118): both routes' raw payloads plus the
+# disagreement map, keyed exactly as check_route_agreement reported them.
+# The coding-agents capture is deliberately NOT in it -- the agents page is a
+# different AA product fetched once after a pair agrees, and pulling it onto
+# the refusal path would break the retry-bound arithmetic the suite pins; a
+# disputed build reads the last-good agents capture instead.
+def window_start_epoch() -> int:
+    """When the disagreement window began, as the refusal records it.
+
+    The window's start is the workflow stamp's first line -- the epoch the
+    Capture step wrote when the window opened. Reading it (instead of
+    resetting to now) is what keeps the disputed banner naming ONE window
+    across hours; without a stamp -- a hand-run before any workflow saw the
+    window -- this fetch starts it.
+    """
+    stamp = ROOT / "data" / "aa-route-disagreement.txt"
+    try:
+        return int(stamp.read_text(encoding="utf-8").splitlines()[0])
+    except (OSError, IndexError, ValueError):
+        return int(time.time())
+
+
+def disagreement_snapshot(base: list, detail: list, divergences: list,
+                          base_generated: int | None,
+                          detail_generated: int | None) -> dict:
+    """The disputed snapshot: schema, window, both raw route payloads, and
+    the disagreement map as (slug, path, leaderboard, detail) entries. The
+    model-detail host slug and the index version are deliberately absent:
+    the refusal path has no CapturePair to read them from, and both are
+    derivable from the payloads -- never invented to fill a field."""
+    return {
+        "schema": 1,
+        "capturedAt": dt.datetime.now(dt.timezone.utc).strftime(
+            "%Y-%m-%dT%H:%M:%SZ"),
+        "windowStartEpoch": window_start_epoch(),
+        "leaderboardGeneratedAt": base_generated,
+        "detailGeneratedAt": detail_generated,
+        "leaderboard": base,
+        "detail": detail,
+        "disagreements": [
+            {"slug": slug, "path": path, "lb": lb, "dt": dt}
+            for slug, path, lb, dt in divergences
+        ],
+    }
+
+
 def write_atomic(path: pathlib.Path, text: str) -> None:
     """Stage `text` in a temp file beside `path`, then os.replace it in.
 
@@ -534,14 +583,22 @@ class _RouteDisagreement(SystemExit):
 
     The two generation epochs ride along for the diagnostics only: the
     stderr lines name how old each disagreeing copy was. No behavior is
-    gated on them, and either may be None.
+    gated on them, and either may be None. Since issue #118 the refusal
+    also carries the refused ATTEMPT's two raw route payloads and the
+    structured divergence list -- exactly what the disagreement snapshot is
+    built from, so a refused read becomes a buildable disputed capture
+    without re-fetching or re-deriving anything.
     """
 
     def __init__(self, message: object, base_generated: int | None = None,
-                 detail_generated: int | None = None) -> None:
+                 detail_generated: int | None = None, base: list | None = None,
+                 detail: list | None = None, divergences: list | None = None) -> None:
         super().__init__(message)
         self.base_generated = base_generated
         self.detail_generated = detail_generated
+        self.base = base
+        self.detail = detail
+        self.divergences = divergences
 
 
 class CapturePair(typing.NamedTuple):
@@ -588,7 +645,8 @@ def capture_pair(cached_base: str | None, cached_detail: str | None) -> CaptureP
         shared_values = check_route_agreement(base, detail)
     except SystemExit as exc:
         raise _RouteDisagreement(exc.code, base_generated,
-                                 detail_generated) from None
+                                 detail_generated, base, detail,
+                                 getattr(exc, "divergences", None)) from None
     return CapturePair(base, detail, host, version, shared_values,
                        base_generated, detail_generated)
 
@@ -646,17 +704,43 @@ def main() -> None:
         # The divergence diagnostic is the original, verbatim: a straddled
         # pair and a broken extractor must stay distinguishable by eye. The
         # appended line explains WHY the exit code differs from every other
-        # refusal and what the refresh will do about it (issue #100).
+        # refusal and what the refresh will do about it (issue #118: the
+        # refusal is now a buildable disputed capture, not a skipped hour).
         print(str(exc), file=sys.stderr)
         print(f"leaderboard generated {_iso_utc(exc.base_generated)}, "
               f"detail generated {_iso_utc(exc.detail_generated)} — "
               "Vercel serves the two routes from independent caches and "
-              "AA's data lands on them at different times (issue #100); "
-              "refresh green-skips this hour and retries (persistent > 3 h "
-              "fails red)", file=sys.stderr)
+              "AA's data lands on them at different times (issues #100, "
+              "#118); refresh builds and publishes the disputed capture "
+              "this hour", file=sys.stderr)
+        # The snapshot's pieces all come from the refused attempt -- both
+        # raw payloads, the structured divergence list, the per-route
+        # generation times -- so the disputed page is exactly the read that
+        # was refused, never a second one.
+        snapshot = disagreement_snapshot(
+            exc.base, exc.detail, exc.divergences or [],
+            exc.base_generated, exc.detail_generated)
+        # The schema guards stay red on the disputed merge (issue #118):
+        # only the disagreement itself stopped being red. A detail payload
+        # that has lost what build.py reads fails here -- exit 1, no
+        # snapshot written -- exactly as it would on an agreeing pair.
+        models = merge_captures(exc.base, exc.detail)
+        check_cost_breakdown(models)
+        out = OUT.with_name(DISPUTED_SNAPSHOT_NAME)
+        out.parent.mkdir(parents=True, exist_ok=True)
+        write_atomic(out, json.dumps(snapshot, indent=1))
+        print(f"wrote {out.relative_to(ROOT)}: "
+              f"{len(snapshot['disagreements'])} disputed value(s) across "
+              f"{len({d['slug'] for d in snapshot['disagreements']})} model(s)",
+              file=sys.stderr)
         sys.exit(DISAGREEMENT_EXIT_CODE)
     models = merge_captures(pair.base, pair.detail)
     priced = check_cost_breakdown(models)
+    # An agreeing capture ends any window: drop a leftover snapshot so the
+    # build this capture feeds cannot render the disputed layer from stale
+    # data. The workflow's own retirement commit removes the tracked copy on
+    # the same rule.
+    OUT.with_name(DISPUTED_SNAPSHOT_NAME).unlink(missing_ok=True)
     agents_text, _ = fetch_html(args.agents_html, AGENTS_URL)
     agents = coding_agent_rows(flight_payload(agents_text))
 

@@ -143,7 +143,10 @@ retry or to hand-fix JSON — when any of these move:
   stop summing to the published total;
 - the leaderboard and model-detail routes disagree on a shared field's value —
   `check_route_agreement` runs before the gap-fill merge and names the slug,
-  the field path and both values;
+  the field path and both values. Since #118 the refusal is also buildable:
+  it exits 3 but writes `data/aa-disagreement-snapshot.json` (both routes'
+  raw payloads plus the disagreement map), which the disputed rendering
+  builds from — see the failure modes below;
 - the Coding Agent Index collapses below `CODING_ROW_FLOOR` paired rows.
 
 `build.py` additionally refuses to write a page where a rendered axis has no
@@ -243,14 +246,24 @@ agent drives by hand still carries one.
 
 Three failure modes are deliberate. `fetch_aa.py` exiting nonzero on a schema
 change turns the scheduled run red rather than committing a mangled capture —
-that is the signal to go re-read the leaderboard by hand. A persistent
-cross-route disagreement is different: AA's two routes are independently
-cached and its data lands on them at different times, so that refusal exits
-with code 3 and the refresh green-skips the hour and stamps
-`data/aa-route-disagreement.txt`, going red once the window exceeds three
-hours (issue #100). And the suite runs BEFORE the commit, so a capture that
-breaks the page leaves the last good capture committed and the last good page
-live.
+that is the signal to go re-read the leaderboard by hand, and those refusals
+stay red on the disputed merge too. A cross-route disagreement is different:
+AA's two routes are independently cached and its data lands on them at
+different times, so that refusal exits with code 3 — but since #118 it is
+buildable. The refusal writes `data/aa-disagreement-snapshot.json` (both
+routes' raw payloads plus the disagreement map), the refresh builds and
+publishes the disputed page the same hour, and the page renders the dispute
+instead of holding: one base generation (the leaderboard's copy — the merge's
+existing tiebreak), a disputed banner naming the window, both values in
+disputed tooltips and table cells (each labeled with its route and
+generated-at), and disputed models sitting out the efficient frontiers and
+carrying no superseded tag while the window lasts. There is no time bound on
+a window: the disputed banner is the visible alarm, and the page reverts to
+the normal rendering automatically when the next agreeing capture retires the
+stamp and the snapshot. The disputed treatment reuses the page's existing
+hollow/de-emphasis idioms — the scatter keeps its three-hue cap. And the suite
+runs BEFORE the commit, so a capture that breaks the page leaves the last good
+capture committed and the last good page live.
 
 ## Commit / co-author trailer
 

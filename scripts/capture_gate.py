@@ -56,6 +56,9 @@ import build  # noqa: E402  # pylint: disable=wrong-import-position
 MODELS_NAME = "aa-raw-models.json"
 AGENTS_NAME = "aa-raw-coding-agents.json"
 STAMP_NAME = "captured-at.txt"
+# The disputed snapshot rides beside the two captures: present in a side's
+# data dir means that side builds disputed (issue #118).
+SNAPSHOT_NAME = "aa-disagreement-snapshot.json"
 
 # Both gate builds run stamp-less: an unset AA_SOURCE_COMMIT renders nothing
 # extra (build.py renders only a SHA-shaped value), so the source-commit
@@ -78,6 +81,26 @@ SYNTHETIC_STAMP = "2000-01-01\n"
 
 # What the digest is masked TO, on both sides, before the comparison.
 MASKED_DIGEST = "0" * 64
+
+# The disputed layer's per-route generation times (issue #118): each hourly
+# fetch sees the routes' cached copies REGENERATED -- the values can stay
+# identical while the timestamps move -- so the two epoch keys must never
+# vote, exactly like the digest above. Matched INSIDE the page payload's
+# JSON, where build.py writes stats.disputed; the mask replaces the whole
+# key:value pair on both sides.
+GENERATED_AT_RE = re.compile(
+    r'"(leaderboardGeneratedAt|detailGeneratedAt)":[0-9a-z]+')
+MASKED_GENERATED_AT = r'"\1":0'
+
+
+def mask_generated_at(page: str) -> str:
+    """The page with the two route-generation epoch keys masked."""
+    return GENERATED_AT_RE.sub(MASKED_GENERATED_AT, page)
+
+
+def mask_page(page: str) -> str:
+    """Both provenance masks: route-generation epochs, then the digest."""
+    return mask_digest(mask_generated_at(page))
 
 
 class HeadCaptureError(Exception):
@@ -174,6 +197,29 @@ def reconcile_speed(head: tuple[bytes, bytes],
             json.dumps(agents, indent=1).encode("utf-8"))
 
 
+def reconcile_snapshot(head: bytes | None,
+                       fresh: bytes | None) -> bytes | None:
+    """The fresh snapshot with sub-threshold speed cells reconciled.
+
+    The snapshot's three payload arrays reconcile exactly like the capture
+    files (the disagreement list and the window metadata compare verbatim --
+    a new disagreement is news, a regenerated route copy is not, and only
+    the generated-at keys are masked downstream). One-sided snapshots pass
+    through verbatim: a window opening or closing is always a real change.
+    """
+    if head is None or fresh is None:
+        return fresh
+    head_parsed = json.loads(head)
+    parsed = json.loads(fresh)
+    for key, keys in (("leaderboard", SPEED_KEYS_MODELS),
+                      ("detail", SPEED_KEYS_MODELS),
+                      ("agents", SPEED_KEYS_AGENTS)):
+        if (isinstance(parsed.get(key), list)
+                and isinstance(head_parsed.get(key), list)):
+            parsed[key] = reconcile_tree(head_parsed[key], parsed[key], keys)
+    return json.dumps(parsed, indent=1).encode("utf-8")
+
+
 # --- reads -------------------------------------------------------------------
 
 
@@ -186,6 +232,22 @@ def read_head_captures() -> tuple[bytes, bytes]:
     main() turns into the fail-open `true`.
     """
     return _git_show(f"data/{MODELS_NAME}"), _git_show(f"data/{AGENTS_NAME}")
+
+
+def read_head_snapshot() -> bytes | None:
+    """The disagreement snapshot as HEAD committed it, or None.
+
+    Absent at HEAD is the NORMAL case -- every hour before a window opens --
+    so the existence probe is a separate call and a miss returns None rather
+    than raising. A miss here while the fresh side has a snapshot is exactly
+    the hour a window opens, and the two pages then differ structurally.
+    """
+    probe = subprocess.run(
+        ["git", "cat-file", "-e", f"HEAD:data/{SNAPSHOT_NAME}"],
+        cwd=str(ROOT), capture_output=True, check=False)
+    if probe.returncode != 0:
+        return None
+    return _git_show(f"data/{SNAPSHOT_NAME}")
 
 
 def _git_show(path: str) -> bytes:
@@ -213,11 +275,29 @@ def read_fresh_captures() -> tuple[bytes, bytes]:
             f"{data / MODELS_NAME} / {data / AGENTS_NAME}: {exc}") from exc
 
 
+def read_fresh_snapshot() -> bytes | None:
+    """The disagreement snapshot fetch_aa.py just wrote, or None.
+
+    A snapshot that exists but cannot be read is broken, not disputed-absent:
+    the run turns red rather than answering either way (same stance as a
+    broken capture file).
+    """
+    path = ROOT / "data" / SNAPSHOT_NAME
+    try:
+        return path.read_bytes()
+    except FileNotFoundError:
+        return None
+    except OSError as exc:
+        raise FreshCaptureError(f"{path}: {exc}") from exc
+
+
 # --- build both sides --------------------------------------------------------
 
 
-def _stage(side_dir: pathlib.Path, captures: tuple[bytes, bytes]) -> None:
-    """One side's temp data dir: the two captures plus the synthetic stamp.
+def _stage(side_dir: pathlib.Path, captures: tuple[bytes, bytes],
+           snapshot: bytes | None) -> None:
+    """One side's temp data dir: the two captures, the side's snapshot when
+    it has one, plus the synthetic stamp.
 
     The real stamps (tree and HEAD) are never read: the date is build-machine
     metadata, and building both sides from the same synthetic date is what
@@ -226,10 +306,13 @@ def _stage(side_dir: pathlib.Path, captures: tuple[bytes, bytes]) -> None:
     side_dir.mkdir(parents=True)
     (side_dir / MODELS_NAME).write_bytes(captures[0])
     (side_dir / AGENTS_NAME).write_bytes(captures[1])
+    if snapshot is not None:
+        (side_dir / SNAPSHOT_NAME).write_bytes(snapshot)
     (side_dir / STAMP_NAME).write_text(SYNTHETIC_STAMP, encoding="utf-8")
 
 
-def _render_side(side_dir: pathlib.Path, captures: tuple[bytes, bytes]) -> str:
+def _render_side(side_dir: pathlib.Path, captures: tuple[bytes, bytes],
+                 snapshot: bytes | None) -> str:
     """Stage one side and build its page; return the page HTML.
 
     The temp dir lives under build.ROOT because build.main() prints
@@ -237,7 +320,7 @@ def _render_side(side_dir: pathlib.Path, captures: tuple[bytes, bytes]) -> str:
     module globals and AA_SOURCE_COMMIT are restored no matter how the build
     ends, so a failed gate build cannot poison the caller's tree state.
     """
-    _stage(side_dir, captures)
+    _stage(side_dir, captures, snapshot)
     page_path = side_dir / "frontier-models.html"
     saved = (build.RAW, build.AGENTS_RAW, build.OUT)
     env_saved = os.environ.pop(STAMP_ENV, None)
@@ -255,7 +338,9 @@ def _render_side(side_dir: pathlib.Path, captures: tuple[bytes, bytes]) -> str:
 
 
 def build_page_pair(head: tuple[bytes, bytes],
-                    fresh: tuple[bytes, bytes]) -> tuple[str, str]:
+                    fresh: tuple[bytes, bytes],
+                    head_snapshot: bytes | None = None,
+                    fresh_snapshot: bytes | None = None) -> tuple[str, str]:
     """Build the page from HEAD's captures and from the fresh ones.
 
     The fresh side is reconciled against HEAD's first (reconcile_speed):
@@ -267,11 +352,12 @@ def build_page_pair(head: tuple[bytes, bytes],
     for a capture build.py refuses) -- a build failure is red, not "changed".
     """
     fresh = reconcile_speed(head, fresh)
+    fresh_snapshot = reconcile_snapshot(head_snapshot, fresh_snapshot)
     with tempfile.TemporaryDirectory(prefix=".capture-gate-",
                                      dir=build.ROOT) as tmp:
         tmp_root = pathlib.Path(tmp)
-        old_page = _render_side(tmp_root / "old", head)
-        new_page = _render_side(tmp_root / "new", fresh)
+        old_page = _render_side(tmp_root / "old", head, head_snapshot)
+        new_page = _render_side(tmp_root / "new", fresh, fresh_snapshot)
     return old_page, new_page
 
 
@@ -300,14 +386,23 @@ def main() -> int:
               "scripts/fetch_aa.py", file=sys.stderr)
         return 1
 
+    head_snapshot = read_head_snapshot()
     try:
-        old_page, new_page = build_page_pair(head, fresh)
+        fresh_snapshot = read_fresh_snapshot()
+    except FreshCaptureError as exc:
+        print(f"capture-gate: {exc} -- broken, not unchanged; re-capture with "
+              "scripts/fetch_aa.py", file=sys.stderr)
+        return 1
+
+    try:
+        old_page, new_page = build_page_pair(head, fresh,
+                                             head_snapshot, fresh_snapshot)
     except (SystemExit, Exception) as exc:  # pylint: disable=broad-exception-caught
         print(f"capture-gate: the capture broke the build ({exc}) -- failing "
               "red rather than report the capture as unchanged", file=sys.stderr)
         return 1
 
-    moved = mask_digest(old_page) != mask_digest(new_page)
+    moved = mask_page(old_page) != mask_page(new_page)
     print("true" if moved else "false")
     return 0
 

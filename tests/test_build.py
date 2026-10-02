@@ -1665,3 +1665,216 @@ class CorruptCaptureTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+# --- disputed build (issue #118) ------------------------------------------------
+
+def _disputed_route_records(slug: str = "fixture-model", *, ii_lb: float = 51,
+                            ii_dt: float = 52,
+                            name: str = "Fixture Model (high)"):
+    """(leaderboard, detail) records for one slug, disagreeing on
+    intelligenceIndex and agreeing on every other shared value: the
+    leaderboard carries its flattened cost scalar and an undefined context,
+    the detail route the full cost object and a measured context."""
+    shared = {
+        "slug": slug,
+        "modelCreatorName": "Fixture Lab",
+        "isOpenWeights": False,
+        "gdpvalNormalized": 0.47,
+        "parameters": 27,
+        "medianOutputTokensPerSecond": 100.0,
+    }
+    leaderboard = {
+        **shared, "shortName": name, "intelligenceIndex": ii_lb,
+        "intelligenceIndexCostPerTask": 0.75,
+        "contextWindowTokens": "$undefined",
+    }
+    detail = {
+        **shared, "name": name, "intelligenceIndex": ii_dt,
+        "intelligenceIndexCostPerTask": {
+            "cost": {"total": 0.75},
+            "evaluations": [
+                {"slug": "gdpval-aa", "weightedCostPerTask": 0.30},
+                {"slug": "scicode", "weightedCostPerTask": 0.45}],
+        },
+        "contextWindowTokens": 400000,
+    }
+    return leaderboard, detail
+
+
+def disputed_snapshot_fixture(**kwargs) -> dict:
+    """The snapshot fetch_aa.py's refusal writes, built the same way: the two
+    raw route payloads plus the disagreement map straight out of
+    check_route_agreement -- mutated payloads against each other, never an
+    edited data/ file."""
+    lb, dt = _disputed_route_records(**kwargs)
+    lb_b, dt_b = _disputed_route_records(
+        "fixture-model-b", ii_lb=40, ii_dt=40,
+        name="Fixture Model B (high)")
+    try:
+        build.check_route_agreement([lb, lb_b], [dt, dt_b])
+        raise AssertionError("the fixture payloads must disagree")
+    except build.RouteDisagreement as exc:
+        divergences = exc.divergences
+    return {
+        "schema": 1,
+        "capturedAt": "2026-10-04T03:30:00Z",
+        "windowStartEpoch": 1791084000,
+        "leaderboardGeneratedAt": 1791084000,
+        "detailGeneratedAt": 1791084300,
+        "indexVersion": build.INDEX_VERSION,
+        "detailHost": "fixture-model-b",
+        "leaderboard": [lb, lb_b],
+        "detail": [dt, dt_b],
+        "disagreements": [
+            {"slug": slug, "path": path, "lb": lb_value, "dt": dt_value}
+            for slug, path, lb_value, dt_value in divergences
+        ],
+    }
+
+
+class DisputedBuildTests(unittest.TestCase):
+    """Issue #118: a disagreement snapshot beside the capture turns the build
+    into a disputed rendering -- banner, both values in disputed cells, and
+    disputed models sitting out the frontiers -- while the file's ABSENCE is
+    the normal build, byte-for-byte as before."""
+
+    @contextlib.contextmanager
+    def disputed_page(self, snapshot: dict | None = None):
+        """build.main() over a temp data dir carrying the snapshot (when
+        given), the last-good agents capture, and the stamp."""
+        with tempfile.TemporaryDirectory(
+                prefix=".issue-118-disputed-", dir=build.ROOT) as tmp:
+            data = pathlib.Path(tmp) / "data"
+            data.mkdir()
+            if snapshot is None:
+                snapshot = disputed_snapshot_fixture()
+            (data / build.DISPUTED_SNAPSHOT_NAME).write_text(
+                json.dumps(snapshot, indent=1), encoding="utf-8")
+            (data / "aa-raw-coding-agents.json").write_text(
+                json.dumps([agent_fixture()]), encoding="utf-8")
+            (data / "captured-at.txt").write_text("2026-10-04\n",
+                                                  encoding="utf-8")
+            saved = build.RAW, build.AGENTS_RAW, build.OUT
+            build.RAW = data / "aa-raw-models.json"
+            build.AGENTS_RAW = data / "aa-raw-coding-agents.json"
+            build.OUT = pathlib.Path(tmp) / "frontier-models.html"
+            try:
+                with contextlib.redirect_stdout(io.StringIO()):
+                    build.main()
+                yield build.OUT.read_text(encoding="utf-8"), snapshot
+            finally:
+                build.RAW, build.AGENTS_RAW, build.OUT = saved
+
+    def payload_of(self, page: str) -> dict:
+        marker = "const DATA = "
+        start = page.index(marker) + len(marker)
+        payload, _ = json.JSONDecoder().raw_decode(page[start:].lstrip())
+        return payload
+
+    def test_the_banner_renders_with_the_window_and_counts(self):
+        with self.disputed_page() as (page, snapshot):
+            self.assertIn('id="disputed" role="status"', page)
+            self.assertIn("Disputed capture", page)
+            self.assertIn("2026-10-04T03:20:00Z", page)
+            self.assertIn("1 model(s) carry 1 conflicting value(s)", page)
+
+    def test_the_disputed_row_carries_both_values_in_the_static_table(self):
+        with self.disputed_page() as (page, _snapshot):
+            payload = self.payload_of(page)
+            disputed = [r for r in payload["rows"] if r.get("disp")]
+            self.assertEqual([r["base"] for r in disputed],
+                             ["Fixture Model"])
+            entry = disputed[0]["disp"]["intelligenceIndex"]
+            self.assertEqual((entry["lb"], entry["dt"]), (51, 52))
+            # The STATIC body is the accessible twin: the disputed cell shows
+            # both routes' values and the disputed pill, in the no-JS render.
+            self.assertIn("51.0 / 52.0", page)
+            self.assertIn(">disputed</span>", page)
+
+    def test_a_non_disputed_row_renders_its_base_value_unchanged(self):
+        with self.disputed_page() as (page, _snapshot):
+            payload = self.payload_of(page)
+            clean = [r for r in payload["rows"]
+                     if r["base"] == "Fixture Model B"]
+            self.assertEqual(len(clean), 1)
+            self.assertNotIn("disp", clean[0])
+            self.assertNotIn("40.0 /", page)
+
+    def test_disputed_rows_sit_out_the_frontier_in_both_directions(self):
+        # The disputed model is smarter at the same cost, so were it eligible
+        # it would dominate Fixture Model B outright. Sitting out BOTH roles,
+        # B keeps its frontier seat and the disputed model has none.
+        with self.disputed_page() as (page, snapshot):
+            payload = self.payload_of(page)
+            self.assertEqual(payload["stats"]["metricFrontiers"],
+                             {"coding": 1, "intelligence": 1, "agentic": 1})
+            rows = {r["base"]: r for r in payload["rows"]}
+            self.assertIn(rows["Fixture Model B"],
+                          build.undominated(payload["rows"], "intelligence"))
+            self.assertNotIn(rows["Fixture Model"],
+                             build.undominated(payload["rows"], "intelligence"))
+            # And the no-JS frontier table carries B, never the disputed model.
+            front = page.index("id=\"fTable\"")
+            self.assertIn('<td class="name">Fixture Model B (high)</td>',
+                          page[front:])
+            self.assertNotIn('<td class="name">Fixture Model (high)</td>',
+                             page[front:])
+
+    def test_the_footer_and_legend_name_the_dispute_only_in_disputed_mode(self):
+        with self.disputed_page() as (page, _snapshot):
+            self.assertIn("currently disagree", page)
+            self.assertIn('class="swatch disp"', page)
+            self.assertEqual(page.count('class="swatch disp"'), 4)
+        # ...and the page built WITHOUT a snapshot is exactly the old one:
+        with tempfile.TemporaryDirectory(
+                prefix=".issue-118-normal-", dir=build.ROOT) as tmp:
+            data = pathlib.Path(tmp) / "data"
+            data.mkdir()
+            (data / "aa-raw-models.json").write_text(
+                json.dumps([model_fixture()]), encoding="utf-8")
+            (data / "aa-raw-coding-agents.json").write_text(
+                json.dumps([agent_fixture()]), encoding="utf-8")
+            (data / "captured-at.txt").write_text("2026-10-04\n",
+                                                  encoding="utf-8")
+            saved = build.RAW, build.AGENTS_RAW, build.OUT
+            build.RAW = data / "aa-raw-models.json"
+            build.AGENTS_RAW = data / "aa-raw-coding-agents.json"
+            build.OUT = pathlib.Path(tmp) / "frontier-models.html"
+            try:
+                with contextlib.redirect_stdout(io.StringIO()):
+                    build.main()
+                page = build.OUT.read_text(encoding="utf-8")
+            finally:
+                build.RAW, build.AGENTS_RAW, build.OUT = saved
+        self.assertIn("agree exactly on every value they share", page)
+        self.assertNotIn('id="disputed"', page)
+        self.assertNotIn("swatch disp", page)
+        self.assertNotIn("__DISPUTED_BANNER__", page)
+        self.assertNotIn("__ROUTE_AGREEMENT_CLAUSE__", page)
+        self.assertNotIn("__DISPUTED_LEGEND__", page)
+        payload = self.payload_of(page)
+        self.assertNotIn("disputed", payload["stats"])
+
+    def test_a_corrupt_snapshot_refuses_like_a_corrupt_capture(self):
+        for why, mutate in (
+                ("schema bump", lambda s: s.update({"schema": 2})),
+                ("routes missing", lambda s: s.pop("detail")),
+                ("bad disagreement entry",
+                 lambda s: s["disagreements"].append({"slug": "x"})),
+                ("window start not an epoch",
+                 lambda s: s.update({"windowStartEpoch": "soon"})),
+        ):
+            with self.subTest(why=why):
+                snapshot = disputed_snapshot_fixture()
+                mutate(snapshot)
+                with self.assertRaises(SystemExit) as caught:
+                    with self.disputed_page(snapshot):
+                        pass
+                self.assertIn("aa-disagreement-snapshot.json",
+                              str(caught.exception))
+
+    def test_the_provenance_names_the_snapshot_as_an_input(self):
+        with self.disputed_page() as (page, _snapshot):
+            self.assertIn("sha256 over data/aa-disagreement-snapshot.json then "
+                          "data/aa-raw-coding-agents.json", page)

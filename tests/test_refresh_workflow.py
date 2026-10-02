@@ -341,156 +341,157 @@ class GateTests(unittest.TestCase):
         self.assertNotIn("if", setup[0])
 
 
-class RouteDisagreementSkipTests(unittest.TestCase):
-    """Issue #100: the capture's route-disagreement refusal (exit 3) must not
-    fail the hour while AA's cache-stagger window is young, but a window that
-    outlasts three hours must fail red again. The Capture step is pinned
-    here on mechanism words and ordering -- substrings, never line numbers
-    or whole-block equality, in this file's existing style.
-
-    The three-colour contract: exit 0 proceeds as before (retiring any stamp
-    a skipped stretch left behind), exit 3 green-skips behind a committed
-    stamp, every other code re-raises its own stderr and fails red exactly
-    as before.
+class RouteDisagreementPublishTests(unittest.TestCase):
+    """Issue #118, amending #100: the capture's route-disagreement refusal
+    (exit 3) no longer green-skips the hour -- it publishes the disputed
+    capture. fetch_aa.py writes the disagreement snapshot, the Capture step
+    writes the window stamp and FALLS THROUGH to the rendered gate, and the
+    hour proceeds exactly like a moved-capture one. There is NO time bound
+    on a disputed window: the page's banner is the visible alarm. Pins on
+    mechanism words and ordering over the flattened blocks, never line
+    numbers, in this file's existing style.
     """
 
     def setUp(self):
         self.wf = load()
         self.step = step(self.wf, "Capture the leaderboard")
         self.block = flattened(self.step["run"])
+        self.header = WORKFLOW.read_text(
+            encoding="utf-8").split("\njobs:", 1)[0]
 
     def test_the_fetch_runs_behind_an_rc_trap_so_the_step_can_classify_it(self):
         # The capture's stderr is parked in a file because every branch
         # below needs it: the stamp carries it, the red paths re-emit it.
+        # alert_after is GONE: the 3 h red bound retired with #118.
         for piece in ("set +e",
                       "python3 scripts/fetch_aa.py 2> /tmp/fetch-err.txt",
                       "rc=$?",
                       "set -e",
                       "stamp=data/aa-route-disagreement.txt",
-                      "alert_after=$((3*3600))",
                       "now=$(date -u +%s)"):
             self.assertIn(piece, self.block)
+        self.assertNotIn("alert_after", self.block)
 
     def test_the_capture_step_holds_the_push_credentials(self):
-        # The stamp commit pushes from THIS step, so the token sits here --
-        # the same explicit env the commit and publish steps carry.
+        # The retirement commit pushes from THIS step, so the token sits
+        # here -- the same explicit env the commit and publish steps carry.
         self.assertEqual(self.step.get("env", {}).get("GH_TOKEN"),
                          "${{ github.token }}")
         self.assertEqual(self.step.get("env", {}).get("REPO"),
                          "${{ github.repository }}")
 
     def test_the_three_exit_colours_are_classified_in_order(self):
-        # Recovery (rc 0) stands first, then the skip (rc 3), then the
-        # designed red re-raise for everything else.
+        # Recovery (rc 0) stands first, then the disputed publish (rc 3),
+        # then the designed red re-raise for everything else.
         self.assertLess(self.block.index('[ "$rc" -eq 0 ]'),
                         self.block.index('[ "$rc" -eq 3 ]'))
         self.assertLess(self.block.index('[ "$rc" -eq 3 ]'),
                         self.block.index('exit "$rc"'))
         self.assertIn("cat /tmp/fetch-err.txt >&2", self.block)
 
-    def test_a_first_refusal_writes_commits_and_pushes_the_stamp(self):
-        # The stamp is the window's start epoch (line 1) plus the capture's
-        # own diagnostic (line 2+); it is added by EXPLICIT path and pushed
-        # inside this step, so no later data/ restore can see it
-        # uncommitted.
-        idx_write = self.block.index('> "$stamp"')
-        idx_add = self.block.index("git add data/aa-route-disagreement.txt")
-        idx_commit = self.block.index(
-            "AA routes disagree; skipping this hour (issue #100)")
-        idx_push = self.block.index("push_head || true")
+    def test_an_exit_three_refusal_publishes_and_falls_through(self):
+        # captured=true: a disputed capture RAN. The stamp is written before
+        # the fall-through, the summary names the disputed publish, and the
+        # branch holds no exit of its own -- the rendered gate decides moved
+        # vs unchanged downstream, exactly as for a moved capture.
+        idx_open = self.block.index('[ "$rc" -eq 3 ]')
+        idx_true = self.block.index('echo "captured=true"', idx_open)
+        idx_stamp = self.block.index('> "$stamp"', idx_true)
+        idx_summary = self.block.index("building and publishing the disputed capture",
+                                       idx_stamp)
+        # No exit between the branch's opening and the `fi` that closes it:
+        # the next `fi` after the summary is the branch's own close.
+        idx_fi = self.block.index(" fi", idx_summary)
+        between = self.block[idx_summary:idx_fi]
+        self.assertNotIn("exit 0", between)
+        self.assertNotIn("exit 1", between)
+        self.assertLess(idx_true, idx_stamp)
+        self.assertIn("issue #118", self.block[idx_summary:idx_summary + 200])
 
-        self.assertLess(idx_write, idx_add)
-        self.assertLess(idx_add, idx_commit)
-        self.assertLess(idx_commit, idx_push)
-        # Both stamp contents, in order: the epoch, then the capture stderr.
-        idx_epoch = self.block.index("echo \"$now\"")
-        self.assertLess(idx_epoch,
-                        self.block.index("cat /tmp/fetch-err.txt", idx_epoch))
-        self.assertIn("} > \"$stamp\"", self.block)
+    def test_the_stamp_is_written_only_when_absent_and_keeps_the_window_start(self):
+        # The banner names ONE window across hours: an existing stamp's
+        # first line is preserved, only the diagnostic body refreshes.
+        idx_f = self.block.index('if [ ! -f "$stamp" ]; then')
+        idx_keep = self.block.index('echo "$(head -n 1 "$stamp")"', idx_f)
+        self.assertLess(idx_f, idx_keep)
 
-    def test_a_young_window_skips_green_without_touching_anything(self):
-        # The stamp-exists branch stands BEFORE the write (a fresh stamp is
-        # never rewritten), and the skip is green: the branch's own summary
-        # line exits 0 BEFORE the first-refusal write can run, so flipping
-        # the skip's exit fails here rather than being satisfied by a later
-        # branch's exit 0 (verified against that mutant).
-        idx_f = self.block.index('[ -f "$stamp" ]')
-        idx_summary = self.block.index(
-            "skipping this hour; fails red past 3 h (issue #100)", idx_f)
-        idx_green = self.block.index("exit 0", idx_summary)
-
-        self.assertLess(idx_f, self.block.index('> "$stamp"'))
-        self.assertIn("AA's routes disagree (window began", self.block)
-        self.assertLess(idx_summary, idx_green)
-        self.assertLess(idx_green, self.block.index('> "$stamp"'))
-
-    def test_a_window_older_than_three_hours_fails_red(self):
-        idx_compare = self.block.index('[ "$((now - start))" -gt "$alert_after" ]')
-        idx_alarm = self.block.index("Re-read artificialanalysis.ai by hand")
-
-        self.assertEqual(self.block.count("3*3600"), 1)
-        # The alarm names the window start, re-emits the capture's own
-        # stderr, and fails the step -- the exit 1 pinned HERE, after the
-        # alarm's own words, so flipping the alarm green fails this pin even
-        # though the corrupt branch still carries one.
-        self.assertLess(idx_compare,
-                        self.block.index('date -u -d "@$start"', idx_compare))
+    def test_a_refusal_without_a_snapshot_is_red(self):
+        # fetch_aa exiting 3 without its snapshot is a broken refusal, not
+        # a publishable disputed hour: red with the capture's own stderr.
+        idx_guard = self.block.index(
+            "fetch_aa exited 3 without writing the disagreement snapshot")
         self.assertLess(
-            idx_alarm, self.block.index("cat /tmp/fetch-err.txt >&2",
-                                        idx_alarm))
-        self.assertLess(idx_alarm, self.block.index("exit 1", idx_alarm))
+            idx_guard, self.block.index("exit 1", idx_guard))
 
-    def test_a_corrupt_stamp_fails_red_rather_than_skipping(self):
-        # A stamp whose first line is empty or non-numeric cannot date the
-        # window, so the alarm's premise is unprovable -- red, not a guess.
-        # The pin runs case-pattern -> the corrupt echo -> that branch's OWN
-        # `exit 1 ;;`: a bare pattern-before-any-exit-1 pin survives turning
-        # this branch green, because the alarm's exit 1 sits later in the
-        # block and satisfies it anyway (verified against that mutant).
-        self.assertIn("start=$(head -n 1 \"$stamp\")", self.block)
-        idx_case = self.block.index("''|*[!0-9]*")
-        idx_echo = self.block.index("stamp is corrupt")
+    def test_the_disputed_hour_is_not_committed_in_the_capture_step(self):
+        # #100 committed the stamp in this step so a later data/ restore
+        # could not lose the window. #118 moves the commit DOWN: the
+        # rendered gate decides moved vs unchanged first, and only what the
+        # suite passed is committed (by the commit step, which stages the
+        # stamp and the snapshot conditionally).
+        self.assertNotIn("git add data/aa-disagreement-snapshot.json",
+                         self.block)
+        commit = flattened(step(self.wf, "Commit the capture")["run"])
+        self.assertIn(
+            "[ ! -f data/aa-disagreement-snapshot.json ] || "
+            "git add data/aa-disagreement-snapshot.json", commit)
+        self.assertIn(
+            "[ ! -f data/aa-route-disagreement.txt ] || "
+            "git add data/aa-route-disagreement.txt", commit)
 
-        self.assertLess(idx_case, idx_echo)
-        self.assertLess(idx_echo, self.block.index("exit 1 ;;", idx_echo))
-
-    def test_a_recovered_capture_retires_the_stamp_and_stays_green(self):
-        # rc == 0 with a tracked stamp: delete, commit the retirement, push.
-        # A push lost to the race concedes silently -- the next successful
-        # capture retires the stamp again.
+    def test_a_recovered_capture_retires_the_stamp_and_the_snapshot(self):
+        # rc == 0 with either window file tracked: remove BOTH, commit the
+        # retirement, push. A push lost to the race concedes silently.
         self.assertIn('git ls-files --error-unmatch "$stamp"', self.block)
-        self.assertIn("git rm -q", self.block)
+        self.assertIn(
+            "git ls-files --error-unmatch data/aa-disagreement-snapshot.json",
+            self.block)
+        self.assertIn("git rm -q --ignore-unmatch", self.block)
         self.assertIn("Route agreement restored; resume captures (issue #100)",
                       self.block)
-        idx_rm = self.block.index("git rm -q")
+        idx_rm = self.block.index("git rm -q --ignore-unmatch")
         self.assertLess(idx_rm, self.block.index(
             "Route agreement restored; resume captures (issue #100)"))
         self.assertIn("if push_head;", self.block)
 
     def test_both_stamp_paths_retry_the_push_race_then_concede(self):
-        # The retry is one shared helper: push, and on a rejection fetch +
-        # rebase + push once more, with a conflict conceding (return 1).
-        # Both the stamp-write and the stamp-retire paths go through it, and
-        # both pushes live ONLY inside the helper.
+        # The retirement path's push still goes through one shared helper:
+        # push, and on a rejection fetch + rebase + push once more, with a
+        # conflict conceding (return 1).
         self.assertIn("push_head () {", self.block)
-        # The rebase carries the inline identity (this step never git-config's
-        # the checkout), so the pin is on the rebase itself.
         self.assertIn("rebase origin/main", self.block)
         self.assertIn("git rebase --abort", self.block)
         self.assertEqual(self.block.count("HEAD:main"), 2)
-        self.assertIn("push_head || true", self.block)
         self.assertIn("if push_head;", self.block)
 
-    def test_the_header_documents_the_third_deliberate_failure_mode(self):
+    def test_no_time_bound_remains_on_the_disagreement(self):
+        # The banner is the alarm now: no stamp age, no red alarm wording.
+        self.assertNotIn("3*3600", self.block)
+        self.assertNotIn("older than 3 h", self.block)
+        self.assertNotIn("stamp is corrupt", self.block)
+
+    def test_the_header_documents_the_disputed_publish(self):
         # The file's contract lives in its header; a reader must find the
         # exit-3 semantics there, not reconstruct them from the step.
-        raw = WORKFLOW.read_text(encoding="utf-8")
-        head = raw.split("\njobs:", 1)[0]
+        self.assertIn("EXIT 3 IS THE DISPUTED PUBLISH", self.header)
+        self.assertIn("issue #118", self.header)
+        self.assertIn("data/aa-disagreement-snapshot.json", self.header)
+        self.assertIn("NO time bound", self.header)
 
-        self.assertIn("EXIT 3 IS THE ONE DELIBERATE NON-RED", head)
-        self.assertIn("issue #100", head)
-        self.assertIn("data/aa-route-disagreement.txt", head)
-        self.assertIn("older than 3 h", head)
+    def test_the_commit_step_messages_the_disputed_publish(self):
+        # A commit that adds the disagreement snapshot says so in its
+        # subject and carries the capture's own divergence diagnostic from
+        # the stamp -- never the differ's rendering, which compares the
+        # last-good captures a window does not touch.
+        run = flattened(step(self.wf, "Commit the capture")["run"])
+        self.assertIn(
+            "git diff --cached --name-only | grep -q "
+            "'^data/aa-disagreement-snapshot\\.json$'", run)
+        self.assertIn(
+            "Publish disputed capture: AA routes disagree (issue #118)", run)
+        self.assertLess(
+            run.index("sed -n '2,$p' data/aa-route-disagreement.txt"),
+            run.index("git commit -F commit-msg.txt"))
 
 
 class ForceOverrideTests(unittest.TestCase):
@@ -536,32 +537,15 @@ class ForceOverrideTests(unittest.TestCase):
         self.assertEqual(commands(between), "")
         self.assertLess(idx_true, raw.index("exit 0", idx_true))
 
-        # Both rc == 3 green paths set captured=false before they exit.
-        self.assertEqual(self.capture.count('echo "captured=false"'), 2)
-
-        # The young-window skip: the verdict precedes the path's summary
-        # line and its exit 0, and the exit precedes the first-refusal
-        # write (the skip must never fall through into it).
-        idx_f = self.capture.index('[ -f "$stamp" ]')
-        idx_false = self.capture.index('echo "captured=false"', idx_f)
-        idx_summary = self.capture.index(
-            "skipping this hour; fails red past 3 h (issue #100)", idx_false)
-        self.assertLess(idx_false, idx_summary)
-        idx_green = self.capture.index("exit 0", idx_summary)
-        self.assertLess(idx_summary, idx_green)
-        self.assertLess(idx_green, self.capture.index('> "$stamp"'))
-
-        # The first refusal: the verdict precedes the stamp write, the
-        # push, and the path's own summary + exit.
-        idx_false2 = self.capture.index('echo "captured=false"',
-                                        idx_false + 1)
-        self.assertLess(idx_false2, self.capture.index('> "$stamp"'))
-        self.assertLess(idx_false2, self.capture.index("push_head || true"))
-        idx_summary2 = self.capture.index(
-            "skipping this hour; fails red past 3 h (issue #100)", idx_false2)
-        self.assertLess(idx_false2, idx_summary2)
-        self.assertLess(idx_summary2, self.capture.index("exit 0",
-                                                         idx_summary2))
+        # The disputed publish (rc == 3) is the other green path, and its
+        # verdict is ALSO true -- a disputed capture ran. captured=false is
+        # set nowhere anymore: no exit of this step is a refusal-skip.
+        self.assertEqual(self.capture.count('echo "captured=false"'), 0)
+        self.assertEqual(self.capture.count('echo "captured=true"'), 2)
+        idx_open = self.capture.index('[ "$rc" -eq 3 ]')
+        idx_true = self.capture.index('echo "captured=true"', idx_open)
+        self.assertLess(idx_open, idx_true)
+        self.assertLess(idx_true, self.capture.index('> "$stamp"', idx_true))
 
     def test_the_captured_verdict_travels_through_env_not_template(self):
         # zizmor's template-injection audit fails any direct `${{ }}` into
@@ -602,30 +586,24 @@ class ForceOverrideTests(unittest.TestCase):
             '[ "$CAPTURED" != "false" ] && [ "$live_stale" = false ]',
             self.moved)
 
-    def test_an_ignored_force_is_reported_in_the_summary(self):
-        # The refused-and-forced hour must be explained, not silent: its
-        # own summary line stands immediately before the proceed decision,
-        # names force, names the refusal, and names the issue. The verdict
-        # arrives as the env var $CAPTURED, the zizmor-required form (see
-        # the env-mapping pin).
+    def test_force_during_a_window_is_honored(self):
+        # Issue #118 amends #103: a disputed hour captures and builds like
+        # any other, so there is something for force to rebuild. The old
+        # "Force dispatch ignored" summary line is gone, and the proceed
+        # decision's veto stays only as the #103 default for a refused
+        # verdict -- which no exit produces today.
+        self.assertNotIn("Force dispatch ignored", self.moved)
         self.assertIn(
-            "[ \"$CAPTURED\" = false ] "
-            "&& [ \"${{ inputs.force }}\" = 'true' ]; then "
-            "echo 'Force dispatch ignored:",
+            '{ [ "$CAPTURED" != "false" ] '
+            "&& [ \"${{ inputs.force }}\" = 'true' ]; }",
             self.moved)
-        self.assertIn("the capture was refused this hour", self.moved)
-        self.assertIn("issue #103", self.moved)
-        # It is the last word before the decision: nothing executes between
-        # the summary and the proceed-if it explains.
-        idx = self.moved.index('[ "$CAPTURED" = false ]')
-        self.assertLess(idx, self.moved.index('[ "$changed" = true ]'))
 
-    def test_the_header_documents_force_terminality_on_a_skipped_hour(self):
-        # The file's contract lives in its header (same pin shape as
-        # RouteDisagreementSkipTests's header test): the force-input
-        # terminality of a green-skipped hour is stated where the exit-3
-        # semantics are, not reconstructed from the steps.
-        self.assertIn("issue #103", self.header)
-        self.assertIn("force", self.header.lower())
-        self.assertIn("terminal", self.header.lower())
-        self.assertIn("3 h red bound", self.header)
+    def test_the_header_documents_the_force_amendment(self):
+        # The file's contract lives in its header (same pin shape as the
+        # disputed-publish class's header test): the #103 amendment is
+        # stated where the exit-3 semantics are, not reconstructed from
+        # the steps.
+        self.assertIn("FORCE DURING A WINDOW NOW REBUILDS", self.header)
+        self.assertIn("amending #103", self.header)
+        self.assertIn("issue #118", self.header)
+        self.assertIn("`captured` verdict stays true on exit 3", self.header)
