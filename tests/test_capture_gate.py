@@ -369,3 +369,146 @@ class OscillationTests(unittest.TestCase):
             code, out = run_gate()
 
         self.assertEqual((code, out), (0, "true\n"))
+
+
+# --- the disputed snapshot through the gate (issue #118) --------------------------
+
+def _gate_route_records(*, ii_lb: float = 51, ii_dt: float = 52,
+                        tps: float = 100.0):
+    """(leaderboard, detail) records for one model, disagreeing on
+    intelligenceIndex, agreeing elsewhere, and carrying every rendered axis.
+    Self-contained: the gate tests never import the build tests."""
+    shared = {
+        "slug": "fixture-model", "modelCreatorName": "Fixture Lab",
+        "isOpenWeights": False, "gdpvalNormalized": 0.47, "parameters": 27,
+        "medianOutputTokensPerSecond": tps,
+    }
+    return (
+        {**shared, "shortName": "Fixture Model (high)",
+         "intelligenceIndex": ii_lb, "intelligenceIndexCostPerTask": 0.75,
+         "contextWindowTokens": "$undefined"},
+        {**shared, "name": "Fixture Model (high)", "intelligenceIndex": ii_dt,
+         "intelligenceIndexCostPerTask": {"cost": {"total": 0.75},
+                                          "evaluations": [
+             {"slug": "gdpval-aa", "weightedCostPerTask": 0.30},
+             {"slug": "scicode", "weightedCostPerTask": 0.45}]},
+         "contextWindowTokens": 400000},
+    )
+
+
+def disputed_snapshot_bytes(*, ii_lb: float = 51, ii_dt: float = 52,
+                            tps: float = 100.0,
+                            lb_gen: int | None = 1791084000,
+                            dt_gen: int | None = 1791084300) -> bytes:
+    """A buildable disagreement snapshot's bytes, as fetch_aa.py writes them
+    (compact-enough JSON at indent=1), from records mutated against each
+    other -- never a data/ file."""
+    lb, dt = _gate_route_records(ii_lb=ii_lb, ii_dt=ii_dt, tps=tps)
+    return json.dumps({
+        "schema": 1,
+        "capturedAt": "2026-10-04T03:30:00Z",
+        "windowStartEpoch": 1791084000,
+        "leaderboardGeneratedAt": lb_gen,
+        "detailGeneratedAt": dt_gen,
+        "leaderboard": [lb],
+        "detail": [dt],
+        "disagreements": [{"slug": "fixture-model",
+                           "path": "intelligenceIndex",
+                           "lb": ii_lb, "dt": ii_dt}],
+    }, indent=1).encode("utf-8")
+
+
+def churned_snapshot_bytes(snapshot: bytes) -> bytes:
+    """The same snapshot with every object's keys reordered -- nothing parsed
+    changes and nothing rendered can change."""
+    return json.dumps(json.loads(snapshot), indent=1,
+                      sort_keys=True).encode()
+
+
+class DisputedGateTests(unittest.TestCase):
+    """Issue #118 through the rendered no-change gate. A snapshot on one side
+    makes that side build disputed, so a window opening or closing is always
+    a change -- content that legitimately reverts at convergence -- while an
+    ongoing window with nothing rendered moving is silent: regenerated route
+    copies (the two generated-at epochs) are masked like the digest, and
+    sub-threshold speed re-samples inside the snapshot's payloads reconcile
+    exactly as they do in the capture files."""
+
+    def run_gate_with(self, *, head_snapshot, fresh_snapshot,
+                      head=(REAL_MODELS, REAL_AGENTS),
+                      fresh=(REAL_MODELS, REAL_AGENTS)):
+        with mock.patch.object(capture_gate, "read_head_captures",
+                               return_value=head), \
+             mock.patch.object(capture_gate, "read_head_snapshot",
+                               return_value=head_snapshot), \
+             mock.patch.object(capture_gate, "read_fresh_captures",
+                               return_value=fresh), \
+             mock.patch.object(capture_gate, "read_fresh_snapshot",
+                               return_value=fresh_snapshot):
+            return run_gate()
+
+    def test_a_window_opening_is_a_change(self):
+        code, out = self.run_gate_with(
+            head_snapshot=None,
+            fresh_snapshot=disputed_snapshot_bytes())
+
+        self.assertEqual((code, out), (0, "true\n"))
+
+    def test_a_converging_hour_is_a_change(self):
+        # The revert: HEAD's page is the disputed rendering and the fresh
+        # capture is agreeing. The gate must vote true so the page flips
+        # back automatically.
+        code, out = self.run_gate_with(
+            head_snapshot=disputed_snapshot_bytes(),
+            fresh_snapshot=None)
+
+        self.assertEqual((code, out), (0, "true\n"))
+
+    def test_an_ongoing_window_that_renders_identically_is_not_a_change(self):
+        code, out = self.run_gate_with(
+            head_snapshot=disputed_snapshot_bytes(),
+            fresh_snapshot=churned_snapshot_bytes(disputed_snapshot_bytes()))
+
+        self.assertEqual((code, out), (0, "false\n"))
+
+    def test_route_copy_regeneration_alone_is_not_a_change(self):
+        # The routes' cached copies were regenerated between hours: same
+        # values, new generation epochs. Masked, exactly like the digest.
+        code, out = self.run_gate_with(
+            head_snapshot=disputed_snapshot_bytes(),
+            fresh_snapshot=disputed_snapshot_bytes(
+                lb_gen=1791160000, dt_gen=1791160300))
+
+        self.assertEqual((code, out), (0, "false\n"))
+
+    def test_sub_threshold_speed_churn_inside_the_snapshot_reconciles(self):
+        # 100 -> 110 tokens/sec inside the disputed payloads is within the
+        # differ's own threshold, so the disputed page compares equal --
+        # the same ruling the capture files live under.
+        code, out = self.run_gate_with(
+            head_snapshot=disputed_snapshot_bytes(tps=100.0),
+            fresh_snapshot=disputed_snapshot_bytes(tps=110.0))
+
+        self.assertEqual((code, out), (0, "false\n"))
+
+    def test_a_threshold_speed_move_inside_the_snapshot_commits(self):
+        code, out = self.run_gate_with(
+            head_snapshot=disputed_snapshot_bytes(tps=100.0),
+            fresh_snapshot=disputed_snapshot_bytes(tps=150.0))
+
+        self.assertEqual((code, out), (0, "true\n"))
+
+    def test_a_new_disagreement_is_a_change(self):
+        head = disputed_snapshot_bytes(ii_lb=51, ii_dt=52)
+        fresh = disputed_snapshot_bytes(ii_lb=51, ii_dt=53)
+        code, out = self.run_gate_with(head_snapshot=head,
+                                       fresh_snapshot=fresh)
+
+        self.assertEqual((code, out), (0, "true\n"))
+
+    def test_a_missing_head_snapshot_is_the_normal_case_not_an_error(self):
+        # Every pre-window hour: no snapshot at HEAD, none fresh -- the
+        # plain capture comparison, untouched.
+        code, out = self.run_gate_with(head_snapshot=None, fresh_snapshot=None)
+
+        self.assertEqual((code, out), (0, "false\n"))

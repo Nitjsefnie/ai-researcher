@@ -1574,3 +1574,79 @@ class BuildProvenanceTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class DisputedBrowserTests(unittest.TestCase):
+    """Issue #118: the disputed rendering in a real browser.
+
+    The disputed JS paths -- both-value table cells, hollow markers, the
+    banner, the disputed tooltip lines -- never execute on a normal page,
+    so a runtime error in them would leave the standard browser class
+    green while every disputed hour shipped a broken script. This class
+    builds a disputed page from a synthetic snapshot (fixture from
+    test_build; never a data/ file) and proves the script runs and renders
+    the disputed layer.
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        from test_build import agent_fixture, disputed_snapshot_fixture
+
+        cls._saved = (build.RAW, build.AGENTS_RAW, build.OUT)
+        # The directory outlives this setup -- tearDownClass cleans it up
+        # after the browser closes -- so it cannot live in a with.
+        cls._dir = tempfile.TemporaryDirectory(  # pylint: disable=consider-using-with
+            prefix=".issue-118-browser-", dir=build.ROOT)
+        data = pathlib.Path(cls._dir.name) / "data"
+        data.mkdir()
+        (data / build.DISPUTED_SNAPSHOT_NAME).write_text(
+            json.dumps(disputed_snapshot_fixture()), encoding="utf-8")
+        (data / "aa-raw-coding-agents.json").write_text(
+            json.dumps([agent_fixture()]), encoding="utf-8")
+        (data / "captured-at.txt").write_text("2026-10-04\n",
+                                              encoding="utf-8")
+        build.RAW = data / "aa-raw-models.json"
+        build.AGENTS_RAW = data / "aa-raw-coding-agents.json"
+        build.OUT = pathlib.Path(cls._dir.name) / "frontier-models.html"
+        try:
+            with contextlib.redirect_stdout(io.StringIO()):
+                build.main()
+            cls.playwright = sync_playwright().start()
+            cls.browser = cls.playwright.chromium.launch(
+                executable_path=CHROMIUM_EXECUTABLE,
+                headless=True,
+                args=["--no-sandbox"])
+        except BaseException:
+            build.RAW, build.AGENTS_RAW, build.OUT = cls._saved
+            cls._dir.cleanup()
+            raise
+
+    @classmethod
+    def tearDownClass(cls):
+        build.RAW, build.AGENTS_RAW, build.OUT = cls._saved
+        cls.browser.close()
+        cls.playwright.stop()
+        cls._dir.cleanup()
+
+    def test_the_disputed_page_renders_its_layer(self):
+        page = self.browser.new_page()
+        try:
+            page.goto(build.OUT.as_uri())
+            # The script ran fillTable to completion -- a runtime error in
+            # any disputed path dies before the rows land.
+            page.wait_for_selector("#tbl tbody tr")
+            banner = page.locator("#disputed")
+            self.assertTrue(banner.is_visible())
+            self.assertIn("AA's two routes disagree", banner.inner_text())
+            # The disputed row's intelligence cell shows both routes'
+            # values, from the live JS render (not the static body).
+            cell = page.locator("#tbl tbody tr",
+                                has_text="Fixture Model (high)").first
+            self.assertIn("51.0 / 52.0", cell.inner_text())
+            self.assertIn("disputed", cell.inner_text())
+            # The disputed point draws the hollow-in-gray treatment.
+            mark = page.locator('[aria-label*="disputed values"]').first
+            self.assertEqual(mark.get_attribute("fill"), "var(--surface-1)")
+            self.assertEqual(mark.get_attribute("stroke"), "var(--muted)")
+        finally:
+            page.close()

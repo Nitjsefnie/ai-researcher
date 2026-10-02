@@ -1441,3 +1441,195 @@ class RetryBoundArithmeticTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+# --- the refusal writes a buildable snapshot (issue #118) ------------------------
+
+def snapshot_path_of() -> pathlib.Path:
+    """The disagreement snapshot's path beside the module's (test) OUT."""
+    return fetch_aa.OUT.with_name("aa-disagreement-snapshot.json")
+
+
+class DisagreementSnapshotTests(unittest.TestCase):
+    """Issue #118: the route-disagreement refusal is buildable. fetch_aa.py
+    still exits DISAGREEMENT_EXIT_CODE with the unchanged diagnostic, but the
+    refused attempt now also writes data/aa-disagreement-snapshot.json -- both
+    routes' raw payloads plus the disagreement map -- so the refresh can build
+    and publish the disputed page instead of holding it. The snapshot's pieces
+    all come from the refused attempt; the schema guards stay red on the
+    disputed merge."""
+
+    DETAIL_URL = fetch_aa.MODEL_DETAIL_URL.format(slug="detail-host-model")
+
+    @contextlib.contextmanager
+    def refused_capture(self, routes: dict, *, seed_stamp: str | None = None):
+        """fetch_aa.main() over the stubbed urlopen, with the module's
+        capture paths redirected into a temp tree. Yields (root, run,
+        captured); `captured` holds both buffers when run() raises."""
+        stub = LoudUrlopenStub(routes)
+        with tempfile.TemporaryDirectory(prefix=".issue-118-snapshot-") as tmp:
+            root = pathlib.Path(tmp)
+            old = (fetch_aa.ROOT, fetch_aa.OUT, fetch_aa.AGENTS_OUT,
+                   fetch_aa.STAMP)
+            argv = sys.argv
+            try:
+                fetch_aa.ROOT = root
+                fetch_aa.OUT = root / "aa-raw-models.json"
+                fetch_aa.AGENTS_OUT = root / "aa-raw-coding-agents.json"
+                fetch_aa.STAMP = root / "captured-at.txt"
+                if seed_stamp is not None:
+                    (root / "data" / "aa-route-disagreement.txt").parent.mkdir(
+                        parents=True, exist_ok=True)
+                    (root / "data" / "aa-route-disagreement.txt").write_text(
+                        seed_stamp, encoding="utf-8")
+                sys.argv = ["fetch_aa.py"]
+                with unittest.mock.patch.object(urllib.request, "urlopen",
+                                                stub), \
+                        unittest.mock.patch.object(fetch_aa, "_sleep",
+                                                   side_effect=lambda s: None):
+                    out, err = io.StringIO(), io.StringIO()
+
+                    def run():
+                        with contextlib.redirect_stdout(out), \
+                                contextlib.redirect_stderr(err):
+                            try:
+                                fetch_aa.main()
+                            finally:
+                                captured["stdout"] = out.getvalue()
+                                captured["stderr"] = err.getvalue()
+                        return captured["stdout"], captured["stderr"]
+
+                    captured: dict = {"stdout": "", "stderr": ""}
+                    yield root, run, captured
+            finally:
+                sys.argv = argv
+                (fetch_aa.ROOT, fetch_aa.OUT, fetch_aa.AGENTS_OUT,
+                 fetch_aa.STAMP) = old
+
+    def routes_forever_disagreeing(self, *, dated: bool = False) -> dict:
+        detail = flight_html(detail_payload(intelligenceIndex=52))
+        if dated:
+            return {
+                fetch_aa.URL: lambda: dated_response(
+                    flight_html(leaderboard_payload()), 1791084000),
+                self.DETAIL_URL: lambda: dated_response(detail, 1791084300),
+            }
+        return {
+            fetch_aa.URL: lambda: _FakeResponse(
+                flight_html(leaderboard_payload())),
+            self.DETAIL_URL: lambda: _FakeResponse(detail),
+        }
+
+    def test_the_refusal_writes_a_buildable_snapshot(self):
+        for why, dated in (("undated", False), ("dated", True)):
+            with self.subTest(why=why):
+                with self.refused_capture(self.routes_forever_disagreeing(
+                        dated=dated)) as (root, run, captured):
+                    with self.assertRaises(SystemExit) as caught:
+                        run()
+
+                    self.assertEqual(caught.exception.code,
+                                     fetch_aa.DISAGREEMENT_EXIT_CODE)
+                    stderr = captured["stderr"]
+                    self.assertIn("shared value(s) disagree", stderr)
+                    self.assertIn(
+                        "fixture-model: intelligenceIndex: leaderboard 51, "
+                        "detail 52", stderr)
+                    raw = snapshot_path_of().read_text(encoding="utf-8")
+                    snapshot = json.loads(raw)
+                    self.assertEqual(snapshot["schema"], 1)
+                    self.assertEqual(
+                        [m["slug"] for m in snapshot["leaderboard"]],
+                        ["detail-host-model", "fixture-model"])
+                    self.assertEqual(
+                        [m["slug"] for m in snapshot["detail"]],
+                        ["fixture-model"])
+                    self.assertEqual(snapshot["disagreements"],
+                                     [{"slug": "fixture-model",
+                                       "path": "intelligenceIndex",
+                                       "lb": 51, "dt": 52}])
+                    if dated:
+                        self.assertEqual(snapshot["leaderboardGeneratedAt"],
+                                         1791084000)
+                        self.assertEqual(snapshot["detailGeneratedAt"],
+                                         1791084300)
+                    else:
+                        self.assertIsNone(snapshot["leaderboardGeneratedAt"])
+                        self.assertIsNone(snapshot["detailGeneratedAt"])
+                    self.assertIsInstance(snapshot["windowStartEpoch"], int)
+                    self.assertRegex(snapshot["capturedAt"],
+                                     r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z")
+
+    def test_the_window_start_comes_from_the_stamp_when_one_exists(self):
+        # The banner names ONE window across hours: an existing workflow
+        # stamp's first line is the window's start, and this fetch must not
+        # reset it to now.
+        with self.refused_capture(
+                self.routes_forever_disagreeing(),
+                seed_stamp="1791080000\ncaptured before\n") as (
+                        root, run, _captured):
+            with self.assertRaises(SystemExit):
+                run()
+
+            snapshot = json.loads(snapshot_path_of().read_text(encoding="utf-8"))
+            self.assertEqual(snapshot["windowStartEpoch"], 1791080000)
+
+    def test_the_refusal_still_reds_on_a_broken_detail_schema(self):
+        # Only the disagreement stopped being red: a detail payload that has
+        # lost what build.py reads fails the schema guard on the disputed
+        # merge -- exit 1, NOT the disagreement exit, and NO snapshot is
+        # written for a capture that cannot be built.
+        detail = flight_html(detail_payload(
+            intelligenceIndexCostPerTask={
+                "cost": {"total": 1.0},
+                "evaluations": [
+                    {"slug": "scicode", "weightedCostPerTask": 1.0}]}))
+        routes = {
+            fetch_aa.URL: lambda: _FakeResponse(
+                flight_html(leaderboard_payload())),
+            self.DETAIL_URL: lambda: _FakeResponse(detail),
+        }
+        with self.refused_capture(routes) as (root, run, captured):
+            with self.assertRaises(SystemExit) as caught:
+                run()
+
+            # The guard's SystemExit carries its message, not a number: the
+            # process exit code would be 1 -- red, and specifically NOT the
+            # disagreement exit the refresh would publish from.
+            self.assertNotEqual(caught.exception.code,
+                                fetch_aa.DISAGREEMENT_EXIT_CODE)
+            self.assertIn("gdpval-aa", str(caught.exception))
+            self.assertFalse(snapshot_path_of().exists(),
+                             "a broken disputed merge wrote a snapshot anyway")
+
+    def test_an_agreeing_capture_drops_a_leftover_snapshot(self):
+        # The window closes: the agreeing capture must not leave a stale
+        # snapshot behind to put the next build into disputed mode from
+        # dead data.
+        routes = {
+            fetch_aa.URL: lambda: _FakeResponse(
+                flight_html(leaderboard_payload())),
+            self.DETAIL_URL: lambda: _FakeResponse(flight_html(detail_payload())),
+            fetch_aa.AGENTS_URL: lambda: _FakeResponse(flight_html(
+                agent_payload([agent_row(f"Agent - Model {i}")
+                               for i in range(5)]))),
+        }
+        with self.refused_capture(routes) as (root, run, _captured):
+            snap = snapshot_path_of()
+            snap.write_text('{"schema": 1}', encoding="utf-8")
+            stdout, _stderr = run()
+
+            self.assertIn("wrote aa-raw-models.json", stdout)
+            self.assertFalse(snap.exists(),
+                             "an agreeing capture left a stale snapshot")
+
+    def test_the_retry_bound_arithmetic_is_unchanged_by_the_refusal_path(self):
+        # The refusal path deliberately does NOT fetch the coding-agents
+        # page: adding that fetch to the worst case (3 waits + 8 route
+        # fetches + 1 agents fetch) would break the 1200 s capture budget
+        # the suite pins. The agents capture a disputed build renders is the
+        # last-good one in data/, not a fresh fetch.
+        worst_case = ((fetch_aa.ATTEMPTS - 1) * fetch_aa.WAIT_SECONDS
+                      + fetch_aa.ATTEMPTS * 2 * fetch_aa.FETCH_TIMEOUT_SECONDS
+                      + fetch_aa.FETCH_TIMEOUT_SECONDS)
+        self.assertLessEqual(worst_case, 1200)

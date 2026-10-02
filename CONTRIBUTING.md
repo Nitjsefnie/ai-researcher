@@ -233,6 +233,15 @@ header explains the rendered no-change gate — the page is built from both
 captures with provenance normalized out — and the stale-page case in
 full).
 
+One hourly-flow case reads differently since #118: when AA's two routes
+disagree, `refresh` no longer skips the hour — `fetch_aa.py` writes a
+disagreement snapshot and the run publishes a **disputed page** (a banner,
+both routes' values in the disputed cells, disputed models off the
+frontiers) until the routes converge and the page reverts on its own. A
+disputed commit's subject says so: "Publish disputed capture: AA routes
+disagree (issue #118)". There is no time bound on a disputed window; the
+banner is the alarm.
+
 **Actions are hash-pinned**, with the version in a trailing comment. Do not
 "tidy" one back to `@v4`: a tag is a moving pointer, and these jobs hold a
 repository token. Dependabot keeps the hashes current.
