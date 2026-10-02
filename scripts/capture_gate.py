@@ -238,16 +238,20 @@ def read_head_snapshot() -> bytes | None:
     """The disagreement snapshot as HEAD committed it, or None.
 
     Absent at HEAD is the NORMAL case -- every hour before a window opens --
-    so the existence probe is a separate call and a miss returns None rather
-    than raising. A miss here while the fresh side has a snapshot is exactly
-    the hour a window opens, and the two pages then differ structurally.
+    so this is ONE `git show` whose every failure mode reads as absent,
+    never a two-call exists-then-read probe (the capture gate is the
+    instruction budgets' hottest tool, and a second git process per hour is
+    pure probe cost). A miss here while the fresh side has a snapshot is
+    exactly the hour a window opens, and the two pages then differ
+    structurally; a failure that is really a broken repo also reads as
+    absent, which fails open toward publishing -- the same stance as the
+    first-capture-ever rule, and it cannot hide a moved page (both pages
+    still build and compare).
     """
-    probe = subprocess.run(
-        ["git", "cat-file", "-e", f"HEAD:data/{SNAPSHOT_NAME}"],
-        cwd=str(ROOT), capture_output=True, check=False)
-    if probe.returncode != 0:
+    try:
+        return _git_show(f"data/{SNAPSHOT_NAME}")
+    except HeadCaptureError:
         return None
-    return _git_show(f"data/{SNAPSHOT_NAME}")
 
 
 def _git_show(path: str) -> bytes:

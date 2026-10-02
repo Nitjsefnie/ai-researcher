@@ -1589,7 +1589,7 @@ class DisagreementSnapshotTests(unittest.TestCase):
                 flight_html(leaderboard_payload())),
             self.DETAIL_URL: lambda: _FakeResponse(detail),
         }
-        with self.refused_capture(routes) as (_root, run, captured):
+        with self.refused_capture(routes) as (_root, run, _captured):
             with self.assertRaises(SystemExit) as caught:
                 run()
 

@@ -15,8 +15,9 @@ from unittest import mock
 
 from playwright.sync_api import sync_playwright
 
-import build
 import test_build
+
+import build
 
 # This box has a system Chromium and no playwright-managed browser; CI has the
 # reverse (`playwright install chromium`). Prefer whatever is actually present
