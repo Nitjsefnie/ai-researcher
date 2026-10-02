@@ -178,11 +178,12 @@ message carries one declaration line per raised leaf,
 
     Budget-Raise: <document> <key> <from> -> <to>
 
-naming the exact values the diff carries. The guard accepts a declared raise
-only on a main **push** (the workflow passes `--allow-declared-raises` on the
-push branch and never on a pull request), so a raise riding a PR refuses even
-a perfectly declared one; a declaration whose values do not match the diff
-exactly refuses too. Seeding
+naming the exact values the diff carries. The guard honors the lines only on
+a main **push** — the pull-request invocation never passes
+`--allow-declared-raises` — and only from commits touching nothing outside the
+two budget documents, so a raise cannot ride feature work onto main, a squash
+merge's embedded PR body included; a declaration whose values do not match the
+diff exactly refuses too. Seeding
 headroom: code_bytes at the measured value exactly (builds are
 byte-deterministic), hover DOM at measured + 2% (rounded up), long tasks at
 measured + 1 (machine-load flap). The browser suite's `PerfBudgetTests` is
