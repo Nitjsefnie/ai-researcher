@@ -184,6 +184,7 @@ CORE_PIN = (
     '.github/workflows/codeql.yml',
     '.github/workflows/coverage-comment.yml',
     '.github/workflows/lint.yml',
+    '.github/workflows/pr-gate.yml',
     '.github/workflows/refresh.yml',
     '.github/workflows/scorecard.yml',
     '.github/workflows/secrets.yml',
