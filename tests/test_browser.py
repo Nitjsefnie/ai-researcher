@@ -276,29 +276,108 @@ class BrowserInteractionTests(unittest.TestCase):
         page.close()
 
     def test_parameter_chart_has_shared_interactions_and_parameter_tooltip(self):
+        # #163: the search matches case-insensitive substrings of name AND
+        # creator (build.py's filteredBase), so a runtime-read name's match
+        # set on the ambient capture is whatever AA published today -- any
+        # ambient pair where one name or creator contains the other turned
+        # this test's hardcoded `exactly one` into `2 != 1`. The page is
+        # this test's own deterministic fixture and the expected match set
+        # derives from it with the page's own matching semantics, over both
+        # axes the search reads: the fixture carries a name-substring pair
+        # and a creator-substring row deliberately, so the guarantee
+        # survives whatever names and creators AA publishes.
+        models = _probe_models(6)
+        # The issue's first counterexample class: the pair's shorter name is
+        # a substring of the longer one, so the shorter name's query
+        # legitimately matches both rows.
+        models[1]["name"] = "Probe Model 0000 Extended"
+        # The second class: the name is unique but the creator contains the
+        # query, which the search reads too.
+        models[2]["name"] = "Probe Isolator"
+        models[2]["modelCreatorName"] = "Probe Model 0000 Labs"
+
+        def expected_slice(query):
+            """The fixture's own match set, by the page's matching
+            semantics: a case-insensitive substring over name AND creator."""
+            ql = query.strip().lower()
+            return [m for m in models
+                    if ql in m["name"].lower()
+                    or ql in m["modelCreatorName"].lower()]
+
+        def assert_slice(page, query):
+            """The visible parameter points are exactly the fixture's match
+            set -- identity, not just a count."""
+            shown = page.locator("#svg-parameters circle.pt")
+            aris = [el.get_attribute("aria-label") for el in shown.all()]
+            expected = [f"Pin {m['name']} on the Parameter efficiency chart"
+                        for m in expected_slice(query)]
+            self.assertEqual(
+                len(aris), len(expected),
+                f"search {query!r} shows {len(aris)} points, the fixture's "
+                f"match set holds {len(expected)}")
+            self.assertEqual(
+                set(aris), set(expected),
+                f"search {query!r} shows a different slice than the "
+                "fixture's match set")
+
+        target = models[5]  # unique name and creator against the fixture
         page = self.browser.new_page(viewport={"width": 1280, "height": 900})
-        page.goto(build.OUT.as_uri())
+        with tempfile.TemporaryDirectory(prefix=".issue-163-search-",
+                                         dir=build.ROOT) as tmp:
+            root = pathlib.Path(tmp)
+            raw, agents_raw = root / "models.json", root / "coding-agents.json"
+            output = root / "frontier-models.html"
+            raw.write_text(json.dumps(models), encoding="utf-8")
+            agents_raw.write_text(json.dumps(_PROBE_AGENTS), encoding="utf-8")
+            old_raw, old_agents, old_out = (
+                build.RAW, build.AGENTS_RAW, build.OUT)
+            try:
+                build.RAW, build.AGENTS_RAW, build.OUT = (
+                    raw, agents_raw, output)
+                with contextlib.redirect_stdout(io.StringIO()):
+                    build.main()
+                page.goto(output.as_uri())
 
-        point = self.first_point(page, "#svg-parameters circle.pt")
-        point.hover()
-        model_name = page.locator("#tip-parameters .tname").inner_text()
-        tooltip = page.locator("#tip-parameters").inner_text()
-        self.assertIn("Parameters", tooltip)
-        self.assertIn("Intelligence Index", tooltip)
+                # The shared interactions, on a point looked up BY the
+                # fixture's own name: hover tooltip, keyboard pin, label.
+                aria = (f"Pin {target['name']} on the "
+                        "Parameter efficiency chart")
+                point = page.locator(
+                    f'#svg-parameters circle.pt[aria-label="{aria}"]')
+                self.assertEqual(point.count(), 1)
+                point.hover()
+                model_name = page.locator("#tip-parameters .tname").inner_text()
+                self.assertEqual(model_name, target["name"])
+                tooltip = page.locator("#tip-parameters").inner_text()
+                self.assertIn("Parameters", tooltip)
+                self.assertIn("Intelligence Index", tooltip)
 
-        accessible_name = f"Pin {model_name} on the Parameter efficiency chart"
-        point.focus()
-        point.press("Enter")
-        pinned = page.get_by_role("button", name=accessible_name)
-        self.assertEqual(pinned.get_attribute("aria-pressed"), "true")
-        self.assertIn(
-            model_name,
-            page.locator("#svg-parameters text.lbl").all_text_contents(),
-        )
+                accessible_name = (
+                    f"Pin {model_name} on the Parameter efficiency chart")
+                point.focus()
+                point.press("Enter")
+                pinned = page.get_by_role("button", name=accessible_name)
+                self.assertEqual(pinned.get_attribute("aria-pressed"), "true")
+                self.assertIn(
+                    model_name,
+                    page.locator("#svg-parameters text.lbl").all_text_contents(),
+                )
 
-        page.locator("#fQ").fill(model_name)
-        self.assertEqual(page.locator("#svg-parameters circle.pt").count(), 1)
-        page.close()
+                # The search, both directions the issue pins, both
+                # fixture-derived: a matched row found and only it, and an
+                # ambiguous pair handled the way the page's semantics say --
+                # every row the query legitimately matches stays visible.
+                with self.subTest("unique query finds its row and only it"):
+                    page.locator("#fQ").fill(models[1]["name"])
+                    assert_slice(page, models[1]["name"])
+
+                with self.subTest("ambiguous pair matches per the semantics"):
+                    page.locator("#fQ").fill(models[0]["name"])
+                    assert_slice(page, models[0]["name"])
+            finally:
+                build.RAW, build.AGENTS_RAW, build.OUT = (
+                    old_raw, old_agents, old_out)
+                page.close()
 
     def test_parameter_frontier_is_exposed_in_accessible_table(self):
         page = self.browser.new_page(viewport={"width": 1280, "height": 900})
