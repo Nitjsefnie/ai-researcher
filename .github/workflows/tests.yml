@@ -4,16 +4,22 @@ name: tests
 # tests/test_browser.py, drives the built HTML in a real headless Chromium
 # through playwright.
 #
-# THREE JOBS, split on purpose. `suites` is a 3-OS x 3-Python matrix running the
+# FOUR JOBS, split on purpose. `suites` is a 3-OS x 3-Python matrix running the
 # non-browser suite on every cell — that is what buys portability coverage of
 # the tooling itself. `coverage` is the dedicated Linux job: the full suite
-# (browser included) under the coverage ratchet. The browser suite stays OUT
+# (browser included) under the coverage ratchet, and it holds a read-only
+# token: it installs unhashed third-party dependencies and downloads a
+# browser, so the automated raise leaves the job as an artifact instead of
+# riding a write token. The browser suite stays OUT
 # of the matrix because (a) playwright's --with-deps browser install is
 # Ubuntu-only, so cross-OS browser steps would need per-OS install recipes for
 # near-zero signal, and (b) the page under test is OS-independent text (HTML/
 # JS built by build.py), so a second OS adds no behavioral coverage the matrix
 # misses. The coverage job installs playwright and Chromium; the matrix job
-# does not. That asymmetry is deliberate. `page` is the committed-page check
+# does not. That asymmetry is deliberate. `ratchet-push` is the data-only
+# push half of that ratchet: it consumes the artifact, runs no repository
+# code, and is the only job here holding `contents: write`. `page` is the
+# committed-page check
 # (issue #105): the source-commit stamp is set only on the refresh path, so a
 # page a PR commits by hand could go out stamp-less and the #94 heal run
 # would publish it — that job refuses a committed page lacking the stamp or
@@ -141,18 +147,23 @@ jobs:
     # holding GitHub's 6-hour default.
     timeout-minutes: 30
 
+    # Read-only, like every job here that runs code. This job installs
+    # unhashed third-party dependencies and downloads a browser, so nothing
+    # in it may hold a write token (issue #134): the ratchet raise leaves
+    # the job as an artifact for `ratchet-push`, the workflow's only
+    # writer, and the job output below is that job's gate.
     permissions:
-      # One step below pushes the automated ratchet raise to main, which the
-      # default read-only token cannot do; refresh.yml's commit step runs
-      # under this same single permission. Everything else here only reads.
-      contents: write
+      contents: read
+
+    outputs:
+      changed: ${{ steps.ratchet.outputs.changed }}
 
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          # The ratchet commit at the end pushes through an explicit remote
-          # URL instead, so the token never sits in .git/config for later
-          # steps to reuse.
+          # Nothing in this job pushes. Leaving the job token in
+          # .git/config lets any later step — or anything a dependency pulls
+          # in — reuse it.
           persist-credentials: false
 
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
@@ -174,11 +185,15 @@ jobs:
         # The browser binary is not a pip package, and playwright's own
         # installer performs no integrity check: browsers.json publishes no
         # digest and the installer never hashes a byte, so a bare install
-        # executes whatever the CDN hands over -- in a job that pushes the
-        # ratchet to main. scripts/ci/install_chromium.py verifies every
-        # archive against a committed sha256 first, pre-seeds the browsers
-        # directory so playwright's install has nothing left to download,
-        # and fails the run if anything was re-downloaded anyway. The
+        # executes whatever the CDN hands over. scripts/ci/install_chromium.py
+        # verifies every archive against a committed sha256 first, pre-seeds
+        # the browsers directory so playwright's install has nothing left to
+        # download, and fails the run if anything was re-downloaded anyway.
+        # The verification keeps its point under the artifact split (issue
+        # #134): the browser produces the V8 coverage dump that sets the
+        # JavaScript floor, and that floor crosses into the privileged
+        # ratchet-push job inside the staged thresholds file.
+        # The
         # --with-deps step inside the script still apt-installs the shared
         # libraries headless Chromium needs on a bare runner; without them
         # the launch fails with a missing-library error that reads like a
@@ -352,7 +367,11 @@ jobs:
         # calibration — a pull request runs untrusted code and must not be
         # able to write it. The ratchet raises either coverage floor when
         # this run justifies it; a lower measurement, or one within the
-        # hysteresis, leaves the document untouched.
+        # hysteresis, leaves the document untouched. The raise never leaves
+        # this job as a push: it is staged with the measured base commit as
+        # an artifact for the ratchet-push job below (issue #134) — this
+        # job holds no write token, and the push job is the workflow's only
+        # writer.
         id: ratchet
         if: ${{ !cancelled() && steps.pytest.outcome == 'success'
                 && steps.jscov.outcome == 'success'
@@ -383,32 +402,121 @@ jobs:
               "${js_measured}% justify no raise." >> "$GITHUB_STEP_SUMMARY"
           fi
 
-      - name: Commit the ratchet
-        # Runs only when the step above changed the data file. The push
-        # authenticates with the workflow token through an explicit remote
-        # URL — refresh.yml's pattern — so the credential never lands in
-        # .git/config, and the commit carries no co-author trailer: no model
-        # authored it.
+      - name: Stage the raise for the push job
+        # Runs only when the step above computed a raise. The staged pair
+        # is everything the push job needs: the validated thresholds
+        # document and the commit it was measured against, which is how
+        # the race handling moves with the data — the push job drops the
+        # raise when main no longer stands at the staged base.
         if: ${{ !cancelled() && steps.ratchet.outputs.changed == 'true' }}
+        env:
+          BASE: ${{ github.sha }}
+        run: |
+          mkdir -p "${RUNNER_TEMP}/ratchet-stage"
+          cp .github/ci-thresholds.json "${RUNNER_TEMP}/ratchet-stage/"
+          printf '%s\n' "${BASE}" > "${RUNNER_TEMP}/ratchet-stage/base.txt"
+
+      - name: Upload the ratchet artifact
+        if: ${{ !cancelled() && steps.ratchet.outputs.changed == 'true' }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ratchet-data
+          path: ${{ runner.temp }}/ratchet-stage
+          if-no-files-found: error
+
+  # --- The data-only push half of the coverage ratchet ---------------------
+  # Issue #134: the coverage job runs the suite, installs unhashed
+  # third-party dependencies and downloads a browser, and so must not hold
+  # a write token while it does. This job is the workflow's only writer: it
+  # holds `contents: write`, and runs no repository code — it installs
+  # nothing, checks out nothing, fetches main, copies the staged thresholds
+  # document in, and pushes. The artifact is downloaded from this same run
+  # (`needs:`, not a workflow_run), so there is no cross-run trust
+  # question, and a pull request never reaches the push: the artifact
+  # exists only when the ratchet step computed a raise, which only happens
+  # on a push to main. A raise staged against a main that has since moved
+  # is dropped, not rebased: the next main push measures and raises
+  # instead.
+  ratchet-push:
+    name: Push the coverage ratchet raise
+    runs-on: ubuntu-latest
+
+    # Per-job ceiling, like every other job's: a hung push fails in 15
+    # minutes instead of holding GitHub's 6-hour default.
+    timeout-minutes: 15
+
+    needs: coverage
+
+    # Defense in depth on top of the artifact's existence: the ratchet
+    # step can only have computed a raise on a main push.
+    if: >-
+      needs.coverage.result == 'success' &&
+      needs.coverage.outputs.changed == 'true' &&
+      github.event_name == 'push' &&
+      github.ref == 'refs/heads/main'
+
+    permissions:
+      # The only writer in this workflow, and it runs no repository code:
+      # the raise it publishes is the artifact of its own run's coverage
+      # job. The next push's "Ratchet documents" guard refuses any
+      # document that lowered a value, so a forged artifact cannot
+      # silently relax the ratchet.
+      contents: write
+
+    steps:
+      - name: Download the ratchet artifact
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: ratchet-data
+          path: ${{ runner.temp }}/ratchet-data
+
+      - name: Push the ratchet commit
         env:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
         run: |
-          git config user.name 'github-actions[bot]'
-          git config user.email \
-            '41898282+github-actions[bot]@users.noreply.github.com'
-          git add .github/ci-thresholds.json
-          git commit -m 'Ratchet ci-thresholds: raise the coverage floor (automated)'
-          if git push "https://x-access-token:${GH_TOKEN}@github.com/${REPO}" HEAD:main; then
+          # The raise was measured against `base`; main must still stand
+          # there. The old inline push learned of a move from a rejected
+          # push; checking before anything is built drops the same raise
+          # without an error-shaped round trip.
+          base="$(cat "${RUNNER_TEMP}/ratchet-data/base.txt")"
+          remote="https://x-access-token:${GH_TOKEN}@github.com/${REPO}"
+          fetched="$(git ls-remote "${remote}" refs/heads/main | cut -f1)"
+          if [ "${fetched}" != "${base}" ]; then
+            echo "::notice::Main moved while this run measured; the next push raises instead"
+            {
+              echo "### Dropped: main moved while this run measured"
+              echo
+              echo "The measured base ${base} is no longer main's tip (${fetched});"
+              echo "this run's raise is dropped and the next main push raises instead."
+            } >> "$GITHUB_STEP_SUMMARY"
             exit 0
           fi
-          # A rejected push usually means main moved while this run was
-          # going; failing the job for that would turn `tests` red for an
-          # ordinary concurrent push. Distinguish it: if the remote still
-          # points at this commit's parent, the race explanation is wrong
-          # and the push failed for a real reason.
-          git fetch --quiet "https://x-access-token:${GH_TOKEN}@github.com/${REPO}" main
-          if [ "$(git rev-parse HEAD^)" = "$(git rev-parse FETCH_HEAD)" ]; then
+          git init -q "${RUNNER_TEMP}/ratchet-repo"
+          git -C "${RUNNER_TEMP}/ratchet-repo" remote add origin "${remote}"
+          git -C "${RUNNER_TEMP}/ratchet-repo" fetch --quiet origin main
+          git -C "${RUNNER_TEMP}/ratchet-repo" checkout -q -B push FETCH_HEAD
+          cp "${RUNNER_TEMP}/ratchet-data/ci-thresholds.json" \
+            "${RUNNER_TEMP}/ratchet-repo/.github/ci-thresholds.json"
+          git -C "${RUNNER_TEMP}/ratchet-repo" config user.name \
+            'github-actions[bot]'
+          git -C "${RUNNER_TEMP}/ratchet-repo" config user.email \
+            '41898282+github-actions[bot]@users.noreply.github.com'
+          git -C "${RUNNER_TEMP}/ratchet-repo" add .github/ci-thresholds.json
+          git -C "${RUNNER_TEMP}/ratchet-repo" commit -q -m \
+            'Ratchet ci-thresholds: raise the coverage floor (automated)'
+          if git -C "${RUNNER_TEMP}/ratchet-repo" push origin HEAD:main; then
+            exit 0
+          fi
+          # A rejected push after the base check usually means main moved
+          # in the window since the check; failing the job for that would
+          # turn `tests` red for an ordinary concurrent push. Distinguish
+          # it: if the remote still points at this commit's parent, the
+          # race explanation is wrong and the push failed for a real
+          # reason.
+          git -C "${RUNNER_TEMP}/ratchet-repo" fetch --quiet origin main
+          if [ "$(git -C "${RUNNER_TEMP}/ratchet-repo" rev-parse HEAD^)" \
+              = "$(git -C "${RUNNER_TEMP}/ratchet-repo" rev-parse FETCH_HEAD)" ]; then
             echo "the ratchet push was rejected while main stood still" >&2
             exit 1
           fi
