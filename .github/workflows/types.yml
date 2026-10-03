@@ -49,8 +49,10 @@ jobs:
           cache-dependency-path: requirements-*.txt
 
       - name: Install pyright
+        # There is deliberately no `pip install --upgrade pip` here: the
+        # runner's stock pip installs the pinned manifests, so the unreviewed
+        # upgrade would be the one unpinned install in the job (issue #141).
         run: |
-          python3 -m pip install --upgrade pip
           # requirements-test.txt too, or pyright cannot resolve playwright in
           # tests/test_browser.py and reports it as an error. The runtime is
           # stdlib, so these two files ARE the whole set of third-party names
