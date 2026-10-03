@@ -1,6 +1,6 @@
 import contextlib
 import datetime
-import html
+from html import escape as html_escape
 import io
 import json
 import pathlib
@@ -2004,7 +2004,7 @@ class FrontierZeroScoreTests(unittest.TestCase):
         ftable = page[page.index('id="fTable"'):page.index("</table>", page.index('id="fTable"'))]
         row_re = re.compile(
             r'<tr><td>GDPval-AA v2</td><td class="name">'
-            + re.escape(html.escape(name)) + r"</td>(.*?)</tr>")
+            + re.escape(html_escape(name)) + r"</td>(.*?)</tr>")
         match = row_re.search(ftable)
         self.assertIsNotNone(
             match, f"no agentic frontier row for the mutated model {name}")
