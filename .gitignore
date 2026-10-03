@@ -19,6 +19,7 @@
 # ---- repository root — the builder, the instruction files, the toolchain --
 !/.gitignore
 !/.gitattributes
+!/.gitleaks.toml
 !/.pylintrc
 !/AGENTS.md
 !/CLAUDE.md
