@@ -1,21 +1,25 @@
 name: coverage comment
 
-# Post or invalidate the patch-coverage comment after the tests workflow.
+# Post or invalidate the patch-coverage comment after the ci-gate run.
 #
-# WHY THIS IS A SEPARATE WORKFLOW. `tests` checks out and executes the
+# WHY THIS IS A SEPARATE WORKFLOW. The tests leg checks out and executes the
 # proposed tree, so that job must not also hold the token that can write pull
 # request conversation. Only the rendered comment crosses this boundary; this
 # workflow checks out nothing and runs no code from the pull request.
 #
 # The DESTINATION does not cross it either. The artifact carries a pull
 # request number, but that artifact is written by a job running the pull
-# request's own copy of `tests.yml`, so obeying it would let any pull request
-# aim bot-authored text at any other one. The number below is resolved from
-# the `workflow_run` event instead, and the artifact's copy is only compared
-# with it — a disagreement fails the step loudly rather than being corrected
-# quietly, because it is the signal that somebody tried.
+# request's own copy of `tests.yml` — inside the ci-gate run, since
+# tests.yml became a workflow_call callee (issue #133) and produces no run
+# of its own on a pull request; the run that carries the
+# diff-coverage-comment artifact is ci-gate's, so the relay keys on that
+# workflow's completion. Obeying the artifact's PR number would let any
+# pull request aim bot-authored text at any other one. The number below is
+# resolved from the `workflow_run` event instead, and the artifact's copy is
+# only compared with it — a disagreement fails the step loudly rather than
+# being corrected quietly, because it is the signal that somebody tried.
 #
-# `pull_request_target` is not the answer. As `tests.yml` explains, that
+# `pull_request_target` is not the answer. As `ci-gate.yml` explains, that
 # trigger would give a run of proposed code the base repository's token and
 # secrets. The workflow_run split keeps the write-capable job on this trusted
 # file while the untrusted job stays read-only.
@@ -29,7 +33,7 @@ name: coverage comment
 # proposed code holding `pull-requests: write` itself, which is worse.
 on:
   workflow_run:  # zizmor: ignore[dangerous-triggers]
-    workflows: [tests]
+    workflows: [ci gate]
     types: [completed]
 
 permissions:
@@ -204,10 +208,14 @@ jobs:
           fi
           # Credit is keyed on the run conclusion, not the coverage
           # job's: a failed run that skipped coverage is a failure,
-          # not a documentation-only skip. The coverage job is
-          # unconditional in tests.yml, so a successful run always
-          # carries the artifact and `success` needs no case here — the
-          # workflow contract tests pin that shape.
+          # not a documentation-only skip. Since #133 the tests leg
+          # itself narrows under ci-gate's docs-only / bot-data-only
+          # classification, so a SUCCESSFUL run without the artifact is
+          # exactly the narrowed shape when its tests leg skipped — the
+          # neutral case below. A successful run whose tests leg RAN
+          # always carries the artifact (diff-coverage uploads with
+          # if-no-files-found: error), so a missing artifact beside a
+          # running tests leg stays a failure.
           case "${RUN_CONCLUSION:-}" in
             cancelled)
               # A cancelled run's coverage job may be `cancelled` or
@@ -217,6 +225,27 @@ jobs:
                 printf 'skipped=true\n'
                 printf 'not_measured_reason=a cancelled tests run\n'
               } >> "$GITHUB_OUTPUT"
+              ;;
+            success)
+              # The tests leg's own conclusion decides: a skipped tests
+              # leg is ci-gate's narrowing (the aggregate folded it as
+              # legitimate, or the run would be red), so coverage was
+              # deliberately not measured and a neutral not-measured
+              # marker replaces any stale number. Any other tests-leg
+              # state beside a missing artifact stays the default
+              # failure.
+              tests_leg="$(jq -s -r '[.[] | select(.name == "tests")
+                | .conclusion] | join(",")' jobs.json)"
+              case "$tests_leg" in
+                skipped)
+                  {
+                    printf 'verdict=\n'
+                    printf 'skipped=true\n'
+                    printf 'not_measured_reason=the tests leg was skipped by the ci-gate classification\n'
+                  } >> "$GITHUB_OUTPUT"
+                  ;;
+                '') echo "the run's jobs list names no tests leg" >&2; exit 1 ;;
+              esac
               ;;
           esac
 

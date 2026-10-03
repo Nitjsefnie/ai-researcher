@@ -40,25 +40,21 @@ name: audit
 # — never silence the whole gate.
 
 on:
-  push:
-    paths-ignore:
-      - '**/*.md'
-      - 'LICENSE'
-      - '.gitignore'
-    # Paired with pull_request, push must name branches: an in-repo PR head
-    # would otherwise run twice per commit under two refs the github.ref
-    # concurrency group cannot collapse.
-    branches: [main]
-  pull_request:
-    # Same paths-ignore as push. No branches filter: PRs target main only
-    # here.
-    paths-ignore:
-      - '**/*.md'
-      - 'LICENSE'
-      - '.gitignore'
+  workflow_call:
   schedule:
     - cron: '12 4 * * *'
   workflow_dispatch:
+    # Standalone dispatch runs (no ci-gate classification) run every job
+    # unconditionally.
+
+# Trigger ownership moved to ci-gate.yml (issue #133): the push and
+# pull_request triggers, and their paths-ignore deny-list
+# (`**/*.md` / LICENSE / .gitignore), live there now — a trigger filter
+# cannot report, so a required-check ruleset could never go green on a
+# documentation-only change. The daily cron survives here: this gate
+# answers "is a version we froze months ago still safe", and that answer
+# changes when a stranger publishes an advisory, with no commit here to
+# hang it on.
 
 permissions:
   contents: read

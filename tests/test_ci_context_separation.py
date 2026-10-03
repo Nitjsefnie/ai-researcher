@@ -42,24 +42,34 @@ def _steps():
 
 
 def test_no_externally_triggerable_default_branch_write_trigger():
-    """tests.yml declares no dispatch trigger, and push names main only.
+    """No dispatch trigger reaches tests.yml, through itself or its caller.
 
     workflow_dispatch is what the cache-poisoning query keys on: an event
     both externally triggerable and default-branch cache-write capable.
     schedule is the one other event in both sets, and repository_dispatch
     would read the same way to the analyser — so the pin refuses all three
-    by pinning the boundary instead of naming members: the trigger set is
-    exactly {push, pull_request}. push stays, scoped to main so the only
-    default-branch-context runs carry main's own reviewed code, and
-    pull_request stays so the suite still runs on changes — a pull_request
-    run holds no default-branch cache write, which is exactly why the
-    untrusted-code execution it does is out of the query's model.
+    by pinning the boundary instead of naming members. Since #133 the
+    trigger surface is owned by the CALLER: tests.yml is a workflow_call
+    callee and declares `workflow_call` alone, and ci-gate.yml carries
+    exactly {push, pull_request} with push scoped to main — CodeQL judges
+    the callee through its caller's triggers, so a dispatch re-added on
+    either file re-arms the alert. push on the caller stays scoped to main
+    so the only default-branch-context runs carry main's own reviewed
+    code, and pull_request stays so the suite still runs on changes — a
+    pull_request run holds no default-branch cache write, which is exactly
+    why the untrusted-code execution it does is out of the query's model.
     """
     triggers = _document()['on']
     assert triggers is not None
-    assert set(triggers) == {'push', 'pull_request'}, sorted(triggers)
-    assert triggers['push']['branches'] == ['main']
-    assert 'pull_request' in triggers, sorted(triggers)
+    assert set(triggers) == {'workflow_call'}, sorted(triggers)
+    gate = yaml.load(
+        (ROOT / '.github' / 'workflows' / 'ci-gate.yml').read_text(
+            encoding='utf-8'),
+        Loader=yaml.BaseLoader)['on']
+    assert gate is not None
+    assert set(gate) == {'push', 'pull_request'}, sorted(gate)
+    assert gate['push']['branches'] == ['main']
+    assert 'pull_request' in gate, sorted(gate)
 
 
 def test_no_step_fetches_or_checks_out_a_pr_controlled_ref():

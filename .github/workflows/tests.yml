@@ -43,38 +43,25 @@ name: tests
 # against pytest.
 
 on:
-  push:
-    # Deny-list rather than an allow-list: a new top-level code directory
-    # would silently stop being tested under an allow-list, whereas an
-    # unlisted path here just runs CI needlessly.
-    paths-ignore:
-      - '**/*.md'
-      - 'LICENSE'
-      - '.gitignore'
-    # Paired with pull_request, push must name branches: an in-repo PR head
-    # would otherwise run twice per commit under two refs the github.ref
-    # concurrency group cannot collapse.
-    branches: [main]
-  pull_request:
-    # Deny-list rather than an allow-list: a new top-level code directory
-    # would silently stop being tested under an allow-list, whereas an
-    # unlisted path here just runs CI needlessly.
-    # No branches filter: PRs target main only here.
-    paths-ignore:
-      - '**/*.md'
-      - 'LICENSE'
-      - '.gitignore'
-  # NO `workflow_dispatch`, deliberately — the one trigger this workflow
-  # gives up. The cache-poisoning query behind code-scanning alert #26
-  # (actions/cache-poisoning/poisonable-step) requires an externally
-  # triggerable event with default-branch cache-write access
-  # (Event.isExternallyTriggerable plus hasDefaultBranchCacheWriteAccess)
-  # and named workflow_dispatch in the alert message, so the trigger is
-  # what armed the finding; re-adding it re-arms the alert, and
-  # tests/test_ci_context_separation.py refuses it by name. What the
-  # trigger bought — running the suite on a ref no push or pull request
-  # covers — is no route at all here: main's push trigger carries every
-  # merge, and a finished run re-runs from its own page.
+  workflow_call:
+
+# Trigger ownership moved to ci-gate.yml (issue #133): the push and
+# pull_request triggers, and their paths-ignore deny-list
+# (`**/*.md` / LICENSE / .gitignore), live there now — a trigger filter
+# cannot report, so a required-check ruleset could never go green on a
+# documentation-only change. ci-gate classifies the changed paths and
+# conditions this leg on the result; this file keeps workflow_call (the
+# leg), its permissions block and its concurrency group.
+#
+# NO `workflow_dispatch`, deliberately — the one trigger this workflow
+# gives up (issue #180). The cache-poisoning query behind code-scanning
+# alert #26 (actions/cache-poisoning/poisonable-step) requires an
+# externally triggerable event with default-branch cache-write access
+# and named workflow_dispatch in the alert message, so re-adding it
+# re-arms the alert, and tests/test_ci_context_separation.py refuses it
+# by name. What the trigger bought — running the suite on a ref no push
+# or pull request covers — is no route at all here: main's push trigger
+# carries every merge, and a finished run re-runs from its own page.
 
 # Least privilege: this job only reads the tree. Without an explicit block it
 # inherits the repository default, which can be read/write for the whole token.
