@@ -149,3 +149,29 @@ def test_page_job_runs_the_committed_page_check():
     [checkout] = [s for s in job["steps"] if "uses" in s and
                   s["uses"].startswith("actions/checkout@")]
     assert checkout["with"]["persist-credentials"] is False
+
+
+def test_only_ratchet_push_holds_contents_write():
+    # Issue #134: the coverage job runs the suite, installs unhashed
+    # third-party dependencies and downloads a browser, and so must not
+    # hold contents: write. The raise leaves `coverage` as an artifact and
+    # `ratchet-push` — which runs no repository code — is the only writer.
+    workflow = yaml.safe_load(TESTS_WORKFLOW.read_text(encoding="utf-8"))
+    jobs = workflow["jobs"]
+    assert "ratchet-push" in jobs, (
+        "the data-only push job is missing from tests.yml")
+    for name, job in jobs.items():
+        contents = (job.get("permissions") or {}).get("contents")
+        if name == "ratchet-push":
+            assert contents == "write", (
+                "ratchet-push is the workflow's only writer and must "
+                "declare it")
+        else:
+            assert contents != "write", (
+                f"{name} holds contents: write; only ratchet-push may")
+    push = jobs["ratchet-push"]
+    assert push["needs"] == "coverage", (
+        "the artifact is this run's own data: needs, not a workflow_run")
+    assert not [s for s in push["steps"]
+                if s.get("uses", "").startswith("actions/checkout@")], (
+        "ratchet-push runs no repository code: no checkout step")
