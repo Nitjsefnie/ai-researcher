@@ -60,6 +60,70 @@ def committed_at_head() -> str:
     return proc.stdout.decode("utf-8")
 
 
+# --- issue #171: a committed disputed page (the #118 disagreement window) ---
+
+# The disputed layer's trigger and its rendered signature: the disagreement
+# snapshot's presence beside the capture puts build.py in disputed mode, and
+# the build splices the disputed callout into the page header.
+DISPUTED_CALLOUT = '<div class="callout disputed" id="disputed"'
+SNAPSHOT_NAME = build.DISPUTED_SNAPSHOT_NAME
+
+
+def fixture_snapshot() -> bytes:
+    """A schema-valid disagreement snapshot built from HEAD's own capture.
+
+    The disputed build's base generation is merge_captures(lb, dt), so the
+    fixture feeds the committed leaderboard payload to both routes and
+    carries one disagreement entry for its first slug: the merged models --
+    the build's whole data input -- stay the committed ones, so the render
+    is fully determined by HEAD's tree. Built from HEAD at call time so it
+    outlives the live window and never writes into data/.
+    """
+    models = json.loads(check_committed_page._git_show(  # pylint: disable=protected-access
+        f"data/{check_committed_page.MODELS_NAME}"))
+    slug = next(m["slug"] for m in models if isinstance(m.get("slug"), str))
+    snapshot = {
+        "schema": build.DISPUTED_SNAPSHOT_SCHEMA,
+        "leaderboard": models,
+        "detail": models,
+        "windowStartEpoch": 1767225600,
+        "disagreements": [{
+            "slug": slug,
+            "path": "intelligenceIndex",
+            "lb": 90.0,
+            "dt": 91.5,
+        }],
+    }
+    return json.dumps(snapshot).encode("utf-8")
+
+
+def git_show_with_snapshot(snapshot: bytes):
+    """`_git_show` with HEAD also carrying data/<SNAPSHOT_NAME>.
+
+    The real `_git_show` is captured before the patch -- the fake delegates
+    to it by module attribute, which under mock.patch.object would be the
+    fake itself.
+    """
+    real = check_committed_page._git_show  # pylint: disable=protected-access
+
+    def fake(path: str) -> bytes:
+        if path == f"data/{SNAPSHOT_NAME}":
+            return snapshot
+        return real(path)
+    return fake
+
+
+def git_show_without_snapshot():
+    """`_git_show` with data/<SNAPSHOT_NAME> absent at HEAD."""
+    real = check_committed_page._git_show  # pylint: disable=protected-access
+
+    def fake(path: str) -> bytes:
+        if path == f"data/{SNAPSHOT_NAME}":
+            raise check_committed_page.HeadCaptureError("absent at HEAD")
+        return real(path)
+    return fake
+
+
 class CheckCommittedPageTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -308,6 +372,91 @@ class CheckCommittedPageTests(unittest.TestCase):
 
         self.assertEqual((build.RAW, build.AGENTS_RAW, build.OUT),
                          self._saved)
+
+
+class DisputedWindowTests(unittest.TestCase):
+    """Pins on the committed-page check during a #118 disagreement window.
+
+    The disputed layer's trigger and its rendered signature: the disagreement
+    snapshot's presence beside the capture puts build.py in disputed mode,
+    and the build splices the disputed callout into the page header. The
+    rebuild must therefore stage the snapshot from HEAD when HEAD carries
+    one -- the callout is page content the disputed rebuild reproduces,
+    never provenance the mask removes; masking it would verify the disputed
+    layer by not looking at it. Every disputed state here is fixture-built
+    from HEAD's own capture, so the pins outlive any live window and never
+    write into data/.
+    """
+
+    # The tests drive the check's git-staging seam directly, the same way
+    # the refresh-shape test drives build's capture paths.
+    # pylint: disable=protected-access
+
+    _disputed_fixture_rebuild_cache = None
+
+    @classmethod
+    def disputed_fixture_rebuild(cls) -> str:
+        """The fixture snapshot's stamp-less rebuild, built once."""
+        if cls._disputed_fixture_rebuild_cache is None:
+            with mock.patch.object(check_committed_page, "_git_show",
+                                   new=git_show_with_snapshot(
+                                       fixture_snapshot())):
+                cls._disputed_fixture_rebuild_cache = (
+                    check_committed_page.rebuild_page())
+        return cls._disputed_fixture_rebuild_cache
+
+    def test_a_rebuild_without_a_disagreement_snapshot_stays_normal(self):
+        # The absence side of #171: no snapshot committed at HEAD, no
+        # disputed layer -- the rebuild stays the normal rendering even
+        # though a stale snapshot in the working data/ (or anywhere else)
+        # would put an unguarded rebuild into disputed mode.
+        with mock.patch.object(check_committed_page, "_git_show",
+                               new=git_show_without_snapshot()):
+            rebuilt = check_committed_page.rebuild_page()
+
+        self.assertNotIn(DISPUTED_CALLOUT, rebuilt)
+        self.assertEqual(
+            check_committed_page.verify(stamp(rebuilt), rebuilt), [])
+
+    def test_a_committed_disputed_page_matches_its_disputed_rebuild(self):
+        # The #171 regression, fixture-built so it outlives the live window:
+        # HEAD commits the disagreement snapshot beside its captures and the
+        # page carries the disputed callout, so the rebuild stages that
+        # snapshot and reproduces the disputed rendering. Masking the callout
+        # away would instead verify the disputed layer by not looking at it.
+        rebuilt = self.disputed_fixture_rebuild()
+        self.assertIn(DISPUTED_CALLOUT, rebuilt)
+        self.assertEqual(
+            check_committed_page.verify(stamp(rebuilt), rebuilt), [])
+
+        # The live-window control, when there is one: HEAD's real committed
+        # page against its real rebuild -- the exact state CI reds on today
+        # (issue #171's reproduction), green again under the fix.
+        try:
+            check_committed_page._git_show(f"data/{SNAPSHOT_NAME}")
+        except check_committed_page.HeadCaptureError:
+            self.skipTest("no disagreement snapshot committed at HEAD")
+        self.assertEqual(
+            check_committed_page.verify(committed_at_head(),
+                                        check_committed_page.rebuild_page()),
+            [])
+
+    def test_a_tampered_disputed_page_still_reds_the_mismatch(self):
+        # The design constraint's proof, pinned: the callout is page content
+        # the disputed rebuild reproduces, not provenance the mask removes,
+        # so a tampered byte inside the disputed layer is exactly the drift
+        # the check exists to catch -- the fix must not have blinded it.
+        rebuilt = self.disputed_fixture_rebuild()
+        tampered = stamp(rebuilt).replace(
+            '<div class="callout disputed" id="disputed" role="status">',
+            '<div class="callout disputed" id="disputed" role="alert">', 1)
+        self.assertNotEqual(tampered, stamp(rebuilt))
+
+        violations = check_committed_page.verify(tampered, rebuilt)
+
+        self.assertEqual(len(violations), 1, violations)
+        self.assertIn("differs from a stamp-less rebuild", violations[0])
+        self.assertIn('role="alert"', violations[0])
 
 
 class HeadStateTests(unittest.TestCase):

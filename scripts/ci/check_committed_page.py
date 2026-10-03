@@ -24,6 +24,12 @@ going red on exactly the runs that had something to commit (issue #108).
 In CI the checkout IS the committed tree, so the `page` job judges the same
 thing it always has.
 
+A route-disagreement window is not an exception (issue #171): the snapshot
+that puts a build into disputed mode is committed data like any other, so
+the rebuild stages it from HEAD too and reproduces the disputed rendering
+exactly. The callout is page content, never provenance -- masking it would
+verify the disputed layer by not looking at it.
+
 Exit 0 when the committed page is well-stamped and byte-equal to its masked
 rebuild; 1 with one line per violated invariant otherwise -- a missing page,
 a missing, duplicated or malformed stamp, a rebuild that failed, or a
@@ -100,13 +106,14 @@ def mask(page: str) -> str:
 
 # The data files the rebuild stages from HEAD, named as build.py and
 # capture_gate.py name them: the two captures plus the stamp file beside
-# them, which build reads from RAW.parent -- staging all three fully
-# determines the build. The count has no drift-sensing control: a fourth
-# data/ input in build.py would mix HEAD's staged files with the working
-# tree's. The refresh-shape test is the one guard it has -- its staged dir
-# holds ONLY these three, so a required input beside the captures fails
-# that build loudly; optional or elsewhere-read inputs stay on this
-# comment and the reader.
+# them, which build reads from RAW.parent -- staging all three plus the
+# disagreement snapshot, when HEAD carries one, fully determines the build.
+# The snapshot is the one OPTIONAL input (a build without it is the normal
+# rendering), so it stages last and its absence stages nothing: the staged
+# dir holds only what HEAD held. Any further data/ input in build.py would
+# mix HEAD's staged files with the working tree's -- a required one fails
+# the refresh-shape test's staged dir loudly, an optional one needs the
+# same staging this one got plus a pin like the disputed tests below.
 MODELS_NAME = "aa-raw-models.json"
 AGENTS_NAME = "aa-raw-coding-agents.json"
 STAMP_NAME = "captured-at.txt"
@@ -141,14 +148,17 @@ def rebuild_page() -> str:
     refresh the working data/ holds the fresh uncommitted capture, and a
     rebuild that honored it judged HEAD's page against data it was never
     built from. HEAD's two captures and their captured-at stamp are staged
-    into a temp data/ dir -- build reads the stamp from RAW.parent -- and
-    build.RAW/AGENTS_RAW/OUT are pointed at the staged copies. Mirrors
-    capture_gate._render_side: the temp dir lives under build.ROOT because
-    build.main() prints OUT.relative_to(ROOT) and would raise on a page
-    outside it. build's module globals and AA_SOURCE_COMMIT are restored no
-    matter how the build ends, so a failed rebuild cannot poison the
-    caller's tree state. A failed `git show` raises -- red, never a silent
-    pass.
+    into a temp data/ dir -- build reads the stamp from RAW.parent -- plus
+    the disagreement snapshot when HEAD carries one (issue #171): a
+    committed disputed page must be rebuilt the way the refresh builds it,
+    from the disagreement snapshot, so the comparison stays exact. The
+    snapshot fetch is optional by nature -- its absence stages nothing and
+    the rebuild stays the normal rendering -- while a genuinely broken git
+    fails red one file earlier, on the required captures, so the optional
+    fetch cannot mask a broken git. build's module globals and
+    AA_SOURCE_COMMIT are restored no matter how the build ends, so a
+    failed rebuild cannot poison the caller's tree state. A failed `git
+    show` raises -- red, never a silent pass.
     """
     with tempfile.TemporaryDirectory(prefix=".committed-page-",
                                      dir=build.ROOT) as tmp:
@@ -156,6 +166,18 @@ def rebuild_page() -> str:
         data_dir.mkdir()
         for name in (MODELS_NAME, AGENTS_NAME, STAMP_NAME):
             (data_dir / name).write_bytes(_git_show(f"data/{name}"))
+        try:
+            snapshot = _git_show(f"data/{build.DISPUTED_SNAPSHOT_NAME}")
+        except HeadCaptureError:
+            # A deliberate conflation (issue #171): an absent snapshot and
+            # one git cannot serve both stage nothing. A broken git fails
+            # red one file earlier, on the required captures, so the only
+            # case staged as normal besides a true absence is one unreadable
+            # snapshot blob -- an inconsistent tree, whose committed page
+            # the masked comparison below judges anyway.
+            pass
+        else:
+            (data_dir / build.DISPUTED_SNAPSHOT_NAME).write_bytes(snapshot)
         page_path = pathlib.Path(tmp) / "frontier-models.html"
         saved = (build.RAW, build.AGENTS_RAW, build.OUT)
         env_saved = os.environ.pop(STAMP_ENV, None)
