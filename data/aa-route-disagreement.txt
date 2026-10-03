@@ -1,7 +1,7 @@
 1791064385
-routes disagree on attempt 1 of 4; re-reading both routes in 120s (leaderboard generated 2026-10-03T21:05:34Z, detail generated 2026-10-03T18:41:49Z)
-routes disagree on attempt 2 of 4; re-reading both routes in 120s (leaderboard generated 2026-10-03T21:05:34Z, detail generated 2026-10-03T18:41:49Z)
-routes disagree on attempt 3 of 4; re-reading both routes in 120s (leaderboard generated 2026-10-03T21:05:34Z, detail generated 2026-10-03T18:41:49Z)
+routes disagree on attempt 1 of 4; re-reading both routes in 120s (leaderboard generated 2026-10-03T23:03:02Z, detail generated 2026-10-03T22:42:09Z)
+routes disagree on attempt 2 of 4; re-reading both routes in 120s (leaderboard generated 2026-10-03T23:03:02Z, detail generated 2026-10-03T22:42:09Z)
+routes disagree on attempt 3 of 4; re-reading both routes in 120s (leaderboard generated 2026-10-03T23:03:02Z, detail generated 2026-10-03T22:42:09Z)
 251 shared value(s) disagree between the leaderboard route and the model detail route; the gap-fill merge keeps the leaderboard's copy:
   a-x-k2: gdpvalNormalized: leaderboard 0.22676, detail 0.23254000000000002
   a-x-k2: terminalBench40: leaderboard None, detail 0
@@ -214,7 +214,7 @@ routes disagree on attempt 3 of 4; re-reading both routes in 120s (leaderboard g
   mimo-v2-flash: gdpvalNormalized: leaderboard 0.05725999999999999, detail 0.065615
   minicpm5-2b: gdpvalNormalized: leaderboard 0.09713499999999999, detail 0.10534500000000002
   minimax-m2-7: gdpvalNormalized: leaderboard 0.24931999999999999, detail 0.25672500000000004
-  minimax-m3: gdpvalNormalized: leaderboard 0.37291499999999994, detail 0.37270000000000003
+  minimax-m3: gdpvalNormalized: leaderboard 0.37291499999999994, detail 0.372505
   mistral-medium-3-5: gdpvalNormalized: leaderboard 0.12355000000000001, detail 0.13160500000000003
   motif-0714: gdpvalNormalized: leaderboard 0.29323, detail 0.302885
   motif-3: gdpvalNormalized: leaderboard 0.30933000000000005, detail 0.31135
@@ -228,21 +228,21 @@ routes disagree on attempt 3 of 4; re-reading both routes in 120s (leaderboard g
   nex-n2-pro: gdpvalNormalized: leaderboard 0.29572000000000004, detail 0.30261
   nvidia-nemotron-3-nano-4b: intelligenceIndex: leaderboard 7.38161312356127, detail 4.76910061591993
   nvidia-nemotron-3-nano-4b: intelligenceIndexIsEstimated: leaderboard True, detail False
-  nvidia-nemotron-3-ultra-550b-a55b: gdpvalNormalized: leaderboard 0.25017500000000004, detail 0.25829
+  nvidia-nemotron-3-ultra-550b-a55b: gdpvalNormalized: leaderboard 0.25017500000000004, detail 0.25808
   quasar-438b: gdpvalNormalized: leaderboard 0.33079, detail 0.34208000000000005
-  qwen3-5-122b-a10b: gdpvalNormalized: leaderboard 0.15089999999999998, detail 0.15865499999999996
+  qwen3-5-122b-a10b: gdpvalNormalized: leaderboard 0.15089999999999998, detail 0.15845499999999998
   qwen3-5-122b-a10b-non-reasoning: gdpvalNormalized: leaderboard 0.09738, detail 0.10634500000000002
   qwen3-5-35b-a3b-non-reasoning: gdpvalNormalized: leaderboard 0.04732999999999998, detail 0.055815
-  qwen3-5-397b-a17b: gdpvalNormalized: leaderboard 0.13977999999999996, detail 0.14808499999999997
+  qwen3-5-397b-a17b: gdpvalNormalized: leaderboard 0.13977999999999996, detail 0.147885
   qwen3-6-27b: gdpvalNormalized: leaderboard 0.23667000000000002, detail 0.24423000000000003
   qwen3-6-27b-non-reasoning: gdpvalNormalized: leaderboard 0.22494999999999998, detail 0.23318
   qwen3-6-35b-a3b: gdpvalNormalized: leaderboard 0.18960500000000002, detail 0.197915
   qwen3-6-35b-a3b-non-reasoning: gdpvalNormalized: leaderboard 0.16867500000000002, detail 0.17482999999999999
   qwen3-6-plus: gdpvalNormalized: leaderboard 0.23792000000000002, detail 0.246505
   qwen3-7-max: gdpvalNormalized: leaderboard 0.30713999999999997, detail 0.31557500000000005
-  qwen3-7-plus: gdpvalNormalized: leaderboard 0.12802, detail 0.13540499999999997
+  qwen3-7-plus: gdpvalNormalized: leaderboard 0.12802, detail 0.135205
   qwen3-8-2-4t-a95b: gdpvalNormalized: leaderboard 0.548635, detail 0.55626
-  qwen3-8-27b-low: gdpvalNormalized: leaderboard 0.42078499999999996, detail 0.43211
+  qwen3-8-27b-low: gdpvalNormalized: leaderboard 0.42078499999999996, detail 0.431725
   qwen3-8-27b-medium: gdpvalNormalized: leaderboard 0.434245, detail 0.44167999999999996
   qwen3-8-27b-non-reasoning: gdpvalNormalized: leaderboard 0.27610500000000004, detail 0.28706500000000007
   qwen3-8-flash-next: gdpvalNormalized: leaderboard 0.556065, detail 0.5665650000000001
@@ -254,5 +254,5 @@ routes disagree on attempt 3 of 4; re-reading both routes in 120s (leaderboard g
   solar-pro4: gdpvalNormalized: leaderboard None, detail 0.30490999999999996
   step-3-7-flash: gdpvalNormalized: leaderboard 0.172415, detail 0.17998000000000003
   step-5: gdpvalNormalized: leaderboard 0.53306, detail 0.543335
-leaderboard generated 2026-10-03T21:05:34Z, detail generated 2026-10-03T18:41:49Z — Vercel serves the two routes from independent caches and AA's data lands on them at different times (issues #100, #118); refresh builds and publishes the disputed capture this hour
+leaderboard generated 2026-10-03T23:03:02Z, detail generated 2026-10-03T22:42:09Z — Vercel serves the two routes from independent caches and AA's data lands on them at different times (issues #100, #118); refresh builds and publishes the disputed capture this hour
 wrote data/aa-disagreement-snapshot.json: 251 disputed value(s) across 198 model(s)
