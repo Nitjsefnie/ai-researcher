@@ -4,6 +4,20 @@ name: refresh
 # built from the new capture would differ from the one it replaces, commit the
 # new capture and publish the rebuilt page to docs-hub.
 #
+# THE WRITE SIDE IS A SEPARATE JOB (issue #143). The `refresh` job captures,
+# gates, rebuilds, installs third-party dependencies, downloads Chromium and
+# runs the full suite -- so it holds NOTHING but a read-only token, and the
+# hour's commit payload (the fresh captures, the built page, the window
+# files, the differ's message) leaves it as an artifact of this same run.
+# The `publish` job is the workflow's only contents:write holder and the
+# credential's only reader: it downloads the artifact, replays the hour's
+# commit (the window retirement first, then the data commit) against main in
+# a scratch repo with git plumbing alone -- no checkout, no pip, no browser,
+# no script from the tree -- pushes it with the documented race handling, and
+# publishes to docs-hub. A red capture or a red suite fails the refresh job,
+# and a failed need never starts the writer: NO commit and NO publish, and
+# the hourly cadence stays green-behaved.
+#
 # WHAT COUNTS AS "MOVED" IS THE RENDERED PAGE, NOT THE RAW CAPTURE BYTES
 # (issue #94). The gate (scripts/capture_gate.py) builds the page twice --
 # once from HEAD's two captures, once from the fresh ones -- and compares the
@@ -48,14 +62,14 @@ name: refresh
 #
 # THE `published` REF IS THE HEAL GATE'S MEMORY. The branch
 # refs/heads/published on the remote points at the main commit whose
-# out/frontier-models.html is live on the hub. It moves only in the publish
-# step, only after the upload succeeded, and only forward along main's
-# history (fast-forward by construction). When a run's capture is unchanged,
-# it fetches the ref and compares the page against HEAD: a missing ref
-# (never published) or a differing page (a publish that failed or never
-# ran) sets proceed, so the stale page is republished by the next run
-# instead of being skipped forever. A green no-op now means "the live page
-# is current", not merely "the data did not move".
+# out/frontier-models.html is live on the hub. It moves only in the write
+# job's publish step, only after the upload succeeded, and only forward
+# along main's history (fast-forward by construction). When a run's capture
+# is unchanged, it fetches the ref and compares the page against HEAD: a
+# missing ref (never published) or a differing page (a publish that failed
+# or never ran) sets proceed, so the stale page is republished by the next
+# run instead of being skipped forever. A green no-op now means "the live
+# page is current", not merely "the data did not move".
 #
 # TWO OVERLAPPING RUNS CAN STILL INVERT THE UPLOAD ORDER (issue #74). The
 # concurrency group serializes runs, but an OLDER run can still reach the
@@ -70,22 +84,25 @@ name: refresh
 # byte-for-byte, so even the residual seconds-wide window heals on the next
 # unchanged-capture run.
 #
-# THE SUITE RUNS BEFORE THE COMMIT, NOT AFTER. A capture can break the page —
-# a new field shape, a model with a null AA never emitted before — and the
-# whole point of a scheduled publish is that nobody is watching it happen. A
-# red build here leaves the last good capture committed and the last good page
-# live, which is the correct failure.
+# THE SUITE RUNS BEFORE THE COMMIT JOB, NOT AFTER. A capture can break the
+# page — a new field shape, a model with a null AA never emitted before —
+# and the whole point of a scheduled publish is that nobody is watching it
+# happen. A red build here fails the refresh job, and a failed need never
+# starts the write job: the last good capture stays committed and the last
+# good page live, which is the correct failure.
 #
 # THE PUSH TO MAIN CAN RACE. The concurrency group serializes runs, but two
 # of them can still pass each other between their checks and their pushes
 # (observed 2026-09-28: runs 287/288, seven seconds apart; the loser died on
-# a non-fast-forward rejection). The commit step treats a rejected push as a
-# race, not a failure: fetch the moved main, rebase onto it, and push once
-# more. A rebase conflict means the concurrent run pushed a different
-# capture for the same hour, so the loser CONCEDES -- green, publish=false,
-# nothing committed or published -- because the concurrent run's capture
-# stands and publishing it is that run's job. The retry is the final
-# attempt: a second rejection fails the run red rather than looping.
+# a non-fast-forward rejection). The write job's commit step treats a
+# rejected push as a race, not a failure: fetch the moved main, rebase onto
+# it, and push once more. A rebase conflict means the concurrent run pushed
+# a different capture for the same hour, so the loser CONCEDES -- green,
+# publish=false, nothing committed or published -- because the concurrent
+# run's capture stands and publishing it is that run's job. The retry is the
+# final attempt: a second rejection fails the run red rather than looping.
+# The retirement push (below) keeps the same handling with a SILENT
+# concession, as the capture step's old inline push_head did.
 #
 # fetch_aa.py exits nonzero when the flight payload or the model schema changes
 # shape, when AA bumps the Intelligence Index version build.py is written
@@ -111,10 +128,11 @@ name: refresh
 # this exit code. The schema guards run on the disputed merge too, so exit 1
 # (schema change, index bump, transport failure) still fails red immediately
 # -- only the disagreement itself stopped being red. When a capture succeeds
-# again, the step removes the stamp AND the snapshot, commits "Route
-# agreement restored; resume captures (issue #100)" and pushes; a push lost
-# to the race concedes green either way, and a lost stamp is self-healing on
-# the next run.
+# again, the hour marks the window RETIRING: the capture step removes the
+# stamp AND the snapshot from its tree and stages their removal for the
+# write job, which commits "Route agreement restored; resume captures
+# (issue #100)" and pushes; a push lost to the race concedes green either
+# way, and a lost stamp is self-healing on the next run.
 #
 # FORCE DURING A WINDOW NOW REBUILDS (issue #118, amending #103). A forced
 # dispatch used to be terminal behind a refused capture because there was
@@ -147,28 +165,34 @@ concurrency:
   cancel-in-progress: false
 
 # Least-privilege floor (issue #52 review): every job here declares its own
-# permissions block today, but a job added later WITHOUT one would silently
-# inherit the repository default. The floor caps what that inheritance can
-# leak; the refresh job's own contents: write overrides it where the pushes
-# happen.
+# permissions block -- the refresh job read-only (it runs the capture, the
+# installs and the suite), the publish job the sole write elevation, where
+# the pushes and the credential are. The floor caps what the inheritance can
+# leak: a job added later WITHOUT its own block inherits read, not the
+# repository default.
 permissions:
   contents: read
 
 jobs:
   refresh:
+    name: Capture, gate, rebuild, verify
     runs-on: ubuntu-latest
 
-    # Job-level rather than workflow-level (issue #52): only this job pushes
-    # — the commit step to main, the publish step to refs/heads/published,
-    # both under the explicit token URL — so the write scope sits where the
-    # pushes are. The workflow-level floor above is contents: read, so this
-    # block is the file's only elevation to write.
+    # Job-level rather than workflow-level (issue #52), and READ-ONLY since
+    # #143: this job runs the capture, third-party installs, a downloaded
+    # browser and the suite, so nothing in it may ride a write token. The
+    # hour's commit payload leaves as an artifact for the publish job, the
+    # workflow's only writer.
     permissions:
-      # This job commits the capture it takes. Everything else stays read-only.
-      contents: write
+      contents: read
+
+    outputs:
+      # The writer's gate: proceed is the rendered-gate + heal verdict the
+      # publish job's `if` reads through needs.refresh.outputs.
+      proceed: ${{ steps.capture.outputs.proceed }}
 
     # Sized for a FULL heal run — pip + Chromium installs, the full suite
-    # with the browser, the publish — not the 13-second unchanged-capture
+    # with the browser — not the 13-second unchanged-capture
     # skip that most hours are. A hung run fails in 30 minutes instead of
     # holding GitHub's 6-hour default.
     timeout-minutes: 30
@@ -176,8 +200,9 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          # The push at the end uses an explicit remote URL instead, so the
-          # token never sits in .git/config for later steps to reuse.
+          # Nothing in this job pushes (issue #143). Leaving the job token
+          # in .git/config would let any later step -- or anything a
+          # dependency pulls in -- reuse it.
           persist-credentials: false
 
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
@@ -202,11 +227,9 @@ jobs:
       # banner until the routes agree. There is no time bound on a window.
       - name: Capture the leaderboard
         # The id is the force gate's handle: "Did anything move?" reads this
-        # step's `captured` verdict through it (issue #103).
+        # step's `captured` verdict through it (issue #103), and the staging
+        # step reads `retire` the same way (#143).
         id: fetch
-        env:
-          GH_TOKEN: ${{ github.token }}
-          REPO: ${{ github.repository }}
         run: |
           set +e
           python3 scripts/fetch_aa.py 2> /tmp/fetch-err.txt
@@ -215,43 +238,26 @@ jobs:
           stamp=data/aa-route-disagreement.txt
           now=$(date -u +%s)
 
-          # The push races a concurrent run exactly as the commit step's
-          # does; a stamp push lost to it is self-healing (the next run
-          # rewrites or retires the stamp), so a conflict or a second
-          # rejection concedes green rather than failing the hour. Identity
-          # is passed inline (-c) because this step never git-config's the
-          # checkout, and the rebase re-creates OUR commit, so it needs a
-          # committer identity too.
-          push_head () {
-            if ! git push "https://x-access-token:${GH_TOKEN}@github.com/${REPO}" HEAD:main; then
-              git fetch --depth=1 origin main
-              if ! git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' rebase origin/main; then
-                git rebase --abort
-                return 1
-              fi
-              git push "https://x-access-token:${GH_TOKEN}@github.com/${REPO}" HEAD:main
-            fi
-          }
-
           if [ "$rc" -eq 0 ]; then
             # captured=true is this step's verdict for the force gate in
             # "Did anything move?" (issue #103): only a capture that ran
             # may honor a forced rebuild.
             echo "captured=true" >> "$GITHUB_OUTPUT"
             # Agreement restored after a skipped stretch: retire the stamp
-            # so its age can never trip the red alarm. A push lost to the
-            # race concedes SILENTLY -- the next successful capture retires
-            # the stamp again.
+            # so its age can never trip an alarm. The window files leave
+            # this tree too -- so the rendered gate builds a clean page --
+            # and the removal is staged for the write job, which commits it
+            # against main. A push lost to the race concedes SILENTLY (see
+            # the publish job): the next successful capture retires the
+            # stamp again.
             if git ls-files --error-unmatch "$stamp" > /dev/null 2>&1 \
                || git ls-files --error-unmatch data/aa-disagreement-snapshot.json > /dev/null 2>&1; then
               # The window closes: the stamp AND the disputed snapshot leave
               # the tree together, so the next build renders normally.
               git rm -q --ignore-unmatch "$stamp" data/aa-disagreement-snapshot.json
-              git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m "Route agreement restored; resume captures (issue #100)"
-              if push_head; then
-                echo "AA's routes agree again — disagreement stamp and snapshot removed; captures resume (issue #118)." \
-                  >> "$GITHUB_STEP_SUMMARY"
-              fi
+              echo "retire=true" >> "$GITHUB_OUTPUT"
+              echo "AA's routes agree again — disagreement stamp and snapshot staged for removal; captures resume (issue #118)." \
+                >> "$GITHUB_STEP_SUMMARY"
             fi
             exit 0
           fi
@@ -261,10 +267,10 @@ jobs:
             # snapshot. The stamp records the window's start once (the
             # banner names one window across hours) and refreshes the
             # window's diagnostic after it; the snapshot is the hour's own
-            # capture. Neither is committed HERE anymore -- the rendered
-            # gate decides moved vs unchanged, and the commit step commits
-            # only what the suite passed. From here a disputed hour
-            # proceeds exactly like a moved-capture hour.
+            # capture. Nothing is committed HERE -- the rendered gate
+            # decides moved vs unchanged, and the write job commits only
+            # what the suite passed. From here a disputed hour proceeds
+            # exactly like a moved-capture hour.
             echo "captured=true" >> "$GITHUB_OUTPUT"
             if [ ! -f "$stamp" ]; then
               {
@@ -327,8 +333,8 @@ jobs:
           if [ "$changed" = false ]; then
             # The fresh captures render identically to HEAD's, so restore the
             # whole directory, not only the stamp: leaving either capture in
-            # the tree would stage it on a later heal run's `git add data/`
-            # in the commit step. This also restores captured-at.txt -- the
+            # the tree would stage it in the staging step's payload for a
+            # later commit. This also restores captured-at.txt -- the
             # stamp records when the DATA moved, so a quiet fetch must not
             # bump it.
             git checkout -- data/
@@ -341,15 +347,15 @@ jobs:
           # differs from HEAD means the live render is behind main. Either
           # way this run republishes. ANY fetch failure is treated as stale:
           # republishing a page that was already current costs one hub
-          # version, while a real outage still fails red at the publish
-          # step's ref update.
+          # version, while a real outage still fails red at the write job's
+          # publish step's ref update.
           live_stale=false
           hub_stale=false
           if [ "$changed" = false ] && [ "${{ inputs.force }}" != 'true' ]; then
             # Anonymous fetch: relies on the repo being public. If it ever
             # goes private, this gate degrades to an hourly republish --
             # self-consistent, since the ref update still authenticates
-            # via GH_TOKEN in the publish step.
+            # via GH_TOKEN in the write job's publish step.
             if git fetch --depth=1 origin \
                  refs/heads/published:refs/remotes/origin/published 2>/dev/null; then
               if ! git diff --quiet origin/published HEAD -- out/frontier-models.html; then
@@ -369,7 +375,7 @@ jobs:
             # against HEAD's page. Divergence sets hub_stale, as does a
             # failed fetch: same stance as the ref fetch above, an extra
             # republish costs one hub version, and a real outage fails red
-            # at the publish step.
+            # at the write job's publish step.
             hub_page="$(mktemp)"
             if curl -fsS --connect-timeout 10 --max-time 30 \
                  https://docs.nitjsefni.eu/d/ai-researcher/frontier-models \
@@ -445,11 +451,14 @@ jobs:
         # The browser binary is not a pip package, and playwright's own
         # installer performs no integrity check: browsers.json publishes no
         # digest and the installer never hashes a byte, so a bare install
-        # executes whatever the CDN hands over -- in a job that holds
-        # contents:write. scripts/ci/install_chromium.py verifies every
-        # archive against a committed sha256 first, pre-seeds the browsers
-        # directory so playwright's install has nothing left to download,
-        # and fails the run if anything was re-downloaded anyway.
+        # executes whatever the CDN hands over. scripts/ci/install_chromium.py
+        # verifies every archive against a committed sha256 first, pre-seeds
+        # the browsers directory so playwright's install has nothing left to
+        # download, and fails the run if anything was re-downloaded anyway.
+        # The verification keeps its point under the artifact split (issue
+        # #143): the browser produces the V8 coverage dump in tests.yml, and
+        # here it produces the page the suite verifies -- nothing a read-only
+        # job builds can touch main or the hub.
         run: python3 scripts/ci/install_chromium.py
 
       - name: Summarise what changed
@@ -472,7 +481,7 @@ jobs:
         run: |
           python3 scripts/diff_aa.py git:HEAD data/aa-raw-models.json > diff.txt
           # Only a run whose DATA moved gets diff_aa's message; a forced
-          # build-only run writes its own in the commit step.
+          # build-only run writes its own in the write job's commit step.
           if [ "$CHANGED" = true ]; then
             python3 scripts/diff_aa.py git:HEAD data/aa-raw-models.json \
               --commit-msg > commit-msg.txt
@@ -488,9 +497,9 @@ jobs:
       - name: Rebuild the page
         if: steps.capture.outputs.proceed == 'true'
         # The page prints the SHA of the tree it was actually built from
-        # (only when this is set). When the push races and the rebase lands
-        # the same build in a later commit, the printed SHA still names the
-        # build's source — that is the honest claim.
+        # (only when this is set). When the write job's push races and the
+        # rebase lands the same build in a later commit, the printed SHA
+        # still names the build's source — that is the honest claim.
         env:
           AA_SOURCE_COMMIT: ${{ github.sha }}
         run: python3 build.py
@@ -501,38 +510,156 @@ jobs:
         # out/frontier-models.html (tests/test_browser.py's setUpClass calls
         # build.main()), so this step must carry the same env the Rebuild
         # step has: unstamped, that rewrite would throw the stamp away and
-        # the commit below would stage an unstamped page (issue #92).
+        # the payload would ship an unstamped page (issue #92).
         env:
           AA_SOURCE_COMMIT: ${{ github.sha }}
         run: python3 -m pytest -q -ra
 
-      - name: Commit the capture
-        id: commit
+      - name: Stage the publish payload
+        # The hour's write side, packed: the staging step is what turns a
+        # verified tree into the artifact the publish job consumes. It runs
+        # on `proceed` -- a heal run packs too (the hub may be behind even
+        # when the capture is quiet) -- and its stamp-churn guard is the old
+        # commit step's, moved wholesale.
         if: steps.capture.outputs.proceed == 'true'
         env:
-          GH_TOKEN: ${{ github.token }}
-          REPO: ${{ github.repository }}
-          # The two flags the stamp-churn guard below reads. On a heal run
-          # (capture unchanged, not forced) this run's rebuild is stamped
-          # with THIS run's github.sha, while HEAD's committed page carries
-          # the PREVIOUS tip's sha -- the commit that page lands in always
-          # postdates the stamp it carries -- so committing the rebuilt page
-          # would be stamp-only churn: the exact hourly churn issue #94
-          # removes, reintroduced through the suite's rebuild.
           CHANGED: ${{ steps.capture.outputs.changed }}
           FORCE: ${{ inputs.force }}
+          RETIRE: ${{ steps.fetch.outputs.retire }}
         run: |
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          # A quiet run restores HEAD's page before anything is staged: the
-          # rebuild above is stamped with this run's own sha (issue #92), and
-          # on a heal run that stamp is the only thing that differs from
-          # HEAD. A FORCED run skips the restore, so an unchanged capture can
-          # commit stamp-only churn -- accepted, because force is manual and
-          # rare, and its whole point is to republish the current build.
+          PAYLOAD="${RUNNER_TEMP}/publish-payload"
+          mkdir -p "${PAYLOAD}/tree"
+          # Issue #94's stamp-churn guard, moved from the old commit step: on
+          # a heal run the rebuilt page is stamped with THIS run's sha -- the
+          # only thing that differs from HEAD's page -- so restore HEAD's page
+          # before it ships; a forced run may commit stamp churn, accepted
+          # because force is manual and rare.
           if [ "$CHANGED" != "true" ] && [ "$FORCE" != "true" ]; then
             git show HEAD:out/frontier-models.html > out/frontier-models.html
           fi
+          # The fixed add list the old commit stage staged: unchanged files
+          # copy fine -- the write job's `git add` stages only what differs
+          # from main.
+          for p in data/aa-raw-models.json data/aa-raw-coding-agents.json \
+                   data/captured-at.txt out/frontier-models.html; do
+            cp --parents "$p" "${PAYLOAD}/tree/"
+          done
+          # The window files ride the data commit when the hour opens or
+          # continues a window (untracked-new or tracked-refreshed). When the
+          # hour RETIRES the window (rc 0 + tracked), they do not ship:
+          # shipping what the retirement commit removes would resurrect it.
+          if [ "$RETIRE" = "true" ]; then
+            printf '%s\n' data/aa-disagreement-snapshot.json data/aa-route-disagreement.txt \
+              > "${PAYLOAD}/remove.txt"
+          else
+            [ ! -f data/aa-disagreement-snapshot.json ] || cp --parents data/aa-disagreement-snapshot.json "${PAYLOAD}/tree/"
+            [ ! -f data/aa-route-disagreement.txt ] || cp --parents data/aa-route-disagreement.txt "${PAYLOAD}/tree/"
+          fi
+          # The differ's message travels when the hour ran it (CHANGED=true);
+          # the write job's message selection reads it exactly as the old
+          # commit step read the workspace copy.
+          [ ! -f commit-msg.txt ] || cp commit-msg.txt "${PAYLOAD}/commit-msg.txt"
+
+      - name: Upload the publish payload
+        # An explicit `if` REPLACES the implicit success() gate, so success()
+        # is restated: a red suite must not hand a payload to the writer.
+        if: success() && steps.capture.outputs.proceed == 'true'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: publish-payload
+          path: ${{ runner.temp }}/publish-payload
+          if-no-files-found: error
+
+  # --- The write half: commit and publish, no repository code --------------
+  # Issue #143: the job that runs the capture, installs unhashed third-party
+  # dependencies and downloads a browser must not hold a write token while it
+  # does. This job is the workflow's only writer: it holds contents:write and
+  # the docs-hub credential, downloads this same run's payload (needs:, not a
+  # workflow_run -- there is no cross-run trust question), and runs no
+  # repository code: no checkout, no pip, no browser, no script from the
+  # tree -- git plumbing against a scratch repo, curl against the pinned hub
+  # host, and the GitHub API for the published ref. A pull request never
+  # reaches it: this workflow has no pull_request trigger, and the job needs
+  # a successful refresh run that said proceed.
+  publish:
+    name: Commit and publish the capture
+    runs-on: ubuntu-latest
+
+    # Per-job ceiling, like every other job's: a hung push or upload fails
+    # in 15 minutes instead of holding GitHub's 6-hour default.
+    timeout-minutes: 15
+
+    needs: refresh
+
+    # The writer runs only behind a successful, proceeding refresh job: a red
+    # capture or a red suite must still produce NO commit and NO publish, and
+    # a quiet hour means the writer has nothing to do.
+    if: >-
+      needs.refresh.result == 'success' &&
+      needs.refresh.outputs.proceed == 'true'
+
+    permissions:
+      # The only writer in this workflow, and it runs no repository code:
+      # everything it commits or uploads is the artifact of its own run's
+      # refresh job, which the suite verified.
+      contents: write
+
+    steps:
+      - name: Download the publish payload
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: publish-payload
+          path: ${{ runner.temp }}/publish-payload
+
+      - name: Commit the capture
+        id: commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          PAYLOAD="${RUNNER_TEMP}/publish-payload"
+          remote="https://x-access-token:${GH_TOKEN}@github.com/${REPO}"
+          scratch="${RUNNER_TEMP}/scratch"
+          # Scratch repo at main's tip: git plumbing only, nothing executed
+          # from the tree, and the token never sits in a checked-out
+          # .git/config (the remote URL carries it per-command).
+          git init -q "${scratch}"
+          git -C "${scratch}" remote add origin "${remote}"
+          git -C "${scratch}" fetch --quiet origin main
+          git -C "${scratch}" checkout -q -B push FETCH_HEAD
+          git -C "${scratch}" config user.name 'github-actions[bot]'
+          git -C "${scratch}" config user.email \
+            '41898282+github-actions[bot]@users.noreply.github.com'
+          cd "${scratch}"
+          # Phase 1 -- the window retirement (issues #100/#118). Applied only
+          # when it still bites: if a concurrent run already retired the
+          # window on a moved main, the staged removal is empty and the
+          # notice records it (the old inline path reached the same end
+          # state by rebase-dropping an empty commit).
+          if [ -f "${PAYLOAD}/remove.txt" ]; then
+            xargs git rm -q --ignore-unmatch < "${PAYLOAD}/remove.txt"
+            if git diff --cached --quiet; then
+              echo "::notice::The window files are already gone from main; nothing to retire." \
+                >> "$GITHUB_STEP_SUMMARY"
+            else
+              git commit -q -m 'Route agreement restored; resume captures (issue #100)'
+              if ! git push origin HEAD:main; then
+                git fetch --quiet origin main
+                if git rebase origin/main; then
+                  # Second rejection concedes SILENTLY: the next
+                  # successful capture retires the stamp again.
+                  git push origin HEAD:main || true
+                else
+                  git rebase --abort
+                fi
+              fi
+            fi
+          fi
+          # Phase 2 -- the hour's data commit, staged over main's tip in the
+          # scratch and pushed with the same two-attempt race handling the
+          # old single job ran: a rejected push is a race, not a failure.
+          # The fixed add list is the old commit step's, verbatim.
+          cp -a "${PAYLOAD}/tree/." ./
           git add data/aa-raw-models.json data/aa-raw-coding-agents.json \
                   data/captured-at.txt out/frontier-models.html
           [ ! -f data/aa-disagreement-snapshot.json ] || git add data/aa-disagreement-snapshot.json
@@ -550,30 +677,31 @@ jobs:
             printf '%s\n\n%s\n' \
               'Publish disputed capture: AA routes disagree (issue #118)' \
               'Both routes'"'"' raw payloads and the disagreement map are committed as data/aa-disagreement-snapshot.json; the page renders the disputed layer until the routes agree again.' \
-              > commit-msg.txt
-            sed -n '2,$p' data/aa-route-disagreement.txt >> commit-msg.txt
-          elif [ -f commit-msg.txt ]; then
+              > "${RUNNER_TEMP}/commit-msg.txt"
+            sed -n '2,$p' data/aa-route-disagreement.txt >> "${RUNNER_TEMP}/commit-msg.txt"
+          elif [ -f "${PAYLOAD}/commit-msg.txt" ]; then
             printf '\n%s\n' 'Captured by .github/workflows/refresh.yml.' \
-              >> commit-msg.txt
+              >> "${PAYLOAD}/commit-msg.txt"
           else
             printf '%s\n\n%s\n' \
               'Rebuild the page: forced run, AA capture unchanged' \
               'The build moved, the data did not. Republished so the live page matches main.' \
-              > commit-msg.txt
+              > "${RUNNER_TEMP}/commit-msg.txt"
           fi
-          # A quiet run stages nothing here (the gate restored data/ and the
-          # guard above restored the page), and a forced run can produce a
-          # page identical to HEAD's; committing nothing is the correct
-          # outcome, and `git commit` would fail on it. The publish still
-          # happens (publish=true): this is exactly the shape of a heal run,
-          # where the page to serve is HEAD's but the hub is behind it.
+          # A quiet run stages nothing here (the gate restored data/ in the
+          # refresh job and the staging step's guard restored the page), and
+          # a forced run can produce a page identical to HEAD's; committing
+          # nothing is the correct outcome, and `git commit` would fail on
+          # it. The publish still happens (publish=true): this is exactly
+          # the shape of a heal run, where the page to serve is HEAD's but
+          # the hub is behind it.
           if git diff --cached --quiet; then
-            echo 'Staged tree matches HEAD — nothing committed.' \
+            echo "Staged tree matches main's tip — nothing committed." \
               >> "$GITHUB_STEP_SUMMARY"
             echo "publish=true" >> "$GITHUB_OUTPUT"
             exit 0
           fi
-          git commit -F commit-msg.txt
+          git commit -F "${RUNNER_TEMP}/commit-msg.txt"
           # No co-author trailer: no model authored this commit. A refresh that
           # a person or an agent drives by hand still carries one.
           #
@@ -585,11 +713,11 @@ jobs:
           # failure: fetch the moved main, rebase, push once more. The retry
           # is the FINAL attempt -- a second rejection fails the run red
           # rather than looping.
-          if ! git push "https://x-access-token:${GH_TOKEN}@github.com/${REPO}" HEAD:main; then
+          if ! git push origin HEAD:main; then
             # Anonymous fetch (the repo is public); on a private repo this
             # fetch fails the run red rather than skipping the retry. The
-            # pushes themselves authenticate via the token URL.
-            git fetch --depth=1 origin main
+            # pushes themselves authenticate via the token URL remote.
+            git fetch --quiet origin main
             if ! git rebase origin/main; then
               # A conflict means the concurrent run pushed a different
               # capture for the same hour -- the capture files are what
@@ -612,18 +740,16 @@ jobs:
             # if it succeeds over a main that moved by a build-code commit,
             # the documented force-input contract covers the staleness and
             # the next moved-data run heals it.
-            git push "https://x-access-token:${GH_TOKEN}@github.com/${REPO}" HEAD:main
+            git push origin HEAD:main
           fi
           echo "publish=true" >> "$GITHUB_OUTPUT"
 
       - name: Publish to docs-hub
-        # Two gates: `proceed` says this run has something to publish, and
-        # the commit step's own verdict says a publishable state was
-        # actually reached. Both must hold — a green run that conceded the
-        # push race must not republish anything.
-        if: >-
-          steps.capture.outputs.proceed == 'true' &&
-          steps.commit.outputs.publish == 'true'
+        # Two gates: the job-level `if` says this run has something to
+        # publish, and the commit step's own verdict says a publishable
+        # state was actually reached. Both must hold — a green run that
+        # conceded the push race must not republish anything.
+        if: steps.commit.outputs.publish == 'true'
         env:
           DOCS_HUB_API_KEY: ${{ secrets.DOCS_HUB_API_KEY }}
           GH_TOKEN: ${{ github.token }}
@@ -648,6 +774,7 @@ jobs:
           # API call retried once, publishes anyway with a warning —
           # availability of publish beats the residual seconds-wide window,
           # which the heal gate's hub check then heals within one run.
+          cd "${RUNNER_TEMP}/scratch"
           if git fetch --depth=1 origin \
                refs/heads/published:refs/remotes/origin/published 2>/dev/null; then
             tip="$(git rev-parse origin/published)"
@@ -675,12 +802,33 @@ jobs:
               # the upload.
             fi
           fi
-          python3 scripts/publish_docs.py out/frontier-models.html \
-            --slug ai-researcher/frontier-models \
-            --title "Frontier models — intelligence vs cost per task" \
-            --from ai-researcher \
-            --tags benchmarks,comparison,interactive,ai \
-            --project ai-researcher
+          # The upload. The write job runs no repository code, so this is
+          # the endpoint's wire format inlined -- scripts/publish_docs.py is
+          # the canonical client and the mirror source: keep the two in
+          # sync. The key travels in a header, never an argument; the URL
+          # is a literal on the pinned hub host -- the same host-pinning
+          # rule publish_docs.py enforces in code -- so the credential can
+          # only ever be sent there.
+          code="$(curl -fSs --connect-timeout 10 --max-time 120 \
+            -o /tmp/publish-response.json -w '%{http_code}' \
+            -H "x-docs-key: ${DOCS_HUB_API_KEY}" \
+            -F 'slug=ai-researcher/frontier-models' \
+            -F 'title=Frontier models — intelligence vs cost per task' \
+            -F 'tags=benchmarks,comparison,interactive,ai' \
+            -F 'project=ai-researcher' \
+            -F 'from=ai-researcher' \
+            -F 'file=@out/frontier-models.html;type=text/html' \
+            https://docs.nitjsefni.eu/api/publish)"
+          # The hub answers with JSON; a non-2xx already failed the step
+          # through curl's --fail, and a 2xx carrying an error field is
+          # still a failure -- the hub uses both, the same verdict
+          # publish_docs.py computes for the hub's answers.
+          if jq -e '(.error // null) != null' /tmp/publish-response.json > /dev/null; then
+            echo "publish failed: HTTP ${code} with an error field:" >&2
+            cat /tmp/publish-response.json >&2
+            exit 1
+          fi
+          cat /tmp/publish-response.json
           # Record the published state only once the upload succeeded: this
           # ref is what the heal gate compares against, so it must never
           # claim a page the hub does not serve. HEAD sits on main's history
@@ -688,11 +836,10 @@ jobs:
           # fast-forward.
           #
           # The ref moves through the GitHub refs API, not `git push`: the
-          # checkout is shallow (actions/checkout's default depth-1), so git
-          # holds too little ancestry to prove a fast-forward locally and
-          # rejected every update with "(fetch first)" even though it was
-          # one -- issue #77. The API checks server-side, where the full
-          # graph lives:
+          # scratch fetch is --depth=1, so git holds too little ancestry to
+          # prove a fast-forward locally and would be rejected with "(fetch
+          # first)" even though it was one -- issue #77. The API checks
+          # server-side, where the full graph lives:
           #   - GET first: the shell branches on the GET's exit code, so a
           #     404 -- or ANY failed GET -- routes to CREATE (POST); a POST
           #     against an existing ref fails there with 422 "already
@@ -704,7 +851,7 @@ jobs:
           #     fast-forward.
           # Any other API failure fails the run too: a silently stale ref
           # would make every later hour republish.
-          head_sha=$(git rev-parse HEAD)
+          head_sha="$(git rev-parse HEAD)"
           if gh api "repos/$REPO/git/refs/heads/published" > /dev/null; then
             gh api --method PATCH "repos/$REPO/git/refs/heads/published" \
               -f sha="$head_sha"
