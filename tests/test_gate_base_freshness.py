@@ -266,7 +266,12 @@ def test_the_window_files_enter_and_leave_the_derivation(tmp_path):
     module = _load()
 
     # Before the window: the run text names both files, but resolve()
-    # admits only tracked names, so neither is in the derived set.
+    # admits only tracked names, so neither is in the derived set -- even
+    # with one sitting untracked on the working disk: the derivation reads
+    # HEAD's tree, never the working directory.
+    (repo / 'data').mkdir(parents=True, exist_ok=True)
+    (repo / WINDOW_PATHS[1]).write_text('1767225600\n', encoding='utf-8',
+                                        newline='\n')
     before = module.gate_paths(repo)
     assert not any(p in before for p in WINDOW_PATHS), before
 
@@ -280,7 +285,7 @@ def test_the_window_files_enter_and_leave_the_derivation(tmp_path):
 
     # The window retires: the files leave the tree, the derivation follows.
     _git(repo, 'rm', '-q', *WINDOW_PATHS)
-    _git(repo, 'commit', '-m', 'ci: the window retires (issue #100)')
+    _git(repo, 'commit', '-m', 'ci: the window retires (issue #118)')
     after = module.gate_paths(repo)
     assert not any(p in after for p in WINDOW_PATHS), after
 
