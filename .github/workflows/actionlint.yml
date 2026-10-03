@@ -29,19 +29,22 @@ name: actionlint
 
 on:
   push:
-    paths:
-      - '.github/workflows/**'
-      - '.github/dependabot.yml'
-    # Paired with pull_request, push must name branches: an in-repo PR head
-    # would otherwise run twice per commit under two refs the github.ref
-    # concurrency group cannot collapse.
+    # Default branch only: a pull-request head already gets one run from the
+    # `pull_request` event below, and an unfiltered `push` schedules the same
+    # commit a second time under a different ref, which the `concurrency`
+    # group cannot collapse.
+    #
+    # Deliberately unfiltered by path (unlike tests/lint/types/audit). A
+    # documentation-only push to main runs no other workflow at all, so a
+    # conflict marker committed into README.md would reach main without any
+    # check reading it — the merge-marker step below exists so that push
+    # still gets checked. It also puts the two gate scripts on the hourly
+    # refresh push, where both are trivially green (main carries itself).
     branches: [main]
   pull_request:
-    # Same paths allow-list as push. No branches filter: PRs target main only
-    # here.
-    paths:
-      - '.github/workflows/**'
-      - '.github/dependabot.yml'
+    # Unfiltered, for the same reason as push: a docs-only pull request is
+    # exactly the one that can carry a merge marker, and the freshness and
+    # scope gates must read every head, not only code heads.
   workflow_dispatch:
 
 permissions:
@@ -86,6 +89,65 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+
+      - name: Check no tracked file carries a merge-conflict marker
+        # a3363ac landed on upstream main with `<<<<<<< HEAD` and the
+        # `>>>>>>> 0d9bffc` line still in README.md, and three review rounds
+        # and every gate in that repository read straight past them: a
+        # conflict marker is text that looks like prose in a Markdown file,
+        # so only a mechanical check can see it. git grep reads the tracked
+        # files out of the working tree, which on a clean checkout is the
+        # repository as shipped, and -I keeps a binary from being reported as
+        # a match. The three markers are matched in the shapes git writes
+        # them: `<<<<<<< ` and `>>>>>>> ` carry the label after seven
+        # characters, and the separator is exactly seven `=`; diff3's extra
+        # `||||||| base` line changes nothing, because the other three are
+        # still written. This job rather than the lint or suites ones because
+        # both ignore `**/*.md` on their triggers, so the documentation-only
+        # commit that carries the marker would never be read there — this
+        # workflow's triggers are deliberately unfiltered (see above).
+        run: |
+          # git grep exits 1 for "no match" and above 1 for an error it could
+          # not run, and a guard that reads its own error as a clean tree is
+          # the false green this step exists to prevent.
+          found=0
+          git grep -nI -E '^(<{7}( |$)|>{7}( |$)|={7}$)' -- . || found=$?
+          if [ "$found" -gt 1 ]; then
+            echo "git grep exited $found, so no marker was looked for."
+            exit "$found"
+          fi
+          if [ "$found" -eq 0 ]; then
+            echo "A merge-conflict marker is committed. Resolve the conflict, rebase onto the target branch and push again."
+            exit 1
+          fi
+
+      - name: Require this head to carry main's gate-defining commits
+        # This repository carries no merge ruleset, so a green head vouches
+        # only for the tree this run checked out — and main moves hourly (the
+        # refresh workflow's capture commits), so a commit that lands on main
+        # touching a file a merge-gate job reads is never applied to a pull
+        # request before it merges, and the merge then publishes a tree no
+        # green run ever saw. This is the only check that compares the two.
+        #
+        # In this job rather than a new one: this workflow is the gate on the
+        # gates, its triggers are unfiltered so every head is judged, and a
+        # `paths:` filter on a workflow hosting a merge-gate step would stop
+        # the step reporting at all on the heads that need it (the trap the
+        # old actionlint.yml trigger filter carried — removed in this change).
+        #
+        # Before setup-python and every install: work done against a base
+        # main has already moved on from is work whose verdict does not
+        # carry, and a head that fails here never pays for what follows.
+        run: python3 scripts/ci/gate_base_freshness.py
+
+      - name: Refuse a commit whose scope names a workflow outside the ci type
+        # CONTRIBUTING's scope rule allows a workflow's `name:` as a scope
+        # only with the `ci` type, and prose no gate reads is a convention —
+        # a rule that exists only in prose is one nobody has to obey. In this
+        # job rather than a new one, for the reason the freshness step names.
+        # After the freshness step: both compare the head against freshly
+        # fetched main, and both must read the rebased head.
+        run: python3 scripts/ci/commit_scopes.py
 
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
