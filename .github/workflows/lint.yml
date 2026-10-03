@@ -53,8 +53,10 @@ jobs:
 
       - name: Install linters
         id: install
+        # There is deliberately no `pip install --upgrade pip` here: the
+        # runner's stock pip installs the pinned manifest, so the unreviewed
+        # upgrade would be the one unpinned install in the job (issue #141).
         run: |
-          python3 -m pip install --upgrade pip
           python3 -m pip install -r requirements-dev.txt
 
       - name: pylint
