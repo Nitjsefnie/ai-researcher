@@ -6,6 +6,7 @@ these pin the two ways it could lie. Counting a blank line or a comment as
 missed would make the percentage depend on formatting; counting a file the
 report never measured would make it depend on which extras a runner resolved.
 """
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -15,6 +16,28 @@ sys.path.insert(0, str(REPO_ROOT / "scripts" / "ci"))
 import diff_coverage  # noqa: E402  # pylint: disable=wrong-import-position
 
 _SCRIPT = REPO_ROOT / "scripts" / "ci" / "diff_coverage.py"
+
+
+def _run_cli(args, **kwargs):
+    """Run the reporter as a child, measured when the job asks for it.
+
+    With COVERAGE_MEASURE_CHILDREN_RC set (the coverage job sets it), the
+    child runs under its own `coverage run`: the reporter constructs a
+    second Coverage object of its own — the statement analyzer with
+    `data_file=None` — and a second construction is fatal to the .pth
+    auto-started collector's save, so subprocess measurement cannot be the
+    implicit hook. It must be the explicit command, which saves itself.
+    """
+    rc = os.environ.get("COVERAGE_MEASURE_CHILDREN_RC")
+    if rc:
+        assert args[0] == sys.executable, args
+        args = [sys.executable, "-m", "coverage", "run",
+                "--parallel-mode", "--rcfile", rc, *args[1:]]
+    env = {key: value for key, value in os.environ.items()
+           if key != "COVERAGE_PROCESS_START"}
+    kwargs.setdefault("env", env)
+    return subprocess.run(args, check=kwargs.pop("check", False), **kwargs)
+
 
 _SCOPE_NOTE = (
     "Only Python statements are measured. The page's JavaScript ships "
@@ -421,7 +444,7 @@ def test_the_cli_reports_the_percentage_and_the_misses(tmp_path):
                     '+one\n'
                     '+two\n'
                     '+three\n')
-    done = subprocess.run(
+    done = _run_cli(
         [sys.executable, str(_SCRIPT), '--coverage', str(coverage_xml),
          '--diff', str(diff)],
         cwd=tmp_path, capture_output=True, text=True, timeout=60, check=False)
@@ -454,7 +477,7 @@ def test_the_cli_reports_wholly_uncovered_numeric_lines(tmp_path):
         raise AssertionError(
             f'numeric zero-hit lines were rejected: {error}') from error
     assert measured == {'zero.py': {1: 0, 2: 0}}
-    done = subprocess.run(
+    done = _run_cli(
         [sys.executable, str(_SCRIPT), '--coverage', str(coverage_xml),
          '--diff', str(diff)],
         cwd=tmp_path, capture_output=True, text=True, timeout=60, check=False)
@@ -481,7 +504,7 @@ def test_the_cli_reads_every_file_in_a_plain_unified_diff(tmp_path):
         '+++ b/b.py\n'
         '@@ -0,0 +1 @@\n'
         '+untested_b = 1\n')
-    done = subprocess.run(
+    done = _run_cli(
         [sys.executable, str(_SCRIPT), '--coverage', str(coverage_xml),
          '--diff', str(diff)],
         cwd=tmp_path, capture_output=True, text=True, timeout=60, check=False)
@@ -507,7 +530,7 @@ def test_the_cli_removes_timestamps_from_unified_diff_paths(tmp_path):
         '+++ b/b.py\t2026-08-25 10:00:00.000000000 +0000\n'
         '@@ -0,0 +1 @@\n'
         '+untested_b = 1\n')
-    done = subprocess.run(
+    done = _run_cli(
         [sys.executable, str(_SCRIPT), '--coverage', str(coverage_xml),
          '--diff', str(diff)],
         cwd=tmp_path, capture_output=True, text=True, timeout=60, check=False)
@@ -536,7 +559,7 @@ def test_the_cli_names_an_unmeasured_uppercase_python_file(tmp_path):
         '+++ b/silent.PY\n'
         '@@ -0,0 +1 @@\n'
         '+never_reached = 2\n')
-    done = subprocess.run(
+    done = _run_cli(
         [sys.executable, str(_SCRIPT), '--coverage', str(coverage_xml),
          '--diff', str(diff)],
         cwd=tmp_path, capture_output=True, text=True, timeout=60, check=False)
@@ -572,7 +595,7 @@ def test_the_cli_refuses_missing_or_nonpositive_statement_coordinates(tmp_path):
             tmp_path, f'{label}.xml',
             '<coverage><class filename="sample.py"><lines>'
             f'{lines}</lines></class></coverage>\n')
-        done = subprocess.run(
+        done = _run_cli(
             [sys.executable, str(_SCRIPT), '--coverage', str(coverage_xml),
              '--diff', str(diff)], cwd=tmp_path,
             capture_output=True, text=True, timeout=60, check=False)
@@ -609,7 +632,7 @@ def test_the_cli_refuses_a_non_integer_coverage_hit_count(tmp_path):
         '@@ -0,0 +1,2 @@\n'
         '+reached = 1\n'
         '+never_reached = 2\n')
-    done = subprocess.run(
+    done = _run_cli(
         [sys.executable, str(_SCRIPT), '--coverage', str(coverage_xml),
          '--diff', str(diff)],
         capture_output=True, text=True, timeout=60, check=False)
@@ -633,7 +656,7 @@ def test_non_cobertura_xml_is_an_error_not_clean_coverage(tmp_path):
         tmp_path, 'wrong-root.xml',
         '<html><class filename="evil.py"><line number="9" hits="12"/>'
         '</class></html>\n')
-    done = subprocess.run(
+    done = _run_cli(
         [sys.executable, str(_SCRIPT), '--coverage', str(coverage_xml),
          '--diff', '-'],
         input=('+++ b/evil.py\n@@ -0,0 +9 @@\n+evil\n'),
@@ -647,7 +670,7 @@ def test_coverage_without_usable_lines_is_an_error(tmp_path):
     coverage_xml = _written(
         tmp_path, 'unusable.xml',
         '<coverage><class filename="x.py"><lines/></class></coverage>\n')
-    done = subprocess.run(
+    done = _run_cli(
         [sys.executable, str(_SCRIPT), '--coverage', str(coverage_xml),
          '--diff', '-'],
         input='', capture_output=True, text=True, timeout=60, check=False)
@@ -659,7 +682,7 @@ def test_an_empty_report_is_an_error_not_a_clean_result(tmp_path):
     """A measurement that did not happen must not read as nothing to cover."""
     coverage_xml = _written(tmp_path, 'empty.xml',
                             '<?xml version="1.0" ?><coverage/>\n')
-    done = subprocess.run(
+    done = _run_cli(
         [sys.executable, str(_SCRIPT), '--coverage', str(coverage_xml),
          '--diff', '-'],
         input='', capture_output=True, text=True, timeout=60, check=False)
@@ -670,7 +693,7 @@ def test_an_empty_report_is_an_error_not_a_clean_result(tmp_path):
 def test_an_undecodable_path_is_reported_not_a_traceback(tmp_path):
     """A git-quoted path that is not UTF-8 gets the clean error treatment."""
     coverage_xml = _written(tmp_path, 'coverage.xml', _COVERAGE_XML)
-    done = subprocess.run(
+    done = _run_cli(
         [sys.executable, str(_SCRIPT), '--coverage', str(coverage_xml),
          '--diff', '-'],
         input='+++ "b/\\377.py"\n@@ -0,0 +1 @@\n+x\n',
@@ -678,3 +701,57 @@ def test_an_undecodable_path_is_reported_not_a_traceback(tmp_path):
     assert done.returncode == 1, (done.returncode, done.stdout, done.stderr)
     assert 'Traceback' not in done.stderr, done.stderr
     assert 'coverage report invalid' in done.stderr, done.stderr
+
+
+def test_the_cli_reports_python_alongside_a_binary_asset(tmp_path):
+    """A binary asset must not cost the whole patch report.
+
+    Built from the workflow's own git invocation on a real repository: a
+    change adds covered and uncovered Python statements AND a PNG whose
+    bytes are not valid UTF-8, and the reporter must render the Python
+    report the way it would without the asset.
+    """
+    repo = tmp_path / 'with-binary'
+    repo.mkdir()
+    _git(repo, 'init', '-q')
+    _git(repo, 'config', 'user.email', 'tests@example.invalid')
+    _git(repo, 'config', 'user.name', 'Tests')
+    (repo / 'mod.py').write_bytes(b'one = 1\ntwo = 2\nthree = 3\n')
+    (repo / 'logo.png').write_bytes(
+        b'\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\xff\xfe\x80')
+    _git(repo, 'add', '-f', 'mod.py', 'logo.png')
+    _git(repo, 'commit', '-qm', 'base')
+    (repo / 'mod.py').write_bytes(
+        b'one = 1\ntwo = 2\nthree = 3\nfour = 4\n')
+    (repo / 'logo.png').write_bytes(
+        b'\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\xff\xfe\x80\x00\x01\x02')
+    _git(repo, 'add', '-f', 'mod.py', 'logo.png')
+    _git(repo, 'commit', '-qm', 'extend mod and grow the png')
+    # Bytes, not text: the diff carries the PNG's non-UTF-8 bytes through,
+    # and the text-level helper would die on exactly that.
+    raw_diff = subprocess.run(
+        ('git', '-C', str(repo), 'diff', '--text', '--no-ext-diff',
+         '--no-textconv', '--unified=0', 'HEAD^1', 'HEAD'),
+        check=True, capture_output=True).stdout
+    patch = repo / 'patch.diff'
+    patch.write_bytes(raw_diff)
+    # The producer's flags really did carry the binary through as text,
+    # with bytes no UTF-8 decoder accepts.
+    assert b'\xff\xfe' in raw_diff
+    _written(repo, 'mod.py', 'one = 1\ntwo = 2\nthree = 3\nfour = 4\n')
+    coverage_xml = _written(
+        repo, 'coverage.xml',
+        '<coverage><class filename="mod.py"><lines>'
+        '<line number="1" hits="1"/>'
+        '<line number="4" hits="0"/>'
+        '</lines></class></coverage>\n')
+    done = _run_cli(
+        [sys.executable, str(_SCRIPT), '--coverage', str(coverage_xml),
+         '--diff', str(patch)],
+        cwd=repo, capture_output=True, text=True, timeout=60, check=False)
+    assert done.returncode == 0, (done.returncode, done.stderr)
+    # The asset sits beside exactly one added statement, missed.
+    assert '**0.0%** of added lines covered (0/1).' in done.stdout, (
+        done.stdout)
+    assert '| `mod.py` | 0 | 1 | 4 |' in done.stdout, done.stdout
+    assert 'logo.png' not in done.stdout, done.stdout
