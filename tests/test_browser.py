@@ -1865,8 +1865,8 @@ class ZeroScoreBrowserTests(unittest.TestCase):
     must render the em dash the static render shows -- "$Infinity" would
     fail the drift contract and read as a real price. A dedicated class
     exists for the same reason its disputed sibling does: this JS path never
-    executes on a normal page (no normal capture puts a zero on the
-    frontier), so without coverage wiring the JavaScript ratchet reads it as
+    executes on a normal page (the standard capture puts no zero on
+    the frontier), so without coverage wiring the JavaScript ratchet reads it as
     uncovered and reds the coverage job.
     """
 

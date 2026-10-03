@@ -1,6 +1,5 @@
 import contextlib
 import datetime
-from html import escape as html_escape
 import io
 import json
 import pathlib
@@ -10,6 +9,7 @@ import sys
 import tempfile
 import time
 import unittest
+from html import escape as html_escape
 from html.parser import HTMLParser
 import build
 import page_format
@@ -1908,14 +1908,17 @@ class DisputedBuildTests(unittest.TestCase):
 
 class FrontierZeroScoreTests(unittest.TestCase):
     """Issue #146: zero is a legal AA-published score -- the current capture
-    carries gdpvalNormalized: 0 on 75 models -- and a score-0 row lands on an
-    axis's efficient frontier exactly when it is the strictly cheapest row
-    there (any cheaper row would dominate it). The hourly refresh at
-    2026-10-03T01:09Z hit the one division over a capture-sourced denominator
-    unprepared for it: the frontier table's $/point. The build now renders
-    that cell as the em dash -- a $/point at zero capability is not a number
-    -- instead of crashing, and the JS mirror must render the same cell or
-    the browser drift test fails.
+    carries gdpvalNormalized: 0 on 75 models -- and a score-0 row is
+    frontier-eligible on an axis exactly when it holds that axis's minimum
+    cost: strictly, or tied only with other zero-score rows (an exact tie
+    survives dominance, and any cheaper row would dominate it). The hourly
+    refresh at 2026-10-03T01:09Z reded on a bare ZeroDivisionError; its
+    capture was refused and is unavailable, so this fixture pins an
+    enumerated reproducible form of the regression, not a reconstruction of
+    that hour's bytes. The build now renders the $/point cell as the em dash
+    -- a $/point at zero capability is not a number -- instead of crashing,
+    and the JS mirror must render the same cell or the browser drift test
+    fails.
     """
 
     def _rows(self):
@@ -1958,9 +1961,10 @@ class FrontierZeroScoreTests(unittest.TestCase):
         self.assertIn('<td class="n">$0.0400</td>', tbody)
 
     def test_zero_score_capture_builds_through_main(self):
-        # The real capture with one model turned into the hourly's crash:
-        # gdpvalNormalized zeroed and its gdpval eval cost set strictly
-        # cheapest, so it lands on the agentic frontier with a zero score.
+        # The real capture with one model turned into the enumerated crash
+        # shape: gdpvalNormalized zeroed and its gdpval eval cost set to the
+        # positive minimum halved, so it holds the axis's minimum cost and
+        # lands on the agentic frontier with a zero score.
         models = json.loads(
             (build.ROOT / "data" / "aa-raw-models.json").read_bytes())
         floor = None
