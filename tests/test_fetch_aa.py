@@ -1209,7 +1209,11 @@ class TransportErrorClassifierTests(unittest.TestCase):
         return len(calls), sleeps
 
     def test_http_status_verdicts(self):
-        for code, retried in ((429, True), (500, True), (502, True),
+        # The 4xx picks sit at the classifier's edges: 430 is just past the
+        # one retried 4xx, 499 just under the >= 500 floor, so a sloppy
+        # range like 400 <= code < 500 or code >= 400 fails here.
+        for code, retried in ((429, True), (430, False), (499, False),
+                              (500, True), (502, True),
                               (503, True), (504, True),
                               (400, False), (403, False), (404, False),
                               (409, False), (451, False)):
@@ -1733,12 +1737,14 @@ class RetryBoundArithmeticTests(unittest.TestCase):
         # Issue #154's fail-fast half: transport exhaustion short-circuits
         # the capture, so a dead AA is refused inside ONE page bound --
         # never the disagreement loop's full product -- and the hour's run
-        # goes red fast instead of hanging toward the job timeout.
+        # goes red fast instead of hanging toward the job timeout. Bound
+        # at WAIT_SECONDS so the invariant is relational: one page bound
+        # never outlasts one pair-retry wait (page bound 90 s, wait 120 s).
         page_bound = (fetch_aa.PAGE_ATTEMPTS * fetch_aa.FETCH_TIMEOUT_SECONDS
                       + sum(k * fetch_aa.PAGE_BACKOFF_SECONDS
                             for k in range(1, fetch_aa.PAGE_ATTEMPTS)))
 
-        self.assertLessEqual(page_bound, 120)
+        self.assertLessEqual(page_bound, fetch_aa.WAIT_SECONDS)
 
     def test_the_sleep_seam_actually_sleeps(self):
         # The seam exists so no TEST ever really sleeps -- and so the wait
