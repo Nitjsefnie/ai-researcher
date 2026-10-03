@@ -193,11 +193,10 @@ jobs:
         # #134): the browser produces the V8 coverage dump that sets the
         # JavaScript floor, and that floor crosses into the privileged
         # ratchet-push job inside the staged thresholds file.
-        # The
-        # --with-deps step inside the script still apt-installs the shared
-        # libraries headless Chromium needs on a bare runner; without them
-        # the launch fails with a missing-library error that reads like a
-        # test failure.
+        # The --with-deps step inside the script still apt-installs the
+        # shared libraries headless Chromium needs on a bare runner; without
+        # them the launch fails with a missing-library error that reads
+        # like a test failure.
         run: python3 scripts/ci/install_chromium.py
 
       - name: Run tests
@@ -475,6 +474,10 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
         run: |
+          # Transport failure must read as an error, not as an empty
+          # listing that drops the raise with a "main moved" notice:
+          # without pipefail, cut exits 0 over a failed ls-remote.
+          set -o pipefail
           # The raise was measured against `base`; main must still stand
           # there. The old inline push learned of a move from a rejected
           # push; checking before anything is built drops the same raise

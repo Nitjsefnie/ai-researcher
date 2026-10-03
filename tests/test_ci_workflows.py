@@ -157,6 +157,10 @@ def test_only_ratchet_push_holds_contents_write():
     # hold contents: write. The raise leaves `coverage` as an artifact and
     # `ratchet-push` — which runs no repository code — is the only writer.
     workflow = yaml.safe_load(TESTS_WORKFLOW.read_text(encoding="utf-8"))
+    assert workflow.get("permissions") == {"contents": "read"}, (
+        "the workflow-level floor must stay contents: read — a job "
+        "without its own permissions block inherits it, so raising the "
+        "default raises every job at once")
     jobs = workflow["jobs"]
     assert "ratchet-push" in jobs, (
         "the data-only push job is missing from tests.yml")
