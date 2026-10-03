@@ -125,8 +125,9 @@ WAIT_SECONDS = 120
 # so the combined worst case above is unchanged at 1170 s.
 FETCH_TIMEOUT_SECONDS = 25
 # The page-fetch retry (issue #154): a transient upstream answer -- HTTP
-# 429, a 5xx, a timeout, a dropped connection -- is retried PAGE_ATTEMPTS
-# times with linear backoff (attempt k waits k * PAGE_BACKOFF_SECONDS)
+# 429, a 5xx, a timeout, a dropped connection -- is attempted at most
+# PAGE_ATTEMPTS times IN TOTAL (fetch_html's loop bound, not a retry
+# count) with linear backoff (attempt k waits k * PAGE_BACKOFF_SECONDS)
 # before the page is refused for good. A non-retryable 4xx is an ANSWER,
 # not an outage, and fails on attempt 1; the classifier's precedent is
 # audit.yml's pip-audit retry (issue #128, PR #142).
@@ -222,12 +223,13 @@ def fetch_html(cached: str | None, url: str = URL) -> tuple[str, int | None]:
     None -- see _generated_epoch).
 
     Each page carries its own bounded retry (issue #154): a transient
-    answer is retried up to PAGE_ATTEMPTS with linear backoff, and the
-    refusal -- exhaustion or a non-retryable 4xx -- is the same one-line
-    guarded exit as before the retry existed. The #89 pair-level loop
-    sits OUTSIDE this one and never re-enters it: a refusal here ends the
-    capture, which is what keeps a hard-down site failing fast inside the
-    combined worst case documented beside the bounds."""
+    answer is retried within a total of PAGE_ATTEMPTS attempts with
+    linear backoff, and the refusal -- exhaustion or a non-retryable 4xx
+    -- is the same one-line guarded exit as before the retry existed. The
+    #89 pair-level loop sits OUTSIDE this one and never re-enters it: a
+    refusal here ends the capture, which is what keeps a hard-down site
+    failing fast inside the combined worst case documented beside the
+    bounds."""
     if cached:
         return (pathlib.Path(cached).read_text(encoding="utf-8",
                                                errors="replace"), None)
