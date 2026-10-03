@@ -195,6 +195,7 @@ def test_gate_paths_on_this_repository(tmp_path):
         'tests/test_diff_coverage.py',
         'tests/test_fetch_aa.py',
         'tests/test_gate_base_freshness.py',
+        'tests/test_gitignore.py',
         'tests/test_js_coverage.py',
         'tests/test_publish_docs.py',
         'tests/test_refresh_workflow.py',
