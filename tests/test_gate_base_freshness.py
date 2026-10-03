@@ -136,71 +136,153 @@ def test_required_jobs_name_the_merge_gate_contexts(tmp_path):
         assert name in jobs, f'{path} must define the merge-gate job {name!r}'
 
 
-# The exact derived set on this repository's HEAD: a required job naming a
-# new file forces this pin to change in the same commit, so the set can
-# neither shrink nor grow in silence.
+# The route-disagreement window's files (issue #118): the one admitted
+# exception to the pin below. They enter and leave the tree at AA's whim on
+# the hourly capture, and while they are tracked the refresh workflow reads
+# them by name, so the live derivation genuinely includes them -- a frozen
+# twin of a live derivation cannot follow them without itself becoming
+# window-aware (issue #172). Named here by hand, not parsed out of
+# refresh.yml: the mechanism is issue #118's, these are exactly its two
+# files, and a parser over the workflow's conditional adds would add
+# machinery without adding teeth -- the pin still fails on every other
+# movement of the set.
+WINDOW_PATHS = (
+    'data/aa-disagreement-snapshot.json',
+    'data/aa-route-disagreement.txt',
+)
+
+
+# The derived set on this repository's HEAD, pinned as the windowless
+# expectation (CORE_PIN below): a required job naming a new file forces this
+# pin to change in the same commit, says nothing else may move.
 def test_gate_paths_on_this_repository(tmp_path):
     del tmp_path
     done = subprocess.run(
         [sys.executable, str(ROOT / 'scripts/ci/gate_base_freshness.py'),
          '--print-paths'], cwd=str(ROOT), check=True, capture_output=True,
         text=True)
-    assert done.stdout.splitlines() == sorted([
-        '.github/ci-thresholds.json',
-        '.github/workflows/actionlint.yml',
-        '.github/workflows/audit.yml',
-        '.github/workflows/claim.yml',
-        '.github/workflows/codeql.yml',
-        '.github/workflows/coverage-comment.yml',
-        '.github/workflows/lint.yml',
-        '.github/workflows/refresh.yml',
-        '.github/workflows/scorecard.yml',
-        '.github/workflows/secrets.yml',
-        '.github/workflows/tests.yml',
-        '.github/workflows/types.yml',
-        'data/aa-raw-coding-agents.json',
-        'data/aa-raw-models.json',
-        'data/captured-at.txt',
-        'out/frontier-models.html',
-        'requirements-dev.txt',
-        'requirements-pip-audit.txt',
-        'requirements-test.txt',
-        'requirements-zizmor.txt',
-        'scripts/ci/check_committed_page.py',
-        'scripts/ci/check_ratchets.py',
-        'scripts/ci/commit_scopes.py',
-        'scripts/ci/gate_base_freshness.py',
-        'scripts/ci/install_chromium.py',
-        'scripts/ci/instruction_budgets.py',
-        'scripts/ci/js_coverage.py',
-        'scripts/ci/ratchet.py',
-        'scripts/ci/thresholds.py',
-        'tests/fixtures/pipeline/aa-raw-coding-agents.json',
-        'tests/fixtures/pipeline/aa-raw-models.json',
-        'tests/fixtures/pipeline/captured-at.txt',
-        'tests/test_browser.py',
-        'tests/test_build.py',
-        'tests/test_capture_gate.py',
-        'tests/test_check_committed_page.py',
-        'tests/test_checkout_clean.py',
-        'tests/test_ci_install_chromium.py',
-        'tests/test_ci_instruction_budgets.py',
-        'tests/test_ci_perf_budgets.py',
-        'tests/test_ci_ratchets.py',
-        'tests/test_ci_thresholds.py',
-        'tests/test_ci_workflows.py',
-        'tests/test_commit_scopes.py',
-        'tests/test_coverage_comment.py',
-        'tests/test_diff_aa.py',
-        'tests/test_diff_coverage.py',
-        'tests/test_fetch_aa.py',
-        'tests/test_gate_base_freshness.py',
-        'tests/test_gitignore.py',
-        'tests/test_js_coverage.py',
-        'tests/test_publish_docs.py',
-        'tests/test_refresh_workflow.py',
-        'tests/_workflowrun.py',
-    ]), done.stdout
+    derived = done.stdout.splitlines()
+    # The window's state is read where the derivation reads it: HEAD's tree
+    # (tracked_files runs `git ls-tree HEAD`), never the working directory --
+    # a working-tree-only stamp is no gate input, and the derivation would
+    # not see it either.
+    window = sorted(p for p in WINDOW_PATHS if p in _load().tracked_files(ROOT))
+    expected = sorted(CORE_PIN + tuple(window))
+    assert derived == expected, (
+        'the derived gate-path set moved against its pin (window files '
+        f'tracked: {window}):\n{done.stdout}')
+
+
+# The windowless derived set -- the pin itself. Frozen so a required job
+# naming a new file forces a same-commit pin change; only WINDOW_PATHS, and
+# only while tracked, may join it without an edit.
+CORE_PIN = (
+    '.github/ci-thresholds.json',
+    '.github/workflows/actionlint.yml',
+    '.github/workflows/audit.yml',
+    '.github/workflows/claim.yml',
+    '.github/workflows/codeql.yml',
+    '.github/workflows/coverage-comment.yml',
+    '.github/workflows/lint.yml',
+    '.github/workflows/refresh.yml',
+    '.github/workflows/scorecard.yml',
+    '.github/workflows/secrets.yml',
+    '.github/workflows/tests.yml',
+    '.github/workflows/types.yml',
+    'data/aa-raw-coding-agents.json',
+    'data/aa-raw-models.json',
+    'data/captured-at.txt',
+    'out/frontier-models.html',
+    'requirements-dev.txt',
+    'requirements-pip-audit.txt',
+    'requirements-test.txt',
+    'requirements-zizmor.txt',
+    'scripts/ci/check_committed_page.py',
+    'scripts/ci/check_ratchets.py',
+    'scripts/ci/commit_scopes.py',
+    'scripts/ci/gate_base_freshness.py',
+    'scripts/ci/install_chromium.py',
+    'scripts/ci/instruction_budgets.py',
+    'scripts/ci/js_coverage.py',
+    'scripts/ci/ratchet.py',
+    'scripts/ci/thresholds.py',
+    'tests/fixtures/pipeline/aa-raw-coding-agents.json',
+    'tests/fixtures/pipeline/aa-raw-models.json',
+    'tests/fixtures/pipeline/captured-at.txt',
+    'tests/test_browser.py',
+    'tests/test_build.py',
+    'tests/test_capture_gate.py',
+    'tests/test_check_committed_page.py',
+    'tests/test_checkout_clean.py',
+    'tests/test_ci_install_chromium.py',
+    'tests/test_ci_instruction_budgets.py',
+    'tests/test_ci_perf_budgets.py',
+    'tests/test_ci_ratchets.py',
+    'tests/test_ci_thresholds.py',
+    'tests/test_ci_workflows.py',
+    'tests/test_commit_scopes.py',
+    'tests/test_coverage_comment.py',
+    'tests/test_diff_aa.py',
+    'tests/test_diff_coverage.py',
+    'tests/test_fetch_aa.py',
+    'tests/test_gate_base_freshness.py',
+    'tests/test_gitignore.py',
+    'tests/test_js_coverage.py',
+    'tests/test_publish_docs.py',
+    'tests/test_refresh_workflow.py',
+    'tests/_workflowrun.py',
+)
+
+
+def test_the_window_files_enter_and_leave_the_derivation(tmp_path):
+    """The committed reproduction of the disputed state (issue #172).
+
+    The route-disagreement window's files (issue #118) enter the derivation
+    exactly while they are tracked: named by the refresh workflow's run
+    text, resolved against HEAD's tree. This fixture turns that mechanism
+    through all three states -- before the window, during it, at its
+    retirement -- so the window-awareness stays proven after the live
+    window on main has closed and the files have left the tree. The data/
+    directory written here is the fixture repository's, never this
+    repository's.
+    """
+    repo = tmp_path / 'repo'
+    _git(tmp_path, 'init', '-b', 'main', str(repo))
+    _config(repo)
+    _commit(repo, 'base: seed the window fixture', {
+        'README.md': '# fixture\n',
+        '.github/workflows/actionlint.yml':
+            'name: actionlint\non: push\njobs:\n  actionlint:\n'
+            '    runs-on: ubuntu-latest\n'
+            '    steps:\n'
+            '      - run: ./actionlint -color .github/workflows/*.yml\n',
+        '.github/workflows/tests.yml':
+            'name: tests\non: push\njobs:\n  suites:\n'
+            '    runs-on: ubuntu-latest\n'
+            '    steps:\n'
+            '      - run: cat README.md ' + ' '.join(WINDOW_PATHS) + '\n',
+        '.github/workflows/gates.yml': _stub_workflow(),
+    })
+    module = _load()
+
+    # Before the window: the run text names both files, but resolve()
+    # admits only tracked names, so neither is in the derived set.
+    before = module.gate_paths(repo)
+    assert not any(p in before for p in WINDOW_PATHS), before
+
+    # The window opens: commit the disputed state, both files are derived.
+    _commit(repo, 'ci: the disagreement window opens (issue #118)', {
+        'data/aa-disagreement-snapshot.json': '{}\n',
+        'data/aa-route-disagreement.txt': '1767225600\n',
+    })
+    during = module.gate_paths(repo)
+    assert all(p in during for p in WINDOW_PATHS), during
+
+    # The window retires: the files leave the tree, the derivation follows.
+    _git(repo, 'rm', '-q', *WINDOW_PATHS)
+    _git(repo, 'commit', '-m', 'ci: the window retires (issue #100)')
+    after = module.gate_paths(repo)
+    assert not any(p in after for p in WINDOW_PATHS), after
 
 
 def test_green_when_the_head_carries_every_gate_commit(tmp_path):
