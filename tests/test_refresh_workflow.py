@@ -700,3 +700,29 @@ class RouteDisagreementPublishTests(unittest.TestCase):
                       '[ "${code}" -lt 200 ] || [ "${code}" -ge 300 ]',
                       "jq -e '(.error // null) != null'"):
             self.assertIn(piece, run)
+
+    def test_the_ref_move_only_names_a_commit_on_mains_history(self):
+        # Issue #152: a quiet hour whose retirement push lost the race ends
+        # with the write job's HEAD at an unpushed retirement commit -- the
+        # PATCH's fast-forward check would accept it and the heal gate's
+        # ref would leave main's history. The move must be gated on HEAD
+        # being an ancestor of main's tip, fresh-fetched after the upload;
+        # off main, the skip is green and the ref waits for a landing
+        # commit, which is exactly the state the heal gate compares
+        # against.
+        raw = pub_step(self.wf, "Publish to docs-hub")["run"]
+        run = flattened(raw)
+
+        idx_upload = run.index("https://docs.nitjsefni.eu/api/publish")
+        idx_fetch = run.index("git fetch --quiet origin main", idx_upload)
+        idx_gate = run.index(
+            'git merge-base --is-ancestor "${head_sha}" FETCH_HEAD',
+            idx_fetch)
+        idx_get = run.index('gh api "repos/$REPO/git/refs/heads/published"',
+                            idx_gate)
+        # The gate stands between the upload and the refs API, and its
+        # skip leaves green through its own exit 0 before the API.
+        idx_exit = run.index("exit 0", idx_gate)
+        self.assertLess(idx_gate, idx_get)
+        self.assertLess(idx_exit, idx_get)
+        self.assertIn("not on main's history", run)

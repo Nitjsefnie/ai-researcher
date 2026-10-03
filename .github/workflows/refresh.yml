@@ -870,6 +870,21 @@ jobs:
           # Any other API failure fails the run too: a silently stale ref
           # would make every later hour republish.
           head_sha="$(git rev-parse HEAD)"
+          # Issue #152: the ref must only ever name a commit on main's
+          # history. A quiet hour whose retirement push lost the race ends
+          # with HEAD at an unpushed retirement commit -- the PATCH's
+          # fast-forward check would accept it and the ref would leave
+          # main's history. So the move is gated on HEAD actually being an
+          # ancestor of (or equal to) main's tip, fresh-fetched after the
+          # upload: off main, the move is skipped green -- the ref stays at
+          # main's last real commit, exactly what the heal gate compares
+          # against, and the next hour whose commit lands moves it forward.
+          git fetch --quiet origin main
+          if ! git merge-base --is-ancestor "${head_sha}" FETCH_HEAD; then
+            echo "The published ref stays where it is: this run's HEAD is not on main's history (a lost retirement push) — the upload stands, the ref moves when a landing commit is the tip." \
+              >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
           if gh api "repos/$REPO/git/refs/heads/published" > /dev/null; then
             gh api --method PATCH "repos/$REPO/git/refs/heads/published" \
               -f sha="$head_sha"
