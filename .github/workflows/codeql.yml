@@ -80,15 +80,24 @@ jobs:
       contents: read
 
     strategy:
-      # Only one language here — this repo has no JS of its own. (build.py
-      # EMITS JavaScript into the page as string literals, which CodeQL cannot
-      # see and which no gate in this repo checks; the browser tests are what
-      # exercise it.) The matrix stays a matrix so adding a language later is
-      # a one-line change rather than a restructure.
+      # One entry per language CodeQL analyses here: `python` for the
+      # pipeline, `actions` for the workflow files themselves (issue #129).
+      # The workflows are among the most privileged code in the repository —
+      # refresh.yml pushes to `main` and publishes to docs-hub with a secret
+      # — and actionlint + zizmor already read them only for known-bad
+      # shapes; CodeQL asks a dataflow question of them instead, and the two
+      # find different things. (This repo has no JS of its own: build.py
+      # EMITS JavaScript into the page as string literals, which CodeQL
+      # cannot see and which no gate in this repo checks; the browser tests
+      # are what exercise it.) matrix.language feeds the job name, the init
+      # step's `languages:` and the analyze step's `category:`, so each
+      # entry lands as its own check.
       fail-fast: false
       matrix:
         include:
           - language: python
+            build-mode: none
+          - language: actions
             build-mode: none
 
     steps:
