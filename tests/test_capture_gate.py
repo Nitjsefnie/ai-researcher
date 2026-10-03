@@ -627,6 +627,7 @@ def zero_score_capture(models: bytes) -> bytes:
             target = m
     if target is None:
         raise AssertionError("no model with a gdpval eval in the capture")
+    assert floor is not None
     target["gdpvalNormalized"] = 0
     for e in target["intelligenceIndexCostPerTask"]["evaluations"]:
         if e.get("slug") == "gdpval-aa":

@@ -1978,6 +1978,10 @@ class FrontierZeroScoreTests(unittest.TestCase):
                     m.get("shortName") or m.get("name") or ""):
                 target = m
         self.assertIsNotNone(target)
+        # unittest's assertIsNotNone does not narrow for pyright; the local
+        # asserts are the type narrowing (and double as fixture guards).
+        assert target is not None
+        assert floor is not None
         target["gdpvalNormalized"] = 0
         for e in target["intelligenceIndexCostPerTask"]["evaluations"]:
             if e.get("slug") == "gdpval-aa":
@@ -2012,6 +2016,7 @@ class FrontierZeroScoreTests(unittest.TestCase):
         match = row_re.search(ftable)
         self.assertIsNotNone(
             match, f"no agentic frontier row for the mutated model {name}")
+        assert match is not None
         self.assertIn('<td class="n">0.0</td>', match.group(1))
         self.assertIn('<td class="n">—</td>', match.group(1))
 
