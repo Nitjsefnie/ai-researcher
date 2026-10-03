@@ -389,28 +389,119 @@ class BrowserInteractionTests(unittest.TestCase):
                         "intelligence": "Intelligence Index",
                         "agentic": "GDPval-AA v2",
                         "parameters": "Parameter efficiency"}
-        # 40 pins on the intelligence chart -- the crowd the audit used, enough
-        # to exhaust the clear slots -- plus a couple on every other chart so
-        # each chart guarantees its own pins. Agent-run rows never share names
-        # with model rows, so the coding chart can only pin its own rows. The
-        # fixture carries the crowd plus a fresh pair per later chart (a pin
-        # is page-global: pinning a name again would toggle it OFF), and the
-        # picks below are looked up on the page BY the fixture's own names.
-        pin_counts = {"intelligence": PIN_CROWD,
-                      "coding": len(_PROBE_AGENTS), "agentic": 2,
-                      "parameters": 2}
-        models = _probe_models(PIN_CROWD + pin_counts["agentic"]
-                               + pin_counts["parameters"])
-        agents = _PROBE_AGENTS
-        names = [m["name"] for m in models]
+        # 40 probe pins on the intelligence chart -- the crowd the audit used,
+        # enough to exhaust the clear slots -- plus a couple on every other
+        # chart so each chart guarantees its own pins. Agent-run rows never
+        # share names with model rows, so the coding chart can only pin its
+        # own rows. Two more crafted intelligence pins carry the name shapes
+        # the crowd lacks: full names over the 34-character chart cap (the
+        # #27 guarantee is the FULL pinned name -- wide labels render r.name
+        # unclipped, so a truncation regression must red here), a shared long
+        # prefix pressuring distinctness, an effort suffix that must survive
+        # display_name, and Unicode. A crafted coding agent carries the same
+        # shape onto the coding chart. The picks are looked up on the page BY
+        # the fixture's own names, and the label checks hold those exact
+        # strings -- long ones included -- so nothing but the full name
+        # passes.
+        pin_long = "Probe Dynamics Ultra Long Benchmark Model Alpha (Reasoning)"
+        pin_unicode = "Probe Dynamics Ultra Long Benchmark Model Ünïcödé — 東京"
+        crafted = [
+            {"name": pin_long,
+             "modelCreatorName": "Probe Lab",
+             "isOpenWeights": False,
+             "slug": "probe-crafted-alpha",
+             "intelligenceIndex": 79.0,
+             "gdpvalNormalized": 0.42,
+             "parameters": 33,
+             "intelligenceIndexCostPerTask": {
+                 "cost": {"total": 0.6},
+                 "evaluations": [{"slug": "gdpval-aa",
+                                  "weightedCostPerTask": 0.06}],
+             }},
+            {"name": pin_unicode,
+             "modelCreatorName": "Probe Lab",
+             "isOpenWeights": True,
+             "slug": "probe-crafted-unicode",
+             "intelligenceIndex": 78.5,
+             "gdpvalNormalized": 0.44,
+             "parameters": 61,
+             "intelligenceIndexCostPerTask": {
+                 "cost": {"total": 0.9},
+                 "evaluations": [{"slug": "gdpval-aa",
+                                  "weightedCostPerTask": 0.09}],
+             }},
+            {"name": "Probe Dynamics Ultra Long Benchmark Model Beta "
+                     "(Reasoning)",
+             "modelCreatorName": "Probe Lab",
+             "isOpenWeights": False,
+             "slug": "probe-crafted-beta",
+             "intelligenceIndex": 60.0,
+             "gdpvalNormalized": 0.5,
+             "parameters": 95,
+             "intelligenceIndexCostPerTask": {
+                 "cost": {"total": 1.6},
+                 "evaluations": [{"slug": "gdpval-aa",
+                                  "weightedCostPerTask": 0.16}],
+             }},
+            {"name": "Probe Short Beta",
+             "modelCreatorName": "Probe Lab",
+             "isOpenWeights": False,
+             "slug": "probe-crafted-gamma",
+             "intelligenceIndex": 59.0,
+             "gdpvalNormalized": 0.52,
+             "parameters": 130,
+             "intelligenceIndexCostPerTask": {
+                 "cost": {"total": 2.4},
+                 "evaluations": [{"slug": "gdpval-aa",
+                                  "weightedCostPerTask": 0.24}],
+             }},
+            {"name": "Probe Dynamics Ultra Long Benchmark Model Delta",
+             "modelCreatorName": "Probe Lab",
+             "isOpenWeights": True,
+             "slug": "probe-crafted-delta",
+             "intelligenceIndex": 40.0,
+             "gdpvalNormalized": 0.6,
+             "parameters": 180,
+             "intelligenceIndexCostPerTask": {
+                 "cost": {"total": 6.0},
+                 "evaluations": [{"slug": "gdpval-aa",
+                                  "weightedCostPerTask": 0.6}],
+             }},
+            {"name": "Probe Short Delta",
+             "modelCreatorName": "Probe Lab",
+             "slug": "probe-crafted-epsilon",
+             "isOpenWeights": True,
+             "intelligenceIndex": 39.0,
+             "gdpvalNormalized": 0.62,
+             "parameters": 220,
+             "intelligenceIndexCostPerTask": {
+                 "cost": {"total": 9.0},
+                 "evaluations": [{"slug": "gdpval-aa",
+                                  "weightedCostPerTask": 0.9}],
+             }},
+        ]
+        agents = list(_PROBE_AGENTS) + [
+            {"id": "probe-agent-long", "displayLabel":
+             "Probe Coding Agent With A Very Long Display Label",
+             "agentName": "Probe Coding Agent Long CLI",
+             "hostModelSlug": "probe-model-0000",
+             "display": {"creator": {"agent": "Probe Agent Lab",
+                                     "model": "Probe Lab"}},
+             "indexScore": 0.45, "mean": {"costUsd": 1.2,
+                                          "agentWallTimeSec": 600.0}},
+        ]
+        pin_counts = {"intelligence": PIN_CROWD + 2,
+                      "coding": len(agents), "agentic": 2, "parameters": 2}
+        models = _probe_models(PIN_CROWD) + crafted
         fresh = {
             "coding": [a["displayLabel"] for a in agents],
-            "intelligence": names[:pin_counts["intelligence"]],
-            "agentic": names[pin_counts["intelligence"]:
-                             pin_counts["intelligence"]
-                             + pin_counts["agentic"]],
-            "parameters": names[pin_counts["intelligence"]
-                                + pin_counts["agentic"]:],
+            "intelligence": ([m["name"] for m in models
+                              if m["name"].startswith("Probe Model")]
+                             + [pin_long, pin_unicode]),
+            "agentic": ["Probe Dynamics Ultra Long Benchmark Model Beta "
+                        "(Reasoning)", "Probe Short Beta"],
+            "parameters": ["Probe Dynamics Ultra Long Benchmark Model Delta",
+                           "Probe Short Delta"],
         }
         with tempfile.TemporaryDirectory(prefix=".issue-153-pins-",
                                          dir=build.ROOT) as tmp:
@@ -1337,7 +1428,10 @@ class PerfBudgetTests(unittest.TestCase):
     about the journeys or the verdict is re-implemented here: the
     journeys come from the harness's own runners
     (scripts/ci/perf_budgets.py) and the verdict from its own gate, so
-    this class and `perf_budgets.py --check` cannot drift.
+    this class and `perf_budgets.py --check` share one runner and one
+    gate logic and cannot drift on those; the capture behind each is
+    deliberately different -- this class's fixed fixture, the CLI's the
+    checkout's own.
 
     The gated page is built from this class's own DETERMINISTIC fixture
     capture (#153), never the ambient data/: budgets measure code cost
@@ -1345,8 +1439,8 @@ class PerfBudgetTests(unittest.TestCase):
     disputed window moves the measured shape anyway -- the disputed
     layer scales the hover tooltip's DOM work with the page it lands
     on, and AA's rollout size changes the scale underneath. The fixture
-    is byte-identical every run, so what the budgets were seeded from
-    is what the gate measures at enforcement time, whatever AA ships.
+    is byte-identical every run, so the gate judges ONE fixed workload
+    against the committed ceilings, whatever AA ships.
     """
 
     @classmethod
@@ -1357,12 +1451,12 @@ class PerfBudgetTests(unittest.TestCase):
         # build.OUT.read_bytes(). The real out/frontier-models.html is
         # never touched (#114); tearDownClass restores the module path.
         # The source stamp is stripped for the build so the bytes this
-        # class gates are the canonical stamp-less build the budgets were
-        # seeded from, whatever the ambient environment carries. The
-        # capture behind the build is the class's deterministic fixture
-        # (#153): the same synthetic the decoupling proof below measures,
-        # written into the temp dir so the ambient data/ -- its disputed
-        # window included -- never reaches the gate.
+        # class gates are the canonical stamp-less build, whatever the
+        # ambient environment carries. The capture behind the build is
+        # the class's deterministic fixture (#153): a fixed synthetic the
+        # committed ceilings evaluate, written into the temp dir so the
+        # ambient data/ -- its disputed window included -- never reaches
+        # the gate.
         cls._saved = (build.RAW, build.AGENTS_RAW, build.OUT)
         # The directory outlives this setup -- tearDownClass cleans it up
         # after the browser closes -- so it cannot live in a with.
