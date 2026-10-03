@@ -1,0 +1,27 @@
+# The collector configuration for MEASURED SUBPROCESSes of the coverage
+# job. tests.yml's coverage job sets COVERAGE_MEASURE_CHILDREN_RC to this
+# file, and the CLI contract tests run the patch-coverage reporter under
+# an explicit `coverage run --rcfile=<this file>` — that is how a child
+# interpreter's lines reach the same ratchet the in-process suite feeds.
+# Without it, the child's lines are invisible to the outer collector and a
+# new CLI-only module reads as untested.
+#
+# (The implicit .pth hook cannot carry this: the reporter constructs a
+# second Coverage object of its own — the statement analyzer with
+# data_file=None — and a second construction suppresses the hook's save,
+# observed on coverage 7.16.1: a hook-collected child that constructs
+# another Coverage writes no data file at all.)
+#
+# parallel = True: each child writes its own .coverage.<host>.<pid>
+# sidecar beside the job's COVERAGE_FILE, so concurrent children cannot
+# clobber one another or the outer run's data; the job's Coverage summary
+# step combines them before any report reads a total.
+#
+# include: the only file a child should ever measure is the reporter
+# itself. Every other Python child of the suite (the gh test double, the
+# nested pytest of the checkout-clean pin, the fixtures) is deliberately
+# NOT measured — their files live under tests/ and in temp trees, and
+# measuring them would put non-shipped files into the ratchet's totals.
+[run]
+parallel = True
+include = */scripts/ci/diff_coverage.py

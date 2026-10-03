@@ -38,8 +38,12 @@ def _state(state_path, **values):
 
 
 def _env(workdir, state, calls, **extra):
+    # The stub directory PREPENDED to the ambient PATH, with the ambient
+    # separator: every matrix OS resolves cat/wc/jq from its own PATH, and
+    # the stub shadows a real gh by search order alone.
     env = {
-        "PATH": f"{workdir / 'bin'}:{_system_path()}",
+        "PATH": os.pathsep.join([
+            str(workdir / "bin"), os.environ.get("PATH", "")]),
         "STUB_STATE": str(state),
         "STUB_CALLS": str(calls),
         "GITHUB_OUTPUT": str(workdir / "github-output"),
@@ -48,16 +52,12 @@ def _env(workdir, state, calls, **extra):
         "HEAD_SHA": "a" * 40,
         "PR_NUMBER": "7",
         "RUN_ID": "1234",
+        "HEAD_REPO": "Nitjsefnie/ai-researcher",
+        "HEAD_BRANCH": "patch-coverage-126",
+        "EVENT_NUMBERS": "[7]",
     }
     env.update(extra)
     return env
-
-
-def _system_path():
-    for entry in os.environ.get("PATH", "").split(":"):
-        if (Path(entry) / "jq").exists():
-            return entry
-    raise AssertionError("jq must be on the ambient PATH")
 
 
 def _outputs(workdir):
@@ -249,3 +249,81 @@ def test_a_neutral_verdict_without_a_reason_is_refused(tmp_path):
                      RUN_URL="https://github.invalid/runs/1"))
     assert done.returncode != 0, done.stdout
     assert "not_measured_reason" in done.stderr, done.stderr
+
+
+def test_the_resolver_takes_the_event_pull_request(tmp_path):
+    """A non-fork run resolves its number from the event's own list."""
+    workdir, state, calls = _workdir(tmp_path)
+    _state(state, head_sha="a" * 40)
+    done = _run(workdir, state, calls,
+                "Resolve the target pull request from the event",
+                _env(workdir, state, calls, EVENT_NUMBERS="[7]"))
+    assert done.returncode == 0, (done.stdout, done.stderr)
+    outputs = _outputs(workdir)
+    assert outputs["number"] == "7", outputs
+    assert outputs["stale"] == "false", outputs
+
+
+def test_the_resolver_falls_back_to_a_base_namespace_head_label(tmp_path):
+    """A fork run resolves in the BASE repository's number namespace.
+
+    The lookup is `repos/<base>/pulls?head=<owner>:<branch>` — never a
+    commit association on the head repository, whose answer can be a
+    fork-local pull request number (review finding F3, observed live).
+    """
+    workdir, state, calls = _workdir(tmp_path)
+    _state(state, head_sha="a" * 40, pulls=[
+        {"number": 7, "head": {"sha": "a" * 40,
+                               "repo": {"full_name": "forker/ai-researcher"},
+                               "ref": "patch"},
+         "base": {"repo": {"full_name": "Nitjsefnie/ai-researcher"}}},
+        # A fork-local pull request with a colliding number cannot appear:
+        # the query names the base repository.
+    ])
+    done = _run(workdir, state, calls,
+                "Resolve the target pull request from the event",
+                _env(workdir, state, calls, EVENT_NUMBERS="[]",
+                     HEAD_REPO="forker/ai-researcher",
+                     HEAD_BRANCH="patch"))
+    assert done.returncode == 0, (done.stdout, done.stderr)
+    assert _outputs(workdir)["number"] == "7", done.stderr
+
+
+def test_the_resolver_without_any_pull_request_posts_nothing(tmp_path):
+    """No open pull request for the head is a real state, not an error."""
+    workdir, state, calls = _workdir(tmp_path)
+    _state(state, head_sha="a" * 40, pulls=[])
+    done = _run(workdir, state, calls,
+                "Resolve the target pull request from the event",
+                _env(workdir, state, calls, EVENT_NUMBERS="[]",
+                     HEAD_REPO="forker/ai-researcher",
+                     HEAD_BRANCH="patch"))
+    assert done.returncode == 0, (done.stdout, done.stderr)
+    assert _outputs(workdir).get("present") == "false"
+
+
+def test_the_resolver_refuses_an_ambiguous_head(tmp_path):
+    """Two open pull requests on one fork branch cannot be told apart."""
+    workdir, state, calls = _workdir(tmp_path)
+    _state(state, head_sha="a" * 40, pulls=[
+        {"number": 7}, {"number": 8}])
+    done = _run(workdir, state, calls,
+                "Resolve the target pull request from the event",
+                _env(workdir, state, calls, EVENT_NUMBERS="[]",
+                     HEAD_REPO="forker/ai-researcher",
+                     HEAD_BRANCH="patch"))
+    assert done.returncode != 0, done.stdout
+    assert "found 2" in done.stderr, done.stderr
+
+
+def test_the_resolver_calls_a_moved_head_stale(tmp_path):
+    """A run whose head no longer is the pull request's head is stale."""
+    workdir, state, calls = _workdir(tmp_path)
+    _state(state, head_sha="b" * 40)
+    done = _run(workdir, state, calls,
+                "Resolve the target pull request from the event",
+                _env(workdir, state, calls, EVENT_NUMBERS="[7]"))
+    assert done.returncode == 0, (done.stdout, done.stderr)
+    outputs = _outputs(workdir)
+    assert outputs["stale"] == "true", outputs
+    assert "number" not in outputs, outputs

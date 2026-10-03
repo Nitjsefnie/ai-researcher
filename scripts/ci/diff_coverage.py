@@ -362,7 +362,12 @@ def main():
 
     diff_bytes = (sys.stdin.buffer.read() if args.diff == '-'
                   else Path(args.diff).read_bytes())
-    diff_text = diff_bytes.decode('utf-8')
+    # The producer runs `git diff --text`, so an ordinary binary asset on a
+    # change that also touches Python arrives as raw bytes with the hunk
+    # structure intact. Undecodable content becomes surrogates and is never
+    # rendered: the parser reads only the ASCII structure lines, and a
+    # measured file the binary addition is not must stay reportable.
+    diff_text = diff_bytes.decode('utf-8', errors='surrogateescape')
     try:
         # Inside the guard with its sibling: a git-quoted path whose bytes
         # are not UTF-8 raises UnicodeDecodeError, a ValueError subclass,

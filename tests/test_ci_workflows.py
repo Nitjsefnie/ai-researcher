@@ -270,3 +270,35 @@ def test_the_comment_artifact_name_spans_both_workflows():
                   if s.get("name") == "Download the comment artifact"]
     assert upload["with"]["name"] == download["with"]["name"] == (
         "diff-coverage-comment")
+
+
+def test_coverage_job_collects_its_measured_subprocesses():
+    # The patch-coverage reporter's CLI contract tests run the script as a
+    # real child interpreter, which the outer collector cannot trace. The
+    # job must therefore start child collectors (COVERAGE_PROCESS_START
+    # naming the committed children config), keep one absolute data file
+    # (children parallel-suffix it in place), and combine the sidecars
+    # before any report reads a total — dropping any leg shrinks the
+    # measured CLI and the ratchet reads a false regression.
+    workflow = yaml.safe_load(TESTS_WORKFLOW.read_text(encoding="utf-8"))
+    coverage = workflow["jobs"]["coverage"]
+    assert coverage["env"]["COVERAGE_FILE"] == (
+        "${{ github.workspace }}/.coverage")
+    [run_tests] = [s for s in coverage["steps"]
+                   if s.get("name") == "Run tests"]
+    assert run_tests["env"]["COVERAGE_MEASURE_CHILDREN_RC"] == (
+        "${{ github.workspace }}/.github/coverage-children.rc")
+    [summary] = [s for s in coverage["steps"]
+                 if s.get("name") == "Coverage summary"]
+    combine_first = summary["run"].splitlines()
+    # The combine line precedes the first report in the same step.
+    combine_at = next(i for i, line in enumerate(combine_first)
+                      if "coverage combine" in line)
+    report_at = next(i for i, line in enumerate(combine_first)
+                     if "coverage report" in line)
+    assert combine_at < report_at
+    # The children config bounds what a child records to the reporter.
+    rc = (REPO_ROOT / ".github" / "coverage-children.rc").read_text(
+        encoding="utf-8")
+    assert "[run]" in rc and "include = */scripts/ci/diff_coverage.py" in rc
+    assert "parallel = True" in rc

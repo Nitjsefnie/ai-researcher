@@ -164,6 +164,14 @@ jobs:
     outputs:
       changed: ${{ steps.ratchet.outputs.changed }}
 
+    env:
+      # One absolute coverage data file for the outer run AND every measured
+      # subprocess: a child collector parallel-suffixes it in place, so
+      # concurrent children cannot clobber one another or the outer data.
+      # Every coverage step below reads the same path, and the Coverage
+      # summary step combines the sidecars before any report reads a total.
+      COVERAGE_FILE: ${{ github.workspace }}/.coverage
+
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -213,8 +221,23 @@ jobs:
         # as before.
         env:
           JS_COVERAGE_OUT: ${{ runner.temp }}/js-coverage.json
+          # Measured subprocesses: the CLI contract tests launch the
+          # patch-coverage reporter as a real child interpreter, which this
+          # run's collector cannot trace, and the IMPLICIT .pth hook cannot
+          # trace it either — the reporter constructs a second Coverage
+          # object of its own (the statement analyzer), and a second
+          # construction suppresses the hook's save. The CLI tests read
+          # this variable and run the child under an explicit `coverage
+          # run`, whose save survives; .github/coverage-children.rc bounds
+          # what such a child records.
+          COVERAGE_MEASURE_CHILDREN_RC: ${{ github.workspace }}/.github/coverage-children.rc
         run: |
-          python3 -m coverage run --source=. --omit='tests/*' -m pytest -q -ra
+          # --parallel-mode: the outer run writes a sidecar like every
+          # measured child, because `coverage combine` REPLACES the data
+          # file with the combined sidecars — it does not merge into an
+          # existing one. A non-parallel outer run would be thrown away.
+          python3 -m coverage run --parallel-mode --source=. \
+            --omit='tests/*' -m pytest -q -ra
 
       - name: Coverage summary
         # Renders whether or not the gates below pass — a coverage regression
@@ -226,6 +249,12 @@ jobs:
         env:
           JS_COVERAGE_OUT: ${{ runner.temp }}/js-coverage.json
         run: |
+          # Fold the measured subprocess sidecars into the outer run's data
+          # FIRST, so every report and gate below reads one complete
+          # measurement. A run that launched no measured child has no
+          # sidecars, and `coverage combine` treats that as an error, so
+          # the guard is load-bearing rather than cosmetic.
+          ls .coverage.* >/dev/null 2>&1 && python3 -m coverage combine
           {
             echo '### Coverage'
             echo

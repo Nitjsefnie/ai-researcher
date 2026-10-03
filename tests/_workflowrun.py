@@ -4,7 +4,10 @@ Adapted from Nitjsefnie-Harness-Commons/daedalus `tests/_workflowrun.py` at
 0d4f2a03765b345cab8105c07991f2dbfdc98f3a: a workflow `run:` block is
 executable code, so the contract tests run it rather than read it, with a
 stub `gh` serving the GitHub API surface the step touches and recording
-every call it makes.
+every call it makes. The stub enforces the run's own identity — a route for
+another repository, pull request or head SHA is unmodeled and fails loudly
+— because a double that answers any destination cannot prove the
+destination.
 """
 import shlex
 import shutil
@@ -33,6 +36,9 @@ def run_step(workdir, step, env):
     The workflow substitutes `${{ ... }}` before a script ever runs, so a
     test must resolve every expression in the step's `env:` itself; an
     unresolved one reaching the child is a broken test, not a broken step.
+    The child's PATH is the stub directory PREPENDED to the ambient PATH —
+    on every matrix OS the step's own tools (`cat`, `wc`, `jq`) resolve
+    ambiently, and the stub `gh` shadows any real one by search order.
     """
     script = step.get("run")
     assert isinstance(script, str), f"step has no run script: {step!r}"
@@ -54,18 +60,28 @@ def run_step(workdir, step, env):
 
 
 def write_gh_stub(bin_dir, state_path, calls_path):
-    """Install a `gh` double that serves canned state and records calls.
+    """Install the `gh` double: a trampoline and its Python payload.
 
-    The stub honors exactly the routes the comment workflow's steps call;
-    anything else is a test bug and fails loudly instead of agreeing.
+    The trampoline is a POSIX `sh` script rather than a Python-shebang
+    file: on the Windows cells the suite runs under git-bash, where an
+    `env python3` shebang resolves to the WindowsApps stub and a bare
+    `python` may not exist on PATH. `sh` exists in every cell's ambient
+    PATH, and the payload is found beside the trampoline.
     """
     bin_dir = Path(bin_dir)
     bin_dir.mkdir(parents=True, exist_ok=True)
-    stub = bin_dir / "gh"
-    stub.write_text(STUB_GH, encoding="utf-8")
-    stub.chmod(0o755)
+    (bin_dir / "gh").write_text(
+        "#!/bin/sh\n"
+        '# The test double for the gh CLI; payload sits beside this file.\n'
+        'exec "$(command -v python || command -v python3)" '
+        '"$(dirname "$0")/gh_payload.py" "$@"\n',
+        encoding="utf-8")
+    (bin_dir / "gh_payload.py").write_text(STUB_GH, encoding="utf-8")
+    trampoline = bin_dir / "gh"
+    trampoline.chmod(0o755)
     state_path.write_text("{}", encoding="utf-8")
-    return stub
+    calls_path.parent.mkdir(parents=True, exist_ok=True)
+    return trampoline
 
 
 STUB_GH = r'''#!/usr/bin/env python3
@@ -84,7 +100,7 @@ with calls_path.open("a", encoding="utf-8") as handle:
     handle.write(json.dumps(args) + chr(10))
 
 def endpoint():
-    for index, value in enumerate(args):
+    for value in args:
         if value.startswith("repos/"):
             return value
     return ""
@@ -96,14 +112,22 @@ def method():
     return "GET"
 
 def fields():
+    """Field flags, with `@file` expansion on -F/--field only.
+
+    Real gh: -f/--raw-field carries a static literal string, -F/--field
+    interprets a leading @ as a filename to read.
+    """
     result = {}
     for index, value in enumerate(args[:-1]):
-        if value in ("-f", "--raw-field", "-F", "--field"):
-            key, separator, field = args[index + 1].partition("=")
-            if separator and field.startswith("@"):
-                field = Path(field[1:]).read_text(encoding="utf-8")
-            if separator:
-                result[key] = field
+        raw = value in ("-f", "--raw-field")
+        typed = value in ("-F", "--field")
+        if not (raw or typed):
+            continue
+        key, separator, field = args[index + 1].partition("=")
+        if separator and typed and field.startswith("@"):
+            field = Path(field[1:]).read_text(encoding="utf-8")
+        if separator:
+            result[key] = field
     return result
 
 def emit(document):
@@ -127,30 +151,55 @@ def emit(document):
         out = json.loads(stripped) + chr(10)
     sys.stdout.write(out)
 
+def refuse(reason):
+    print(f"gh stub: {reason}: {args}", file=sys.stderr)
+    raise SystemExit(64)
+
 target = endpoint()
 verb = method()
+REPO = os.environ.get("REPO", "")
+PR_NUMBER = os.environ.get("PR_NUMBER", "")
+HEAD_SHA = os.environ.get("HEAD_SHA", "")
 
-if target.endswith("/artifacts") and verb == "GET":
-    emit(json.dumps({"total_count": len(state.get("artifacts", [])),
-                     "artifacts": state.get("artifacts", [])}))
-elif target.endswith("/jobs") and verb == "GET":
-    emit(json.dumps({"total_count": len(state.get("jobs", [])),
-                     "jobs": state.get("jobs", [])}))
-elif "/comments" in target and verb == "GET":
-    emit(json.dumps(state.get("comments", [])))
-elif "/comments" in target and verb == "POST":
+# Identity first: the double answers only the run's own repository, and
+# the destination routes only the run's own pull request and head SHA. A
+# step that writes anywhere else is unmodeled, never served.
+if not target.startswith(f"repos/{REPO}/"):
+    refuse(f"route outside {REPO}")
+if "/issues/" in target and "/comments" in target and verb == "POST":
+    if target != f"repos/{REPO}/issues/{PR_NUMBER}/comments":
+        refuse(f"destination is not pull request {PR_NUMBER}")
     comments = state.setdefault("comments", [])
     comments.append({"id": len(comments) + 1,
                      "user": {"login": "github-actions[bot]"},
                      "body": fields().get("body", "")})
 elif "/issues/comments/" in target and verb == "PATCH":
+    # The route is repo-level on the real API; the id is the identity, so
+    # a PATCH to an id the PR's comment list never named is refused.
     comment_id = target.rsplit("/", 1)[1]
+    known = {str(comment["id"]) for comment in state.get("comments", [])}
+    if comment_id not in known:
+        refuse(f"PATCH to unknown comment id {comment_id}")
     for comment in state.get("comments", []):
         if str(comment["id"]) == comment_id:
             comment["body"] = fields().get("body", "")
+elif "/issues/" in target and target.endswith("/comments") and verb == "GET":
+    emit(json.dumps(state.get("comments", [])))
+elif "/pulls?" in target and verb == "GET":
+    emit(json.dumps(state.get("pulls", [])))
 elif "/pulls/" in target and verb == "GET":
+    if not target.rstrip("/").endswith(f"/pulls/{PR_NUMBER}"):
+        refuse(f"pull route is not pull request {PR_NUMBER}")
     emit(json.dumps({"head": {"sha": state.get("head_sha", "")}}))
+elif target.endswith("/artifacts") and verb == "GET":
+    emit(json.dumps({"total_count": len(state.get("artifacts", [])),
+                     "artifacts": state.get("artifacts", [])}))
+elif target.endswith("/jobs") and verb == "GET":
+    emit(json.dumps({"total_count": len(state.get("jobs", [])),
+                     "jobs": state.get("jobs", [])}))
 elif target.endswith("/check-runs") and verb == "GET":
+    if f"/commits/{HEAD_SHA}/" not in target:
+        refuse(f"check route is not head {HEAD_SHA}")
     checks = state.get("checks", [])
     if fields().get("filter") != "all":
         checks = checks[-1:]
@@ -165,8 +214,7 @@ elif "/check-runs/" in target and verb == "PATCH":
         if str(check["id"]) == check_id:
             check.update(fields())
 else:
-    print(f"gh stub: unmodeled call: {args}", file=sys.stderr)
-    raise SystemExit(64)
+    refuse("unmodeled call")
 
 state_path.write_text(json.dumps(state), encoding="utf-8")
 '''

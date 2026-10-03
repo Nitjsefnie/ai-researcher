@@ -103,6 +103,7 @@ jobs:
           REPO: ${{ github.repository }}
           HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
           HEAD_REPO: ${{ github.event.workflow_run.head_repository.full_name }}
+          HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
           EVENT_NUMBERS: >-
             ${{ toJSON(github.event.workflow_run.pull_requests.*.number) }}
         run: |
@@ -115,15 +116,25 @@ jobs:
           if [ -z "$numbers" ]; then
             # A fork pull request arrives with an empty `pull_requests`, and
             # the base repository does not associate its head commit with a
-            # pull request, so ask the head repository which one owns it.
+            # pull request at all. The event's head repository and branch
+            # are trusted event metadata, so ask the BASE repository which
+            # open pull requests carry that head label. A commit-to-PR
+            # association looked up on the HEAD repository is not evidence
+            # of the destination: its answer lives in the head repository's
+            # own number namespace, where a fork-local pull request can
+            # carry a number that means a different pull request here, and
+            # the upstream pull request can be absent from it entirely
+            # (observed against the live API during review).
+            label="$(printf '%s:%s' "$HEAD_REPO" "$HEAD_BRANCH")"
             if ! gh api -H 'Cache-Control: no-cache' --paginate \
-              "repos/$HEAD_REPO/commits/$HEAD_SHA/pulls" \
-              --jq '.[].number' > pulls.txt
+              "repos/$REPO/pulls?head=$(printf '%s' "$label" |
+                jq -Rr @uri)&state=open" \
+              --jq '.[]' > pulls.txt
             then
-              echo "listing the pull requests for $HEAD_SHA failed" >&2
+              echo "listing the pull requests with head $label failed" >&2
               exit 1
             fi
-            numbers="$(sort -u pulls.txt)"
+            numbers="$(jq -r '.number' pulls.txt | sort -u)"
           fi
           count="$(printf '%s\n' "$numbers" | awk 'NF' | wc -l | tr -d ' ')"
           if [ "$count" -eq 0 ]; then
