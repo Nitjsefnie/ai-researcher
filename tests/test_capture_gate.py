@@ -592,3 +592,91 @@ class SnapshotReadWiringTests(unittest.TestCase):
             with mock.patch.object(capture_gate, "ROOT", pathlib.Path(tmp)):
                 with self.assertRaises(capture_gate.FreshCaptureError):
                     capture_gate.read_fresh_snapshot()
+
+
+# --- issue #146: a zero score is a legal AA publication ----------------------
+
+
+def zero_score_capture(models: bytes) -> bytes:
+    """The capture with one model turned into issue #146's crash shape: its
+    gdpvalNormalized zeroed and its gdpval eval cost set strictly cheapest,
+    so the model lands on the agentic frontier carrying a zero score. The
+    mutation lives in memory only -- never a data/ write. Self-contained by
+    this file's convention: no import from the build tests."""
+    parsed = json.loads(models)
+    floor = None
+    target = None
+    for m in parsed:
+        outer = m.get("intelligenceIndexCostPerTask")
+        evals = outer.get("evaluations") if isinstance(outer, dict) else None
+        if not isinstance(evals, list):
+            continue
+        weighted = None
+        for e in evals:
+            if (isinstance(e, dict) and e.get("slug") == "gdpval-aa"
+                    and isinstance(e.get("weightedCostPerTask"), (int, float))
+                    and not isinstance(e.get("weightedCostPerTask"), bool)):
+                weighted = e["weightedCostPerTask"]
+                break
+        if weighted is None or weighted <= 0:
+            continue
+        if floor is None or weighted < floor:
+            floor = weighted
+        if target is None and "(" not in (
+                m.get("shortName") or m.get("name") or ""):
+            target = m
+    if target is None:
+        raise AssertionError("no model with a gdpval eval in the capture")
+    target["gdpvalNormalized"] = 0
+    for e in target["intelligenceIndexCostPerTask"]["evaluations"]:
+        if e.get("slug") == "gdpval-aa":
+            e["weightedCostPerTask"] = floor / 2
+    return json.dumps(parsed, indent=1).encode("utf-8")
+
+
+class ZeroScoreCaptureGateTests(unittest.TestCase):
+    """Issue #146 through the rendered no-change gate. A capture carrying a
+    legal zero score must BUILD -- the gate answers false on identical
+    bytes, it does not crash -- and an unexpected build crash now carries
+    its traceback on stderr, so the next occurrence is diagnosable from the
+    log alone instead of a bare "float division by zero"."""
+
+
+    def test_a_zero_score_capture_builds_and_answers_false(self):
+        models = zero_score_capture(REAL_MODELS)
+        with head_serving(models, REAL_AGENTS), \
+             mock.patch.object(capture_gate, "read_fresh_captures",
+                               return_value=(models, REAL_AGENTS)):
+            code, out = run_gate()
+
+        self.assertEqual((code, out), (0, "false\n"))
+
+
+    def test_an_unexpected_build_crash_carries_its_traceback(self):
+        # The 2026-10-03T01:09Z hour failed with a bare "float division by
+        # zero" that named neither site nor field. An unexpected exception
+        # now carries the traceback on stderr.
+        err = io.StringIO()
+        with head_serving(b"{not json", REAL_AGENTS), \
+             mock.patch.object(capture_gate, "read_fresh_captures",
+                               return_value=(b"{not json", REAL_AGENTS)), \
+             contextlib.redirect_stderr(err):
+            code = capture_gate.main()
+
+        self.assertNotEqual(code, 0)
+        self.assertIn("Traceback (most recent call last)", err.getvalue())
+        self.assertIn("JSONDecodeError", err.getvalue())
+
+    def test_a_named_build_refusal_stays_bare_of_traceback(self):
+        # build.py's own refusals are SystemExit -- they already carry their
+        # named reason, and no traceback is appended to them.
+        err = io.StringIO()
+        with head_serving(b"[]", b"[]"), \
+             mock.patch.object(capture_gate, "read_fresh_captures",
+                               return_value=(b"[]", b"[]")), \
+             contextlib.redirect_stderr(err):
+            code = capture_gate.main()
+
+        self.assertNotEqual(code, 0)
+        self.assertIn("no rows carry", err.getvalue())
+        self.assertNotIn("Traceback", err.getvalue())

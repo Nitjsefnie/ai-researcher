@@ -1,5 +1,6 @@
 import contextlib
 import datetime
+import html
 import io
 import json
 import pathlib
@@ -1903,3 +1904,125 @@ class DisputedBuildTests(unittest.TestCase):
         with self.disputed_page() as (page, _snapshot):
             self.assertIn("sha256 over data/aa-disagreement-snapshot.json then "
                           "data/aa-raw-coding-agents.json", page)
+
+
+class FrontierZeroScoreTests(unittest.TestCase):
+    """Issue #146: zero is a legal AA-published score -- the current capture
+    carries gdpvalNormalized: 0 on 75 models -- and a score-0 row lands on an
+    axis's efficient frontier exactly when it is the strictly cheapest row
+    there (any cheaper row would dominate it). The hourly refresh at
+    2026-10-03T01:09Z hit the one division over a capture-sourced denominator
+    unprepared for it: the frontier table's $/point. The build now renders
+    that cell as the em dash -- a $/point at zero capability is not a number
+    -- instead of crashing, and the JS mirror must render the same cell or
+    the browser drift test fails.
+    """
+
+    def _rows(self):
+        """Two hand-built rows; the cheap one scores 0.0 on agentic, making
+        it the strictly cheapest row on that axis and therefore frontier-
+        eligible. Coding and intelligence pairs stay positive on both."""
+        return [
+            {
+                "name": "Cheap Zero", "creator": "Zero Lab", "open": False,
+                "lic": None, "disp": None,
+                "metrics": {
+                    "coding": {"score": 40.0, "cost": 0.5},
+                    "intelligence": {"score": 30.0, "cost": 1.0},
+                    "agentic": {"score": 0.0, "cost": 0.3},
+                },
+            },
+            {
+                "name": "Costly Smart", "creator": "Other Lab", "open": True,
+                "lic": "mit", "disp": None,
+                "metrics": {
+                    "coding": {"score": 60.0, "cost": 2.0},
+                    "intelligence": {"score": 51.0, "cost": 1.5},
+                    "agentic": {"score": 50.0, "cost": 2.0},
+                },
+            },
+        ]
+
+    def test_the_frontier_table_renders_zero_score_rows(self):
+        # The agentic row: score 0.0, cost $0.300, and the $/point cell is
+        # the em dash -- not a crash, not "$Infinity".
+        tbody = build.render_frontier_tbody(self._rows())
+        self.assertIn(
+            '<tr><td>GDPval-AA v2</td><td class="name">Cheap Zero</td>'
+            "<td>Zero Lab</td>"
+            '<td class="n">0.0</td><td class="n">$0.300</td>'
+            '<td class="n">—</td>'
+            '<td><span class="tag">proprietary</span></td></tr>',
+            tbody)
+        # A positive-score sibling still renders its $/point: 2.0/50.
+        self.assertIn('<td class="n">$0.0400</td>', tbody)
+
+    def test_zero_score_capture_builds_through_main(self):
+        # The real capture with one model turned into the hourly's crash:
+        # gdpvalNormalized zeroed and its gdpval eval cost set strictly
+        # cheapest, so it lands on the agentic frontier with a zero score.
+        models = json.loads(
+            (build.ROOT / "data" / "aa-raw-models.json").read_bytes())
+        floor = None
+        target = None
+        for m in models:
+            weighted = gdpval_weighted_cost(m)
+            if (weighted is not None and weighted > 0
+                    and (floor is None or weighted < floor)):
+                floor = weighted
+            if target is None and weighted is not None and weighted > 0 and "(" not in (
+                    m.get("shortName") or m.get("name") or ""):
+                target = m
+        self.assertIsNotNone(target)
+        target["gdpvalNormalized"] = 0
+        for e in target["intelligenceIndexCostPerTask"]["evaluations"]:
+            if e.get("slug") == "gdpval-aa":
+                e["weightedCostPerTask"] = floor / 2
+        # The rendered row name is build's own cleaning over name-first,
+        # shortName-fallback -- "(Reasoning)" survives the cleaning, so the
+        # assertion derives it through the same function rather than guessing.
+        name = build.display_name(target.get("name") or target.get("shortName"))
+
+        with tempfile.TemporaryDirectory(
+                prefix=".issue-146-build-", dir=build.ROOT) as tmp:
+            raw = pathlib.Path(tmp) / "models.json"
+            agents_raw = pathlib.Path(tmp) / "coding-agents.json"
+            page_path = pathlib.Path(tmp) / "frontier-models.html"
+            raw.write_bytes(
+                json.dumps(models, indent=1).encode("utf-8"))
+            agents_raw.write_bytes(
+                (build.ROOT / "data" / "aa-raw-coding-agents.json").read_bytes())
+            saved = (build.RAW, build.AGENTS_RAW, build.OUT)
+            build.RAW, build.AGENTS_RAW, build.OUT = raw, agents_raw, page_path
+            try:
+                with contextlib.redirect_stdout(io.StringIO()):
+                    build.main()
+            finally:
+                build.RAW, build.AGENTS_RAW, build.OUT = saved
+            page = page_path.read_text(encoding="utf-8")
+
+        ftable = page[page.index('id="fTable"'):page.index("</table>", page.index('id="fTable"'))]
+        row_re = re.compile(
+            r'<tr><td>GDPval-AA v2</td><td class="name">'
+            + re.escape(html.escape(name)) + r"</td>(.*?)</tr>")
+        match = row_re.search(ftable)
+        self.assertIsNotNone(
+            match, f"no agentic frontier row for the mutated model {name}")
+        self.assertIn('<td class="n">0.0</td>', match.group(1))
+        self.assertIn('<td class="n">—</td>', match.group(1))
+
+
+def gdpval_weighted_cost(m):
+    """The model's gdpval-aa weightedCostPerTask, or None when it has no
+    parseable one. Test-side mirror of build.evaluation_cost_per_task's
+    value sourcing."""
+    outer = m.get("intelligenceIndexCostPerTask")
+    evals = outer.get("evaluations") if isinstance(outer, dict) else None
+    if not isinstance(evals, list):
+        return None
+    for e in evals:
+        if (isinstance(e, dict) and e.get("slug") == "gdpval-aa"
+                and isinstance(e.get("weightedCostPerTask"), (int, float))
+                and not isinstance(e.get("weightedCostPerTask"), bool)):
+            return e["weightedCostPerTask"]
+    return None

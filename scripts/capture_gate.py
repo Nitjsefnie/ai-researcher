@@ -42,6 +42,7 @@ import re
 import subprocess
 import sys
 import tempfile
+import traceback
 from typing import Any
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
@@ -402,7 +403,15 @@ def main() -> int:
         old_page, new_page = build_page_pair(head, fresh,
                                              head_snapshot, fresh_snapshot)
     except (SystemExit, Exception) as exc:  # pylint: disable=broad-exception-caught
-        print(f"capture-gate: the capture broke the build ({exc}) -- failing "
+        # build.py's own refusals (SystemExit) already carry their named
+        # reason. An unexpected crash gets the traceback appended, so the
+        # next occurrence names its site and field from the log alone --
+        # the 2026-10-03T01:09Z hour printed only "float division by zero"
+        # and named neither (issue #146).
+        detail = str(exc)
+        if not isinstance(exc, SystemExit):
+            detail += "\n" + traceback.format_exc()
+        print(f"capture-gate: the capture broke the build ({detail}) -- failing "
               "red rather than report the capture as unchanged", file=sys.stderr)
         return 1
 
