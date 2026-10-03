@@ -371,6 +371,7 @@ def test_pr_gate_workflow_runs_only_where_it_can_act():
     assert "github.event.pull_request.draft == false" in job["if"], job["if"]
     assert job["timeout-minutes"] == 5, job["timeout-minutes"]
     [step] = [step for step in job["steps"] if "uses" in step]
+    assert step["uses"].startswith("Nitjsefnie-Actions/pr-gate@"), step["uses"]
     assert step["with"] == {
         "github-token": "${{ github.token }}",
         "repository": "${{ github.repository }}",
