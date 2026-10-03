@@ -28,8 +28,9 @@ name: tests
 # A FOURTH job rides along on pull requests only. `diff-coverage` reports the
 # coverage of the change's OWN added lines — informational, never a gate
 # (issue #126) — and hands the rendered report to the `coverage comment`
-# workflow, which is the only holder of `pull-requests: write`: no job that
-# executes this tree ever carries a conversation-write token.
+# workflow, which holds `pull-requests: write` beside the claim action's job
+# (issue #161, claim#153): no job that executes this tree ever carries a
+# conversation-write token, and the two writers never check the tree out.
 #
 # THE RUNNER IS ALWAYS THE `-m` FORM — `python -m pytest`, which the coverage
 # job spells `python3 -m pytest` — NOT `pytest`, AND
