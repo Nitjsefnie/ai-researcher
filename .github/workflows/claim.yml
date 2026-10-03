@@ -17,8 +17,9 @@ jobs:
     timeout-minutes: 5
     permissions:
       issues: write
+      pull-requests: write
     steps:
-      - uses: Nitjsefnie-Actions/claim@cf2aaae56eb3bb6c655b8c4bc35906dafc77a63e # v2.0.2
+      - uses: Nitjsefnie-Actions/claim@0c79a0325d8ab789a60c2eeaf751690d2875c39c # v2.0.3
         with:
           max-claims: 'read=2, triage=4, write=6, maintain=10, admin=-1'
           expire: '7'
