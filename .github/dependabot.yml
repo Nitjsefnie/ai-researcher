@@ -48,10 +48,21 @@ updates:
     # whose init and analyze pins disagree fails every CodeQL run at SARIF
     # processing with "Loaded a configuration file for version 'X', but
     # running version 'Y'" (issue #45: every action-pin bump PR since 4.37.7
-    # went red). The group is what keeps both pins in one atomic PR; the
+    # went red). The groups are what keep both pins in one atomic PR; the
     # in-tree tripwire is tests/test_ci_workflows.py.
+    #
+    # A group without `applies-to` covers version updates only, and security
+    # updates are enabled on this repository — so without the mirror group
+    # below, a security bump to codeql-action still arrived as one PR per
+    # `uses:` line, splitting init from analyze across SHAs (issue #132).
+    # Shaped like the security group in Nitjsefnie-Actions/claim (claim#37)
+    # and Nitjsefnie-Actions/pr-gate (pr-gate#23).
     groups:
       actions:
         applies-to: version-updates
+        patterns:
+          - "*"
+      actions-security:
+        applies-to: security-updates
         patterns:
           - "*"
