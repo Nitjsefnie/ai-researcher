@@ -114,10 +114,11 @@ def check_ignore(flags, path):
 # committed name under data/ is `aa-*` or `captured-at.txt`, and out/
 # ships exactly one file, so a future LEGITIMATE negation -- which names
 # a new committed path exactly (`!/data/aa-new-thing.json`) -- cannot
-# match a synthetic name and cannot turn these probes falsely red. Only
-# an edit that un-denies a tree wholesale (`!/data/*` in place of a
-# named path, the issue's own repro) flips the verdict, and that
-# wholesale case is exactly the rot this pin exists to catch.
+# match a synthetic name and cannot turn these probes falsely red. Any
+# edit broad enough to un-deny a probe flips the verdict -- a wholesale
+# `!/data/*` (the issue's own repro) or a class-scoped `!/data/*.json`
+# alike -- and every such edit is exactly the rot this pin exists to
+# catch, because each of them un-denies scratch files along with it.
 DENY_PROBE_PATHS = (
     "data/zz-deny-probe-synthetic.json",
     "out/zz-deny-probe-synthetic.html",
