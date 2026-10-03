@@ -945,8 +945,16 @@ def render_frontier_tbody(rows):
                 + f"<td>{html.escape(show_text(row['creator']))}</td>"
                 + f'<td class="n">{js_to_fixed(pair["score"], 1)}</td>'
                 + f'<td class="n">{fmt_cost(pair["cost"])}</td>'
-                + '<td class="n">$'
-                + js_to_fixed(pair["cost"] / pair["score"], 4)
+                + '<td class="n">'
+                # A zero score is a legal AA publication (gdpvalNormalized
+                # carries literal zeros in the capture), and a score-0 row
+                # sits on this layer exactly when it is the strictly
+                # cheapest one. $/point at zero capability is not a number:
+                # em dash, the page's missing-value mark -- never a crash
+                # (issue #146 red an hour on the bare ZeroDivisionError)
+                # and never a "$Infinity" cell.
+                + ('$' + js_to_fixed(pair["cost"] / pair["score"], 4)
+                   if pair["score"] else EM_DASH)
                 + "</td>"
                 + f"<td>{_tag(weights_text(row), 'tag')}</td>"
                 + "</tr>"
@@ -2612,7 +2620,10 @@ const DATA = __DATA__;
           if(cls) td.className=cls; td.textContent=txt; tr.appendChild(td);};
         add(METRICS[key].label); add(r.name,"name"); add(show(r.creator));
         add(m.score.toFixed(1),"n"); add(fmtCost(m.cost),"n");
-        add("$"+(m.cost/m.score).toFixed(4),"n");
+        // Zero is a legal AA score (#146); $/point at 0 capability is not
+        // a number -- em dash, matching the static render, never
+        // "$Infinity".
+        add(m.score?"$"+(m.cost/m.score).toFixed(4):"—","n");
         const td=document.createElement("td");
         const sp=document.createElement("span"); sp.className="tag";
         sp.textContent=weightsOf(r);

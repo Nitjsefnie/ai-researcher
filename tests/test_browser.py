@@ -1857,3 +1857,119 @@ class DisputedBrowserTests(unittest.TestCase):
             page.wait_for_timeout(100)
         finally:
             page.close()
+
+
+class ZeroScoreBrowserTests(unittest.TestCase):
+    """Issue #146 in a real browser: a zero capability score is a legal AA
+    publication, and the JS fillFrontiers cell for a zero-score frontier row
+    must render the em dash the static render shows -- "$Infinity" would
+    fail the drift contract and read as a real price. A dedicated class
+    exists for the same reason its disputed sibling does: this JS path never
+    executes on a normal page (no normal capture puts a zero on the
+    frontier), so without coverage wiring the JavaScript ratchet reads it as
+    uncovered and reds the coverage job.
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        cls._saved = (build.RAW, build.AGENTS_RAW, build.OUT)
+        cls._dir = tempfile.TemporaryDirectory(  # pylint: disable=consider-using-with
+            prefix=".issue-146-browser-", dir=build.ROOT)
+        data = pathlib.Path(cls._dir.name) / "data"
+        data.mkdir()
+        # gdpval 0.0 with the fixture's gdpval eval (weightedCostPerTask
+        # 0.80 -> measured cost 8.00) puts the page's only model on the
+        # agentic frontier carrying a zero score.
+        (data / "aa-raw-models.json").write_text(
+            json.dumps([test_build.model_fixture(gdpval=0.0)]),
+            encoding="utf-8")
+        (data / "aa-raw-coding-agents.json").write_text(
+            json.dumps([test_build.agent_fixture()]), encoding="utf-8")
+        (data / "captured-at.txt").write_text("2026-10-04\n",
+                                              encoding="utf-8")
+        build.RAW = data / "aa-raw-models.json"
+        build.AGENTS_RAW = data / "aa-raw-coding-agents.json"
+        build.OUT = pathlib.Path(cls._dir.name) / "frontier-models.html"
+        try:
+            with contextlib.redirect_stdout(io.StringIO()):
+                build.main()
+            cls.playwright = sync_playwright().start()
+            cls.browser = cls.playwright.chromium.launch(
+                executable_path=CHROMIUM_EXECUTABLE,
+                headless=True,
+                args=["--no-sandbox"])
+        except BaseException:
+            build.RAW, build.AGENTS_RAW, build.OUT = cls._saved
+            cls._dir.cleanup()
+            raise
+        # The same V8 block-coverage wiring the disputed class uses.
+        cls._coverage_entries = []
+        cls._open_pages = []
+        original_new_page = cls.browser.new_page
+
+        def new_page(**kwargs):
+            page = original_new_page(**kwargs)
+            if kwargs.get("java_script_enabled") is False:
+                return page
+            session = page.context.new_cdp_session(page)
+            session.send("Debugger.enable")
+            session.send("Profiler.enable")
+            session.send("Profiler.startPreciseCoverage",
+                         {"callCount": True, "detailed": True})
+            original_close = page.close
+
+            def close(**close_kwargs):
+                if (page, session) in cls._open_pages:
+                    cls._open_pages.remove((page, session))
+                cls._coverage_entries.extend(collect_page_coverage(session))
+                return original_close(**close_kwargs)
+
+            page.close = close
+            cls._open_pages.append((page, session))
+            return page
+
+        cls.browser.new_page = new_page
+
+    @classmethod
+    def tearDownClass(cls):
+        build.RAW, build.AGENTS_RAW, build.OUT = cls._saved
+        for _page, session in list(cls._open_pages):
+            try:
+                cls._coverage_entries.extend(collect_page_coverage(session))
+            except Exception:  # pylint: disable=broad-exception-caught
+                pass
+        cls._open_pages.clear()
+        dump = os.environ.get("JS_COVERAGE_OUT")
+        if dump:
+            path = pathlib.Path(dump)
+            entries = cls._coverage_entries
+            if path.exists():
+                try:
+                    entries = json.loads(
+                        path.read_text(encoding="utf-8")) + entries
+                except (OSError, json.JSONDecodeError):
+                    pass
+            path.write_text(json.dumps(entries), encoding="utf-8")
+        cls.browser.close()
+        cls.playwright.stop()
+        cls._dir.cleanup()
+
+    def test_the_zero_score_frontier_cell_is_em_dash(self):
+        page = self.browser.new_page()
+        try:
+            page.goto(build.OUT.as_uri())
+            # fillTable/fillFrontiers ran to completion -- a crash in the
+            # new JS branch would leave the frontier table empty.
+            page.wait_for_selector("#fTable tbody tr")
+            # The agentic section, not the agent row's coding section --
+            # both rows carry the model text.
+            row = page.locator("#fTable tbody tr",
+                               has_text="GDPval-AA v2").filter(
+                                   has_text="Fixture Model").first
+            cells = row.locator("td").all_text_contents()
+            # metric | name | creator | score | cost | $/point | weights
+            self.assertEqual(cells[3], "0.0")
+            self.assertEqual(cells[4], "$8.00")
+            self.assertEqual(cells[5], "—")
+        finally:
+            page.close()

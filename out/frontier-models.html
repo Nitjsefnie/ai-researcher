@@ -406,7 +406,7 @@
       the components sum exactly to the published total. No score, token price or task measurement is
       estimated, and nothing is filled in from another source. Rebuild with
       <code>python3 scripts/fetch_aa.py &amp;&amp; python3 build.py</code>.</p>
-    <p>Capture <code>3f50ff14f74f3506a3ff693c0dce675e2f44d97f2418a7daa4c3662a755c798a</code> &mdash; sha256 over data/aa-raw-models.json then data/aa-raw-coding-agents.json, whole files concatenated in that order. Source commit <code>bcf47a0baa43590283015cb6e3efbb2652a6e98a</code>.</p>
+    <p>Capture <code>3f50ff14f74f3506a3ff693c0dce675e2f44d97f2418a7daa4c3662a755c798a</code> &mdash; sha256 over data/aa-raw-models.json then data/aa-raw-coding-agents.json, whole files concatenated in that order. Source commit <code>d590f01295bbafc3174b91b118af9525a1d6d535</code>.</p>
     <p>&copy; 2026 Peter Z (Nitjsefnie) &middot;
       <a href="https://github.com/Nitjsefnie/ai-researcher/blob/main/LICENSE">MIT licence</a></p>
   </div>
@@ -1263,7 +1263,10 @@ const DATA = {"rows":[{"name":"Claude Opus 5.5 (Max, Default Fallback)","base":"
           if(cls) td.className=cls; td.textContent=txt; tr.appendChild(td);};
         add(METRICS[key].label); add(r.name,"name"); add(show(r.creator));
         add(m.score.toFixed(1),"n"); add(fmtCost(m.cost),"n");
-        add("$"+(m.cost/m.score).toFixed(4),"n");
+        // Zero is a legal AA score (#146); $/point at 0 capability is not
+        // a number -- em dash, matching the static render, never
+        // "$Infinity".
+        add(m.score?"$"+(m.cost/m.score).toFixed(4):"—","n");
         const td=document.createElement("td");
         const sp=document.createElement("span"); sp.className="tag";
         sp.textContent=weightsOf(r);
