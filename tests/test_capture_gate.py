@@ -642,7 +642,6 @@ class ZeroScoreCaptureGateTests(unittest.TestCase):
     its traceback on stderr, so the next occurrence is diagnosable from the
     log alone instead of a bare "float division by zero"."""
 
-
     def test_a_zero_score_capture_builds_and_answers_false(self):
         models = zero_score_capture(REAL_MODELS)
         with head_serving(models, REAL_AGENTS), \
@@ -651,7 +650,6 @@ class ZeroScoreCaptureGateTests(unittest.TestCase):
             code, out = run_gate()
 
         self.assertEqual((code, out), (0, "false\n"))
-
 
     def test_an_unexpected_build_crash_carries_its_traceback(self):
         # The 2026-10-03T01:09Z hour failed with a bare "float division by
