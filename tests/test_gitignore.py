@@ -108,3 +108,52 @@ def check_ignore(flags, path):
         ["git", "check-ignore", *flags, "--", path],
         cwd=str(HERE), capture_output=True, check=False,
         timeout=GIT_TIMEOUT)
+
+
+# Synthetic probe paths: no real artifact would ever carry them. Every
+# committed name under data/ is `aa-*` or `captured-at.txt`, and out/
+# ships exactly one file, so a future LEGITIMATE negation -- which names
+# a new committed path exactly (`!/data/aa-new-thing.json`) -- cannot
+# match a synthetic name and cannot turn these probes falsely red. Only
+# an edit that un-denies a tree wholesale (`!/data/*` in place of a
+# named path, the issue's own repro) flips the verdict, and that
+# wholesale case is exactly the rot this pin exists to catch.
+DENY_PROBE_PATHS = (
+    "data/zz-deny-probe-synthetic.json",
+    "out/zz-deny-probe-synthetic.html",
+)
+
+
+class GitignoreDenyDirectionTests(unittest.TestCase):
+    """Pins the deny DIRECTION of the data/ and out/ blocks (issue #169).
+
+    test_the_paths_the_refresh_commits_are_git_trackable proves the
+    positive half: the paths the refresh names are NOT ignored. This is
+    the negative half: everything else in those trees stays ignored.
+    The two together pin the deny-by-default SHAPE of the blocks.
+    Without this half, an over-broad negation (`!/data/*` replacing a
+    named path) passes the whole suite while every scratch file under
+    the tree silently becomes `git status`-visible and `git add`-able in
+    the refresh's scratch clone, where the commit step stages whatever
+    differs.
+    """
+
+    def test_synthetic_scratch_paths_stay_denied(self):
+        for path in DENY_PROBE_PATHS:
+            with self.subTest(path=path):
+                verdict = check_ignore(["-q"], path)
+                # 0 = denied by the rules (the promise under test), 1 =
+                # trackable; anything else is a git error, named rather
+                # than read as a verdict.
+                self.assertIn(
+                    verdict.returncode, (0, 1),
+                    f"git check-ignore -q errored on {path}: "
+                    f"{verdict.stderr.decode('utf-8', 'replace')}")
+                if verdict.returncode == 0:
+                    continue
+                self.fail(
+                    f"{path} is git-trackable (check-ignore exit 1): the "
+                    "deny-by-default shape of its ignore block is broken "
+                    "-- an edit stopped denying new paths under the tree "
+                    "(the verbose form names nothing here, because no "
+                    "rule matches any more)")
