@@ -27,6 +27,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 
 CODEQL_WORKFLOW = REPO_ROOT / ".github" / "workflows" / "codeql.yml"
 DEPENDABOT = REPO_ROOT / ".github" / "dependabot.yml"
+PR_GATE_WORKFLOW = REPO_ROOT / ".github" / "workflows" / "pr-gate.yml"
 TESTS_WORKFLOW = REPO_ROOT / ".github" / "workflows" / "tests.yml"
 WORKFLOWS = sorted((REPO_ROOT / ".github" / "workflows").glob("*.yml"))
 
@@ -35,6 +36,27 @@ _PIN = re.compile(
     r"uses:\s*github/codeql-action/(?P<step>\S+)@(?P<sha>[0-9a-f]{40})"
     r"(?:\s+#\s*(?P<comment>\S+))?"
 )
+
+# `uses: Nitjsefnie-Actions/pr-gate@<40-hex sha>  # vX.Y.Z`
+_PR_GATE_PIN = re.compile(
+    r"uses:\s*Nitjsefnie-Actions/pr-gate@(?P<sha>[0-9a-f]{40})"
+    r"(?:\s+#\s*(?P<comment>\S+))?"
+)
+
+# The template contract the pinned gate enforces, mirrored for the pin below.
+# Upstream pr-gate's template_rules (scripts/ci/pr_body.py at
+# 441f855e54f4f6c98709152f2d2542031dc82f03) refuses a consumer template in
+# which any `##` section lacks a Required/Conditional/Optional-tagged
+# instruction comment between its heading and the next: every pull-request
+# run of the gate then dies on the refusal (exit 1) instead of gating
+# anything. The two regexes are copied from that file so this test judges
+# the same shapes the gate does, and the workflow's SHA pin freezes the
+# parser they mirror. Like test_gate_base_freshness.py's upstream mirroring,
+# the duplicated lines are kept as written and duplicate-code stays scoped
+# to this block.
+_TEMPLATE_HEADING = re.compile(r"^##[ \t]+(?P<text>.+?)[ \t]*$", re.MULTILINE)
+_TEMPLATE_TAG = re.compile(
+    r"<!--\s*(?P<tag>required|conditional|optional)\b", re.IGNORECASE)
 
 
 def _pins(workflow: str):
@@ -203,10 +225,12 @@ def test_diff_coverage_job_is_pull_request_only_and_read_only():
 
 def test_no_job_that_checks_out_the_tree_holds_conversation_write():
     # Issue #126: a job that checks out the tree never carries a
-    # conversation-write token. The only writers are the coverage poster and
+    # conversation-write token. The only writers are the coverage poster,
     # the claim action (issue #161; Nitjsefnie-Actions/claim#153 — a /claim on
-    # a pull request 403s without the grant), both of which run without a
-    # checkout. Every job in the catalogue with an actions/checkout step is
+    # a pull request 403s without the grant), and the pr-gate admission
+    # action (issue #166 — it comments on, closes and reopens pull requests
+    # through the API and reads the template at the base SHA; no checkout).
+    # Every job in the catalogue with an actions/checkout step is
     # scanned, so a future job cannot quietly grow pull-requests: write.
     for path in WORKFLOWS:
         workflow = yaml.safe_load(path.read_text(encoding="utf-8"))
@@ -222,9 +246,12 @@ def test_no_job_that_checks_out_the_tree_holds_conversation_write():
                     f"{path.name}: job {name!r} checks out the tree and "
                     "holds pull-requests: write")
             elif pull_write:
-                assert path.name in ("claim.yml", "coverage-comment.yml"), (
+                assert path.name in (
+                    "claim.yml", "coverage-comment.yml", "pr-gate.yml",
+                ), (
                     f"{path.name}: job {name!r} holds pull-requests: write "
-                    "but only the coverage poster and the claim action may")
+                    "but only the coverage poster, the claim action and the "
+                    "pr-gate action may")
 
 
 def test_coverage_comment_workflow_never_executes_the_tree():
@@ -304,3 +331,81 @@ def test_coverage_job_collects_its_measured_subprocesses():
         encoding="utf-8")
     assert "[run]" in rc and "include = */scripts/ci/diff_coverage.py" in rc
     assert "parallel = True" in rc
+
+
+def test_pr_gate_action_pins_the_reviewed_v2_0_0_sha():
+    # Issue #166: exactly one pr-gate pin, at the reviewed commit the
+    # Overseer pinned — Nitjsefnie-Actions/pr-gate tag v2.0.0 — with the
+    # immutable release tag as the comment, the way the codeql pins above
+    # carry theirs.
+    text = PR_GATE_WORKFLOW.read_text(encoding="utf-8")
+    pins = _PR_GATE_PIN.findall(text)
+    assert len(pins) == 1, f"expected exactly one pr-gate pin: {pins}"
+    sha, comment = pins[0]
+    assert sha == "441f855e54f4f6c98709152f2d2542031dc82f03", sha
+    assert comment == "v2.0.0", comment
+
+
+def test_pr_gate_workflow_runs_only_where_it_can_act():
+    # Issue #166: pull_request_target so a fork's pull request is still
+    # gated with a token allowed to comment and close; filtered to non-Bot
+    # non-draft (a Bot-authored reopen must not recurse, and the gate holds
+    # no opinion on drafts); one never-cancelled queue per pull request, so
+    # a queued run always follows a run that may already have closed it; and
+    # the four inputs the action requires, all from the event, never the
+    # tree.
+    workflow = yaml.safe_load(PR_GATE_WORKFLOW.read_text(encoding="utf-8"))
+    assert list(workflow[True]) == ["pull_request_target"], workflow.get("on")
+    trigger = workflow[True]["pull_request_target"]
+    assert trigger["types"] == [
+        "opened", "edited", "reopened", "ready_for_review"], trigger
+    assert workflow["permissions"] == {
+        "contents": "read", "issues": "read", "pull-requests": "write"}
+    concurrency = workflow["concurrency"]
+    assert concurrency["group"] == (
+        "pr-gate-${{ github.event.pull_request.number }}"), concurrency
+    assert concurrency["cancel-in-progress"] is False, concurrency
+    job = workflow["jobs"]["gate"]
+    assert "github.event.pull_request.user.type != 'Bot'" in job["if"], (
+        job["if"])
+    assert "github.event.pull_request.draft == false" in job["if"], job["if"]
+    assert job["timeout-minutes"] == 5, job["timeout-minutes"]
+    [step] = [step for step in job["steps"] if "uses" in step]
+    assert step["with"] == {
+        "github-token": "${{ github.token }}",
+        "repository": "${{ github.repository }}",
+        "pull-request-number": "${{ github.event.pull_request.number }}",
+        "pull-request-author": "${{ github.event.pull_request.user.login }}",
+    }, step["with"]
+
+
+def test_pr_gate_template_satisfies_the_gate_contract():
+    # Issue #166: the gate reads this template at the pull request's base
+    # SHA, so a template the parser refuses turns every pull-request run of
+    # the gate into an exit-1 refusal — the gate's first act must never be
+    # failing on every PR. Judged with the parser shapes copied at the top
+    # of this file: every `##` section carries a tagged instruction comment,
+    # names are unique (upstream keys its rules by casefolded name, so a
+    # duplicate would silently shadow), the two content-audited sections sit
+    # under the audited keys, and Footer is required and defined last — the
+    # gate's footer rule accepts it only as the body's final section.
+    template = (REPO_ROOT / ".github" / "PULL_REQUEST_TEMPLATE.md").read_text(
+        encoding="utf-8")
+    headings = list(_TEMPLATE_HEADING.finditer(template))
+    assert headings, "template defines no sections"
+    rules = {}
+    for index, heading in enumerate(headings):
+        name = " ".join(heading.group("text").split())
+        end = (headings[index + 1].start()
+               if index + 1 < len(headings) else len(template))
+        tag = _TEMPLATE_TAG.search(template[heading.end():end])
+        assert tag is not None, (
+            f'template section "{name}" carries no Required/Conditional/'
+            'Optional-tagged instruction comment')
+        assert name.casefold() not in rules, (
+            f'template section "{name}" is defined twice')
+        rules[name.casefold()] = (tag.group("tag").casefold(), index)
+    assert "footer" in rules, sorted(rules)
+    assert "bugs discovered" in rules, sorted(rules)
+    assert rules["footer"][0] == "required", rules["footer"]
+    assert rules["footer"][1] == len(rules) - 1, rules["footer"]
