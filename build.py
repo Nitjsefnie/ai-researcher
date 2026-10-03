@@ -948,8 +948,10 @@ def render_frontier_tbody(rows):
                 + '<td class="n">'
                 # A zero score is a legal AA publication (gdpvalNormalized
                 # carries literal zeros in the capture), and a score-0 row
-                # sits on this layer exactly when it is the strictly
-                # cheapest one. $/point at zero capability is not a number:
+                # sits on this layer exactly when it holds the axis's
+                # minimum cost -- strictly, or tied only with other
+                # zero-score rows. $/point at zero capability is not a
+                # number:
                 # em dash, the page's missing-value mark -- never a crash
                 # (issue #146 red an hour on the bare ZeroDivisionError)
                 # and never a "$Infinity" cell.
