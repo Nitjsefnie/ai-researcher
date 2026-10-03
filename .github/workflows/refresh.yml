@@ -621,8 +621,12 @@ jobs:
           remote="https://x-access-token:${GH_TOKEN}@github.com/${REPO}"
           scratch="${RUNNER_TEMP}/scratch"
           # Scratch repo at main's tip: git plumbing only, nothing executed
-          # from the tree, and the token never sits in a checked-out
-          # .git/config (the remote URL carries it per-command).
+          # from the tree. The remote carries the token in its URL, so it
+          # sits in this scratch's .git/config -- under RUNNER_TEMP,
+          # ephemeral, created and torn down inside this one step of this
+          # one job, and this job checks out and executes nothing from the
+          # tree. (Reviewed on PR #151: the old wording claimed the token
+          # never sat in a config; the remote add has always persisted it.)
           git init -q "${scratch}"
           git -C "${scratch}" remote add origin "${remote}"
           git -C "${scratch}" fetch --quiet origin main
@@ -680,8 +684,14 @@ jobs:
               > "${RUNNER_TEMP}/commit-msg.txt"
             sed -n '2,$p' data/aa-route-disagreement.txt >> "${RUNNER_TEMP}/commit-msg.txt"
           elif [ -f "${PAYLOAD}/commit-msg.txt" ]; then
+            # Route the differ's message into the file the commit below
+            # reads -- every branch of this selection must leave THAT file
+            # written (review C1 on PR #151: the append used to land on the
+            # payload copy, and every ordinary moved-capture hour died at
+            # the commit, exit 128).
+            cat "${PAYLOAD}/commit-msg.txt" > "${RUNNER_TEMP}/commit-msg.txt"
             printf '\n%s\n' 'Captured by .github/workflows/refresh.yml.' \
-              >> "${PAYLOAD}/commit-msg.txt"
+              >> "${RUNNER_TEMP}/commit-msg.txt"
           else
             printf '%s\n\n%s\n' \
               'Rebuild the page: forced run, AA capture unchanged' \
@@ -809,7 +819,7 @@ jobs:
           # is a literal on the pinned hub host -- the same host-pinning
           # rule publish_docs.py enforces in code -- so the credential can
           # only ever be sent there.
-          code="$(curl -fSs --connect-timeout 10 --max-time 120 \
+          code="$(curl -sS --connect-timeout 10 --max-time 120 \
             -o /tmp/publish-response.json -w '%{http_code}' \
             -H "x-docs-key: ${DOCS_HUB_API_KEY}" \
             -F 'slug=ai-researcher/frontier-models' \
@@ -819,10 +829,18 @@ jobs:
             -F 'from=ai-researcher' \
             -F 'file=@out/frontier-models.html;type=text/html' \
             https://docs.nitjsefni.eu/api/publish)"
-          # The hub answers with JSON; a non-2xx already failed the step
-          # through curl's --fail, and a 2xx carrying an error field is
-          # still a failure -- the hub uses both, the same verdict
-          # publish_docs.py computes for the hub's answers.
+          # No --fail on curl: the status is captured and branched on
+          # explicitly, so the hub's refusal body reaches the log the way
+          # publish_docs.py surfaced it (review M2 on PR #151). A transport
+          # failure still kills the step under bash -e before the verdict.
+          if [ "${code}" -lt 200 ] || [ "${code}" -ge 300 ]; then
+            echo "publish failed: HTTP ${code}:" >&2
+            cat /tmp/publish-response.json >&2
+            exit 1
+          fi
+          # A 2xx carrying an error field is still a failure -- the hub uses
+          # both, the same verdict publish_docs.py computes for the hub's
+          # answers.
           if jq -e '(.error // null) != null' /tmp/publish-response.json > /dev/null; then
             echo "publish failed: HTTP ${code} with an error field:" >&2
             cat /tmp/publish-response.json >&2

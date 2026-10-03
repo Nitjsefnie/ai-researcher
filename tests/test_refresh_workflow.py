@@ -287,9 +287,9 @@ class GateTests(unittest.TestCase):  # pylint: disable=too-many-public-methods
         run = flattened(pub_step(self.wf, "Publish to docs-hub")["run"])
 
         self.assertLess(
-            run.index("curl -fSs"), run.index("cat /tmp/publish-response.json"))
+            run.index("curl -sS"), run.index("cat /tmp/publish-response.json"))
         self.assertLess(
-            run.index("curl -fSs"),
+            run.index("curl -sS"),
             run.index('gh api "repos/$REPO/git/refs/heads/published"'))
 
     def test_the_published_ref_moves_through_the_refs_api(self):
@@ -643,3 +643,60 @@ class RouteDisagreementPublishTests(unittest.TestCase):
         self.assertLess(
             run.index("sed -n '2,$p' data/aa-route-disagreement.txt"),
             run.index("git commit -F"))
+
+    def test_every_message_branch_writes_the_file_the_commit_reads(self):
+        # Review C1/I3 on PR #151: the differ branch of the message
+        # selection appended its trailer to the payload copy while
+        # `git commit -F` read the RUNNER_TEMP file -- nothing wrote it on
+        # an ordinary moved-capture hour, and the workflow's primary
+        # publishing path died at the commit, exit 128, with every
+        # structural pin green. The pin follows the dataflow: all three
+        # branches leave the commit's file written, no branch appends to
+        # the payload copy, and the commit reads exactly that path.
+        run = flattened(pub_step(self.wf, "Commit the capture")["run"])
+        msg = '"${RUNNER_TEMP}/commit-msg.txt"'
+
+        # The disputed branch writes it directly...
+        idx_disputed = run.index("Publish disputed capture: AA routes disagree")
+        self.assertLess(run.index(f"> {msg}", idx_disputed),
+                        run.index("elif [ -f"))
+        # ...the differ branch routes the payload message into it before
+        # the trailer append...
+        idx_differ = run.index('elif [ -f "${PAYLOAD}/commit-msg.txt" ]; then')
+        idx_cat = run.index(
+            'cat "${PAYLOAD}/commit-msg.txt" > "${RUNNER_TEMP}/commit-msg.txt"',
+            idx_differ)
+        idx_append = run.index("> " + msg, idx_cat)
+        self.assertLess(idx_cat, idx_append)
+        # ...and the forced branch writes it outright.
+        idx_forced = run.index("Rebuild the page: forced run")
+        self.assertLess(idx_forced, run.index(f"> {msg}", idx_forced))
+        # No branch mutates the payload copy, and the commit consumes the
+        # one file every branch wrote.
+        self.assertNotIn('>> "${PAYLOAD}/commit-msg.txt"', run)
+        self.assertLess(run.index(f"> {msg}"),
+                        run.index("git commit -F " + msg))
+
+    def test_the_upload_mirrors_publish_docs_py(self):
+        # Review I2 on PR #151: the write job runs no repository code, so
+        # the upload is the endpoint's wire format inlined, and the step
+        # names scripts/publish_docs.py as the canonical client and mirror
+        # source. Nothing else binds the two -- this pin holds the literals
+        # that must drift together: the multipart part names, the key
+        # header, the pinned host and endpoint, and the hub's dual failure
+        # semantics (a non-2xx, or a 2xx carrying an error field).
+        raw = pub_step(self.wf, "Publish to docs-hub")["run"]
+        run = flattened(raw)
+
+        for piece in ("-F 'slug=ai-researcher/frontier-models'",
+                      "-F 'title=Frontier models — intelligence vs cost per task'",
+                      "-F 'tags=benchmarks,comparison,interactive,ai'",
+                      "-F 'project=ai-researcher'",
+                      "-F 'from=ai-researcher'",
+                      "-F 'file=@out/frontier-models.html;type=text/html'",
+                      'x-docs-key: ${DOCS_HUB_API_KEY}',
+                      "https://docs.nitjsefni.eu/api/publish",
+                      "scripts/publish_docs.py",
+                      '[ "${code}" -lt 200 ] || [ "${code}" -ge 300 ]',
+                      "jq -e '(.error // null) != null'"):
+            self.assertIn(piece, run)
