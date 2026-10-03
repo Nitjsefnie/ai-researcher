@@ -26,6 +26,7 @@ import argparse
 import datetime as dt
 import email.message
 import email.utils
+import http.client
 import json
 import os
 import pathlib
@@ -91,24 +92,46 @@ CHUNK_RE = re.compile(r'self\.__next_f\.push\(\[1,("(?:[^"\\]|\\.)*")\]\)')
 # installs, the browser suite, build, commit, publish (~7 min / 420 s
 # measured) -- on top of the capture. Worst case for the capture itself:
 #
+#     page bound: PAGE_ATTEMPTS * FETCH_TIMEOUT_SECONDS plus the backoff
+#              sleeps between attempts ((1+2) * PAGE_BACKOFF_SECONDS)
+#              = 3 * 25 + 15                                         =   90 s
 #     waits:   (ATTEMPTS - 1) * WAIT_SECONDS
 #              = 3 * 120                                             =  360 s
-#     fetches: ATTEMPTS * 2 * FETCH_TIMEOUT_SECONDS
-#              (leaderboard + detail per attempt, at the urlopen bound)
+#     fetches: ATTEMPTS * 2 * (page bound)
+#              (leaderboard + detail per attempt, each bounded as above)
 #              = 4 * 2 * 90                                          =  720 s
-#     agents:  FETCH_TIMEOUT_SECONDS, fetched once after a pair agrees
-#                                                                    =   90 s
+#     agents:  one page fetch after a pair agrees                    =   90 s
 #     total                                                        = 1170 s
 #
 # 1170 s is inside the 1200 s capture budget the suite pins
 # (RetryBoundArithmeticTests), which leaves >= 600 s of the job for
 # everything that is not the capture -- the ~420 s heal remainder, with
-# slack. The fetch terms are the per-fetch BOUND, not a promise: a slow-drip
-# body can outlast a single socket timeout, and the 600 s of headroom is
-# what absorbs the difference rather than the sum meeting the job timeout.
+# slack. The levels do NOT multiply on a hard-down site, because transport
+# exhaustion SHORT-CIRCUITS: the first page's three attempts exhaust,
+# fetch_html refuses, and the process exits within one page bound (~90 s)
+# -- the disagreement loop never reaches attempt 2. Their product
+# materializes only when every page fetch SUCCEEDS slowly (near its
+# socket bound) while the routes keep disagreeing. The fetch terms are
+# the per-attempt BOUND, not a promise: a slow-drip body can outlast a
+# single socket timeout, and the 600 s of headroom is what absorbs the
+# difference rather than the sum meeting the job timeout.
 ATTEMPTS = 4
 WAIT_SECONDS = 120
-FETCH_TIMEOUT_SECONDS = 90
+# One page-fetch ATTEMPT's stall bound -- urlopen's socket timeout, the
+# most a single attempt may stall before the page retry (issue #154)
+# declares it dead and backs off. Tighter than the pre-#154 90 s on
+# purpose: with the retry as the recovery path a stall costs one attempt
+# instead of the whole page, and the page bound stays 90 s (3 x 25 + 15),
+# so the combined worst case above is unchanged at 1170 s.
+FETCH_TIMEOUT_SECONDS = 25
+# The page-fetch retry (issue #154): a transient upstream answer -- HTTP
+# 429, a 5xx, a timeout, a dropped connection -- is retried PAGE_ATTEMPTS
+# times with linear backoff (attempt k waits k * PAGE_BACKOFF_SECONDS)
+# before the page is refused for good. A non-retryable 4xx is an ANSWER,
+# not an outage, and fails on attempt 1; the classifier's precedent is
+# audit.yml's pip-audit retry (issue #128, PR #142).
+PAGE_ATTEMPTS = 3
+PAGE_BACKOFF_SECONDS = 5
 # The exit code for a route disagreement that outlasts every re-read attempt
 # (issue #100). AA's two routes are independently cached Vercel pages whose
 # data lands at different times -- measured windows up to ~1 h -- so this
@@ -175,25 +198,64 @@ def _iso_utc(epoch: int | None) -> str:
         epoch, tz=dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
+def _retryable_transport_error(exc: BaseException) -> bool:
+    """Whether a page-fetch attempt's failure is worth another attempt.
+
+    The classifier mirrors audit.yml's pip-audit retry (issue #128): HTTP
+    429 and the 5xx family are the rate-limit and server-outage answers a
+    retry can clear; every OTHER 4xx is an answer -- a 404 is a moved page,
+    a 403 a block -- that no retry will change, so it fails on attempt 1.
+    Beyond the status code everything transport-shaped gets the full bound:
+    URLError and its reason (DNS, connect, refused, SSL), socket timeouts,
+    and dropped connections (http.client.HTTPException -- RemoteDisconnected,
+    IncompleteRead). HTTPError subclasses URLError subclasses OSError, so
+    the status-bearing exception is tested FIRST and the bare transport
+    check last.
+    """
+    if isinstance(exc, urllib.error.HTTPError):
+        return exc.code == 429 or exc.code >= 500
+    return isinstance(exc, (OSError, http.client.HTTPException))
+
+
 def fetch_html(cached: str | None, url: str = URL) -> tuple[str, int | None]:
     """The page text, plus the epoch the route's copy was generated at (or
-    None -- see _generated_epoch)."""
+    None -- see _generated_epoch).
+
+    Each page carries its own bounded retry (issue #154): a transient
+    answer is retried up to PAGE_ATTEMPTS with linear backoff, and the
+    refusal -- exhaustion or a non-retryable 4xx -- is the same one-line
+    guarded exit as before the retry existed. The #89 pair-level loop
+    sits OUTSIDE this one and never re-enters it: a refusal here ends the
+    capture, which is what keeps a hard-down site failing fast inside the
+    combined worst case documented beside the bounds."""
     if cached:
         return (pathlib.Path(cached).read_text(encoding="utf-8",
                                                errors="replace"), None)
-    req = urllib.request.Request(url, headers={"User-Agent": UA})
-    try:
-        with urllib.request.urlopen(req, timeout=FETCH_TIMEOUT_SECONDS) as r:
-            text = r.read().decode("utf-8", errors="replace")
-            return text, _generated_epoch(r.headers)
-    except (urllib.error.URLError, OSError) as exc:
-        # HTTPError subclasses URLError and socket.timeout subclasses OSError,
-        # so this is every transport shape: DNS, connect, refused status, a
-        # dead read. Same shape as the schema-change refusals -- one
-        # actionable stderr line and a nonzero exit, not a traceback
-        # (issue #66). Nothing has been written.
-        sys.exit(f"{url}: fetch failed: {exc} -- nothing was captured; "
-                 "check connectivity or the site, then re-run")
+    for attempt in range(1, PAGE_ATTEMPTS + 1):
+        try:
+            req = urllib.request.Request(url, headers={"User-Agent": UA})
+            with urllib.request.urlopen(req, timeout=FETCH_TIMEOUT_SECONDS) as r:
+                text = r.read().decode("utf-8", errors="replace")
+                return text, _generated_epoch(r.headers)
+        except (urllib.error.URLError, OSError, http.client.HTTPException) as exc:
+            # HTTPError subclasses URLError and socket.timeout subclasses
+            # OSError, so this is every transport shape: DNS, connect,
+            # refused status, a dead read, a dropped body (issue #66).
+            # The classifier decides whether the answer is transient;
+            # either way the refusal is the same one actionable stderr
+            # line, not a traceback.
+            if not _retryable_transport_error(exc) or attempt == PAGE_ATTEMPTS:
+                exhausted = f" after {attempt} attempts" if attempt > 1 else ""
+                sys.exit(f"{url}: fetch failed{exhausted}: {exc} -- nothing "
+                         "was captured; check connectivity or the site, "
+                         "then re-run")
+            delay = attempt * PAGE_BACKOFF_SECONDS
+            print(f"{url}: attempt {attempt} of {PAGE_ATTEMPTS} failed "
+                  f"({exc}); retrying in {delay}s", file=sys.stderr)
+            _sleep(delay)
+    # Unreachable while PAGE_ATTEMPTS >= 1: the last attempt's try returns
+    # on success and exits on failure, so the loop cannot fall through.
+    raise AssertionError("fetch_html ran out of attempts without a verdict")
 
 
 def flight_payload(html: str) -> str:

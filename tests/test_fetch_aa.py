@@ -2,6 +2,7 @@ import contextlib
 import datetime
 import email.message
 import email.utils
+import http.client
 import io
 import json
 import os
@@ -844,7 +845,10 @@ class TransportErrorTests(unittest.TestCase):
                 fetch_aa.STAMP = root / "captured-at.txt"
                 sys.argv = ["fetch_aa.py"]
                 with unittest.mock.patch.object(
-                        urllib.request, "urlopen", stub):
+                        urllib.request, "urlopen", stub), \
+                        unittest.mock.patch.object(
+                            fetch_aa, "_sleep",
+                            side_effect=lambda s: None):
                     buffer = io.StringIO()
                     with contextlib.redirect_stdout(buffer):
                         fetch_aa.main()
@@ -877,7 +881,9 @@ class TransportErrorTests(unittest.TestCase):
         # URLError covers DNS/connect failures, HTTPError (its subclass)
         # refused status codes, socket.timeout (an OSError) a dead read --
         # each becomes the same clean exit shape the schema guards use,
-        # naming the URL and carrying the underlying reason.
+        # naming the URL and carrying the underlying reason. Every raiser
+        # here is retryable, so the refusal names the exhaustion (issue
+        # #154) rather than pretending attempt 1 was final.
         raisers = (
             ("URLError", urllib.error.URLError("Connection refused")),
             ("HTTPError", urllib.error.HTTPError(
@@ -897,11 +903,14 @@ class TransportErrorTests(unittest.TestCase):
                 self.assertIn(fetch_aa.URL, message)
                 self.assertIn("fetch failed", message)
                 self.assertIn(str(error), message)
+                self.assertIn(
+                    f"after {fetch_aa.PAGE_ATTEMPTS} attempts", message)
 
     def test_the_guarded_refusal_is_the_whole_of_stderr_at_exit_one(self):
         # End to end: a subprocess whose urlopen is stubbed before fetch_aa
-        # loads. The observable is the process's -- exit 1, stderr exactly
-        # the actionable line, and no traceback anywhere.
+        # loads. The observable is the process's -- exit 1, the actionable
+        # line LAST on stderr after the page-retry lines (issue #154), and
+        # no traceback anywhere.
         with tempfile.TemporaryDirectory(prefix=".issue-66-subproc-") as tmp:
             runner = pathlib.Path(tmp) / "runner.py"
             runner.write_text(
@@ -913,6 +922,7 @@ class TransportErrorTests(unittest.TestCase):
                 "urllib.request.urlopen = refused\n"
                 "sys.argv = ['fetch_aa.py']\n"
                 "import fetch_aa\n"
+                "fetch_aa._sleep = lambda seconds: None\n"
                 "fetch_aa.main()\n",
                 encoding="utf-8")
             proc = subprocess.run(
@@ -921,10 +931,11 @@ class TransportErrorTests(unittest.TestCase):
 
         self.assertEqual(proc.returncode, 1)
         self.assertNotIn("Traceback", proc.stderr)
-        self.assertEqual(len(proc.stderr.strip().splitlines()), 1,
-                         proc.stderr)
-        self.assertIn("fetch failed", proc.stderr)
-        self.assertIn("Connection refused", proc.stderr)
+        lines = proc.stderr.strip().splitlines()
+        self.assertEqual(len(lines), fetch_aa.PAGE_ATTEMPTS, proc.stderr)
+        self.assertIn("retrying", lines[0], proc.stderr)
+        self.assertIn("fetch failed", lines[-1])
+        self.assertIn("Connection refused", lines[-1])
         self.assertEqual(proc.stdout, "")
 
 
@@ -961,6 +972,292 @@ def serving_dated(*entries: tuple[int, str]):
         return dated_response(page, epoch)
 
     return handler
+
+
+def flaky(*events):
+    """A urlopen route handler whose outcomes run in sequence: BaseException
+    events are raised, str events are served as pages, and the last repeats.
+    This is what AA answering one transient 500 before the real page looks
+    like to the stub (issue #154)."""
+    remaining = list(events)
+
+    def handler() -> object:
+        event = remaining.pop(0) if remaining else events[-1]
+        if isinstance(event, BaseException):
+            raise event
+        return _FakeResponse(event)
+
+    return handler
+
+
+class PageFetchRetryTests(unittest.TestCase):
+    """Issue #154: a transient upstream answer -- a 429, a 5xx, a timeout,
+    a dropped connection -- on any page the capture fetches is retried a
+    bounded number of times with backoff before the capture gives up, so
+    one momentary 500 (run 37113891861) fails an attempt, not the hour.
+
+    Every page comes through LoudUrlopenStub (unmodeled URLs raise rather
+    than touch the network) and the sleep seam is a recorder, so no test
+    really sleeps. The nesting is pinned end to end: this retry lives
+    INSIDE the issue #89 pair-level disagreement loop, and a refusal here
+    still ends the capture -- the short-circuit that keeps a hard-down
+    site failing fast inside the combined worst case documented beside
+    fetch_aa's bounds.
+    """
+
+    DETAIL_URL = fetch_aa.MODEL_DETAIL_URL.format(slug="detail-host-model")
+    LEADERBOARD = flight_html(leaderboard_payload())
+    DETAIL = flight_html(detail_payload())
+    AGENTS = flight_html(agent_payload(
+        [agent_row(f"Agent - Model {i}") for i in range(5)]))
+
+    @contextlib.contextmanager
+    def capture_over_boundary(self, routes: dict, *, seed: bool = False):
+        """fetch_aa.main() over the stubbed urlopen with the sleep seam
+        recorded. Yields (root, stub, sleeps, run, captured); `captured`
+        holds both buffers even when run() raises."""
+        stub = LoudUrlopenStub(routes)
+        sleeps: list = []
+        with tempfile.TemporaryDirectory(prefix=".issue-154-page-retry-") as tmp:
+            root = pathlib.Path(tmp)
+            old = (fetch_aa.ROOT, fetch_aa.OUT, fetch_aa.AGENTS_OUT,
+                   fetch_aa.STAMP)
+            argv = sys.argv
+            try:
+                fetch_aa.ROOT = root
+                fetch_aa.OUT = root / "aa-raw-models.json"
+                fetch_aa.AGENTS_OUT = root / "aa-raw-coding-agents.json"
+                fetch_aa.STAMP = root / "captured-at.txt"
+                if seed:
+                    # The previous capture, as a refused run must leave it.
+                    fetch_aa.OUT.write_bytes(b"SENTINEL MODELS CAPTURE")
+                    fetch_aa.AGENTS_OUT.write_bytes(b"SENTINEL AGENTS CAPTURE")
+                    fetch_aa.STAMP.write_text("2020-01-01\n", encoding="utf-8")
+                sys.argv = ["fetch_aa.py"]
+                with unittest.mock.patch.object(urllib.request, "urlopen",
+                                                stub), \
+                        unittest.mock.patch.object(fetch_aa, "_sleep",
+                                                   side_effect=sleeps.append,
+                                                   create=True):
+                    def run() -> tuple[str, str]:
+                        out, err = io.StringIO(), io.StringIO()
+                        with contextlib.redirect_stdout(out), \
+                                contextlib.redirect_stderr(err):
+                            try:
+                                fetch_aa.main()
+                            finally:
+                                captured["stdout"] = out.getvalue()
+                                captured["stderr"] = err.getvalue()
+                        return captured["stdout"], captured["stderr"]
+
+                    captured: dict = {"stdout": "", "stderr": ""}
+                    yield root, stub, sleeps, run, captured
+            finally:
+                sys.argv = argv
+                (fetch_aa.ROOT, fetch_aa.OUT, fetch_aa.AGENTS_OUT,
+                 fetch_aa.STAMP) = old
+
+    def test_a_transient_500_on_the_leaderboard_is_retried_and_captured(self):
+        # The incident shape: attempt 1 refuses with 500, attempt 2 reads
+        # the real page, and the capture lands -- with the backoff sleep
+        # and the stderr retry line as the only traces.
+        routes = {
+            fetch_aa.URL: flaky(
+                urllib.error.HTTPError(fetch_aa.URL, 500,
+                                       "Internal Server Error",
+                                       email.message.Message(), None),
+                self.LEADERBOARD),
+            self.DETAIL_URL: lambda: _FakeResponse(self.DETAIL),
+            fetch_aa.AGENTS_URL: lambda: _FakeResponse(self.AGENTS),
+        }
+        with self.capture_over_boundary(routes) as (root, stub, sleeps, run,
+                                                    _captured):
+            stdout, stderr = run()
+
+            self.assertEqual(stub.calls,
+                             [fetch_aa.URL, fetch_aa.URL, self.DETAIL_URL,
+                              fetch_aa.AGENTS_URL])
+            self.assertEqual(sleeps, [fetch_aa.PAGE_BACKOFF_SECONDS])
+            self.assertIn("attempt 1 of 3", stderr)
+            self.assertIn(
+                f"retrying in {fetch_aa.PAGE_BACKOFF_SECONDS}s", stderr)
+            self.assertIn("wrote aa-raw-models.json", stdout)
+            self.assertEqual(
+                (root / "captured-at.txt").read_text(encoding="utf-8"),
+                datetime.date.today().isoformat() + "\n")
+
+    def test_a_page_down_past_the_bound_is_refused_with_the_named_reason(self):
+        # Every attempt answers 503: the refusal is the same one-line exit
+        # as before the retry existed, naming the URL, the exhaustion and
+        # the last reason -- and the previous capture on disk is untouched,
+        # because a refused run writes nothing.
+        def unavailable():
+            raise urllib.error.HTTPError(fetch_aa.URL, 503,
+                                         "Service Unavailable",
+                                         email.message.Message(), None)
+
+        routes = {fetch_aa.URL: unavailable}
+        with self.capture_over_boundary(routes, seed=True) as (root, stub,
+                                                               sleeps, run,
+                                                               _captured):
+            with self.assertRaises(SystemExit) as caught:
+                run()
+
+            message = str(caught.exception)
+            self.assertIn(fetch_aa.URL, message)
+            self.assertIn(
+                f"fetch failed after {fetch_aa.PAGE_ATTEMPTS} attempts",
+                message)
+            self.assertIn("503", message)
+            self.assertIn("Service Unavailable", message)
+            self.assertEqual(
+                sleeps,
+                [k * fetch_aa.PAGE_BACKOFF_SECONDS
+                 for k in range(1, fetch_aa.PAGE_ATTEMPTS)])
+            self.assertEqual(stub.calls,
+                             [fetch_aa.URL] * fetch_aa.PAGE_ATTEMPTS)
+            self.assertEqual((root / "aa-raw-models.json").read_bytes(),
+                             b"SENTINEL MODELS CAPTURE")
+            self.assertEqual((root / "aa-raw-coding-agents.json").read_bytes(),
+                             b"SENTINEL AGENTS CAPTURE")
+            self.assertEqual(
+                (root / "captured-at.txt").read_text(encoding="utf-8"),
+                "2020-01-01\n", "the stamp moved on a refused capture")
+
+    def test_a_non_retryable_4xx_fails_fast_without_a_retry(self):
+        # A 404 is an answer, not an outage: attempt 1 refuses and the
+        # capture exits -- no backoff sleep, no retry line, nothing
+        # written.
+        def not_found():
+            raise urllib.error.HTTPError(fetch_aa.URL, 404, "Not Found",
+                                         email.message.Message(), None)
+
+        routes = {fetch_aa.URL: not_found}
+        with self.capture_over_boundary(routes, seed=True) as (root, stub,
+                                                               sleeps, run,
+                                                               captured):
+            with self.assertRaises(SystemExit) as caught:
+                run()
+
+            message = str(caught.exception)
+            self.assertIn(fetch_aa.URL, message)
+            self.assertIn("fetch failed", message)
+            self.assertIn("404", message)
+            self.assertEqual(sleeps, [], "the 404 was retried")
+            self.assertEqual(stub.calls, [fetch_aa.URL], "the 404 was retried")
+            self.assertNotIn("retrying", captured["stderr"])
+            self.assertNotIn("wrote", captured["stdout"])
+            self.assertEqual((root / "aa-raw-models.json").read_bytes(),
+                             b"SENTINEL MODELS CAPTURE")
+
+    def test_the_page_retry_sits_inside_the_disagreement_loop(self):
+        # The nesting pin: attempt 1's detail fetch eats one transient 500
+        # (page retry, 5s backoff) and then answers a snapshot the
+        # leaderboard disagrees with (pair retry, 120s wait); attempt 2's
+        # pair agrees and the capture lands. Both retry levels visible in
+        # one run, each with its own seam record.
+        routes = {
+            fetch_aa.URL: lambda: _FakeResponse(self.LEADERBOARD),
+            self.DETAIL_URL: flaky(
+                urllib.error.HTTPError(self.DETAIL_URL, 500,
+                                       "Internal Server Error",
+                                       email.message.Message(), None),
+                flight_html(detail_payload(intelligenceIndex=52)),
+                flight_html(detail_payload())),
+            fetch_aa.AGENTS_URL: lambda: _FakeResponse(self.AGENTS),
+        }
+        with self.capture_over_boundary(routes) as (_root, stub, sleeps, run,
+                                                    _captured):
+            stdout, stderr = run()
+
+            self.assertEqual(
+                stub.calls,
+                [fetch_aa.URL, self.DETAIL_URL, self.DETAIL_URL,
+                 fetch_aa.URL, self.DETAIL_URL, fetch_aa.AGENTS_URL])
+            self.assertEqual(sleeps,
+                             [fetch_aa.PAGE_BACKOFF_SECONDS,
+                              fetch_aa.WAIT_SECONDS])
+            self.assertIn(
+                f"retrying in {fetch_aa.PAGE_BACKOFF_SECONDS}s", stderr)
+            self.assertIn("re-reading both routes", stderr)
+            self.assertIn("wrote aa-raw-models.json", stdout)
+
+
+class TransportErrorClassifierTests(unittest.TestCase):
+    """The page-retry classifier's verdicts, at the fetch_html boundary
+    itself: which answers are transient (retried to the bound) and which
+    are final (attempt 1 refuses). The status table is audit.yml's
+    pip-audit retry (issue #128, PR #142) transplanted: 429 rides with the
+    5xx family, every other 4xx fails fast."""
+
+    def attempts_through_boundary(self, raiser) -> tuple[int, list]:
+        """fetch_html against a stubbed urlopen that always raises
+        `raiser`. -> (urlopen call count, recorded backoff sleeps)."""
+        calls: list = []
+        sleeps: list = []
+
+        def stub(request, timeout=None):
+            calls.append(request.full_url)
+            raiser()
+
+        with unittest.mock.patch.object(urllib.request, "urlopen", stub), \
+                unittest.mock.patch.object(fetch_aa, "_sleep",
+                                           side_effect=sleeps.append,
+                                           create=True):
+            with self.assertRaises(SystemExit):
+                fetch_aa.fetch_html(None, fetch_aa.URL)
+        return len(calls), sleeps
+
+    def test_http_status_verdicts(self):
+        for code, retried in ((429, True), (500, True), (502, True),
+                              (503, True), (504, True),
+                              (400, False), (403, False), (404, False),
+                              (409, False), (451, False)):
+            with self.subTest(code=code, retried=retried):
+                error = urllib.error.HTTPError(fetch_aa.URL, code, "nope",
+                                               email.message.Message(), None)
+
+                def raise_it(e=error):
+                    raise e
+
+                calls, sleeps = self.attempts_through_boundary(raise_it)
+
+                self.assertEqual(calls,
+                                 fetch_aa.PAGE_ATTEMPTS if retried else 1)
+                self.assertEqual(
+                    sleeps,
+                    [k * fetch_aa.PAGE_BACKOFF_SECONDS
+                     for k in range(1, calls)])
+
+    def test_transport_shapes_are_all_retryable(self):
+        # DNS (gaierror rides URLError), connection refused, a socket
+        # timeout, and dropped connections -- before the response
+        # (RemoteDisconnected) and mid-body (IncompleteRead): each is an
+        # outage shape, retried to the bound, never mistaken for an
+        # answer.
+        raisers = (
+            ("dns failure", urllib.error.URLError(
+                socket.gaierror(-2, "Name or service not known"))),
+            ("connection refused", urllib.error.URLError(
+                ConnectionRefusedError(111, "Connection refused"))),
+            ("socket timeout", socket.timeout(
+                "The read operation timed out")),
+            ("dropped before response", http.client.RemoteDisconnected(
+                "Remote end closed connection without response")),
+            ("dropped mid-body", http.client.IncompleteRead(b"partial")),
+        )
+        for why, error in raisers:
+            with self.subTest(why=why):
+                def raise_it(e=error):
+                    raise e
+
+                calls, sleeps = self.attempts_through_boundary(raise_it)
+
+                self.assertEqual(calls, fetch_aa.PAGE_ATTEMPTS)
+                self.assertEqual(
+                    sleeps,
+                    [k * fetch_aa.PAGE_BACKOFF_SECONDS
+                     for k in range(1, calls)])
 
 
 class RouteDisagreementRetryTests(unittest.TestCase):
@@ -1418,15 +1715,30 @@ class RetryBoundArithmeticTests(unittest.TestCase):
 
     def test_worst_case_stays_within_the_capture_budget(self):
         # The comment in fetch_aa.py commits to exactly this arithmetic: the
-        # waits, the two fetches per attempt at the 90 s socket bound, and
+        # disagreement waits, the pair fetches at the PAGE fetch bound --
+        # each page fetch itself a bounded retry since issue #154 -- and
         # the one agents fetch after a pair agrees. 1200 s is the capture
         # budget that leaves the ~7-min heal remainder room in the job's
         # 1800 s, with slack.
+        page_bound = (fetch_aa.PAGE_ATTEMPTS * fetch_aa.FETCH_TIMEOUT_SECONDS
+                      + sum(k * fetch_aa.PAGE_BACKOFF_SECONDS
+                            for k in range(1, fetch_aa.PAGE_ATTEMPTS)))
         worst_case = ((fetch_aa.ATTEMPTS - 1) * fetch_aa.WAIT_SECONDS
-                      + fetch_aa.ATTEMPTS * 2 * fetch_aa.FETCH_TIMEOUT_SECONDS
-                      + fetch_aa.FETCH_TIMEOUT_SECONDS)
+                      + fetch_aa.ATTEMPTS * 2 * page_bound
+                      + page_bound)
 
         self.assertLessEqual(worst_case, 1200)
+
+    def test_a_hard_down_site_fails_inside_the_first_page_bound(self):
+        # Issue #154's fail-fast half: transport exhaustion short-circuits
+        # the capture, so a dead AA is refused inside ONE page bound --
+        # never the disagreement loop's full product -- and the hour's run
+        # goes red fast instead of hanging toward the job timeout.
+        page_bound = (fetch_aa.PAGE_ATTEMPTS * fetch_aa.FETCH_TIMEOUT_SECONDS
+                      + sum(k * fetch_aa.PAGE_BACKOFF_SECONDS
+                            for k in range(1, fetch_aa.PAGE_ATTEMPTS)))
+
+        self.assertLessEqual(page_bound, 120)
 
     def test_the_sleep_seam_actually_sleeps(self):
         # The seam exists so no TEST ever really sleeps -- and so the wait
@@ -1625,11 +1937,14 @@ class DisagreementSnapshotTests(unittest.TestCase):
 
     def test_the_retry_bound_arithmetic_is_unchanged_by_the_refusal_path(self):
         # The refusal path deliberately does NOT fetch the coding-agents
-        # page: adding that fetch to the worst case (3 waits + 8 route
+        # page: adding that fetch to the worst case (3 waits + 8 page-bound
         # fetches + 1 agents fetch) would break the 1200 s capture budget
         # the suite pins. The agents capture a disputed build renders is the
         # last-good one in data/, not a fresh fetch.
+        page_bound = (fetch_aa.PAGE_ATTEMPTS * fetch_aa.FETCH_TIMEOUT_SECONDS
+                      + sum(k * fetch_aa.PAGE_BACKOFF_SECONDS
+                            for k in range(1, fetch_aa.PAGE_ATTEMPTS)))
         worst_case = ((fetch_aa.ATTEMPTS - 1) * fetch_aa.WAIT_SECONDS
-                      + fetch_aa.ATTEMPTS * 2 * fetch_aa.FETCH_TIMEOUT_SECONDS
-                      + fetch_aa.FETCH_TIMEOUT_SECONDS)
+                      + fetch_aa.ATTEMPTS * 2 * page_bound
+                      + page_bound)
         self.assertLessEqual(worst_case, 1200)
