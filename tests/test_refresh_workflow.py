@@ -56,7 +56,9 @@ def commands(text):
                                if not line.lstrip().startswith("#")))
 
 
-class GateTests(unittest.TestCase):
+class GateTests(unittest.TestCase):  # pylint: disable=too-many-public-methods
+    # The disable mirrors tests/test_browser.py:69: this class pins one
+    # workflow's step/job contracts, and splitting it would hide that.
     def setUp(self):
         self.wf = load()
 
