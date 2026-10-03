@@ -25,6 +25,12 @@ name: tests
 # would publish it — that job refuses a committed page lacking the stamp or
 # differing from its own stamp-less rebuild.
 #
+# A FOURTH job rides along on pull requests only. `diff-coverage` reports the
+# coverage of the change's OWN added lines — informational, never a gate
+# (issue #126) — and hands the rendered report to the `coverage comment`
+# workflow, which is the only holder of `pull-requests: write`: no job that
+# executes this tree ever carries a conversation-write token.
+#
 # THE RUNNER IS ALWAYS THE `-m` FORM — `python -m pytest`, which the coverage
 # job spells `python3 -m pytest` — NOT `pytest`, AND
 # NOT `unittest discover`. tests/ has no __init__.py and the tests `import
@@ -525,6 +531,95 @@ jobs:
           fi
           echo 'Main moved while this run measured; the next push raises instead.' \
             >> "$GITHUB_STEP_SUMMARY"
+
+  # --- The patch-coverage report ------------------------------------------
+  # INFORMATIONAL, never a gate — which is why no gate reads its result. A
+  # comment that failed to post must not be able to block a merge, and the
+  # number it reports is one a reviewer judges: a refactor that only moves
+  # code, and a fix whose test lives behind an optional dependency, both read
+  # low for reasons a threshold cannot tell apart. The ratchet in `coverage`
+  # is the gate.
+  #
+  # Pull requests only, and only when coverage produced the artifact this job
+  # consumes. A skipped ancestor must not hide that successful result. The
+  # rendered report travels to the pull request as an artifact, and the
+  # trusted `coverage comment` workflow posts it — see its header for why
+  # the poster must be a workflow_run and not this job.
+  diff-coverage:
+    if: ${{ !cancelled() && needs.coverage.result == 'success'
+            && github.event_name == 'pull_request' }}
+    needs: coverage
+    runs-on: ubuntu-latest
+
+    # Per-job ceiling, like every other job's: a hung check fails in 10
+    # minutes instead of holding GitHub's 6-hour default.
+    timeout-minutes: 10
+
+    permissions:
+      # This job reads the proposed tree, so it must not carry a token that
+      # can write conversation. The trusted workflow_run commenter owns that
+      # token.
+      contents: read
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # The merge commit the event named, and the exact SHA `coverage`
+          # measured. Resolving `refs/pull/N/merge` here instead would let
+          # GitHub hand this job a different tree than the one the coverage
+          # report describes.
+          ref: ${{ github.sha }}
+          # Both parents of that merge commit, which the diff below needs.
+          fetch-depth: 0
+          persist-credentials: false
+
+      # actions/download-artifact v8.0.1
+      - uses: >-
+          actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        with:
+          name: coverage-xml
+
+      - name: Install the pinned statement analyzer
+        # diff_coverage.py borrows coverage.py's statement analyzer — the
+        # same pinned copy requirements-test.txt gave the measuring run, so
+        # the two can never disagree about which lines are executable.
+        run: python3 -m pip install --requirement requirements-test.txt
+
+      - name: Measure the coverage of this change
+        # HEAD is the merge tree checked out above and HEAD^1 is, by
+        # construction, the base tip that was merged into it. The event
+        # payload's `base.sha` is NOT that: the base branch can advance
+        # between the event and the checkout, and every base commit merged in
+        # since would then be reported as a line this pull request added.
+        #
+        # --text is load-bearing, not decoration: the pull request controls
+        # .gitattributes on its own tree, so an attribute could render a
+        # changed source file binary and cost the whole report. --text and
+        # --no-ext-diff --no-textconv force the bytes through.
+        run: |
+          git diff --text --no-ext-diff --no-textconv --unified=0 \
+            HEAD^1 HEAD > patch.diff
+          python3 scripts/ci/diff_coverage.py \
+            --coverage coverage.xml \
+            --diff patch.diff > body.md
+          cat body.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Package the comment for the trusted commenter
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          printf '%s\n' "$PR_NUMBER" > pr-number.txt
+
+      - name: Upload the comment for the trusted commenter
+        # actions/upload-artifact v7.0.1
+        uses: >-
+          actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: diff-coverage-comment
+          path: |
+            body.md
+            pr-number.txt
+          if-no-files-found: error
 
   # --- The committed-page check -------------------------------------------
   # Issue #105: out/frontier-models.html gets its "Source commit <code>…

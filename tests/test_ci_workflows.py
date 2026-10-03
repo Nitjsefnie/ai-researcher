@@ -179,3 +179,94 @@ def test_only_ratchet_push_holds_contents_write():
     assert not [s for s in push["steps"]
                 if s.get("uses", "").startswith("actions/checkout@")], (
         "ratchet-push runs no repository code: no checkout step")
+
+
+def test_diff_coverage_job_is_pull_request_only_and_read_only():
+    # Issue #126: the patch-coverage job runs the diff against the exact
+    # tree coverage measured, on pull requests only, and holds read-only
+    # credentials — the rendered comment travels as an artifact to the
+    # trusted workflow_run poster, so this job never needs conversation
+    # write.
+    workflow = yaml.safe_load(TESTS_WORKFLOW.read_text(encoding="utf-8"))
+    job = workflow["jobs"]["diff-coverage"]
+    assert "pull_request" in job["if"], job["if"]
+    assert "needs.coverage.result == 'success'" in job["if"], job["if"]
+    # YAML reads the scalar `needs: coverage` as a string, not a list.
+    assert job["needs"] in ("coverage", ["coverage"]), job["needs"]
+    assert job["permissions"] == {"contents": "read"}
+    [checkout] = [s for s in job["steps"] if "uses" in s
+                  and s["uses"].startswith("actions/checkout@")]
+    assert checkout["with"]["ref"] == "${{ github.sha }}", checkout["with"]
+    assert checkout["with"]["fetch-depth"] == 0
+    assert checkout["with"]["persist-credentials"] is False
+
+
+def test_no_job_that_checks_out_the_tree_holds_conversation_write():
+    # Issue #126: the comment poster is the ONE conversation writer, and it
+    # must be the workflow that never checks the tree out. Every job in the
+    # catalogue with an actions/checkout step is scanned, so a future job
+    # cannot quietly grow pull-requests: write.
+    for path in WORKFLOWS:
+        workflow = yaml.safe_load(path.read_text(encoding="utf-8"))
+        for name, job in (workflow.get("jobs") or {}).items():
+            checks_out = any(
+                "uses" in step and step["uses"].startswith("actions/checkout@")
+                for step in job.get("steps", []))
+            requested = (job.get("permissions")
+                         or workflow.get("permissions") or {})
+            pull_write = requested.get("pull-requests") == "write"
+            if checks_out:
+                assert not pull_write, (
+                    f"{path.name}: job {name!r} checks out the tree and "
+                    "holds pull-requests: write")
+            elif pull_write:
+                assert path.name == "coverage-comment.yml", (
+                    f"{path.name}: job {name!r} holds pull-requests: write "
+                    "but the poster must be coverage-comment.yml")
+
+
+def test_coverage_comment_workflow_never_executes_the_tree():
+    workflow = yaml.safe_load(
+        (REPO_ROOT / ".github" / "workflows" / "coverage-comment.yml")
+        .read_text(encoding="utf-8"))
+    # The trusted half: triggered only by the tests workflow completing,
+    # filtered to its pull_request runs, and it checks out nothing — the
+    # only thing crossing from the pull request is the TEXT of a comment.
+    assert list(workflow[True]) == ["workflow_run"], workflow.get("on")
+    assert workflow[True]["workflow_run"]["workflows"] == ["tests"]
+    [job] = workflow["jobs"].values()
+    assert "github.event.workflow_run.event == 'pull_request'" in job["if"]
+    assert not [s for s in job["steps"] if "uses" in s
+                and s["uses"].startswith("actions/checkout@")]
+    # The write lives at workflow level: the single job inherits it.
+    assert workflow["permissions"] == {
+        "pull-requests": "write", "actions": "read", "checks": "write"}
+
+
+def test_coverage_job_is_unconditional_in_tests_workflow():
+    # The comment workflow treats "run failed or cancelled" as the only
+    # not-measured shapes because the coverage job is unconditional: a
+    # successful run always carries the artifact. If a skip condition ever
+    # lands on the coverage job, this pin fails and the comment workflow's
+    # missing-artifact handling needs its success case back.
+    workflow = yaml.safe_load(TESTS_WORKFLOW.read_text(encoding="utf-8"))
+    assert "if" not in workflow["jobs"]["coverage"], (
+        "the coverage job grew a skip condition; the comment workflow's "
+        "mark-missing step assumes an unconditional coverage job")
+
+
+def test_the_comment_artifact_name_spans_both_workflows():
+    # One artifact carries the rendered comment from the producer to the
+    # poster; the two sides name it independently, so the shared literal is
+    # pinned across the pair rather than per file.
+    tests = yaml.safe_load(TESTS_WORKFLOW.read_text(encoding="utf-8"))
+    comment = yaml.safe_load(
+        (REPO_ROOT / ".github" / "workflows" / "coverage-comment.yml")
+        .read_text(encoding="utf-8"))
+    [upload] = [s for s in tests["jobs"]["diff-coverage"]["steps"]
+                if s.get("name") == "Upload the comment for the trusted "
+                                    "commenter"]
+    [download] = [s for s in comment["jobs"]["comment"]["steps"]
+                  if s.get("name") == "Download the comment artifact"]
+    assert upload["with"]["name"] == download["with"]["name"] == (
+        "diff-coverage-comment")
