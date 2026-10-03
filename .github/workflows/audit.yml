@@ -15,8 +15,11 @@ name: audit
 # dependency tree of its own, and that is where an advisory lands.
 #
 # NOT HERMETIC, ON PURPOSE. The requirements files pin the direct tools only
-# — no lockfile, no hashes — so every install resolves its transitive tree
-# fresh at run time. That is what gives this gate its subject: the
+# — no lockfile — so every install resolves its transitive tree fresh at run
+# time. The one exception is requirements-zizmor.txt, whose single package
+# carries --hash lines for actionlint.yml's --require-hashes install
+# (issue #127); zizmor declares no dependencies, so nothing else was frozen
+# to get there. That is what gives this gate its subject: the
 # transitives are exactly where an advisory lands, and a frozen tree would go
 # stale exactly when an advisory did. The recorded cost (issue #50): with
 # zero repository change, a transitive release can turn CI red — here, or in
@@ -86,19 +89,28 @@ jobs:
         # From requirements-pip-audit.txt rather than an inline pin:
         # Dependabot's pip ecosystem reads manifest files, never a `run:`
         # block, so the inline pin was a version nothing ever bumped
-        # (issue #50).
-        run: |
-          python3 -m pip install --upgrade pip
-          python3 -m pip install -r requirements-pip-audit.txt
+        # (issue #50). The manifest itself stays unhashed (issue #127): this
+        # workflow audits it per-manifest below, so a tampered pip-audit
+        # artifact is exactly what the audit step would surface.
+        #
+        # There is deliberately no `pip install --upgrade pip` here: the
+        # unreviewed pip upgrade is an unaudited component — the very thing
+        # this gate judges — and the runner's stock pip installs the pinned
+        # manifest.
+        run: python3 -m pip install -r requirements-pip-audit.txt
 
       - name: Audit dependencies
-        # All four requirements files in one invocation: a package constrained
-        # by two of them is resolved once, consistently — the same way an
-        # install would see it. The two gate tools' own trees join the audit
-        # with this change (requirements-zizmor.txt,
-        # requirements-pip-audit.txt): both run in CI with the repository
-        # token, and until they grew manifest files neither was audited at
-        # all (issue #50).
+        # Each requirements file gets its OWN pip-audit invocation, so every
+        # manifest is audited the way its own install consumes it. The
+        # former single invocation over all four is unshippable since
+        # requirements-zizmor.txt grew --hash lines for actionlint.yml's
+        # --require-hashes install (issue #127): pip-audit resolves ALL
+        # --requirement files in one internal pip dry-run, and a hash-pinned
+        # manifest beside un-hashed ones flips that resolution into
+        # --require-hashes mode, which fails on the hashes the other
+        # manifests do not carry (observed on pr-gate's first run of this
+        # step). A manifest added at the repository root joins this audit
+        # without editing this workflow.
         #
         # No --ignore-vuln entries at present.
         #
@@ -107,33 +119,58 @@ jobs:
         # produces the same exit status as a real finding. A blanket retry
         # would re-run a genuine vulnerability three times before reporting
         # it, and a gate that goes red for reasons unrelated to its subject is
-        # one people learn to ignore. So this retries ONLY when the output
-        # carries a transport error, and reports anything else verbatim.
+        # one people learn to ignore. So this retries ONLY transport/service
+        # failures — connection errors, could-not-connect, SSLError, HTTP 5xx,
+        # rate-limited 429 (the sole retried 4xx, so a 403/404 exits
+        # immediately), and a ServiceError exception (issue #128). Findings
+        # and every other failure are reported verbatim.
         run: |
-          for attempt in 1 2 3; do
-            if pip-audit \
-                 --progress-spinner off \
-                 --requirement requirements-dev.txt \
-                 --requirement requirements-test.txt \
-                 --requirement requirements-zizmor.txt \
-                 --requirement requirements-pip-audit.txt \
-                 > audit.out 2>&1; then
-              cat audit.out
-              exit 0
-            fi
-
-            if grep -qiE 'connection (aborted|reset|error)|read timed out|temporary failure in name resolution' audit.out; then
-              echo "attempt $attempt: transport failure talking to PyPI, retrying"
-              tail -n 5 audit.out
-              sleep $(( attempt * 15 ))
-              continue
-            fi
-
-            echo "pip-audit reported findings:" >&2
-            cat audit.out >&2
+          shopt -s nullglob
+          manifests=(requirements*.txt)
+          if [ "${#manifests[@]}" -eq 0 ]; then
+            echo "no requirements*.txt manifest at the repository root; nothing to audit" >&2
             exit 1
-          done
+          fi
 
-          echo "pip-audit could not reach PyPI after 3 attempts:" >&2
-          cat audit.out >&2
-          exit 1
+          for manifest in "${manifests[@]}"; do
+            echo "auditing $manifest"
+            resolved=0
+            for attempt in 1 2 3; do
+              if pip-audit \
+                   --progress-spinner off \
+                   --requirement "$manifest" \
+                   > audit.out 2>&1; then
+                cat audit.out
+                resolved=1
+                break
+              fi
+
+              if grep -qiE '4[0-9][0-9] Client Error' audit.out \
+                  && ! grep -qiE '429 (Client Error|Too Many Requests)' audit.out; then
+                echo "pip-audit failed with a non-retryable 4xx client error:" >&2
+                cat audit.out >&2
+                exit 1
+              fi
+
+              if grep -qiE 'connection (aborted|reset|error)|read timed out|temporary failure in name resolution' audit.out \
+                  || grep -qiE 'Could not connect to (PyPI|OSV).*vulnerability feed' audit.out \
+                  || grep -qiE '(^|[[:space:]])[[:alnum:]_.]*SSLError:' audit.out \
+                  || grep -qiE '5[0-9][0-9] Server Error|502 Bad Gateway|503 Service Unavailable|504 Gateway Timeout|429 (Client Error|Too Many Requests)' audit.out \
+                  || grep -qiE '(^|[[:space:]])(pip_audit\._service\.interface\.)?ServiceError:' audit.out; then
+                echo "attempt $attempt: transport/service failure talking to PyPI, retrying"
+                tail -n 5 audit.out
+                sleep $(( attempt * 15 ))
+                continue
+              fi
+
+              echo "pip-audit reported findings:" >&2
+              cat audit.out >&2
+              exit 1
+            done
+
+            if [ "$resolved" -eq 0 ]; then
+              echo "pip-audit could not reach PyPI after 3 attempts on $manifest:" >&2
+              cat audit.out >&2
+              exit 1
+            fi
+          done

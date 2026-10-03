@@ -17,7 +17,10 @@ name: actionlint
 #
 # Both tools are pinned. actionlint is verified by checksum rather than
 # trusted from the release page, because a linter that runs before every other
-# gate is a supply-chain position worth defending.
+# gate is a supply-chain position worth defending. zizmor is hash-pinned in
+# requirements-zizmor.txt and installed with --require-hashes (issue #127):
+# the tool that judges every workflow's supply chain is itself installed
+# byte-for-byte as reviewed.
 #
 # Suppressions belong at the offending line as a `# zizmor: ignore[rule]`
 # comment WITH a justification, never as a raised --min-severity here: a
@@ -108,9 +111,12 @@ jobs:
         # From requirements-zizmor.txt rather than an inline pin: Dependabot's
         # pip ecosystem reads manifest files, never a `run:` block, so the
         # inline pin was a version nothing ever bumped (issue #50).
-        run: |
-          python3 -m pip install --upgrade pip
-          python3 -m pip install -r requirements-zizmor.txt
+        # --require-hashes installs the manifest byte-for-byte as reviewed
+        # (issue #127). There is deliberately no `pip install --upgrade pip`
+        # here: the unreviewed pip upgrade is an unaudited component — the
+        # very thing the audit gate judges — and the runner's stock pip
+        # installs the pinned manifest.
+        run: python3 -m pip install --require-hashes -r requirements-zizmor.txt
 
       - name: actionlint
         id: actionlint
