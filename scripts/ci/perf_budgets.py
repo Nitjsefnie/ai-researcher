@@ -311,9 +311,10 @@ def code_bytes(raw):
     (issue #112). The DISPUTED page (issue #118) is the one exception: its
     banner is build-time HTML outside every excised region and carries the
     window's counts, so the quantity moves by ~1.5 KB with the disputed
-    mode -- the budget covers that shape (measured at re-seed time), and a
-    disputed build is exactly the shape the gate sees when a window is
-    live.
+    mode. The suite's gate measures a deterministic normal-mode fixture
+    page since #153, so the disputed shape is out of the gate's view by
+    construction; `--check` still measures the checkout's own capture and
+    sees the disputed shape during a window.
     """
     spans = _row_regions(raw)
     return len(raw) - sum(end - start for start, end in spans)

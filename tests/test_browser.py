@@ -378,8 +378,13 @@ class BrowserInteractionTests(unittest.TestCase):
         # elsewhere. Every pinned name must be visible on every chart that
         # draws the pinned point. A pin is page-global, so pins made on one
         # chart must also survive wherever the pinned row renders on another.
+        # #153: the page is this test's own deterministic fixture, and every
+        # expectation -- which names exist, how many are pickable -- derives
+        # from that fixture, never from the ambient capture. A disputed
+        # window labels its points "Pin ... (disputed values)" and AA's
+        # rollout size moves freely, so pin expectations read off the live
+        # page break in exactly the hours the suite must stay green.
         page = self.browser.new_page(viewport={"width": 1280, "height": 900})
-        page.goto(build.OUT.as_uri())
         chart_labels = {"coding": "Coding Agent Index",
                         "intelligence": "Intelligence Index",
                         "agentic": "GDPval-AA v2",
@@ -387,61 +392,96 @@ class BrowserInteractionTests(unittest.TestCase):
         # 40 pins on the intelligence chart -- the crowd the audit used, enough
         # to exhaust the clear slots -- plus a couple on every other chart so
         # each chart guarantees its own pins. Agent-run rows never share names
-        # with model rows, so the coding chart can only pin its own rows.
-        pin_counts = {"intelligence": 40, "coding": 2, "agentic": 2,
+        # with model rows, so the coding chart can only pin its own rows. The
+        # fixture carries the crowd plus a fresh pair per later chart (a pin
+        # is page-global: pinning a name again would toggle it OFF), and the
+        # picks below are looked up on the page BY the fixture's own names.
+        pin_counts = {"intelligence": PIN_CROWD,
+                      "coding": len(_PROBE_AGENTS), "agentic": 2,
                       "parameters": 2}
-        pinned = {}
-        already = set()
-        for chart, label in chart_labels.items():
-            suffix = f" on the {label} chart"
-            points = page.locator(f"#svg-{chart} circle.pt")
-            aris = page.evaluate(
-                "sel => [...document.querySelectorAll(sel)]"
-                ".map(c => c.getAttribute('aria-label'))",
-                f"#svg-{chart} circle.pt")
-            # a pin is keyed by name and page-global, so pinning the same row
-            # through a second chart would toggle it OFF again -- pick rows
-            # no earlier chart has pinned
-            pick = []
-            for i, aria in enumerate(aris):
-                if not (aria.startswith("Pin ") and aria.endswith(suffix)):
-                    continue
-                name = aria[len("Pin "):-len(suffix)]
-                if name in already:
-                    continue
-                pick.append((i, name))
-                if len(pick) == pin_counts[chart]:
-                    break
-            self.assertEqual(len(pick), pin_counts[chart],
-                             f"could not pick {pin_counts[chart]} fresh names on {chart}")
-            for i, _ in pick:
-                points.nth(i).focus()
-                points.nth(i).press("Enter")
-            pinned[chart] = [n for _, n in pick]
-            already.update(pinned[chart])
+        models = _probe_models(PIN_CROWD + pin_counts["agentic"]
+                               + pin_counts["parameters"])
+        agents = _PROBE_AGENTS
+        names = [m["name"] for m in models]
+        fresh = {
+            "coding": [a["displayLabel"] for a in agents],
+            "intelligence": names[:pin_counts["intelligence"]],
+            "agentic": names[pin_counts["intelligence"]:
+                             pin_counts["intelligence"]
+                             + pin_counts["agentic"]],
+            "parameters": names[pin_counts["intelligence"]
+                                + pin_counts["agentic"]:],
+        }
+        with tempfile.TemporaryDirectory(prefix=".issue-153-pins-",
+                                         dir=build.ROOT) as tmp:
+            root = pathlib.Path(tmp)
+            raw, agents_raw = root / "models.json", root / "coding-agents.json"
+            output = root / "frontier-models.html"
+            raw.write_text(json.dumps(models), encoding="utf-8")
+            agents_raw.write_text(json.dumps(agents), encoding="utf-8")
+            old_raw, old_agents, old_out = (
+                build.RAW, build.AGENTS_RAW, build.OUT)
+            try:
+                build.RAW, build.AGENTS_RAW, build.OUT = (
+                    raw, agents_raw, output)
+                with contextlib.redirect_stdout(io.StringIO()):
+                    build.main()
+                page.goto(output.as_uri())
 
-        # every chart labels every one of its own pinned points
-        for chart in chart_labels:
-            labels = page.locator(f"#svg-{chart} text.lbl").all_text_contents()
-            missing = [n for n in pinned[chart] if n not in labels]
-            self.assertEqual(
-                missing, [],
-                f"pinned names dropped on the {chart} chart")
+                pinned = {}
+                for chart, label in chart_labels.items():
+                    suffix = f" on the {label} chart"
+                    points = page.locator(f"#svg-{chart} circle.pt")
+                    aris = page.evaluate(
+                        "sel => [...document.querySelectorAll(sel)]"
+                        ".map(c => c.getAttribute('aria-label'))",
+                        f"#svg-{chart} circle.pt")
+                    pick = []
+                    for want in fresh[chart]:
+                        aria = f"Pin {want}{suffix}"
+                        matches = [i for i, a in enumerate(aris) if a == aria]
+                        self.assertEqual(
+                            len(matches), 1,
+                            f"{want!r} is not pinnable exactly once on "
+                            f"{chart}: {aris}")
+                        pick.append((matches[0], want))
+                    self.assertEqual(
+                        len(pick), pin_counts[chart],
+                        f"could not pick {pin_counts[chart]} fresh names "
+                        f"on {chart}")
+                    for i, _ in pick:
+                        points.nth(i).focus()
+                        points.nth(i).press("Enter")
+                    pinned[chart] = [n for _, n in pick]
 
-        # and wherever a pinned row renders on ANOTHER chart, its label
-        # survives there too (the pin set is page-global)
-        for chart, label in chart_labels.items():
-            aria = page.evaluate(
-                "sel => [...document.querySelectorAll(sel)]"
-                ".map(c => c.getAttribute('aria-label'))",
-                f"#svg-{chart} circle.pt")
-            foreign = {n for names in pinned.values() for n in names
-                       if f"Pin {n} on the {label} chart" in aria}
-            labels = page.locator(f"#svg-{chart} text.lbl").all_text_contents()
-            self.assertEqual(
-                [n for n in foreign if n not in labels], [],
-                f"cross-chart pinned names dropped on the {chart} chart")
-        page.close()
+                # every chart labels every one of its own pinned points
+                for chart in chart_labels:
+                    labels = page.locator(
+                        f"#svg-{chart} text.lbl").all_text_contents()
+                    missing = [n for n in pinned[chart] if n not in labels]
+                    self.assertEqual(
+                        missing, [],
+                        f"pinned names dropped on the {chart} chart")
+
+                # and wherever a pinned row renders on ANOTHER chart, its
+                # label survives there too (the pin set is page-global)
+                for chart, label in chart_labels.items():
+                    aria = page.evaluate(
+                        "sel => [...document.querySelectorAll(sel)]"
+                        ".map(c => c.getAttribute('aria-label'))",
+                        f"#svg-{chart} circle.pt")
+                    foreign = {n for names in pinned.values() for n in names
+                               if f"Pin {n} on the {label} chart" in aria}
+                    labels = page.locator(
+                        f"#svg-{chart} text.lbl").all_text_contents()
+                    self.assertEqual(
+                        [n for n in foreign if n not in labels], [],
+                        f"cross-chart pinned names dropped on the {chart} "
+                        "chart")
+            finally:
+                build.RAW, build.AGENTS_RAW, build.OUT = (
+                    old_raw, old_agents, old_out)
+                page.close()
 
     def test_unpinned_labels_still_refuse_when_no_clear_space(self):
         # #27's flip side, as a guard: the pin fallback must stay pin-only.
@@ -1298,6 +1338,15 @@ class PerfBudgetTests(unittest.TestCase):
     journeys come from the harness's own runners
     (scripts/ci/perf_budgets.py) and the verdict from its own gate, so
     this class and `perf_budgets.py --check` cannot drift.
+
+    The gated page is built from this class's own DETERMINISTIC fixture
+    capture (#153), never the ambient data/: budgets measure code cost
+    and must be capture-size-invariant (issue #112), but an ambient
+    disputed window moves the measured shape anyway -- the disputed
+    layer scales the hover tooltip's DOM work with the page it lands
+    on, and AA's rollout size changes the scale underneath. The fixture
+    is byte-identical every run, so what the budgets were seeded from
+    is what the gate measures at enforcement time, whatever AA ships.
     """
 
     @classmethod
@@ -1309,12 +1358,25 @@ class PerfBudgetTests(unittest.TestCase):
         # never touched (#114); tearDownClass restores the module path.
         # The source stamp is stripped for the build so the bytes this
         # class gates are the canonical stamp-less build the budgets were
-        # seeded from, whatever the ambient environment carries.
-        cls._saved_out = build.OUT
+        # seeded from, whatever the ambient environment carries. The
+        # capture behind the build is the class's deterministic fixture
+        # (#153): the same synthetic the decoupling proof below measures,
+        # written into the temp dir so the ambient data/ -- its disputed
+        # window included -- never reaches the gate.
+        cls._saved = (build.RAW, build.AGENTS_RAW, build.OUT)
         # The directory outlives this setup -- tearDownClass cleans it up
         # after the browser closes -- so it cannot live in a with.
         cls._page_dir = tempfile.TemporaryDirectory(  # pylint: disable=consider-using-with
             prefix=".issue-114-perf-", dir=build.ROOT)
+        data = pathlib.Path(cls._page_dir.name) / "data"
+        data.mkdir()
+        (data / "models.json").write_text(
+            json.dumps(_probe_models(_PERF_FIXTURE_MODELS)),
+            encoding="utf-8")
+        (data / "coding-agents.json").write_text(
+            json.dumps(_PROBE_AGENTS), encoding="utf-8")
+        build.RAW = data / "models.json"
+        build.AGENTS_RAW = data / "coding-agents.json"
         build.OUT = pathlib.Path(cls._page_dir.name) / "frontier-models.html"
         saved_stamp = os.environ.pop("AA_SOURCE_COMMIT", None)
         try:
@@ -1335,7 +1397,7 @@ class PerfBudgetTests(unittest.TestCase):
                 args=["--no-sandbox", "--js-flags=--expose-gc"],
             )
         except BaseException:
-            build.OUT = cls._saved_out
+            build.RAW, build.AGENTS_RAW, build.OUT = cls._saved
             cls._page_dir.cleanup()
             raise
         finally:
@@ -1344,9 +1406,9 @@ class PerfBudgetTests(unittest.TestCase):
 
     @classmethod
     def tearDownClass(cls):
-        # Restore the module path first, mirroring BrowserInteractionTests:
+        # Restore the module paths first, mirroring BrowserInteractionTests:
         # a browser-close failure must not leave build.OUT at the temp path.
-        build.OUT = cls._saved_out
+        build.RAW, build.AGENTS_RAW, build.OUT = cls._saved
         cls._page_dir.cleanup()
         cls.browser.close()
         cls.playwright.stop()
@@ -1493,6 +1555,26 @@ class PerfBudgetTests(unittest.TestCase):
             findings, [],
             "the gate red on a capture whose growth it was rebuilt to "
             "survive -- a budget moved with the data")
+
+
+# The pin crowd test_pinned_names_stay_labelled_on_every_chart pins on the
+# intelligence chart: the audit's count (#27), large enough to exhaust the
+# clear slots so the clamp fallback is the only option. A property of the
+# test's own fixture -- never of the ambient capture (#153).
+PIN_CROWD = 40
+
+# The row count of PerfBudgetTests' deterministic fixture capture (#153).
+# Measured on this box, 8 runs: code_bytes 78687 against the committed 79700;
+# long_task_count maxima load 1 / filter 1 / sort 1 / hover 0 against the
+# committed 2 / 2 / 2 / 1; hover dom_nodes_mutated 32 against the committed
+# 40 -- every budget met with margin, the load journey still crossing the
+# 50 ms threshold so the long-task family keeps gating. 58 rows (the
+# decoupling proof's large size) also passes but occasionally pushes hover's
+# single long task onto its budget of 1, so the reference page sits at the
+# largest size probed that keeps the tightest budget clear. A property of
+# the gate's own page -- never of the ambient capture. Re-measure before
+# changing.
+_PERF_FIXTURE_MODELS = 40
 
 
 def _probe_models(count):
