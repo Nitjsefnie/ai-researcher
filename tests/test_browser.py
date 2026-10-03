@@ -644,62 +644,123 @@ class BrowserInteractionTests(unittest.TestCase):
                 page.close()
 
     def test_missing_lab_renders_as_em_dash_on_every_surface(self):
-        # #28: the two "Devin Fusion CLI" coding-agent rows carry creator:"",
-        # and a missing value must render as the page's em dash everywhere --
-        # never as a blank option, cell or export field (AGENTS.md).
+        # #28: a coding-agent run whose capture record carries no creator
+        # (today's Devin Fusion CLI rows: display carries agent/model but no
+        # creator) must render the em dash everywhere -- never a blank
+        # option, cell or export field (AGENTS.md). #159: the page is this
+        # test's own deterministic fixture and every expectation -- which
+        # rows exist and how many match -- derives from it, never from the
+        # ambient capture, so AA republishing a different Devin run count
+        # leaves the guarantee intact and the suite green.
+        devin_runs = [
+            {"id": "devin-probe-1",
+             "agentName": "Devin Fusion CLI Probe Run One",
+             "displayLabel": "Devin Fusion CLI - Probe Run One",
+             "hostModelSlug": "probe-model-0000",
+             "display": {"agent": "Devin Fusion CLI",
+                         "model": "Probe Run One"},
+             "indexScore": 0.61, "mean": {"costUsd": 3.1,
+                                          "agentWallTimeSec": 810.0}},
+            {"id": "devin-probe-2",
+             "agentName": "Devin Fusion CLI Probe Run Two",
+             "displayLabel": "Devin Fusion CLI - Probe Run Two",
+             "hostModelSlug": "probe-model-0001",
+             "display": {"agent": "Devin Fusion CLI",
+                         "model": "Probe Run Two"},
+             "indexScore": 0.52, "mean": {"costUsd": 2.3,
+                                          "agentWallTimeSec": 760.0}},
+            {"id": "devin-probe-3",
+             "agentName": "Devin Fusion CLI Probe Run Three",
+             "displayLabel": "Devin Fusion CLI - Probe Run Three",
+             "hostModelSlug": "probe-model-0002",
+             "display": {"agent": "Devin Fusion CLI",
+                         "model": "Probe Run Three"},
+             "indexScore": 0.44, "mean": {"costUsd": 1.7,
+                                          "agentWallTimeSec": 690.0}},
+        ]
+
+        # No creator key in display -- the ambient shape of a run whose
+        # model's lab AA has not published -- so every Devin row's creator
+        # is "" and must render as the em dash. The probe agents and models
+        # carry "Probe Lab", the present-lab contrast.
+        agents = list(_PROBE_AGENTS) + devin_runs
+        models = _probe_models(6)
+        devin_count = len(devin_runs)
         page = self.browser.new_page(viewport={"width": 1280, "height": 900})
-        page.goto(build.OUT.as_uri())
+        with tempfile.TemporaryDirectory(prefix=".issue-159-missing-lab-",
+                                         dir=build.ROOT) as tmp:
+            root = pathlib.Path(tmp)
+            raw, agents_raw = root / "models.json", root / "coding-agents.json"
+            output = root / "frontier-models.html"
+            raw.write_text(json.dumps(models), encoding="utf-8")
+            agents_raw.write_text(json.dumps(agents), encoding="utf-8")
+            old_raw, old_agents, old_out = (
+                build.RAW, build.AGENTS_RAW, build.OUT)
+            try:
+                build.RAW, build.AGENTS_RAW, build.OUT = (
+                    raw, agents_raw, output)
+                with contextlib.redirect_stdout(io.StringIO()):
+                    build.main()
+                page.goto(output.as_uri())
 
-        with self.subTest("lab filter dropdown"):
-            options = page.locator("#fLab option").all_text_contents()
-            self.assertNotIn("", options)
-            self.assertEqual(options[0], "All labs")
+                with self.subTest("lab filter dropdown"):
+                    options = page.locator("#fLab option").all_text_contents()
+                    self.assertNotIn("", options)
+                    self.assertEqual(options[0], "All labs")
 
-        with self.subTest("chart tooltip"):
-            devin = page.locator(
-                "#svg-coding circle.pt[aria-label^='Pin Devin Fusion CLI']")
-            self.assertGreater(devin.count(), 0)
-            devin.first.hover()
-            lab_row = page.locator("#tip-coding .trow").filter(has_text="Lab")
-            self.assertEqual(lab_row.count(), 1)
-            self.assertEqual(lab_row.first.locator(".tv").inner_text(), "—")
+                with self.subTest("chart tooltip"):
+                    devin = page.locator(
+                        "#svg-coding "
+                        "circle.pt[aria-label^='Pin Devin Fusion CLI']")
+                    self.assertEqual(devin.count(), devin_count)
+                    devin.first.hover()
+                    lab_row = page.locator("#tip-coding .trow").filter(
+                        has_text="Lab")
+                    self.assertEqual(lab_row.count(), 1)
+                    self.assertEqual(
+                        lab_row.first.locator(".tv").inner_text(), "—")
 
-        with self.subTest("full table"):
-            rows = page.locator("#tbl tbody tr").filter(
-                has_text="Devin Fusion CLI")
-            self.assertEqual(rows.count(), 2)
-            for row in rows.all():
-                self.assertEqual(row.locator("td").nth(1).inner_text(), "—")
+                with self.subTest("full table"):
+                    rows = page.locator("#tbl tbody tr").filter(
+                        has_text="Devin Fusion CLI")
+                    self.assertEqual(rows.count(), devin_count)
+                    for row in rows.all():
+                        self.assertEqual(
+                            row.locator("td").nth(1).inner_text(), "—")
 
-        stub = """() => {
-          window.__copied = null;
-          Object.defineProperty(navigator, 'clipboard', {
-            value: { writeText: t => { window.__copied = t;
-                                       return Promise.resolve(); } },
-            configurable: true,
-          });
-        }"""
-        with self.subTest("copy as markdown"):
-            page.evaluate(stub)
-            page.locator("#copyMd").click()
-            md = page.evaluate("() => window.__copied")
-            self.assertIsNotNone(md)
-            devin_lines = [line for line in md.split("\n")
-                           if line.startswith("| Devin Fusion CLI")]
-            self.assertEqual(len(devin_lines), 2)
-            for line in devin_lines:
-                self.assertEqual(line.split(" | ")[1], "—")
+                stub = """() => {
+                  window.__copied = null;
+                  Object.defineProperty(navigator, 'clipboard', {
+                    value: { writeText: t => { window.__copied = t;
+                                               return Promise.resolve(); } },
+                    configurable: true,
+                  });
+                }"""
+                with self.subTest("copy as markdown"):
+                    page.evaluate(stub)
+                    page.locator("#copyMd").click()
+                    md = page.evaluate("() => window.__copied")
+                    self.assertIsNotNone(md)
+                    devin_lines = [line for line in md.split("\n")
+                                   if line.startswith("| Devin Fusion CLI")]
+                    self.assertEqual(len(devin_lines), devin_count)
+                    for line in devin_lines:
+                        self.assertEqual(line.split(" | ")[1], "—")
 
-        with self.subTest("copy as json"):
-            page.evaluate(stub)
-            page.locator("#copyJson").click()
-            exported = json.loads(page.evaluate("() => window.__copied"))
-            devin_rows = [m for m in exported["models"]
-                          if m["name"].startswith("Devin Fusion CLI")]
-            self.assertEqual(len(devin_rows), 2)
-            for row in devin_rows:
-                self.assertEqual(row["creator"], "—")
-        page.close()
+                with self.subTest("copy as json"):
+                    page.evaluate(stub)
+                    page.locator("#copyJson").click()
+                    copied = page.evaluate("() => window.__copied")
+                    exported = json.loads(copied)
+                    devin_rows = [m for m in exported["models"]
+                                  if m["name"].startswith("Devin Fusion CLI")]
+                    self.assertEqual(len(devin_rows), devin_count)
+                    for row in devin_rows:
+                        self.assertEqual(row["creator"], "—")
+            finally:
+                build.RAW, build.AGENTS_RAW, build.OUT = (
+                    old_raw, old_agents, old_out)
+                page.close()
 
     def test_tooltip_secondary_rows_identical_across_charts(self):
         # #29: one record must read the same wherever it is hovered. The
