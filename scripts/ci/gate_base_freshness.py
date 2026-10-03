@@ -72,9 +72,14 @@ from pathlib import Path
 # nothing in repository settings can be asked which jobs are required, and the
 # de facto set lives in this one tuple. Each name is still looked up in the
 # workflows below, and a name with no job behind it is a refusal rather than a
-# silently smaller set.
-REQUIRED_JOBS = ("actionlint", "analyze", "coverage", "lint", "page",
-                 "pip-audit", "pyright", "suites")
+# silently smaller set. Two ci-gate names sit here beside the callee jobs:
+# `aggregate` is the fold ci-gate.yml reports on every push and pull request
+# (issue #133) and the context a required-check ruleset is to require, and
+# `classify` is the job whose decision binds every leg — naming both here is
+# what brings ci-gate's own steps, the classifier and the fold, into the
+# derived set.
+REQUIRED_JOBS = ("actionlint", "aggregate", "analyze", "classify", "coverage",
+                 "lint", "page", "pip-audit", "pyright", "suites")
 
 # The branch a gate's head is compared against. Not configurable: a second
 # branch here would be a second base, and this question has one.

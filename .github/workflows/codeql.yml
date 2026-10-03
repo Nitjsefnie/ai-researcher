@@ -21,35 +21,28 @@ name: codeql
 # between pushes, is most of it.
 
 on:
-  push:
-    # Same deny-list as tests.yml — an allow-list would silently stop scanning
-    # a new top-level code directory.
-    paths-ignore:
-      - '**/*.md'
-      - 'LICENSE'
-      - '.gitignore'
-    # Paired with pull_request, push must name branches: an in-repo PR head
-    # would otherwise run twice per commit under two refs the github.ref
-    # concurrency group cannot collapse.
-    branches: [main]
-  pull_request:
-    # Same deny-list as tests.yml — an allow-list would silently stop scanning
-    # a new top-level code directory.
-    # No branches filter: PRs target main only here.
-    #
-    # PR heads run untrusted code, so note the write surface: this job's only
-    # write is the `security-events: write` upload of its OWN analysis results
-    # — the standard GitHub starter pattern for push+pull_request — and the
-    # scheduled publish path (refresh.yml) stays off PR events entirely.
-    paths-ignore:
-      - '**/*.md'
-      - 'LICENSE'
-      - '.gitignore'
+  workflow_call:
   schedule:
     # Wednesday 03:47 UTC. Off the hour and off Monday deliberately: the top
     # of the hour is when every cron on GitHub fires at once and jobs queue.
     - cron: '47 3 * * 3'
   workflow_dispatch:
+    # Standalone dispatch runs (no ci-gate classification) run every job
+    # unconditionally.
+
+# Trigger ownership moved to ci-gate.yml (issue #133): the push and
+# pull_request triggers, and their paths-ignore deny-list
+# (`**/*.md` / LICENSE / .gitignore), live there now — a trigger filter
+# cannot report, so a required-check ruleset could never go green on a
+# documentation-only change. The weekly cron survives here: CodeQL's
+# query packs update continuously, and a new query must still reach code
+# that has changed since it shipped.
+#
+# PR heads still run untrusted code under the caller's pull_request run
+# (the callee executes the caller's merge ref), so the write surface is
+# unchanged: this job's only write is the `security-events: write`
+# upload of its OWN analysis results, and the scheduled publish path
+# (refresh.yml) stays off PR events entirely.
 
 # The workflow-level floor. A workflow with no permissions block at all hands
 # every job the repository's default token scopes — potentially read/write —

@@ -206,6 +206,87 @@ def test_a_cancelled_run_with_no_prior_comment_writes_nothing(tmp_path):
     assert _workflowrun.recorded_writes(calls) == [], "a write escaped"
 
 
+DOCS_ONLY_JOBS = [
+    {"name": "classify", "conclusion": "success"},
+    {"name": "tests", "conclusion": "skipped"},
+    {"name": "lint", "conclusion": "skipped"},
+    {"name": "actionlint", "conclusion": "success"},
+    {"name": "aggregate", "conclusion": "success"},
+]
+FULL_RUN_JOBS = [
+    {"name": "classify", "conclusion": "success"},
+    {"name": "tests", "conclusion": "success"},
+    {"name": "aggregate", "conclusion": "success"},
+]
+
+
+def test_a_docs_only_run_marks_an_existing_comment_not_measured(tmp_path):
+    # Since #133 the tests leg narrows under ci-gate's classification, so
+    # a SUCCESSFUL run without the artifact is the narrowed shape when
+    # its tests leg skipped: coverage was deliberately not measured, the
+    # check goes neutral (never red), and the stale number is replaced.
+    workdir, state, calls = _workdir(tmp_path)
+    _state(state, head_sha="a" * 40, jobs=DOCS_ONLY_JOBS, comments=[
+        {"id": 11, "user": {"login": "github-actions[bot]"},
+         "body": f"{MARKER}\n\nPatch coverage for commit {'b' * 40}."},
+    ])
+    done = _run(workdir, state, calls, "Mark missing patch coverage",
+                _env(workdir, state, calls, RUN_CONCLUSION="success"))
+    assert done.returncode == 0, (done.stdout, done.stderr)
+    outputs = _outputs(workdir)
+    assert outputs["skipped"] == "true", outputs
+    assert outputs["not_measured_reason"] == (
+        "the tests leg was skipped by the ci-gate classification"), outputs
+    # The verdict is EMPTIED, not absent: the default is `failure`, and a
+    # narrowed docs-only run must not turn into a failed check.
+    assert outputs.get("verdict", "missing") == "", outputs
+    state_now = json.loads(state.read_text(encoding="utf-8"))
+    assert "was not measured" in state_now["comments"][0]["body"], state_now
+    assert f"{'a' * 40}" in state_now["comments"][0]["body"], state_now
+
+
+def test_a_docs_only_run_with_no_prior_comment_writes_nothing(tmp_path):
+    workdir, state, calls = _workdir(tmp_path)
+    _state(state, head_sha="a" * 40, jobs=DOCS_ONLY_JOBS, comments=[])
+    done = _run(workdir, state, calls, "Mark missing patch coverage",
+                _env(workdir, state, calls, RUN_CONCLUSION="success"))
+    assert done.returncode == 0, (done.stdout, done.stderr)
+    assert "no patch-coverage marker to update" in done.stdout, done.stdout
+    assert _workflowrun.recorded_writes(calls) == [], "a write escaped"
+
+
+def test_a_successful_run_whose_tests_leg_ran_keeps_the_failure_default(tmp_path):
+    # A successful run whose tests leg RAN always carries the artifact
+    # (diff-coverage uploads with if-no-files-found: error), so a missing
+    # artifact beside a running tests leg is the true-failure shape and
+    # the default verdict stands.
+    workdir, state, calls = _workdir(tmp_path)
+    _state(state, head_sha="a" * 40, jobs=FULL_RUN_JOBS, comments=[
+        {"id": 11, "user": {"login": "github-actions[bot]"},
+         "body": f"{MARKER}\n\nPatch coverage for commit {'b' * 40}."},
+    ])
+    done = _run(workdir, state, calls, "Mark missing patch coverage",
+                _env(workdir, state, calls, RUN_CONCLUSION="success"))
+    assert done.returncode == 0, (done.stdout, done.stderr)
+    outputs = _outputs(workdir)
+    assert "skipped" not in outputs, outputs
+    assert outputs.get("verdict", "failure") == "failure", outputs
+
+
+def test_a_successful_run_without_a_tests_leg_is_refused(tmp_path):
+    # Fail closed: a jobs list the step cannot read the tests leg out of
+    # is a shape this harness never modelled, not a narrowed run.
+    workdir, state, calls = _workdir(tmp_path)
+    _state(state, head_sha="a" * 40, jobs=[
+        {"name": "classify", "conclusion": "success"},
+        {"name": "aggregate", "conclusion": "success"},
+    ], comments=[])
+    done = _run(workdir, state, calls, "Mark missing patch coverage",
+                _env(workdir, state, calls, RUN_CONCLUSION="success"))
+    assert done.returncode != 0, (done.stdout, done.stderr)
+    assert "names no tests leg" in done.stderr, done.stderr
+
+
 def test_the_check_publishes_on_the_pull_request_head(tmp_path):
     workdir, state, calls = _workdir(tmp_path)
     _state(state, head_sha="a" * 40, checks=[])

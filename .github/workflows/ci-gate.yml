@@ -1,0 +1,208 @@
+name: ci gate
+
+# One aggregate gate over every check this repository runs on a push or
+# pull request (issue #133).
+#
+# WHY ONE WORKFLOW. Eight independent check names could not be
+# required: a ruleset requires one context per name, and the gate
+# workflows narrowed by paths-ignore, so a documentation-only change
+# started no run at all — those check names went MISSING rather than
+# reporting, and a ruleset requiring them could never go green on such
+# a change. This workflow starts on every push and pull request,
+# classifies the changed paths, and either runs every gate leg or
+# narrows: a docs-only run skips the conditioned legs, a bot-data-only
+# run (the hourly refresh bot's exact four-file signature — the refresh
+# job already ran the full suite against the fresh capture before
+# pushing) runs only the cheap legs lint and actionlint, and the
+# aggregate still reports either way. The classifier and its over-run
+# fallbacks live in scripts/ci/classify_changes.py; the fold over the
+# legs' results is scripts/ci/aggregate_gate.py, and its one check name
+# is what a future ruleset requires.
+#
+# TRIGGER OWNERSHIP. The six gate workflows below are called as
+# reusable workflows; they keep `workflow_call`, their crons (audit
+# daily, codeql weekly) and `workflow_dispatch`, and they carry no
+# `push` or `pull_request` trigger any more — this file owns that
+# surface. Each callee keeps its own `permissions:` blocks and its
+# concurrency group (the latter governs its standalone dispatch runs).
+# refresh.yml, secrets.yml, scorecard.yml, claim.yml and
+# coverage-comment.yml are outside the aggregate.
+#
+# SUPERSESSION AND CANCELLATION. The concurrency group is one per pull
+# request, or per commit SHA on a push: a newer push starts its own run
+# instead of cancelling the older one, so the ordinary two-push
+# supersession cancel cannot leave a stale aggregate behind — the
+# aggregate carries `if: always()`, so a run-level cancel would still
+# fold and record a red aggregate on the superseded commit. A residual
+# lives one level down: the legs keep their own per-ref groups, which
+# hold at most one PENDING run, so a third concurrent main push can
+# cancel a merely-queued short leg, and that middle run's aggregate
+# folds red — the window is that leg's own duration, it fails closed,
+# and the next push re-verifies it. With the group itself no longer
+# cancelling on a push, a run-level cancel is always DELIBERATE: it
+# leaves that run's aggregate cancelled — folded as a failure by
+# aggregate_gate.py, so a required-check ruleset reads it never-green.
+
+on:
+  pull_request:
+    # Unfiltered: a docs-only pull request is exactly the change a
+    # required aggregate must still report on.
+  push:
+    # Default branch only, and deliberately unfiltered by path: the
+    # classification, not a trigger filter, narrows the legs, so the
+    # refresh bot's data push still gets a verdict (the cheap class)
+    # and a merge marker committed into a Markdown file is still read.
+    branches: [main]
+  # NO `workflow_dispatch`, deliberately (issue #180): CodeQL judges the
+  # workflow_call callee through its caller's triggers, and an
+  # externally triggerable event here re-arms the cache-poisoning alert
+  # through the tests leg even with tests.yml's own trigger list clean.
+  # Main's push trigger carries every merge; a finished run re-runs
+  # from its own page.
+
+# Read-only at workflow level except where a leg says otherwise.
+permissions:
+  contents: read
+
+concurrency:
+  # One run per pull request or per pushed commit SHA. See the
+  # SUPERSESSION AND CANCELLATION block above.
+  group: ci-gate-${{ github.event.pull_request.number
+    || (github.event_name == 'push' && github.sha) || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  classify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      # contents: read pays for the checkout; pull-requests: read is
+      # what the pulls/<n>/files read needs on a pull-request event;
+      # actions: read is what the workflow-runs and run-jobs reads need
+      # on a push, where the classifier walks back to the newest main
+      # commit whose gate legs executed.
+      contents: read
+      pull-requests: read
+      actions: read
+    outputs:
+      docs_only: ${{ steps.classify.outputs.docs_only }}
+      data_only: ${{ steps.classify.outputs.data_only }}
+      reason: ${{ steps.classify.outputs.reason }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # Nothing in this workflow pushes; no token left in
+          # .git/config is reusable by later steps.
+          persist-credentials: false
+
+      - name: Classify the changed paths
+        id: classify
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          BEFORE_SHA: ${{ github.event.before }}
+        # Emits docs_only / data_only =true|false plus a reason; every
+        # read failure over-runs to a full gate set
+        # (scripts/ci/classify_changes.py).
+        run: python3 scripts/ci/classify_changes.py
+
+  # One leg per gate workflow. `skipped` is reserved for the
+  # classification narrowing (docs-only skips the conditioned legs;
+  # data-only skips every leg but lint and actionlint): any leg skipped
+  # without it fails the aggregate, as does a cancelled or failed leg,
+  # a leg missing from the needs document, or a classifier crash (whose
+  # empty output reads as not-docs and leaves every leg skipped —
+  # fail-closed, visibly red). actionlint carries no narrowing
+  # condition at all: it is the gate on the gates, its merge-marker
+  # step and freshness check must read a documentation-only head too,
+  # and it is what keeps the two gate scripts themselves watched on the
+  # hourly bot push.
+
+  tests:
+    needs: classify
+    if: needs.classify.outputs.docs_only != 'true' && needs.classify.outputs.data_only != 'true'
+    # The local reusable-workflow syntax GitHub documents; nothing else
+    # resolves in-repo (suppressed at the line below).
+    uses: ./.github/workflows/tests.yml  # zizmor: ignore[self-repository]
+    permissions:
+      # The caller's grant CAPS what the callee can use. contents: write
+      # is for the callee's `ratchet-push` job alone — the workflow's
+      # only writer, which publishes the coverage raise the same run's
+      # coverage job measured; its own permissions block stays the
+      # authority for every other job, which remain read-only. The
+      # callee runs on the pull_request trust model: no secret is
+      # forwarded.
+      contents: write
+
+  lint:
+    needs: classify
+    if: needs.classify.outputs.docs_only != 'true'
+    # The local reusable-workflow syntax GitHub documents; nothing else
+    # resolves in-repo (suppressed at the line below).
+    uses: ./.github/workflows/lint.yml  # zizmor: ignore[self-repository]
+    permissions:
+      contents: read
+
+  types:
+    needs: classify
+    if: needs.classify.outputs.docs_only != 'true' && needs.classify.outputs.data_only != 'true'
+    # The local reusable-workflow syntax GitHub documents; nothing else
+    # resolves in-repo (suppressed at the line below).
+    uses: ./.github/workflows/types.yml  # zizmor: ignore[self-repository]
+    permissions:
+      contents: read
+
+  audit:
+    needs: classify
+    if: needs.classify.outputs.docs_only != 'true' && needs.classify.outputs.data_only != 'true'
+    # The local reusable-workflow syntax GitHub documents; nothing else
+    # resolves in-repo (suppressed at the line below).
+    uses: ./.github/workflows/audit.yml  # zizmor: ignore[self-repository]
+    permissions:
+      contents: read
+
+  actionlint:
+    needs: classify
+    # Deliberately unconditional: no narrowing output may skip it. A
+    # docs-only change still gets the merge-marker check, the
+    # freshness/scope gates and zizmor; a skipped actionlint in the
+    # needs document fails the fold, so the two lines cannot drift.
+    # The local reusable-workflow syntax GitHub documents; nothing else
+    # resolves in-repo (suppressed at the line below).
+    uses: ./.github/workflows/actionlint.yml  # zizmor: ignore[self-repository]
+    permissions:
+      contents: read
+
+  codeql:
+    needs: classify
+    if: needs.classify.outputs.docs_only != 'true' && needs.classify.outputs.data_only != 'true'
+    # The local reusable-workflow syntax GitHub documents; nothing else
+    # resolves in-repo (suppressed at the line below).
+    uses: ./.github/workflows/codeql.yml  # zizmor: ignore[self-repository]
+    permissions:
+      # Writing the analysis is the whole point of the callee; the rest
+      # stays read-only, as codeql.yml itself declares per job.
+      security-events: write
+      actions: read
+      contents: read
+
+  aggregate:
+    needs: [classify, tests, lint, types, audit, actionlint, codeql]
+    if: ${{ always() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Fold the leg results into one verdict
+        env:
+          NEEDS_JSON: ${{ toJSON(needs) }}
+        # scripts/ci/aggregate_gate.py owns the verdict: success passes,
+        # a skip passes only when the classification narrowed it, and
+        # any other result fails — with the legs that decided named in
+        # the verdict and in the step summary the script writes.
+        run: python3 scripts/ci/aggregate_gate.py

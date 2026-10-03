@@ -87,8 +87,9 @@ def test_names_derived_from_this_repository(tmp_path):
     del tmp_path
     module = _load()
     assert module.workflow_name_set(ROOT) == {
-        'actionlint', 'audit', 'claim', 'codeql', 'coverage comment', 'lint',
-        'pr gate', 'refresh', 'scorecard', 'secrets', 'tests', 'types'}
+        'actionlint', 'audit', 'claim', 'ci gate', 'codeql',
+        'coverage comment', 'lint', 'pr gate', 'refresh', 'scorecard',
+        'secrets', 'tests', 'types'}
 
 
 def test_violation_red_for_workflow_scope_with_non_ci_type(tmp_path):

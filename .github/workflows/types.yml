@@ -5,23 +5,17 @@ name: types
 # (pyrightconfig.json) so CI and every editor use the same settings.
 
 on:
-  push:
-    paths-ignore:
-      - '**/*.md'
-      - 'LICENSE'
-      - '.gitignore'
-    # Paired with pull_request, push must name branches: an in-repo PR head
-    # would otherwise run twice per commit under two refs the github.ref
-    # concurrency group cannot collapse.
-    branches: [main]
-  pull_request:
-    # Same paths-ignore as push. No branches filter: PRs target main only
-    # here.
-    paths-ignore:
-      - '**/*.md'
-      - 'LICENSE'
-      - '.gitignore'
+  workflow_call:
   workflow_dispatch:
+    # Standalone dispatch runs (no ci-gate classification) run every job
+    # unconditionally.
+
+# Trigger ownership moved to ci-gate.yml (issue #133): the push and
+# pull_request triggers, and their paths-ignore deny-list
+# (`**/*.md` / LICENSE / .gitignore), live there now — a trigger filter
+# cannot report, so a required-check ruleset could never go green on a
+# documentation-only change. ci-gate classifies the changed paths and
+# conditions this leg on the result.
 
 permissions:
   contents: read
