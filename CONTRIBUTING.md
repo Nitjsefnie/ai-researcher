@@ -267,6 +267,17 @@ file of an unlisted type is invisible to git and will NOT appear in `git
 status` as untracked — it simply never appears. `git check-ignore -v <path>`
 names the rule hiding it.
 
+## Commit subjects
+
+There is no enforced commit grammar here — the merged history is written in
+plain-English subjects. A subject written in conventional-commit shape
+(`type(scope): summary`) carries one rule, enforced on every pull request by
+`scripts/ci/commit_scopes.py`: a workflow's `name:` is allowed as a scope
+only with the `ci` type. The type disambiguates shared names: `ci(refresh)`
+changes the refresh workflow, while `fix(refresh)` would be a change no
+reader can place. A subject that does not parse is listed by the check and
+is never a failure.
+
 ## House style
 
 - **Python** — stdlib only in the runtime, type hints where they help, no
