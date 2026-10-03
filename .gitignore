@@ -63,6 +63,11 @@
 # the Capture step, retired when the routes agree again, so it is tracked,
 # not junk.
 !/data/aa-route-disagreement.txt
+# The route-disagreement snapshot (issue #118): both routes' raw payloads
+# plus the disagreement map, committed by the refresh's commit step for the
+# disputed rendering, retired with the stamp when the routes agree again.
+# Named back with the stamp or the add reds the disputed hour (issue #165).
+!/data/aa-disagreement-snapshot.json
 
 # ---- out/ — the published page --------------------------------------------
 !/out/
