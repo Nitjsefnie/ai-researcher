@@ -4,19 +4,24 @@ name: refresh
 # built from the new capture would differ from the one it replaces, commit the
 # new capture and publish the rebuilt page to docs-hub.
 #
-# THE WRITE SIDE IS A SEPARATE JOB (issue #143). The `refresh` job captures,
-# gates, rebuilds, installs third-party dependencies, downloads Chromium and
-# runs the full suite -- so it holds NOTHING but a read-only token, and the
-# hour's commit payload (the fresh captures, the built page, the window
-# files, the differ's message) leaves it as an artifact of this same run.
-# The `publish` job is the workflow's only contents:write holder and the
-# credential's only reader: it downloads the artifact, replays the hour's
-# commit (the window retirement first, then the data commit) against main in
-# a scratch repo with git plumbing alone -- no checkout, no pip, no browser,
-# no script from the tree -- pushes it with the documented race handling, and
-# publishes to docs-hub. A red capture or a red suite fails the refresh job,
-# and a failed need never starts the writer: NO commit and NO publish, and
-# the hourly cadence stays green-behaved.
+# THE WRITE SIDE IS THREE JOBS IN A FIXED ORDER (issues #143 and #133):
+# `refresh` captures, gates, rebuilds, installs third-party dependencies,
+# downloads Chromium and runs the full suite -- so it holds NOTHING but a
+# read-only token, and the hour's commit payload (the fresh captures, the
+# built page, the window files, the differ's message) leaves it as an
+# artifact of this same run. `publish` is a keyless committer: it downloads
+# the artifact, replays the hour's commits (the window retirement first,
+# then the data commit) against main in a scratch repo with git plumbing
+# alone -- no checkout, no pip, no browser, no script from the tree, and no
+# push; it stages the commits for the push job as a git bundle. `push` is
+# the only job that loads the deploy key (the main-push environment,
+# reachable from main alone): it delivers the bundle to main, so the bot
+# commit starts workflow runs and gets a real ci-gate aggregate verdict --
+# the reason the push moved off the GITHUB_TOKEN for issue #133. `hub` then
+# publishes to docs-hub and moves the `published` ref, naming the landed
+# commit. A red capture or a red suite fails the refresh job, and a failed
+# need never starts the write half: NO commit and NO publish, and the
+# hourly cadence stays green-behaved.
 #
 # WHAT COUNTS AS "MOVED" IS THE RENDERED PAGE, NOT THE RAW CAPTURE BYTES
 # (issue #94). The gate (scripts/capture_gate.py) builds the page twice --
@@ -93,16 +98,15 @@ name: refresh
 #
 # THE PUSH TO MAIN CAN RACE. The concurrency group serializes runs, but two
 # of them can still pass each other between their checks and their pushes
-# (observed 2026-09-28: runs 287/288, seven seconds apart; the loser died on
-# a non-fast-forward rejection). The write job's commit step treats a
-# rejected push as a race, not a failure: fetch the moved main, rebase onto
-# it, and push once more. A rebase conflict means the concurrent run pushed
-# a different capture for the same hour, so the loser CONCEDES -- green,
-# publish=false, nothing committed or published -- because the concurrent
-# run's capture stands and publishing it is that run's job. The retry is the
-# final attempt: a second rejection fails the run red rather than looping.
-# The retirement push (below) keeps the same handling with a SILENT
-# concession, as the capture step's old inline push_head did.
+# (observed 2026-09-28: runs 287/288, seven seconds apart). The push job
+# handles the race the claudit way (issue #133): a base check before
+# anything is built drops the run green when main moved under the tested
+# base, a rejected push distinguishes "main stood still" (a real error) from
+# "main moved before the push landed" (dropped green), and the hub job then
+# CONCEDES -- green, no upload, no ref move -- whenever the payload page is
+# not the page of main's tip, because the winning run's capture stands and
+# publishing it is that run's job. Nothing loops: a dropped hour is
+# re-fetched, re-tested and landed by the next hourly run.
 #
 # fetch_aa.py exits nonzero when the flight payload or the model schema changes
 # shape, when AA bumps the Intelligence Index version build.py is written
@@ -130,9 +134,10 @@ name: refresh
 # -- only the disagreement itself stopped being red. When a capture succeeds
 # again, the hour marks the window RETIRING: the capture step removes the
 # stamp AND the snapshot from its tree and stages their removal for the
-# write job, which commits "Route agreement restored; resume captures
-# (issue #100)" and pushes; a push lost to the race concedes green either
-# way, and a lost stamp is self-healing on the next run.
+# write half: the publish job commits "Route agreement restored; resume
+# captures (issue #100)" into the bundle, the push job lands it, and a push
+# lost to the race concedes green either way -- a lost stamp is self-healing
+# on the next run.
 #
 # FORCE DURING A WINDOW NOW REBUILDS (issue #118, amending #103). A forced
 # dispatch used to be terminal behind a refused capture because there was
@@ -165,11 +170,12 @@ concurrency:
   cancel-in-progress: false
 
 # Least-privilege floor (issue #52 review): every job here declares its own
-# permissions block -- the refresh job read-only (it runs the capture, the
-# installs and the suite), the publish job the sole write elevation, where
-# the pushes and the credential are. The floor caps what the inheritance can
-# leak: a job added later WITHOUT its own block inherits read, not the
-# repository default.
+# permissions block -- the refresh and publish jobs read-only (the capture,
+# the installs, the suite, and the keyless commit), the push job read-only
+# behind the deploy key, and the hub job the sole write elevation (the
+# published-ref move). The floor caps what the inheritance can leak: a job
+# added later WITHOUT its own block inherits read, not the repository
+# default.
 permissions:
   contents: read
 
@@ -570,19 +576,47 @@ jobs:
           path: ${{ runner.temp }}/publish-payload
           if-no-files-found: error
 
-  # --- The write half: commit and publish, no repository code --------------
-  # Issue #143: the job that runs the capture, installs unhashed third-party
-  # dependencies and downloads a browser must not hold a write token while it
-  # does. This job is the workflow's only writer: it holds contents:write and
-  # the docs-hub credential, downloads this same run's payload (needs:, not a
-  # workflow_run -- there is no cross-run trust question), and runs no
-  # repository code: no checkout, no pip, no browser, no script from the
-  # tree -- git plumbing against a scratch repo, curl against the pinned hub
-  # host, and the GitHub API for the published ref. A pull request never
-  # reaches it: this workflow has no pull_request trigger, and the job needs
-  # a successful refresh run that said proceed.
+  # --- The write half: commit, push, publish --------------------------------
+  # Issues #143 and #133: the write side is three jobs in a fixed order —
+  # commit, push, publish.
+  #
+  # `publish` (the keyless committer) downloads the payload, replays the
+  # hour's commits — the window retirement first, then the data commit —
+  # against main in a scratch repo with git plumbing alone, and stages the
+  # result for the push job as a git bundle. It runs no repository code: no
+  # checkout, no pip, no browser, no script from the tree, and it pushes
+  # nothing: the fetches are anonymous.
+  #
+  # `push` is the only job that loads the deploy key. It declares the
+  # main-push environment — the environment's deployment-branch policy
+  # admits only main — and runs no repository code either: the pinned
+  # download action runs before the key is loaded, and the push step is git
+  # plumbing against its own scratch. The push authenticates with the
+  # deploy key, never the job token: unlike a GITHUB_TOKEN push, a
+  # deploy-key push to main starts workflow runs, so ci-gate gives the bot
+  # commit a real aggregate verdict on main's tip — the reason the push
+  # moved off the token for issue #133.
+  #
+  # `hub` publishes the verified page to docs-hub and moves the `published`
+  # ref, after the push job had its turn: the ref names the landed commit.
+  # A red capture or a red suite fails the refresh job, and a failed need
+  # never starts the write half — NO commit and NO publish, and the hourly
+  # cadence stays green-behaved. A pull request never reaches any of it:
+  # this workflow has no pull_request trigger, and each job needs a
+  # successful refresh run that said proceed.
+  #
+  # THE PUSH CAN STILL RACE. The concurrency group serializes runs, but two
+  # of them can still pass each other between their checks and their pushes
+  # (observed 2026-09-28: runs 287/288, seven seconds apart). The push job
+  # handles it the claudit way: a base check before anything is built drops
+  # the run green when main moved under the tested base, and a rejected
+  # push distinguishes "main stood still" (a real error) from "main moved
+  # before the push landed" (dropped green; the next hourly run re-fetches,
+  # re-tests and lands it). The retirement commit rides the same bundle as
+  # the data commit: they land together or the hour drops together, and the
+  # next successful capture retires the window again.
   publish:
-    name: Commit and publish the capture
+    name: Commit and stage the capture
     runs-on: ubuntu-latest
 
     # Per-job ceiling, like every other job's: a hung push or upload fails
@@ -591,18 +625,28 @@ jobs:
 
     needs: refresh
 
-    # The writer runs only behind a successful, proceeding refresh job: a red
-    # capture or a red suite must still produce NO commit and NO publish, and
-    # a quiet hour means the writer has nothing to do.
+    # The committer runs only behind a successful, proceeding refresh job: a
+    # red capture or a red suite must still produce NO commit and NO publish,
+    # and a quiet hour means the committer has nothing to do.
     if: >-
       needs.refresh.result == 'success' &&
       needs.refresh.outputs.proceed == 'true'
 
     permissions:
-      # The only writer in this workflow, and it runs no repository code:
-      # everything it commits or uploads is the artifact of its own run's
-      # refresh job, which the suite verified.
-      contents: write
+      # Read-only: the published-ref move lives in the hub job, and every
+      # fetch here is anonymous. Everything this job commits or stages is
+      # the artifact of its own run's refresh job, which the suite verified.
+      contents: read
+
+    outputs:
+      # Whether the commit step staged a bundle for the push job: false on a
+      # quiet or heal hour (nothing to push) and after a staging failure.
+      commits: ${{ steps.commit.outputs.commits }}
+      # The publish verdict: publish=true whenever the run reached a
+      # publishable state - a forced run with nothing committed is exactly
+      # the shape of a heal run, where the page to serve is HEAD's but the
+      # hub is behind it. The hub job's own tie check decides the rest.
+      publish: ${{ steps.commit.outputs.publish }}
 
     steps:
       - name: Download the publish payload
@@ -613,20 +657,32 @@ jobs:
 
       - name: Commit the capture
         id: commit
-        env:
-          GH_TOKEN: ${{ github.token }}
-          REPO: ${{ github.repository }}
         run: |
           PAYLOAD="${RUNNER_TEMP}/publish-payload"
-          remote="https://x-access-token:${GH_TOKEN}@github.com/${REPO}"
+          # The push-data staging helper: base is main's tip the hour was
+          # built against, tip is the hour's own tip (the bundle tip when
+          # commits exist, base itself when not), and the bundle carries the
+          # commits only when there are any. The hub job ties its upload
+          # and ref move to `tip`, so both always name the same commit.
+          stage_push_data() {
+            mkdir -p "${RUNNER_TEMP}/push-data"
+            if [ "${1}" = "true" ]; then
+              git bundle create "${RUNNER_TEMP}/push-data/push.bundle" \
+                FETCH_HEAD..push
+              git rev-parse HEAD > "${RUNNER_TEMP}/push-data/tip.txt"
+            else
+              git rev-parse FETCH_HEAD > "${RUNNER_TEMP}/push-data/tip.txt"
+            fi
+            git rev-parse FETCH_HEAD > "${RUNNER_TEMP}/push-data/base.txt"
+          }
+          # Anonymous remote: the repo is public, and this job pushes nothing
+          # -- the push job owns the deploy key, and this job stages the
+          # verified commits for it as a bundle. A private repo degrades red
+          # here exactly as the heal gate's anonymous fetches do.
+          remote="https://github.com/${GITHUB_REPOSITORY}"
           scratch="${RUNNER_TEMP}/scratch"
           # Scratch repo at main's tip: git plumbing only, nothing executed
-          # from the tree. The remote carries the token in its URL, so it
-          # sits in this scratch's .git/config -- under RUNNER_TEMP,
-          # ephemeral, created and torn down inside this one step of this
-          # one job, and this job checks out and executes nothing from the
-          # tree. (Reviewed on PR #151: the old wording claimed the token
-          # never sat in a config; the remote add has always persisted it.)
+          # from the tree, and no credential in it.
           git init -q "${scratch}"
           git -C "${scratch}" remote add origin "${remote}"
           git -C "${scratch}" fetch --quiet origin main
@@ -638,36 +694,23 @@ jobs:
           # Phase 1 -- the window retirement (issues #100/#118). Applied only
           # when it still bites: if a concurrent run already retired the
           # window on a moved main, the staged removal is empty and the
-          # notice records it (the old inline path reached the same end
-          # state by rebase-dropping an empty commit).
-          if [ -f "${PAYLOAD}/remove.txt" ]; then
+          # notice records it. The retirement commit joins the bundle: it
+          # lands with the data commit, in the push job.
+          if [ -f "${PAYLOAD}/remove.txt" ] && [ -s "${PAYLOAD}/remove.txt" ]; then
             xargs git rm -q --ignore-unmatch < "${PAYLOAD}/remove.txt"
-            if git diff --cached --quiet; then
+            if ! git diff --cached --quiet; then
+              git commit -q -m 'Route agreement restored; resume captures (issue #100)'
+            else
               echo "::notice::The window files are already gone from main; nothing to retire." \
                 >> "$GITHUB_STEP_SUMMARY"
-            else
-              git commit -q -m 'Route agreement restored; resume captures (issue #100)'
-              if ! git push origin HEAD:main; then
-                git fetch --quiet origin main
-                if git rebase origin/main; then
-                  # Second rejection concedes SILENTLY: the next
-                  # successful capture retires the stamp again.
-                  git push origin HEAD:main || true
-                else
-                  git rebase --abort
-                fi
-              fi
             fi
           fi
           # Phase 2 -- the hour's data commit, staged over main's tip in the
-          # scratch and pushed with the same two-attempt race handling the
-          # old single job ran: a rejected push is a race, not a failure.
-          # The fixed add list is the old commit step's, verbatim.
-          cp -a "${PAYLOAD}/tree/." ./
-          git add data/aa-raw-models.json data/aa-raw-coding-agents.json \
-                  data/captured-at.txt out/frontier-models.html
-          [ ! -f data/aa-disagreement-snapshot.json ] || git add data/aa-disagreement-snapshot.json
-          [ ! -f data/aa-route-disagreement.txt ] || git add data/aa-route-disagreement.txt
+          # scratch. The staging step restored HEAD's page on a heal hour, so
+          # the tree copy stages only what differs from main; the fixed add
+          # list is the old commit step's, widened to the payload's own
+          # staging shape.
+          #
           # The message is diff_aa.py's own rendering, subject line included —
           # not truncated here. A long one means a lot genuinely moved, and
           # that is the day you want the detail. A run with an unchanged
@@ -677,6 +720,11 @@ jobs:
           # capture's own divergence diagnostic from the stamp, never the
           # differ's "nothing moved" rendering (the differ compares the
           # last-good captures, which a window does not touch).
+          cp -a "${PAYLOAD}/tree/." ./
+          git add data/aa-raw-models.json data/aa-raw-coding-agents.json \
+                  data/captured-at.txt out/frontier-models.html
+          [ ! -f data/aa-disagreement-snapshot.json ] || git add data/aa-disagreement-snapshot.json
+          [ ! -f data/aa-route-disagreement.txt ] || git add data/aa-route-disagreement.txt
           if git diff --cached --name-only | grep -q '^data/aa-disagreement-snapshot\.json$'; then
             printf '%s\n\n%s\n' \
               'Publish disputed capture: AA routes disagree (issue #118)' \
@@ -684,11 +732,6 @@ jobs:
               > "${RUNNER_TEMP}/commit-msg.txt"
             sed -n '2,$p' data/aa-route-disagreement.txt >> "${RUNNER_TEMP}/commit-msg.txt"
           elif [ -f "${PAYLOAD}/commit-msg.txt" ]; then
-            # Route the differ's message into the file the commit below
-            # reads -- every branch of this selection must leave THAT file
-            # written (review C1 on PR #151: the append used to land on the
-            # payload copy, and every ordinary moved-capture hour died at
-            # the commit, exit 128).
             cat "${PAYLOAD}/commit-msg.txt" > "${RUNNER_TEMP}/commit-msg.txt"
             printf '\n%s\n' 'Captured by .github/workflows/refresh.yml.' \
               >> "${RUNNER_TEMP}/commit-msg.txt"
@@ -698,7 +741,7 @@ jobs:
               'The build moved, the data did not. Republished so the live page matches main.' \
               > "${RUNNER_TEMP}/commit-msg.txt"
           fi
-          # A quiet run stages nothing here (the gate restored data/ in the
+          # A quiet run stages nothing (the gate restored data/ in the
           # refresh job and the staging step's guard restored the page), and
           # a forced run can produce a page identical to HEAD's; committing
           # nothing is the correct outcome, and `git commit` would fail on
@@ -709,116 +752,247 @@ jobs:
             echo "Staged tree matches main's tip — nothing committed." \
               >> "$GITHUB_STEP_SUMMARY"
             echo "publish=true" >> "$GITHUB_OUTPUT"
+            echo "commits=false" >> "$GITHUB_OUTPUT"
+            stage_push_data false
             exit 0
           fi
           git commit -F "${RUNNER_TEMP}/commit-msg.txt"
           # No co-author trailer: no model authored this commit. A refresh that
           # a person or an agent drives by hand still carries one.
-          #
-          # The push races a concurrent run of this same workflow: the
-          # concurrency group serializes jobs, but two runs can still pass
-          # each other between their checks and their pushes (observed
-          # 2026-09-28, runs 287/288, seven seconds apart; the loser died on
-          # a non-fast-forward rejection). A rejection is a race, not a
-          # failure: fetch the moved main, rebase, push once more. The retry
-          # is the FINAL attempt -- a second rejection fails the run red
-          # rather than looping.
-          if ! git push origin HEAD:main; then
-            # Anonymous fetch (the repo is public); on a private repo this
-            # fetch fails the run red rather than skipping the retry. The
-            # pushes themselves authenticate via the token URL remote.
-            git fetch --quiet origin main
-            if ! git rebase origin/main; then
-              # A conflict means the concurrent run pushed a different
-              # capture for the same hour -- the capture files are what
-              # both commits touch, so they collide. Concede: the
-              # concurrent run's capture stands, and publishing it is that
-              # run's job. Green, publishes nothing.
-              git rebase --abort
-              {
-                echo 'Lost the race: a concurrent refresh run pushed first, and its capture stands.'
-                echo 'Nothing committed or published by this run.'
-              } >> "$GITHUB_STEP_SUMMARY"
-              echo "publish=false" >> "$GITHUB_OUTPUT"
-              exit 0
-            fi
-            # The suite is not re-run over the rebased commit: a conflict-
-            # free rebase means the concurrent commit edited different
-            # regions than ours -- same-region edits to the page would have
-            # conflicted -- so the rebased commit is overwhelmingly the page
-            # this suite run passed. The retry below is the final attempt;
-            # if it succeeds over a main that moved by a build-code commit,
-            # the documented force-input contract covers the staleness and
-            # the next moved-data run heals it.
-            git push origin HEAD:main
-          fi
           echo "publish=true" >> "$GITHUB_OUTPUT"
+          echo "commits=true" >> "$GITHUB_OUTPUT"
+          stage_push_data true
+
+      - name: Upload the push data
+        # The markers exist on every publishable path (bundle included only
+        # when there are commits), and the upload is error-gated: a staging
+        # failure must not hand an empty artifact to the push job. The
+        # artifact is data, not code.
+        if: success() && steps.commit.outputs.publish == 'true'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: push-data
+          path: ${{ runner.temp }}/push-data
+          if-no-files-found: error
+          retention-days: 1
+  push:
+    name: Push the tested tree to main
+    runs-on: ubuntu-latest
+
+    # Per-job ceiling, like every other job's.
+    timeout-minutes: 15
+
+    needs: publish
+
+    # The push runs only when the committer staged a bundle: a quiet or
+    # heal hour has nothing to land.
+    if: needs.publish.outputs.commits == 'true'
+
+    # The ONLY environment declaration in this workflow: the main-push
+    # environment's deployment-branch policy admits main alone, so the
+    # deploy key it holds is reachable from nowhere else.
+    environment: main-push
+
+    permissions:
+      # The push authenticates with the deploy key; the job token stays
+      # read-only.
+      contents: read
+
+    steps:
+      - name: Download the push bundle
+        # The pinned download action is the only action here, and it runs
+        # before the key is loaded: no repository code executes in this
+        # job, before or while the key is in memory.
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: push-data
+          path: ${{ runner.temp }}/push-data
+
+      - name: Push the tested tree to main
+        id: push
+        env:
+          MASTER_PUSH_DEPLOY_KEY: ${{ secrets.MASTER_PUSH_DEPLOY_KEY }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -o pipefail
+          # Fail closed when the environment is missing its secret: with no
+          # key there is nothing to authenticate the push with, and the
+          # fallback must never be a token.
+          if [ -z "${MASTER_PUSH_DEPLOY_KEY:-}" ]; then
+            echo "MASTER_PUSH_DEPLOY_KEY is empty: the main-push environment is missing its secret" >&2
+            exit 1
+          fi
+          eval "$(ssh-agent -s)" >/dev/null
+          # The agent is stopped when this step ends, whatever its outcome:
+          # the key never outlives the step that loaded it.
+          trap 'kill "$SSH_AGENT_PID" 2>/dev/null || true' EXIT
+          ssh-add <(printf '%s\n' "$MASTER_PUSH_DEPLOY_KEY") >/dev/null
+          mkdir -p ~/.ssh
+          # GitHub SSH host keys, published by GitHub's Meta endpoint:
+          # https://docs.github.com/en/rest/meta/meta#get-github-meta-information
+          printf '%s\n' \
+            'github.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl' \
+            'github.com ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQCj7ndNxQowgcQnjshcLrqPEiiphnt+VTTvDP6mHBL9j1aNUkY4Ue1gvwnGLVlOhGeYrnZaMgRK6+PKCUXaDbC7qtbW8gIkhL7aGCsOr/C56SJMy/BCZfxd1nWzAOxSDPgVsmerOBYfNqltV9/hWCqBywINIR+5dIg6JTJ72pcEpEjcYgXkE2YEFXV1JHnsKgbLWNlhScqb2UmyRkQyytRLtL+38TGxkxCflmO+5Z8CSSNY7GidjMIZ7Q4zMjA2n1nGrlTDkzwDCsw+wqFPGQA179cnfGWOWRVruj16z6XyvxvjJwbz0wQZ75XK5tKSb7FNyeIEs4TT4jk+S4dhPeAUC5y+bDYirYgM4GC7uEnztnZyaVWQ7B381AK4Qdrwt51ZqExKbQpTUNn+EjqoTwvqNj4kqx5QUCI0ThS/YkOxJCXmPUWZbhjpCg56i+2aB6CmK2JGhn57K5mj0MNdBXA4/WnwH6XoPWJzK5Nyu2zB3nAZp+S5hpQs+p1vN1/wsjk=' \
+            >> ~/.ssh/known_hosts
+          export GIT_SSH_COMMAND='ssh -o StrictHostKeyChecking=yes'
+          remote="${PUSH_REMOTE:-git@github.com:${REPO}.git}"
+          base="$(cat "${RUNNER_TEMP}/push-data/base.txt")"
+          fetched="$(git ls-remote "$remote" refs/heads/main | cut -f1)"
+          if [ "$fetched" != "$base" ]; then
+            echo "::notice::main moved under the run (tested base $base, current tip $fetched); the next hourly run re-fetches, re-tests and lands it"
+            {
+              echo "### Dropped: main moved under the run"
+              echo
+              echo "The tested base $base is no longer main's tip ($fetched)."
+              echo "The next hourly run re-fetches on the new tip, re-runs the suite"
+              echo "in the keyless publish job, and lands the data there."
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          git init -q "${RUNNER_TEMP}/push-repo"
+          git -C "${RUNNER_TEMP}/push-repo" remote add origin "$remote"
+          git -C "${RUNNER_TEMP}/push-repo" fetch --quiet origin main
+          git -C "${RUNNER_TEMP}/push-repo" fetch --quiet \
+            "${RUNNER_TEMP}/push-data/push.bundle" \
+            'refs/heads/push:refs/heads/push'
+          if ! git -C "${RUNNER_TEMP}/push-repo" push origin \
+            "$(cat "${RUNNER_TEMP}/push-data/tip.txt"):refs/heads/main"; then
+            git -C "${RUNNER_TEMP}/push-repo" fetch --quiet origin main
+            # base.txt, not tip^: the bundle may carry two commits (the
+            # window retirement rides with the data commit), so tip^ names
+            # the retirement, not the tested base.
+            if [ "$(cat "${RUNNER_TEMP}/push-data/base.txt")" = \
+                 "$(git -C "${RUNNER_TEMP}/push-repo" rev-parse FETCH_HEAD)" ]; then
+              echo "the push was rejected while main stood still" >&2
+              exit 1
+            fi
+            echo "::notice::main moved before the push landed; the next hourly run re-fetches, re-tests and lands it"
+            {
+              echo "### Dropped: main moved before the push landed"
+              echo "The next hourly run re-fetches on the new tip, re-runs the suite"
+              echo "in the keyless publish job, and lands the data there."
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+  hub:
+    name: Publish the page to docs-hub
+    runs-on: ubuntu-latest
+
+    # Per-job ceiling, like every other job's.
+    timeout-minutes: 15
+
+    needs: [publish, push]
+
+    # The hub job runs whenever the run reached a publishable state - a
+    # quiet or heal hour too, where the push job skipped (nothing to
+    # commit). A FAILED push (the stood-still error) holds it back: the
+    # run is red, and the hub publishes nothing it did not verify.
+    if: >-
+      !cancelled() && needs.publish.result == 'success' &&
+      needs.publish.outputs.publish == 'true' &&
+      (needs.push.result == 'skipped' || needs.push.result == 'success')
+
+    permissions:
+      # The published ref moves through the refs API with the job token:
+      # this is the write the hub job exists for, and the workflow floor
+      # stays read everywhere else.
+      contents: write
+
+    steps:
+      - name: Download the publish payload
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: publish-payload
+          path: ${{ runner.temp }}/publish-payload
+
+      - name: Download the push data
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: push-data
+          path: ${{ runner.temp }}/push-data
 
       - name: Publish to docs-hub
-        # Two gates: the job-level `if` says this run has something to
-        # publish, and the commit step's own verdict says a publishable
-        # state was actually reached. Both must hold — a green run that
-        # conceded the push race must not republish anything.
-        if: steps.commit.outputs.publish == 'true'
+        id: hub
         env:
           DOCS_HUB_API_KEY: ${{ secrets.DOCS_HUB_API_KEY }}
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
         run: |
-          # The compare-and-abort gate (issue #74). Two overlapping runs can
-          # both reach this step, and if the OLDER run's upload lands after
-          # the newer run's, the hub serves the older page while the
-          # `published` ref records the newer commit — an inversion the heal
-          # gate's ref comparison cannot see (the ref agrees with HEAD; the
-          # HUB is what is behind). So the upload itself is gated: fresh-
-          # fetch the ref anonymously (same shape as the heal gate's fetch),
-          # and when the tip is not already this run's HEAD, ask the compare
-          # API. Its status names the TIP side relative to the BASE side:
-          # `behind` — the tip is an ancestor of this run's HEAD, the normal
-          # heal situation — publishes; `ahead` — the tip is a descendant, a
-          # newer run already published — ABORTS green: a summary line, no
-          # upload, no ref move, exit 0. The newest run NEVER aborts, so
-          # within any overlap the newest page always wins; the abort only
-          # stops the older run from regressing the hub afterwards. A missing
-          # ref means nothing was ever published; anything else, or a failed
-          # API call retried once, publishes anyway with a warning —
-          # availability of publish beats the residual seconds-wide window,
-          # which the heal gate's hub check then heals within one run.
-          cd "${RUNNER_TEMP}/scratch"
-          if git fetch --depth=1 origin \
+          # The scratch is read-only plumbing: init and two anonymous
+          # fetches (the repo is public), rev-parse, compare. No
+          # credential sits in it; the ref update authenticates via the
+          # job token through the refs API.
+          scratch="${RUNNER_TEMP}/ref-scratch"
+          git init -q "${scratch}"
+          git -C "${scratch}" remote add origin "https://github.com/${GITHUB_REPOSITORY}"
+          git -C "${scratch}" fetch --quiet origin main
+          target="$(git -C "${scratch}" rev-parse FETCH_HEAD)"
+          # THE PAGE-REF TIE. The payload page belongs to the commit the
+          # publish job recorded as `tip` -- the bundle tip when the hour
+          # committed, its own base when not. The upload and the ref move
+          # run only when that commit IS main's tip now: a landing whose
+          # tip still stands, or a quiet or heal hour nobody has
+          # superseded. When main has moved past `tip`, a newer run owns
+          # the tip, and its own hub job publishes its page -- this run
+          # uploads nothing, moves nothing, exits 0. This is what makes
+          # "the ref never names a page the hub does not serve" enforced
+          # rather than asserted: the ref below moves to `tip`, and it
+          # moves only when `tip == target` and the page uploaded is the
+          # tip's page.
+          mine="$(cat "${RUNNER_TEMP}/push-data/tip.txt")"
+          if [ "$mine" != "$target" ]; then
+            echo "Lost the race: main's tip moved past this run's page, and the newer run's hub job publishes it." \
+              >> "$GITHUB_STEP_SUMMARY"
+            echo "Nothing published by this run."
+            exit 0
+          fi
+          # THE NEWER-RUN GATE (issue #74). The ref must never move
+          # backwards: fresh-fetch it and, when it is not already the
+          # target, ask the compare API, whose status names the TIP side
+          # relative to the BASE side. `ahead` - a newer run already
+          # published past this target - aborts green before the upload:
+          # no upload, no ref move, exit 0. `behind` is the normal heal
+          # and publishes; a failed or unrankable answer retries once,
+          # then publishes anyway behind a warning, because availability
+          # of publish beats the residual seconds-wide window.
+          if git -C "${scratch}" fetch --depth=1 origin \
                refs/heads/published:refs/remotes/origin/published 2>/dev/null; then
-            tip="$(git rev-parse origin/published)"
-            mine="$(git rev-parse HEAD)"
-            if [ "$tip" != "$mine" ]; then
+            tip="$(git -C "${scratch}" rev-parse origin/published)"
+            if [ "$tip" != "$target" ]; then
               status=""
               for _ in 1 2; do
-                status="$(gh api "repos/$REPO/compare/$mine...$tip" --jq .status)" || status=""
+                status="$(gh api "repos/$REPO/compare/$target...$tip" --jq .status)" || status=""
                 case "$status" in
                   ahead|behind|identical) break ;;
                   *) status="" ;;
                 esac
               done
               if [ "$status" = ahead ]; then
-                echo "A newer refresh run already published: the published ref names a commit past this run's HEAD — nothing uploaded, no ref moved." \
+                echo "A newer refresh run already published: the published ref names a commit past this target - nothing uploaded, no ref moved." \
                   >> "$GITHUB_STEP_SUMMARY"
                 exit 0
               fi
               if [ -z "$status" ]; then
-                echo "WARNING: the compare API could not rank refs/heads/published against this run's HEAD; publishing anyway." \
+                echo "WARNING: the compare API could not rank refs/heads/published against this target; publishing anyway." \
                   >> "$GITHUB_STEP_SUMMARY"
               fi
-              # `behind` (or `identical`, a ref that moved to exactly this
-              # HEAD while the gate ran) is the normal heal: fall through to
-              # the upload.
+              # `behind` (or `identical`) is the normal heal: fall through.
             fi
           fi
-          # The upload. The write job runs no repository code, so this is
+          # THE UPLOAD. The write job runs no repository code, so this is
           # the endpoint's wire format inlined -- scripts/publish_docs.py is
           # the canonical client and the mirror source: keep the two in
           # sync. The key travels in a header, never an argument; the URL
           # is a literal on the pinned hub host -- the same host-pinning
           # rule publish_docs.py enforces in code -- so the credential can
-          # only ever be sent there.
+          # only ever be sent there. The page travels from the payload
+          # artifact via a staging dir, so the relative path the canonical
+          # client pins is the one used here.
+          page_dir="${RUNNER_TEMP}/page"
+          mkdir -p "${page_dir}/out"
+          cp "${RUNNER_TEMP}/publish-payload/tree/out/frontier-models.html" \
+            "${page_dir}/out/frontier-models.html"
+          cd "${page_dir}"
           code="$(curl -sS --connect-timeout 10 --max-time 120 \
             -o /tmp/publish-response.json -w '%{http_code}' \
             -H "x-docs-key: ${DOCS_HUB_API_KEY}" \
@@ -847,17 +1021,14 @@ jobs:
             exit 1
           fi
           cat /tmp/publish-response.json
-          # Record the published state only once the upload succeeded: this
-          # ref is what the heal gate compares against, so it must never
-          # claim a page the hub does not serve. HEAD sits on main's history
-          # and the ref only ever moves along it, so the update is always a
-          # fast-forward.
-          #
-          # The ref moves through the GitHub refs API, not `git push`: the
-          # scratch fetch is --depth=1, so git holds too little ancestry to
-          # prove a fast-forward locally and would be rejected with "(fetch
-          # first)" even though it was one -- issue #77. The API checks
-          # server-side, where the full graph lives:
+          # THE REF MOVE. The ref is what the heal gate compares against, so
+          # it must never claim a page the hub does not serve - and the
+          # target here is main's tip fresh-fetched after the push job's
+          # turn, which is structurally on main's history: the state issue
+          # #152's ancestor gate guaranteed, now by construction. The ref
+          # moves through the GitHub refs API, not `git push` (issue #77:
+          # a shallow scratch cannot prove a fast-forward locally; the API
+          # checks server-side):
           #   - GET first: the shell branches on the GET's exit code, so a
           #     404 -- or ANY failed GET -- routes to CREATE (POST); a POST
           #     against an existing ref fails there with 422 "already
@@ -869,26 +1040,10 @@ jobs:
           #     fast-forward.
           # Any other API failure fails the run too: a silently stale ref
           # would make every later hour republish.
-          head_sha="$(git rev-parse HEAD)"
-          # Issue #152: the ref must only ever name a commit on main's
-          # history. A quiet hour whose retirement push lost the race ends
-          # with HEAD at an unpushed retirement commit -- the PATCH's
-          # fast-forward check would accept it and the ref would leave
-          # main's history. So the move is gated on HEAD actually being an
-          # ancestor of (or equal to) main's tip, fresh-fetched after the
-          # upload: off main, the move is skipped green -- the ref stays at
-          # main's last real commit, exactly what the heal gate compares
-          # against, and the next hour whose commit lands moves it forward.
-          git fetch --quiet origin main
-          if ! git merge-base --is-ancestor "${head_sha}" FETCH_HEAD; then
-            echo "The published ref stays where it is: this run's HEAD is not on main's history (a lost retirement push) — the upload stands, the ref moves when a landing commit is the tip." \
-              >> "$GITHUB_STEP_SUMMARY"
-            exit 0
-          fi
           if gh api "repos/$REPO/git/refs/heads/published" > /dev/null; then
             gh api --method PATCH "repos/$REPO/git/refs/heads/published" \
-              -f sha="$head_sha"
+              -f sha="$mine"
           else
             gh api --method POST "repos/$REPO/git/refs/heads/published" \
-              -f ref=refs/heads/published -f sha="$head_sha"
+              -f ref=refs/heads/published -f sha="$mine"
           fi
