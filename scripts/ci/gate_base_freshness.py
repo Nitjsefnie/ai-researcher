@@ -11,6 +11,21 @@ on main changing a file a gate reads is never applied to the pull request
 before it merges, and the merge publishes a tree whose green run proved
 nothing about it. Nothing else compares the two.
 
+THE EVENT DECIDES WHAT THE HEAD OWES (issue #195). A `push` run's head is a
+commit somebody pushed, and a push to main lands that head IN main's own
+history: main moving past it afterwards — including while the run is still
+executing, as the hourly refresh commits do — cannot make its verdict stale,
+because the tree it checked out is a tree main carries, and no push can
+change a commit that is already landed. So on `push` the gate asks exactly
+one question: is the head an ancestor of (or equal to) the freshly fetched
+main? Ancestor-or-equal passes; a pushed head OUTSIDE main's history (an
+ordinary feature branch) is judged like any other head, strictly. Every
+other event — pull_request above all — keeps the comparison exactly as
+before, and the event name comes from GITHUB_EVENT_NAME, which a workflow
+caller's event context supplies (a re-run keeps the original event);
+absent — a local run — the strict comparison stands, so nothing relaxes
+by accident.
+
 The set of such files is DERIVED from the workflows under .github/workflows,
 not kept in a list here. A remembered list is only as current as the last time
 somebody remembered to add to it, which is this defect wearing different
@@ -62,6 +77,7 @@ shape it does not model is better than a silent misreading.
 pins the derivation.
 """
 
+import os
 import re
 import subprocess
 import sys
@@ -558,6 +574,25 @@ def stale_commits(root, head, base, paths):
     return stale
 
 
+def head_is_mains_history(root, head, base):
+    """True when the head is an ancestor of (or equal to) the fetched base.
+
+    `git merge-base --is-ancestor` is three-valued — 0 ancestor, 1 not, past
+    that an error — and an error is a refusal, never a "no": a guard that
+    read its own failure as "not an ancestor" would fall through to the
+    strict comparison and judge a head whose ancestry was never established.
+    """
+    done = subprocess.run(
+        ("git", "-C", str(root), "merge-base", "--is-ancestor", head, base),
+        capture_output=True, text=True, check=False)
+    if done.returncode > 1:
+        raise GateError(
+            f"cannot tell whether the head is {BASE_BRANCH}'s own history: "
+            f"`git merge-base --is-ancestor {head} {base}` exited "
+            f"{done.returncode}: {done.stderr.strip() or 'no output'}")
+    return done.returncode == 0
+
+
 def check(root):
     head = git(root, "rev-parse", "--verify", "HEAD^{commit}",
                what="resolve the checked-out head").strip()
@@ -565,6 +600,24 @@ def check(root):
     base = git(root, "rev-parse", "--verify", f"refs/remotes/origin/{BASE_BRANCH}^{{commit}}",
                what=f"resolve origin/{BASE_BRANCH}").strip()
     paths = gate_paths(root)
+    if (os.environ.get("GITHUB_EVENT_NAME", "").strip() == "push"
+            and head_is_mains_history(root, head, base)):
+        # The derivation ran above, so its refusals stayed universal; this
+        # verdict is the event's, not the derivation's, and it names what
+        # main holds past the head rather than a bare pass.
+        behind = git(root, "rev-list", "--count", f"{head}..{base}",
+                     what=f"count what {BASE_BRANCH} holds past this head").strip()
+        plural = "s" if behind != "1" else ""
+        print(f"This run answers a push, and its head is part of {BASE_BRANCH}'s "
+              f"own history — {BASE_BRANCH} holds {behind} commit{plural} it does "
+              f"not — so the tree it checked out is a tree {BASE_BRANCH} carries "
+              f"and there is nothing to rebase.")
+        print("  The run derived the "
+              f"{len(paths)} file(s) a merge-gate job reads BY NAME; a step "
+              "reading every tracked file — the `.` spelling, which the "
+              "actionlint\n  job's merge-marker step uses — is a named reach "
+              "limit and is not\n  counted above; see the module docstring.")
+        return 0
     stale = stale_commits(root, head, base, paths)
     if not stale:
         # "reads", not "reads" with no limit attached. The merge-marker step

@@ -19,9 +19,25 @@ import subprocess
 import sys
 from pathlib import Path
 
+import pytest
 import yaml
 
 ROOT = Path(__file__).resolve().parents[1]
+
+
+@pytest.fixture(autouse=True)
+def _local_event_by_default(monkeypatch):
+    """Run the gate as a LOCAL run unless a test names its event.
+
+    The gate's verdict reads GITHUB_EVENT_NAME, and the suite runs inside CI
+    where the runner sets it for real — push on a main push, pull_request on
+    a PR. Left inherited, every fixture's expectation would depend on which
+    workflow happened to run the suite: a red fixture asserted on a push run
+    goes green there. Deleted by default, the whole suite judges every head
+    as a local run — the strict comparison — and only the event tests below
+    set the variable again.
+    """
+    monkeypatch.delenv('GITHUB_EVENT_NAME', raising=False)
 
 
 def _load():
@@ -337,6 +353,158 @@ def test_red_when_main_advances_a_gate_file(tmp_path):
     assert 'ci: move the gate the head already read' in done.stdout
     assert '.github/workflows/actionlint.yml' in done.stdout
     assert 'Rebase onto main' in done.stdout
+
+
+def test_a_push_head_main_has_passed_passes(tmp_path):
+    """A push run whose head main has passed passes the gate (issue #195).
+
+    The refresh workflow lands gate-read files (data/, out/) hourly, so main
+    has usually moved past a main-push head by the time the step runs — while
+    the run is still executing, not only between runs (issue #196, closed a
+    duplicate). The gate's only view of time is the fetch its check performs,
+    so this fixture advances main on a gate-read file and THEN runs the gate,
+    exactly where the step's fetch lands it; an advance later in the run
+    cannot reach a step that has already fetched.
+    """
+    repo, origin = _fixture(tmp_path)
+    _advance_main(tmp_path, origin, 'ci: move a gate file after the push landed', {
+        '.github/workflows/actionlint.yml':
+            'name: actionlint\n'
+            'on: push\n'
+            'jobs:\n'
+            '  actionlint:\n'
+            '    runs-on: changed\n'
+            '    steps:\n'
+            '      - run: ./actionlint -color .github/workflows/*.yml\n',
+    })
+    monkeypatch_env = os.environ.copy()
+    monkeypatch_env['GITHUB_EVENT_NAME'] = 'push'
+    done = subprocess.run(
+        [sys.executable, str(ROOT / 'scripts/ci/gate_base_freshness.py'),
+         '--root', str(repo)], check=False, capture_output=True, text=True,
+        env=monkeypatch_env)
+    assert done.returncode == 0, (done.stdout, done.stderr)
+    assert "part of main's own history" in done.stdout
+    assert 'holds 1 commit it does not' in done.stdout
+    assert 'Rebase' not in done.stdout
+    assert 'BY NAME' in done.stdout, (
+        'the push verdict still derives the gate-path set, so its refusals '
+        'stay universal')
+
+
+def test_a_push_head_outside_mains_history_is_judged_strictly(tmp_path):
+    """A pushed head outside main's history is judged like any other head.
+
+    The push event alone is not the pass: an ordinary feature-branch push is
+    diverged from main, nothing about landing it in main's history is vacuous,
+    and the ancestor arm would be a false green if the event alone relaxed the
+    comparison.
+    """
+    repo, origin = _fixture(tmp_path)
+    _commit(repo, 'ci: the diverged push head', {
+        '.github/workflows/tests.yml':
+            'name: tests\n'
+            'on: push\n'
+            'jobs:\n'
+            '  suites:\n'
+            '    runs-on: diverged\n'
+            '    steps:\n'
+            '      - run: python run_tests.py\n',
+    })
+    _advance_main(tmp_path, origin, 'ci: move a gate file past the diverged push', {
+        '.github/workflows/actionlint.yml':
+            'name: actionlint\n'
+            'on: push\n'
+            'jobs:\n'
+            '  actionlint:\n'
+            '    runs-on: changed\n'
+            '    steps:\n'
+            '      - run: ./actionlint -color .github/workflows/*.yml\n',
+    })
+    monkeypatch_env = os.environ.copy()
+    monkeypatch_env['GITHUB_EVENT_NAME'] = 'push'
+    done = subprocess.run(
+        [sys.executable, str(ROOT / 'scripts/ci/gate_base_freshness.py'),
+         '--root', str(repo)], check=False, capture_output=True, text=True,
+        env=monkeypatch_env)
+    assert done.returncode == 1, (done.stdout, done.stderr)
+    assert 'main holds 1 commit this head does not' in done.stdout
+    assert 'Rebase onto main' in done.stdout
+
+
+def test_a_pull_request_head_keeps_the_strict_gate(tmp_path):
+    """A pull_request event keeps the comparison exactly as before.
+
+    The arm is the event's, not the ancestry's alone: a PR head that is an
+    ancestor of main — every fixture head is — still fails when main has
+    moved on a gate-read file, because a PR can still rebase and the run's
+    checks are meant to read the files main reads.
+    """
+    repo, origin = _fixture(tmp_path)
+    _advance_main(tmp_path, origin, 'ci: move a gate file under an open pull request', {
+        '.github/workflows/actionlint.yml':
+            'name: actionlint\n'
+            'on: push\n'
+            'jobs:\n'
+            '  actionlint:\n'
+            '    runs-on: changed\n'
+            '    steps:\n'
+            '      - run: ./actionlint -color .github/workflows/*.yml\n',
+    })
+    monkeypatch_env = os.environ.copy()
+    monkeypatch_env['GITHUB_EVENT_NAME'] = 'pull_request'
+    done = subprocess.run(
+        [sys.executable, str(ROOT / 'scripts/ci/gate_base_freshness.py'),
+         '--root', str(repo)], check=False, capture_output=True, text=True,
+        env=monkeypatch_env)
+    assert done.returncode == 1, (done.stdout, done.stderr)
+    assert 'main holds 1 commit this head does not' in done.stdout
+    assert 'Rebase onto main' in done.stdout
+    assert "part of main's own history" not in done.stdout
+
+
+def test_an_unset_event_keeps_the_strict_gate(tmp_path):
+    """An absent GITHUB_EVENT_NAME — a local run — keeps the strict gate.
+
+    The arm is named by the event, never by the ancestry alone: absent
+    evidence of the event, nothing relaxes by accident.
+    """
+    repo, origin = _fixture(tmp_path)
+    _advance_main(tmp_path, origin, 'ci: move a gate file under a local run', {
+        '.github/workflows/actionlint.yml':
+            'name: actionlint\n'
+            'on: push\n'
+            'jobs:\n'
+            '  actionlint:\n'
+            '    runs-on: changed\n'
+            '    steps:\n'
+            '      - run: ./actionlint -color .github/workflows/*.yml\n',
+    })
+    assert 'GITHUB_EVENT_NAME' not in os.environ
+    done = subprocess.run(
+        [sys.executable, str(ROOT / 'scripts/ci/gate_base_freshness.py'),
+         '--root', str(repo)], check=False, capture_output=True, text=True)
+    assert done.returncode == 1, (done.stdout, done.stderr)
+    assert 'Rebase onto main' in done.stdout
+    assert "part of main's own history" not in done.stdout
+
+
+def test_the_ancestry_refusal_names_the_attempt():
+    """A merge-base that cannot run is a refusal, not a `no`.
+
+    `git merge-base --is-ancestor` is three-valued — 0 ancestor, 1 not, past
+    that an error — and an error must not read as "not an ancestor": the
+    strict comparison that follows would judge a head whose ancestry was
+    never established.
+    """
+    module = _load()
+    try:
+        module.head_is_mains_history(ROOT, 'HEAD', 'not-a-ref')
+    except module.GateError as refusal:
+        assert 'cannot tell whether' in str(refusal)
+        assert 'exited' in str(refusal)
+    else:
+        raise AssertionError('an unanswerable ancestry must refuse, not pass')
 
 
 def test_green_when_main_advances_a_non_gate_file(tmp_path):
