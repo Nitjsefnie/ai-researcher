@@ -587,6 +587,186 @@ def write_atomic(path: pathlib.Path, text: str) -> None:
         raise
 
 
+# The one shared field AA splits across shapes: a bare number (its cost.total)
+# on the leaderboard, the {cost, evaluations} object on the detail route. A
+# disagreement reported at this path is the shape-split one.
+COST_TOTAL_PATH = "intelligenceIndexCostPerTask.cost.total"
+
+# _value_at's marker for a path that resolves nowhere on a record -- a missing
+# key, a walk through a scalar, a list-index path. Deliberately not None: a
+# JSON null is a VALUE (an absent field AA published as null), and a baseline
+# null must match a route's null without reading as resolvable-elsewhere.
+_UNRESOLVED = object()
+
+
+def _value_at(record, path):
+    """The value a record carries at a disagreement path, or _UNRESOLVED.
+
+    Dotted-path read over nested dicts. The leaderboard's flattened cost
+    scalar reads at COST_TOTAL_PATH -- the same reshape check_route_agreement
+    applies (and the shape the detail-stale repair leaves behind). List-index
+    paths resolve to _UNRESOLVED: the current window has none, and an
+    unresolvable lookup may only fall back to the disputed rendering.
+    """
+    parts = path.split(".")
+    value = record
+    for index, part in enumerate(parts):
+        if not isinstance(value, dict):
+            remaining = ".".join(parts[index:])
+            if (remaining == "cost.total"
+                    and isinstance(value, (int, float))
+                    and not isinstance(value, bool)):
+                return value
+            return _UNRESOLVED
+        if part not in value:
+            return _UNRESOLVED
+        value = value[part]
+    return value
+
+
+def _set_value_at(record, path, value) -> bool:
+    """Set `value` at a dotted path over existing dicts; False when the walk
+    leaves the record's shape (the caller then treats the repair as failed)."""
+    parts = path.split(".")
+    node = record
+    for part in parts[:-1]:
+        if not isinstance(node, dict) or part not in node:
+            return False
+        node = node[part]
+    if not isinstance(node, dict):
+        return False
+    node[parts[-1]] = value
+    return True
+
+
+def heal_route_disagreement(exc, baseline):
+    """One route provably stale: the fresh route's capture, or None.
+
+    Overseer ruling (delegated by the maintainer), 2026-10-04 (issue #176).
+    When ALL of one route's disputed values equal the last committed capture
+    (the last agreeing capture, data/aa-raw-models.json) and NONE of the other
+    route's do, the matching route is serving that capture unchanged -- it is
+    stale -- and its disagreeing values are dropped: the capture is the fresh
+    route's copy of every shared field, through the normal capture path. This
+    amends the #118 disputed rendering ONLY for that provable case; where
+    staleness cannot be shown -- mixed matches, both routes differing from the
+    last capture, a disputed slug with no row in the last capture -- this
+    returns None and the disputed rendering stands unchanged. The per-route
+    generation timestamps are never consulted: #117's window had copies 3 s
+    apart carrying different data, so no timestamp identifies the stale route.
+
+    When the DETAIL route is stale, its detail-only fields (the per-evaluation
+    cost breakdown, parameters, license, release date) stay at their last
+    capture, and any field that would MIX two generations renders absent:
+    for a model whose cost.total moved, the stale breakdown is dropped and
+    the fresh flattened total takes its place -- the GDPval cost that
+    breakdown fed renders '--' until the routes agree. check_cost_breakdown
+    remains the refusal of the alternative: a stale breakdown left under a
+    moved total sums to the old total and exits. Every value is still AA's
+    own, from the snapshot or the committed capture; nothing is estimated.
+
+    Returns (models, note) -- the healed capture in merge_captures' shape and
+    a one-line diagnostic -- or None when staleness is not provable (no
+    baseline, unresolvable paths, or a repair that fails its own
+    verification: every divergent path must end at the fresh route's value).
+    Never raises for a disagreement.
+    """
+    entries = exc.divergences
+    if not entries or not isinstance(baseline, list) or not baseline:
+        return None
+    base_by_slug = {m.get("slug"): m for m in baseline if isinstance(m, dict)}
+    lb_matches: list[bool] = []
+    dt_matches: list[bool] = []
+    for slug, path, lb_value, dt_value in entries:
+        record = base_by_slug.get(slug)
+        base_value = (_value_at(record, path)
+                      if record is not None else _UNRESOLVED)
+        resolvable = base_value is not _UNRESOLVED
+        lb_matches.append(resolvable and lb_value == base_value)
+        dt_matches.append(resolvable and dt_value == base_value)
+    if all(lb_matches) and not any(dt_matches):
+        stale_route = "leaderboard"
+    elif all(dt_matches) and not any(lb_matches):
+        stale_route = "detail"
+    else:
+        return None
+
+    models = merge_captures(exc.base, exc.detail)
+    by_slug = {m.get("slug"): m for m in models if isinstance(m.get("slug"), str)}
+    lb_by_slug = {m.get("slug"): m for m in exc.base if isinstance(m.get("slug"), str)}
+
+    absent_costs = 0
+    if stale_route == "detail":
+        # The leaderboard is fresh, and merge_captures already keeps its copy
+        # of every shared scalar. The one place the stale detail record still
+        # shadows it is the shape split: the merge lets the object win, which
+        # would publish the stale total -- and the stale breakdown under it.
+        # Drop the breakdown (the GDPval cost renders absent) and keep the
+        # fresh scalar total.
+        cost_moves = sorted({slug for slug, path, _, _ in entries
+                             if path == COST_TOTAL_PATH})
+        for slug in cost_moves:
+            record = by_slug.get(slug)
+            leaderboard_record = lb_by_slug.get(slug)
+            fresh_total = (leaderboard_record or {}).get(
+                "intelligenceIndexCostPerTask")
+            if (record is None or leaderboard_record is None
+                    or not isinstance(fresh_total, (int, float))
+                    or isinstance(fresh_total, bool)):
+                return None
+            record["intelligenceIndexCostPerTask"] = fresh_total
+        absent_costs = len(cost_moves)
+    else:
+        # The detail route is fresh; the merge kept the stale leaderboard's
+        # copy of every divergent scalar. Override each divergent path with
+        # the detail route's value -- the cost total included, where the
+        # merge's object-wins rule already took the fresh object.
+        for slug, path, _lb_value, dt_value in entries:
+            record = by_slug.get(slug)
+            if record is None or not _set_value_at(record, path, dt_value):
+                return None
+
+    # Verification: every divergent path now carries the fresh route's value.
+    # A repair that misses -- an unmodelled shape split letting the stale
+    # detail record shadow a fresh scalar, a path the setter could not walk --
+    # is staleness the code cannot actually deliver, so it falls back rather
+    # than publish a half-repaired merge.
+    for slug, path, lb_value, dt_value in entries:
+        record = by_slug.get(slug)
+        healed_value = _value_at(record, path)
+        expected = dt_value if stale_route == "leaderboard" else lb_value
+        if healed_value is _UNRESOLVED or healed_value != expected:
+            return None
+
+    note = (
+        f"route disagreement resolved: the {stale_route} route is stale -- "
+        f"all {len(entries)} disputed value(s) equal the last committed "
+        "capture and none of the other route's do; publishing the fresh "
+        "route through the normal capture path"
+        + (f" ({absent_costs} GDPval cost(s) absent until the routes agree)"
+           if absent_costs else " (every axis pairs same-run values)"))
+
+    return models, note
+
+
+def _healed_capture(exc):
+    """heal_route_disagreement over the capture on disk, or None.
+
+    The refusing run has not written OUT -- whatever sits there is the last
+    committed capture (the refresh runs on a clean checkout), exactly the
+    baseline the staleness verdict compares against. A missing, corrupt or
+    non-list file is staleness nobody can prove: None, and the disputed path
+    takes over.
+    """
+    try:
+        baseline = json.loads(OUT.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    if not isinstance(baseline, list):
+        return None
+    return heal_route_disagreement(exc, baseline)
+
+
 class _RouteDisagreement(SystemExit):
     """check_route_agreement's refusal, tagged for the retry loop.
 
@@ -732,7 +912,8 @@ def main() -> None:
         # pair and a broken extractor must stay distinguishable by eye. The
         # appended line explains WHY the exit code differs from every other
         # refusal and what the refresh will do about it (issue #118: the
-        # refusal is now a buildable disputed capture, not a skipped hour).
+        # refusal is a buildable disputed capture; issue #176: it heals
+        # first when one route is provably the last capture's copy).
         print(str(exc), file=sys.stderr)
         print(f"leaderboard generated {_iso_utc(exc.base_generated)}, "
               f"detail generated {_iso_utc(exc.detail_generated)} — "
@@ -740,33 +921,44 @@ def main() -> None:
               "AA's data lands on them at different times (issues #100, "
               "#118); refresh builds and publishes the disputed capture "
               "this hour", file=sys.stderr)
-        # The snapshot's pieces all come from the refused attempt -- both
-        # raw payloads, the structured divergence list, the per-route
-        # generation times -- so the disputed page is exactly the read that
-        # was refused, never a second one.
-        snapshot = disagreement_snapshot(
-            exc.base, exc.detail, exc.divergences,
-            exc.base_generated, exc.detail_generated)
-        # The schema guards stay red on the disputed merge (issue #118):
-        # only the disagreement itself stopped being red. A detail payload
-        # that has lost what build.py reads fails here -- exit 1, no
-        # snapshot written -- exactly as it would on an agreeing pair.
-        models = merge_captures(exc.base, exc.detail)
-        check_cost_breakdown(models)
-        out = OUT.with_name(DISPUTED_SNAPSHOT_NAME)
-        out.parent.mkdir(parents=True, exist_ok=True)
-        write_atomic(out, json.dumps(snapshot, indent=1))
-        print(f"wrote {out.relative_to(ROOT)}: "
-              f"{len(snapshot['disagreements'])} disputed value(s) across "
-              f"{len({d['slug'] for d in snapshot['disagreements']})} model(s)",
-              file=sys.stderr)
-        sys.exit(DISAGREEMENT_EXIT_CODE)
-    models = merge_captures(pair.base, pair.detail)
+        healed = _healed_capture(exc)
+        if healed is None:
+            # The snapshot's pieces all come from the refused attempt -- both
+            # raw payloads, the structured divergence list, the per-route
+            # generation times -- so the disputed page is exactly the read
+            # that was refused, never a second one.
+            snapshot = disagreement_snapshot(
+                exc.base, exc.detail, exc.divergences,
+                exc.base_generated, exc.detail_generated)
+            # The schema guards stay red on the disputed merge (issue #118):
+            # only the disagreement itself stopped being red. A detail payload
+            # that has lost what build.py reads fails here -- exit 1, no
+            # snapshot written -- exactly as it would on an agreeing pair.
+            models = merge_captures(exc.base, exc.detail)
+            check_cost_breakdown(models)
+            out = OUT.with_name(DISPUTED_SNAPSHOT_NAME)
+            out.parent.mkdir(parents=True, exist_ok=True)
+            write_atomic(out, json.dumps(snapshot, indent=1))
+            print(f"wrote {out.relative_to(ROOT)}: "
+                  f"{len(snapshot['disagreements'])} disputed value(s) across "
+                  f"{len({d['slug'] for d in snapshot['disagreements']})} model(s)",
+                  file=sys.stderr)
+            sys.exit(DISAGREEMENT_EXIT_CODE)
+        models, heal_note = healed
+        print(heal_note, file=sys.stderr)
+        origin = (f"v{INDEX_VERSION} cost breakdown (stale-route heal, "
+                  "issue #176: the stale route's disagreeing values are "
+                  "discarded)")
+    else:
+        models = merge_captures(pair.base, pair.detail)
+        origin = (f"v{pair.version} cost breakdown (detail merged from "
+                  f"/models/{pair.host}; {pair.shared_values} shared values "
+                  "cross-checked)")
     priced = check_cost_breakdown(models)
-    # An agreeing capture ends any window: drop a leftover snapshot so the
-    # build this capture feeds cannot render the disputed layer from stale
-    # data. The workflow's own retirement commit removes the tracked copy on
-    # the same rule.
+    # An agreeing capture -- or a healed one -- ends any window: drop a
+    # leftover snapshot so the build this capture feeds cannot render the
+    # disputed layer from stale data. The workflow's own retirement commit
+    # removes the tracked copy on the same rule.
     OUT.with_name(DISPUTED_SNAPSHOT_NAME).unlink(missing_ok=True)
     agents_text, _ = fetch_html(args.agents_html, AGENTS_URL)
     agents = coding_agent_rows(flight_payload(agents_text))
@@ -778,9 +970,7 @@ def main() -> None:
 
     scored = sum(1 for m in models if isinstance(m.get("intelligenceIndex"), (int, float)))
     print(f"wrote {OUT.relative_to(ROOT)}: {len(models)} models, {scored} with an "
-          f"intelligence index, {priced} with a v{pair.version} cost breakdown "
-          f"(detail merged from /models/{pair.host}; {pair.shared_values} shared "
-          "values cross-checked)")
+          f"intelligence index, {priced} with a {origin}")
     print(f"wrote {AGENTS_OUT.relative_to(ROOT)}: {len(agents)} agent+model rows "
           f"with a paired index score and cost per task")
 
