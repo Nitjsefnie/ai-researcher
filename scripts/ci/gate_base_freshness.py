@@ -574,18 +574,28 @@ def stale_commits(root, head, base, paths):
     return stale
 
 
+# The reach-limit sentence every green verdict prints: the derivation counts
+# only files a gate job names, never the whole-tree `.` spelling. One
+# constant, because two copies of a sentence have to be kept honest together.
+REACH_LIMIT_NOTE = (
+    "  A step reading every tracked file — the `.` spelling, which the "
+    "actionlint\n  job's merge-marker step uses — is a named reach limit and "
+    "is not\n  counted above; see the module docstring.")
+
+
 def head_is_mains_history(root, head, base):
     """True when the head is an ancestor of (or equal to) the fetched base.
 
     `git merge-base --is-ancestor` is three-valued — 0 ancestor, 1 not, past
-    that an error — and an error is a refusal, never a "no": a guard that
-    read its own failure as "not an ancestor" would fall through to the
+    that an error (any other status, negative included: a probe killed by a
+    signal reports one) — and an error is a refusal, never a "no": a guard
+    that read its own failure as "not an ancestor" would fall through to the
     strict comparison and judge a head whose ancestry was never established.
     """
     done = subprocess.run(
         ("git", "-C", str(root), "merge-base", "--is-ancestor", head, base),
         capture_output=True, text=True, check=False)
-    if done.returncode > 1:
+    if done.returncode not in (0, 1):
         raise GateError(
             f"cannot tell whether the head is {BASE_BRANCH}'s own history: "
             f"`git merge-base --is-ancestor {head} {base}` exited "
@@ -613,10 +623,8 @@ def check(root):
               f"not — so the tree it checked out is a tree {BASE_BRANCH} carries "
               f"and there is nothing to rebase.")
         print("  The run derived the "
-              f"{len(paths)} file(s) a merge-gate job reads BY NAME; a step "
-              "reading every tracked file — the `.` spelling, which the "
-              "actionlint\n  job's merge-marker step uses — is a named reach "
-              "limit and is not\n  counted above; see the module docstring.")
+              f"{len(paths)} file(s) a merge-gate job reads BY NAME.")
+        print(REACH_LIMIT_NOTE)
         return 0
     stale = stale_commits(root, head, base, paths)
     if not stale:
@@ -629,9 +637,7 @@ def check(root):
         # the set is complete.
         print(f"This head carries every commit on {BASE_BRANCH} that touches "
               f"the {len(paths)} file(s) a merge-gate job reads BY NAME.")
-        print("  A step reading every tracked file — the `.` spelling, which the "
-              "actionlint\n  job's merge-marker step uses — is a named reach "
-              "limit and is not\n  counted above; see the module docstring.")
+        print(REACH_LIMIT_NOTE)
         return 0
     plural = "s" if len(stale) != 1 else ""
     print(f"{BASE_BRANCH} holds {len(stale)} commit{plural} this head does not:")
