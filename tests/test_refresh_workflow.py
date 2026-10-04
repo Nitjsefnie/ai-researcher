@@ -1,10 +1,14 @@
 """Structural pins on .github/workflows/refresh.yml.
 
-The workflow publishes the live page hourly, and since issue #143 its write
-side is a separate job: `refresh` (capture, rendered gate, rebuild, suite)
-runs on a read-only token and leaves the commit payload as an artifact of its
-own run; `publish` -- the workflow's only contents:write holder -- downloads
-that artifact and commits and publishes it while running no repository code.
+The workflow publishes the live page hourly, and since issues #143 and #133
+its write side is three jobs in a fixed order: `refresh` (capture, rendered
+gate, rebuild, suite) runs on a read-only token and leaves the commit
+payload as an artifact of its own run; `publish` -- a keyless committer --
+downloads that artifact and replays the hour's commits into a git bundle
+while running no repository code; `push` -- the only job that loads the
+deploy key, in the main-push environment -- delivers the bundle to main;
+`hub` -- the workflow's only contents:write holder since the split -- uploads
+the verified page and moves the `published` ref.
 Its safety lives in the gating BETWEEN steps and BETWEEN jobs: what runs only
 after the suite passed, what only when the commit actually landed, what heals
 a stale publish. Those contracts are invisible to the Python suite until
@@ -13,6 +17,7 @@ and on substrings that name the mechanism, never on line numbers or
 whole-run-block equality that any reflow would break.
 """
 import pathlib
+import re
 import unittest
 
 import yaml
@@ -41,6 +46,10 @@ def step(wf, name):
 
 def pub_step(wf, name):
     return step_in(wf, "publish", name)
+
+
+def hub_step(wf, name):
+    return step_in(wf, "hub", name)
 
 
 def flattened(text):
@@ -72,31 +81,41 @@ class GateTests(unittest.TestCase):  # pylint: disable=too-many-public-methods
         self.assertEqual(self.wf["jobs"]["refresh"]["permissions"],
                          {"contents": "read"})
 
-    def test_only_the_publish_job_holds_contents_write(self):
-        # Issue #143, the #134 tripwire applied here: the commit and the
-        # docs-hub publish are the write side, and they run in the publish
-        # job -- which consumes this same run's artifact, runs no repository
-        # code, and is the only contents:write holder in the file.
+    def test_only_the_hub_job_holds_contents_write(self):
+        # Issues #143 and #133: the hub job is the workflow's only
+        # contents:write holder (the published-ref move). The push job --
+        # the deploy key's only reader -- is read-only: the push
+        # authenticates with the key, never the job token. No write-side
+        # job checks the tree out.
         workflow = self.wf
         self.assertEqual(workflow.get("permissions"), {"contents": "read"})
         jobs = workflow["jobs"]
-        assert "publish" in jobs, (
-            "the data-only write job is missing from refresh.yml")
+        for name in ("publish", "push", "hub"):
+            assert name in jobs, f"the {name} job is missing from refresh.yml"
         for name, job in jobs.items():
             contents = (job.get("permissions") or {}).get("contents")
-            if name == "publish":
+            if name == "hub":
                 assert contents == "write", (
-                    "publish is the workflow's only writer and must "
-                    "declare it")
+                    "hub is the workflow's only writer and must declare it")
             else:
                 assert contents != "write", (
-                    f"{name} holds contents: write; only publish may")
-        push = jobs["publish"]
-        assert push["needs"] == "refresh", (
-            "the payload is this run's own data: needs, not a workflow_run")
+                    f"{name} holds contents: write; only hub may")
+        writer = jobs["hub"]
+        assert not [s for s in writer["steps"]
+                    if s.get("uses", "").startswith("actions/checkout@")], (
+            "hub runs no repository code: no checkout step")
+        push = jobs["push"]
+        assert push["needs"] == "publish", (
+            "the bundle is this run's own data: needs, not a workflow_run")
+        assert push.get("environment") == "main-push", (
+            "the deploy key is reachable only through the main-push "
+            "environment")
         assert not [s for s in push["steps"]
                     if s.get("uses", "").startswith("actions/checkout@")], (
-            "publish runs no repository code: no checkout step")
+            "the push job runs no repository code: no checkout step")
+        assert (jobs["publish"].get("permissions") or {}).get(
+            "contents") == "read", (
+            "the committer is keyless and read-only: it pushes nothing")
 
     def test_the_publish_job_is_gated_on_the_refresh_jobs_success_and_proceed(self):
         # A red capture or a red suite leaves needs.refresh.result != success
@@ -142,21 +161,23 @@ class GateTests(unittest.TestCase):  # pylint: disable=too-many-public-methods
         # push race concedes with exit 0), so the publish step must read the
         # commit step's own verdict. Proceed is the writer JOB's gate; the
         # verdict is the publish STEP's gate inside it.
-        cond = self.wf["jobs"]["publish"]["if"]
-        gate = pub_step(self.wf, "Publish to docs-hub")["if"]
+        cond = self.wf["jobs"]["hub"]["if"]
+        gate = self.wf["jobs"]["publish"]["if"]
 
-        self.assertIn("needs.refresh.outputs.proceed == 'true'", cond)
-        self.assertIn("steps.commit.outputs.publish == 'true'", gate)
+        self.assertIn("needs.refresh.outputs.proceed == 'true'", gate)
+        self.assertIn("needs.publish.outputs.publish == 'true'", cond)
 
     def test_the_publish_job_runs_no_repository_code(self):
         # The writer runs no checkout, no third-party install, no test
         # suite, and no script from the tree: its only inputs are the
         # artifact, git plumbing, and curl/jq/gh against the pinned hub
         # host. Anything executed here would ride the write token.
-        for s in self.wf["jobs"]["publish"]["steps"]:
-            run = s.get("run", "")
-            self.assertNotIn("python3", commands(run))
-            self.assertNotIn("pip", commands(run))
+        banned = re.compile(r"\bpython3\b|\bpip[0-9]?\b")
+        for job in ("publish", "push", "hub"):
+            for s in self.wf["jobs"][job]["steps"]:
+                run = s.get("run", "")
+                self.assertIsNone(banned.search(commands(run)),
+                                  commands(run))
 
     def test_the_suite_step_rebuilds_the_page_stamped_too(self):
         # Issue #92: the suite's browser tests used to call build.main() over
@@ -284,7 +305,7 @@ class GateTests(unittest.TestCase):  # pylint: disable=too-many-public-methods
         # check has something to compare against. It must move only after
         # the upload succeeded, in the same step -- the first refs-API
         # command is the GET probe that decides create-vs-update.
-        run = flattened(pub_step(self.wf, "Publish to docs-hub")["run"])
+        run = flattened(hub_step(self.wf, "Publish to docs-hub")["run"])
 
         self.assertLess(
             run.index("curl -sS"), run.index("cat /tmp/publish-response.json"))
@@ -303,7 +324,7 @@ class GateTests(unittest.TestCase):  # pylint: disable=too-many-public-methods
         # GitHub's fast-forward check. The step must document that a
         # non-forced PATCH is the point, so a future reader does not "fix"
         # the 422 by adding force.
-        raw = pub_step(self.wf, "Publish to docs-hub")["run"]
+        raw = hub_step(self.wf, "Publish to docs-hub")["run"]
         run = flattened(raw)
 
         # The GET probe decides create-vs-update.
@@ -337,20 +358,22 @@ class GateTests(unittest.TestCase):  # pylint: disable=too-many-public-methods
         # newer commit — an inversion the heal gate's ref comparison cannot
         # see. Immediately before the upload the step fresh-fetches the ref
         # (anonymous, same shape as the heal gate) and, when the tip is not
-        # this run's own HEAD, asks the compare API, whose status names the
-        # TIP side relative to the BASE side. Only a tip that is AHEAD (a
-        # newer run already published) aborts: green, exit 0, no upload, no
-        # ref move. `behind` is the normal heal and publishes; a failed or
+        # this run's own page commit (`tip`, the publish job's record; the
+        # tie above has already conceded when it is not main's tip), asks
+        # the compare API, whose status names the TIP side relative to the
+        # BASE side. Only a tip that is AHEAD (a newer run already
+        # published) aborts: green, exit 0, no upload, no ref move.
+        # `behind` is the normal heal and publishes; a failed or
         # unrankable answer retries once and then publishes anyway behind a
         # warning, because availability of publish beats the residual
         # seconds-wide window. The newest run NEVER aborts, so within any
         # overlap the newest page always wins.
-        run = flattened(pub_step(self.wf, "Publish to docs-hub")["run"])
+        run = flattened(hub_step(self.wf, "Publish to docs-hub")["run"])
 
         # The gate stands between the step's start and the upload: the
         # anonymous ref fetch and the compare call precede the upload, and
         # the abort leaves through exit 0 before anything is uploaded.
-        self.assertLess(run.index("git fetch --depth=1 origin"),
+        self.assertLess(run.index("fetch --depth=1 origin"),
                         run.index("https://docs.nitjsefni.eu/api/publish"))
         self.assertLess(
             run.index("refs/heads/published:refs/remotes/origin/published"),
@@ -401,31 +424,43 @@ class GateTests(unittest.TestCase):  # pylint: disable=too-many-public-methods
 
         self.assertEqual(s["id"], "commit")
         self.assertIn('echo "publish=true"', flattened(s["run"]))
+        self.assertIn('echo "commits=true"', flattened(s["run"]))
+        self.assertIn('echo "commits=false"', flattened(s["run"]))
 
-    def test_the_commit_step_concedes_a_lost_push_race_instead_of_dying_red(self):
-        # Issue 46: two same-group runs raced the push to main and the loser
-        # died red on a non-fast-forward rejection. The loser must fetch the
-        # moved main, rebase, and either push again or concede -- green, with
-        # publish=false, because the concurrent run's capture stands and
-        # publishing it is that run's job. The scratch checkout makes the
-        # data push's two attempts four `HEAD:main` spellings across the
-        # step: two belong to the retirement push, two to the data push.
+    def test_the_commit_step_performs_no_push(self):
+        # Issue #133: the commit step is the keyless committer -- it stages
+        # the verified commits as a bundle and pushes nothing. Every main
+        # push in the workflow lives in the push job, behind the deploy key.
         run = flattened(pub_step(self.wf, "Commit the capture")["run"])
 
-        self.assertIn("git fetch --quiet origin main", run)
-        self.assertIn("git rebase origin/main", run)
-        # A conflict is the concurrent capture arriving first; the loser
-        # aborts, says so in the summary, and exits 0 without publishing.
-        self.assertIn("git rebase --abort", run)
-        self.assertLess(run.index("git rebase --abort"),
-                        run.index('echo "publish=false"'))
-        self.assertIn("lost the race", run.lower())
-        self.assertLess(run.rindex('echo "publish=false"'),
-                        run.rindex("exit 0"))
-        # Exactly two attempts on each push: the original and the
-        # post-rebase retry, which is the final one -- a second rejection
-        # fails the run red rather than looping.
-        self.assertEqual(run.count("HEAD:main"), 4)
+        self.assertNotIn("git push", run)
+        self.assertNotIn("HEAD:main", run)
+        # The bundle is staged with the base and tip the push job checks.
+        self.assertIn("git bundle create", run)
+        self.assertIn("FETCH_HEAD..push", run)
+        self.assertIn("base.txt", run)
+        self.assertIn("tip.txt", run)
+
+    def test_the_push_job_concedes_a_lost_push_race(self):
+        # Issue 46's race contract, re-homed with the push: a rejected push
+        # distinguishes "main stood still" (a real error, red) from "main
+        # moved before the push landed" (dropped green; the next hourly run
+        # re-fetches, re-tests and lands it). Exactly two attempts: the
+        # original and the post-fetch verdict, which is the final one --
+        # nothing loops.
+        run = flattened(
+            step_in(self.wf, "push", "Push the tested tree to main")["run"])
+
+        # Exactly one guarded push attempt: a rejection is classified once
+        # (stood still vs main moved) and never loops.
+        self.assertEqual(run.count("refs/heads/main"), 2)
+        self.assertIn("moved under the run", run)
+        self.assertIn("moved before the push landed", run)
+        self.assertIn("rejected while main stood still", run)
+        # The stood-still verdict compares the TESTED BASE, not tip^: the
+        # bundle may carry two commits (the retirement rides along), so
+        # tip^ would name the retirement commit.
+        self.assertIn('base.txt")" =', run)
 
     def test_the_fetch_runs_above_the_installs_which_gate_on_proceed(self):
         # Issue 59: pip + Chromium install burned 40-50 s on the large
@@ -492,17 +527,25 @@ class RouteDisagreementPublishTests(unittest.TestCase):
         self.assertNotIn("alert_after", self.block)
 
     def test_the_capture_step_holds_no_push_credentials(self):
-        # #143: the capture step no longer pushes -- the retirement leaves
-        # as payload -- so no token env sits here. The tokens live on the
-        # write side only: the publish job's commit step (push to main) and
-        # publish step (docs-hub key, published-ref API).
+        # #143 and #133: the capture step pushes nothing, and since the
+        # commit step's fetches went anonymous, NO step before the hub job
+        # holds a credential at all. The deploy key lives only in the push
+        # job; the docs-hub key and the job token live only in the hub.
         self.assertNotIn("GH_TOKEN", self.step.get("env", {}))
         commit = pub_step(self.wf, "Commit the capture")
-        self.assertEqual(commit["env"]["GH_TOKEN"], "${{ github.token }}")
-        self.assertEqual(commit["env"]["REPO"], "${{ github.repository }}")
-        publish = pub_step(self.wf, "Publish to docs-hub")
-        self.assertEqual(publish["env"]["DOCS_HUB_API_KEY"],
+        self.assertNotIn("GH_TOKEN", commit.get("env", {}))
+        self.assertNotIn("MASTER_PUSH_DEPLOY_KEY", commit.get("env", {}))
+        push = self.wf["jobs"]["push"]
+        push_step = step_in(self.wf, "push", "Push the tested tree to main")
+        self.assertEqual(push.get("environment"), "main-push")
+        self.assertEqual(push_step["env"]["MASTER_PUSH_DEPLOY_KEY"],
+                         "${{ secrets.MASTER_PUSH_DEPLOY_KEY }}")
+        self.assertNotIn("GH_TOKEN", push_step.get("env", {}))
+        hub = hub_step(self.wf, "Publish to docs-hub")
+        self.assertEqual(hub["env"]["DOCS_HUB_API_KEY"],
                          "${{ secrets.DOCS_HUB_API_KEY }}")
+        self.assertEqual(hub["env"]["GH_TOKEN"], "${{ github.token }}")
+        self.assertNotIn("MASTER_PUSH_DEPLOY_KEY", hub.get("env", {}))
 
     def test_the_three_exit_colours_are_classified_in_order(self):
         # Recovery (rc 0) stands first, then the disputed publish (rc 3),
@@ -590,22 +633,23 @@ class RouteDisagreementPublishTests(unittest.TestCase):
                       commit)
         self.assertIn("xargs git rm -q --ignore-unmatch", commit)
 
-    def test_both_stamp_paths_retry_the_push_race_then_concede(self):
-        # The retirement push keeps its own two-attempt race handling, and
-        # its failures concede SILENTLY -- no summary line, no publish
-        # verdict of its own: the next successful capture retires again.
-        # Only its slice of the commit step's run block is examined, so the
-        # data push's louder contract (pinned separately) cannot satisfy it.
+    def test_both_stamp_paths_ride_the_push_bundle(self):
+        # The retirement commit rides the bundle with the data commit: it
+        # lands when the push job lands, and a push lost to the race
+        # concedes silently for the retirement too -- the next successful
+        # capture retires the stamp again. Only the commit step's retire
+        # slice is examined: it must hold the retirement commit and none of
+        # the push machinery.
         commit = flattened(pub_step(self.wf, "Commit the capture")["run"])
-        idx_ret = commit.index("Route agreement restored")
+        idx_ret = commit.index("xargs git rm -q --ignore-unmatch")
         idx_data = commit.index("cp -a")
         retire = commit[idx_ret:idx_data]
 
-        self.assertIn("git fetch --quiet origin main", retire)
-        self.assertIn("git rebase origin/main", retire)
-        self.assertIn("git rebase --abort", retire)
-        self.assertIn("push origin HEAD:main || true", retire)
-        self.assertNotIn("publish=false", retire)
+        self.assertIn("git commit -q -m "
+                      "'Route agreement restored; resume captures "
+                      "(issue #100)'", retire)
+        self.assertNotIn("git push", retire)
+        self.assertNotIn("HEAD:main", retire)
 
     def test_no_time_bound_remains_on_the_disagreement(self):
         # The banner is the alarm now: no stamp age, no red alarm wording.
@@ -677,6 +721,38 @@ class RouteDisagreementPublishTests(unittest.TestCase):
         self.assertLess(run.index(f"> {msg}"),
                         run.index("git commit -F " + msg))
 
+    def test_the_hub_ties_the_upload_and_the_ref_to_one_commit(self):
+        # The ref must never name a page the hub does not serve, and the
+        # tie is ENFORCED, not asserted: the upload and the ref move run
+        # only when the payload page's own commit (`tip`, recorded by the
+        # publish job) is still main's tip. When main has moved past it, a
+        # newer run owns the tip and its hub job publishes - this run
+        # concedes green before anything is uploaded or moved. The #74
+        # gate then compares the published ref against that same `tip`.
+        run = flattened(hub_step(self.wf, "Publish to docs-hub")["run"])
+
+        idx_target = run.index('target="$(git -C "${scratch}" rev-parse FETCH_HEAD)"')
+        idx_mine = run.index('mine="$(cat "${RUNNER_TEMP}/push-data/tip.txt")"')
+        # The target is fetched before the tip is read: the tie compares a
+        # fresh main against the page's own commit.
+        self.assertLess(idx_target, idx_mine)
+        idx_tie = run.index('[ "$mine" != "$target" ]; then')
+        idx_concede = run.index("Lost the race")
+        # The tie's concede leaves GREEN through its own exit 0 before the
+        # #74 gate: a superseded hour must neither publish nor go red.
+        idx_exit = run.index("exit 0", idx_concede)
+        idx_gate = run.index("refs/heads/published:refs/remotes/origin/published")
+        self.assertLess(idx_exit, idx_gate)
+        idx_upload = run.index("https://docs.nitjsefni.eu/api/publish")
+        idx_ref = run.index('-f sha="$mine"')
+        self.assertLess(idx_mine, idx_tie)
+        self.assertLess(idx_tie, idx_concede)
+        self.assertLess(idx_concede, idx_gate)
+        self.assertLess(idx_gate, idx_upload)
+        self.assertLess(idx_upload, idx_ref)
+        # The ref move names `mine`, the page's own commit.
+        self.assertNotIn('-f sha="$target"', run)
+
     def test_the_upload_mirrors_publish_docs_py(self):
         # Review I2 on PR #151: the write job runs no repository code, so
         # the upload is the endpoint's wire format inlined, and the step
@@ -685,7 +761,7 @@ class RouteDisagreementPublishTests(unittest.TestCase):
         # that must drift together: the multipart part names, the key
         # header, the pinned host and endpoint, and the hub's dual failure
         # semantics (a non-2xx, or a 2xx carrying an error field).
-        raw = pub_step(self.wf, "Publish to docs-hub")["run"]
+        raw = hub_step(self.wf, "Publish to docs-hub")["run"]
         run = flattened(raw)
 
         for piece in ("-F 'slug=ai-researcher/frontier-models'",
@@ -702,27 +778,73 @@ class RouteDisagreementPublishTests(unittest.TestCase):
             self.assertIn(piece, run)
 
     def test_the_ref_move_only_names_a_commit_on_mains_history(self):
-        # Issue #152: a quiet hour whose retirement push lost the race ends
-        # with the write job's HEAD at an unpushed retirement commit -- the
-        # PATCH's fast-forward check would accept it and the heal gate's
-        # ref would leave main's history. The move must be gated on HEAD
-        # being an ancestor of main's tip, fresh-fetched after the upload;
-        # off main, the skip is green and the ref waits for a landing
-        # commit, which is exactly the state the heal gate compares
-        # against.
-        raw = pub_step(self.wf, "Publish to docs-hub")["run"]
+        # Issue #152's gate is structural now: the ref target is main's tip
+        # fresh-fetched AFTER the push job's turn (the landed tip IS main's
+        # tip on a landing; the concession path publishes nothing), so it
+        # cannot leave main's history, and the tie above ties the ref to
+        # the page's own commit: the ref moves to `mine` (the publish
+        # job's recorded tip), only while `mine` is still main's tip. The
+        # pin holds the shape: target read from FETCH_HEAD, the tie's
+        # concede before the #74 gate, the gate before the upload, and the
+        # upload before a refs-API call naming `$mine`, never `$target`.
+        raw = hub_step(self.wf, "Publish to docs-hub")["run"]
         run = flattened(raw)
 
+        idx_target = run.index('target="$(git -C "${scratch}" rev-parse FETCH_HEAD)"')
+        idx_concede = run.index("Lost the race")
         idx_upload = run.index("https://docs.nitjsefni.eu/api/publish")
-        idx_fetch = run.index("git fetch --quiet origin main", idx_upload)
-        idx_gate = run.index(
-            'git merge-base --is-ancestor "${head_sha}" FETCH_HEAD',
-            idx_fetch)
         idx_get = run.index('gh api "repos/$REPO/git/refs/heads/published"',
-                            idx_gate)
-        # The gate stands between the upload and the refs API, and its
-        # skip leaves green through its own exit 0 before the API.
-        idx_exit = run.index("exit 0", idx_gate)
-        self.assertLess(idx_gate, idx_get)
-        self.assertLess(idx_exit, idx_get)
-        self.assertIn("not on main's history", run)
+                            idx_upload)
+        self.assertLess(idx_target, idx_concede)
+        self.assertLess(idx_concede, idx_upload)
+        self.assertLess(idx_upload, idx_get)
+        self.assertIn("Lost the race", run)
+
+
+class DeployKeyPushTests(unittest.TestCase):
+    """Issue #133 part 2: the push job's deploy-key contract.
+
+    The push is the workflow's one privileged delivery, and its safety
+    shape is copied from claudit's refresh-pricing push job: the key is
+    loaded in one step of one job, fails closed when the environment is
+    missing it, and never outlives the step that loaded it. The trigger
+    set pin freezes what issue #180 taught about externally triggerable
+    events reaching privileged surfaces.
+    """
+
+    def setUp(self):
+        self.wf = load()
+
+    def test_the_deploy_key_fails_closed_when_the_environment_misses_it(self):
+        run = flattened(
+            step_in(self.wf, "push", "Push the tested tree to main")["run"])
+        self.assertIn(
+            "MASTER_PUSH_DEPLOY_KEY is empty: the main-push environment is "
+            "missing its secret", run)
+        # The fallback is never a token: the push step names no token at all.
+        self.assertNotIn("github.token", run)
+
+    def test_the_agent_never_outlives_the_step_that_loaded_it(self):
+        run = flattened(
+            step_in(self.wf, "push", "Push the tested tree to main")["run"])
+        self.assertIn('trap \'kill "$SSH_AGENT_PID" 2>/dev/null || true\' EXIT',
+                      run)
+        self.assertIn("ssh-add <(printf '%s\\n' \"$MASTER_PUSH_DEPLOY_KEY\")",
+                      run)
+
+    def test_the_refresh_trigger_set_stays_frozen(self):
+        # Schedule plus the force dispatch. Issue #180's lesson applies to
+        # the ci-gate caller/callee pair, not here -- this workflow has no
+        # privileged cross-context sink -- but the set is pinned anyway, so
+        # a trigger added later is a decision, not a slip.
+        triggers = self.wf.get("on") or self.wf.get(True) or {}
+        self.assertEqual(set(triggers), {"schedule", "workflow_dispatch"})
+
+    def test_the_bundle_is_never_fetched_from_a_foreign_run(self):
+        # Same-run artifact only: the push job's download consumes the
+        # publish job's upload name, and nothing keys on a workflow_run.
+        up = step_in(self.wf, "publish", "Upload the push data")
+        down = step_in(self.wf, "push", "Download the push bundle")
+        self.assertEqual(up["with"]["name"], down["with"]["name"])
+        self.assertEqual(up["with"]["if-no-files-found"], "error")
+        self.assertEqual(self.wf["jobs"]["push"]["needs"], "publish")

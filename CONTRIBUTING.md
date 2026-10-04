@@ -236,7 +236,11 @@ unassigned open issue, and `/unclaim` and `/release` remove the commenter's own
 assignment — self-service issue claiming for contributors without write access.
 
 `refresh` is the capture → commit → publish of the page, and it fires two
-ways, which are not equivalent. The workflow's own `schedule` trigger asks
+ways, which are not equivalent. The commit lands on main through the
+`push` job's write deploy key (the `main-push` environment, restricted to
+main) rather than the workflow token, so the bot commit starts workflow
+runs and gets a real `ci gate` aggregate verdict on main's tip (issue
+#133). The workflow's own `schedule` trigger asks
 for hourly (`11 * * * *`), but GitHub delivers scheduled runs best-effort:
 measured over the 37 days ending 2026-09-28, it averaged five runs a day.
 The hourly cadence is actually carried by an out-of-repository scheduler on
