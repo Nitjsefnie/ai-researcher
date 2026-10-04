@@ -181,12 +181,15 @@ message carries one declaration line per raised leaf,
 
     Budget-Raise: <document> <key> <from> -> <to>
 
-naming the exact values the diff carries. The guard honors the lines only on
-a main **push** — the pull-request invocation never passes
-`--allow-declared-raises` — and only from commits touching nothing outside the
-two budget documents, so a raise cannot ride feature work onto main, a squash
-merge's embedded PR body included; a declaration whose values do not match the
-diff exactly refuses too. Seeding
+naming the exact values the diff carries. The guard honors the lines on a
+main **push** and on a **pull request** whose raise commit touches nothing
+outside the two budget documents (issue #133 part 3) — a raise cannot ride
+feature work onto main on either shape; a declaration whose values do not
+match the diff exactly refuses too. Merge a raise pull request with **rebase**:
+the lines live in the raise commit's message. A squash merge may replace them
+with the pull request's title — GitHub's squash message can also prefill the
+commit's own message — and a squash that drops them makes the raise refuse on
+main's push; the rebase merge is the deterministic route. Seeding
 headroom: code_bytes at the measured value exactly (builds are
 byte-deterministic), hover DOM at measured + 2% (rounded up), long tasks at
 measured + 1 (machine-load flap). The browser suite's `PerfBudgetTests` is
@@ -205,10 +208,11 @@ holds each target under its integer maximum. Tighten-only like the perf
 budgets: the default check mode fails on any budget exceeded, the ratchet
 guard refuses a budget that rises, and there is no automated raise. A
 deliberate raise follows the perf budgets' route (issue #120): its own
-commit on main, one `Budget-Raise: <document> <key> <from> -> <to>` line
+commit, one `Budget-Raise: <document> <key> <from> -> <to>` line
 per raised leaf with the exact values the diff carries — the lines count
-only on a main push, from a commit touching nothing outside the two
-budget documents. Budgets are pinned to the CI cell that runs the gate —
+on a main push or a pull request's own raise commit, from a commit
+touching nothing outside the two budget documents. Budgets are pinned to
+the CI cell that runs the gate —
 the coverage job's ubuntu-latest runner, CPython 3.13.15 / valgrind
 3.22.0 — and were seeded from that cell's own first measured counts
 (build 171,504,264, capture_gate 267,669,619, diff_aa 222,551,193

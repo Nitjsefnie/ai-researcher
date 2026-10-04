@@ -372,14 +372,22 @@ jobs:
         # completes the history of both sides first. A branch-creation
         # push carries the all-zero BEFORE — nothing to compare against.
         #
-        # Only the push branch passes --allow-declared-raises: the one
-        # route a deliberate budget raise has (issue #120). The raise
-        # lands on main as its own commit whose message carries one
-        # "Budget-Raise: <document> <key> <from> -> <to>" line per raised
-        # leaf, naming the exact values the diff carries. A pull
-        # request's invocation never passes the flag, and the lines
-        # count only on commits touching nothing outside the two budget
-        # documents — a raise cannot ride feature work onto main.
+        # Both branches pass --allow-declared-raises (issues #120 and
+        # #133): a deliberate budget raise lands as its own commit whose
+        # message carries one "Budget-Raise: <document> <key> <from> ->
+        # <to>" line per raised leaf, naming the exact values the diff
+        # carries, and the lines count only on commits touching nothing
+        # outside the two budget documents — a raise cannot ride feature
+        # work onto main, on a push or on a pull request. The routes
+        # differ in the window's guarantee: the push branch requires base
+        # to be an ancestor of head (a fast-forward of main), while the
+        # PR branch's HEAD^1..HEAD^2 is the pull request's own commits by
+        # construction — --route pr tells the guard which shape it is in.
+        # Merge shape matters: a rebase merge keeps the raise commit's
+        # lines; a squash merge may replace them with the PR title
+        # (GitHub's squash message can also prefill the commit's own
+        # message), and a squash that drops them makes the raise refuse
+        # on main's push. A rebase merge is the deterministic route.
         #
         # The pull-request branch fetches the event's merge commit, never
         # refs/pull/<number>/head: the PR-number refspec was the untrusted
@@ -396,7 +404,8 @@ jobs:
         run: |
           if [ "${GITHUB_EVENT_NAME}" = "pull_request" ]; then
             git fetch --unshallow origin "${CI_SHA}"
-            python3 scripts/ci/check_ratchets.py HEAD^1 HEAD^2
+            python3 scripts/ci/check_ratchets.py --allow-declared-raises \
+              --route pr HEAD^1 HEAD^2
           else
             if [ "${BEFORE}" = "0000000000000000000000000000000000000000" ]; then
               echo "branch creation: no previous main tip to compare against"
