@@ -140,7 +140,10 @@ actionlint .github/workflows/*.yml && zizmor .github/workflows/  # actionlint
 the pinned toolchain. Coverage is gated by a **ratchet**, not a fixed target:
 the floors live in `.github/ci-thresholds.json`, each seeded 1.5 points under
 the coverage of the run that recorded it. CI never lowers them: the automated
-raise is the only writer on main. There are two floors: Python statement
+raise is the only writer on main, and it lands through the top-level
+`ratchet-push` workflow's write deploy key (the `main-push` environment) —
+a workflow_call callee cannot read an environment secret, which is why the
+push is not a job in tests.yml (issue #133 part 2b). There are two floors: Python statement
 coverage from the pytest run,
 and JavaScript physical code-line coverage of the page's inline script,
 measured through the browser suite (`tests/test_browser.py` records V8

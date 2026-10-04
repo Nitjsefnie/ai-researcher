@@ -180,34 +180,23 @@ def test_page_job_runs_the_committed_page_check():
     assert checkout["with"]["persist-credentials"] is False
 
 
-def test_only_ratchet_push_holds_contents_write():
-    # Issue #134: the coverage job runs the suite, installs unhashed
-    # third-party dependencies and downloads a browser, and so must not
-    # hold contents: write. The raise leaves `coverage` as an artifact and
-    # `ratchet-push` — which runs no repository code — is the only writer.
+def test_no_job_in_tests_workflow_holds_contents_write():
+    # Issues #134 and #133 part 2b: the coverage job runs the suite,
+    # installs unhashed third-party dependencies and downloads a browser,
+    # so nothing here may hold contents: write. The raise leaves `coverage`
+    # as the ratchet-data artifact for the top-level ratchet-push workflow,
+    # whose own job is the writer; this workflow declares no writer at all.
     workflow = yaml.safe_load(TESTS_WORKFLOW.read_text(encoding="utf-8"))
     assert workflow.get("permissions") == {"contents": "read"}, (
         "the workflow-level floor must stay contents: read — a job "
         "without its own permissions block inherits it, so raising the "
         "default raises every job at once")
     jobs = workflow["jobs"]
-    assert "ratchet-push" in jobs, (
-        "the data-only push job is missing from tests.yml")
     for name, job in jobs.items():
         contents = (job.get("permissions") or {}).get("contents")
-        if name == "ratchet-push":
-            assert contents == "write", (
-                "ratchet-push is the workflow's only writer and must "
-                "declare it")
-        else:
-            assert contents != "write", (
-                f"{name} holds contents: write; only ratchet-push may")
-    push = jobs["ratchet-push"]
-    assert push["needs"] == "coverage", (
-        "the artifact is this run's own data: needs, not a workflow_run")
-    assert not [s for s in push["steps"]
-                if s.get("uses", "").startswith("actions/checkout@")], (
-        "ratchet-push runs no repository code: no checkout step")
+        assert contents != "write", (
+            f"{name} holds contents: write; the ratchet raise lands "
+            "through the top-level ratchet-push workflow")
 
 
 def test_diff_coverage_job_is_pull_request_only_and_read_only():

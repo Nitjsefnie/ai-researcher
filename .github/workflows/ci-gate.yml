@@ -125,14 +125,12 @@ jobs:
     # resolves in-repo (suppressed at the line below).
     uses: ./.github/workflows/tests.yml  # zizmor: ignore[self-repository]
     permissions:
-      # The caller's grant CAPS what the callee can use. contents: write
-      # is for the callee's `ratchet-push` job alone — the workflow's
-      # only writer, which publishes the coverage raise the same run's
-      # coverage job measured; its own permissions block stays the
-      # authority for every other job, which remain read-only. The
+      # Read-only: the callee runs no writer (its ratchet raise leaves as
+      # an artifact for the top-level ratchet-push workflow, issue #133
+      # part 2b), so the caller's grant stays at the workflow floor. The
       # callee runs on the pull_request trust model: no secret is
       # forwarded.
-      contents: write
+      contents: read
 
   lint:
     needs: classify
