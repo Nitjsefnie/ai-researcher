@@ -815,7 +815,7 @@ def _healed_capture(exc):
     """
     baseline = _last_agreeing_capture()
     healed = heal_route_disagreement(exc, baseline)
-    if healed is None:
+    if healed is None or not isinstance(baseline, list):
         return None
     models, note = healed
     return models, note, baseline
