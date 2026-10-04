@@ -1013,8 +1013,11 @@ class ExecutedCommitMessageTests(unittest.TestCase):
             .write_text('{"window_start": 7, "baseline": []}\n',
                         encoding="utf-8")
         if remove:
-            (payload / "remove.txt").write_text(
-                "".join(f"{rel}\n" for rel in remove), encoding="utf-8")
+            # Bytes, not text mode: a Windows text-mode write turns the
+            # newlines into CRLF, xargs hands git a CR-suffixed pathspec,
+            # and --ignore-unmatch swallows the miss silently.
+            (payload / "remove.txt").write_bytes(
+                "".join(f"{rel}\n" for rel in remove).encode("utf-8"))
         if differ_msg:
             (payload / "commit-msg.txt").write_text(differ_msg,
                                                     encoding="utf-8")
