@@ -46,8 +46,10 @@ def test_no_externally_triggerable_default_branch_write_trigger():
 
     workflow_dispatch is what the cache-poisoning query keys on: an event
     both externally triggerable and default-branch cache-write capable.
-    repository_dispatch would read the same way to the analyser and is
-    refused with it. push stays, scoped to main so the only
+    schedule is the one other event in both sets, and repository_dispatch
+    would read the same way to the analyser — so the pin refuses all three
+    by pinning the boundary instead of naming members: the trigger set is
+    exactly {push, pull_request}. push stays, scoped to main so the only
     default-branch-context runs carry main's own reviewed code, and
     pull_request stays so the suite still runs on changes — a pull_request
     run holds no default-branch cache write, which is exactly why the
@@ -55,8 +57,7 @@ def test_no_externally_triggerable_default_branch_write_trigger():
     """
     triggers = _document()['on']
     assert triggers is not None
-    for absent in ('workflow_dispatch', 'repository_dispatch'):
-        assert absent not in triggers, sorted(triggers)
+    assert set(triggers) == {'push', 'pull_request'}, sorted(triggers)
     assert triggers['push']['branches'] == ['main']
     assert 'pull_request' in triggers, sorted(triggers)
 
@@ -73,8 +74,22 @@ def test_no_step_fetches_or_checks_out_a_pr_controlled_ref():
     command = re.compile(
         r'\bgit\b[^\n]*?\b(?:fetch|pull|checkout)\b'
         r'|\b(?:gh|hub)\b[^\n]*?\bpr\s+checkout\b')
-    forbidden = ('refs/pull', 'pr_number', 'pull_request.number',
-                 'head_ref', 'head.sha', 'merge_commit_sha')
+    # The analyser's own recognition grammar, mirrored needle for needle so
+    # a grammar change upstream reds this pin as a diff instead of
+    # re-arming alert #27 in silence. Grouped by the UntrustedCheckoutQuery
+    # predicate each needle comes from.
+    forbidden = (
+        'refs/pull',
+        # containsPullRequestNumber
+        'event.number', 'issue.number', 'pull_request.id',
+        'pull_request.number', 'check_suite.pull_requests',
+        'check_run.pull_requests', 'pr_number', 'pr_id',
+        # containsHeadRef
+        'head.ref', 'head_ref', 'head_branch', 'merge_ref', 'pr_head_ref',
+        # containsHeadSHA
+        'head.sha', 'head_sha', 'head_commit', 'check_suite.after',
+        'merge_commit_sha', 'merge_sha', 'pr_head_sha',
+    )
     flagged = []
     for step in _steps():
         env = step.get('env') or {}
