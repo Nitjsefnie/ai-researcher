@@ -167,7 +167,7 @@ def test_required_jobs_name_the_merge_gate_contexts(tmp_path):
 # tests/test_gitignore.py parses them -- so the next window file joins the
 # pin with no second edit. The window files proper are the parsed add paths
 # that are not in CORE_PIN: a path the gate reads windowless is already
-# pinned unconditionally, so its tracked-ness cannot move the derived set.
+# pinned unconditionally, so its tracked-ness cannot move the expectation.
 def window_paths():
     """The refresh add paths whose tracked-ness can move the derived set."""
     paths = [p for p in test_gitignore.added_paths() if p not in CORE_PIN]
@@ -218,10 +218,14 @@ def test_the_pin_expectation_admits_every_window_combination():
     Runs OUTSIDE a live window: `tracked` is synthesized, never this
     repository's tree. Every tracked/untracked combination of the window
     files the pipeline can commit must leave the expectation equal to the
-    tracked set it describes. The pre-#198 pin fails exactly here: its hand
-    list knew the snapshot and the stamp but not the last-agreeing record,
-    so the healed combinations left the record out of the expectation while
-    the derivation -- which reaches every tracked data/ file -- had it.
+    tracked set it describes. The pre-#198 pin fails exactly here -- under
+    a builder-only regression to the hand list. What this test does NOT
+    watch: its universe is window_paths() itself, so a coherent
+    hand-regression of BOTH the builder and the window set turns red only
+    in the real pin, and only while the drifted-away file is tracked -- on
+    a windowless tree every committed test passes (the corpus's
+    subject-derived-universe facet, named rather than left to imply full
+    coverage).
     """
     window = window_paths()
     for size in range(len(window) + 1):
