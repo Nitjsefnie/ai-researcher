@@ -370,11 +370,18 @@ def _budgets_written(repo, document):
     return target
 
 
-def _commit_budgets_on_branch(repo, document, message):
+def _commit_budgets_on_branch(repo, document, message, extra_path=None,
+                              extra_content=None):
     """Commit the budgets document on a `pr` branch forked from main, as
-    a pull request does."""
+    a pull request does. `extra_path`/`extra_content` ride the SAME
+    commit — the per-commit purity rule's impure shape."""
     _git(repo, "checkout", "-q", "-b", "pr")
     _budgets_written(repo, document)
+    if extra_path is not None:
+        target = repo / extra_path
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(extra_content, encoding="utf-8")
+        _git(repo, "add", extra_path)
     _git(repo, "add", ".github/perf-budgets.json")
     _git(repo, "commit", "-qm", message)
     return _git(repo, "rev-parse", "HEAD").stdout.strip()
@@ -1205,11 +1212,13 @@ def test_end_to_end_push_undeclared_raise_refuses_with_the_route_hint(
     assert "Budget-Raise: <document> <key> <from> -> <to>" in out
 
 
-def test_end_to_end_pull_request_cannot_declare_a_raise(tmp_path, capsys,
-                                                        monkeypatch):
-    """The PR invocation never passes --allow-declared-raises, so a
-    raise riding a pull request refuses even when its commit carries a
-    perfectly formed declaration line."""
+def test_end_to_end_pull_request_declared_raise_is_clean(tmp_path, capsys,
+                                                         monkeypatch):
+    """Issue #133 part 3: the PR route opens the same rules the push
+    route applies. The window is the merge commit's own commits
+    (HEAD^1..HEAD^2), so a pure raise commit carrying perfectly formed
+    declaration lines passes on a pull request: --allow-declared-raises
+    --route pr is the invocation the workflow's PR branch makes."""
     repo = _seed_repo(tmp_path, _document(), budgets=_budgets_document())
     was = _budgets_document()["bytes"]["code_bytes"]
     raised = _budgets_document()
@@ -1221,10 +1230,88 @@ def test_end_to_end_pull_request_cannot_declare_a_raise(tmp_path, capsys,
     head = _git(repo, "rev-parse", "pr").stdout.strip()
     guard = _guard()
     monkeypatch.chdir(repo)
-    assert guard.main(["main", head]) == 1
+    assert guard.main(["main", head, "--allow-declared-raises",
+                       "--route", "pr"]) == 0
+    out = capsys.readouterr().out
+    assert out.count("not relaxed") == 3
+    assert "cannot ride a pull request" not in out
+
+
+def test_end_to_end_pull_request_route_survives_a_moved_base(
+        tmp_path, capsys, monkeypatch):
+    """The route clause's discriminating input: main advanced past the
+    fork point, so `main` is NOT an ancestor of the PR head and the push
+    route's ancestor gate would shut the route. The pr route exists for
+    exactly this shape — an ordinary raise PR on this repository, where
+    main moves hourly — and must still land the pure declared raise.
+
+    This test is the clause's only entry: deleting `route == 'pr'` from
+    the guard turns this pass into a refusal and nothing else in the
+    suite notices (the round-1 review's surviving-mutant probe)."""
+    repo = _seed_repo(tmp_path, _document(), budgets=_budgets_document())
+    was = _budgets_document()["bytes"]["code_bytes"]
+    raised = _budgets_document()
+    raised["bytes"]["code_bytes"] = 79700
+    _commit_budgets_on_branch(
+        repo, raised,
+        _push_message(_declaration(".github/perf-budgets.json",
+                                   "bytes.code_bytes", was, 79700)))
+    head = _git(repo, "rev-parse", "pr").stdout.strip()
+    (repo / "UNRELATED.md").write_text("main moved on", encoding="utf-8")
+    _git(repo, "checkout", "-q", "main")
+    _git(repo, "add", "UNRELATED.md")
+    _git(repo, "commit", "-qm", "an unrelated main commit lands first")
+    guard = _guard()
+    monkeypatch.chdir(repo)
+    assert guard.main(["main", head, "--allow-declared-raises",
+                       "--route", "pr"]) == 0
+    out = capsys.readouterr().out
+    assert out.count("not relaxed") == 3
+
+
+def test_end_to_end_pull_request_impure_carrier_refuses(tmp_path, capsys,
+                                                        monkeypatch):
+    """The purity rule crosses to the PR route unchanged, and it is a
+    PER-COMMIT rule exactly as on the push route: a commit carrying
+    declaration lines must touch nothing outside the two budget
+    documents. The raise commit itself carries the code edit here, so
+    the finding names the foreign path; a separate sibling code commit
+    with no lines is the push route's own allowed shape."""
+    repo = _seed_repo(tmp_path, _document(), budgets=_budgets_document())
+    was = _budgets_document()["bytes"]["code_bytes"]
+    raised = _budgets_document()
+    raised["bytes"]["code_bytes"] = 79700
+    _commit_budgets_on_branch(
+        repo, raised,
+        _push_message(_declaration(".github/perf-budgets.json",
+                                   "bytes.code_bytes", was, 79700)),
+        extra_path="build.py", extra_content="# touched\n")
+    head = _git(repo, "rev-parse", "pr").stdout.strip()
+    guard = _guard()
+    monkeypatch.chdir(repo)
+    assert guard.main(["main", head, "--allow-declared-raises",
+                       "--route", "pr"]) == 1
+    out = capsys.readouterr().out
+    assert "carries declaration lines but also touches" in out
+    assert "build.py" in out
+
+
+def test_end_to_end_pull_request_undeclared_raise_refuses(tmp_path, capsys,
+                                                          monkeypatch):
+    """Undeclared raises refuse on the PR route exactly as on the push
+    route, and the refusal teaches the route."""
+    repo = _seed_repo(tmp_path, _document(), budgets=_budgets_document())
+    raised = _budgets_document()
+    raised["bytes"]["code_bytes"] = 79700
+    _commit_budgets_on_branch(repo, raised, "Raise code_bytes, no line")
+    head = _git(repo, "rev-parse", "pr").stdout.strip()
+    guard = _guard()
+    monkeypatch.chdir(repo)
+    assert guard.main(["main", head, "--allow-declared-raises",
+                       "--route", "pr"]) == 1
     out = capsys.readouterr().out
     assert "raised; it may only fall" in out
-    assert "cannot ride a pull request" in out
+    assert "Budget-Raise: <document> <key> <from> -> <to>" in out
 
 
 def test_end_to_end_mismatched_declaration_refuses(tmp_path, capsys,
@@ -1548,11 +1635,16 @@ def test_end_to_end_declaration_cannot_rescue_a_key_add(
 
 
 def test_workflow_wiring_pins_the_invocations():
-    """Pin the enforcement wiring: the push branch passes the flag, the
-    pull-request invocation never does — the flag's absence there is
-    what refuses a raise riding a PR."""
+    """Pin the enforcement wiring: the push branch passes the flag with
+    the push route, the pull-request branch passes it with the pr route
+    -- the routes' differing window guarantees are the workflow's to
+    name, and dropping either flag goes red here."""
     text = (REPO_ROOT / ".github" / "workflows" / "tests.yml").read_text(
         encoding="utf-8")
     assert ('check_ratchets.py --allow-declared-raises "${BEFORE}" HEAD'
             in text)
-    assert "check_ratchets.py HEAD^1 HEAD^2" in text
+    assert "--route pr HEAD^1 HEAD^2" in text
+    # Exactly two invocations carry the flag; the comment's prose mention
+    # names it without the script prefix, so the prefixed count pins the
+    # invocations alone.
+    assert text.count("check_ratchets.py --allow-declared-raises") == 2

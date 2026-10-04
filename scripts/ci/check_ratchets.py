@@ -44,26 +44,36 @@ Three documents are guarded, each with its own direction rules:
   Key added and key removed are findings in every guarded document — a
   PR must not be able to mask a raise behind a reshuffle.
 
-A deliberate budget raise has exactly one route onto main (issue #120):
-it lands as its own fast-forward push of main, and the raise commit's
-message carries one declaration line per raised leaf,
+A deliberate budget raise has exactly one route onto main (issue #120,
+widened by #133 to a pull request): the raise lands as its own commit —
+on a fast-forward push of main, or as a pull request's commit — and the
+raise commit's message carries one declaration line per raised leaf,
 
     Budget-Raise: <document> <key> <from> -> <to>
 
-with the exact values the diff carries. The workflow's push branch (and
-only it) invokes the guard with --allow-declared-raises; a pull
-request's invocation never does. The lines are collected from the
-window base..head only when the base is an ancestor of the head — the
-fast-forward shape a main push has — and only from commits touching
-nothing outside the two budget documents: the route is its own act, and
-a raise cannot ride feature work onto main, including through a squash
-merge whose message embeds the PR body. Every raised budget leaf needs
-a declaration naming it exactly: a raise with no declaration refuses,
-and so does a declaration the diff does not carry exactly — a
-mismatched value, a duplicate, a key that did not rise, a non-finite
-token, or one naming the coverage document (whose raises are the
-ratchet's own automated act and whose relaxations refuse everywhere;
-only the two budget documents' raises are declarable).
+with the exact values the diff carries. The workflow invokes the guard
+with --allow-declared-raises on both shapes: the push branch passes
+--route push (the default), the pull-request branch --route pr. The
+lines are collected from the window base..head — on a push that is
+exactly the push's own commits because the base is an ancestor of the
+head (enforced: without the ancestor relationship the route stays shut,
+``declarations apply only on a fast-forward push of main``); on a pull
+request the base is the merge commit's first parent, so base..head is
+exactly the pull request's own commits by construction. On both routes
+the lines count only from commits touching nothing outside the two
+budget documents: the route is its own act, and a raise cannot ride
+feature work onto main. Every raised budget leaf needs a declaration
+naming it exactly: a raise with no declaration refuses, and so does a
+declaration the diff does not carry exactly — a mismatched value, a
+duplicate, a key that did not rise, a non-finite token, or one naming
+the coverage document (whose raises are the ratchet's own automated act
+and whose relaxations refuse everywhere; only the two budget documents'
+raises are declarable). Merge shape matters on the PR route: a rebase
+merge keeps the raise commit's lines, while a squash merge may replace
+them with the pull request's title — GitHub's squash message can also
+prefill the commit's own message, so the lines are not always lost —
+but a squash that drops them makes the raise refuse on main's push.
+A rebase merge is the deterministic route.
 """
 from __future__ import annotations
 
@@ -575,14 +585,21 @@ def read_document(cwd, commit, path):
             f'{path} at {commit} is not valid JSON: {error}') from None
 
 
-def check_ratchets(cwd, base_rev, head_rev, allow_declared_raises=False):
+def check_ratchets(cwd, base_rev, head_rev, allow_declared_raises=False,
+                   route='push'):
     require_full_history(cwd)
     base = resolve_commit(cwd, base_rev)
     head = resolve_commit(cwd, head_rev)
     fork = merge_base(cwd, base, head)
     findings = []
     by_document = None
-    if allow_declared_raises and _is_ancestor(cwd, base, head):
+    # The push route rides a fast-forward (base an ancestor of head), so
+    # base..head is exactly the push's own commits. The PR route needs no
+    # ancestor check: its base is the merge commit's first parent, and
+    # base..head is the pull request's own commits by construction.
+    route_open = allow_declared_raises and (
+        route == 'pr' or _is_ancestor(cwd, base, head))
+    if route_open:
         by_document, declaration_findings = _collect_declarations(
             cwd, base, head)
         findings.extend(declaration_findings)
@@ -611,13 +628,19 @@ def main(argv=None):
     parser.add_argument(
         '--allow-declared-raises', action='store_true',
         help='let a budget raise pass when a Budget-Raise line in '
-             'base..head names it exactly — the push branch\'s '
-             'invocation; a pull request never passes this')
+             'base..head names it exactly')
+    parser.add_argument(
+        '--route', choices=('push', 'pr'), default='push',
+        help='which shape the comparison is: push requires base to be an '
+             'ancestor of head (a fast-forward push of main); pr reads '
+             'the window as the merge commit\'s own commits (base is '
+             'HEAD^1, head HEAD^2)')
     args = parser.parse_args(argv)
     try:
         fork, findings = check_ratchets(
             Path.cwd(), args.base_rev, args.head_rev,
-            allow_declared_raises=args.allow_declared_raises)
+            allow_declared_raises=args.allow_declared_raises,
+            route=args.route)
     except ValueError as error:
         print(f'ratchet check: {error}', file=sys.stderr)
         return 2
@@ -632,20 +655,22 @@ def main(argv=None):
           f'base {fork}; the ratchet document may only tighten')
     saw_raise = any('raised; it may only fall' in line for line in findings)
     route_open = (args.allow_declared_raises
-                  and _is_ancestor(Path.cwd(), args.base_rev,
-                                   args.head_rev))
+                  and (args.route == 'pr'
+                       or _is_ancestor(Path.cwd(), args.base_rev,
+                                       args.head_rev)))
     if saw_raise and route_open:
-        print("ratchet check: a deliberate raise lands on main as its own "
-              "commit with one line per raised leaf — "
+        print("ratchet check: a deliberate raise lands as its own commit "
+              "touching only the two budget documents, with one line per "
+              "raised leaf — "
               "'Budget-Raise: <document> <key> <from> -> <to>' "
               '(CONTRIBUTING.md)')
     elif saw_raise and args.allow_declared_raises:
         print('ratchet check: Budget-Raise declarations apply only on a '
               'fast-forward push of main — this comparison is not one')
     elif saw_raise:
-        print("ratchet check: a budget raise cannot ride a pull request — "
-              "land it on main as its own commit with the Budget-Raise "
-              'line(s) (CONTRIBUTING.md)')
+        print("ratchet check: a budget raise needs one Budget-Raise line "
+              "per raised leaf, on a commit touching only the two budget "
+              'documents — pass --allow-declared-raises (CONTRIBUTING.md)')
     return 1
 
 
