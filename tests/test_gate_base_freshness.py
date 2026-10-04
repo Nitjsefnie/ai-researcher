@@ -14,6 +14,7 @@ kept as written, and duplicate-code stays scoped to this file.
 import contextlib
 import importlib.util
 import io
+import itertools
 import os
 import subprocess
 import sys
@@ -21,6 +22,9 @@ from pathlib import Path
 
 import pytest
 import yaml
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import test_gitignore  # noqa: E402  # pylint: disable=wrong-import-position
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -154,20 +158,36 @@ def test_required_jobs_name_the_merge_gate_contexts(tmp_path):
         assert name in jobs, f'{path} must define the merge-gate job {name!r}'
 
 
-# The route-disagreement window's files (issue #118): the one admitted
-# exception to the pin below. They enter and leave the tree at AA's whim on
-# the hourly capture, and while they are tracked the refresh workflow reads
-# them by name, so the live derivation genuinely includes them -- a frozen
-# twin of a live derivation cannot follow them without itself becoming
-# window-aware (issue #172). Named here by hand, not parsed out of
-# refresh.yml: the mechanism is issue #118's, these are exactly its two
-# files, and a parser over the workflow's conditional adds would add
-# machinery without adding teeth -- the pin still fails on every other
-# movement of the set.
-WINDOW_PATHS = (
-    'data/aa-disagreement-snapshot.json',
-    'data/aa-route-disagreement.txt',
-)
+# The route-disagreement window's files (issue #118) used to be hand-named
+# here, and the hand list is exactly what failed (issue #198): it named the
+# snapshot and the stamp but not the last-agreeing record #192's re-land
+# added, so the first real heal (c98e1bf1) reded main and froze the hourly
+# refresh. The set is derived instead from the same source the pipeline
+# commits from -- the refresh workflow's commit-step adds, parsed exactly as
+# tests/test_gitignore.py parses them -- so the next window file joins the
+# pin with no second edit. The window files proper are the parsed add paths
+# that are not in CORE_PIN: a path the gate reads windowless is already
+# pinned unconditionally, so its tracked-ness cannot move the derived set.
+def window_paths():
+    """The refresh add paths whose tracked-ness can move the derived set."""
+    paths = [p for p in test_gitignore.added_paths() if p not in CORE_PIN]
+    assert paths, (
+        'no window paths parsed from the refresh commit step; the pin would '
+        'silently narrow to CORE_PIN alone')
+    return paths
+
+
+def pin_expected_paths(tracked):
+    """The windowless pin widened by exactly the window files tracked.
+
+    CORE_PIN is the windowless derived set; every refresh add path HEAD
+    tracks joins it. The tracked-filter is the same one the derivation
+    itself applies (resolve() admits tracked names only), so the two halves
+    agree in every window state the pipeline can commit -- including the
+    healed hour, where the pre-#198 hand list did not.
+    """
+    return sorted(set(CORE_PIN)
+                  | {p for p in test_gitignore.added_paths() if p in tracked})
 
 
 # The derived set on this repository's HEAD, pinned as the windowless
@@ -184,16 +204,45 @@ def test_gate_paths_on_this_repository(tmp_path):
     # (tracked_files runs `git ls-tree HEAD`), never the working directory --
     # a working-tree-only stamp is no gate input, and the derivation would
     # not see it either.
-    window = sorted(p for p in WINDOW_PATHS if p in _load().tracked_files(ROOT))
-    expected = sorted(CORE_PIN + tuple(window))
+    tracked = _load().tracked_files(ROOT)
+    expected = pin_expected_paths(tracked)
+    moving = [p for p in window_paths() if p in tracked]
     assert derived == expected, (
         'the derived gate-path set moved against its pin (window files '
-        f'tracked: {window}):\n{done.stdout}')
+        f'tracked: {moving}):\n{done.stdout}')
+
+
+def test_the_pin_expectation_admits_every_window_combination():
+    """The committed reproduction of the healed-hour red (issue #198).
+
+    Runs OUTSIDE a live window: `tracked` is synthesized, never this
+    repository's tree. Every tracked/untracked combination of the window
+    files the pipeline can commit must leave the expectation equal to the
+    tracked set it describes. The pre-#198 pin fails exactly here: its hand
+    list knew the snapshot and the stamp but not the last-agreeing record,
+    so the healed combinations left the record out of the expectation while
+    the derivation -- which reaches every tracked data/ file -- had it.
+    """
+    window = window_paths()
+    for size in range(len(window) + 1):
+        for combo in itertools.combinations(window, size):
+            tracked = frozenset(CORE_PIN) | set(combo)
+            assert set(pin_expected_paths(tracked)) == tracked, (
+                'the pin does not admit the window combination '
+                f'{combo!r}: expected {pin_expected_paths(tracked)!r}')
+    # And the negative half: a tracked file the pipeline cannot commit --
+    # no refresh add carries it, and CORE_PIN does not name it -- joins no
+    # expectation. The real-repo pin fails on such a movement, because the
+    # derivation follows every file a gate job names; the expectation
+    # builder is the side that must refuse.
+    stranger = 'scripts/ci/not-a-window-file.py'
+    assert stranger not in pin_expected_paths(frozenset(CORE_PIN) | {stranger})
 
 
 # The windowless derived set -- the pin itself. Frozen so a required job
-# naming a new file forces a same-commit pin change; only WINDOW_PATHS, and
-# only while tracked, may join it without an edit.
+# naming a new file forces a same-commit pin change; only the window files
+# derived from the refresh commit step, and only while tracked, may join it
+# without an edit.
 CORE_PIN = (
     '.github/ci-thresholds.json',
     '.github/workflows/actionlint.yml',
@@ -268,17 +317,26 @@ CORE_PIN = (
 
 
 def test_the_window_files_enter_and_leave_the_derivation(tmp_path):
-    """The committed reproduction of the disputed state (issue #172).
+    """The committed reproduction of every window state (issues #118, #172,
+    #198).
 
     The route-disagreement window's files (issue #118) enter the derivation
     exactly while they are tracked: named by the refresh workflow's run
     text, resolved against HEAD's tree. This fixture turns that mechanism
-    through all three states -- before the window, during it, at its
-    retirement -- so the window-awareness stays proven after the live
-    window on main has closed and the files have left the tree. The data/
-    directory written here is the fixture repository's, never this
-    repository's.
+    through the states the pipeline commits -- windowless, the disputed
+    hour, the healed hour (stamp + last-agreeing record, no snapshot: the
+    shape c98e1bf1 put on main), the all-three hour, and the retirement --
+    so the window-awareness stays proven after the live window on main has
+    closed and the files have left the tree. Each state is checked BOTH
+    ways: the derivation must see exactly the tracked window files, and the
+    pin's expectation -- built the way the real pin builds it, a windowless
+    base plus the tracked window files -- must equal the derivation. On the
+    pre-#198 pin the healed arm fails: the hand list did not know the
+    record. The data/ directory written here is the fixture repository's,
+    never this repository's.
     """
+    module = _load()
+    window = window_paths()
     repo = tmp_path / 'repo'
     _git(tmp_path, 'init', '-b', 'main', str(repo))
     _config(repo)
@@ -293,34 +351,113 @@ def test_the_window_files_enter_and_leave_the_derivation(tmp_path):
             'name: tests\non: push\njobs:\n  suites:\n'
             '    runs-on: ubuntu-latest\n'
             '    steps:\n'
-            '      - run: cat README.md ' + ' '.join(WINDOW_PATHS) + '\n',
+            '      - run: cat README.md ' + ' '.join(window) + '\n',
         '.github/workflows/gates.yml': _stub_workflow(),
     })
-    module = _load()
 
-    # Before the window: the run text names both files, but resolve()
-    # admits only tracked names, so neither is in the derived set -- even
-    # with one sitting untracked on the working disk: the derivation reads
+    # Before the window: the run text names every window file, but resolve()
+    # admits only tracked names, so none is in the derived set -- even with
+    # all of them sitting untracked on the working disk: the derivation reads
     # HEAD's tree, never the working directory.
     (repo / 'data').mkdir(parents=True, exist_ok=True)
-    (repo / WINDOW_PATHS[1]).write_text('1767225600\n', encoding='utf-8',
-                                        newline='\n')
-    before = module.gate_paths(repo)
-    assert not any(p in before for p in WINDOW_PATHS), before
+    for path in window:
+        (repo / path).write_text('1767225600\n', encoding='utf-8',
+                                 newline='\n')
+    base = module.gate_paths(repo)
+    assert not any(p in base for p in window), base
 
-    # The window opens: commit the disputed state, both files are derived.
+    def assert_state(why, tracked_window):
+        """The two halves per state: the derivation must see exactly the
+        tracked window files, and the pin's expectation -- a windowless base
+        plus the tracked window files -- must equal it."""
+        tracked = module.tracked_files(repo)
+        derived = module.gate_paths(repo)
+        expected = sorted(set(base) | {p for p in window if p in tracked})
+        assert set(derived) == set(expected), (why, sorted(derived), expected)
+        for path in tracked_window:
+            assert path in derived, (why, path)
+
+    # The disputed hour opens: the snapshot and the stamp are committed --
+    # both derived, both expected. Today's parse order puts the snapshot at
+    # window[0], the stamp at window[1], the record at window[2]; the walk's
+    # mechanics do not depend on which file sits in which slot.
     _commit(repo, 'ci: the disagreement window opens (issue #118)', {
-        'data/aa-disagreement-snapshot.json': '{}\n',
-        'data/aa-route-disagreement.txt': '1767225600\n',
+        window[0]: '{}\n',
+        window[1]: '1767225600\n',
     })
-    during = module.gate_paths(repo)
-    assert all(p in during for p in WINDOW_PATHS), during
+    assert_state('disputed hour', window[:2])
 
-    # The window retires: the files leave the tree, the derivation follows.
-    _git(repo, 'rm', '-q', *WINDOW_PATHS)
+    # The healed hour (#192's re-land): the snapshot leaves the tree, the
+    # last-agreeing record joins -- the shape c98e1bf1 committed and the
+    # pre-#198 hand list did not know.
+    _git(repo, 'rm', '-q', window[0])
+    _commit(repo, 'ci: the hour heals the stale route (issues #176, #189)', {
+        window[2]: '{"captured_at": 1767225600}\n',
+    })
+    assert_state('healed hour', window[2:])
+
+    # The window reopens disputed on top of a healed hour: the snapshot
+    # returns while the stamp and the record stay. No state transition may
+    # assume an ordering.
+    _commit(repo, 'ci: the routes disagree again (issue #118)', {
+        window[0]: '{}\n',
+    })
+    assert_state('all three tracked', window)
+
+    # The routes agree: the whole set leaves together, and the derivation
+    # and the expectation return to the windowless base.
+    _git(repo, 'rm', '-q', *window)
     _git(repo, 'commit', '-m', 'ci: the window retires (issue #118)')
-    after = module.gate_paths(repo)
-    assert not any(p in after for p in WINDOW_PATHS), after
+    assert_state('retired', [])
+
+
+def test_the_pin_fails_when_a_gate_names_a_file_the_pipeline_cannot_commit(tmp_path):
+    """The pin's teeth beyond the window files (issue #198).
+
+    The window-aware widening follows ONE source -- the refresh workflow's
+    commit-step adds -- and must follow no other. A gate job naming a new
+    tracked file that no add carries grows the derivation but not the
+    expectation: the pin fails, naming the movement. This is the proof that
+    deriving the window set did not soften the pin: every movement the
+    pipeline cannot explain stays a failure.
+    """
+    module = _load()
+    window = window_paths()
+    repo = tmp_path / 'repo'
+    _git(tmp_path, 'init', '-b', 'main', str(repo))
+    _config(repo)
+    _commit(repo, 'base: seed the teeth fixture', {
+        'README.md': '# fixture\n',
+        '.github/workflows/actionlint.yml':
+            'name: actionlint\non: push\njobs:\n  actionlint:\n'
+            '    runs-on: ubuntu-latest\n'
+            '    steps:\n'
+            '      - run: ./actionlint -color .github/workflows/*.yml\n',
+        '.github/workflows/tests.yml':
+            'name: tests\non: push\njobs:\n  suites:\n'
+            '    runs-on: ubuntu-latest\n'
+            '    steps:\n'
+            '      - run: cat README.md ' + ' '.join(window) + '\n',
+        '.github/workflows/gates.yml': _stub_workflow(),
+    })
+    base = module.gate_paths(repo)
+
+    # A gate job names a new tracked file no refresh add carries.
+    _commit(repo, 'ci: a gate reads a file the pipeline cannot commit', {
+        'scripts/ci/fixture-gate-read.py': '# read by the suites job\n',
+        '.github/workflows/tests.yml':
+            'name: tests\non: push\njobs:\n  suites:\n'
+            '    runs-on: ubuntu-latest\n'
+            '    steps:\n'
+            '      - run: cat README.md scripts/ci/fixture-gate-read.py\n',
+    })
+    tracked = module.tracked_files(repo)
+    derived = module.gate_paths(repo)
+    expected = sorted(set(base) | {p for p in window if p in tracked})
+    assert 'scripts/ci/fixture-gate-read.py' in derived, derived
+    assert derived != expected, (
+        'the derivation moved without any window file moving; the pin '
+        'must fail on this movement')
 
 
 def test_green_when_the_head_carries_every_gate_commit(tmp_path):
