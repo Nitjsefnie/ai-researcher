@@ -64,7 +64,17 @@ on:
       - '**/*.md'
       - 'LICENSE'
       - '.gitignore'
-  workflow_dispatch:
+  # NO `workflow_dispatch`, deliberately — the one trigger this workflow
+  # gives up. The cache-poisoning query behind code-scanning alert #26
+  # (actions/cache-poisoning/poisonable-step) requires an externally
+  # triggerable event with default-branch cache-write access
+  # (Event.isExternallyTriggerable plus hasDefaultBranchCacheWriteAccess)
+  # and named workflow_dispatch in the alert message, so the trigger is
+  # what armed the finding; re-adding it re-arms the alert, and
+  # tests/test_ci_context_separation.py refuses it by name. What the
+  # trigger bought — running the suite on a ref no push or pull request
+  # covers — is no route at all here: main's push trigger carries every
+  # merge, and a finished run re-runs from its own page.
 
 # Least privilege: this job only reads the tree. Without an explicit block it
 # inherits the repository default, which can be read/write for the whole token.
@@ -384,13 +394,22 @@ jobs:
         # request's invocation never passes the flag, and the lines
         # count only on commits touching nothing outside the two budget
         # documents — a raise cannot ride feature work onto main.
+        #
+        # The pull-request branch fetches the event's merge commit, never
+        # refs/pull/<number>/head: the PR-number refspec was the untrusted
+        # source of code-scanning alert #27
+        # (actions/untrusted-checkout/medium) and fed alert #26 — the
+        # analyser reads a git fetch whose command or env names the PR
+        # number as pulling the untrusted head — and fetching the merge
+        # commit completes both sides at once. github.sha is trusted event
+        # provenance, and a mutable PR-head refspec is not what the guard
+        # compares: HEAD^1 and HEAD^2 are its only inputs.
         env:
-          PR_NUMBER: ${{ github.event.pull_request.number }}
+          CI_SHA: ${{ github.sha }}
           BEFORE: ${{ github.event.before }}
         run: |
           if [ "${GITHUB_EVENT_NAME}" = "pull_request" ]; then
-            git fetch --unshallow origin main \
-              "+refs/pull/${PR_NUMBER}/head:refs/remotes/pr/head"
+            git fetch --unshallow origin "${CI_SHA}"
             python3 scripts/ci/check_ratchets.py HEAD^1 HEAD^2
           else
             if [ "${BEFORE}" = "0000000000000000000000000000000000000000" ]; then
