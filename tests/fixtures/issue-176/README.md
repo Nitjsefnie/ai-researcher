@@ -32,8 +32,8 @@ vs 0/9 here).
 - **Detail-stale direction** (the real window): baseline = `last-capture.json`
   verbatim.
 - **Leaderboard-stale direction** (synthetic window, same payloads): the
-  baseline re-pairs the shape-split total with the leaderboard's copy (a
-  committed capture always pairs agreeing values) and otherwise merges the
+  baseline re-pairs the shape-split total with the leaderboard's copy (an
+  agreeing capture always pairs agreeing values) and otherwise merges the
   two payloads (`merge_captures`, leaderboard's copy of every shared value,
   detail-only fields from the detail payload). This models a window where the
   leaderboard's generation was already published and the detail route has

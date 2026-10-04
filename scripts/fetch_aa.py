@@ -669,7 +669,7 @@ def heal_route_disagreement(exc, baseline):
     breakdown fed renders '--' until the routes agree. check_cost_breakdown
     remains the refusal of the alternative: a stale breakdown left under a
     moved total sums to the old total and exits. Every value is still AA's
-    own, from the snapshot or the committed capture; nothing is estimated.
+    own, from the snapshot or the recorded baseline; nothing is estimated.
 
     Returns (models, note) -- the healed capture in merge_captures' shape and
     a one-line diagnostic -- or None when staleness is not provable (no
@@ -746,8 +746,9 @@ def heal_route_disagreement(exc, baseline):
 
     note = (
         f"route disagreement resolved: the {stale_route} route is stale -- "
-        f"all {len(entries)} disputed value(s) equal the last committed "
-        "capture and none of the other route's do; publishing the fresh "
+        f"all {len(entries)} disputed value(s) equal the last agreeing "
+        "capture (the recorded baseline) and none of the other route's "
+        "do; publishing the fresh "
         "route through the normal capture path"
         + (f" ({absent_costs} GDPval cost(s) absent until the routes agree)"
            if absent_costs else " (every axis pairs same-run values)"))
