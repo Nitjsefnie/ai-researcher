@@ -793,21 +793,24 @@ jobs:
           if [ "$HEALED" = "true" ] && [ -f "${PAYLOAD}/remove.txt" ] && [ -s "${PAYLOAD}/remove.txt" ]; then
             xargs git rm -q --ignore-unmatch < "${PAYLOAD}/remove.txt"
           fi
-          # A DISPUTED publish is a snapshot ADDITION (issue #189): a healed
-          # hour's snapshot REMOVAL stages the same name, and must not read
-          # as a disputed publish.
-          if git diff --cached --name-only --diff-filter=A | grep -q '^data/aa-disagreement-snapshot\.json$'; then
-            printf '%s\n\n%s\n' \
-              'Publish disputed capture: AA routes disagree (issue #118)' \
-              'Both routes'"'"' raw payloads and the disagreement map are committed as data/aa-disagreement-snapshot.json; the page renders the disputed layer until the routes agree again.' \
-              > "${RUNNER_TEMP}/commit-msg.txt"
-            sed -n '2,$p' data/aa-route-disagreement.txt >> "${RUNNER_TEMP}/commit-msg.txt"
-          elif [ "$HEALED" = "true" ]; then
+          # The healed hour's message stands FIRST (review on PR #192):
+          # its snapshot REMOVAL stages the same name a disputed publish
+          # adds, so the disputed predicate below must never see a healed
+          # hour. That predicate stays NAME-ONLY: an hour-2+ disputed hour
+          # stages the snapshot as a tracked MODIFICATION, not an addition,
+          # and its designed disputed message must fire all the same.
+          if [ "$HEALED" = "true" ]; then
             printf '%s\n\n%s\n' \
               'Heal the stale route: publish the fresh generation (issues #176, #189)' \
               'One route was provably still serving the last agreeing capture; its disagreeing values are dropped and the fresh route publishes undisputed through the normal capture path. The window stays open until the routes agree.' \
               > "${RUNNER_TEMP}/commit-msg.txt"
             [ ! -f "${PAYLOAD}/commit-msg.txt" ] || cat "${PAYLOAD}/commit-msg.txt" >> "${RUNNER_TEMP}/commit-msg.txt"
+          elif git diff --cached --name-only | grep -q '^data/aa-disagreement-snapshot\.json$'; then
+            printf '%s\n\n%s\n' \
+              'Publish disputed capture: AA routes disagree (issue #118)' \
+              'Both routes'"'"' raw payloads and the disagreement map are committed as data/aa-disagreement-snapshot.json; the page renders the disputed layer until the routes agree again.' \
+              > "${RUNNER_TEMP}/commit-msg.txt"
+            sed -n '2,$p' data/aa-route-disagreement.txt >> "${RUNNER_TEMP}/commit-msg.txt"
           elif [ -f "${PAYLOAD}/commit-msg.txt" ]; then
             cat "${PAYLOAD}/commit-msg.txt" > "${RUNNER_TEMP}/commit-msg.txt"
             printf '\n%s\n' 'Captured by .github/workflows/refresh.yml.' \
