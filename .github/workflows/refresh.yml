@@ -129,7 +129,19 @@ name: refresh
 # automatically at convergence, when the next agreeing capture retires the
 # stamp and the snapshot. There is NO time bound on this mode: the disputed
 # banner is the visible alarm, so the 3 h red bound of #100 is retired for
-# this exit code. The schema guards run on the disputed merge too, so exit 1
+# this exit code.
+#
+# THE PROVABLY-STALE HOUR HEALS INSTEAD (issues #176, #189). When ALL of one
+# route's disputed values equal the last agreeing capture and NONE of the
+# other route's do, fetch_aa.py heals the stale route: the fresh route
+# publishes undisputed through the normal capture path, exit 0, and the hour
+# records the baseline it healed from in data/aa-last-agreeing-capture.json.
+# THE RECORD KEEPS THE WINDOW OPEN: a healed capture is never a baseline,
+# every healed hour re-proves staleness against the SAME capture, the stamp
+# stays alive, and the window retires only when a capture's routes AGREE. A
+# window that worsens (staleness no longer provable) falls back to the
+# disputed rendering, stamp intact. The schema guards run on the disputed
+# merge too, so exit 1
 # (schema change, index bump, transport failure) still fails red immediately
 # -- only the disagreement itself stopped being red. When a capture succeeds
 # again, the hour marks the window RETIRING: the capture step removes the
@@ -196,6 +208,11 @@ jobs:
       # The writer's gate: proceed is the rendered-gate + heal verdict the
       # publish job's `if` reads through needs.refresh.outputs.
       proceed: ${{ steps.capture.outputs.proceed }}
+      # A healed hour (issues #176, #189): the capture healed a provably
+      # stale route from the recorded last-agreeing capture, so the window
+      # is NOT over. The write half reads it to keep the retirement commit
+      # out of the healed hour and to carry the healed message instead.
+      healed: ${{ steps.fetch.outputs.healed }}
 
     # Sized for a FULL heal run — pip + Chromium installs, the full suite
     # with the browser — not the 13-second unchanged-capture
@@ -249,20 +266,46 @@ jobs:
             # "Did anything move?" (issue #103): only a capture that ran
             # may honor a forced rebuild.
             echo "captured=true" >> "$GITHUB_OUTPUT"
+            record=data/aa-last-agreeing-capture.json
+            if [ -f "$record" ]; then
+              # Healed hour (issues #176, #189): the capture healed a
+              # provably stale route from the recorded last-agreeing
+              # capture, so the window is NOT over -- retire NOTHING. The
+              # stamp stays alive (recreated from the record's window start
+              # if a lost push or a retired stamp left the window unnamed),
+              # and a tracked disputed snapshot must leave the tree: the
+              # healed page renders clean. The write job carries the
+              # snapshot's removal in the data commit (the HEALED output),
+              # never in a retirement commit of its own.
+              echo "healed=true" >> "$GITHUB_OUTPUT"
+              if [ ! -f "$stamp" ]; then
+                {
+                  python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["window_start"])' "$record"
+                  echo "routes disagree; the stale route is healed from the recorded last-agreeing capture (issues #176, #189)"
+                } > "$stamp"
+              fi
+              echo "AA's routes still disagree -- the hour healed the stale route from the recorded last-agreeing capture; the window stays open until the routes agree (issues #176, #189)." \
+                >> "$GITHUB_STEP_SUMMARY"
+              exit 0
+            fi
             # Agreement restored after a skipped stretch: retire the stamp
             # so its age can never trip an alarm. The window files leave
             # this tree too -- so the rendered gate builds a clean page --
             # and the removal is staged for the write job, which commits it
             # against main. A push lost to the race concedes SILENTLY (see
             # the publish job): the next successful capture retires the
-            # stamp again.
+            # stamp again. The last-agreeing record leaves with them
+            # (issue #189): with the routes agreeing again there is no
+            # window to carry a baseline for.
             if git ls-files --error-unmatch "$stamp" > /dev/null 2>&1 \
-               || git ls-files --error-unmatch data/aa-disagreement-snapshot.json > /dev/null 2>&1; then
-              # The window closes: the stamp AND the disputed snapshot leave
-              # the tree together, so the next build renders normally.
-              git rm -q --ignore-unmatch "$stamp" data/aa-disagreement-snapshot.json
+               || git ls-files --error-unmatch data/aa-disagreement-snapshot.json > /dev/null 2>&1 \
+               || git ls-files --error-unmatch "$record" > /dev/null 2>&1; then
+              # The window closes: the stamp, the disputed snapshot and the
+              # last-agreeing record leave the tree together, so the next
+              # build renders normally.
+              git rm -q --ignore-unmatch "$stamp" data/aa-disagreement-snapshot.json "$record"
               echo "retire=true" >> "$GITHUB_OUTPUT"
-              echo "AA's routes agree again — disagreement stamp and snapshot staged for removal; captures resume (issue #118)." \
+              echo "AA's routes agree again — disagreement stamp, snapshot and last-agreeing record staged for removal; captures resume (issue #118)." \
                 >> "$GITHUB_STEP_SUMMARY"
             fi
             exit 0
@@ -532,6 +575,7 @@ jobs:
           CHANGED: ${{ steps.capture.outputs.changed }}
           FORCE: ${{ inputs.force }}
           RETIRE: ${{ steps.fetch.outputs.retire }}
+          HEALED: ${{ steps.fetch.outputs.healed }}
         run: |
           PAYLOAD="${RUNNER_TEMP}/publish-payload"
           mkdir -p "${PAYLOAD}/tree"
@@ -555,11 +599,20 @@ jobs:
           # hour RETIRES the window (rc 0 + tracked), they do not ship:
           # shipping what the retirement commit removes would resurrect it.
           if [ "$RETIRE" = "true" ]; then
-            printf '%s\n' data/aa-disagreement-snapshot.json data/aa-route-disagreement.txt \
+            printf '%s\n' data/aa-disagreement-snapshot.json data/aa-route-disagreement.txt data/aa-last-agreeing-capture.json \
               > "${PAYLOAD}/remove.txt"
           else
             [ ! -f data/aa-disagreement-snapshot.json ] || cp --parents data/aa-disagreement-snapshot.json "${PAYLOAD}/tree/"
             [ ! -f data/aa-route-disagreement.txt ] || cp --parents data/aa-route-disagreement.txt "${PAYLOAD}/tree/"
+            [ ! -f data/aa-last-agreeing-capture.json ] || cp --parents data/aa-last-agreeing-capture.json "${PAYLOAD}/tree/"
+          fi
+          # A healed hour dropped the disputed snapshot from the tree (the
+          # healed page renders clean), but the tracked copy on main must
+          # leave too: name it so the write job's DATA commit removes it --
+          # never a retirement commit, because the window is not over
+          # (issues #176, #189).
+          if [ "$HEALED" = "true" ] && git ls-files --error-unmatch data/aa-disagreement-snapshot.json > /dev/null 2>&1; then
+            printf '%s\n' data/aa-disagreement-snapshot.json >> "${PAYLOAD}/remove.txt"
           fi
           # The differ's message travels when the hour ran it (CHANGED=true);
           # the write job's message selection reads it exactly as the old
@@ -657,6 +710,10 @@ jobs:
 
       - name: Commit the capture
         id: commit
+        env:
+          # The healed hour's shape changes phase 1/2 below; the env form is
+          # the zizmor-sanctioned route for step-output interpolation.
+          HEALED: ${{ needs.refresh.outputs.healed }}
         run: |
           PAYLOAD="${RUNNER_TEMP}/publish-payload"
           # The push-data staging helper: base is main's tip the hour was
@@ -691,12 +748,16 @@ jobs:
           git -C "${scratch}" config user.email \
             '41898282+github-actions[bot]@users.noreply.github.com'
           cd "${scratch}"
-          # Phase 1 -- the window retirement (issues #100/#118). Applied only
-          # when it still bites: if a concurrent run already retired the
-          # window on a moved main, the staged removal is empty and the
-          # notice records it. The retirement commit joins the bundle: it
-          # lands with the data commit, in the push job.
-          if [ -f "${PAYLOAD}/remove.txt" ] && [ -s "${PAYLOAD}/remove.txt" ]; then
+          # Phase 1 -- the window retirement (issues #100/#118), AGREEMENT
+          # only: a healed hour names its stale-snapshot removal in
+          # remove.txt too, and that one rides the DATA commit instead --
+          # the window is not over (issues #176, #189). Applied only when
+          # it still bites: if a concurrent run already retired the window
+          # on a moved main, the staged removal is empty and the notice
+          # records it. The retirement commit joins the bundle: it lands
+          # with the data commit, in the push job.
+          if [ -f "${PAYLOAD}/remove.txt" ] && [ -s "${PAYLOAD}/remove.txt" ] \
+             && [ "$HEALED" != "true" ]; then
             xargs git rm -q --ignore-unmatch < "${PAYLOAD}/remove.txt"
             if ! git diff --cached --quiet; then
               git commit -q -m 'Route agreement restored; resume captures (issue #100)'
@@ -725,12 +786,28 @@ jobs:
                   data/captured-at.txt out/frontier-models.html
           [ ! -f data/aa-disagreement-snapshot.json ] || git add data/aa-disagreement-snapshot.json
           [ ! -f data/aa-route-disagreement.txt ] || git add data/aa-route-disagreement.txt
-          if git diff --cached --name-only | grep -q '^data/aa-disagreement-snapshot\.json$'; then
+          [ ! -f data/aa-last-agreeing-capture.json ] || git add data/aa-last-agreeing-capture.json
+          # A healed hour's stale-snapshot removal rides the DATA commit
+          # (issues #176, #189): the healed page renders clean, so the
+          # tracked disputed snapshot must leave with it.
+          if [ "$HEALED" = "true" ] && [ -f "${PAYLOAD}/remove.txt" ] && [ -s "${PAYLOAD}/remove.txt" ]; then
+            xargs git rm -q --ignore-unmatch < "${PAYLOAD}/remove.txt"
+          fi
+          # A DISPUTED publish is a snapshot ADDITION (issue #189): a healed
+          # hour's snapshot REMOVAL stages the same name, and must not read
+          # as a disputed publish.
+          if git diff --cached --name-only --diff-filter=A | grep -q '^data/aa-disagreement-snapshot\.json$'; then
             printf '%s\n\n%s\n' \
               'Publish disputed capture: AA routes disagree (issue #118)' \
               'Both routes'"'"' raw payloads and the disagreement map are committed as data/aa-disagreement-snapshot.json; the page renders the disputed layer until the routes agree again.' \
               > "${RUNNER_TEMP}/commit-msg.txt"
             sed -n '2,$p' data/aa-route-disagreement.txt >> "${RUNNER_TEMP}/commit-msg.txt"
+          elif [ "$HEALED" = "true" ]; then
+            printf '%s\n\n%s\n' \
+              'Heal the stale route: publish the fresh generation (issues #176, #189)' \
+              'One route was provably still serving the last agreeing capture; its disagreeing values are dropped and the fresh route publishes undisputed through the normal capture path. The window stays open until the routes agree.' \
+              > "${RUNNER_TEMP}/commit-msg.txt"
+            [ ! -f "${PAYLOAD}/commit-msg.txt" ] || cat "${PAYLOAD}/commit-msg.txt" >> "${RUNNER_TEMP}/commit-msg.txt"
           elif [ -f "${PAYLOAD}/commit-msg.txt" ]; then
             cat "${PAYLOAD}/commit-msg.txt" > "${RUNNER_TEMP}/commit-msg.txt"
             printf '\n%s\n' 'Captured by .github/workflows/refresh.yml.' \

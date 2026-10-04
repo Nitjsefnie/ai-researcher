@@ -68,6 +68,11 @@ UA = (
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 OUT = ROOT / "data" / "aa-raw-models.json"
 AGENTS_OUT = ROOT / "data" / "aa-raw-coding-agents.json"
+# The route-disagreement window's baseline record: the last capture BOTH
+# routes agreed on, recorded at the first healed hour and kept byte-identical
+# through the window, so every healed hour proves staleness against the same
+# capture (issue #189). A healed capture is never the baseline.
+LAST_AGREEING_NAME = "aa-last-agreeing-capture.json"
 # When the capture happened. build.py stamps this on the page, so it cannot be
 # derived at build time: rebuilding an old capture tomorrow would relabel it with
 # tomorrow's date, and the page's copy-as-JSON export would carry the lie too.
@@ -642,12 +647,13 @@ def _set_value_at(record, path, value) -> bool:
 def heal_route_disagreement(exc, baseline):
     """One route provably stale: the fresh route's capture, or None.
 
-    Overseer ruling (delegated by the maintainer), 2026-10-04 (issue #176).
-    When ALL of one route's disputed values equal the last committed capture
-    (the last agreeing capture, data/aa-raw-models.json) and NONE of the other
-    route's do, the matching route is serving that capture unchanged -- it is
-    stale -- and its disagreeing values are dropped: the capture is the fresh
-    route's copy of every shared field, through the normal capture path. This
+    Overseer ruling (delegated by the maintainer), 2026-10-04 (issue #176),
+    baseline corrected 2026-10-04 (issue #189). When ALL of one route's
+    disputed values equal the last agreeing capture -- the capture both
+    routes agreed on, never a healed one -- and NONE of the other route's do,
+    the matching route is serving that capture unchanged -- it is stale --
+    and its disagreeing values are dropped: the capture is the fresh route's
+    copy of every shared field, through the normal capture path. This
     amends the #118 disputed rendering ONLY for that provable case; where
     staleness cannot be shown -- mixed matches, both routes differing from the
     last capture, a disputed slug with no row in the last capture -- this
@@ -749,22 +755,70 @@ def heal_route_disagreement(exc, baseline):
     return models, note
 
 
-def _healed_capture(exc):
-    """heal_route_disagreement over the capture on disk, or None.
+def _last_agreeing_capture():
+    """The baseline a heal may prove staleness against, or None.
 
-    The refusing run has not written OUT -- whatever sits there is the last
-    committed capture (the refresh runs on a clean checkout), exactly the
-    baseline the staleness verdict compares against. A missing, corrupt or
-    non-list file is staleness nobody can prove: None, and the disputed path
-    takes over.
+    The last capture BOTH routes agreed on -- never a healed one (issue
+    #189). A healed run always leaves data/aa-last-agreeing-capture.json
+    beside the capture it healed, so the record's presence means the on-disk
+    capture is a healed one and the baseline is the capture the record holds,
+    byte-identical from the first healed hour of the window. No record: the
+    on-disk capture was written by an agreeing run -- a disputed refusal
+    never writes OUT, however many disputed hours precede the first heal --
+    so it IS the last agreeing capture. A missing, corrupt or non-list file
+    is staleness nobody can prove: None, and the disputed path takes over.
     """
+    marker_path = OUT.with_name(LAST_AGREEING_NAME)
+    try:
+        marker = json.loads(marker_path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        marker = None
+    if (isinstance(marker, dict)
+            and isinstance(marker.get("baseline"), list)
+            and marker["baseline"]):
+        return marker["baseline"]
     try:
         baseline = json.loads(OUT.read_text(encoding="utf-8"))
     except (OSError, ValueError):
         return None
-    if not isinstance(baseline, list):
+    return baseline if isinstance(baseline, list) else None
+
+
+def _record_last_agreeing(baseline: list) -> None:
+    """Put the just-used baseline on record for the window's later hours.
+
+    Written at the FIRST healed hour, from the baseline the heal proved
+    staleness against; later healed hours leave it untouched, so every hour
+    of the window compares against the same agreeing capture (issue #189).
+    The stamp's window start rides along, so a window record lost to a
+    retired stamp can be rebuilt faithfully.
+    """
+    marker_path = OUT.with_name(LAST_AGREEING_NAME)
+    if marker_path.exists():
+        return
+    try:
+        first = OUT.with_name("aa-route-disagreement.txt") \
+            .read_text(encoding="utf-8").splitlines()[0]
+        window_start = int(first)
+    except (OSError, ValueError, IndexError):
+        window_start = int(time.time())
+    write_atomic(marker_path, json.dumps(
+        {"window_start": window_start, "baseline": baseline}, indent=1))
+
+
+def _healed_capture(exc):
+    """heal_route_disagreement over the recorded last-agreeing baseline.
+
+    -> (models, note, baseline) on a heal, None for the disputed path; the
+    baseline travels so main can put it on record for the window's later
+    hours (issue #189).
+    """
+    baseline = _last_agreeing_capture()
+    healed = heal_route_disagreement(exc, baseline)
+    if healed is None:
         return None
-    return heal_route_disagreement(exc, baseline)
+    models, note = healed
+    return models, note, baseline
 
 
 class _RouteDisagreement(SystemExit):
@@ -919,8 +973,9 @@ def main() -> None:
               f"detail generated {_iso_utc(exc.detail_generated)} — "
               "Vercel serves the two routes from independent caches and "
               "AA's data lands on them at different times (issues #100, "
-              "#118); refresh builds and publishes the disputed capture "
-              "this hour", file=sys.stderr)
+              "#118); refresh heals the stale route when one is provable, "
+              "else builds and publishes the disputed capture this hour "
+              "(issues #176, #189)", file=sys.stderr)
         healed = _healed_capture(exc)
         if healed is None:
             # The snapshot's pieces all come from the refused attempt -- both
@@ -944,22 +999,31 @@ def main() -> None:
                   f"{len({d['slug'] for d in snapshot['disagreements']})} model(s)",
                   file=sys.stderr)
             sys.exit(DISAGREEMENT_EXIT_CODE)
-        models, heal_note = healed
+        models, heal_note, baseline = healed
         print(heal_note, file=sys.stderr)
         origin = (f"v{INDEX_VERSION} cost breakdown (stale-route heal, "
                   "issue #176: the stale route's disagreeing values are "
                   "discarded)")
+        # The healed hour keeps the window open WITHOUT the disputed layer:
+        # the healed page renders clean and the window record carries the
+        # hour until the routes agree (issue #189).
+        OUT.with_name(DISPUTED_SNAPSHOT_NAME).unlink(missing_ok=True)
+        _record_last_agreeing(baseline)
     else:
         models = merge_captures(pair.base, pair.detail)
         origin = (f"v{pair.version} cost breakdown (detail merged from "
                   f"/models/{pair.host}; {pair.shared_values} shared values "
                   "cross-checked)")
+        # An agreeing capture ends the window: drop the leftover snapshot
+        # so the build this capture feeds cannot render the disputed layer
+        # from stale data -- and drop the last-agreeing record with it.
+        # Agreement is the ONLY window-closer for the record: a leftover one
+        # would make the NEXT window's first heal prove staleness against a
+        # pre-window capture (issue #189). The workflow's own retirement
+        # commit removes the tracked copies on the same rule.
+        OUT.with_name(DISPUTED_SNAPSHOT_NAME).unlink(missing_ok=True)
+        OUT.with_name(LAST_AGREEING_NAME).unlink(missing_ok=True)
     priced = check_cost_breakdown(models)
-    # An agreeing capture -- or a healed one -- ends any window: drop a
-    # leftover snapshot so the build this capture feeds cannot render the
-    # disputed layer from stale data. The workflow's own retirement commit
-    # removes the tracked copy on the same rule.
-    OUT.with_name(DISPUTED_SNAPSHOT_NAME).unlink(missing_ok=True)
     agents_text, _ = fetch_html(args.agents_html, AGENTS_URL)
     agents = coding_agent_rows(flight_payload(agents_text))
 

@@ -68,6 +68,12 @@
 # disputed rendering, retired with the stamp when the routes agree again.
 # Named back with the stamp or the add reds the disputed hour (issue #165).
 !/data/aa-disagreement-snapshot.json
+# The route-disagreement window's last-agreeing record (issue #189): the
+# capture both routes agreed on, recorded at the first healed hour and kept
+# through the window so every healed hour proves staleness against the same
+# baseline -- a healed capture is never a baseline. Retired with the stamp
+# when the routes agree again.
+!/data/aa-last-agreeing-capture.json
 
 # ---- out/ — the published page --------------------------------------------
 !/out/
