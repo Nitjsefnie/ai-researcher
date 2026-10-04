@@ -1,0 +1,260 @@
+1791110863
+routes disagree on attempt 1 of 4; re-reading both routes in 120s (leaderboard generated 2026-10-04T10:05:25Z, detail generated 2026-10-04T09:41:32Z)
+routes disagree on attempt 2 of 4; re-reading both routes in 120s (leaderboard generated 2026-10-04T10:05:25Z, detail generated 2026-10-04T09:41:32Z)
+routes disagree on attempt 3 of 4; re-reading both routes in 120s (leaderboard generated 2026-10-04T10:05:25Z, detail generated 2026-10-04T09:41:32Z)
+253 shared value(s) disagree between the leaderboard route and the model detail route; the gap-fill merge keeps the leaderboard's copy:
+  a-x-k2: gdpvalNormalized: leaderboard 0.22676, detail 0.23254000000000002
+  a-x-k2: terminalBench40: leaderboard None, detail 0
+  apodex-1-1: gdpvalNormalized: leaderboard 0.34429, detail 0.34867499999999996
+  claude-4-5-haiku-reasoning: gdpvalNormalized: leaderboard 0.10943000000000001, detail 0.117625
+  claude-4-5-sonnet-thinking: gdpvalNormalized: leaderboard 0.196435, detail 0.20541500000000001
+  claude-4-sonnet-thinking: gdpvalNormalized: leaderboard 0.08988, detail 0.09725999999999999
+  claude-fable-5: gdpvalNormalized: leaderboard 0.547705, detail 0.5563250000000001
+  claude-fable-5: name: leaderboard 'Claude Fable 5 (Adaptive Reasoning, Max Effort, Opus 4.8 Fallback)', detail 'Claude Fable 5 (Max, Opus 4.8 Fallback)'
+  claude-fable-5-1: gdpvalNormalized: leaderboard 0.6173350000000001, detail 0.628885
+  claude-fable-5-1: name: leaderboard 'Claude Fable 5.1 (Adaptive Reasoning, Max Effort, Default Fallback)', detail 'Claude Fable 5.1 (Max, Default Fallback)'
+  claude-fable-5-1-high: gdpvalNormalized: leaderboard 0.558645, detail 0.56735
+  claude-fable-5-1-high: name: leaderboard 'Claude Fable 5.1 (Adaptive Reasoning, High Effort, Default Fallback)', detail 'Claude Fable 5.1 (High, Default Fallback)'
+  claude-fable-5-1-low: gdpvalNormalized: leaderboard 0.47478499999999996, detail 0.48432000000000003
+  claude-fable-5-1-low: name: leaderboard 'Claude Fable 5.1 (Adaptive Reasoning, Low Effort, Default Fallback)', detail 'Claude Fable 5.1 (Low, Default Fallback)'
+  claude-fable-5-1-medium: gdpvalNormalized: leaderboard 0.517925, detail 0.5251849999999999
+  claude-fable-5-1-medium: name: leaderboard 'Claude Fable 5.1 (Adaptive Reasoning, Medium Effort, Default Fallback)', detail 'Claude Fable 5.1 (Medium, Default Fallback)'
+  claude-fable-5-1-xhigh: gdpvalNormalized: leaderboard 0.61046, detail 0.61753
+  claude-fable-5-1-xhigh: name: leaderboard 'Claude Fable 5.1 (Adaptive Reasoning, Xhigh Effort, Default Fallback)', detail 'Claude Fable 5.1 (Xhigh, Default Fallback)'
+  claude-opus-4-6: name: leaderboard 'Claude Opus 4.6 (Non-reasoning, High Effort)', detail 'Claude Opus 4.6 (Non-reasoning, High)'
+  claude-opus-4-6-adaptive: name: leaderboard 'Claude Opus 4.6 (Adaptive Reasoning, Max Effort)', detail 'Claude Opus 4.6 (Max)'
+  claude-opus-4-7: gdpvalNormalized: leaderboard 0.41921, detail 0.42808500000000005
+  claude-opus-4-7: name: leaderboard 'Claude Opus 4.7 (Adaptive Reasoning, Max Effort)', detail 'Claude Opus 4.7 (Max)'
+  claude-opus-4-7-non-reasoning: name: leaderboard 'Claude Opus 4.7 (Non-reasoning, High Effort)', detail 'Claude Opus 4.7 (Non-reasoning, High)'
+  claude-opus-4-8: gdpvalNormalized: leaderboard 0.46915999999999997, detail 0.47775
+  claude-opus-4-8: name: leaderboard 'Claude Opus 4.8 (Adaptive Reasoning, Max Effort)', detail 'Claude Opus 4.8 (Max)'
+  claude-opus-5: gdpvalNormalized: leaderboard 0.60396, detail 0.61281
+  claude-opus-5: name: leaderboard 'Claude Opus 5 (Adaptive Reasoning, Max Effort)', detail 'Claude Opus 5 (Max)'
+  claude-opus-5-5: gdpvalNormalized: leaderboard 0.673085, detail 0.6835249999999999
+  claude-opus-5-5: name: leaderboard 'Claude Opus 5.5 (Adaptive Reasoning, Max Effort, Default Fallback)', detail 'Claude Opus 5.5 (Max, Default Fallback)'
+  claude-opus-5-5-high: gdpvalNormalized: leaderboard 0.5958600000000001, detail 0.6034400000000001
+  claude-opus-5-5-high: name: leaderboard 'Claude Opus 5.5 (Adaptive Reasoning, High Effort, Default Fallback)', detail 'Claude Opus 5.5 (High, Default Fallback)'
+  claude-opus-5-5-low: gdpvalNormalized: leaderboard 0.361755, detail 0.3679
+  claude-opus-5-5-low: name: leaderboard 'Claude Opus 5.5 (Adaptive Reasoning, Low Effort, Default Fallback)', detail 'Claude Opus 5.5 (Low, Default Fallback)'
+  claude-opus-5-5-medium: gdpvalNormalized: leaderboard 0.5381, detail 0.543125
+  claude-opus-5-5-medium: name: leaderboard 'Claude Opus 5.5 (Adaptive Reasoning, Medium Effort, Default Fallback)', detail 'Claude Opus 5.5 (Medium, Default Fallback)'
+  claude-opus-5-5-xhigh: gdpvalNormalized: leaderboard 0.660055, detail 0.668405
+  claude-opus-5-5-xhigh: name: leaderboard 'Claude Opus 5.5 (Adaptive Reasoning, Xhigh Effort, Default Fallback)', detail 'Claude Opus 5.5 (Xhigh, Default Fallback)'
+  claude-opus-5-high: gdpvalNormalized: leaderboard 0.5405, detail 0.547935
+  claude-opus-5-high: name: leaderboard 'Claude Opus 5 (Adaptive Reasoning, High Effort)', detail 'Claude Opus 5 (High)'
+  claude-opus-5-low: gdpvalNormalized: leaderboard 0.39683, detail 0.40219000000000005
+  claude-opus-5-low: name: leaderboard 'Claude Opus 5 (Adaptive Reasoning, Low Effort)', detail 'Claude Opus 5 (Low)'
+  claude-opus-5-medium: gdpvalNormalized: leaderboard 0.48796500000000004, detail 0.49595500000000003
+  claude-opus-5-medium: name: leaderboard 'Claude Opus 5 (Adaptive Reasoning, Medium Effort)', detail 'Claude Opus 5 (Medium)'
+  claude-opus-5-xhigh: gdpvalNormalized: leaderboard 0.58815, detail 0.596215
+  claude-opus-5-xhigh: name: leaderboard 'Claude Opus 5 (Adaptive Reasoning, Xhigh Effort)', detail 'Claude Opus 5 (Xhigh)'
+  claude-sonnet-4-6: name: leaderboard 'Claude Sonnet 4.6 (Non-reasoning, High Effort)', detail 'Claude Sonnet 4.6 (Non-reasoning, High)'
+  claude-sonnet-4-6-adaptive: gdpvalNormalized: leaderboard 0.35986, detail 0.366975
+  claude-sonnet-4-6-adaptive: name: leaderboard 'Claude Sonnet 4.6 (Adaptive Reasoning, Max Effort)', detail 'Claude Sonnet 4.6 (Max)'
+  claude-sonnet-4-6-non-reasoning-low-effort: name: leaderboard 'Claude Sonnet 4.6 (Non-reasoning, Low Effort)', detail 'Claude Sonnet 4.6 (Non-reasoning, Low)'
+  claude-sonnet-5: gdpvalNormalized: leaderboard 0.4746, detail 0.482875
+  claude-sonnet-5: name: leaderboard 'Claude Sonnet 5 (Adaptive Reasoning, Max Effort)', detail 'Claude Sonnet 5 (Max)'
+  claude-sonnet-5-5: name: leaderboard 'Claude Sonnet 5.5 (Adaptive Reasoning, Max Effort, Default Fallback)', detail 'Claude Sonnet 5.5 (Max, Default Fallback)'
+  claude-sonnet-5-5-high: gdpvalNormalized: leaderboard 0.5258849999999999, detail 0.52546
+  claude-sonnet-5-5-high: name: leaderboard 'Claude Sonnet 5.5 (Adaptive Reasoning, High Effort, Default Fallback)', detail 'Claude Sonnet 5.5 (High, Default Fallback)'
+  claude-sonnet-5-5-low: name: leaderboard 'Claude Sonnet 5.5 (Adaptive Reasoning, Low Effort, Default Fallback)', detail 'Claude Sonnet 5.5 (Low, Default Fallback)'
+  claude-sonnet-5-5-medium: name: leaderboard 'Claude Sonnet 5.5 (Adaptive Reasoning, Medium Effort, Default Fallback)', detail 'Claude Sonnet 5.5 (Medium, Default Fallback)'
+  claude-sonnet-5-5-xhigh: gdpvalNormalized: leaderboard 0.6140599999999999, detail 0.615275
+  claude-sonnet-5-5-xhigh: name: leaderboard 'Claude Sonnet 5.5 (Adaptive Reasoning, Xhigh Effort, Default Fallback)', detail 'Claude Sonnet 5.5 (Xhigh, Default Fallback)'
+  claude-sonnet-5-high: gdpvalNormalized: leaderboard 0.37286, detail 0.37888499999999997
+  claude-sonnet-5-high: name: leaderboard 'Claude Sonnet 5 (Adaptive Reasoning, High Effort)', detail 'Claude Sonnet 5 (High)'
+  claude-sonnet-5-low: gdpvalNormalized: leaderboard 0.279275, detail 0.285265
+  claude-sonnet-5-low: name: leaderboard 'Claude Sonnet 5 (Adaptive Reasoning, Low Effort)', detail 'Claude Sonnet 5 (Low)'
+  claude-sonnet-5-medium: gdpvalNormalized: leaderboard 0.32238, detail 0.33019000000000004
+  claude-sonnet-5-medium: name: leaderboard 'Claude Sonnet 5 (Adaptive Reasoning, Medium Effort)', detail 'Claude Sonnet 5 (Medium)'
+  claude-sonnet-5-non-reasoning: gdpvalNormalized: leaderboard 0.35005, detail 0.35689
+  claude-sonnet-5-non-reasoning: name: leaderboard 'Claude Sonnet 5 (Non-reasoning, High Effort)', detail 'Claude Sonnet 5 (Non-reasoning, High)'
+  claude-sonnet-5-xhigh: gdpvalNormalized: leaderboard 0.4222, detail 0.430995
+  claude-sonnet-5-xhigh: name: leaderboard 'Claude Sonnet 5 (Adaptive Reasoning, Xhigh Effort)', detail 'Claude Sonnet 5 (Xhigh)'
+  command-a-plus: gdpvalNormalized: leaderboard 1.4999999999986358e-05, detail 0.008954999999999984
+  deepseek-v3-1-terminus-reasoning: gdpvalNormalized: leaderboard 0.09908999999999997, detail 0.10605
+  deepseek-v3-2-reasoning: gdpvalNormalized: leaderboard 0.09041000000000002, detail 0.0975
+  deepseek-v4-1-flash-non-reasoning: gdpvalNormalized: leaderboard 0.413845, detail 0.422115
+  deepseek-v4-flash: gdpvalNormalized: leaderboard 0.46328499999999995, detail 0.46908500000000003
+  deepseek-v4-flash-0420: gdpvalNormalized: leaderboard 0.2615, detail 0.26949
+  deepseek-v4-flash-0420-high: gdpvalNormalized: leaderboard 0.24734500000000004, detail 0.253985
+  deepseek-v4-flash-vision: gdpvalNormalized: leaderboard 0.5172100000000001, detail 0.5240549999999999
+  deepseek-v4-pro: gdpvalNormalized: leaderboard 0.47071, detail 0.47755999999999993
+  deepseek-v4-pro-0424: gdpvalNormalized: leaderboard 0.32218499999999994, detail 0.32971500000000004
+  deepseek-v4-pro-0424-high: gdpvalNormalized: leaderboard 0.32041, detail 0.32583000000000006
+  deepseek-v4-pro-non-reasoning: cacheHitPrice: leaderboard 0.044, detail 0.041999999999999996
+  deepseek-v4-pro-non-reasoning: gdpvalNormalized: leaderboard 0.27621, detail 0.28117
+  deepseek-v4-pro-non-reasoning: intelligenceIndexCostPerTask.cost.total: leaderboard 0.47742401619163854, detail 0.3296953563474809
+  deepseek-v4-pro-non-reasoning: price1mInputTokens: leaderboard 1.32, detail 0.91
+  deepseek-v4-pro-non-reasoning: price1mOutputTokens: leaderboard 3.96, detail 2.98
+  devstral-2: gdpvalNormalized: leaderboard 0.01569, detail 0.023685
+  devstral-small-2: gdpvalNormalized: leaderboard 0.007860000000000013, detail 0.01583499999999998
+  g9v3-39a5b: gdpvalNormalized: leaderboard None, detail 0.30526
+  gemini-3-1-pro-preview: gdpvalNormalized: leaderboard 0.13799, detail 0.14723000000000003
+  gemini-3-5-flash: gdpvalNormalized: leaderboard 0.3424, detail 0.352415
+  gemini-3-5-flash-lite: gdpvalNormalized: leaderboard 0.23476, detail 0.24287999999999998
+  gemini-3-6-flash: gdpvalNormalized: leaderboard 0.38233500000000004, detail 0.39295500000000005
+  gemini-3-7-flash: gdpvalNormalized: leaderboard 0.435625, detail 0.44615499999999997
+  gemini-3-7-flash-low: gdpvalNormalized: leaderboard 0.402615, detail 0.413645
+  gemini-3-7-flash-medium: gdpvalNormalized: leaderboard 0.41978999999999994, detail 0.430495
+  gemini-3-8-flash: gdpvalNormalized: leaderboard 0.455975, detail 0.46752
+  gemini-3-8-flash-low: gdpvalNormalized: leaderboard 0.39718, detail 0.40517499999999995
+  gemini-3-8-flash-medium: gdpvalNormalized: leaderboard 0.45428999999999997, detail 0.46285000000000004
+  gemini-4-argon: gdpvalNormalized: leaderboard 0.555665, detail 0.56351
+  gemma-4-12b: contextWindowTokens: leaderboard 256000, detail 262144
+  gemma-4-26b-a4b: gdpvalNormalized: leaderboard 0.035464999999999976, detail 0.034370000000000005
+  gemma-4-31b: gdpvalNormalized: leaderboard 0.05692500000000001, detail 0.06146499999999998
+  gemma-4-31b-non-reasoning: gdpvalNormalized: leaderboard 0.01764499999999998, detail 0.025189999999999997
+  glm-4-6-reasoning: gdpvalNormalized: leaderboard 0.12297500000000003, detail 0.130365
+  glm-4-7: gdpvalNormalized: leaderboard 0.24989499999999998, detail 0.25831
+  glm-5-1: gdpvalNormalized: leaderboard 0.30167999999999995, detail 0.30972500000000003
+  glm-5-2: gdpvalNormalized: leaderboard 0.42876, detail 0.43729499999999993
+  glm-5-2-non-reasoning: gdpvalNormalized: leaderboard 0.3665, detail 0.37515499999999996
+  glm-5-3: gdpvalNormalized: leaderboard 0.57814, detail 0.576465
+  glm-5-3-low: gdpvalNormalized: leaderboard 0.40241499999999997, detail 0.41272000000000003
+  gpt-5: gdpvalNormalized: leaderboard 0.20288, detail 0.20995
+  gpt-5-1: contextWindowTokens: leaderboard 272000, detail 400000
+  gpt-5-1: gdpvalNormalized: leaderboard 0.15631, detail 0.16509500000000002
+  gpt-5-4: gdpvalNormalized: leaderboard 0.366335, detail 0.37416999999999995
+  gpt-5-4-mini: gdpvalNormalized: leaderboard 0.25011, detail 0.258015
+  gpt-5-4-mini-non-reasoning: gdpvalNormalized: leaderboard 0.047720000000000026, detail 0.046505
+  gpt-5-4-nano: gdpvalNormalized: leaderboard 0.218325, detail 0.22527999999999998
+  gpt-5-5: gdpvalNormalized: leaderboard 0.41794500000000007, detail 0.42661
+  gpt-5-5-high: gdpvalNormalized: leaderboard 0.414625, detail 0.41458000000000006
+  gpt-5-5-instant-06-26: gdpvalNormalized: leaderboard 0, detail 0.005909999999999997
+  gpt-5-5-low: gdpvalNormalized: leaderboard 0.26605999999999996, detail 0.274355
+  gpt-5-5-medium: gdpvalNormalized: leaderboard 0.359215, detail 0.3669450000000001
+  gpt-5-5-non-reasoning: gdpvalNormalized: leaderboard 0.22852999999999998, detail 0.23648000000000002
+  gpt-5-6-luna: gdpvalNormalized: leaderboard 0.481615, detail 0.48194000000000004
+  gpt-5-6-luna-high: gdpvalNormalized: leaderboard 0.40938, detail 0.41655
+  gpt-5-6-luna-low: gdpvalNormalized: leaderboard 0.240485, detail 0.248485
+  gpt-5-6-luna-medium: gdpvalNormalized: leaderboard 0.31645500000000004, detail 0.31581500000000007
+  gpt-5-6-luna-non-reasoning: gdpvalNormalized: leaderboard 0.20308999999999996, detail 0.21124
+  gpt-5-6-luna-xhigh: gdpvalNormalized: leaderboard 0.441855, detail 0.45144500000000004
+  gpt-5-6-sol: gdpvalNormalized: leaderboard 0.54395, detail 0.55567
+  gpt-5-6-sol-high: gdpvalNormalized: leaderboard 0.490015, detail 0.502265
+  gpt-5-6-sol-low: gdpvalNormalized: leaderboard 0.39467499999999994, detail 0.402425
+  gpt-5-6-sol-medium: gdpvalNormalized: leaderboard 0.451475, detail 0.46106500000000006
+  gpt-5-6-sol-non-reasoning: gdpvalNormalized: leaderboard 0.36288, detail 0.37116999999999994
+  gpt-5-6-sol-xhigh: gdpvalNormalized: leaderboard 0.52378, detail 0.536165
+  gpt-5-6-terra-high: gdpvalNormalized: leaderboard 0.43127499999999996, detail 0.43927
+  gpt-5-6-terra-low: gdpvalNormalized: leaderboard 0.29802999999999996, detail 0.30515
+  gpt-5-6-terra-medium: gdpvalNormalized: leaderboard 0.37730499999999995, detail 0.38457500000000006
+  gpt-5-6-terra-non-reasoning: gdpvalNormalized: leaderboard 0.292385, detail 0.29978999999999995
+  gpt-5-6-terra-xhigh: gdpvalNormalized: leaderboard 0.46408000000000005, detail 0.47458000000000006
+  gpt-5-mini: gdpvalNormalized: leaderboard 0.12694, detail 0.13484
+  gpt-6-luna: gdpvalNormalized: leaderboard 0.46919000000000005, detail 0.468765
+  gpt-6-luna: intelligenceIndexCostPerTask.cost.total: leaderboard 0.06765421772017903, detail 0.06782295669812205
+  gpt-6-luna-high: gdpvalNormalized: leaderboard 0.422515, detail 0.42204499999999995
+  gpt-6-luna-high: intelligenceIndexCostPerTask.cost.total: leaderboard 0.029023834521101737, detail 0.02903157640372802
+  gpt-6-luna-low: gdpvalNormalized: leaderboard 0.26899, detail 0.26780499999999996
+  gpt-6-luna-low: intelligenceIndexCostPerTask.cost.total: leaderboard 0.0045151153559203, detail 0.004516607569410252
+  gpt-6-luna-medium: gdpvalNormalized: leaderboard 0.380755, detail 0.3808099999999999
+  gpt-6-luna-non-reasoning: gdpvalNormalized: leaderboard 0.27551, detail 0.27455499999999994
+  gpt-6-luna-non-reasoning: intelligenceIndexCostPerTask.cost.total: leaderboard 0.011341233858951989, detail 0.011342690862652438
+  gpt-6-luna-xhigh: gdpvalNormalized: leaderboard 0.43304499999999996, detail 0.43179999999999996
+  gpt-6-sol: gdpvalNormalized: leaderboard 0.50261, detail 0.50454
+  gpt-6-sol-high: gdpvalNormalized: leaderboard 0.44817499999999993, detail 0.4478
+  gpt-6-sol-low: gdpvalNormalized: leaderboard 0.353335, detail 0.351885
+  gpt-6-sol-medium: gdpvalNormalized: leaderboard 0.42354499999999995, detail 0.42478999999999995
+  gpt-6-sol-non-reasoning: gdpvalNormalized: leaderboard 0.376855, detail 0.37594500000000003
+  gpt-6-sol-xhigh: gdpvalNormalized: leaderboard 0.47828, detail 0.4786
+  gpt-oss-120b: gdpvalNormalized: leaderboard 0.04775, detail 0.05592500000000001
+  granite-4-2-30b: gdpvalNormalized: leaderboard 0.03187, detail 0.03929000000000002
+  granite-4-2-3b: intelligenceIndexCostPerTask.cost.total: leaderboard 0.005980247671024821, detail 0.005985262336744139
+  grok-4-3: gdpvalNormalized: leaderboard 0.21160500000000002, detail 0.22041000000000002
+  grok-4-3-non-reasoning: gdpvalNormalized: leaderboard 0.214555, detail 0.222625
+  grok-4-5: gdpvalNormalized: leaderboard 0.43522000000000005, detail 0.44461
+  grok-4-6: gdpvalNormalized: leaderboard 0.55452, detail 0.560825
+  grok-4-6-low: gdpvalNormalized: leaderboard 0.45121000000000006, detail 0.45463
+  grok-4-6-medium: gdpvalNormalized: leaderboard 0.5524199999999999, detail 0.55857
+  grok-4-6-xhigh: gdpvalNormalized: leaderboard 0.56611, detail 0.573345
+  grok-4-7: gdpvalNormalized: leaderboard 0.597605, detail 0.60775
+  grok-4-7-low: gdpvalNormalized: leaderboard 0.5368099999999999, detail 0.5443049999999999
+  grok-build-0-1-06-16: gdpvalNormalized: leaderboard 0.27595500000000006, detail 0.28487
+  hy3: gdpvalNormalized: leaderboard 0.27255999999999997, detail 0.283645
+  inkling: gdpvalNormalized: leaderboard 0.28958500000000004, detail 0.28937
+  inkling-small: gdpvalNormalized: leaderboard 0.30428999999999995, detail 0.31222500000000003
+  jt-4-1-flash-236b-a21b: contextWindowTokens: leaderboard 256000, detail 262144
+  jt-4-1-flash-236b-a21b: critpt: leaderboard 0, detail 0.14
+  jt-4-1-flash-236b-a21b: gdpvalNormalized: leaderboard 0.30716999999999994, detail 0.413995
+  jt-4-1-flash-236b-a21b: gpqa: leaderboard 0.845454545454545, detail None
+  jt-4-1-flash-236b-a21b: hle: leaderboard 0.177942539388323, detail 0.435588507877665
+  jt-4-1-flash-236b-a21b: intelligenceIndex: leaderboard 27.2926268381758, detail 33.9172581709394
+  jt-4-1-flash-236b-a21b: intelligenceIndexIsEstimated: leaderboard True, detail False
+  jt-4-1-flash-236b-a21b: isReasoning: leaderboard False, detail True
+  jt-4-1-flash-236b-a21b: lcr: leaderboard 0.713333333333333, detail 0.783333333333333
+  jt-4-1-flash-236b-a21b: mmmuPro: leaderboard 0.641040462427746, detail None
+  jt-4-1-flash-236b-a21b: name: leaderboard 'JT-4.1 Flash 236B A21B (Non-reasoning)', detail 'JT-4.1 Flash 236B A21B (Reasoning)'
+  jt-4-1-flash-236b-a21b: omniscience: leaderboard -8.783333333333333, detail 20.566666666666666
+  jt-4-1-flash-236b-a21b: omniscienceAccuracy: leaderboard 0.24283333333333335, detail 0.494
+  jt-4-1-flash-236b-a21b: scicode: leaderboard None, detail 0.519675925925926
+  jt-4-1-flash-236b-a21b: shortName: leaderboard 'JT-4.1 Flash 236B A21B (non-reasoning)', detail 'JT-4.1 Flash 236B A21B'
+  jt-4-1-flash-236b-a21b: terminalBench21: leaderboard 0.595505617977528, detail None
+  jt-4-1-flash-236b-a21b: terminalBench40: leaderboard None, detail 0.0303030303030303
+  k2-horizon-3-7b: gdpvalNormalized: leaderboard 0.18229, detail 0.192015
+  k2-horizon-375b-a23b: gdpvalNormalized: leaderboard 0.42460000000000003, detail 0.43302999999999997
+  k2-horizon-7b: gdpvalNormalized: leaderboard 0.2557, detail 0.26244000000000006
+  k2-horizon-mova-36b-a4b: gdpvalNormalized: leaderboard 0.34064, detail 0.34652499999999997
+  kat-coder-pro-v1: gdpvalNormalized: leaderboard 0.10916500000000003, detail 0.11705000000000002
+  kat-coder-pro-v2: gdpvalNormalized: leaderboard 0.10990499999999997, detail 0.11803500000000003
+  kimi-k2-5: gdpvalNormalized: leaderboard 0.16202999999999998, detail 0.17159500000000003
+  kimi-k2-6: gdpvalNormalized: leaderboard 0.263045, detail 0.270315
+  kimi-k2-7-code: gdpvalNormalized: leaderboard 0.26252, detail 0.27024000000000004
+  kimi-k3: gdpvalNormalized: leaderboard 0.519995, detail 0.51886
+  kimi-k3-low: gdpvalNormalized: leaderboard 0.30929999999999996, detail 0.31438
+  ling-3-0-flash: gdpvalNormalized: leaderboard 0.22032999999999997, detail 0.224175
+  ling-3-0-flash-fin: gdpvalNormalized: leaderboard 0.29647, detail 0.302765
+  ling-3-0-flash-vl: gdpvalNormalized: leaderboard 0.32494500000000004, detail 0.332345
+  ling-3-0-tiny: gdpvalNormalized: leaderboard 0.027389999999999987, detail 0.03236500000000001
+  longcat-2-0: gdpvalNormalized: leaderboard 0.17809500000000003, detail 0.18652
+  mimo-v2-5-0424: gdpvalNormalized: leaderboard 0.24310500000000002, detail 0.25151
+  mimo-v2-5-pro: gdpvalNormalized: leaderboard 0.30351, detail 0.311745
+  mimo-v2-6-flash: gdpvalNormalized: leaderboard 0.55003, detail 0.55525
+  mimo-v2-6-flash: intelligenceIndexCostPerTask.cost.total: leaderboard 0.0621899731897297, detail 0.06231470136619077
+  mimo-v2-6-pro: gdpvalNormalized: leaderboard 0.5930599999999999, detail 0.59423
+  mimo-v2-flash: gdpvalNormalized: leaderboard 0.05725999999999999, detail 0.065615
+  minicpm5-2b: gdpvalNormalized: leaderboard 0.09713499999999999, detail 0.10534500000000002
+  minimax-m2-7: gdpvalNormalized: leaderboard 0.24931999999999999, detail 0.25672500000000004
+  minimax-m3: gdpvalNormalized: leaderboard 0.37291499999999994, detail 0.372505
+  mistral-medium-3-5: gdpvalNormalized: leaderboard 0.12355000000000001, detail 0.13160500000000003
+  motif-0714: gdpvalNormalized: leaderboard 0.29323, detail 0.302885
+  motif-3: gdpvalNormalized: leaderboard 0.30933000000000005, detail 0.31135
+  muse-glimmer: gdpvalNormalized: leaderboard 0.13712, detail 0.145315
+  muse-spark: gdpvalNormalized: leaderboard 0.24289, detail 0.250535
+  muse-spark-1-1: gdpvalNormalized: leaderboard 0.35417999999999994, detail 0.35740999999999995
+  muse-spark-1-2: gdpvalNormalized: leaderboard 0.49080999999999997, detail 0.488765
+  muse-spark-1-3: gdpvalNormalized: leaderboard 0.5861649999999999, detail 0.592145
+  muse-spark-1-3-xhigh: gdpvalNormalized: leaderboard 0.55932, detail 0.564895
+  nemotron-3-5-lightning: gdpvalNormalized: leaderboard 0.06211000000000001, detail 0.07057
+  nex-n2-pro: gdpvalNormalized: leaderboard 0.29572000000000004, detail 0.30261
+  nvidia-nemotron-3-nano-4b: intelligenceIndex: leaderboard 7.38161312356127, detail 4.76910061591993
+  nvidia-nemotron-3-nano-4b: intelligenceIndexIsEstimated: leaderboard True, detail False
+  nvidia-nemotron-3-ultra-550b-a55b: gdpvalNormalized: leaderboard 0.25017500000000004, detail 0.25808
+  quasar-438b: gdpvalNormalized: leaderboard 0.33079, detail 0.34208000000000005
+  qwen3-5-122b-a10b: gdpvalNormalized: leaderboard 0.15089999999999998, detail 0.15845499999999998
+  qwen3-5-122b-a10b-non-reasoning: gdpvalNormalized: leaderboard 0.09738, detail 0.10634500000000002
+  qwen3-5-35b-a3b-non-reasoning: gdpvalNormalized: leaderboard 0.04732999999999998, detail 0.055815
+  qwen3-5-397b-a17b: gdpvalNormalized: leaderboard 0.13977999999999996, detail 0.147885
+  qwen3-6-27b: gdpvalNormalized: leaderboard 0.23667000000000002, detail 0.24423000000000003
+  qwen3-6-27b-non-reasoning: gdpvalNormalized: leaderboard 0.22494999999999998, detail 0.23318
+  qwen3-6-35b-a3b: gdpvalNormalized: leaderboard 0.18960500000000002, detail 0.197915
+  qwen3-6-35b-a3b-non-reasoning: gdpvalNormalized: leaderboard 0.16867500000000002, detail 0.17482999999999999
+  qwen3-6-plus: gdpvalNormalized: leaderboard 0.23792000000000002, detail 0.246505
+  qwen3-7-max: gdpvalNormalized: leaderboard 0.30713999999999997, detail 0.31557500000000005
+  qwen3-7-plus: gdpvalNormalized: leaderboard 0.12802, detail 0.135205
+  qwen3-8-2-4t-a95b: gdpvalNormalized: leaderboard 0.548635, detail 0.55626
+  qwen3-8-27b-low: gdpvalNormalized: leaderboard 0.42078499999999996, detail 0.431725
+  qwen3-8-27b-medium: gdpvalNormalized: leaderboard 0.434245, detail 0.44167999999999996
+  qwen3-8-27b-non-reasoning: gdpvalNormalized: leaderboard 0.27610500000000004, detail 0.28706500000000007
+  qwen3-8-flash-next: gdpvalNormalized: leaderboard 0.556065, detail 0.5665650000000001
+  qwen3-8-max-0803: gdpvalNormalized: leaderboard 0.5537949999999999, detail 0.55383
+  qwen3-8b-instruct: contextWindowTokens: leaderboard 32768, detail 131072
+  qwen3-coder-next: gdpvalNormalized: leaderboard 0.0004950000000000046, detail 0.008560000000000002
+  ring-2-6-1t: gdpvalNormalized: leaderboard 0.11680000000000001, detail 0.12448500000000001
+  solar-mini4: gdpvalNormalized: leaderboard 0.285915, detail 0.29509500000000005
+  solar-pro4: gdpvalNormalized: leaderboard None, detail 0.30490999999999996
+  step-3-7-flash: gdpvalNormalized: leaderboard 0.172415, detail 0.17998000000000003
+  step-5: gdpvalNormalized: leaderboard 0.53306, detail 0.543335
+leaderboard generated 2026-10-04T10:05:25Z, detail generated 2026-10-04T09:41:32Z — Vercel serves the two routes from independent caches and AA's data lands on them at different times (issues #100, #118); refresh builds and publishes the disputed capture this hour
+wrote data/aa-disagreement-snapshot.json: 253 disputed value(s) across 198 model(s)
