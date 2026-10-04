@@ -188,6 +188,7 @@ CORE_PIN = (
     '.github/workflows/coverage-comment.yml',
     '.github/workflows/lint.yml',
     '.github/workflows/pr-gate.yml',
+    '.github/workflows/ratchet-push.yml',
     '.github/workflows/refresh.yml',
     '.github/workflows/scorecard.yml',
     '.github/workflows/secrets.yml',
@@ -241,6 +242,7 @@ CORE_PIN = (
     'tests/test_workflow_ci_gate.py',
     'tests/test_js_coverage.py',
     'tests/test_publish_docs.py',
+    'tests/test_ratchet_push_workflow.py',
     'tests/test_refresh_workflow.py',
     'tests/_workflowrun.py',
 )

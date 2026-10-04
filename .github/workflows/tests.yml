@@ -16,10 +16,12 @@ name: tests
 # near-zero signal, and (b) the page under test is OS-independent text (HTML/
 # JS built by build.py), so a second OS adds no behavioral coverage the matrix
 # misses. The coverage job installs playwright and Chromium; the matrix job
-# does not. That asymmetry is deliberate. `ratchet-push` is the data-only
-# push half of that ratchet: it consumes the artifact, runs no repository
-# code, and is the only job here holding `contents: write`. `page` is the
-# committed-page check
+# does not. That asymmetry is deliberate. The raise's push half left this
+# file for the top-level `ratchet-push` workflow (issue #133 part 2b): a
+# workflow_call callee cannot read an environment secret, and the deploy
+# key the push now authenticates with lives in one. The coverage job still
+# stages the raise as the `ratchet-data` artifact for that workflow. `page`
+# is the committed-page check
 # (issue #105): the source-commit stamp is set only on the refresh path, so a
 # page a PR commits by hand could go out stamp-less and the #94 heal run
 # would publish it — that job refuses a committed page lacking the stamp or
@@ -156,13 +158,10 @@ jobs:
     # Read-only, like every job here that runs code. This job installs
     # unhashed third-party dependencies and downloads a browser, so nothing
     # in it may hold a write token (issue #134): the ratchet raise leaves
-    # the job as an artifact for `ratchet-push`, the workflow's only
-    # writer, and the job output below is that job's gate.
+    # the job as an artifact for the top-level `ratchet-push` workflow
+    # (issue #133 part 2b), whose own gates decide whether it lands.
     permissions:
       contents: read
-
-    outputs:
-      changed: ${{ steps.ratchet.outputs.changed }}
 
     env:
       # One absolute coverage data file for the outer run AND every measured
@@ -414,9 +413,9 @@ jobs:
         # this run justifies it; a lower measurement, or one within the
         # hysteresis, leaves the document untouched. The raise never leaves
         # this job as a push: it is staged with the measured base commit as
-        # an artifact for the ratchet-push job below (issue #134) — this
-        # job holds no write token, and the push job is the workflow's only
-        # writer.
+        # an artifact for the top-level ratchet-push workflow (issues #134
+        # and #133 part 2b) — this job holds no write token, and the push
+        # authenticates with the deploy key in that workflow's own job.
         id: ratchet
         if: ${{ !cancelled() && steps.pytest.outcome == 'success'
                 && steps.jscov.outcome == 'success'
@@ -468,109 +467,6 @@ jobs:
           name: ratchet-data
           path: ${{ runner.temp }}/ratchet-stage
           if-no-files-found: error
-
-  # --- The data-only push half of the coverage ratchet ---------------------
-  # Issue #134: the coverage job runs the suite, installs unhashed
-  # third-party dependencies and downloads a browser, and so must not hold
-  # a write token while it does. This job is the workflow's only writer: it
-  # holds `contents: write`, and runs no repository code — it installs
-  # nothing, checks out nothing, fetches main, copies the staged thresholds
-  # document in, and pushes. The artifact is downloaded from this same run
-  # (`needs:`, not a workflow_run), so there is no cross-run trust
-  # question, and a pull request never reaches the push: the artifact
-  # exists only when the ratchet step computed a raise, which only happens
-  # on a push to main. A raise staged against a main that has since moved
-  # is dropped, not rebased: the next main push measures and raises
-  # instead.
-  ratchet-push:
-    name: Push the coverage ratchet raise
-    runs-on: ubuntu-latest
-
-    # Per-job ceiling, like every other job's: a hung push fails in 15
-    # minutes instead of holding GitHub's 6-hour default.
-    timeout-minutes: 15
-
-    needs: coverage
-
-    # Defense in depth on top of the artifact's existence: the ratchet
-    # step can only have computed a raise on a main push.
-    if: >-
-      needs.coverage.result == 'success' &&
-      needs.coverage.outputs.changed == 'true' &&
-      github.event_name == 'push' &&
-      github.ref == 'refs/heads/main'
-
-    permissions:
-      # The only writer in this workflow, and it runs no repository code:
-      # the raise it publishes is the artifact of its own run's coverage
-      # job. The next push's "Ratchet documents" guard refuses any
-      # document that lowered a value, so a forged artifact cannot
-      # silently relax the ratchet.
-      contents: write
-
-    steps:
-      - name: Download the ratchet artifact
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
-        with:
-          name: ratchet-data
-          path: ${{ runner.temp }}/ratchet-data
-
-      - name: Push the ratchet commit
-        env:
-          GH_TOKEN: ${{ github.token }}
-          REPO: ${{ github.repository }}
-        run: |
-          # Transport failure must read as an error, not as an empty
-          # listing that drops the raise with a "main moved" notice:
-          # without pipefail, cut exits 0 over a failed ls-remote.
-          set -o pipefail
-          # The raise was measured against `base`; main must still stand
-          # there. The old inline push learned of a move from a rejected
-          # push; checking before anything is built drops the same raise
-          # without an error-shaped round trip.
-          base="$(cat "${RUNNER_TEMP}/ratchet-data/base.txt")"
-          remote="https://x-access-token:${GH_TOKEN}@github.com/${REPO}"
-          fetched="$(git ls-remote "${remote}" refs/heads/main | cut -f1)"
-          if [ "${fetched}" != "${base}" ]; then
-            echo "::notice::Main moved while this run measured; the next push raises instead"
-            {
-              echo "### Dropped: main moved while this run measured"
-              echo
-              echo "The measured base ${base} is no longer main's tip (${fetched});"
-              echo "this run's raise is dropped and the next main push raises instead."
-            } >> "$GITHUB_STEP_SUMMARY"
-            exit 0
-          fi
-          git init -q "${RUNNER_TEMP}/ratchet-repo"
-          git -C "${RUNNER_TEMP}/ratchet-repo" remote add origin "${remote}"
-          git -C "${RUNNER_TEMP}/ratchet-repo" fetch --quiet origin main
-          git -C "${RUNNER_TEMP}/ratchet-repo" checkout -q -B push FETCH_HEAD
-          cp "${RUNNER_TEMP}/ratchet-data/ci-thresholds.json" \
-            "${RUNNER_TEMP}/ratchet-repo/.github/ci-thresholds.json"
-          git -C "${RUNNER_TEMP}/ratchet-repo" config user.name \
-            'github-actions[bot]'
-          git -C "${RUNNER_TEMP}/ratchet-repo" config user.email \
-            '41898282+github-actions[bot]@users.noreply.github.com'
-          git -C "${RUNNER_TEMP}/ratchet-repo" add .github/ci-thresholds.json
-          git -C "${RUNNER_TEMP}/ratchet-repo" commit -q -m \
-            'Ratchet ci-thresholds: raise the coverage floor (automated)'
-          if git -C "${RUNNER_TEMP}/ratchet-repo" push origin HEAD:main; then
-            exit 0
-          fi
-          # A rejected push after the base check usually means main moved
-          # in the window since the check; failing the job for that would
-          # turn `tests` red for an ordinary concurrent push. Distinguish
-          # it: if the remote still points at this commit's parent, the
-          # race explanation is wrong and the push failed for a real
-          # reason.
-          git -C "${RUNNER_TEMP}/ratchet-repo" fetch --quiet origin main
-          if [ "$(git -C "${RUNNER_TEMP}/ratchet-repo" rev-parse HEAD^)" \
-              = "$(git -C "${RUNNER_TEMP}/ratchet-repo" rev-parse FETCH_HEAD)" ]; then
-            echo "the ratchet push was rejected while main stood still" >&2
-            exit 1
-          fi
-          echo 'Main moved while this run measured; the next push raises instead.' \
-            >> "$GITHUB_STEP_SUMMARY"
 
   # --- The patch-coverage report ------------------------------------------
   # INFORMATIONAL, never a gate — which is why no gate reads its result. A

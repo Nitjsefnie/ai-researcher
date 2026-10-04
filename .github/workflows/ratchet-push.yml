@@ -1,0 +1,231 @@
+name: ratchet push
+
+# The data-only push half of the coverage ratchet, split out of tests.yml
+# (issues #134 and #133 part 2b). A workflow_call callee cannot read an
+# environment's secret — the main-push deploy key would resolve EMPTY
+# inside the tests leg, exactly as claudit's #479 recorded for the same
+# split — and the job token's push is rejected by the planned
+# require-ci-aggregate ruleset, whose only bypass is the deploy key. So
+# the push lives HERE, a top-level workflow where `environment: main-push`
+# resolves, keyed on the ci-gate run's completion.
+#
+# tests.yml is a workflow_call callee and produces no run of its own on a
+# main push — the run that carries the ratchet-data artifact is ci-gate's
+# (a callee's artifacts surface on the caller's run) — so that run is the
+# trigger. The keyless half stays in tests.yml: the coverage leg measures,
+# and stages the artifacts there; this workflow lists the triggering run's
+# artifacts, downloads the ratchet data, validates it as data, and pushes
+# the raise when there is one to push.
+#
+# THE SUITE GATES THE PUSH: only a run whose pytest and coverage legs were
+# green stages the ratchet data, and only a FULLY green gate run
+# (conclusion: success) publishes it. The artifact is treated as data and
+# nothing else: the job runs no repository code — no checkout, no pip, no
+# script from the tree — and the staged thresholds document is
+# schema-checked inline (exact key set, numeric values) before anything is
+# pushed; the next push's "Ratchet documents" guard refuses any document
+# that lowered a value, so a forged artifact cannot silently relax the
+# ratchet either way.
+#
+# THE TRIGGER'S HAZARD — event data or code from another branch's run
+# reaching a privileged job — is gated shut: the job admits only a push
+# event on main from THIS repository whose gate run concluded success, so
+# a fork pull request's run never passes it, and the push authenticates
+# with the deploy key, not the job token. The deploy key lives in the
+# main-push environment, reachable only from main. The push starts
+# workflow runs, unlike a GITHUB_TOKEN push, so the raise commit gets a
+# real ci-gate aggregate verdict on main's tip.
+#
+# Main standing still is checked before anything is built: the staged
+# base — the commit the raise was measured against — must still be
+# main's tip, or the raise is dropped green; the next main push measures
+# and raises instead. A push rejected after the check distinguishes main
+# having moved (dropped green) from main having stood still (a real
+# error).
+
+on:
+  workflow_run:  # zizmor: ignore[dangerous-triggers]
+    workflows: [ci gate]
+    types: [completed]
+
+permissions: {}
+
+concurrency:
+  # Never cancel in progress: a cancelled run can stop between the commit
+  # and the push. Two main runs completing close together queue here; the
+  # loser's staleness check below drops its data.
+  group: ratchet-push
+  cancel-in-progress: false
+
+jobs:
+  push:
+    # Main pushes only: a PR run stages no main data, and a failed or
+    # cancelled gate run's data is not the tested state worth publishing.
+    # The head-repository gate is belt to the event gate's suspenders: a
+    # fork's run carries event pull_request, never push, so it can never
+    # pass — and the explicit repository equality keeps a same-named
+    # fork's push-shaped event out too.
+    if: >-
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.head_branch == 'main' &&
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.head_repository.full_name ==
+      github.repository
+    environment: main-push
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      actions: read  # list and download the triggering run's artifacts
+
+    steps:
+      - name: List the triggering run's artifacts
+        id: list
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          RUN_ID: ${{ github.event.workflow_run.id }}
+        run: |
+          set -o pipefail
+          names="$(gh api -H 'Cache-Control: no-cache' --paginate \
+            "repos/$REPO/actions/runs/$RUN_ID/artifacts" \
+            --jq '.artifacts[] | select(.expired != true) | .name' \
+            | sort -u)"
+          if printf '%s\n' "$names" | grep -qx 'ratchet-data'; then
+            echo "staged=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "staged=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Download the ratchet data
+        # The artifact belongs to the TRIGGERING run: the download is
+        # cross-run, so it names the run id and carries a token capped by
+        # the job's actions: read.
+        if: steps.list.outputs.staged == 'true'
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: ratchet-data
+          path: ${{ runner.temp }}/ratchet-data
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Validate the staged data
+        # The artifact is DATA and nothing else: no file from it is
+        # executed, sourced or interpreted as anything but bytes. The
+        # validation is the push's own gate — the exact two-file shape the
+        # coverage leg stages, a base of exactly one 40-hex commit, and
+        # the thresholds document's exact key set (top level, per
+        # language, and leaf) with four finite numeric leaves and
+        # schema_version exactly 1. A forged or reshaped artifact dies
+        # here, before the key is ever put to work.
+        if: steps.list.outputs.staged == 'true'
+        run: |
+          set -euo pipefail
+          data="${RUNNER_TEMP}/ratchet-data"
+          files="$(ls -A "${data}")"
+          echo "staged: ${files}"
+          # The exact two-file shape the coverage leg stages.
+          [ "$(printf '%s\n' "${files}" | sort | tr '\n' ' ' | xargs)" \
+            = "base.txt ci-thresholds.json" ] || {
+            echo "the ratchet artifact carries unexpected files" >&2
+            exit 1
+          }
+          # The base is exactly one 40-hex commit: the whole file content,
+          # not one line of it, must be the commit.
+          base="$(cat "${data}/base.txt")"
+          [ "${#base}" -eq 40 ] || {
+            echo "base.txt is not a single 40-hex commit" >&2
+            exit 1
+          }
+          grep -qE "^[0-9a-f]{40}$" <<< "${base}" || {
+            echo "base.txt is not a 40-hex commit" >&2
+            exit 1
+          }
+          # The thresholds document's exact key set at every level, four
+          # finite numeric leaves, and schema_version exactly 1.
+          jq -e '
+            (keys | sort) == ["coverage", "schema_version"]
+            and .schema_version == 1
+            and (.coverage | keys | sort) == ["javascript", "python"]
+            and (.coverage.python | keys | sort) == ["floor", "measured"]
+            and (.coverage.javascript | keys | sort) == ["floor", "measured"]
+            and ([.coverage[][] | type] | sort)
+              == ["number", "number", "number", "number"]
+            and ([.coverage[][]] |
+                 all(type == "number" and . == . and . != infinite))
+          ' "${data}/ci-thresholds.json" > /dev/null || {
+            echo "ci-thresholds.json does not match the ratchet schema" >&2
+            exit 1
+          }
+
+      - name: Push the ratchet commit
+        if: steps.list.outputs.staged == 'true'
+        env:
+          MASTER_PUSH_DEPLOY_KEY: ${{ secrets.MASTER_PUSH_DEPLOY_KEY }}
+          REPO: ${{ github.repository }}
+        run: |
+          # Fail closed when the environment is missing its secret: with
+          # no key there is nothing to authenticate the push with, and
+          # the fallback must never be a token.
+          if [ -z "${MASTER_PUSH_DEPLOY_KEY:-}" ]; then
+            echo "MASTER_PUSH_DEPLOY_KEY is empty: the main-push environment is missing its secret" >&2
+            exit 1
+          fi
+          eval "$(ssh-agent -s)" >/dev/null
+          # The agent is stopped when this step ends, whatever its
+          # outcome: the key never outlives the step that loaded it.
+          trap 'kill "$SSH_AGENT_PID" 2>/dev/null || true' EXIT
+          ssh-add <(printf '%s\n' "$MASTER_PUSH_DEPLOY_KEY") >/dev/null
+          mkdir -p ~/.ssh
+          # GitHub SSH host keys, published by GitHub's Meta endpoint:
+          # https://docs.github.com/en/rest/meta/meta#get-github-meta-information
+          printf '%s\n' \
+            'github.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl' \
+            'github.com ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQCj7ndNxQowgcQnjshcLrqPEiiphnt+VTTvDP6mHBL9j1aNUkY4Ue1gvwnGLVlOhGeYrnZaMgRK6+PKCUXaDbC7qtbW8gIkhL7aGCsOr/C56SJMy/BCZfxd1nWzAOxSDPgVsmerOBYfNqltV9/hWCqBywINIR+5dIg6JTJ72pcEpEjcYgXkE2YEFXV1JHnsKgbLWNlhScqb2UmyRkQyytRLtL+38TGxkxCflmO+5Z8CSSNY7GidjMIZ7Q4zMjA2n1nGrlTDkzwDCsw+wqFPGQA179cnfGWOWRVruj16z6XyvxvjJwbz0wQZ75XK5tKSb7FNyeIEs4TT4jk+S4dhPeAUC5y+bDYirYgM4GC7uEnztnZyaVWQ7B381AK4Qdrwt51ZqExKbQpTUNn+EjqoTwvqNj4kqx5QUCI0ThS/YkOxJCXmPUWZbhjpCg56i+2aB6CmK2JGhn57K5mj0MNdBXA4/WnwH6XoPWJzK5Nyu2zB3nAZp+S5hpQs+p1vN1/wsjk=' \
+            >> ~/.ssh/known_hosts
+          export GIT_SSH_COMMAND='ssh -o StrictHostKeyChecking=yes'
+          # Transport failure must read as an error, not as an empty
+          # listing that drops the raise with a "main moved" notice.
+          set -o pipefail
+          remote="${PUSH_REMOTE:-git@github.com:${REPO}.git}"
+          base="$(cat "${RUNNER_TEMP}/ratchet-data/base.txt")"
+          fetched="$(git ls-remote "${remote}" refs/heads/main | cut -f1)"
+          if [ "${fetched}" != "${base}" ]; then
+            echo "::notice::Main moved while this run measured; the next push raises instead"
+            {
+              echo "### Dropped: main moved while this run measured"
+              echo
+              echo "The measured base ${base} is no longer main's tip (${fetched});"
+              echo "this run's raise is dropped and the next main push raises instead."
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          git init -q "${RUNNER_TEMP}/ratchet-repo"
+          git -C "${RUNNER_TEMP}/ratchet-repo" remote add origin "${remote}"
+          git -C "${RUNNER_TEMP}/ratchet-repo" fetch --quiet origin main
+          git -C "${RUNNER_TEMP}/ratchet-repo" checkout -q -B push FETCH_HEAD
+          cp "${RUNNER_TEMP}/ratchet-data/ci-thresholds.json" \
+            "${RUNNER_TEMP}/ratchet-repo/.github/ci-thresholds.json"
+          git -C "${RUNNER_TEMP}/ratchet-repo" config user.name \
+            'github-actions[bot]'
+          git -C "${RUNNER_TEMP}/ratchet-repo" config user.email \
+            '41898282+github-actions[bot]@users.noreply.github.com'
+          git -C "${RUNNER_TEMP}/ratchet-repo" add .github/ci-thresholds.json
+          git -C "${RUNNER_TEMP}/ratchet-repo" commit -q -m \
+            'Ratchet ci-thresholds: raise the coverage floor (automated)'
+          if git -C "${RUNNER_TEMP}/ratchet-repo" push origin HEAD:main; then
+            exit 0
+          fi
+          # A rejected push after the base check usually means main moved
+          # in the window since the check; failing the job for that would
+          # turn the gate red for an ordinary concurrent push. Distinguish
+          # it: if the remote still points at this commit's parent, the
+          # race explanation is wrong and the push failed for a real
+          # reason.
+          git -C "${RUNNER_TEMP}/ratchet-repo" fetch --quiet origin main
+          if [ "$(git -C "${RUNNER_TEMP}/ratchet-repo" rev-parse HEAD^)" \
+              = "$(git -C "${RUNNER_TEMP}/ratchet-repo" rev-parse FETCH_HEAD)" ]; then
+            echo "the ratchet push was rejected while main stood still" >&2
+            exit 1
+          fi
+          echo 'Main moved while this run measured; the next push raises instead.' \
+            >> "$GITHUB_STEP_SUMMARY"

@@ -18,9 +18,10 @@ here:
   drift apart;
 - the classifier's NON_LEG_JOBS and this file's LEG_IDS must together
   name every ci-gate job;
-- the tests leg is the only leg forwarding `contents: write` — the
-  callee's `ratchet-push` job is its workflow's only writer — and the
-  codeql leg forwards the `security-events: write` its callee needs;
+- every leg grants its callee read-only (`contents: read`): the callee
+  runs no writer — the ratchet raise leaves tests.yml as an artifact for
+  the top-level ratchet-push workflow — and the codeql leg forwards the
+  `security-events: write` its callee needs;
 - coverage-comment relays on the ci-gate run, the run that carries the
   diff-coverage-comment artifact once tests.yml is a workflow_call
   callee.
@@ -194,20 +195,17 @@ def test_classify_job_reads_actions_for_the_verified_base_walk():
     assert permissions.get("actions") == "read"
 
 
-def test_the_tests_leg_forwards_contents_write_and_no_other_leg_does():
-    # The callee's `ratchet-push` job — tests.yml's only writer, per
-    # test_ci_workflows.py — keeps working under the caller's cap: the
-    # caller's grant caps what the callee can use, so the leg must
-    # forward the write the ratchet-push job's own permissions block
-    # requests. Every other leg stays read-only, and the codeql leg
-    # forwards the security-events write its callee's job requests.
+def test_every_leg_grants_read_only():
+    # The callee runs no writer (issue #133 part 2b removed tests.yml's
+    # ratchet-push job; the raise leaves as an artifact for the
+    # top-level ratchet-push workflow), so every leg's grant stays at the
+    # workflow floor. The codeql leg forwards the security-events write
+    # its callee's job requests — the one non-contents elevation.
     doc = _ci_gate()
-    tests_leg = doc["jobs"]["tests"]
-    assert (tests_leg.get("permissions") or {}).get("contents") == "write"
-    for leg in ("lint", "types", "audit", "actionlint"):
+    for leg in ("tests", "lint", "types", "audit", "actionlint"):
         assert (doc["jobs"][leg].get("permissions") or {}).get(
             "contents") == "read", leg
-    codeql = (doc["jobs"]["codeql"].get("permissions") or {})
+    codeql = doc["jobs"]["codeql"].get("permissions") or {}
     assert codeql.get("security-events") == "write"
     assert codeql.get("contents") == "read"
     assert codeql.get("actions") == "read"
