@@ -973,8 +973,11 @@ class ExecutedCommitMessageTests(unittest.TestCase):
         self._git("init", "-q", str(seed))
         config = str(root / "gitconfig")
         config_path = pathlib.Path(config)
+        # as_uri(): file:///C:/Users/... on Windows, file:///tmp/... on
+        # POSIX -- a raw str(Path) renders backslashes the file:// transport
+        # eats (the windows-latest matrix cell caught exactly that).
         config_path.write_text(
-            f"[url \"file://{origin}\"]\n"
+            f'[url "{origin.as_uri()}"]\n'
             "    insteadOf = https://github.com/Nitjsefnie/ai-researcher\n",
             encoding="utf-8")
         env = {
