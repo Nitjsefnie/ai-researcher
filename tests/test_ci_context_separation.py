@@ -38,8 +38,7 @@ def _document():
 
 def _steps():
     for job in _document()['jobs'].values():
-        for step in job.get('steps') or []:
-            yield step
+        yield from job.get('steps') or []
 
 
 def test_no_externally_triggerable_default_branch_write_trigger():
