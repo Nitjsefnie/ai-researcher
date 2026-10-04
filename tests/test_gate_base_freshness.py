@@ -215,6 +215,7 @@ CORE_PIN = (
     'tests/test_capture_gate.py',
     'tests/test_check_committed_page.py',
     'tests/test_checkout_clean.py',
+    'tests/test_ci_context_separation.py',
     'tests/test_ci_install_chromium.py',
     'tests/test_ci_instruction_budgets.py',
     'tests/test_ci_perf_budgets.py',
