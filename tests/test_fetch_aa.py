@@ -1959,7 +1959,7 @@ class DisagreementSnapshotTests(unittest.TestCase):
 # ---------------------------------------------------------------------------
 # Issue #176: the stale-route heal (Overseer ruling (delegated by the
 # maintainer), 2026-10-04). When ALL of one route's disputed values equal the
-# last committed capture and NONE of the other route's do, the matching route
+# last agreeing capture and NONE of the other route's do, the matching route
 # is stale: its values are dropped and the fresh route publishes undisputed
 # through the normal capture path. The pinned fixture is the 909ca49 window,
 # trimmed (tests/fixtures/issue-176/, provenance in its README): all 9 kept
@@ -2004,7 +2004,7 @@ def issue176_by_slug(payload: list) -> dict:
 
 def leaderboard_stale_baseline() -> list:
     """The fixture payloads modelled as a window where the LEADERBOARD's
-    generation was the last committed one. A committed capture always pairs
+    generation was the last agreeing one. An agreeing capture always pairs
     agreeing values, so such a window's baseline carries the leaderboard's
     copy of the shape-split total; the fixture's real window disagrees on
     it, so this re-pairs the baseline object's total with the leaderboard's
@@ -2133,9 +2133,13 @@ class StaleRouteHealTests(unittest.TestCase):
         # The repaired capture passes the sum check unchanged.
         self.assertGreater(fetch_aa.check_cost_breakdown(models), 0)
 
-        # The note names the stale route and the absent count.
+        # The note names the stale route, the absent count, and the
+        # corrected baseline (issue #193: never "the last committed
+        # capture" -- the baseline is the recorded last-agreeing one).
         self.assertIn("detail route is stale", note)
         self.assertIn("1 GDPval cost", note)
+        self.assertIn(
+            "equal the last agreeing capture (the recorded baseline)", note)
 
     def test_the_leaderboard_stale_direction_heals(self):
         # The synthetic second direction (#117 ran it for real): the same
@@ -2252,7 +2256,7 @@ class StaleRouteHealTests(unittest.TestCase):
                 fetch_aa.OUT = root / "aa-raw-models.json"
                 fetch_aa.AGENTS_OUT = root / "aa-raw-coding-agents.json"
                 fetch_aa.STAMP = root / "captured-at.txt"
-                # The last committed capture: the fixture baseline.
+                # The last agreeing capture: the fixture baseline.
                 fetch_aa.OUT.write_text(json.dumps(issue176_baseline()),
                                         encoding="utf-8")
                 sys.argv = ["fetch_aa.py"]

@@ -148,7 +148,7 @@ retry or to hand-fix JSON — when any of these move:
   raw payloads plus the disagreement map), which the disputed rendering
   builds from. Since the Overseer ruling (delegated by the maintainer),
   2026-10-04 (issue #176), the refusal first attempts the staleness heal:
-  when one route is provably the last committed capture's copy, the fresh
+  when one route is provably the last agreeing capture's copy, the fresh
   route publishes undisputed through the normal capture path and nothing
   disputed is written — see the failure modes below;
 - the Coding Agent Index collapses below `CODING_ROW_FLOOR` paired rows.
