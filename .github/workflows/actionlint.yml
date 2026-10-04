@@ -28,24 +28,20 @@ name: actionlint
 # has thought about yet.
 
 on:
-  push:
-    # Default branch only: a pull-request head already gets one run from the
-    # `pull_request` event below, and an unfiltered `push` schedules the same
-    # commit a second time under a different ref, which the `concurrency`
-    # group cannot collapse.
-    #
-    # Deliberately unfiltered by path (unlike tests/lint/types/audit). A
-    # documentation-only push to main runs no other workflow at all, so a
-    # conflict marker committed into README.md would reach main without any
-    # check reading it — the merge-marker step below exists so that push
-    # still gets checked. It also puts the two gate scripts on the hourly
-    # refresh push, where both are trivially green (main carries itself).
-    branches: [main]
-  pull_request:
-    # Unfiltered, for the same reason as push: a docs-only pull request is
-    # exactly the one that can carry a merge marker, and the freshness and
-    # scope gates must read every head, not only code heads.
+  workflow_call:
   workflow_dispatch:
+    # Standalone dispatch runs (no ci-gate classification) run every job
+    # unconditionally.
+
+# Trigger ownership moved to ci-gate.yml (issue #133): the push and
+# pull_request triggers live there now. This leg is DELIBERATELY
+# UNCONDITIONAL in ci-gate — no narrowing output may skip it — which
+# preserves exactly the guarantee the old unfiltered triggers carried: a
+# conflict marker committed into a Markdown file is still read (the
+# merge-marker step below), the freshness and scope gates still read
+# every head, not only code heads, and the two gate scripts stay watched
+# on the hourly refresh bot's push, where both are trivially green (main
+# carries itself).
 
 permissions:
   contents: read

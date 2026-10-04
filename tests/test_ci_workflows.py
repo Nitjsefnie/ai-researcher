@@ -122,6 +122,13 @@ def test_every_job_declares_timeout_minutes():
     for path in WORKFLOWS:
         workflow = yaml.safe_load(path.read_text(encoding="utf-8"))
         for name, job in (workflow.get("jobs") or {}).items():
+            if "steps" not in job:
+                # A reusable-workflow call carries no steps and no
+                # timeout-minutes of its own -- GitHub's schema has
+                # neither on a `uses:` job. The ceiling that governs its
+                # runtime is the callee's, and the callee's jobs are
+                # pinned by this same loop over their own file.
+                continue
             assert "timeout-minutes" in job, (
                 f"{path.name}: job {name!r} declares no timeout-minutes"
             )
@@ -258,11 +265,14 @@ def test_coverage_comment_workflow_never_executes_the_tree():
     workflow = yaml.safe_load(
         (REPO_ROOT / ".github" / "workflows" / "coverage-comment.yml")
         .read_text(encoding="utf-8"))
-    # The trusted half: triggered only by the tests workflow completing,
-    # filtered to its pull_request runs, and it checks out nothing — the
-    # only thing crossing from the pull request is the TEXT of a comment.
+    # The trusted half: triggered only by the ci-gate workflow completing
+    # (tests.yml is a workflow_call callee since #133 and produces no run
+    # of its own on a pull request; the run carrying the
+    # diff-coverage-comment artifact is ci-gate's), filtered to its
+    # pull_request runs, and it checks out nothing — the only thing
+    # crossing from the pull request is the TEXT of a comment.
     assert list(workflow[True]) == ["workflow_run"], workflow.get("on")
-    assert workflow[True]["workflow_run"]["workflows"] == ["tests"]
+    assert workflow[True]["workflow_run"]["workflows"] == ["ci gate"]
     [job] = workflow["jobs"].values()
     assert "github.event.workflow_run.event == 'pull_request'" in job["if"]
     assert not [s for s in job["steps"] if "uses" in s
@@ -273,15 +283,20 @@ def test_coverage_comment_workflow_never_executes_the_tree():
 
 
 def test_coverage_job_is_unconditional_in_tests_workflow():
-    # The comment workflow treats "run failed or cancelled" as the only
-    # not-measured shapes because the coverage job is unconditional: a
-    # successful run always carries the artifact. If a skip condition ever
-    # lands on the coverage job, this pin fails and the comment workflow's
-    # missing-artifact handling needs its success case back.
+    # The comment workflow keys its missing-artifact verdict on the RUN
+    # conclusion plus the tests leg's own conclusion (the mark-missing
+    # step reads the run's jobs list): a successful run whose tests leg
+    # skipped is ci-gate's narrowing and goes neutral; every other
+    # missing-artifact shape stays a failure. The coverage JOB itself
+    # stays unconditional inside its callee — the narrowing lives on the
+    # caller's leg conditions — and this pin fails if a skip condition
+    # ever lands on the coverage job itself, which would move the
+    # decision the mark-missing step cannot see.
     workflow = yaml.safe_load(TESTS_WORKFLOW.read_text(encoding="utf-8"))
     assert "if" not in workflow["jobs"]["coverage"], (
         "the coverage job grew a skip condition; the comment workflow's "
-        "mark-missing step assumes an unconditional coverage job")
+        "mark-missing step reads the tests leg's conclusion, not this "
+        "job's")
 
 
 def test_the_comment_artifact_name_spans_both_workflows():

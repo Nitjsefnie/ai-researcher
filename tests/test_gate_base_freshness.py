@@ -118,12 +118,14 @@ def _advance_main(tmp_path, origin, subject, files):
 def test_required_jobs_name_the_merge_gate_contexts(tmp_path):
     del tmp_path
     module = _load()
-    assert module.REQUIRED_JOBS == ('actionlint', 'analyze', 'coverage',
-                                    'lint', 'page', 'pip-audit', 'pyright',
-                                    'suites')
+    assert module.REQUIRED_JOBS == ('actionlint', 'aggregate', 'analyze',
+                                    'classify', 'coverage', 'lint', 'page',
+                                    'pip-audit', 'pyright', 'suites')
     assert module.BASE_BRANCH == 'main'
     for name, path in (('actionlint', 'actionlint.yml'),
+                       ('aggregate', 'ci-gate.yml'),
                        ('analyze', 'codeql.yml'),
+                       ('classify', 'ci-gate.yml'),
                        ('coverage', 'tests.yml'),
                        ('lint', 'lint.yml'),
                        ('page', 'tests.yml'),
@@ -182,6 +184,7 @@ CORE_PIN = (
     '.github/workflows/audit.yml',
     '.github/workflows/claim.yml',
     '.github/workflows/codeql.yml',
+    '.github/workflows/ci-gate.yml',
     '.github/workflows/coverage-comment.yml',
     '.github/workflows/lint.yml',
     '.github/workflows/pr-gate.yml',
@@ -199,7 +202,9 @@ CORE_PIN = (
     'requirements-test.txt',
     'requirements-zizmor.txt',
     'scripts/ci/check_committed_page.py',
+    'scripts/ci/aggregate_gate.py',
     'scripts/ci/check_ratchets.py',
+    'scripts/ci/classify_changes.py',
     'scripts/ci/commit_scopes.py',
     'scripts/ci/gate_base_freshness.py',
     'scripts/ci/install_chromium.py',
@@ -214,6 +219,10 @@ CORE_PIN = (
     'tests/test_build.py',
     'tests/test_capture_gate.py',
     'tests/test_check_committed_page.py',
+    'tests/test_ci_classify_verified_base.py',
+    'tests/test_ci_gate_botdata.py',
+    'tests/test_ci_gate_modules.py',
+    'tests/test_ci_gate_output_wiring.py',
     'tests/test_checkout_clean.py',
     'tests/test_ci_context_separation.py',
     'tests/test_ci_install_chromium.py',
@@ -229,6 +238,7 @@ CORE_PIN = (
     'tests/test_fetch_aa.py',
     'tests/test_gate_base_freshness.py',
     'tests/test_gitignore.py',
+    'tests/test_workflow_ci_gate.py',
     'tests/test_js_coverage.py',
     'tests/test_publish_docs.py',
     'tests/test_refresh_workflow.py',

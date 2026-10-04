@@ -123,7 +123,7 @@ reachable through those tests, so a change to the emitted JavaScript needs one.
 
 ## CI
 
-Eight workflows run. Five of them you can run locally:
+Nine workflows run. Five of them you can run locally:
 
 ```sh
 python3 -m pytest -q                                             # tests
@@ -223,7 +223,13 @@ regenerated only through the generator functions in
 `tests/test_ci_instruction_budgets.py` (a test pins its exact bytes) and
 is never hand-edited.
 
-Three run only on GitHub. `codeql` is gated on repository visibility, because
+Four run only on GitHub. `ci gate` aggregates every merge gate into one
+`aggregate` verdict (issue #133): it starts on every push and pull request,
+classifies the changed paths, and narrows the legs a documentation-only or
+bot-data-only change skips while its `ci gate / aggregate` check still
+reports — the one context a required-check ruleset can require, so a
+docs-only pull request can still merge once that ruleset exists. `codeql` is
+gated on repository visibility, because
 code scanning is free on public repositories and needs Code Security on private
 ones. `claim` watches issue comments: `/claim` assigns the commenter to an
 unassigned open issue, and `/unclaim` and `/release` remove the commenter's own
