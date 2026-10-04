@@ -101,7 +101,3 @@
 !/tests/fixtures/pipeline/aa-raw-models.json
 !/tests/fixtures/pipeline/aa-raw-coding-agents.json
 !/tests/fixtures/pipeline/captured-at.txt
-!/tests/fixtures/issue-176/
-/tests/fixtures/issue-176/*
-!/tests/fixtures/issue-176/*.json
-!/tests/fixtures/issue-176/README.md
