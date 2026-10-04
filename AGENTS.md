@@ -146,7 +146,11 @@ retry or to hand-fix JSON — when any of these move:
   the field path and both values. Since #118 the refusal is also buildable:
   it exits 3 but writes `data/aa-disagreement-snapshot.json` (both routes'
   raw payloads plus the disagreement map), which the disputed rendering
-  builds from — see the failure modes below;
+  builds from. Since the Overseer ruling (delegated by the maintainer),
+  2026-10-04 (issue #176), the refusal first attempts the staleness heal:
+  when one route is provably the last committed capture's copy, the fresh
+  route publishes undisputed through the normal capture path and nothing
+  disputed is written — see the failure modes below;
 - the Coding Agent Index collapses below `CODING_ROW_FLOOR` paired rows.
 
 `build.py` additionally refuses to write a page where a rendered axis has no
@@ -249,8 +253,27 @@ change turns the scheduled run red rather than committing a mangled capture —
 that is the signal to go re-read the leaderboard by hand, and those refusals
 stay red on the disputed merge too. A cross-route disagreement is different:
 AA's two routes are independently cached and its data lands on them at
-different times, so that refusal exits with code 3 — but since #118 it is
-buildable. The refusal writes `data/aa-disagreement-snapshot.json` (both
+different times, so that refusal exits with code 3 — but since the Overseer
+ruling (delegated by the maintainer), 2026-10-04 (issue #176), it first
+attempts the staleness heal. When ALL of one route's disputed values equal the
+last committed capture (`data/aa-raw-models.json` at HEAD, the last agreeing
+capture) and NONE of the other route's do, the matching route is serving that
+capture unchanged — it is stale — and the refresh drops its disagreeing
+values, committing and publishing an **undisputed** page from the fresh route
+through the normal capture path. When the stale route is the detail route, its
+detail-only fields (per-evaluation cost breakdown, parameters, license,
+release date) stay at their last capture, and any field that would mix the two
+generations renders absent (—) until the routes agree — for a model whose
+`cost.total` moved, the GDPval-AA cost recovered from the stale breakdown is
+absent, and the breakdown-sum check remains the refusal of the mixed pairing.
+Every value still comes only from AA; nothing is estimated or interpolated.
+Generation timestamps never identify the stale route: #117's window had
+copies 3 s apart carrying different data. This amends the maintainer's #118
+ruling (2026-10-02, "render the disagreement, never pick a side") ONLY for
+the provably-stale case; #118 stands wherever staleness cannot be shown —
+mixed matches, both routes differing from the last capture, a disputed slug
+with no row in the last capture — and there the disputed rendering is
+unchanged: the refusal writes `data/aa-disagreement-snapshot.json` (both
 routes' raw payloads plus the disagreement map), the refresh builds and
 publishes the disputed page the same hour, and the page renders the dispute
 instead of holding: one base generation (the leaderboard's copy — the merge's
@@ -259,11 +282,11 @@ disputed tooltips and table cells (each labeled with its route and
 generated-at), and disputed models sitting out the efficient frontiers and
 carrying no superseded tag while the window lasts. There is no time bound on
 a window: the disputed banner is the visible alarm, and the page reverts to
-the normal rendering automatically when the next agreeing capture retires the
-stamp and the snapshot. The disputed treatment reuses the page's existing
-hollow/de-emphasis idioms — the scatter keeps its three-hue cap. And the suite
-runs BEFORE the commit, so a capture that breaks the page leaves the last good
-capture committed and the last good page live.
+the normal rendering automatically when the next agreeing capture — or a
+stale-route heal — retires the stamp and the snapshot. The disputed treatment
+reuses the page's existing hollow/de-emphasis idioms — the scatter keeps its
+three-hue cap. And the suite runs BEFORE the commit, so a capture that breaks
+the page leaves the last good capture committed and the last good page live.
 
 ## Commit / co-author trailer
 
