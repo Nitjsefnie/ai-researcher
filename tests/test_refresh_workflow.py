@@ -16,11 +16,18 @@ something parses the YAML, so this file does -- structurally, on step shape
 and on substrings that name the mechanism, never on line numbers or
 whole-run-block equality that any reflow would break.
 """
+import os
 import pathlib
 import re
+import subprocess
+import sys
+import tempfile
 import unittest
 
 import yaml
+
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
+import _workflowrun  # noqa: E402  # pylint: disable=wrong-import-position
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 WORKFLOW = ROOT / ".github" / "workflows" / "refresh.yml"
@@ -691,17 +698,21 @@ class RouteDisagreementPublishTests(unittest.TestCase):
         # the stamp -- never the differ's rendering, which compares the
         # last-good captures a window does not touch.
         run = flattened(pub_step(self.wf, "Commit the capture")["run"])
-        # --diff-filter=A: a DISPUTED publish is a snapshot ADDITION. A
-        # healed hour's snapshot REMOVAL stages the same name and must not
-        # read as a disputed publish (issue #189).
+        # NAME-ONLY (review on PR #192): an hour-2+ disputed hour stages the
+        # tracked snapshot as a MODIFICATION, and its designed disputed
+        # message must fire all the same. A healed hour's snapshot REMOVAL
+        # never reaches this predicate: the healed branch is checked FIRST,
+        # so the same name staging as a deletion cannot read as a disputed
+        # publish (issue #189).
         self.assertIn(
-            "git diff --cached --name-only --diff-filter=A | grep -q "
-            "'^data/aa-disagreement-snapshot\\.json$'", run)
-        self.assertNotIn(
             "git diff --cached --name-only | grep -q "
             "'^data/aa-disagreement-snapshot\\.json$'", run)
+        self.assertNotIn("--diff-filter=A", run)
         self.assertIn(
             "Publish disputed capture: AA routes disagree (issue #118)", run)
+        self.assertLess(run.index('if [ "$HEALED" = "true" ]; then'),
+                        run.index("git diff --cached --name-only "
+                                  "| grep -q"))
         self.assertLess(
             run.index("sed -n '2,$p' data/aa-route-disagreement.txt"),
             run.index("git commit -F"))
@@ -899,20 +910,189 @@ class HealedHourWindowTests(unittest.TestCase):
 
     def test_the_healed_hour_carries_its_own_commit_message(self):
         # The healed commit names the heal; the differ's numeric rendering
-        # (when the hour ran it) rides as the body.
+        # (when the hour ran it) rides as the body. The healed branch stands
+        # FIRST in the executing code -- its snapshot removal stages the
+        # name a disputed publish adds (review on PR #192).
+        run = commands(pub_step(self.wf, "Commit the capture")["run"])
         self.assertIn(
             "Heal the stale route: publish the fresh generation "
             "(issues #176, #189)", self.commit)
-        idx_disputed = self.commit.index(
-            "Publish disputed capture: AA routes disagree (issue #118)")
-        idx_healed = self.commit.index(
-            "Heal the stale route: publish the fresh generation")
-        self.assertLess(idx_disputed, idx_healed)
+        self.assertLess(run.index('if [ "$HEALED" = "true" ]; then'),
+                        run.index("git diff --cached --name-only "
+                                  "| grep -q"))
 
     def test_the_commit_step_stages_the_record(self):
         self.assertIn(
             "[ ! -f data/aa-last-agreeing-capture.json ] || "
             "git add data/aa-last-agreeing-capture.json", self.commit)
+
+
+class ExecutedCommitMessageTests(unittest.TestCase):
+    """The commit step's message selection, EXECUTED, not pinned as text.
+
+    The review corpus's ci/run-workflow-step-scripts-dont-read-them, fourth
+    sighting on this file: the --diff-filter=A narrowing shipped green over
+    every text pin in this module and demoted the designed disputed message
+    on hour-2+ disputed hours -- only running the step caught it (review on
+    PR #192). These scenarios run the real step over a local origin (the
+    https remote rewritten to it by GIT_CONFIG_GLOBAL) for the three shapes
+    that select a message through the snapshot's staged status.
+    """
+
+    BASE_FILES = {
+        "data/aa-raw-models.json": '{"models": []}\n',
+        "data/aa-raw-coding-agents.json": "[]\n",
+        "data/captured-at.txt": "2026-10-04\n",
+        "out/frontier-models.html": "<p>base</p>\n",
+    }
+    WINDOW_FILES = {
+        "data/aa-disagreement-snapshot.json": '{"disagreements": []}\n',
+        "data/aa-route-disagreement.txt": "1759560000\nold diagnostic\n",
+    }
+    MOVED_FILES = {
+        "data/aa-raw-models.json": '{"models": [1]}\n',
+        "data/aa-raw-coding-agents.json": "[1]\n",
+        "data/captured-at.txt": "2026-10-04T11\n",
+        "out/frontier-models.html": "<p>moved</p>\n",
+    }
+
+    @classmethod
+    def setUpClass(cls):
+        cls.step = _workflowrun.step_by_name(
+            WORKFLOW, "publish", "Commit the capture")
+
+    def _git(self, *args, cwd=None, env=None):
+        return subprocess.run(
+            ["git", *args], cwd=cwd, env=env, check=True,
+            capture_output=True, text=True)
+
+    def _seed_origin(self, root: pathlib.Path, files: dict) -> str:
+        origin = root / "origin.git"
+        seed = root / "seed"
+        self._git("init", "-q", "--bare", str(origin))
+        self._git("init", "-q", str(seed))
+        config = str(root / "gitconfig")
+        config_path = pathlib.Path(config)
+        config_path.write_text(
+            f"[url \"file://{origin}\"]\n"
+            "    insteadOf = https://github.com/Nitjsefnie/ai-researcher\n",
+            encoding="utf-8")
+        env = {
+            "GIT_CONFIG_GLOBAL": config,
+            "GIT_AUTHOR_NAME": "seed", "GIT_AUTHOR_EMAIL": "seed@example",
+            "GIT_COMMITTER_NAME": "seed", "GIT_COMMITTER_EMAIL": "seed@example",
+        }
+        for rel, text in files.items():
+            path = seed / rel
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(text, encoding="utf-8")
+        self._git("add", "-A", cwd=str(seed), env=env)
+        self._git("commit", "-q", "-m", "seed", cwd=str(seed), env=env)
+        self._git("push", "-q", str(origin), "HEAD:main",
+                  cwd=str(seed), env=env)
+        return config
+
+    def _run_hour(self, tmp: pathlib.Path, tracked: dict, healed: bool,
+                  window_files: dict, remove: list, differ_msg):
+        """Stage one hour's payload and run the real commit step."""
+        config = self._seed_origin(tmp, {**self.BASE_FILES, **tracked})
+        payload = tmp / "publish-payload"
+        (payload / "tree").mkdir(parents=True)
+        for rel, text in self.MOVED_FILES.items():
+            path = payload / "tree" / rel
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(text, encoding="utf-8")
+        for rel, text in window_files.items():
+            path = payload / "tree" / rel
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(text, encoding="utf-8")
+        (payload / "tree" / "data" / "aa-last-agreeing-capture.json") \
+            .write_text('{"window_start": 7, "baseline": []}\n',
+                        encoding="utf-8")
+        if remove:
+            (payload / "remove.txt").write_text(
+                "".join(f"{rel}\n" for rel in remove), encoding="utf-8")
+        if differ_msg:
+            (payload / "commit-msg.txt").write_text(differ_msg,
+                                                    encoding="utf-8")
+        env = {
+            "PATH": os.environ["PATH"],
+            "HOME": str(tmp),
+            "RUNNER_TEMP": str(tmp),
+            "GITHUB_REPOSITORY": "Nitjsefnie/ai-researcher",
+            "GITHUB_OUTPUT": str(tmp / "output.txt"),
+            "GITHUB_STEP_SUMMARY": str(tmp / "summary.txt"),
+            "GIT_CONFIG_GLOBAL": config,
+            "HEALED": "true" if healed else "",
+        }
+        proc = _workflowrun.run_step(tmp, self.step, env)
+        self.assertEqual(proc.returncode, 0,
+                         f"step failed: {proc.stderr}")
+        scratch = tmp / "scratch"
+        message = self._git("log", "-1", "--format=%B", cwd=str(scratch)).stdout
+        names = self._git("diff-tree", "--no-commit-id", "--name-status",
+                          "-r", "HEAD", cwd=str(scratch)).stdout
+        return message, names
+
+    def test_an_hour_1_disputed_publish_adds_with_its_own_message(self):
+        with tempfile.TemporaryDirectory(prefix=".commit-msg-") as raw:
+            tmp = pathlib.Path(raw)
+            window = dict(self.WINDOW_FILES)
+            window["data/aa-route-disagreement.txt"] = (
+                "1759560000\nnew diagnostic\n")
+            message, names = self._run_hour(
+                tmp, tracked={}, healed=False, window_files=window,
+                remove=[], differ_msg=None)
+        self.assertIn(
+            "Publish disputed capture: AA routes disagree (issue #118)",
+            message)
+        self.assertIn("new diagnostic", message)
+        self.assertIn("A\tdata/aa-disagreement-snapshot.json", names)
+
+    def test_an_hour_2_disputed_publish_still_says_disputed(self):
+        # The regression the executed run caught: the tracked snapshot
+        # stages as a MODIFICATION on hour 2+ of a window, and its designed
+        # disputed message must fire all the same -- never the differ's
+        # routine Refresh-capture rendering.
+        with tempfile.TemporaryDirectory(prefix=".commit-msg-") as raw:
+            tmp = pathlib.Path(raw)
+            window = dict(self.WINDOW_FILES)
+            window["data/aa-disagreement-snapshot.json"] = (
+                '{"disagreements": [1]}\n')
+            window["data/aa-route-disagreement.txt"] = (
+                "1759560000\nnewer diagnostic\n")
+            message, names = self._run_hour(
+                tmp, tracked=dict(self.WINDOW_FILES), healed=False,
+                window_files=window, remove=[], differ_msg=None)
+        self.assertIn(
+            "Publish disputed capture: AA routes disagree (issue #118)",
+            message)
+        self.assertIn("newer diagnostic", message)
+        self.assertNotIn("Refresh capture", message)
+        self.assertIn("M\tdata/aa-disagreement-snapshot.json", names)
+
+    def test_a_healed_hour_never_reads_as_a_disputed_publish(self):
+        # The healed hour's snapshot REMOVAL stages the same name: the
+        # healed branch is checked first, the differ's rendering rides as
+        # the body, and no retirement commit exists (the window is open).
+        with tempfile.TemporaryDirectory(prefix=".commit-msg-") as raw:
+            tmp = pathlib.Path(raw)
+            message, names = self._run_hour(
+                tmp, tracked=dict(self.WINDOW_FILES), healed=True,
+                window_files={}, remove=["data/aa-disagreement-snapshot.json"],
+                differ_msg="Refresh capture: 690 models\n\nspeed rows\n")
+            self.assertIn(
+                "Heal the stale route: publish the fresh generation "
+                "(issues #176, #189)", message)
+            self.assertIn("Refresh capture: 690 models", message)
+            self.assertNotIn(
+                "Publish disputed capture: AA routes disagree (issue #118)",
+                message)
+            self.assertIn("D\tdata/aa-disagreement-snapshot.json", names)
+            scratch = tmp / "scratch"
+            log = self._git("log", "--format=%B", cwd=str(scratch)).stdout
+            self.assertNotIn("Route agreement restored", log,
+                             "a healed hour grew a retirement commit")
 
 
 class DeployKeyPushTests(unittest.TestCase):
