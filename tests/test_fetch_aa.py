@@ -2029,6 +2029,57 @@ def leaderboard_stale_baseline() -> list:
     return build.merge_captures(snap["leaderboard"], detail)
 
 
+@contextlib.contextmanager
+def issue176_fetch_paths(root: pathlib.Path):
+    """Point fetch_aa's write paths at a temp root for a modeled run."""
+    old = (fetch_aa.ROOT, fetch_aa.OUT, fetch_aa.AGENTS_OUT, fetch_aa.STAMP)
+    fetch_aa.ROOT = root
+    fetch_aa.OUT = root / "aa-raw-models.json"
+    fetch_aa.AGENTS_OUT = root / "aa-raw-coding-agents.json"
+    fetch_aa.STAMP = root / "captured-at.txt"
+    try:
+        yield
+    finally:
+        (fetch_aa.ROOT, fetch_aa.OUT, fetch_aa.AGENTS_OUT,
+         fetch_aa.STAMP) = old
+
+
+def issue176_stub_urlopen() -> "LoudUrlopenStub":
+    """The fixture window's three pages, for a modeled main() run."""
+    snap = issue176_snapshot()
+    lb_page = flight_html(json.dumps(
+        {"intro": f"Intelligence Index v{fetch_aa.INDEX_VERSION}",
+         "models": snap["leaderboard"]}, separators=(",", ":")))
+    host = fetch_aa.detail_host_slug(snap["leaderboard"])
+    detail_page = flight_html(json.dumps(
+        {"models": snap["detail"]}, separators=(",", ":")))
+    agents_page = flight_html(agent_payload(
+        [agent_row(f"Agent - Model {i}") for i in range(5)]))
+    routes = {
+        fetch_aa.URL: lambda: _FakeResponse(lb_page),
+        fetch_aa.MODEL_DETAIL_URL.format(slug=host): lambda: _FakeResponse(detail_page),
+        fetch_aa.AGENTS_URL: lambda: _FakeResponse(agents_page),
+    }
+    return LoudUrlopenStub(routes)
+
+
+def run_fetch_main_with(stub) -> tuple[str, str]:
+    """One modeled fetch_aa.main() run; -> (stdout, stderr)."""
+    argv = sys.argv
+    try:
+        sys.argv = ["fetch_aa.py"]
+        with unittest.mock.patch.object(urllib.request, "urlopen", stub), \
+                unittest.mock.patch.object(fetch_aa, "_sleep",
+                                           side_effect=lambda s: None):
+            out, err = io.StringIO(), io.StringIO()
+            with contextlib.redirect_stdout(out), \
+                    contextlib.redirect_stderr(err):
+                fetch_aa.main()
+    finally:
+        sys.argv = argv
+    return out.getvalue(), err.getvalue()
+
+
 class StaleRouteHealTests(unittest.TestCase):
     """The provably-stale route's heal, pinned on the 909ca49 fixture."""
 
@@ -2089,8 +2140,12 @@ class StaleRouteHealTests(unittest.TestCase):
     def test_the_leaderboard_stale_direction_heals(self):
         # The synthetic second direction (#117 ran it for real): the same
         # captured payloads, but the baseline is the merge of those payloads
-        # -- a modelling of a window where the leaderboard's generation was
-        # already published. See tests/fixtures/issue-176/README.md.
+        # -- a modelling of a window OPENING with the leaderboard's
+        # generation as the last agreeing capture. This is never the state
+        # after a heal: a healed capture is never a baseline (issue #189,
+        # pinned by the two-hour loop test below), so this window's hour 2
+        # re-derives the same verdict from the same recorded baseline.
+        # See tests/fixtures/issue-176/README.md.
         snap = issue176_snapshot()
         baseline = leaderboard_stale_baseline()
         models, note = self.healed(baseline)
@@ -2226,3 +2281,156 @@ class StaleRouteHealTests(unittest.TestCase):
                             "the heal skipped the coding-agents capture")
             self.assertTrue((root / "captured-at.txt").exists(),
                             "the heal skipped the capture stamp")
+
+    def test_the_two_hour_loop_does_not_flip(self):
+        # Issue #189, the required regression: heal twice over the 909ca49
+        # fixture -- hour 2's HEAD state is hour 1's committed result -- and
+        # the SAME route must be judged stale with an identical capture both
+        # hours. The pre-#189 code read the baseline off HEAD's
+        # data/aa-raw-models.json, so hour 1's healed capture became hour 2's
+        # baseline, the verdict flipped, and hour 2 republished the stale
+        # generation undisputed. The baseline is the recorded last-agreeing
+        # capture, never a healed one.
+        with tempfile.TemporaryDirectory(prefix=".issue-189-loop-") as tmp:
+            root = pathlib.Path(tmp)
+            with issue176_fetch_paths(root):
+                # Hour 1's HEAD state: the last agreeing capture, on disk.
+                fetch_aa.OUT.write_text(json.dumps(issue176_baseline()),
+                                        encoding="utf-8")
+                _out1, err1 = run_fetch_main_with(issue176_stub_urlopen())
+                healed1 = fetch_aa.OUT.read_text(encoding="utf-8")
+                marker_path = fetch_aa.OUT.with_name(
+                    fetch_aa.LAST_AGREEING_NAME)
+                marker1 = marker_path.read_bytes()
+                self.assertIn("detail route is stale", err1)
+
+                # Hour 2's HEAD state: hour 1's committed result, fed back in.
+                _out2, err2 = run_fetch_main_with(issue176_stub_urlopen())
+                healed2 = fetch_aa.OUT.read_text(encoding="utf-8")
+                marker2 = marker_path.read_bytes()
+
+        self.assertIn("detail route is stale", err2,
+                      "hour 2 flipped the stale route")
+        self.assertNotIn("leaderboard route is stale", err2)
+        self.assertEqual(healed2, healed1, "hour 2 changed the page")
+        self.assertEqual(marker2, marker1,
+                         "the baseline record moved under hour 2")
+
+    def test_consecutive_disputed_hours_stay_disputed_without_a_flip(self):
+        # A window that cannot heal -- mixed matches, the shape the live
+        # window takes when disputed commits land on main between heals --
+        # stays on the disputed rendering for every hour of its length:
+        # provability is re-derived each hour against the unchanged
+        # baseline, the hour's own snapshot is written, and the capture on
+        # disk is never touched by a disputed hour.
+        with tempfile.TemporaryDirectory(prefix=".issue-189-disputed-") as tmp:
+            root = pathlib.Path(tmp)
+            with issue176_fetch_paths(root):
+                # The last agreeing capture, committed; a disputed hour
+                # never writes OUT, so it stays the baseline all window.
+                fetch_aa.OUT.write_text(json.dumps(issue176_baseline()),
+                                        encoding="utf-8")
+                on_disk = fetch_aa.OUT.read_bytes()
+
+                # One detail value nudged off the baseline it otherwise
+                # equals: no route matches everywhere any more -- provable
+                # staleness is gone, for both orderings, every hour.
+                snap = issue176_snapshot()
+                exc = issue176_exc()
+                slug, path, lb, _dt = exc.divergences[0]
+                dt_records = {m.get("slug"): m for m in snap["detail"]}
+                parent = dt_records[slug]
+                keys = path.split(".")
+                for part in keys[:-1]:
+                    parent = parent[part]
+                nudge = lb + 1234.5 if isinstance(lb, (int, float)) \
+                    and not isinstance(lb, bool) else f"nudged-{lb}"
+                parent[keys[-1]] = nudge
+                mixed_page = flight_html(json.dumps(
+                    {"intro": f"Intelligence Index v{fetch_aa.INDEX_VERSION}",
+                     "models": snap["leaderboard"]}, separators=(",", ":")))
+                host = fetch_aa.detail_host_slug(snap["leaderboard"])
+                detail_page = flight_html(json.dumps(
+                    {"models": snap["detail"]}, separators=(",", ":")))
+                agents_page = flight_html(agent_payload(
+                    [agent_row(f"Agent - Model {i}") for i in range(5)]))
+                routes = {
+                    fetch_aa.URL: lambda: _FakeResponse(mixed_page),
+                    fetch_aa.MODEL_DETAIL_URL.format(slug=host):
+                        lambda: _FakeResponse(detail_page),
+                    fetch_aa.AGENTS_URL: lambda: _FakeResponse(agents_page),
+                }
+
+                for hour in (1, 2, 3):
+                    with self.assertRaises(SystemExit) as caught:
+                        run_fetch_main_with(LoudUrlopenStub(routes))
+                    self.assertEqual(caught.exception.code,
+                                     fetch_aa.DISAGREEMENT_EXIT_CODE,
+                                     f"hour {hour} did not refuse")
+                    self.assertTrue(
+                        (root / "aa-disagreement-snapshot.json").exists(),
+                        f"hour {hour} wrote no disputed snapshot")
+                    self.assertNotIn("route disagreement resolved",
+                                     str(caught.exception))
+                    self.assertEqual(fetch_aa.OUT.read_bytes(), on_disk,
+                                     f"hour {hour} touched the capture")
+                    self.assertFalse((root / fetch_aa.LAST_AGREEING_NAME)
+                                     .exists(),
+                                     f"hour {hour} wrote the last-agreeing "
+                                     "record")
+
+    def test_the_baseline_is_the_recorded_last_agreeing_capture(self):
+        # A healed capture on disk plus the record: the recorded baseline
+        # wins -- never the healed capture at HEAD (issue #189).
+        with tempfile.TemporaryDirectory(prefix=".issue-189-base-") as tmp:
+            root = pathlib.Path(tmp)
+            with issue176_fetch_paths(root):
+                fetch_aa.OUT.write_text(json.dumps([{"slug": "healed"}]),
+                                        encoding="utf-8")
+                marker = fetch_aa.OUT.with_name(fetch_aa.LAST_AGREEING_NAME)
+                marker.write_text(json.dumps(
+                    {"window_start": 7, "baseline": issue176_baseline()}),
+                    encoding="utf-8")
+                baseline = fetch_aa._last_agreeing_capture()  # pylint: disable=protected-access
+        self.assertEqual(baseline, issue176_baseline())
+
+    def test_without_a_record_the_ondisk_capture_is_the_baseline(self):
+        # Before the first healed hour the on-disk capture IS the last
+        # agreeing capture: a disputed refusal never writes OUT.
+        with tempfile.TemporaryDirectory(prefix=".issue-189-base-") as tmp:
+            root = pathlib.Path(tmp)
+            with issue176_fetch_paths(root):
+                fetch_aa.OUT.write_text(json.dumps(issue176_baseline()),
+                                        encoding="utf-8")
+                baseline = fetch_aa._last_agreeing_capture()  # pylint: disable=protected-access
+        self.assertEqual(baseline, issue176_baseline())
+
+    def test_no_baseline_at_all_falls_back_to_disputed(self):
+        # No record and no capture: staleness nobody can prove -- the
+        # disputed rendering takes over.
+        with tempfile.TemporaryDirectory(prefix=".issue-189-base-") as tmp:
+            root = pathlib.Path(tmp)
+            with issue176_fetch_paths(root):
+                self.assertIsNone(fetch_aa._healed_capture(issue176_exc()))  # pylint: disable=protected-access
+
+    def test_an_agreeing_capture_clears_a_stale_record(self):
+        # Agreement is the only window-closer: a healthy capture removes the
+        # record so the NEXT window's first heal proves staleness against the
+        # capture it actually healed, not a pre-window one.
+        agents = flight_html(agent_payload(
+            [agent_row(f"Agent - Model {i}") for i in range(5)]))
+        routes = {
+            fetch_aa.URL: lambda: _FakeResponse(flight_html(leaderboard_payload())),
+            fetch_aa.MODEL_DETAIL_URL.format(slug="detail-host-model"):
+                lambda: _FakeResponse(flight_html(detail_payload())),
+            fetch_aa.AGENTS_URL: lambda: _FakeResponse(agents),
+        }
+        with tempfile.TemporaryDirectory(prefix=".issue-189-clear-") as tmp:
+            root = pathlib.Path(tmp)
+            with issue176_fetch_paths(root):
+                marker = fetch_aa.OUT.with_name(fetch_aa.LAST_AGREEING_NAME)
+                marker.write_text("{}\n", encoding="utf-8")
+                run_fetch_main_with(LoudUrlopenStub(routes))
+                self.assertFalse(
+                    marker.exists(),
+                    "an agreeing capture left the last-agreeing record behind")

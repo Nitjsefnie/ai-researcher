@@ -256,11 +256,17 @@ AA's two routes are independently cached and its data lands on them at
 different times, so that refusal exits with code 3 — but since the Overseer
 ruling (delegated by the maintainer), 2026-10-04 (issue #176), it first
 attempts the staleness heal. When ALL of one route's disputed values equal the
-last committed capture (`data/aa-raw-models.json` at HEAD, the last agreeing
-capture) and NONE of the other route's do, the matching route is serving that
-capture unchanged — it is stale — and the refresh drops its disagreeing
-values, committing and publishing an **undisputed** page from the fresh route
-through the normal capture path. When the stale route is the detail route, its
+last agreeing capture and NONE of the other route's do, the matching route is
+serving that capture unchanged — it is stale — and the refresh drops its
+disagreeing values, committing and publishing an **undisputed** page from the
+fresh route through the normal capture path. The baseline is the last capture
+BOTH routes agreed on, never a healed one: the first healed hour records it
+in `data/aa-last-agreeing-capture.json`, every healed hour of the window
+re-proves staleness against that same record, and a healed capture is never a
+baseline (the pre-#189 code read `data/aa-raw-models.json` at HEAD instead,
+so each heal became the next hour's baseline and the stale route flipped
+every hour — issue #189). With no agreeing capture on record, the disputed
+rendering stands. When the stale route is the detail route, its
 detail-only fields (per-evaluation cost breakdown, parameters, license,
 release date) stay at their last capture, and any field that would mix the two
 generations renders absent (—) until the routes agree — for a model whose
@@ -282,8 +288,10 @@ disputed tooltips and table cells (each labeled with its route and
 generated-at), and disputed models sitting out the efficient frontiers and
 carrying no superseded tag while the window lasts. There is no time bound on
 a window: the disputed banner is the visible alarm, and the page reverts to
-the normal rendering automatically when the next agreeing capture — or a
-stale-route heal — retires the stamp and the snapshot. The disputed treatment
+the normal rendering automatically when the next agreeing capture retires the
+stamp, the snapshot and the last-agreeing record. A healed hour does NOT
+close the window — it keeps the stamp and the record alive (the healed page
+renders clean, the disagreement continues) and retires nothing. The disputed treatment
 reuses the page's existing hollow/de-emphasis idioms — the scatter keeps its
 three-hue cap. And the suite runs BEFORE the commit, so a capture that breaks
 the page leaves the last good capture committed and the last good page live.

@@ -612,19 +612,31 @@ class RouteDisagreementPublishTests(unittest.TestCase):
             "git add data/aa-route-disagreement.txt", commit)
 
     def test_a_recovered_capture_retires_the_stamp_and_the_snapshot(self):
-        # rc == 0 with either window file tracked: remove BOTH from the
-        # tree (so the rendered gate builds a clean page), mark the hour
-        # retiring, and let the write job commit the removal -- a push lost
-        # to the race concedes silently, and the next successful capture
-        # retires the stamp again.
+        # rc == 0 with any window file tracked and NO last-agreeing record
+        # on disk: remove ALL of them from the tree (so the rendered gate
+        # builds a clean page), mark the hour retiring, and let the write
+        # job commit the removal -- a push lost to the race concedes
+        # silently, and the next successful capture retires the stamp
+        # again. The record retires with the stamp and the snapshot: with
+        # the routes agreeing again there is no window to carry a baseline
+        # for (issue #189).
         self.assertIn('git ls-files --error-unmatch "$stamp"', self.block)
         self.assertIn(
             "git ls-files --error-unmatch data/aa-disagreement-snapshot.json",
             self.block)
+        self.assertIn('git ls-files --error-unmatch "$record"', self.block)
         self.assertIn("git rm -q --ignore-unmatch", self.block)
         self.assertIn('echo "retire=true"', self.block)
         idx_rm = self.block.index("git rm -q --ignore-unmatch")
         self.assertLess(idx_rm, self.block.index('echo "retire=true"'))
+        # The healed-hour branch stands BEFORE the agreement branch and
+        # exits inside itself: a record on disk means the window is open,
+        # whatever rc says (issue #189).
+        idx_record = self.block.index('if [ -f "$record" ]; then')
+        idx_healed = self.block.index('echo "healed=true"', idx_record)
+        idx_exit = self.block.index("exit 0", idx_healed)
+        idx_agree = self.block.index("Agreement restored", idx_exit)
+        self.assertLess(idx_exit, idx_agree)
         # The retirement commit itself is the write job's: not a word of it
         # lives in this step.
         self.assertNotIn("Route agreement restored", self.block)
@@ -679,7 +691,13 @@ class RouteDisagreementPublishTests(unittest.TestCase):
         # the stamp -- never the differ's rendering, which compares the
         # last-good captures a window does not touch.
         run = flattened(pub_step(self.wf, "Commit the capture")["run"])
+        # --diff-filter=A: a DISPUTED publish is a snapshot ADDITION. A
+        # healed hour's snapshot REMOVAL stages the same name and must not
+        # read as a disputed publish (issue #189).
         self.assertIn(
+            "git diff --cached --name-only --diff-filter=A | grep -q "
+            "'^data/aa-disagreement-snapshot\\.json$'", run)
+        self.assertNotIn(
             "git diff --cached --name-only | grep -q "
             "'^data/aa-disagreement-snapshot\\.json$'", run)
         self.assertIn(
@@ -799,6 +817,102 @@ class RouteDisagreementPublishTests(unittest.TestCase):
         self.assertLess(idx_concede, idx_upload)
         self.assertLess(idx_upload, idx_get)
         self.assertIn("Lost the race", run)
+
+
+class HealedHourWindowTests(unittest.TestCase):
+    """Issues #176 and #189: the provably-stale hour heals, and the window
+    record keeps every healed hour honest. A healed capture is never a
+    baseline; the stamp stays alive through healed hours; only a capture
+    whose routes AGREE retires the window. The healed hour's snapshot
+    removal rides the DATA commit, never a retirement commit of its own.
+    """
+
+    def setUp(self):
+        self.wf = load()
+        self.step = step(self.wf, "Capture the leaderboard")
+        self.block = flattened(self.step["run"])
+        self.commit = flattened(pub_step(self.wf, "Commit the capture")["run"])
+        self.staging = flattened(
+            step(self.wf, "Stage the publish payload")["run"])
+
+    def test_the_healed_hour_is_classified_before_agreement(self):
+        # The record's presence, not rc, decides the healed hour: the
+        # healed=true output is written and the branch exits before the
+        # agreement branch can retire anything.
+        self.assertIn('record=data/aa-last-agreeing-capture.json', self.block)
+        idx_record = self.block.index('if [ -f "$record" ]; then')
+        idx_healed = self.block.index('echo "healed=true"', idx_record)
+        idx_stamp = self.block.index('if [ ! -f "$stamp" ]; then', idx_healed)
+        idx_exit = self.block.index("exit 0", idx_stamp)
+        idx_agree = self.block.index("Agreement restored", idx_exit)
+        for later in (idx_healed, idx_stamp, idx_exit):
+            self.assertLess(idx_record, later)
+        self.assertLess(idx_exit, idx_agree)
+
+    def test_the_healed_stamp_rebuilds_from_the_records_window_start(self):
+        # A lost push or a retired stamp must leave the window unnamed: the
+        # healed branch rebuilds the stamp's first line from the record.
+        self.assertIn('window_start', self.block)
+        self.assertIn('> "$stamp"', self.block)
+
+    def test_the_retirement_removes_the_record_with_the_window(self):
+        # Agreement is the ONLY window-closer, and it closes everything:
+        # stamp, snapshot and last-agreeing record leave the tree together.
+        self.assertIn(
+            'git rm -q --ignore-unmatch "$stamp" '
+            'data/aa-disagreement-snapshot.json "$record"', self.block)
+
+    def test_the_refresh_job_exports_the_heal_verdict(self):
+        # The write half reads needs.refresh.outputs.healed.
+        outputs = self.wf["jobs"]["refresh"]["outputs"]
+        self.assertEqual(outputs["healed"],
+                         "${{ steps.fetch.outputs.healed }}")
+
+    def test_the_staging_step_ships_the_record_on_healed_hours(self):
+        # The record rides the data commit like the window files, and the
+        # retirement's remove list names it too.
+        self.assertIn(
+            "[ ! -f data/aa-last-agreeing-capture.json ] || "
+            "cp --parents data/aa-last-agreeing-capture.json "
+            '"${PAYLOAD}/tree/"', self.staging)
+        retire_idx = self.staging.index('[ "$RETIRE" = "true" ]')
+        remove_idx = self.staging.index(
+            "data/aa-last-agreeing-capture.json", retire_idx)
+        self.assertLess(retire_idx, remove_idx)
+
+    def test_the_healed_snapshot_removal_rides_the_data_commit(self):
+        # The healed hour dropped the snapshot from its tree; the tracked
+        # copy on main must leave in the DATA commit -- phase 1 (the
+        # retirement commit) is for AGREEMENT only.
+        self.assertIn(
+            "if [ \"$HEALED\" = \"true\" ] && git ls-files "
+            "--error-unmatch data/aa-disagreement-snapshot.json",
+            self.staging)
+        phase1 = self.commit[self.commit.index("Phase 1"):
+                             self.commit.index("Phase 2")]
+        self.assertIn('[ "$HEALED" != "true" ]', phase1)
+        phase2_idx = self.commit.index("Phase 2")
+        idx = self.commit.index("xargs git rm -q --ignore-unmatch",
+                                phase2_idx)
+        gated = self.commit[idx - 200:idx]
+        self.assertIn('[ "$HEALED" = "true" ]', gated)
+
+    def test_the_healed_hour_carries_its_own_commit_message(self):
+        # The healed commit names the heal; the differ's numeric rendering
+        # (when the hour ran it) rides as the body.
+        self.assertIn(
+            "Heal the stale route: publish the fresh generation "
+            "(issues #176, #189)", self.commit)
+        idx_disputed = self.commit.index(
+            "Publish disputed capture: AA routes disagree (issue #118)")
+        idx_healed = self.commit.index(
+            "Heal the stale route: publish the fresh generation")
+        self.assertLess(idx_disputed, idx_healed)
+
+    def test_the_commit_step_stages_the_record(self):
+        self.assertIn(
+            "[ ! -f data/aa-last-agreeing-capture.json ] || "
+            "git add data/aa-last-agreeing-capture.json", self.commit)
 
 
 class DeployKeyPushTests(unittest.TestCase):
