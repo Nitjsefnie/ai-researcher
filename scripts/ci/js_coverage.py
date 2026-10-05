@@ -115,12 +115,11 @@ def _shape_key(source):
     """The code text with the page's one payload line elided, or None.
 
     The page's script carries the data payload as ONE line (a ``const DATA
-    = {...};`` statement, wherever the compiled text puts it). The
-    disputed build (issue #118) writes a DIFFERENT payload of a different
-    length on that one line -- so both shapes share one code text under
-    one moving header line, and line n of a disputed build's script is
-    line n of the normal build's for every line number: the payload is a
-    single line in both, and everything around it is byte-identical.
+    = {...};`` statement, wherever the compiled text puts it), and its
+    length moves with the capture. Two captures therefore share one code
+    text under one moving header line, and line n of one build's script is
+    line n of the other's for every line number: the payload is a single
+    line in both, and everything around it is byte-identical.
     """
     if source.startswith("const DATA = "):
         payload_start = 0

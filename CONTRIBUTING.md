@@ -265,14 +265,17 @@ header explains the rendered no-change gate — the page is built from both
 captures with provenance normalized out — and the stale-page case in
 full).
 
-One hourly-flow case reads differently since #118: when AA's two routes
-disagree, `refresh` no longer skips the hour — `fetch_aa.py` writes a
-disagreement snapshot and the run publishes a **disputed page** (a banner,
-both routes' values in the disputed cells, disputed models off the
-frontiers) until the routes converge and the page reverts on its own. A
-disputed commit's subject says so: "Publish disputed capture: AA routes
-disagree (issue #118)". There is no time bound on a disputed window; the
-banner is the alarm.
+One hourly-flow case reads differently since #200: AA's two routes are
+independently cached and can serve two generations of the same data, and the
+refresh used to react to that with a skip, a heal, or a **disputed page** whose
+cells showed both routes' values. It no longer reacts at all, because there is
+nothing to react to: the leaderboard route is the fresh one and is published,
+the detail route fills only fields the leaderboard omits, and a disagreement is
+resolved by that fixed precedence rather than by a state. So the only scheduled
+commit is `Refresh capture: N models, …`, there is no disagreement that turns a
+run red, and the published document only moves forward. The two rules that
+matter when you touch the capture are in AGENTS.md — the leaderboard-wins
+precedence and the breakdown-drop guard at the cost shape split.
 
 **Actions are hash-pinned**, with the version in a trailing comment. Do not
 "tidy" one back to `@v4`: a tag is a moving pointer, and these jobs hold a

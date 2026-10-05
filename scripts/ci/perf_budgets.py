@@ -308,13 +308,9 @@ def code_bytes(raw):
     total - DATA blob - #fTable tbody - #tbl tbody; byte-identical
     across same-code/different-data builds of the NORMAL page, which is
     the property that decouples the budget from AA's capture volume
-    (issue #112). The DISPUTED page (issue #118) is the one exception: its
-    banner is build-time HTML outside every excised region and carries the
-    window's counts, so the quantity moves by ~1.5 KB with the disputed
-    mode. The suite's gate measures a deterministic normal-mode fixture
-    page since #153, so the disputed shape is out of the gate's view by
-    construction; `--check` still measures the checkout's own capture and
-    sees the disputed shape during a window.
+    (issue #112), which is what lets the budget track the CODE the page
+    ships rather than how many models AA happens to list. The suite's gate
+    measures a deterministic fixture page since #153.
     """
     spans = _row_regions(raw)
     return len(raw) - sum(end - start for start, end in spans)
