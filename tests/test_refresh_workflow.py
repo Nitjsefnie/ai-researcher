@@ -7,8 +7,8 @@ payload as an artifact of its own run; `publish` -- a keyless committer --
 downloads that artifact and replays the hour's commits into a git bundle
 while running no repository code; `push` -- the only job that loads the
 deploy key, in the main-push environment -- delivers the bundle to main;
-`hub` -- the workflow's only contents:write holder since the split -- uploads
-the verified page and moves the `published` ref.
+`hub` -- read-only since issue #206 -- uploads the verified page when the
+live page's embedded source-commit stamp shows the hub behind.
 Its safety lives in the gating BETWEEN steps and BETWEEN jobs: what runs only
 after the suite passed, what only when the commit actually landed, what
 republishes a stale live page. Those contracts are invisible to the Python
@@ -94,9 +94,11 @@ class GateTests(unittest.TestCase):  # pylint: disable=too-many-public-methods
         self.assertEqual(self.wf["jobs"]["refresh"]["permissions"],
                          {"contents": "read"})
 
-    def test_only_the_hub_job_holds_contents_write(self):
-        # Issues #143 and #133: the hub job is the workflow's only
-        # contents:write holder (the published-ref move). The push job --
+    def test_no_job_holds_contents_write(self):
+        # Issues #143 and #133, narrowed by #206: the published-ref move was
+        # the workflow's last contents:write holder and the live page's
+        # embedded stamp replaced it, so EVERY job now declares read and no
+        # write permission exists anywhere in the workflow. The push job --
         # the deploy key's only reader -- is read-only: the push
         # authenticates with the key, never the job token. No write-side
         # job checks the tree out.
@@ -106,13 +108,8 @@ class GateTests(unittest.TestCase):  # pylint: disable=too-many-public-methods
         for name in ("publish", "push", "hub"):
             assert name in jobs, f"the {name} job is missing from refresh.yml"
         for name, job in jobs.items():
-            contents = (job.get("permissions") or {}).get("contents")
-            if name == "hub":
-                assert contents == "write", (
-                    "hub is the workflow's only writer and must declare it")
-            else:
-                assert contents != "write", (
-                    f"{name} holds contents: write; only hub may")
+            assert (job.get("permissions") or {}).get("contents") == "read", (
+                f"{name} must declare contents: read")
         writer = jobs["hub"]
         assert not [s for s in writer["steps"]
                     if s.get("uses", "").startswith("actions/checkout@")], (
@@ -234,8 +231,8 @@ class GateTests(unittest.TestCase):  # pylint: disable=too-many-public-methods
         self.assertIn('echo "changed=$changed" >> "$GITHUB_OUTPUT"', run)
         # No raw-VCS view of data/ may leak back into this step, whatever
         # the spelling: any `git diff` or `git status` here must not name
-        # data/. (The republish gate's `git diff origin/published HEAD --
-        # out/frontier-models.html` stays: it compares pages, not captures.)
+        # data/. The republish gate compares pages too, but through the
+        # hub's live bytes, not a git diff (issue #206).
         joined = raw.replace("\\\n", " ")
         for line in joined.splitlines():
             if line.lstrip().startswith("#"):
@@ -255,9 +252,9 @@ class GateTests(unittest.TestCase):  # pylint: disable=too-many-public-methods
         self.assertIn("git checkout -- data/", run)
         self.assertNotIn("git checkout -- data/captured-at.txt", run)
         # The restore stands on the unchanged path: after the gate's answer,
-        # before the republish gate's ref fetch.
+        # before the republish gate's live-page fetch.
         self.assertLess(run.index("git checkout -- data/"),
-                        run.index("refs/heads/published"))
+                        run.index("docs.nitjsefni.eu/d/ai-researcher"))
 
     def test_the_payload_staging_restores_heads_page_when_the_capture_did_not_move(self):
         # Issue #94, second half: on a republish run the suite's rebuild is now
@@ -305,122 +302,117 @@ class GateTests(unittest.TestCase):  # pylint: disable=too-many-public-methods
             self.assertNotIn(gone, run)
 
     def test_the_unchanged_path_checks_whether_the_live_page_is_current(self):
-        # Issue 42: `changed=false` used to skip both commit and publish
-        # forever, so a failed or missed publish never self-repaired. The
-        # unchanged path must now consult the `published` ref: a MISSING ref
-        # means never published, a ref whose page differs from HEAD means
-        # stale -- either republishes.
-        run = flattened(step(self.wf, "Did anything move?")["run"])
-
-        self.assertIn("refs/heads/published", run)
-        self.assertIn("origin/published HEAD -- out/frontier-models.html", run)
-        self.assertIn("--depth=1", run)
-
-    def test_the_publish_step_updates_the_published_ref_after_a_successful_upload(self):
-        # The ref records the last successfully published state, so the republish
-        # check has something to compare against. It must move only after
-        # the upload succeeded, in the same step -- the first refs-API
-        # command is the GET probe that decides create-vs-update.
-        run = flattened(hub_step(self.wf, "Publish to docs-hub")["run"])
-
-        self.assertLess(
-            run.index("curl -sS"), run.index("cat /tmp/publish-response.json"))
-        self.assertLess(
-            run.index("curl -sS"),
-            run.index('gh api "repos/$REPO/git/refs/heads/published"'))
-
-    def test_the_published_ref_moves_through_the_refs_api(self):
-        # Issue 77: the checkout is shallow (actions/checkout's default
-        # depth-1), so a local `git push` behind the ref update cannot walk
-        # enough ancestry to prove the update is a fast-forward and was
-        # rejected "(fetch first)" on every publishing run -- even though it
-        # was one. The refs API runs the check server-side, where the full
-        # graph lives: a 404 on GET means CREATE (POST needs no fast-forward
-        # proof), otherwise PATCH, whose default non-forced update IS
-        # GitHub's fast-forward check. The step must document that a
-        # non-forced PATCH is the point, so a future reader does not "fix"
-        # the 422 by adding force.
-        raw = hub_step(self.wf, "Publish to docs-hub")["run"]
+        # Issue 42 taught the unchanged path to check; issue #206 changed
+        # what it consults: the hub's live page IS the publish record --
+        # the page HTML embeds its source-commit stamp, so the served
+        # bytes are their own memory. A page behind HEAD (a failed or
+        # missed publish, an unstamped page) and a failed fetch both
+        # republish; the branch that used to be fetched is gone.
+        raw = step(self.wf, "Did anything move?")["run"]
         run = flattened(raw)
 
-        # The GET probe decides create-vs-update.
-        self.assertIn('gh api "repos/$REPO/git/refs/heads/published"', run)
-        self.assertIn("--method PATCH", run)
-        self.assertIn("--method POST", run)
-        self.assertIn("-f sha=", run)
-        # The non-forced fast-forward semantics are documented in the step,
-        # not incidental -- and no executed call carries a `force` field at
-        # all (the API default is the check).
-        self.assertIn("without `force`", run)
-        self.assertNotIn("force", commands(raw))
+        self.assertIn("docs.nitjsefni.eu/d/ai-researcher/frontier-models", run)
+        self.assertIn('cmp -s - "$hub_page" || hub_stale=true', run)
+        self.assertNotIn("refs/heads/published", run)
+        self.assertNotIn("origin/published", run)
 
-    def test_no_git_push_touches_the_published_ref(self):
-        # Issue 77: the git push behind the ref update was rejected
-        # "(fetch first)" on every publishing run while the upload itself
-        # succeeded, so the run went red and the ref stayed stale. The refs
-        # API owns this ref now: no step in either job may git-push to it.
-        # (The republish gate's `git fetch` of the same ref only reads it.)
-        for job in self.wf["jobs"].values():
-            for s in job["steps"]:
-                raw = s.get("run", "")
-                if "refs/heads/published" in flattened(raw):
-                    self.assertNotIn("git push", commands(raw))
+    def test_an_off_main_dispatch_drops_the_hour_before_anything_expensive(self):
+        # PR #205's conceded-run ledger, closed explicitly: workflow_dispatch
+        # can target any branch, and the write half's generation tie would
+        # concede an off-main dispatch anyway -- but only after a full
+        # capture + pip + Chromium + suite had been paid, and under "main
+        # moved under the run" wording that blames main for a move that
+        # never happened. The capture step's FIRST act reads the run's ref
+        # (env-mapped, the zizmor convention) and drops the hour green,
+        # before the gate, under its own truthful heading. Scheduled runs
+        # always fire on the default branch, so the check is exactly
+        # "not refs/heads/main".
+        s = step(self.wf, "Did anything move?")
+        raw = s["run"]
+        run = flattened(raw)
 
-    def test_the_publish_step_aborts_when_a_newer_run_already_published(self):
-        # Issue 74: two overlapping runs can both reach this step, and if
-        # the OLDER run's upload lands after the newer run's, the hub ends
-        # up serving the older page while the `published` ref records the
-        # newer commit — an inversion the republish gate's ref comparison cannot
-        # see. Immediately before the upload the step fresh-fetches the ref
-        # (anonymous, same shape as the republish gate) and, when the tip is
-        # not this run's own page commit (`tip`, the publish job's record;
-        # the tie above has already conceded when it is not main's tip), asks
-        # the compare API, whose status names the TIP side relative to the
-        # BASE side. Only a tip that is AHEAD (a newer run already
-        # published) aborts: green, exit 0, no upload, no ref move.
-        # `behind` is the normal republish and publishes; a failed or
-        # unrankable answer retries once and then publishes anyway behind a
-        # warning, because availability of publish beats the residual
-        # seconds-wide window. The newest run NEVER aborts, so within any
-        # overlap the newest page always wins.
+        self.assertEqual(s["env"]["REF"], "${{ github.ref }}")
+        idx_gate = run.index('if [ "$REF" != "refs/heads/main" ]; then')
+        # The off-main gate runs FIRST: before the rendered gate and before
+        # any check that could be mislabeled as a main move.
+        self.assertLess(idx_gate,
+                        run.index('changed="$(python3 scripts/capture_gate.py)"'))
+        self.assertIn("Dropped: dispatched off main", run)
+        self.assertIn("a payload built", run)
+        # The drop is green and total: proceed=false is written and the
+        # branch exits before the gate's own restore runs.
+        self.assertIn('echo "proceed=false" >> "$GITHUB_OUTPUT"', run)
+        idx_exit = run.index("exit 0", idx_gate)
+        self.assertLess(idx_exit, run.index("git checkout -- data/"))
+
+    def test_the_publish_step_reads_the_live_page_before_the_upload(self):
+        # Issue #206: the step decides whether to upload at all by reading
+        # the hub's live page -- its embedded source-commit stamp and its
+        # bytes -- BEFORE the upload call. The refs-API GET that used to
+        # precede the upload is gone with the ref; the upload's own curl
+        # keeps its status-captured form, branched on explicitly.
         run = flattened(hub_step(self.wf, "Publish to docs-hub")["run"])
 
-        # The gate stands between the step's start and the upload: the
-        # anonymous ref fetch and the compare call precede the upload, and
-        # the abort leaves through exit 0 before anything is uploaded.
-        self.assertLess(run.index("fetch --depth=1 origin"),
-                        run.index("https://docs.nitjsefni.eu/api/publish"))
         self.assertLess(
-            run.index("refs/heads/published:refs/remotes/origin/published"),
-            run.index("https://docs.nitjsefni.eu/api/publish"))
-        self.assertLess(run.index("repos/$REPO/compare/"),
-                        run.index("https://docs.nitjsefni.eu/api/publish"))
-        self.assertLess(run.index("exit 0"), run.index("https://docs.nitjsefni.eu/api/publish"))
-        # The gate reads the status field, breaks its retry loop only on a
-        # real ranking, and aborts on ahead alone. Two attempts total, then a
-        # warning and a publish anyway.
-        self.assertIn("--jq .status", run)
-        self.assertIn("ahead|behind|identical) break", run)
-        self.assertIn('"$status" = ahead', run)
-        self.assertIn("for _ in 1 2", run)
-        self.assertIn("WARNING: the compare API", run)
-        self.assertIn("already published", run)
+            run.index("https://docs.nitjsefni.eu/d/ai-researcher/frontier-models"),
+            run.index("curl -sS"))
+        self.assertLess(
+            run.index("curl -sS"), run.index("cat /tmp/publish-response.json"))
+        self.assertIn("Source commit <code>", run)
 
-    def test_the_unchanged_path_also_checks_the_hubs_live_page(self):
-        # Issue 74: the ref comparison cannot see an upload that landed AFTER
-        # the published ref moved — the ref agrees with HEAD while the HUB
-        # serves the older page. On the unchanged path the gate therefore
-        # also fetches the hub's live page (the public /d/ route serves
-        # the stored bytes verbatim, proven byte-identical to the
-        # committed page (2026-09-29)) and compares it byte-for-byte
-        # against HEAD's page. Divergence sets hub_stale, as does a
-        # failed fetch: same stance as the ref fetch above, an extra
-        # republish costs one hub version, and a real outage fails red
-        # at the publish step.
+    def test_no_refs_api_call_remains(self):
+        # Issue #206: the published ref and its refs-API move are retired --
+        # the live page's embedded stamp is the publish record. No step in
+        # any job calls the refs API, names the branch, or maps the job
+        # token: nothing in this workflow writes to GitHub.
+        for job_name, job in self.wf["jobs"].items():
+            for s in job["steps"]:
+                run = flattened(s.get("run", ""))
+                self.assertNotIn("git/refs/", run, job_name)
+                self.assertNotIn("refs/heads/published", run, job_name)
+                self.assertNotIn("gh api", run, job_name)
+                self.assertNotIn("GH_TOKEN", s.get("env", {}), job_name)
+
+    def test_the_publish_step_skips_when_the_hub_already_serves_the_page(self):
+        # Issue 74's newest-run-wins guarantee keeps its replacement: the
+        # tie owns ordering (a newer run has necessarily landed before it
+        # can publish), and the live-page gate owns the version spend.
+        # The step fetches the live page, extracts its stamp, and when the
+        # hub already serves EXACTLY this run's page -- stamp and every
+        # byte -- leaves green through exit 0 BEFORE the upload. A failed
+        # fetch publishes: availability beats the seconds-wide window, the
+        # same stance the ref gates it replaced held.
+        run = flattened(hub_step(self.wf, "Publish to docs-hub")["run"])
+
+        idx_fetch = run.index(
+            "https://docs.nitjsefni.eu/d/ai-researcher/frontier-models")
+        idx_stamp = run.index("Source commit <code>")
+        idx_cmp = run.index('cmp -s "$live_page"')
+        idx_skip = run.index("nothing uploaded", idx_cmp)
+        idx_exit = run.index("exit 0", idx_skip)
+        idx_upload = run.index("https://docs.nitjsefni.eu/api/publish")
+        self.assertLess(idx_fetch, idx_stamp)
+        self.assertLess(idx_stamp, idx_cmp)
+        self.assertLess(idx_cmp, idx_skip)
+        self.assertLess(idx_exit, idx_upload)
+        # The skip names the served page's own stamp in its summary line.
+        self.assertIn("The hub already serves this run's page", run)
+        self.assertIn("(source commit ${live_stamp})", run)
+
+    def test_the_unchanged_path_checks_the_hubs_live_page(self):
+        # Issue 74's hub check is now the ONLY republish check (issue #206):
+        # on the unchanged path the gate fetches the hub's live page (the
+        # public /d/ route serves the stored bytes verbatim, proven
+        # byte-identical to the committed page (2026-09-29)) and compares
+        # it byte-for-byte against HEAD's page -- the embedded stamp is one
+        # of those bytes. Divergence sets hub_stale, as does a failed
+        # fetch: republishing a page that was already current costs one
+        # hub version, while a real outage fails red at the write job's
+        # publish step.
         run = flattened(step(self.wf, "Did anything move?")["run"])
 
-        # The check stands on the unchanged path, after the ref check, and
-        # feeds the same proceed decision.
+        # The check stands on the unchanged path and feeds the proceed
+        # decision.
         self.assertLess(run.index('[ "$changed" = false ]'),
                         run.index("docs.nitjsefni.eu/d/ai-researcher"))
         self.assertIn("git show HEAD:out/frontier-models.html", run)
@@ -536,14 +528,15 @@ class GateTests(unittest.TestCase):  # pylint: disable=too-many-public-methods
         # runs on it.
         self.assertNotIn("if", setup[0])
 
-    def test_the_hub_ties_the_upload_and_the_ref_to_one_commit(self):
-        # The ref must never name a page the hub does not serve, and the
-        # tie is ENFORCED, not asserted: the upload and the ref move run
-        # only when the payload page's own commit (`tip`, recorded by the
-        # publish job) is still main's tip. When main has moved past it, a
-        # newer run owns the tip and its hub job publishes - this run
-        # concedes green before anything is uploaded or moved. The #74
-        # gate then compares the published ref against that same `tip`.
+    def test_the_hub_ties_the_upload_to_one_commit(self):
+        # The tie is ENFORCED, not asserted: the upload runs only when the
+        # payload page's own commit (`tip`, recorded by the publish job) is
+        # still main's tip. When main has moved past it, a newer run owns
+        # the tip and its hub job publishes - this run concedes green
+        # before anything is uploaded. The tie is also what lets the
+        # ref's compare-API gate retire (issue #206): a newer run has
+        # necessarily landed before it can publish anything this run could
+        # overwrite.
         run = flattened(hub_step(self.wf, "Publish to docs-hub")["run"])
 
         idx_target = run.index('target="$(git -C "${scratch}" rev-parse FETCH_HEAD)"')
@@ -554,19 +547,16 @@ class GateTests(unittest.TestCase):  # pylint: disable=too-many-public-methods
         idx_tie = run.index('[ "$mine" != "$target" ]; then')
         idx_concede = run.index("Lost the race")
         # The tie's concede leaves GREEN through its own exit 0 before the
-        # #74 gate: a superseded hour must neither publish nor go red.
+        # live-page gate: a superseded hour must neither publish nor go red.
         idx_exit = run.index("exit 0", idx_concede)
-        idx_gate = run.index("refs/heads/published:refs/remotes/origin/published")
-        self.assertLess(idx_exit, idx_gate)
+        idx_fetch = run.index(
+            "https://docs.nitjsefni.eu/d/ai-researcher/frontier-models")
         idx_upload = run.index("https://docs.nitjsefni.eu/api/publish")
-        idx_ref = run.index('-f sha="$mine"')
         self.assertLess(idx_mine, idx_tie)
         self.assertLess(idx_tie, idx_concede)
-        self.assertLess(idx_concede, idx_gate)
-        self.assertLess(idx_gate, idx_upload)
-        self.assertLess(idx_upload, idx_ref)
-        # The ref move names `mine`, the page's own commit.
-        self.assertNotIn('-f sha="$target"', run)
+        self.assertLess(idx_concede, idx_exit)
+        self.assertLess(idx_exit, idx_fetch)
+        self.assertLess(idx_fetch, idx_upload)
 
     def test_the_upload_mirrors_publish_docs_py(self):
         # Review I2 on PR #151: the write job runs no repository code, so
@@ -592,28 +582,26 @@ class GateTests(unittest.TestCase):  # pylint: disable=too-many-public-methods
                       "jq -e '(.error // null) != null'"):
             self.assertIn(piece, run)
 
-    def test_the_ref_move_only_names_a_commit_on_mains_history(self):
-        # Issue #152's gate is structural now: the ref target is main's tip
-        # fresh-fetched AFTER the push job's turn (the landed tip IS main's
-        # tip on a landing; the concession path publishes nothing), so it
-        # cannot leave main's history, and the tie above ties the ref to
-        # the page's own commit: the ref moves to `mine` (the publish
-        # job's recorded tip), only while `mine` is still main's tip. The
-        # pin holds the shape: target read from FETCH_HEAD, the tie's
-        # concede before the #74 gate, the gate before the upload, and the
-        # upload before a refs-API call naming `$mine`, never `$target`.
+    def test_the_publish_record_lives_in_the_page_itself(self):
+        # Issue #152 asked that the publish record never leave main's
+        # history; issue #206 retired the ref and moved the record into the
+        # page: the source-commit stamp inside the HTML names the commit
+        # the page was built from, and the tie above uploads only while
+        # that commit is main's tip. The pin holds the shape: the step
+        # extracts the stamp from the fetched live page, names both stamps
+        # in the publishing summary, and never touches a GitHub ref.
         raw = hub_step(self.wf, "Publish to docs-hub")["run"]
         run = flattened(raw)
 
-        idx_target = run.index('target="$(git -C "${scratch}" rev-parse FETCH_HEAD)"')
-        idx_concede = run.index("Lost the race")
+        idx_fetch = run.index(
+            "https://docs.nitjsefni.eu/d/ai-researcher/frontier-models")
+        idx_extract = run.index("Source commit <code>")
+        idx_publishing = run.index("Publishing: the hub serves")
         idx_upload = run.index("https://docs.nitjsefni.eu/api/publish")
-        idx_get = run.index('gh api "repos/$REPO/git/refs/heads/published"',
-                            idx_upload)
-        self.assertLess(idx_target, idx_concede)
-        self.assertLess(idx_concede, idx_upload)
-        self.assertLess(idx_upload, idx_get)
-        self.assertIn("Lost the race", run)
+        self.assertLess(idx_fetch, idx_extract)
+        self.assertLess(idx_extract, idx_publishing)
+        self.assertLess(idx_publishing, idx_upload)
+        self.assertIn("grep -oE 'Source commit <code>[0-9a-f]{40}</code>'", run)
 
 
 class CaptureStepTests(unittest.TestCase):
@@ -1000,7 +988,9 @@ class DeployKeyPushTests(unittest.TestCase):
         self.assertNotIn("GH_TOKEN", push_step.get("env", {}))
         self.assertEqual(hub["env"]["DOCS_HUB_API_KEY"],
                          "${{ secrets.DOCS_HUB_API_KEY }}")
-        self.assertEqual(hub["env"]["GH_TOKEN"], "${{ github.token }}")
+        # The job token is mapped nowhere since #206: the refs-API call
+        # that held GH_TOKEN is retired with the ref.
+        self.assertNotIn("GH_TOKEN", hub.get("env", {}))
         self.assertNotIn("MASTER_PUSH_DEPLOY_KEY", hub.get("env", {}))
 
     def test_the_refresh_trigger_set_stays_frozen(self):
