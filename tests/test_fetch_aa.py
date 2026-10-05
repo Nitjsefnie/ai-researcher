@@ -1,7 +1,6 @@
 import contextlib
 import datetime
 import email.message
-import email.utils
 import http.client
 import io
 import json
@@ -343,20 +342,60 @@ class MergeCapturesTests(unittest.TestCase):
         self.assertEqual(
             got[0]["intelligenceIndexCostPerTask"]["cost"]["total"], 1.0)
 
-    def test_a_flattened_scalar_does_not_shadow_the_structured_breakdown(self):
+    def test_a_flattened_scalar_wins_and_the_breakdown_hangs_under_it(self):
         # AA flattened the leaderboard's intelligenceIndexCostPerTask to its
-        # bare total. Same key, scalar shape; the detail route kept the
-        # object. "Present, so keep it" left every model without a breakdown
-        # and stopped the pipeline for a day. The object must win.
+        # bare total while the detail route kept the object with the
+        # per-evaluation breakdown. Same key, different shapes -- and the
+        # leaderboard's number WINS: it is the fresh generation's measured
+        # total, and it is the value the cost axis plots. The object is taken
+        # whole as a fill with its cost.total replaced by that number, so the
+        # breakdown decomposes exactly the total it is hung under. Here the
+        # detail object publishes 1.2 and the leaderboard 1.5, so the total
+        # that lands proves which side won.
         base = [{"slug": "a", "intelligenceIndexCostPerTask": 1.5}]
         detail = [{"slug": "a", "intelligenceIndexCostPerTask": {
-            "cost": {"total": 1.5},
-            "evaluations": [{"slug": "gdpval-aa", "weightedCostPerTask": 0.4}]}}]
+            "cost": {"total": 1.2},
+            "evaluations": [{"slug": "gdpval-aa", "weightedCostPerTask": 0.4},
+                            {"slug": "scicode", "weightedCostPerTask": 1.1}]}}]
 
         got = fetch_aa.merge_captures(base, detail)
 
-        self.assertEqual(got[0]["intelligenceIndexCostPerTask"]["cost"]["total"], 1.5)
-        self.assertEqual(len(got[0]["intelligenceIndexCostPerTask"]["evaluations"]), 1)
+        cost = got[0]["intelligenceIndexCostPerTask"]
+        self.assertEqual(cost["cost"]["total"], 1.5)
+        self.assertEqual(len(cost["evaluations"]), 2)
+
+    def test_a_breakdown_that_will_not_sum_to_the_leaderboards_total_is_dropped(self):
+        # The same shape-split pair, where the detail route's breakdown does
+        # NOT sum to the leaderboard's number (0.85 against 1.5). It is not
+        # this total's breakdown, whatever route it came from, so it is
+        # dropped whole and the plain scalar stays: the GDPval axis reads
+        # absent for this model rather than decomposing someone else's total.
+        base = [{"slug": "a", "intelligenceIndexCostPerTask": 1.5}]
+        detail = [{"slug": "a", "intelligenceIndexCostPerTask": {
+            "cost": {"total": 1.5},
+            "evaluations": [{"slug": "gdpval-aa", "weightedCostPerTask": 0.4},
+                            {"slug": "scicode", "weightedCostPerTask": 0.45}]}}]
+
+        got = fetch_aa.merge_captures(base, detail)
+
+        self.assertEqual(got[0]["intelligenceIndexCostPerTask"], 1.5)
+
+    def test_a_detail_value_never_overrides_a_leaderboard_field(self):
+        # The whole contract (issue #200): wherever BOTH routes carry a field
+        # with different values -- two generations of AA's data mixed into one
+        # capture is what made the page oscillate -- the detail route's value
+        # simply loses, while a field only it ships still fills.
+        base = [{"slug": "a", "intelligenceIndex": 51, "name": "Fresh",
+                 "modelCreatorName": "Lab"}]
+        detail = [{"slug": "a", "intelligenceIndex": 52, "name": "Stale",
+                   "modelCreatorName": "Other Lab", "parameters": 27}]
+
+        got = fetch_aa.merge_captures(base, detail)
+
+        self.assertEqual(got[0]["intelligenceIndex"], 51)
+        self.assertEqual(got[0]["name"], "Fresh")
+        self.assertEqual(got[0]["modelCreatorName"], "Lab")
+        self.assertEqual(got[0]["parameters"], 27)
 
     def test_a_scalar_never_overwrites_a_structured_value(self):
         # The reverse direction: the leaderboard's object must not be
@@ -414,83 +453,28 @@ class DetailHostSlugTests(unittest.TestCase):
 
 class FetchHtmlTests(unittest.TestCase):
     def test_cached_file_is_read_instead_of_the_network(self):
-        # --html is how you re-extract without hitting AA again; a file has
-        # no headers, so the generation time is the pair's None half (issue
-        # #100).
+        # --html is how you re-extract without hitting AA again. The cache is
+        # the page text and nothing else: fetch_html hands back the string
+        # the extractor parses, per route.
         path = pathlib.Path(__file__).resolve().parent / "_cached.html"
         path.write_text("<html>cached</html>", encoding="utf-8")
         try:
             self.assertEqual(fetch_aa.fetch_html(str(path)),
-                             ("<html>cached</html>", None))
-            # The second capture reads its own cache through the same helper.
+                             "<html>cached</html>")
+            # The other two routes read their own cache through the same
+            # helper, which the URL argument only names.
             self.assertEqual(
                 fetch_aa.fetch_html(str(path), fetch_aa.AGENTS_URL),
-                ("<html>cached</html>", None))
+                "<html>cached</html>")
         finally:
             path.unlink()
-
-
-class GeneratedAtTests(unittest.TestCase):
-    """Issue #100: each route reports when its cached copy was generated.
-
-    Vercel's Date header equals the entry's generation time on every probed
-    shape, and it is the only observable that says how old a disagreeing
-    snapshot is -- so fetch_html returns it beside the text. It is a
-    diagnostic ONLY: nothing downstream may gate on it, which these pins
-    enforce by construction (the helpers under test can only format, never
-    decide).
-    """
-
-    EPOCH = 1791084000
-
-    def fetch(self, headers: email.message.Message) -> int | None:
-        """fetch_html through the urlopen boundary, headers modeled."""
-        stub = LoudUrlopenStub({fetch_aa.URL: lambda: _FakeResponse(
-            "<html>leaderboard</html>", headers)})
-        with unittest.mock.patch.object(urllib.request, "urlopen", stub):
-            text, generated = fetch_aa.fetch_html(None, fetch_aa.URL)
-        self.assertEqual(stub.calls, [fetch_aa.URL])
-        self.assertEqual(text, "<html>leaderboard</html>")
-        return generated
-
-    def test_the_date_header_parses_to_an_epoch(self):
-        headers = email.message.Message()
-        headers["Date"] = email.utils.formatdate(self.EPOCH, usegmt=True)
-
-        self.assertEqual(self.fetch(headers), self.EPOCH)
-
-    def test_a_naive_gmt_date_still_parses_as_utc(self):
-        # "-0000" is the one Date spelling email parses to a NAIVE datetime;
-        # HTTP dates are GMT by definition, so it must read as UTC rather
-        # than land in the runner's local zone.
-        headers = email.message.Message()
-        headers["Date"] = "Wed, 30 Sep 2026 13:59:17 -0000"
-        expected = int(datetime.datetime(
-            2026, 9, 30, 13, 59, 17,
-            tzinfo=datetime.timezone.utc).timestamp())
-
-        self.assertEqual(self.fetch(headers), expected)
-
-    def test_a_missing_or_unparseable_date_header_yields_none(self):
-        absent = email.message.Message()
-        garbage = email.message.Message()
-        garbage["Date"] = "not a date"
-        for why, headers in (("absent", absent), ("garbage", garbage)):
-            with self.subTest(why=why):
-                self.assertIsNone(self.fetch(headers))
-
-    def test_the_disagreement_exit_code_is_three(self):
-        # The number the refresh workflow matches on (rc -eq 3); a drift on
-        # either side of that contract is caught here or in the workflow's
-        # own static pins.
-        self.assertEqual(fetch_aa.DISAGREEMENT_EXIT_CODE, 3)
 
 
 def leaderboard_record(**overrides: object) -> dict:
     """fixture-model as the leaderboard route carries it: the flattened cost
     total plus the filler fields AA still ships there. The filler is
     identical on both routes -- only a deliberate delta may make a shared
-    field disagree."""
+    field differ, and the leaderboard's copy is then the one that lands."""
     return {**model(21, "shared"), "slug": "fixture-model",
             "intelligenceIndex": 51, "intelligenceIndexCostPerTask": 0.75,
             **overrides}
@@ -510,11 +494,11 @@ def detail_record(**overrides: object) -> dict:
             **overrides}
 
 
-def leaderboard_payload(host_slug: str = "detail-host-model") -> str:
+def leaderboard_payload() -> str:
     """A leaderboard flight payload: the pinned index version and the model
-    array, one unpriced detail host (named `host_slug`) plus the shared
-    model. Compact JSON -- the extractor anchors on that shape."""
-    host = {"slug": host_slug,
+    array, one unpriced detail host plus the shared model. Compact JSON --
+    the extractor anchors on that shape."""
+    host = {"slug": "detail-host-model",
             "intelligenceIndexCostPerTask": "$undefined"}
     return json.dumps({
         "intro": f"Intelligence Index v{fetch_aa.INDEX_VERSION}",
@@ -527,33 +511,67 @@ def detail_payload(**record_overrides: object) -> str:
                       separators=(",", ":"))
 
 
-class CaptureAgreementWiringTests(unittest.TestCase):
-    """Issue #44: the pre-merge agreement check is wired into the capture.
+class CaptureGapFillWiringTests(unittest.TestCase):
+    """Issue #200: capture() reads both routes and merges them under one rule.
 
-    build.check_route_agreement protects the page's claim only while
-    scripts/fetch_aa.py actually calls it between loading the two routes and
-    merge_captures -- a call site no unit test observes, which is exactly the
-    gap a refactor could delete silently. These pins drive fetch_aa.main()
-    over three cached pages: a divergent capture is refused by the real
-    entry path before the merge, and a healthy one runs through to its
-    writes with the compared count in the capture log. All three caches are
-    always passed, whatever a test asserts: no test here may reach the
-    network.
+    The detail route is a GAP FILL: it supplies the fields the leaderboard
+    does not ship and loses every field the leaderboard does carry. The merge
+    rule lives in build.merge_captures (pinned there), but only the capture
+    function is what CALLS it with a detail host computed from THIS
+    leaderboard's own rows -- a call site no unit test observes, which is
+    exactly the gap a refactor could delete silently. These pins drive
+    fetch_aa.capture() over two cached pages: the returned Capture names the
+    host it widened from and the index version the costs belong to, and the
+    merged corpus carries the leaderboard's value wherever the two routes
+    differ.
     """
 
-    last_output: tuple[str, str] = ("", "")
+    @contextlib.contextmanager
+    def cached_routes(self, **record_overrides: object):
+        """Two cached pages for capture(cached_base, cached_detail) to read."""
+        with tempfile.TemporaryDirectory(prefix=".issue-200-gapfill-") as tmp:
+            root = pathlib.Path(tmp)
+            base = root / "leaderboard.html"
+            detail = root / "detail.html"
+            base.write_text(flight_html(leaderboard_payload()), encoding="utf-8")
+            detail.write_text(flight_html(detail_payload(**record_overrides)),
+                              encoding="utf-8")
+            yield str(base), str(detail)
 
-    def run_capture(self, leaderboard: str, detail: str,
-                    agents: str) -> tuple[str, str]:
-        """Drive fetch_aa.main() over cached pages; -> (stdout, stderr). The
-        pair is also kept on `self.last_output`, because a refusing main()
-        never returns it."""
-        self.last_output = ("", "")
-        with tempfile.TemporaryDirectory(prefix=".issue-44-capture-") as tmp:
+    def test_capture_names_the_host_it_widened_from_and_the_index_version(self):
+        # detail_host_slug is computed from THIS leaderboard's rows: the
+        # detail page is chosen for what its page excludes, so the corpus
+        # must never be paired with a host picked from a different read.
+        with self.cached_routes() as (base, detail):
+            captured = fetch_aa.capture(base, detail)
+
+        self.assertEqual(captured.host, "detail-host-model")
+        self.assertEqual(captured.version, fetch_aa.INDEX_VERSION)
+        self.assertEqual([m["slug"] for m in captured.models],
+                         ["detail-host-model", "fixture-model"])
+
+    def test_a_divergent_detail_value_never_reaches_the_captured_corpus(self):
+        # The end of the old agreement machinery: the two routes disagreeing
+        # is no longer a state to detect or resolve, it is simply a detail
+        # value that loses. The capture lands, and the leaderboard's 51 is
+        # what build.py reads.
+        with self.cached_routes(intelligenceIndex=52) as (base, detail):
+            captured = fetch_aa.capture(base, detail)
+
+        by_slug = {m["slug"]: m for m in captured.models}
+        self.assertEqual(by_slug["fixture-model"]["intelligenceIndex"], 51)
+
+    def test_the_capture_log_names_the_host_and_the_filling_rule(self):
+        # The capture log is where an operator reads which page filled the
+        # gaps, and it states the rule the capture ran under.
+        with tempfile.TemporaryDirectory(prefix=".issue-200-log-") as tmp:
             root = pathlib.Path(tmp)
             pages = [root / name for name in
                      ("leaderboard.html", "detail.html", "agents.html")]
-            for path, payload in zip(pages, (leaderboard, detail, agents)):
+            payloads = (leaderboard_payload(), detail_payload(),
+                        agent_payload([agent_row(f"Agent - Model {i}")
+                                       for i in range(5)]))
+            for path, payload in zip(pages, payloads):
                 path.write_text(flight_html(payload), encoding="utf-8")
             old = (fetch_aa.ROOT, fetch_aa.OUT, fetch_aa.AGENTS_OUT,
                    fetch_aa.STAMP)
@@ -566,55 +584,19 @@ class CaptureAgreementWiringTests(unittest.TestCase):
                 sys.argv = ["fetch_aa.py", "--html", str(pages[0]),
                             "--detail-html", str(pages[1]),
                             "--agents-html", str(pages[2])]
-                out, err = io.StringIO(), io.StringIO()
-                with contextlib.redirect_stdout(out), \
-                        contextlib.redirect_stderr(err):
-                    try:
-                        fetch_aa.main()
-                    finally:
-                        self.last_output = (out.getvalue(), err.getvalue())
-                return self.last_output
+                buffer = io.StringIO()
+                with contextlib.redirect_stdout(buffer):
+                    fetch_aa.main()
             finally:
                 sys.argv = argv
                 (fetch_aa.ROOT, fetch_aa.OUT, fetch_aa.AGENTS_OUT,
                  fetch_aa.STAMP) = old
 
-    def test_a_cross_route_divergence_refuses_the_real_capture_before_the_merge(self):
-        # One delta from the healthy capture: the detail route's copy of
-        # intelligenceIndex moves. The refusal is exit 3 (issue #100), with
-        # the agreement check's own message -- not a downstream schema
-        # guard's -- on stderr, and the cached pages have no headers, so the
-        # generation times read as unknown.
-        with self.assertRaises(SystemExit) as caught:
-            self.run_capture(
-                leaderboard_payload(),
-                detail_payload(intelligenceIndex=52),
-                agent_payload([agent_row(f"Agent - Model {i}") for i in range(5)]))
-
-        self.assertEqual(caught.exception.code, fetch_aa.DISAGREEMENT_EXIT_CODE)
-        stderr = self.last_output[1]
-        self.assertIn("shared value(s) disagree", stderr)
-        self.assertIn(
-            "fixture-model: intelligenceIndex: leaderboard 51, detail 52",
-            stderr)
-        self.assertIn("leaderboard generated (generation time unknown), "
-                      "detail generated (generation time unknown)",
-                      stderr)
-
-    def test_a_capture_whose_routes_agree_runs_the_check_and_writes_through(self):
-        # The healthy control: the fixture capture is valid end to end, the
-        # check passes over it, and the capture log carries the compared
-        # count -- the observable that shows the call ran. 24 = the 21 filler
-        # fields the routes share, slug, intelligenceIndex, and the
-        # leaderboard's flattened 0.75 against the detail object's
-        # cost.total.
-        stdout, _stderr = self.run_capture(
-            leaderboard_payload(), detail_payload(),
-            agent_payload([agent_row(f"Agent - Model {i}") for i in range(5)]))
-
-        self.assertIn("24 shared values cross-checked", stdout)
-        self.assertIn("wrote aa-raw-models.json", stdout)
-        self.assertIn("wrote aa-raw-coding-agents.json", stdout)
+        stdout = buffer.getvalue()
+        self.assertIn("/models/detail-host-model", stdout)
+        self.assertIn("the leaderboard's own value wins wherever both routes "
+                      "carry the field", stdout)
+        self.assertIn(f"v{fetch_aa.INDEX_VERSION} cost breakdown", stdout)
 
 
 class AtomicCaptureWritesTests(unittest.TestCase):
@@ -774,17 +756,10 @@ class AtomicCaptureWritesTests(unittest.TestCase):
 
 
 class _FakeResponse:
-    """The urlopen context-manager result, for a modeled healthy page.
+    """The urlopen context-manager result, for a modeled healthy page."""
 
-    A real response carries headers; the default models a Date-less one, so
-    tests that do not care about generation times keep exercising the None
-    path for free (issue #100).
-    """
-
-    def __init__(self, body: str, headers: email.message.Message | None = None):
+    def __init__(self, body: str):
         self._body = body
-        self.headers = (headers if headers is not None
-                        else email.message.Message())
 
     def __enter__(self):
         return self
@@ -939,41 +914,6 @@ class TransportErrorTests(unittest.TestCase):
         self.assertEqual(proc.stdout, "")
 
 
-def serving(*pages: str):
-    """A urlopen route handler serving each page in turn, the last repeating.
-
-    This is what AA midway through an update looks like to the stub: the
-    same route answers a different snapshot on each read, then settles."""
-    remaining = list(pages)
-
-    def handler() -> _FakeResponse:
-        page = remaining.pop(0) if remaining else pages[-1]
-        return _FakeResponse(page)
-
-    return handler
-
-
-def dated_response(page: str, epoch: int) -> _FakeResponse:
-    """A response carrying a Date header naming when its cache entry was
-    generated -- what Vercel serves and what issue #100's diagnostics
-    quote."""
-    headers = email.message.Message()
-    headers["Date"] = email.utils.formatdate(epoch, usegmt=True)
-    return _FakeResponse(page, headers)
-
-
-def serving_dated(*entries: tuple[int, str]):
-    """serving(), where each page also carries its generation epoch in a
-    Date header."""
-    remaining = list(entries)
-
-    def handler() -> _FakeResponse:
-        epoch, page = remaining.pop(0) if remaining else entries[-1]
-        return dated_response(page, epoch)
-
-    return handler
-
-
 def flaky(*events):
     """A urlopen route handler whose outcomes run in sequence: BaseException
     events are raised, str events are served as pages, and the last repeats.
@@ -998,11 +938,10 @@ class PageFetchRetryTests(unittest.TestCase):
 
     Every page comes through LoudUrlopenStub (unmodeled URLs raise rather
     than touch the network) and the sleep seam is a recorder, so no test
-    really sleeps. The nesting is pinned end to end: this retry lives
-    INSIDE the issue #89 pair-level disagreement loop, and a refusal here
-    still ends the capture -- the short-circuit that keeps a hard-down
-    site failing fast inside the combined worst case documented beside
-    fetch_aa's bounds.
+    really sleeps. The retry is the ONLY level left (issue #200 removed the
+    pair-level disagreement loop above it): a refusal here still ends the
+    capture, which is what keeps a hard-down site failing fast inside the
+    single bound documented beside fetch_aa's constants.
     """
 
     DETAIL_URL = fetch_aa.MODEL_DETAIL_URL.format(slug="detail-host-model")
@@ -1150,37 +1089,40 @@ class PageFetchRetryTests(unittest.TestCase):
             self.assertEqual((root / "aa-raw-models.json").read_bytes(),
                              b"SENTINEL MODELS CAPTURE")
 
-    def test_the_page_retry_sits_inside_the_disagreement_loop(self):
-        # The nesting pin: attempt 1's detail fetch eats one transient 500
-        # (page retry, 5s backoff) and then answers a snapshot the
-        # leaderboard disagrees with (pair retry, 120s wait); attempt 2's
-        # pair agrees and the capture lands. Both retry levels visible in
-        # one run, each with its own seam record.
+    def test_a_detail_route_divergence_is_merged_not_re_read(self):
+        # The nesting pin, restated against the issue #200 rule. The detail
+        # fetch eats one transient 500 (page retry, 5s backoff) and then
+        # answers a snapshot whose intelligenceIndex is 52 against the
+        # leaderboard's 51. There is no pair-level retry any more: the
+        # leaderboard is the authority, so the capture lands on the first
+        # read of each route (four calls, one wait) with the LEADERBOARD's
+        # copy of the shared value in the written capture.
         routes = {
             fetch_aa.URL: lambda: _FakeResponse(self.LEADERBOARD),
             self.DETAIL_URL: flaky(
                 urllib.error.HTTPError(self.DETAIL_URL, 500,
                                        "Internal Server Error",
                                        email.message.Message(), None),
-                flight_html(detail_payload(intelligenceIndex=52)),
-                flight_html(detail_payload())),
+                flight_html(detail_payload(intelligenceIndex=52))),
             fetch_aa.AGENTS_URL: lambda: _FakeResponse(self.AGENTS),
         }
-        with self.capture_over_boundary(routes) as (_root, stub, sleeps, run,
+        with self.capture_over_boundary(routes) as (root, stub, sleeps, run,
                                                     _captured):
             stdout, stderr = run()
 
             self.assertEqual(
                 stub.calls,
                 [fetch_aa.URL, self.DETAIL_URL, self.DETAIL_URL,
-                 fetch_aa.URL, self.DETAIL_URL, fetch_aa.AGENTS_URL])
-            self.assertEqual(sleeps,
-                             [fetch_aa.PAGE_BACKOFF_SECONDS,
-                              fetch_aa.WAIT_SECONDS])
+                 fetch_aa.AGENTS_URL])
+            self.assertEqual(sleeps, [fetch_aa.PAGE_BACKOFF_SECONDS])
             self.assertIn(
                 f"retrying in {fetch_aa.PAGE_BACKOFF_SECONDS}s", stderr)
-            self.assertIn("re-reading both routes", stderr)
             self.assertIn("wrote aa-raw-models.json", stdout)
+            models = json.loads(
+                (root / "aa-raw-models.json").read_text(encoding="utf-8"))
+            self.assertEqual(
+                {m["slug"]: m for m in models}["fixture-model"]["intelligenceIndex"],
+                51)
 
 
 class TransportErrorClassifierTests(unittest.TestCase):
@@ -1264,487 +1206,37 @@ class TransportErrorClassifierTests(unittest.TestCase):
                      for k in range(1, calls)])
 
 
-class RouteDisagreementRetryTests(unittest.TestCase):
-    """Issue #89: a cross-route disagreement that clears within a bounded
-    wait must not fail the hourly refresh. fetch_aa waits, re-reads BOTH
-    routes, and compares a complete fresh pair each time -- proceeding once
-    they agree, refusing with the unchanged diagnostic only past the bound
-    (which, since issue #100, exits DISAGREEMENT_EXIT_CODE with the
-    generation times on stderr, not the schema-change red).
-
-    Every page comes through LoudUrlopenStub (unmodeled URLs raise rather
-    than touch the network) and the sleep seam is a recorder, so no test
-    really sleeps. The written captures are the observable for "never mix
-    attempts": attempts can carry distinct sentinels, and the written bytes
-    must be the SUCCESSFUL attempt's data alone.
-    """
-
-    DETAIL_URL = fetch_aa.MODEL_DETAIL_URL.format(slug="detail-host-model")
-    AGENTS = flight_html(agent_payload(
-        [agent_row(f"Agent - Model {i}") for i in range(5)]))
-    # A straddled pair from the measured stagger window: the two routes'
-    # cached entries generated five minutes apart. The ISO strings the
-    # stderr pins expect are 2026-10-04T03:20:00Z and 2026-10-04T03:25:00Z.
-    WINDOW_BASE = 1791084000
-    WINDOW_DETAIL = 1791084300
-
-    @contextlib.contextmanager
-    def capture_over_routes(self, routes: dict, *, seed: bool = False):
-        """fetch_aa.main() over the stubbed urlopen with the sleep seam
-        recorded. Yields (root, stub, sleeps, run, captured); call run()
-        inside the block -- it returns (stdout, stderr) on success, and
-        `captured` holds both buffers even when it raises. The written
-        captures are readable under root while the block is open."""
-        stub = LoudUrlopenStub(routes)
-        sleeps: list = []
-        with tempfile.TemporaryDirectory(prefix=".issue-89-retry-") as tmp:
-            root = pathlib.Path(tmp)
-            old = (fetch_aa.ROOT, fetch_aa.OUT, fetch_aa.AGENTS_OUT,
-                   fetch_aa.STAMP)
-            argv = sys.argv
-            try:
-                fetch_aa.ROOT = root
-                fetch_aa.OUT = root / "aa-raw-models.json"
-                fetch_aa.AGENTS_OUT = root / "aa-raw-coding-agents.json"
-                fetch_aa.STAMP = root / "captured-at.txt"
-                if seed:
-                    # The previous capture, as a refused run must leave it.
-                    fetch_aa.OUT.write_bytes(b"SENTINEL MODELS CAPTURE")
-                    fetch_aa.AGENTS_OUT.write_bytes(b"SENTINEL AGENTS CAPTURE")
-                    fetch_aa.STAMP.write_text("2020-01-01\n", encoding="utf-8")
-                sys.argv = ["fetch_aa.py"]
-                # create=True: the seam patch must also WORK against a tree
-                # that predates the seam, so the red-on-main run of these
-                # pins shows main's real behavior -- refusing on the first
-                # disagreement -- rather than a missing-attribute error.
-                with unittest.mock.patch.object(urllib.request, "urlopen", stub), \
-                        unittest.mock.patch.object(fetch_aa, "_sleep",
-                                                   side_effect=sleeps.append,
-                                                   create=True):
-                    def run() -> tuple[str, str]:
-                        out, err = io.StringIO(), io.StringIO()
-                        with contextlib.redirect_stdout(out), \
-                                contextlib.redirect_stderr(err):
-                            try:
-                                fetch_aa.main()
-                            finally:
-                                captured["stdout"] = out.getvalue()
-                                captured["stderr"] = err.getvalue()
-                        return captured["stdout"], captured["stderr"]
-
-                    captured: dict = {"stdout": "", "stderr": ""}
-                    yield root, stub, sleeps, run, captured
-            finally:
-                sys.argv = argv
-                (fetch_aa.ROOT, fetch_aa.OUT, fetch_aa.AGENTS_OUT,
-                 fetch_aa.STAMP) = old
-
-    def test_an_agreeing_pair_captures_once_and_never_waits(self):
-        # The quiet path is today's behavior, unchanged: one fetch of each
-        # route, no wait, no stderr noise, and the capture lands.
-        routes = {
-            fetch_aa.URL: lambda: _FakeResponse(flight_html(leaderboard_payload())),
-            self.DETAIL_URL: lambda: _FakeResponse(flight_html(detail_payload())),
-            fetch_aa.AGENTS_URL: lambda: _FakeResponse(self.AGENTS),
-        }
-        with self.capture_over_routes(routes) as (root, stub, sleeps, run,
-                                                  _captured):
-            stdout, stderr = run()
-
-            self.assertEqual(stub.calls,
-                             [fetch_aa.URL, self.DETAIL_URL,
-                              fetch_aa.AGENTS_URL])
-            self.assertEqual(sleeps, [], "the quiet path slept")
-            self.assertEqual(stderr, "", "the quiet path logged a retry")
-            self.assertIn("wrote aa-raw-models.json", stdout)
-            self.assertEqual(
-                (root / "captured-at.txt").read_text(encoding="utf-8"),
-                datetime.date.today().isoformat() + "\n")
-
-    def test_a_disagreement_that_clears_is_retried_and_captures_the_fresh_pair(self):
-        # Attempt 1 straddles AA's update: the detail route's intelligenceIndex
-        # is 52 against the leaderboard's 51 (the 2026-09-29 17:41Z window).
-        # Attempt 2 reads a settled pair. The pin is the whole shape: BOTH
-        # routes re-read (5 calls, not 3), exactly one wait at exactly the
-        # constant, the retry announced once on stderr, and the capture that
-        # lands is the fresh pair's.
-        routes = {
-            fetch_aa.URL: lambda: _FakeResponse(flight_html(leaderboard_payload())),
-            self.DETAIL_URL: serving(flight_html(detail_payload(intelligenceIndex=52)),
-                                     flight_html(detail_payload())),
-            fetch_aa.AGENTS_URL: lambda: _FakeResponse(self.AGENTS),
-        }
-        with self.capture_over_routes(routes, seed=True) as (root, stub, sleeps,
-                                                             run, _captured):
-            stdout, stderr = run()
-
-            self.assertEqual(
-                stub.calls,
-                [fetch_aa.URL, self.DETAIL_URL,
-                 fetch_aa.URL, self.DETAIL_URL,
-                 fetch_aa.AGENTS_URL],
-                "the injected fault did not visibly fire")
-            self.assertEqual(sleeps, [fetch_aa.WAIT_SECONDS])
-            self.assertEqual(stderr.count("re-reading"), 1, stderr)
-            self.assertIn("attempt 1 of", stderr)
-            self.assertIn("wrote aa-raw-models.json", stdout)
-            models = json.loads(
-                (root / "aa-raw-models.json").read_text(encoding="utf-8"))
-            self.assertEqual([m["slug"] for m in models],
-                             ["detail-host-model", "fixture-model"])
-            self.assertEqual(
-                len(json.loads(
-                    (root / "aa-raw-coding-agents.json").read_text(encoding="utf-8"))),
-                5)
-            self.assertEqual(
-                (root / "captured-at.txt").read_text(encoding="utf-8"),
-                datetime.date.today().isoformat() + "\n")
-
-    def test_the_retry_line_names_how_old_each_disagreeing_copy_was(self):
-        # The intermediate-attempt stderr line appends the two generation
-        # times in parens when the routes reported them (issue #100) -- the
-        # observation the refresh's skip decision and the stamp's red alarm
-        # are later argued from. Attempt 1 straddles with dated entries;
-        # attempt 2 settles and the capture lands normally.
-        routes = {
-            fetch_aa.URL: lambda: dated_response(
-                flight_html(leaderboard_payload()), self.WINDOW_BASE),
-            self.DETAIL_URL: serving_dated(
-                (self.WINDOW_DETAIL, flight_html(detail_payload(intelligenceIndex=52))),
-                (self.WINDOW_DETAIL + 60, flight_html(detail_payload()))),
-            fetch_aa.AGENTS_URL: lambda: _FakeResponse(self.AGENTS),
-        }
-        with self.capture_over_routes(routes) as (_root, _stub, sleeps, run,
-                                                  _captured):
-            stdout, stderr = run()
-
-            self.assertEqual(sleeps, [fetch_aa.WAIT_SECONDS])
-            self.assertEqual(stderr.count("re-reading"), 1, stderr)
-            self.assertIn(
-                "re-reading both routes in 120s "
-                "(leaderboard generated 2026-10-04T03:20:00Z, "
-                "detail generated 2026-10-04T03:25:00Z)", stderr)
-            self.assertIn("wrote aa-raw-models.json", stdout)
-
-    def test_a_disagreement_past_the_bound_refuses_with_the_unchanged_diagnostic(self):
-        # Every attempt straddles the update. The refusal is exit 3 (issue
-        # #100) -- not the schema-change red -- with the unchanged divergence
-        # text on stderr plus one appended line naming how old each copy was,
-        # and the previous capture on disk untouched, because a refused run
-        # writes nothing. Both header shapes are pinned: dated responses
-        # carry the real ISO times, Date-less ones the explicit marker.
-        for why, dated in (("no Date header", False), ("dated headers", True)):
-            with self.subTest(why=why):
-                if dated:
-                    routes = {
-                        fetch_aa.URL: lambda: dated_response(
-                            flight_html(leaderboard_payload()), self.WINDOW_BASE),
-                        self.DETAIL_URL: lambda: dated_response(
-                            flight_html(detail_payload(intelligenceIndex=52)),
-                            self.WINDOW_DETAIL),
-                    }
-                else:
-                    routes = {
-                        fetch_aa.URL: lambda: _FakeResponse(
-                            flight_html(leaderboard_payload())),
-                        self.DETAIL_URL: lambda: _FakeResponse(
-                            flight_html(detail_payload(intelligenceIndex=52))),
-                    }
-                with self.capture_over_routes(routes, seed=True) as (
-                        root, stub, sleeps, run, captured):
-                    with self.assertRaises(SystemExit) as caught:
-                        run()
-
-                    self.assertEqual(caught.exception.code,
-                                     fetch_aa.DISAGREEMENT_EXIT_CODE)
-                    stderr = captured["stderr"]
-                    self.assertIn("shared value(s) disagree", stderr)
-                    self.assertIn(
-                        "fixture-model: intelligenceIndex: leaderboard 51, detail 52",
-                        stderr)
-                    self.assertEqual(
-                        stderr.count("re-reading"),
-                        fetch_aa.ATTEMPTS - 1, stderr)
-                    self.assertEqual(
-                        sleeps,
-                        [fetch_aa.WAIT_SECONDS] * (fetch_aa.ATTEMPTS - 1))
-                    self.assertEqual(
-                        stub.calls,
-                        [fetch_aa.URL, self.DETAIL_URL] * fetch_aa.ATTEMPTS)
-                    if dated:
-                        self.assertIn(
-                            "leaderboard generated 2026-10-04T03:20:00Z, "
-                            "detail generated 2026-10-04T03:25:00Z — "
-                            "Vercel serves the two routes from independent caches",
-                            stderr)
-                        # The intermediate lines carry the same observation in
-                        # their parenthetical.
-                        self.assertIn(
-                            "(leaderboard generated 2026-10-04T03:20:00Z, "
-                            "detail generated 2026-10-04T03:25:00Z)", stderr)
-                    else:
-                        self.assertIn(
-                            "leaderboard generated (generation time unknown), "
-                            "detail generated (generation time unknown)",
-                            stderr)
-                    self.assertEqual(
-                        (root / "aa-raw-models.json").read_bytes(),
-                        b"SENTINEL MODELS CAPTURE")
-                    self.assertEqual(
-                        (root / "aa-raw-coding-agents.json").read_bytes(),
-                        b"SENTINEL AGENTS CAPTURE")
-                    self.assertEqual(
-                        (root / "captured-at.txt").read_text(encoding="utf-8"),
-                        "2020-01-01\n",
-                        "the stamp moved even though the capture did not land")
-
-    def test_none_against_a_value_still_counts_as_disagreement(self):
-        # The leaderboard measured 51 while the detail route's copy arrived
-        # as null. A comparison loosened into "absent means agree" would
-        # accept this pair outright (3 calls, no waits); the pin is that the
-        # retry ENGAGES, then captures the settled pair.
-        routes = {
-            fetch_aa.URL: lambda: _FakeResponse(flight_html(leaderboard_payload())),
-            self.DETAIL_URL: serving(flight_html(
-                detail_payload(intelligenceIndex=None)),
-                                     flight_html(detail_payload())),
-            fetch_aa.AGENTS_URL: lambda: _FakeResponse(self.AGENTS),
-        }
-        with self.capture_over_routes(routes) as (_root, stub, sleeps, run,
-                                                  _captured):
-            stdout, _ = run()
-
-            self.assertGreaterEqual(
-                len(sleeps), 1,
-                "None-vs-value was accepted without a re-read")
-            self.assertGreater(len(stub.calls), 3)
-            self.assertEqual(sleeps, [fetch_aa.WAIT_SECONDS])
-            self.assertEqual(stub.calls,
-                             [fetch_aa.URL, self.DETAIL_URL,
-                              fetch_aa.URL, self.DETAIL_URL,
-                              fetch_aa.AGENTS_URL])
-            self.assertIn("wrote aa-raw-models.json", stdout)
-
-    def test_the_capture_keeps_only_the_successful_attempt_data(self):
-        # Each attempt's detail route carries a distinct sentinel in a
-        # detail-only field (`parameters` is absent from the leaderboard
-        # record, so it never enters check_route_agreement's comparison and
-        # survives the merge). The written capture must be attempt 2's --
-        # exact, whole, and with no trace of attempt 1's sentinel.
-        routes = {
-            fetch_aa.URL: lambda: _FakeResponse(flight_html(leaderboard_payload())),
-            self.DETAIL_URL: serving(
-                flight_html(detail_payload(intelligenceIndex=52,
-                                           parameters=888001)),
-                flight_html(detail_payload(parameters=888002))),
-            fetch_aa.AGENTS_URL: lambda: _FakeResponse(self.AGENTS),
-        }
-        with self.capture_over_routes(routes) as (root, _stub, sleeps, run,
-                                                  _captured):
-            _ = run()
-
-            self.assertEqual(sleeps, [fetch_aa.WAIT_SECONDS])
-            written = json.loads(
-                (root / "aa-raw-models.json").read_text(encoding="utf-8"))
-            expected = fetch_aa.merge_captures(
-                json.loads(leaderboard_payload())["models"],
-                json.loads(detail_payload(parameters=888002))["models"])
-            self.assertEqual(written, expected)
-            self.assertEqual(written[1]["parameters"], 888002)
-            self.assertNotIn("888001",
-                             (root / "aa-raw-models.json").read_text(encoding="utf-8"))
-
-    def test_each_attempt_rereads_the_host_its_own_leaderboard_names(self):
-        # detail_host_slug is recomputed per attempt: the detail page is
-        # chosen for what its page EXCLUDES, so a retry must never pair
-        # attempt 2's leaderboard with attempt 1's host -- the obvious
-        # regression is reusing the stale host, or pairing fresh leaderboard
-        # with stale page.
-        detail1 = fetch_aa.MODEL_DETAIL_URL.format(slug="detail-host-model")
-        detail2 = fetch_aa.MODEL_DETAIL_URL.format(slug="second-host-model")
-        routes = {
-            fetch_aa.URL: serving(flight_html(leaderboard_payload()),
-                                  flight_html(leaderboard_payload(
-                                      host_slug="second-host-model"))),
-            detail1: lambda: _FakeResponse(
-                flight_html(detail_payload(intelligenceIndex=52))),
-            detail2: lambda: _FakeResponse(flight_html(detail_payload())),
-            fetch_aa.AGENTS_URL: lambda: _FakeResponse(self.AGENTS),
-        }
-        with self.capture_over_routes(routes) as (_root, stub, sleeps, run,
-                                                  _captured):
-            stdout, _ = run()
-
-            self.assertEqual(sleeps, [fetch_aa.WAIT_SECONDS])
-            self.assertEqual(
-                stub.calls,
-                [fetch_aa.URL, detail1, fetch_aa.URL, detail2,
-                 fetch_aa.AGENTS_URL])
-            self.assertEqual(stub.calls[3], detail2,
-                             "attempt 2 reused attempt 1's detail host")
-            self.assertIn("wrote aa-raw-models", stdout)
-            self.assertIn("/models/second-host-model", stdout)
-
-    def test_a_fully_cached_capture_refuses_without_waiting_or_rereading(self):
-        # --html/--detail-html pin the bytes: re-reading a file would return
-        # the identical snapshot, so the bounded wait could never clear a
-        # disagreement between two cached pages. One attempt, no seam call,
-        # and the unchanged refusal -- which is also what keeps the #44
-        # cached-page wiring pins instant instead of six minutes of sleep.
-        with tempfile.TemporaryDirectory(prefix=".issue-89-cached-") as tmp:
-            root = pathlib.Path(tmp)
-            pages = [root / name for name in
-                     ("leaderboard.html", "detail.html", "agents.html")]
-            payloads = (leaderboard_payload(),
-                        detail_payload(intelligenceIndex=52),
-                        agent_payload([agent_row(f"Agent - Model {i}")
-                                       for i in range(5)]))
-            for path, payload in zip(pages, payloads):
-                path.write_text(flight_html(payload), encoding="utf-8")
-            old = (fetch_aa.ROOT, fetch_aa.OUT, fetch_aa.AGENTS_OUT,
-                   fetch_aa.STAMP)
-            argv = sys.argv
-            sleeps: list = []
-            try:
-                fetch_aa.ROOT = root
-                fetch_aa.OUT = root / "aa-raw-models.json"
-                fetch_aa.AGENTS_OUT = root / "aa-raw-coding-agents.json"
-                fetch_aa.STAMP = root / "captured-at.txt"
-                fetch_aa.OUT.write_bytes(b"SENTINEL MODELS CAPTURE")
-                fetch_aa.AGENTS_OUT.write_bytes(b"SENTINEL AGENTS CAPTURE")
-                fetch_aa.STAMP.write_text("2020-01-01\n", encoding="utf-8")
-                sys.argv = ["fetch_aa.py", "--html", str(pages[0]),
-                            "--detail-html", str(pages[1]),
-                            "--agents-html", str(pages[2])]
-                err = io.StringIO()
-                with unittest.mock.patch.object(fetch_aa, "_sleep",
-                                                side_effect=sleeps.append):
-                    with self.assertRaises(SystemExit) as caught:
-                        with contextlib.redirect_stdout(io.StringIO()), \
-                                contextlib.redirect_stderr(err):
-                            fetch_aa.main()
-
-                # Same exit-3 conversion as the network path (issue #100):
-                # the diagnostic and the generation-time line land on stderr,
-                # and cached pages have no headers, so both read as unknown.
-                self.assertEqual(caught.exception.code,
-                                 fetch_aa.DISAGREEMENT_EXIT_CODE)
-                self.assertIn("shared value(s) disagree", err.getvalue())
-                self.assertIn(
-                    "fixture-model: intelligenceIndex: leaderboard 51, detail 52",
-                    err.getvalue())
-                self.assertIn(
-                    "leaderboard generated (generation time unknown), "
-                    "detail generated (generation time unknown)",
-                    err.getvalue())
-                self.assertEqual(sleeps, [],
-                                 "a cached capture waited on the seam")
-            finally:
-                sys.argv = argv
-                (fetch_aa.ROOT, fetch_aa.OUT, fetch_aa.AGENTS_OUT,
-                 fetch_aa.STAMP) = old
-
-    def test_the_retry_catches_only_the_tagged_disagreement_exit(self):
-        # A schema refusal is not the tagged disagreement exit, so the retry
-        # loop must not catch it: refused inside the FIRST attempt (here by
-        # the index-version pin), it propagates uncaught carrying the
-        # version-bump message, with no wait, no re-read, no agents fetch,
-        # and the previous capture on disk untouched. The seam itself is
-        # left REAL: time.sleep is the observation point (as in the
-        # seam-delegation pin), so "the seam was never called" is provable
-        # -- and a mutant that widens the retry's except to bare SystemExit
-        # fails here instead of really sleeping through its retries.
-        bad_version = leaderboard_payload().replace(
-            f"Intelligence Index v{fetch_aa.INDEX_VERSION}",
-            "Intelligence Index v9.9")
-        routes = {
-            fetch_aa.URL: lambda: _FakeResponse(flight_html(bad_version)),
-        }
-        stub = LoudUrlopenStub(routes)
-        with tempfile.TemporaryDirectory(prefix=".issue-89-schema-") as tmp:
-            root = pathlib.Path(tmp)
-            old = (fetch_aa.ROOT, fetch_aa.OUT, fetch_aa.AGENTS_OUT,
-                   fetch_aa.STAMP)
-            argv = sys.argv
-            try:
-                fetch_aa.ROOT = root
-                fetch_aa.OUT = root / "aa-raw-models.json"
-                fetch_aa.AGENTS_OUT = root / "aa-raw-coding-agents.json"
-                fetch_aa.STAMP = root / "captured-at.txt"
-                # The previous capture, as a refused run must leave it.
-                fetch_aa.OUT.write_bytes(b"SENTINEL MODELS CAPTURE")
-                fetch_aa.AGENTS_OUT.write_bytes(b"SENTINEL AGENTS CAPTURE")
-                fetch_aa.STAMP.write_text("2020-01-01\n", encoding="utf-8")
-                sys.argv = ["fetch_aa.py"]
-                with unittest.mock.patch.object(urllib.request, "urlopen", stub), \
-                        unittest.mock.patch.object(fetch_aa.time, "sleep") as slept:
-                    err = io.StringIO()
-                    with self.assertRaises(SystemExit) as caught:
-                        with contextlib.redirect_stdout(io.StringIO()), \
-                                contextlib.redirect_stderr(err):
-                            fetch_aa.main()
-
-                message = str(caught.exception)
-                self.assertIn("Intelligence Index v9.9", message)
-                self.assertIn(f"v{fetch_aa.INDEX_VERSION}", message)
-                self.assertIn("methodology", message)
-                self.assertFalse(slept.called, "a schema refusal slept")
-                self.assertEqual(
-                    stub.calls, [fetch_aa.URL],
-                    "a schema refusal was re-read, or the agents route "
-                    "was fetched")
-                self.assertNotIn("re-reading", err.getvalue())
-                self.assertEqual((root / "aa-raw-models.json").read_bytes(),
-                                 b"SENTINEL MODELS CAPTURE")
-                self.assertEqual(
-                    (root / "aa-raw-coding-agents.json").read_bytes(),
-                    b"SENTINEL AGENTS CAPTURE")
-                self.assertEqual(
-                    (root / "captured-at.txt").read_text(encoding="utf-8"),
-                    "2020-01-01\n",
-                    "the stamp moved even though the capture did not land")
-            finally:
-                sys.argv = argv
-                (fetch_aa.ROOT, fetch_aa.OUT, fetch_aa.AGENTS_OUT,
-                 fetch_aa.STAMP) = old
-
-
 class RetryBoundArithmeticTests(unittest.TestCase):
-    """Issue #89: the retry bound must fit inside refresh.yml's 30-minute
+    """The capture's worst case must fit inside refresh.yml's 30-minute
     job timeout WITHOUT editing the workflow, so the fit is pinned as an
     assertion rather than narrated. A future constant bump that would crowd
-    out the heal-run remainder (checkout, pip + Chromium, the browser suite,
+    out the rest of the job (checkout, pip + Chromium, the browser suite,
     build, publish -- ~7 min measured) fails here instead of timing out a
     real run."""
 
-    def test_worst_case_stays_within_the_capture_budget(self):
-        # The comment in fetch_aa.py commits to exactly this arithmetic: the
-        # disagreement waits, the pair fetches at the PAGE fetch bound --
-        # each page fetch itself a bounded retry since issue #154 -- and
-        # the one agents fetch after a pair agrees. 1200 s is the capture
-        # budget that leaves the ~7-min heal remainder room in the job's
-        # 1800 s, with slack.
-        page_bound = (fetch_aa.PAGE_ATTEMPTS * fetch_aa.FETCH_TIMEOUT_SECONDS
-                      + sum(k * fetch_aa.PAGE_BACKOFF_SECONDS
-                            for k in range(1, fetch_aa.PAGE_ATTEMPTS)))
-        worst_case = ((fetch_aa.ATTEMPTS - 1) * fetch_aa.WAIT_SECONDS
-                      + fetch_aa.ATTEMPTS * 2 * page_bound
-                      + page_bound)
+    # One page fetch's bound: PAGE_ATTEMPTS attempts, each stalling at most
+    # FETCH_TIMEOUT_SECONDS, plus the linear backoff sleeps between them.
+    PAGE_BOUND = (fetch_aa.PAGE_ATTEMPTS * fetch_aa.FETCH_TIMEOUT_SECONDS
+                  + sum(k * fetch_aa.PAGE_BACKOFF_SECONDS
+                        for k in range(1, fetch_aa.PAGE_ATTEMPTS)))
+    # The capture fetches exactly three pages (leaderboard, detail, coding
+    # agents), each at that bound, and the page retry is the only retry level
+    # left (issue #200). 1200 s is the capture budget that leaves the ~7-min
+    # remainder room in the job's 1800 s, with slack.
+    CAPTURE_BUDGET = 1200
 
-        self.assertLessEqual(worst_case, 1200)
+    def test_worst_case_stays_within_the_capture_budget(self):
+        # The comment in fetch_aa.py commits to exactly this arithmetic.
+        worst_case = 3 * self.PAGE_BOUND
+
+        self.assertLessEqual(worst_case, self.CAPTURE_BUDGET)
 
     def test_a_hard_down_site_fails_inside_the_first_page_bound(self):
         # Issue #154's fail-fast half: transport exhaustion short-circuits
-        # the capture, so a dead AA is refused inside ONE page bound --
-        # never the disagreement loop's full product -- and the hour's run
-        # goes red fast instead of hanging toward the job timeout. Bound
-        # at WAIT_SECONDS so the invariant is relational: one page bound
-        # never outlasts one pair-retry wait (page bound 90 s, wait 120 s).
-        page_bound = (fetch_aa.PAGE_ATTEMPTS * fetch_aa.FETCH_TIMEOUT_SECONDS
-                      + sum(k * fetch_aa.PAGE_BACKOFF_SECONDS
-                            for k in range(1, fetch_aa.PAGE_ATTEMPTS)))
-
-        self.assertLessEqual(page_bound, fetch_aa.WAIT_SECONDS)
+        # the capture, so a dead AA is refused inside ONE page bound -- never
+        # the three-page product -- and the hour's run goes red fast instead
+        # of hanging toward the job timeout.
+        self.assertLessEqual(self.PAGE_BOUND, self.CAPTURE_BUDGET)
 
     def test_the_sleep_seam_actually_sleeps(self):
         # The seam exists so no TEST ever really sleeps -- and so the wait
@@ -1759,682 +1251,3 @@ class RetryBoundArithmeticTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
-
-
-# --- the refusal writes a buildable snapshot (issue #118) ------------------------
-
-def snapshot_path_of() -> pathlib.Path:
-    """The disagreement snapshot's path beside the module's (test) OUT."""
-    return fetch_aa.OUT.with_name("aa-disagreement-snapshot.json")
-
-
-class DisagreementSnapshotTests(unittest.TestCase):
-    """Issue #118: the route-disagreement refusal is buildable. fetch_aa.py
-    still exits DISAGREEMENT_EXIT_CODE with the unchanged diagnostic, but the
-    refused attempt now also writes data/aa-disagreement-snapshot.json -- both
-    routes' raw payloads plus the disagreement map -- so the refresh can build
-    and publish the disputed page instead of holding it. The snapshot's pieces
-    all come from the refused attempt; the schema guards stay red on the
-    disputed merge."""
-
-    DETAIL_URL = fetch_aa.MODEL_DETAIL_URL.format(slug="detail-host-model")
-
-    @contextlib.contextmanager
-    def refused_capture(self, routes: dict, *, seed_stamp: str | None = None):
-        """fetch_aa.main() over the stubbed urlopen, with the module's
-        capture paths redirected into a temp tree. Yields (root, run,
-        captured); `captured` holds both buffers when run() raises."""
-        stub = LoudUrlopenStub(routes)
-        with tempfile.TemporaryDirectory(prefix=".issue-118-snapshot-") as tmp:
-            root = pathlib.Path(tmp)
-            old = (fetch_aa.ROOT, fetch_aa.OUT, fetch_aa.AGENTS_OUT,
-                   fetch_aa.STAMP)
-            argv = sys.argv
-            try:
-                fetch_aa.ROOT = root
-                fetch_aa.OUT = root / "aa-raw-models.json"
-                fetch_aa.AGENTS_OUT = root / "aa-raw-coding-agents.json"
-                fetch_aa.STAMP = root / "captured-at.txt"
-                if seed_stamp is not None:
-                    (root / "data" / "aa-route-disagreement.txt").parent.mkdir(
-                        parents=True, exist_ok=True)
-                    (root / "data" / "aa-route-disagreement.txt").write_text(
-                        seed_stamp, encoding="utf-8")
-                sys.argv = ["fetch_aa.py"]
-                with unittest.mock.patch.object(urllib.request, "urlopen",
-                                                stub), \
-                        unittest.mock.patch.object(fetch_aa, "_sleep",
-                                                   side_effect=lambda s: None):
-                    out, err = io.StringIO(), io.StringIO()
-
-                    def run():
-                        with contextlib.redirect_stdout(out), \
-                                contextlib.redirect_stderr(err):
-                            try:
-                                fetch_aa.main()
-                            finally:
-                                captured["stdout"] = out.getvalue()
-                                captured["stderr"] = err.getvalue()
-                        return captured["stdout"], captured["stderr"]
-
-                    captured: dict = {"stdout": "", "stderr": ""}
-                    yield root, run, captured
-            finally:
-                sys.argv = argv
-                (fetch_aa.ROOT, fetch_aa.OUT, fetch_aa.AGENTS_OUT,
-                 fetch_aa.STAMP) = old
-
-    def routes_forever_disagreeing(self, *, dated: bool = False) -> dict:
-        detail = flight_html(detail_payload(intelligenceIndex=52))
-        if dated:
-            return {
-                fetch_aa.URL: lambda: dated_response(
-                    flight_html(leaderboard_payload()), 1791084000),
-                self.DETAIL_URL: lambda: dated_response(detail, 1791084300),
-            }
-        return {
-            fetch_aa.URL: lambda: _FakeResponse(
-                flight_html(leaderboard_payload())),
-            self.DETAIL_URL: lambda: _FakeResponse(detail),
-        }
-
-    def test_the_refusal_writes_a_buildable_snapshot(self):
-        for why, dated in (("undated", False), ("dated", True)):
-            with self.subTest(why=why):
-                with self.refused_capture(self.routes_forever_disagreeing(
-                        dated=dated)) as (_root, run, captured):
-                    with self.assertRaises(SystemExit) as caught:
-                        run()
-
-                    self.assertEqual(caught.exception.code,
-                                     fetch_aa.DISAGREEMENT_EXIT_CODE)
-                    stderr = captured["stderr"]
-                    self.assertIn("shared value(s) disagree", stderr)
-                    self.assertIn(
-                        "fixture-model: intelligenceIndex: leaderboard 51, "
-                        "detail 52", stderr)
-                    raw = snapshot_path_of().read_text(encoding="utf-8")
-                    snapshot = json.loads(raw)
-                    self.assertEqual(snapshot["schema"], 1)
-                    self.assertEqual(
-                        [m["slug"] for m in snapshot["leaderboard"]],
-                        ["detail-host-model", "fixture-model"])
-                    self.assertEqual(
-                        [m["slug"] for m in snapshot["detail"]],
-                        ["fixture-model"])
-                    self.assertEqual(snapshot["disagreements"],
-                                     [{"slug": "fixture-model",
-                                       "path": "intelligenceIndex",
-                                       "lb": 51, "dt": 52}])
-                    if dated:
-                        self.assertEqual(snapshot["leaderboardGeneratedAt"],
-                                         1791084000)
-                        self.assertEqual(snapshot["detailGeneratedAt"],
-                                         1791084300)
-                    else:
-                        self.assertIsNone(snapshot["leaderboardGeneratedAt"])
-                        self.assertIsNone(snapshot["detailGeneratedAt"])
-                    self.assertIsInstance(snapshot["windowStartEpoch"], int)
-                    self.assertRegex(snapshot["capturedAt"],
-                                     r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z")
-
-    def test_the_window_start_comes_from_the_stamp_when_one_exists(self):
-        # The banner names ONE window across hours: an existing workflow
-        # stamp's first line is the window's start, and this fetch must not
-        # reset it to now.
-        with self.refused_capture(
-                self.routes_forever_disagreeing(),
-                seed_stamp="1791080000\ncaptured before\n") as (
-                        _root, run, _captured):
-            with self.assertRaises(SystemExit):
-                run()
-
-            snapshot = json.loads(snapshot_path_of().read_text(encoding="utf-8"))
-            self.assertEqual(snapshot["windowStartEpoch"], 1791080000)
-
-    def test_the_refusal_still_reds_on_a_broken_detail_schema(self):
-        # Only the disagreement stopped being red: a detail payload that has
-        # lost what build.py reads fails the schema guard on the disputed
-        # merge -- exit 1, NOT the disagreement exit, and NO snapshot is
-        # written for a capture that cannot be built.
-        detail = flight_html(detail_payload(
-            intelligenceIndexCostPerTask={
-                "cost": {"total": 1.0},
-                "evaluations": [
-                    {"slug": "scicode", "weightedCostPerTask": 1.0}]}))
-        routes = {
-            fetch_aa.URL: lambda: _FakeResponse(
-                flight_html(leaderboard_payload())),
-            self.DETAIL_URL: lambda: _FakeResponse(detail),
-        }
-        with self.refused_capture(routes) as (_root, run, _captured):
-            with self.assertRaises(SystemExit) as caught:
-                run()
-
-            # The guard's SystemExit carries its message, not a number: the
-            # process exit code would be 1 -- red, and specifically NOT the
-            # disagreement exit the refresh would publish from.
-            self.assertNotEqual(caught.exception.code,
-                                fetch_aa.DISAGREEMENT_EXIT_CODE)
-            self.assertIn("gdpval-aa", str(caught.exception))
-            self.assertFalse(snapshot_path_of().exists(),
-                             "a broken disputed merge wrote a snapshot anyway")
-
-    def test_an_agreeing_capture_drops_a_leftover_snapshot(self):
-        # The window closes: the agreeing capture must not leave a stale
-        # snapshot behind to put the next build into disputed mode from
-        # dead data.
-        routes = {
-            fetch_aa.URL: lambda: _FakeResponse(
-                flight_html(leaderboard_payload())),
-            self.DETAIL_URL: lambda: _FakeResponse(flight_html(detail_payload())),
-            fetch_aa.AGENTS_URL: lambda: _FakeResponse(flight_html(
-                agent_payload([agent_row(f"Agent - Model {i}")
-                               for i in range(5)]))),
-        }
-        with self.refused_capture(routes) as (_root, run, _captured):
-            snap = snapshot_path_of()
-            snap.write_text('{"schema": 1}', encoding="utf-8")
-            stdout, _stderr = run()
-
-            self.assertIn("wrote aa-raw-models.json", stdout)
-            self.assertFalse(snap.exists(),
-                             "an agreeing capture left a stale snapshot")
-
-    def test_the_retry_bound_arithmetic_is_unchanged_by_the_refusal_path(self):
-        # The refusal path deliberately does NOT fetch the coding-agents
-        # page: adding that fetch to the worst case (3 waits + 8 page-bound
-        # fetches + 1 agents fetch) would break the 1200 s capture budget
-        # the suite pins. The agents capture a disputed build renders is the
-        # last-good one in data/, not a fresh fetch.
-        page_bound = (fetch_aa.PAGE_ATTEMPTS * fetch_aa.FETCH_TIMEOUT_SECONDS
-                      + sum(k * fetch_aa.PAGE_BACKOFF_SECONDS
-                            for k in range(1, fetch_aa.PAGE_ATTEMPTS)))
-        worst_case = ((fetch_aa.ATTEMPTS - 1) * fetch_aa.WAIT_SECONDS
-                      + fetch_aa.ATTEMPTS * 2 * page_bound
-                      + page_bound)
-        self.assertLessEqual(worst_case, 1200)
-
-
-# ---------------------------------------------------------------------------
-# Issue #176: the stale-route heal (Overseer ruling (delegated by the
-# maintainer), 2026-10-04). When ALL of one route's disputed values equal the
-# last agreeing capture and NONE of the other route's do, the matching route
-# is stale: its values are dropped and the fresh route publishes undisputed
-# through the normal capture path. The pinned fixture is the 909ca49 window,
-# trimmed (tests/fixtures/issue-176/, provenance in its README): all 9 kept
-# detail values equal the a0ff4ad baseline, none of the leaderboard's do.
-# The suite never writes into data/: every main()-level test redirects
-# fetch_aa.OUT / AGENTS_OUT / STAMP into a temp tree and loads the fixture
-# baseline read-only.
-
-import build  # noqa: E402  # pylint: disable=wrong-import-position
-
-FIXTURE_176_DIR = pathlib.Path(__file__).resolve().parent / "fixtures" / "issue-176"
-
-
-def issue176_snapshot() -> dict:
-    """The trimmed 909ca49 disagreement snapshot."""
-    return json.loads(
-        (FIXTURE_176_DIR / "disagreement-snapshot.json").read_text(encoding="utf-8"))
-
-
-def issue176_baseline() -> list:
-    """The trimmed a0ff4ad capture -- the last agreeing capture."""
-    return json.loads(
-        (FIXTURE_176_DIR / "last-capture.json").read_text(encoding="utf-8"))
-
-
-def issue176_exc() -> fetch_aa._RouteDisagreement:
-    """The fixture window as the retry loop's last attempt raises it."""
-    snap = issue176_snapshot()
-    divergences = [(e["slug"], e["path"], e["lb"], e["dt"])
-                   for e in snap["disagreements"]]
-    return fetch_aa._RouteDisagreement(  # pylint: disable=protected-access
-        f"{len(divergences)} shared value(s) disagree between the leaderboard "
-        "route and the model detail route; the gap-fill merge keeps the "
-        "leaderboard's copy:\n  (fixture)",
-        snap["leaderboardGeneratedAt"], snap["detailGeneratedAt"],
-        snap["leaderboard"], snap["detail"], divergences)
-
-
-def issue176_by_slug(payload: list) -> dict:
-    return {m["slug"]: m for m in payload}
-
-
-def leaderboard_stale_baseline() -> list:
-    """The fixture payloads modelled as a window where the LEADERBOARD's
-    generation was the last agreeing one. An agreeing capture always pairs
-    agreeing values, so such a window's baseline carries the leaderboard's
-    copy of the shape-split total; the fixture's real window disagrees on
-    it, so this re-pairs the baseline object's total with the leaderboard's
-    copy before the merge. Everything else is merge_captures of the two
-    payloads -- detail-only fields from the detail payload, shared values
-    from the leaderboard. See tests/fixtures/issue-176/README.md."""
-    snap = issue176_snapshot()
-    lb = issue176_by_slug(snap["leaderboard"])
-    detail = []
-    for m in snap["detail"]:
-        lb_rec = lb.get(m.get("slug"))
-        outer = m.get("intelligenceIndexCostPerTask")
-        lb_total = (lb_rec or {}).get("intelligenceIndexCostPerTask")
-        if (isinstance(outer, dict) and isinstance(outer.get("cost"), dict)
-                and isinstance(lb_total, (int, float))
-                and not isinstance(lb_total, bool)):
-            outer = {**outer,
-                     "cost": {**outer["cost"], "total": lb_total}}
-            detail.append({**m, "intelligenceIndexCostPerTask": outer})
-        else:
-            detail.append(m)
-    return build.merge_captures(snap["leaderboard"], detail)
-
-
-@contextlib.contextmanager
-def issue176_fetch_paths(root: pathlib.Path):
-    """Point fetch_aa's write paths at a temp root for a modeled run."""
-    old = (fetch_aa.ROOT, fetch_aa.OUT, fetch_aa.AGENTS_OUT, fetch_aa.STAMP)
-    fetch_aa.ROOT = root
-    fetch_aa.OUT = root / "aa-raw-models.json"
-    fetch_aa.AGENTS_OUT = root / "aa-raw-coding-agents.json"
-    fetch_aa.STAMP = root / "captured-at.txt"
-    try:
-        yield
-    finally:
-        (fetch_aa.ROOT, fetch_aa.OUT, fetch_aa.AGENTS_OUT,
-         fetch_aa.STAMP) = old
-
-
-def issue176_stub_urlopen() -> "LoudUrlopenStub":
-    """The fixture window's three pages, for a modeled main() run."""
-    snap = issue176_snapshot()
-    lb_page = flight_html(json.dumps(
-        {"intro": f"Intelligence Index v{fetch_aa.INDEX_VERSION}",
-         "models": snap["leaderboard"]}, separators=(",", ":")))
-    host = fetch_aa.detail_host_slug(snap["leaderboard"])
-    detail_page = flight_html(json.dumps(
-        {"models": snap["detail"]}, separators=(",", ":")))
-    agents_page = flight_html(agent_payload(
-        [agent_row(f"Agent - Model {i}") for i in range(5)]))
-    routes = {
-        fetch_aa.URL: lambda: _FakeResponse(lb_page),
-        fetch_aa.MODEL_DETAIL_URL.format(slug=host): lambda: _FakeResponse(detail_page),
-        fetch_aa.AGENTS_URL: lambda: _FakeResponse(agents_page),
-    }
-    return LoudUrlopenStub(routes)
-
-
-def run_fetch_main_with(stub) -> tuple[str, str]:
-    """One modeled fetch_aa.main() run; -> (stdout, stderr)."""
-    argv = sys.argv
-    try:
-        sys.argv = ["fetch_aa.py"]
-        with unittest.mock.patch.object(urllib.request, "urlopen", stub), \
-                unittest.mock.patch.object(fetch_aa, "_sleep",
-                                           side_effect=lambda s: None):
-            out, err = io.StringIO(), io.StringIO()
-            with contextlib.redirect_stdout(out), \
-                    contextlib.redirect_stderr(err):
-                fetch_aa.main()
-    finally:
-        sys.argv = argv
-    return out.getvalue(), err.getvalue()
-
-
-class StaleRouteHealTests(unittest.TestCase):
-    """The provably-stale route's heal, pinned on the 909ca49 fixture."""
-
-    FRESH_TOTAL = 0.47742401619163854   # deepseek, leaderboard (21:05) copy
-    STALE_TOTAL = 0.3296953563474809    # deepseek, detail (18:41) == baseline
-
-    def healed(self, baseline):
-        exc = issue176_exc()
-        verdict = fetch_aa.heal_route_disagreement(exc, baseline)
-        return verdict
-
-    def test_the_real_window_heals_with_the_detail_route_stale(self):
-        models, note = self.healed(issue176_baseline())
-        by_slug = issue176_by_slug(models)
-        snap = issue176_snapshot()
-        dt = issue176_by_slug(snap["detail"])
-        lb = issue176_by_slug(snap["leaderboard"])
-
-        # deepseek: the fresh scalar total replaces the stale object --
-        # absent rather than mixed. Every shared scalar takes the fresh
-        # leaderboard's copy.
-        deepseek = by_slug["deepseek-v4-pro-non-reasoning"]
-        self.assertIsInstance(deepseek["intelligenceIndexCostPerTask"], (int, float))
-        self.assertEqual(deepseek["intelligenceIndexCostPerTask"], self.FRESH_TOTAL)
-        self.assertEqual(deepseek["gdpvalNormalized"],
-                         lb["deepseek-v4-pro-non-reasoning"]["gdpvalNormalized"])
-        self.assertEqual(deepseek["name"], lb["deepseek-v4-pro-non-reasoning"]["name"])
-        self.assertEqual(deepseek["price1mInputTokens"], 1.32)
-
-        # Stale detail-only fields stay at their last capture.
-        for field in ("parameters", "licenseName", "releaseDate"):
-            self.assertEqual(deepseek[field], dt["deepseek-v4-pro-non-reasoning"][field])
-
-        # GDPval cost: absent for the cost-moved model, rendered for models
-        # whose cost did not move.
-        self.assertIsNone(build.evaluation_cost_per_task(
-            deepseek, build.GDPVAL_SLUG, build.GDPVAL_INDEX_WEIGHT))
-        # claude-fable-5: the score moved, the cost did not -- the stale
-        # breakdown stays at its last capture and still pairs with its
-        # unchanged total, so the GDPval cost renders.
-        fable = by_slug["claude-fable-5"]
-        self.assertIsNotNone(build.evaluation_cost_per_task(
-            fable, build.GDPVAL_SLUG, build.GDPVAL_INDEX_WEIGHT))
-
-        # And it feeds the page: the intelligence pair is fresh, the agentic
-        # pair is absent only where the cost moved.
-        self.assertEqual(build.cost_per_task(deepseek), self.FRESH_TOTAL)
-        self.assertIsNone(build.metric_record(deepseek, "agentic"))
-        self.assertIsNotNone(build.metric_record(fable, "agentic"))
-
-        # The repaired capture passes the sum check unchanged.
-        self.assertGreater(fetch_aa.check_cost_breakdown(models), 0)
-
-        # The note names the stale route, the absent count, and the
-        # corrected baseline (issue #193: never "the last committed
-        # capture" -- the baseline is the recorded last-agreeing one).
-        self.assertIn("detail route is stale", note)
-        self.assertIn("1 GDPval cost", note)
-        self.assertIn(
-            "equal the last agreeing capture (the recorded baseline)", note)
-
-    def test_the_leaderboard_stale_direction_heals(self):
-        # The synthetic second direction (#117 ran it for real): the same
-        # captured payloads, but the baseline is the merge of those payloads
-        # -- a modelling of a window OPENING with the leaderboard's
-        # generation as the last agreeing capture. This is never the state
-        # after a heal: a healed capture is never a baseline (issue #189,
-        # pinned by the two-hour loop test below), so this window's hour 2
-        # re-derives the same verdict from the same recorded baseline.
-        # See tests/fixtures/issue-176/README.md.
-        snap = issue176_snapshot()
-        baseline = leaderboard_stale_baseline()
-        models, note = self.healed(baseline)
-        by_slug = issue176_by_slug(models)
-        dt = issue176_by_slug(snap["detail"])
-
-        self.assertIn("leaderboard route is stale", note)
-
-        # Every divergent path takes the detail route's copy -- including the
-        # cost total, which the fresh detail object already carried.
-        deepseek = by_slug["deepseek-v4-pro-non-reasoning"]
-        self.assertEqual(
-            deepseek["intelligenceIndexCostPerTask"]["cost"]["total"],
-            self.STALE_TOTAL)
-        self.assertEqual(
-            deepseek["intelligenceIndexCostPerTask"]["cost"]["total"],
-            dt["deepseek-v4-pro-non-reasoning"]["intelligenceIndexCostPerTask"]["cost"]["total"])
-        self.assertEqual(deepseek["gdpvalNormalized"],
-                         dt["deepseek-v4-pro-non-reasoning"]["gdpvalNormalized"])
-        self.assertEqual(deepseek["name"], dt["deepseek-v4-pro-non-reasoning"]["name"])
-
-        # The fresh breakdown pairs with the fresh total: GDPval renders, and
-        # the sum check passes unchanged.
-        self.assertIsNotNone(build.evaluation_cost_per_task(
-            deepseek, build.GDPVAL_SLUG, build.GDPVAL_INDEX_WEIGHT))
-        self.assertGreater(fetch_aa.check_cost_breakdown(models), 0)
-
-    def test_mixed_matches_fall_back_to_disputed(self):
-        baseline = issue176_baseline()
-        exc = issue176_exc()
-        # One leaderboard value swapped to the baseline's copy: the
-        # leaderboard now matches 1 of 9 -- provable staleness is gone.
-        slug, path, _lb, dt = exc.divergences[0]
-        base = issue176_by_slug(baseline)[slug]
-        parts = path.split(".")
-        base_value = base
-        for part in parts:
-            base_value = base_value[part]
-        exc.divergences[0] = (slug, path, base_value, dt)
-        self.assertIsNone(fetch_aa.heal_route_disagreement(exc, baseline))
-
-    def test_both_routes_differing_falls_back_to_disputed(self):
-        baseline = issue176_baseline()
-        exc = issue176_exc()
-        # Nudge every value away from both the baseline and each other: the
-        # routes agree with neither generation.
-        exc.divergences = [
-            (slug, path, lb + 1000.0, dt + 2000.0)
-            if isinstance(lb, (int, float)) and isinstance(dt, (int, float))
-            else (slug, path, f"new-{lb}", f"new-{dt}")
-            for slug, path, lb, dt in exc.divergences
-        ]
-        self.assertIsNone(fetch_aa.heal_route_disagreement(exc, baseline))
-
-    def test_a_slug_without_a_baseline_row_falls_back_to_disputed(self):
-        baseline = issue176_baseline()
-        exc = issue176_exc()
-        exc.divergences = [
-            ("brand-new-model", "gdpvalNormalized", 0.5, 0.6)]
-        exc.base = issue176_snapshot()["leaderboard"]
-        self.assertIsNone(fetch_aa.heal_route_disagreement(exc, baseline))
-
-    def test_a_missing_baseline_falls_back_to_disputed(self):
-        self.assertIsNone(fetch_aa.heal_route_disagreement(issue176_exc(), None))
-
-    def test_the_mixed_pairing_is_refused_by_the_sum_check(self):
-        # The explicit refusal path: a stale breakdown left under a moved
-        # total is exactly what check_cost_breakdown refuses -- which is why
-        # the heal drops the breakdown instead of pairing it.
-        dt = issue176_by_slug(issue176_snapshot()["detail"])[
-            "deepseek-v4-pro-non-reasoning"]
-        mixed = dict(dt)
-        mixed["intelligenceIndexCostPerTask"] = {
-            "cost": {"total": self.FRESH_TOTAL},
-            "evaluations": dt["intelligenceIndexCostPerTask"]["evaluations"],
-        }
-        with self.assertRaises(SystemExit) as caught:
-            fetch_aa.check_cost_breakdown([mixed])
-        self.assertIn("deepseek-v4-pro-non-reasoning", str(caught.exception))
-
-    def test_a_healed_refusal_captures_through_the_normal_path(self):
-        snap = issue176_snapshot()
-        lb_page = flight_html(json.dumps(
-            {"intro": f"Intelligence Index v{fetch_aa.INDEX_VERSION}",
-             "models": snap["leaderboard"]}, separators=(",", ":")))
-        host = fetch_aa.detail_host_slug(snap["leaderboard"])
-        detail_page = flight_html(json.dumps(
-            {"models": snap["detail"]}, separators=(",", ":")))
-        agents_page = flight_html(agent_payload(
-            [agent_row(f"Agent - Model {i}") for i in range(5)]))
-        routes = {
-            fetch_aa.URL: lambda: _FakeResponse(lb_page),
-            fetch_aa.MODEL_DETAIL_URL.format(slug=host): lambda: _FakeResponse(detail_page),
-            fetch_aa.AGENTS_URL: lambda: _FakeResponse(agents_page),
-        }
-        stub = LoudUrlopenStub(routes)
-        with tempfile.TemporaryDirectory(prefix=".issue-176-heal-") as tmp:
-            root = pathlib.Path(tmp)
-            old = (fetch_aa.ROOT, fetch_aa.OUT, fetch_aa.AGENTS_OUT,
-                   fetch_aa.STAMP)
-            argv = sys.argv
-            try:
-                fetch_aa.ROOT = root
-                fetch_aa.OUT = root / "aa-raw-models.json"
-                fetch_aa.AGENTS_OUT = root / "aa-raw-coding-agents.json"
-                fetch_aa.STAMP = root / "captured-at.txt"
-                # The last agreeing capture: the fixture baseline.
-                fetch_aa.OUT.write_text(json.dumps(issue176_baseline()),
-                                        encoding="utf-8")
-                sys.argv = ["fetch_aa.py"]
-                with unittest.mock.patch.object(urllib.request, "urlopen", stub), \
-                        unittest.mock.patch.object(fetch_aa, "_sleep",
-                                                   side_effect=lambda s: None):
-                    out, err = io.StringIO(), io.StringIO()
-                    with contextlib.redirect_stdout(out), \
-                            contextlib.redirect_stderr(err):
-                        fetch_aa.main()   # heals: no SystemExit
-            finally:
-                sys.argv = argv
-                (fetch_aa.ROOT, fetch_aa.OUT, fetch_aa.AGENTS_OUT,
-                 fetch_aa.STAMP) = old
-
-            stdout, stderr = out.getvalue(), err.getvalue()
-            self.assertIn("route disagreement resolved", stderr)
-            self.assertIn("detail route is stale", stderr)
-            self.assertIn("wrote aa-raw-models.json", stdout)
-            healed = json.loads((root / "aa-raw-models.json").read_text(encoding="utf-8"))
-            deepseek = issue176_by_slug(healed)["deepseek-v4-pro-non-reasoning"]
-            self.assertEqual(deepseek["intelligenceIndexCostPerTask"], self.FRESH_TOTAL)
-            self.assertFalse((root / "aa-disagreement-snapshot.json").exists(),
-                             "a healed capture wrote the disputed snapshot")
-            self.assertTrue((root / "aa-raw-coding-agents.json").exists(),
-                            "the heal skipped the coding-agents capture")
-            self.assertTrue((root / "captured-at.txt").exists(),
-                            "the heal skipped the capture stamp")
-
-    def test_the_two_hour_loop_does_not_flip(self):
-        # Issue #189, the required regression: heal twice over the 909ca49
-        # fixture -- hour 2's HEAD state is hour 1's committed result -- and
-        # the SAME route must be judged stale with an identical capture both
-        # hours. The pre-#189 code read the baseline off HEAD's
-        # data/aa-raw-models.json, so hour 1's healed capture became hour 2's
-        # baseline, the verdict flipped, and hour 2 republished the stale
-        # generation undisputed. The baseline is the recorded last-agreeing
-        # capture, never a healed one.
-        with tempfile.TemporaryDirectory(prefix=".issue-189-loop-") as tmp:
-            root = pathlib.Path(tmp)
-            with issue176_fetch_paths(root):
-                # Hour 1's HEAD state: the last agreeing capture, on disk.
-                fetch_aa.OUT.write_text(json.dumps(issue176_baseline()),
-                                        encoding="utf-8")
-                _out1, err1 = run_fetch_main_with(issue176_stub_urlopen())
-                healed1 = fetch_aa.OUT.read_text(encoding="utf-8")
-                marker_path = fetch_aa.OUT.with_name(
-                    fetch_aa.LAST_AGREEING_NAME)
-                marker1 = marker_path.read_bytes()
-                self.assertIn("detail route is stale", err1)
-
-                # Hour 2's HEAD state: hour 1's committed result, fed back in.
-                _out2, err2 = run_fetch_main_with(issue176_stub_urlopen())
-                healed2 = fetch_aa.OUT.read_text(encoding="utf-8")
-                marker2 = marker_path.read_bytes()
-
-        self.assertIn("detail route is stale", err2,
-                      "hour 2 flipped the stale route")
-        self.assertNotIn("leaderboard route is stale", err2)
-        self.assertEqual(healed2, healed1, "hour 2 changed the page")
-        self.assertEqual(marker2, marker1,
-                         "the baseline record moved under hour 2")
-
-    def test_consecutive_disputed_hours_stay_disputed_without_a_flip(self):
-        # A window that cannot heal -- mixed matches, the shape the live
-        # window takes when disputed commits land on main between heals --
-        # stays on the disputed rendering for every hour of its length:
-        # provability is re-derived each hour against the unchanged
-        # baseline, the hour's own snapshot is written, and the capture on
-        # disk is never touched by a disputed hour.
-        with tempfile.TemporaryDirectory(prefix=".issue-189-disputed-") as tmp:
-            root = pathlib.Path(tmp)
-            with issue176_fetch_paths(root):
-                # The last agreeing capture, committed; a disputed hour
-                # never writes OUT, so it stays the baseline all window.
-                fetch_aa.OUT.write_text(json.dumps(issue176_baseline()),
-                                        encoding="utf-8")
-                on_disk = fetch_aa.OUT.read_bytes()
-
-                # One detail value nudged off the baseline it otherwise
-                # equals: no route matches everywhere any more -- provable
-                # staleness is gone, for both orderings, every hour.
-                snap = issue176_snapshot()
-                exc = issue176_exc()
-                slug, path, lb, _dt = exc.divergences[0]
-                dt_records = {m.get("slug"): m for m in snap["detail"]}
-                parent = dt_records[slug]
-                keys = path.split(".")
-                for part in keys[:-1]:
-                    parent = parent[part]
-                nudge = lb + 1234.5 if isinstance(lb, (int, float)) \
-                    and not isinstance(lb, bool) else f"nudged-{lb}"
-                parent[keys[-1]] = nudge
-                mixed_page = flight_html(json.dumps(
-                    {"intro": f"Intelligence Index v{fetch_aa.INDEX_VERSION}",
-                     "models": snap["leaderboard"]}, separators=(",", ":")))
-                host = fetch_aa.detail_host_slug(snap["leaderboard"])
-                detail_page = flight_html(json.dumps(
-                    {"models": snap["detail"]}, separators=(",", ":")))
-                agents_page = flight_html(agent_payload(
-                    [agent_row(f"Agent - Model {i}") for i in range(5)]))
-                routes = {
-                    fetch_aa.URL: lambda: _FakeResponse(mixed_page),
-                    fetch_aa.MODEL_DETAIL_URL.format(slug=host):
-                        lambda: _FakeResponse(detail_page),
-                    fetch_aa.AGENTS_URL: lambda: _FakeResponse(agents_page),
-                }
-
-                for hour in (1, 2, 3):
-                    with self.assertRaises(SystemExit) as caught:
-                        run_fetch_main_with(LoudUrlopenStub(routes))
-                    self.assertEqual(caught.exception.code,
-                                     fetch_aa.DISAGREEMENT_EXIT_CODE,
-                                     f"hour {hour} did not refuse")
-                    self.assertTrue(
-                        (root / "aa-disagreement-snapshot.json").exists(),
-                        f"hour {hour} wrote no disputed snapshot")
-                    self.assertNotIn("route disagreement resolved",
-                                     str(caught.exception))
-                    self.assertEqual(fetch_aa.OUT.read_bytes(), on_disk,
-                                     f"hour {hour} touched the capture")
-                    self.assertFalse((root / fetch_aa.LAST_AGREEING_NAME)
-                                     .exists(),
-                                     f"hour {hour} wrote the last-agreeing "
-                                     "record")
-
-    def test_the_baseline_is_the_recorded_last_agreeing_capture(self):
-        # A healed capture on disk plus the record: the recorded baseline
-        # wins -- never the healed capture at HEAD (issue #189).
-        with tempfile.TemporaryDirectory(prefix=".issue-189-base-") as tmp:
-            root = pathlib.Path(tmp)
-            with issue176_fetch_paths(root):
-                fetch_aa.OUT.write_text(json.dumps([{"slug": "healed"}]),
-                                        encoding="utf-8")
-                marker = fetch_aa.OUT.with_name(fetch_aa.LAST_AGREEING_NAME)
-                marker.write_text(json.dumps(
-                    {"window_start": 7, "baseline": issue176_baseline()}),
-                    encoding="utf-8")
-                baseline = fetch_aa._last_agreeing_capture()  # pylint: disable=protected-access
-        self.assertEqual(baseline, issue176_baseline())
-
-    def test_without_a_record_the_ondisk_capture_is_the_baseline(self):
-        # Before the first healed hour the on-disk capture IS the last
-        # agreeing capture: a disputed refusal never writes OUT.
-        with tempfile.TemporaryDirectory(prefix=".issue-189-base-") as tmp:
-            root = pathlib.Path(tmp)
-            with issue176_fetch_paths(root):
-                fetch_aa.OUT.write_text(json.dumps(issue176_baseline()),
-                                        encoding="utf-8")
-                baseline = fetch_aa._last_agreeing_capture()  # pylint: disable=protected-access
-        self.assertEqual(baseline, issue176_baseline())
-
-    def test_no_baseline_at_all_falls_back_to_disputed(self):
-        # No record and no capture: staleness nobody can prove -- the
-        # disputed rendering takes over.
-        with tempfile.TemporaryDirectory(prefix=".issue-189-base-") as tmp:
-            root = pathlib.Path(tmp)
-            with issue176_fetch_paths(root):
-                self.assertIsNone(fetch_aa._healed_capture(issue176_exc()))  # pylint: disable=protected-access
-
-    def test_an_agreeing_capture_clears_a_stale_record(self):
-        # Agreement is the only window-closer: a healthy capture removes the
-        # record so the NEXT window's first heal proves staleness against the
-        # capture it actually healed, not a pre-window one.
-        agents = flight_html(agent_payload(
-            [agent_row(f"Agent - Model {i}") for i in range(5)]))
-        routes = {
-            fetch_aa.URL: lambda: _FakeResponse(flight_html(leaderboard_payload())),
-            fetch_aa.MODEL_DETAIL_URL.format(slug="detail-host-model"):
-                lambda: _FakeResponse(flight_html(detail_payload())),
-            fetch_aa.AGENTS_URL: lambda: _FakeResponse(agents),
-        }
-        with tempfile.TemporaryDirectory(prefix=".issue-189-clear-") as tmp:
-            root = pathlib.Path(tmp)
-            with issue176_fetch_paths(root):
-                marker = fetch_aa.OUT.with_name(fetch_aa.LAST_AGREEING_NAME)
-                marker.write_text("{}\n", encoding="utf-8")
-                run_fetch_main_with(LoudUrlopenStub(routes))
-                self.assertFalse(
-                    marker.exists(),
-                    "an agreeing capture left the last-agreeing record behind")

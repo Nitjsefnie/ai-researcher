@@ -322,7 +322,7 @@ def test_unterminatable_source_raises(source):
         code_lines(source)
 
 
-# --- the disputed build's second shape (issue #118) -------------------------------
+# --- a second payload length over byte-identical code ---------------------------
 
 def _page_root(tmp_path, payload: str):
     """A root carrying a built page whose DATA line is `payload`.
@@ -347,10 +347,11 @@ def _one_range_record(source: str, start: int, end: int, count: int = 1):
 
 
 def test_a_different_one_line_payload_attributes_and_scores(tmp_path):
-    # The disputed build (issue #118): a different-length DATA line over the
+    # A capture whose DATA line is a different length over the
     # byte-identical code. Its records must attribute and score -- the
-    # disputed JS paths run on no other page -- landing on the shared line
-    # numbers from line 2 on.
+    # payload length moves with every capture, so a stale record from an
+    # earlier one must still land -- on the shared line numbers from line 2
+    # on.
     payload_a = "const DATA = {\"a\": 1};"
     payload_b = "const DATA = {\"a\": 1, \"much\": \"longer payload here\"};"
     root = _page_root(tmp_path, payload_a)

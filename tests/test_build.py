@@ -134,9 +134,10 @@ def route_pair() -> tuple[dict, dict]:
     route has measured it. intelligenceIndexEvaluations is a shared LIST: the
     real corpus ships the key on 678/679 records, 502 empty arrays and 176
     populated in this branch's base capture (177 populated at main HEAD), so
-    the walk's list limb runs on every live capture -- the fixture still
-    carries elements rather than empty arrays because elements pin the limb
-    deterministically, where an empty list walks nothing and proves nothing."""
+    the merge's fill-only-absent walk meets a list on every live capture --
+    the fixture still carries elements rather than empty arrays because
+    elements pin that deterministically, where an empty list proves
+    nothing."""
     return (
         {
             "slug": "fixture-model",
@@ -894,174 +895,83 @@ class EmptyAxisGuardTests(unittest.TestCase):
             self.assertEqual(stats["parameterCount"], 1)
 
 
-class RouteAgreementTests(unittest.TestCase):
-    """Issue #44: the page's cross-route agreement claim, enforced at capture.
+class MergeCapturesTests(unittest.TestCase):
+    """Issue #200: the capture is ONE generation, taken from the leaderboard.
 
-    The page footer states the leaderboard route and the model detail route
-    "agree exactly on every value they share"; the gap-fill merge
-    (scripts/fetch_aa.py merge_captures) keeps the leaderboard's copy of any
-    shared value, so only a check run BEFORE the merge can see a divergence.
-    build.check_route_agreement is that check -- scripts/fetch_aa.py calls it
-    between loading the two routes and the merge -- and these pins hold it to:
-    exact recursive value equality over the parsed structures, every
-    divergence collected and raised in one message naming model slug, field
-    path and both values, "$undefined" read as absent (a field absent on one
-    route is not shared), the leaderboard's flattened cost scalar compared
-    against the detail object's cost.total -- the reshape the merge itself
-    applies, symmetrically in whichever direction the shapes sit -- and
-    shared lists walked element-wise with length mismatches refused at the
-    field.
+    AA's two routes are independently cached pages and its data lands on them
+    at different times, so one capture can straddle an update -- which is what
+    flipped the published page between two generations, hour by hour. The
+    leaderboard route is the authority; the detail route is a gap-fill that
+    supplies only what the leaderboard does not ship (parameters, licence,
+    release date, the per-evaluation cost breakdown) and never overrides a
+    value it does. There is no disagreement state left to resolve: a
+    conflicting detail value simply loses, silently and always.
     """
 
-    def test_agreeing_routes_pass_and_the_comparison_ran_non_vacuously(self):
-        # The healthy control. The comparison's own count of compared values
-        # is the liveness oracle: 6 means it descended the shared record --
-        # slug, isOpenWeights, intelligenceIndex, the flattened 0.75 against
-        # the detail object's cost.total, and both elements of the shared
-        # list -- and skipped only what one route does not carry:
-        # contextWindowTokens ($undefined is absent, not a disagreeing
-        # value), the detail-only evaluations and name/licence/parameter
-        # fields, and the two single-route models (the detail host, which has
-        # no row on its own page, and a detail-only record, which the merge
-        # would drop).
-        leaderboard, detail_route = route_pair()
-        leaderboard = [
-            leaderboard, {"slug": "detail-host-model", "shortName": "Host Model"}]
-        detail_route = [detail_route, {"slug": "detail-only-model", "name": "Detail Only"}]
-
-        compared = build.check_route_agreement(leaderboard, detail_route)
-
-        self.assertEqual(compared, 6)
-
-    def test_a_leaderboard_value_that_diverges_fails_naming_model_field_and_both_values(self):
-        # One delta from the healthy pair: the leaderboard's copy moves.
-        leaderboard, detail_route = route_pair()
-        leaderboard["intelligenceIndex"] = 52
-
-        with self.assertRaises(SystemExit) as raised:
-            build.check_route_agreement([leaderboard], [detail_route])
-
-        message = str(raised.exception)
-        self.assertIn("1 shared value", message)
-        self.assertIn(
-            "fixture-model: intelligenceIndex: leaderboard 52, detail 51",
-            message)
-
-    def test_the_detail_value_being_the_odd_one_fails_identically(self):
-        # The same one delta, carried by the other route: symmetric in which
-        # side is wrong.
-        leaderboard, detail_route = route_pair()
-        detail_route["intelligenceIndex"] = 52
-
-        with self.assertRaises(SystemExit) as raised:
-            build.check_route_agreement([leaderboard], [detail_route])
-
-        message = str(raised.exception)
-        self.assertIn("1 shared value", message)
-        self.assertIn(
-            "fixture-model: intelligenceIndex: leaderboard 51, detail 52",
-            message)
-
-    def test_a_divergence_behind_the_flattened_cost_scalar_fails_at_its_field(self):
-        # One delta, nested: the detail route's cost.total moves while the
-        # leaderboard's flattened scalar stays. The canonicalized comparison
-        # (scalar against cost.total) must catch it, and the divergence line
-        # names the logical field path with the two compared values.
+    def test_the_leaderboard_bare_number_wins_over_the_detail_routes_object(self):
+        # Same key, different SHAPE: the leaderboard flattened
+        # intelligenceIndexCostPerTask to its bare total while the detail route
+        # kept the object. The object is a fill, so it is taken whole -- but
+        # hung under the LEADERBOARD's number, which is the generation being
+        # published and the value the cost axis plots. The detail route's own
+        # total is discarded rather than compared.
         leaderboard, detail_route = route_pair()
         detail_route["intelligenceIndexCostPerTask"]["cost"]["total"] = 0.99
 
-        with self.assertRaises(SystemExit) as raised:
-            build.check_route_agreement([leaderboard], [detail_route])
+        merged = build.merge_captures([leaderboard], [detail_route])[0]
 
-        message = str(raised.exception)
-        self.assertIn("1 shared value", message)
-        self.assertIn(
-            "fixture-model: intelligenceIndexCostPerTask.cost.total: "
-            "leaderboard 0.75, detail 0.99", message)
-
-    def test_a_divergent_element_of_a_shared_list_fails_at_its_indexed_path(self):
-        # One delta: element [1] of the shared list moves on the detail side.
-        # The walk must compare lists element-wise and name the divergence at
-        # its indexed path -- not as one whole-list blob.
-        leaderboard, detail_route = route_pair()
-        detail_route["intelligenceIndexEvaluations"][1] = "terminal-bench-v4-0"
-
-        with self.assertRaises(SystemExit) as raised:
-            build.check_route_agreement([leaderboard], [detail_route])
-
-        message = str(raised.exception)
-        self.assertIn("1 shared value", message)
-        self.assertIn(
-            "fixture-model: intelligenceIndexEvaluations[1]: "
-            "leaderboard 'scicode', detail 'terminal-bench-v4-0'", message)
-
-    def test_shared_lists_of_different_lengths_are_refused_at_the_field(self):
-        # One delta: the detail route's copy of the shared list loses an
-        # element. A shorter list is not a prefix -- element-wise comparison
-        # would silently skip the tail -- so the length mismatch is the
-        # divergence, named at the field itself.
-        leaderboard, detail_route = route_pair()
-        detail_route["intelligenceIndexEvaluations"] = ["gdpval-aa"]
-
-        with self.assertRaises(SystemExit) as raised:
-            build.check_route_agreement([leaderboard], [detail_route])
-
-        message = str(raised.exception)
-        self.assertIn("1 shared value", message)
-        self.assertIn(
-            "fixture-model: intelligenceIndexEvaluations: "
-            "leaderboard ['gdpval-aa', 'scicode'], detail ['gdpval-aa']",
-            message)
-
-    def test_the_cost_scalar_on_the_detail_side_is_canonicalized_symmetrically(self):
-        # The mirror of the flattened-scalar pin: the LEADERBOARD carries the
-        # cost object (total 0.80) while the detail route carries the bare
-        # scalar. The canonicalization is shape-driven, not side-driven --
-        # the same reshape applies with the routes swapped. The mirror-healthy
-        # pair (equal totals, shapes swapped) passes with the same compared
-        # count as the healthy control; the delta below moves exactly one
-        # value from it.
-        leaderboard, detail_route = route_pair()
-        detail_route["intelligenceIndexCostPerTask"] = 0.80
-        leaderboard["intelligenceIndexCostPerTask"] = {
-            "cost": {"total": 0.80},
-            "evaluations": [
-                {"slug": "gdpval-aa", "weightedCostPerTask": 0.30},
-                {"slug": "scicode", "weightedCostPerTask": 0.50},
-            ],
-        }
-
+        pair = merged["intelligenceIndexCostPerTask"]
+        self.assertIsInstance(pair, dict)
+        self.assertEqual(pair["cost"]["total"], 0.75)
+        # ...and the breakdown rides along, since it still decomposes that
+        # number -- the shape this key really ships.
         self.assertEqual(
-            build.check_route_agreement([leaderboard], [detail_route]), 6)
+            [e["slug"] for e in pair["evaluations"]],
+            ["gdpval-aa", "scicode"])
 
-        detail_route["intelligenceIndexCostPerTask"] = 0.75
-
-        with self.assertRaises(SystemExit) as raised:
-            build.check_route_agreement([leaderboard], [detail_route])
-
-        message = str(raised.exception)
-        self.assertIn("1 shared value", message)
-        self.assertIn(
-            "fixture-model: intelligenceIndexCostPerTask.cost.total: "
-            "leaderboard 0.8, detail 0.75", message)
-
-    def test_every_divergence_is_collected_before_the_raise(self):
-        # Two shared fields diverge: one raise, both listed, in a stable
-        # (sorted) order.
+    def test_a_breakdown_that_does_not_sum_drops_whole_and_leaves_the_scalar(self):
+        # The detail route is the STALE one, so its breakdown can belong to the
+        # previous generation's total: it decomposes a number that is not the
+        # one being published. A breakdown that does not sum to the
+        # leaderboard's is not that total's breakdown, so it is dropped whole
+        # rather than hung under it -- and the GDPval axis, the only reader of
+        # the breakdown, goes absent for this model instead of decomposing
+        # someone else's spend.
         leaderboard, detail_route = route_pair()
-        leaderboard["intelligenceIndex"] = 52
-        leaderboard["isOpenWeights"] = True
+        detail_route["intelligenceIndexCostPerTask"]["evaluations"] = [
+            {"slug": "gdpval-aa", "weightedCostPerTask": 0.30},
+            {"slug": "scicode", "weightedCostPerTask": 0.90},
+        ]
 
-        with self.assertRaises(SystemExit) as raised:
-            build.check_route_agreement([leaderboard], [detail_route])
+        merged = build.merge_captures([leaderboard], [detail_route])[0]
 
-        message = str(raised.exception)
-        self.assertIn("2 shared value", message)
-        score_line = "fixture-model: intelligenceIndex: leaderboard 52, detail 51"
-        weights_line = "fixture-model: isOpenWeights: leaderboard True, detail False"
-        self.assertIn(score_line, message)
-        self.assertIn(weights_line, message)
-        self.assertLess(message.index(score_line), message.index(weights_line))
+        # The plain scalar survives, and it is the LEADERBOARD's number.
+        self.assertEqual(merged["intelligenceIndexCostPerTask"], 0.75)
+        self.assertIsNone(
+            build.capability_cost_per_task(merged, "agentic"))
+        # The intelligence axis, which reads the scalar, is untouched.
+        self.assertAlmostEqual(
+            build.capability_cost_per_task(merged, "intelligence"), 0.75)
+
+    def test_a_detail_value_never_overrides_a_leaderboard_value(self):
+        # The whole rule in one pair of records: two shared fields disagree,
+        # the leaderboard's copies are what the capture carries, and the
+        # detail-only fields still fill -- so a conflicting detail value costs
+        # a value the page would otherwise render and nothing else.
+        leaderboard, detail_route = route_pair()
+        leaderboard["intelligenceIndex"] = 51
+        leaderboard["licenseName"] = "Leaderboard Licence"
+        detail_route["intelligenceIndex"] = 52
+        detail_route["licenseName"] = "Detail Licence"
+        detail_route["parameters"] = 27
+
+        merged = build.merge_captures([leaderboard], [detail_route])[0]
+
+        self.assertEqual(merged["intelligenceIndex"], 51)
+        self.assertEqual(merged["licenseName"], "Leaderboard Licence")
+        # The gap-fill half of the rule is untouched by the conflict.
+        self.assertEqual(merged["parameters"], 27)
+        self.assertEqual(merged["name"], "Fixture Model (high)")
 
 
 class SplitEffortTests(unittest.TestCase):
@@ -1668,244 +1578,6 @@ if __name__ == "__main__":
     unittest.main()
 
 
-# --- disputed build (issue #118) ------------------------------------------------
-
-def _disputed_route_records(slug: str = "fixture-model", *, ii_lb: float = 51,
-                            ii_dt: float = 52,
-                            name: str = "Fixture Model (high)",
-                            lic_lb: str | None = None,
-                            lic_dt: str | None = None):
-    """(leaderboard, detail) records for one slug, disagreeing on
-    intelligenceIndex and agreeing on every other shared value: the
-    leaderboard carries its flattened cost scalar and an undefined context,
-    the detail route the full cost object and a measured context."""
-    shared = {
-        "slug": slug,
-        "modelCreatorName": "Fixture Lab",
-        "isOpenWeights": False,
-        "gdpvalNormalized": 0.47,
-        "parameters": 27,
-        "medianOutputTokensPerSecond": 100.0,
-    }
-    if lic_lb is not None:
-        shared["licenseName"] = lic_lb
-    leaderboard = {
-        **shared, "shortName": name, "intelligenceIndex": ii_lb,
-        "intelligenceIndexCostPerTask": 0.75,
-        "contextWindowTokens": "$undefined",
-    }
-    if lic_dt is not None:
-        shared["licenseName"] = lic_dt
-    detail = {
-        **shared, "name": name, "intelligenceIndex": ii_dt,
-        "intelligenceIndexCostPerTask": {
-            "cost": {"total": 0.75},
-            "evaluations": [
-                {"slug": "gdpval-aa", "weightedCostPerTask": 0.30},
-                {"slug": "scicode", "weightedCostPerTask": 0.45}],
-        },
-        "contextWindowTokens": 400000,
-    }
-    return leaderboard, detail
-
-
-def disputed_snapshot_fixture(**kwargs) -> dict:
-    """The snapshot fetch_aa.py's refusal writes, built the same way: the two
-    raw route payloads plus the disagreement map straight out of
-    check_route_agreement -- mutated payloads against each other, never an
-    edited data/ file. Pass lic_lb/lic_dt to add a shared-string dispute
-    (the licence) beside the intelligence-index one."""
-    lb, dt = _disputed_route_records(**kwargs)
-    lb_b, dt_b = _disputed_route_records(
-        "fixture-model-b", ii_lb=40, ii_dt=40,
-        name="Fixture Model B (high)")
-    try:
-        build.check_route_agreement([lb, lb_b], [dt, dt_b])
-        raise AssertionError("the fixture payloads must disagree")
-    except build.RouteDisagreement as exc:
-        divergences = exc.divergences
-    return {
-        "schema": 1,
-        "capturedAt": "2026-10-04T03:30:00Z",
-        "windowStartEpoch": 1791084000,
-        "leaderboardGeneratedAt": 1791084000,
-        "detailGeneratedAt": 1791084300,
-        "indexVersion": build.INDEX_VERSION,
-        "detailHost": "fixture-model-b",
-        "leaderboard": [lb, lb_b],
-        "detail": [dt, dt_b],
-        "disagreements": [
-            {"slug": slug, "path": path, "lb": lb_value, "dt": dt_value}
-            for slug, path, lb_value, dt_value in divergences
-        ],
-    }
-
-
-class DisputedBuildTests(unittest.TestCase):
-    """Issue #118: a disagreement snapshot beside the capture turns the build
-    into a disputed rendering -- banner, both values in disputed cells, and
-    disputed models sitting out the frontiers -- while the file's ABSENCE is
-    the normal build, byte-for-byte as before."""
-
-    @contextlib.contextmanager
-    def disputed_page(self, snapshot: dict | None = None):
-        """build.main() over a temp data dir carrying the snapshot (when
-        given), the last-good agents capture, and the stamp."""
-        with tempfile.TemporaryDirectory(
-                prefix=".issue-118-disputed-", dir=build.ROOT) as tmp:
-            data = pathlib.Path(tmp) / "data"
-            data.mkdir()
-            if snapshot is None:
-                snapshot = disputed_snapshot_fixture()
-            (data / build.DISPUTED_SNAPSHOT_NAME).write_text(
-                json.dumps(snapshot, indent=1), encoding="utf-8")
-            (data / "aa-raw-coding-agents.json").write_text(
-                json.dumps([agent_fixture()]), encoding="utf-8")
-            (data / "captured-at.txt").write_text("2026-10-04\n",
-                                                  encoding="utf-8")
-            saved = build.RAW, build.AGENTS_RAW, build.OUT
-            build.RAW = data / "aa-raw-models.json"
-            build.AGENTS_RAW = data / "aa-raw-coding-agents.json"
-            build.OUT = pathlib.Path(tmp) / "frontier-models.html"
-            try:
-                with contextlib.redirect_stdout(io.StringIO()):
-                    build.main()
-                yield build.OUT.read_text(encoding="utf-8"), snapshot
-            finally:
-                build.RAW, build.AGENTS_RAW, build.OUT = saved
-
-    def payload_of(self, page: str) -> dict:
-        marker = "const DATA = "
-        start = page.index(marker) + len(marker)
-        payload, _ = json.JSONDecoder().raw_decode(page[start:].lstrip())
-        return payload
-
-    def test_the_banner_renders_with_the_window_and_counts(self):
-        with self.disputed_page() as (page, _snapshot):
-            self.assertIn('id="disputed" role="status"', page)
-            self.assertIn("Disputed capture", page)
-            self.assertIn("2026-10-04T03:20:00Z", page)
-            self.assertIn("1 model(s) carry 1 conflicting value(s)", page)
-
-    def test_the_disputed_row_carries_both_values_in_the_static_table(self):
-        with self.disputed_page() as (page, _snapshot):
-            payload = self.payload_of(page)
-            disputed = [r for r in payload["rows"] if r.get("disp")]
-            self.assertEqual([r["base"] for r in disputed],
-                             ["Fixture Model"])
-            entry = disputed[0]["disp"]["intelligenceIndex"]
-            self.assertEqual((entry["lb"], entry["dt"]), (51, 52))
-            # The STATIC body is the accessible twin: the disputed cell shows
-            # both routes' values and the disputed pill, in the no-JS render.
-            self.assertIn("51.0 / 52.0", page)
-            self.assertIn(">disputed</span>", page)
-
-    def test_a_non_disputed_row_renders_its_base_value_unchanged(self):
-        with self.disputed_page() as (page, _snapshot):
-            payload = self.payload_of(page)
-            clean = [r for r in payload["rows"]
-                     if r["base"] == "Fixture Model B"]
-            self.assertEqual(len(clean), 1)
-            self.assertNotIn("disp", clean[0])
-            self.assertNotIn("40.0 /", page)
-
-    def test_disputed_rows_sit_out_the_frontier_in_both_directions(self):
-        # The disputed model is smarter at the same cost, so were it eligible
-        # it would dominate Fixture Model B outright. Sitting out BOTH roles,
-        # B keeps its frontier seat and the disputed model has none.
-        with self.disputed_page() as (page, _snapshot):
-            payload = self.payload_of(page)
-            self.assertEqual(payload["stats"]["metricFrontiers"],
-                             {"coding": 1, "intelligence": 1, "agentic": 1})
-            rows = {r["base"]: r for r in payload["rows"]}
-            self.assertIn(rows["Fixture Model B"],
-                          build.undominated(payload["rows"], "intelligence"))
-            self.assertNotIn(rows["Fixture Model"],
-                             build.undominated(payload["rows"], "intelligence"))
-            # And the no-JS frontier table carries B, never the disputed model.
-            front = page.index("id=\"fTable\"")
-            self.assertIn('<td class="name">Fixture Model B (high)</td>',
-                          page[front:])
-            self.assertNotIn('<td class="name">Fixture Model (high)</td>',
-                             page[front:])
-
-    def test_the_footer_and_legend_name_the_dispute_only_in_disputed_mode(self):
-        with self.disputed_page() as (page, _snapshot):
-            self.assertIn("currently disagree", page)
-            self.assertIn('class="swatch disp"', page)
-            self.assertEqual(page.count('class="swatch disp"'), 4)
-        # ...and the page built WITHOUT a snapshot is exactly the old one:
-        with tempfile.TemporaryDirectory(
-                prefix=".issue-118-normal-", dir=build.ROOT) as tmp:
-            data = pathlib.Path(tmp) / "data"
-            data.mkdir()
-            (data / "aa-raw-models.json").write_text(
-                json.dumps([model_fixture()]), encoding="utf-8")
-            (data / "aa-raw-coding-agents.json").write_text(
-                json.dumps([agent_fixture()]), encoding="utf-8")
-            (data / "captured-at.txt").write_text("2026-10-04\n",
-                                                  encoding="utf-8")
-            saved = build.RAW, build.AGENTS_RAW, build.OUT
-            build.RAW = data / "aa-raw-models.json"
-            build.AGENTS_RAW = data / "aa-raw-coding-agents.json"
-            build.OUT = pathlib.Path(tmp) / "frontier-models.html"
-            try:
-                with contextlib.redirect_stdout(io.StringIO()):
-                    build.main()
-                page = build.OUT.read_text(encoding="utf-8")
-            finally:
-                build.RAW, build.AGENTS_RAW, build.OUT = saved
-        self.assertIn("agree exactly on every value they share", page)
-        self.assertNotIn('id="disputed"', page)
-        self.assertNotIn("swatch disp", page)
-        self.assertNotIn("__DISPUTED_BANNER__", page)
-        self.assertNotIn("__ROUTE_AGREEMENT_CLAUSE__", page)
-        self.assertNotIn("__DISPUTED_LEGEND__", page)
-        payload = self.payload_of(page)
-        self.assertNotIn("disputed", payload["stats"])
-
-    def test_a_corrupt_snapshot_refuses_like_a_corrupt_capture(self):
-        for why, mutate in (
-                ("schema bump", lambda s: s.update({"schema": 2})),
-                ("routes missing", lambda s: s.pop("detail")),
-                ("bad disagreement entry",
-                 lambda s: s["disagreements"].append({"slug": "x"})),
-                ("window start not an epoch",
-                 lambda s: s.update({"windowStartEpoch": "soon"})),
-        ):
-            with self.subTest(why=why):
-                snapshot = disputed_snapshot_fixture()
-                mutate(snapshot)
-                with self.assertRaises(SystemExit) as caught:
-                    with self.disputed_page(snapshot):
-                        pass
-                self.assertIn("aa-disagreement-snapshot.json",
-                              str(caught.exception))
-
-    def test_the_js_dispute_map_spans_the_mirror_paths(self):
-        # One map per language, and the drift between them is silent: the
-        # JS DISPUTE_KINDS (the tooltip's labels and kinds) must carry every
-        # path the static mirror renders, and the cost path's two spellings
-        # -- the nested shape and the reshape spelling -- must both resolve.
-        # Extracted from TEMPLATE so the assertion spans the two modules'
-        # literals, not a copy of either.
-        match = re.search(
-            r'const DISPUTE_KINDS = \{(.*?)\};', build.TEMPLATE, re.S)
-        assert match is not None, "DISPUTE_KINDS vanished from the template"
-        js_keys = set(re.findall(r'"([^"]+)":', match.group(1)))
-        mirror_paths = {"intelligenceIndex", "gdpvalNormalized", "parameters",
-                        "intelligenceIndexCostPerTask",
-                        "intelligenceIndexCostPerTask.cost.total"}
-        self.assertTrue(mirror_paths <= js_keys,
-                        f"the JS map lost a mirror path: "
-                        f"{sorted(mirror_paths - js_keys)}")
-
-    def test_the_provenance_names_the_snapshot_as_an_input(self):
-        with self.disputed_page() as (page, _snapshot):
-            self.assertIn("sha256 over data/aa-disagreement-snapshot.json then "
-                          "data/aa-raw-coding-agents.json", page)
-
-
 class FrontierZeroScoreTests(unittest.TestCase):
     """Issue #146: zero is a legal AA-published score -- the current capture
     carries gdpvalNormalized: 0 on 75 models -- and a score-0 row is
@@ -1928,7 +1600,7 @@ class FrontierZeroScoreTests(unittest.TestCase):
         return [
             {
                 "name": "Cheap Zero", "creator": "Zero Lab", "open": False,
-                "lic": None, "disp": None,
+                "lic": None,
                 "metrics": {
                     "coding": {"score": 40.0, "cost": 0.5},
                     "intelligence": {"score": 30.0, "cost": 1.0},
@@ -1937,7 +1609,7 @@ class FrontierZeroScoreTests(unittest.TestCase):
             },
             {
                 "name": "Costly Smart", "creator": "Other Lab", "open": True,
-                "lic": "mit", "disp": None,
+                "lic": "mit",
                 "metrics": {
                     "coding": {"score": 60.0, "cost": 2.0},
                     "intelligence": {"score": 51.0, "cost": 1.5},
