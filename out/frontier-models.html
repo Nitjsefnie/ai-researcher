@@ -121,10 +121,6 @@
   .legend .item{display:inline-flex;align-items:center;gap:7px}
   .legend .swatch{width:11px;height:11px;border-radius:50%;display:inline-block}
   .legend .swatch.hollow{background:none !important;border:2px solid var(--series-prop);box-sizing:border-box}
-  /* Disputed (issue #118): the hollow SHAPE in the de-emphasis GRAY -- the
-     page's two existing non-hue idioms composited, so the scatter keeps its
-     three-hue cap and disputed is never a fourth color. */
-  .legend .swatch.disp{background:none !important;border:2px solid var(--muted);box-sizing:border-box}
   .legend .line{width:20px;height:0;border-top:2px dashed var(--frontier-line);display:inline-block}
 
   .tip{position:absolute;pointer-events:none;opacity:0;
@@ -195,7 +191,6 @@
       AA's reported total parameter count and so sits apart, last. Together they show both economic and
       parameter efficiency without stitching numbers from different sources.</p>
   </header>
-
 
   <div class="method">
     <div class="label">Method</div>
@@ -400,13 +395,14 @@
   <div class="foot">
     <p>Sourced entirely from Artificial Analysis. Intelligence Index v4.3 comprises
       <span id="evals"></span>. The Coding Agent Index carries its own measured cost per task, and the
-      Intelligence Index cost is AA's own total, and the model rows are one AA snapshot stitched from its
-      leaderboard and a model detail page, which carry different halves of the record and agree exactly on every value they share. GDPval-AA's cost is AA's figure for that evaluation with
+      Intelligence Index cost is AA's own total, and the model rows are the leaderboard's own records,
+      widened only where the leaderboard omits a field the page needs by a value from a model detail
+      page; where both carry a field, the leaderboard's value is the one published. GDPval-AA's cost is AA's figure for that evaluation with
       its 10% index weight divided back out &mdash; AA reports each component's task cost pre-weighted, and
       the components sum exactly to the published total. No score, token price or task measurement is
       estimated, and nothing is filled in from another source. Rebuild with
       <code>python3 scripts/fetch_aa.py &amp;&amp; python3 build.py</code>.</p>
-    <p>Capture <code>92caffab98ca5aa817620781d4f6014c85d95f2cb07fa572df7f8e21b26ba154</code> &mdash; sha256 over data/aa-raw-models.json then data/aa-raw-coding-agents.json, whole files concatenated in that order. Source commit <code>1c489180c89318c8755b29455f03d9abe4b942de</code>.</p>
+    <p>Capture <code>92caffab98ca5aa817620781d4f6014c85d95f2cb07fa572df7f8e21b26ba154</code> &mdash; sha256 over data/aa-raw-models.json then data/aa-raw-coding-agents.json, whole files concatenated in that order. Source commit <code>67109a456d86bc58a10a521cfc8d88a5d98ca9b4</code>.</p>
     <p>&copy; 2026 Peter Z (Nitjsefnie) &middot;
       <a href="https://github.com/Nitjsefnie/ai-researcher/blob/main/LICENSE">MIT licence</a></p>
   </div>
@@ -506,16 +502,10 @@ const DATA = {"rows":[{"name":"Claude Opus 5.5 (Max, Default Fallback)","base":"
   }
 
   function frontierMetric(rows,key){
-    // Disputed rows sit out BOTH roles (issue #118), exactly as the build's
-    // own undominated() does: no disputed model is a frontier candidate, and
-    // no disputed model dominates anyone -- a verdict computed against a
-    // value one of AA's own routes disagrees with is not a verdict the page
-    // can stand behind.
     return rows.filter(r=>{
-      if(r.disp) return false;
       const m=metricOf(r,key);
       return !rows.some(o=>{
-        if(o===r||o.disp) return false;
+        if(o===r) return false;
         const om=metricOf(o,key);
         return om.score>=m.score && om.cost<=m.cost &&
           (om.score>m.score || om.cost<m.cost);
@@ -554,94 +544,6 @@ const DATA = {"rows":[{"name":"Claude Opus 5.5 (Max, Default Fallback)","base":"
     ["Output speed", show(r.tps == null ? null : r.tps + " tok/s")],
     ["Context", fmtCtx(r.ctx)],
   ];
-
-  /* ---------- disputed layer (issue #118) ---------- */
-  // The disputed rendering reads exactly two things: the row's own disp map
-  // (which of its values the two AA routes disagree on, both values each)
-  // and stats.disputed (the window + per-route generation times). Both exist
-  // only in a disputed build, so every rule here is inert on a normal page.
-  const DISPUTE_LABELS = {
-    "intelligenceIndex": "Intelligence Index",
-    "intelligenceIndexCostPerTask": "Cost per task",
-    "intelligenceIndexCostPerTask.cost.total": "Cost per task",
-    "gdpvalNormalized": "GDPval-AA v2",
-    "parameters": "Parameters",
-    "price1mInputTokens": "$ / 1M in",
-    "price1mOutputTokens": "$ / 1M out",
-    "medianOutputTokensPerSecond": "Output speed",
-    "contextWindowTokens": "Context",
-    "releaseDate": "Released",
-    "licenseName": "Weights licence",
-    "modelCreatorName": "Lab",
-    "name": "Name",
-    "shortName": "AA label",
-  };
-  const routeCostTotal = v =>
-    typeof v === "number" ? v
-      : (v && typeof v === "object" && v.cost && typeof v.cost.total === "number"
-          ? v.cost.total : null);
-  // The kind a disputed path renders with, mirroring the build's own
-  // _fmt_dispute_value kind-for-kind; the fallback is the page's show() --
-  // a string-valued dispute (a label, a licence, a date) renders as text,
-  // never as a number that is not one.
-  const DISPUTE_KINDS = {
-    "intelligenceIndex": "score",
-    "intelligenceIndexCostPerTask": "cost",
-    "intelligenceIndexCostPerTask.cost.total": "cost",
-    "gdpvalNormalized": "gdpval",
-    "parameters": "params",
-    "price1mInputTokens": "price",
-    "price1mOutputTokens": "price",
-    "medianOutputTokensPerSecond": "num",
-    "contextWindowTokens": "ctx",
-    "releaseDate": "text",
-    "licenseName": "text",
-    "modelCreatorName": "text",
-    "name": "text",
-    "shortName": "text",
-  };
-  const fmtDisp = (v, kind) => {
-    if (v == null) return "—";
-    if (kind === "gdpval") return (v * 100).toFixed(1);
-    if (kind === "cost") {
-      const t = routeCostTotal(v);
-      return t == null ? "—" : fmtCost(t);
-    }
-    if (kind === "params") return fmtParams(v);
-    if (kind === "price") return "$" + v;
-    if (kind === "ctx") return fmtCtx(v);
-    if (kind === "score") return typeof v === "number" ? v.toFixed(1) : String(v);
-    if (kind === "num") return String(v);
-    return show(v);
-  };
-  const dispPair = (r, path) => {
-    if (!r.disp || !(path in r.disp)) return null;
-    const e = r.disp[path];
-    return fmtDisp(e.lb, DISPUTE_KINDS[path]) + " / "
-         + fmtDisp(e.dt, DISPUTE_KINDS[path]);
-  };
-  // The cost cell's both-routes text: the disagreement map can spell the
-  // cost path two ways (the nested shape, or the top-level path when the
-  // leaderboard's flattened scalar was compared through the check's
-  // reshape), and either side that fails to resolve to a number renders the
-  // em dash for that side alone -- never a guess.
-  const dispCostPair = r => dispPair(r, "intelligenceIndexCostPerTask.cost.total")
-    || dispPair(r, "intelligenceIndexCostPerTask");
-  const dispTagCell = cell => {
-    cell.appendChild(document.createTextNode(" "));
-    const tag = document.createElement("span");
-    tag.className = "tag"; tag.textContent = "disputed";
-    cell.appendChild(tag);
-  };
-  // The per-route generation times, rendered once per disputed tooltip: the
-  // route label on each pair plus the time that route's copy was generated,
-  // as the banner promises. Epoch ints from stats.disputed.
-  const dispIso = e => e == null ? "unknown"
-    : new Date(e * 1000).toISOString().replace(/\.\d{3}Z$/, "Z");
-  const dispGeneratedLine = () => !S.disputed ? null :
-    ["Route copies generated",
-     "leaderboard " + dispIso(S.disputed.leaderboardGeneratedAt) +
-     " · detail " + dispIso(S.disputed.detailGeneratedAt)];
 
   /* ---------- scatter ---------- */
   // The plot fills whatever width the page gives it. The viewBox width tracks
@@ -783,16 +685,11 @@ const DATA = {"rows":[{"name":"Claude Opus 5.5 (Max, Default Fallback)","base":"
       const cx=X(r.cost), cy=Y(r.ii), on=frontSet.has(r);
       // the de-emphasis gray is page-wide, matching drawCapability: a point
       // off this chart's frontier draws var(--muted); a frontier point keeps
-      // its weights fill. A DISPUTED point (issue #118) overrides both: the
-      // hollow shape in the de-emphasis gray -- no fourth hue, the same
-      // idioms the legend's swatch renders.
-      const disp=!!r.disp;
+      // its weights fill.
       const c=el("circle",{cx:cx,cy:cy,r:on?6:5,
-        fill:disp?"var(--surface-1)":(on?fillOf(r):"var(--muted)"),
-        stroke:disp?"var(--muted)":strokeOf(r),"stroke-width":2,
+        fill:on?fillOf(r):"var(--muted)",stroke:strokeOf(r),"stroke-width":2,
         class:"pt"+(pins.has(r.name)?" pinned":""),role:"button",tabindex:0,
-        "aria-label":"Pin "+r.name+" on the Intelligence Index chart"
-          +(disp?" (disputed values)":""),
+        "aria-label":"Pin "+r.name+" on the Intelligence Index chart",
         "aria-pressed":String(pins.has(r.name))});
       svg.appendChild(c);
       pts.push({r:r,x:cx,y:cy,el:c});
@@ -967,27 +864,7 @@ const DATA = {"rows":[{"name":"Claude Opus 5.5 (Max, Default Fallback)","base":"
       const rows=[["Intelligence Index",r.ii.toFixed(1)],
                   ["Cost per task",fmtCost(r.cost)],
                   ...secondaryRows(r)];
-      if(r.disp){
-        // Both routes' values for the rendered fields, each labeled with its
-        // route (the pairs' "leaderboard / detail" order is fixed), plus the
-        // per-route generation times and one line for the rest of the map --
-        // the reader learns the record is wider-disputed without the tooltip
-        // becoming a raw dump (#118).
-        const entries=Object.entries(r.disp);
-        let shown=0;
-        for(const [path,e] of entries){
-          const label=DISPUTE_LABELS[path];
-          if(!label) continue;
-          rows.push([label+" — both routes", dispPair(r, path)]);
-          shown++;
-        }
-        if(entries.length>shown)
-          rows.push(["Other fields disputed", String(entries.length-shown)]);
-        const gen=dispGeneratedLine();
-        if(gen) rows.push(gen);
-      }
-      rows.push(["On frontier", r.disp ? "excluded — disputed"
-               : frontSet.has(r) ? "yes" : "no — superseded"]);
+      rows.push(["On frontier", frontSet.has(r) ? "yes" : "no — superseded"]);
       if(r.dep) rows.push(["Vendor status","retired"]);
       for(const [k,v] of rows){
         const d=document.createElement("div"); d.className="trow";
@@ -1099,14 +976,12 @@ const DATA = {"rows":[{"name":"Claude Opus 5.5 (Max, Default Fallback)","base":"
       const m=metricOf(r,key), x=X(m.cost), y=Y(m.score), on=front.has(r);
       // the de-emphasis gray is page-wide: a point off THIS chart's frontier
       // draws var(--muted) here and on the other three charts alike, while a
-      // frontier point keeps its weights fill. Disputed (issue #118) draws
-      // hollow in the gray, on every chart alike.
-      const fill=r.disp?"var(--surface-1)":(!on?"var(--muted)":fillOf(r));
+      // frontier point keeps its weights fill.
+      const fill=on?fillOf(r):"var(--muted)";
       const mark=el("circle",{cx:x,cy:y,r:on?6:5,fill:fill,
-        stroke:r.disp?"var(--muted)":strokeOf(r),"stroke-width":2,
+        stroke:strokeOf(r),"stroke-width":2,
         class:"pt"+(pins.has(r.name)?" pinned":""),role:"button",tabindex:0,
-        "aria-label":"Pin "+r.name+" on the "+cfg.label+" chart"
-          +(r.disp?" (disputed values)":""),
+        "aria-label":"Pin "+r.name+" on the "+cfg.label+" chart",
         "aria-pressed":String(pins.has(r.name))});
       chart.appendChild(mark); pts.push({r,x,y,el:mark});
     }
@@ -1201,23 +1076,8 @@ const DATA = {"rows":[{"name":"Claude Opus 5.5 (Max, Default Fallback)","base":"
            ...secondaryRows(hit.r)]
         : [[cfg.label,m.score.toFixed(1)],["Cost per task",fmtCost(m.cost)],
            ...secondaryRows(hit.r)];
-      if(hit.r.disp){
-        const entries=Object.entries(hit.r.disp);
-        let shown=0;
-        for(const [path,e] of entries){
-          const label=DISPUTE_LABELS[path];
-          if(!label) continue;
-          lines.push([label+" — both routes", dispPair(hit.r, path)]);
-          shown++;
-        }
-        if(entries.length>shown)
-          lines.push(["Other fields disputed", String(entries.length-shown)]);
-        const gen=dispGeneratedLine();
-        if(gen) lines.push(gen);
-      }
       lines.push([key==="parameters" ? "On parameter frontier" : "On frontier",
-                  hit.r.disp ? "excluded — disputed"
-                  : plot.front.has(hit.r) ? "yes" : "no — superseded"]);
+                  plot.front.has(hit.r) ? "yes" : "no — superseded"]);
       if(hit.r.dep) lines.push(["Vendor status","retired"]);
       for(const [k,v] of lines){
         const row=document.createElement("div"); row.className="trow";
@@ -1330,13 +1190,8 @@ const DATA = {"rows":[{"name":"Claude Opus 5.5 (Max, Default Fallback)","base":"
       for(const key of Object.keys(METRICS)){
         const m=metricOf(r,key), score=document.createElement("td"), cost=document.createElement("td");
         score.className="n"; cost.className="n";
-        const dsp = key==="intelligence" ? dispPair(r,"intelligenceIndex")
-                  : key==="agentic" ? dispPair(r,"gdpvalNormalized") : null;
-        const dcost = key!=="coding" ? dispCostPair(r) : null;
-        score.textContent = dsp || (m?m.score.toFixed(1):"—");
-        cost.textContent = dcost || (m?fmtCost(m.cost):"—");
-        if(dsp) dispTagCell(score);
-        if(dcost) dispTagCell(cost);
+        score.textContent = m ? m.score.toFixed(1) : "—";
+        cost.textContent = m ? fmtCost(m.cost) : "—";
         if(m&&frontSets[key].has(r)){
           score.appendChild(document.createTextNode(" "));
           const tag=document.createElement("span"); tag.className="tag f";
@@ -1346,10 +1201,8 @@ const DATA = {"rows":[{"name":"Claude Opus 5.5 (Max, Default Fallback)","base":"
         if(key==="intelligence"){
           const parameters=document.createElement("td");
           parameters.className="n";
-          const pdp=dispPair(r,"parameters");
-          parameters.textContent = pdp || fmtParams(r.params);
-          if(pdp) dispTagCell(parameters);
-          else if(metricOf(r,"parameters")&&frontSets.parameters.has(r)){
+          parameters.textContent = fmtParams(r.params);
+          if(metricOf(r,"parameters")&&frontSets.parameters.has(r)){
             parameters.appendChild(document.createTextNode(" "));
             const tag=document.createElement("span"); tag.className="tag f";
             tag.textContent="parameter frontier"; parameters.appendChild(tag);
