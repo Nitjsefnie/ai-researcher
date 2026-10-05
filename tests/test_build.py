@@ -1762,6 +1762,31 @@ class RetiredMismatchSummaryTests(unittest.TestCase):
             build.retired_summary(rows, self._front_of(rows)),
             "metric filter subsumes the vendor flag")
 
+    def test_a_same_named_agent_row_lends_no_frontier_to_the_retired_model(self):
+        # The identity guard: an agent row sharing the retired model's
+        # display name sits on the coding frontier itself, and the retired
+        # MODEL row must not borrow it -- under name matching the summary
+        # would claim a coding frontier the model never earned. The second
+        # assertion is the live-oracle half: the agent row IS the coding
+        # frontier point, so the fixture can carry the collision.
+        model = self._row("Retired Champ", ii=51, icost=0.75, agentic=47, dep=True)
+        agent = {
+            "name": "Retired Champ", "dep": False, "params": None,
+            "ii": None, "cost": None,
+            "metrics": {
+                "coding": {"score": 40.0, "cost": 0.5},
+                "intelligence": None,
+                "agentic": None,
+            },
+        }
+        rows = [model, agent]
+        self.assertEqual(
+            build.retired_summary(rows, self._front_of([model])),
+            "MISMATCH -- still undominated: Retired Champ "
+            "[frontiers: intelligence, agentic]")
+        self.assertEqual(
+            build.retired_frontier_axes(rows, agent), ["coding"])
+
     def test_the_printed_line_names_the_undominated_retired_model(self):
         # Through main() on a mutated real capture: retiring an undominated
         # frontier model must put its name and frontiers on the printed
