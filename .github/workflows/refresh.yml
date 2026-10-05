@@ -761,7 +761,7 @@ jobs:
               echo
               echo "The tested base $base is no longer main's tip ($fetched)."
               echo "The next hourly run re-fetches on the new tip, re-runs the suite"
-              echo "in the keyless publish job, and lands the data there."
+              echo "in the capture job, and lands the data there."
             } >> "$GITHUB_STEP_SUMMARY"
             exit 0
           fi
@@ -786,7 +786,7 @@ jobs:
             {
               echo "### Dropped: main moved before the push landed"
               echo "The next hourly run re-fetches on the new tip, re-runs the suite"
-              echo "in the keyless publish job, and lands the data there."
+              echo "in the capture job, and lands the data there."
             } >> "$GITHUB_STEP_SUMMARY"
           fi
 

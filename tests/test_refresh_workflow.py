@@ -910,9 +910,11 @@ class ExecutedGenerationTieTests(_SeededOrigin, unittest.TestCase):
                 tmp, self.step, self._env(tmp, config, base))
             # Green, and nothing committed: the deliberate outcome.
             self.assertEqual(proc.returncode, 0, proc.stderr)
+            # The EXACT outputs, not substrings: a step that wrote
+            # publish=false and later publish=true satisfies both `in`
+            # checks, and one job output has one meaning.
             outputs = (tmp / "output.txt").read_text(encoding="utf-8")
-            self.assertIn("publish=false", outputs)
-            self.assertIn("commits=false", outputs)
+            self.assertEqual(outputs, "publish=false\ncommits=false\n")
             # The scratch repo exists (it is inited before the fetch) but
             # never held a commit: main's newer tree was never checked out
             # and no payload byte was ever copied over it.
@@ -923,21 +925,28 @@ class ExecutedGenerationTieTests(_SeededOrigin, unittest.TestCase):
             self.assertIn(base, summary)
             self.assertIn(newer, summary)
 
-    def test_an_unset_sha_still_concedes(self):
-        # The tie fails toward the dropped hour: an unset GITHUB_SHA cannot
-        # equal a SHA, so the step concedes rather than committing a
-        # payload whose generation it cannot name.
-        with tempfile.TemporaryDirectory(prefix=".generation-tie-") as raw:
-            tmp = pathlib.Path(raw)
-            config, _, _, _, _ = self._seed_origin(tmp, self.base_files)
-            self._payload(tmp)
-            env = self._env(tmp, config, "")
-            del env["GITHUB_SHA"]
-            proc = _workflowrun.run_step(tmp, self.step, env)
-            self.assertEqual(proc.returncode, 0, proc.stderr)
-            self.assertIn("publish=false",
-                          (tmp / "output.txt").read_text(encoding="utf-8"))
-            self.assertFalse(self._has_commit(tmp / "scratch"))
+    def test_a_sha_that_is_absent_or_empty_still_concedes(self):
+        # The tie fails toward the dropped hour: a GITHUB_SHA that is absent
+        # and one that is empty are BOTH driven, because the workflow runs
+        # under `bash -e` with no `set -u` and a `set -u` added later would
+        # split them into two shapes where only one is refused today.
+        for absent in (True, False):
+            with self.subTest(absent=absent):
+                with tempfile.TemporaryDirectory(
+                        prefix=".generation-tie-") as raw:
+                    tmp = pathlib.Path(raw)
+                    config, _, _, _, _ = self._seed_origin(
+                        tmp, self.base_files)
+                    self._payload(tmp)
+                    env = self._env(tmp, config, "")
+                    if absent:
+                        del env["GITHUB_SHA"]
+                    proc = _workflowrun.run_step(tmp, self.step, env)
+                    self.assertEqual(proc.returncode, 0, proc.stderr)
+                    self.assertEqual(
+                        (tmp / "output.txt").read_text(encoding="utf-8"),
+                        "publish=false\ncommits=false\n")
+                    self.assertFalse(self._has_commit(tmp / "scratch"))
 
 
 class DeployKeyPushTests(unittest.TestCase):
