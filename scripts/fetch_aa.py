@@ -39,7 +39,7 @@ ROOT_FOR_IMPORT = pathlib.Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT_FOR_IMPORT))
 
 from build import (  # noqa: E402  # pylint: disable=wrong-import-position
-    GDPVAL_SLUG, INDEX_VERSION, merge_captures,
+    GDPVAL_SLUG, INDEX_VERSION, SUM_TOLERANCE, merge_captures,
 )
 
 URL = "https://artificialanalysis.ai/leaderboards/models"
@@ -118,9 +118,10 @@ CODING_ROW_FLOOR = 5
 VERSION_RE = re.compile(r"Intelligence Index v(\d+\.\d+)")
 
 # The per-evaluation costs are the index weights already applied, so they sum
-# to the published total. A drift past this means AA changed what the breakdown
-# contains -- exactly the move that silently emptied two charts at v4.3.
-SUM_TOLERANCE = 1e-6
+# to the published total. A drift past build.py's SUM_TOLERANCE -- the same
+# constant merge_captures uses to drop another generation's breakdown -- means
+# AA changed what the breakdown contains, which is exactly the move that
+# silently emptied two charts at v4.3.
 
 
 def _retryable_transport_error(exc: BaseException) -> bool:
@@ -286,12 +287,25 @@ def label(m: dict) -> str:
     return "<unidentifiable model>"
 
 
-def check_cost_breakdown(models: list[dict]) -> int:
-    """The cost breakdown still contains what build.py reads from it."""
+def check_cost_breakdown(models: list[dict]) -> tuple[int, list[str]]:
+    """The cost breakdown still contains what build.py reads from it.
+
+    Returns (models carrying a usable breakdown, models whose breakdown
+    merge_captures DROPPED). The second is not an error: a detail-route
+    breakdown that does not sum to the leaderboard's total is not that
+    total's breakdown, so the merge leaves the leaderboard's number alone and
+    the GDPval axis reads absent for that model until the routes converge
+    (issue #200). It is reported so a capture that drops EVERY breakdown reads
+    as what it is -- a cross-generation window the merge is holding honest
+    through -- rather than as the schema change the refusal below names.
+    """
     checked = 0
+    dropped: list[str] = []
     for m in models:
         outer = m.get("intelligenceIndexCostPerTask")
         if not isinstance(outer, dict):
+            if isinstance(outer, (int, float)) and not isinstance(outer, bool):
+                dropped.append(label(m))
             continue
         evaluations = outer.get("evaluations")
         total = (outer.get("cost") or {}).get("total")
@@ -316,8 +330,21 @@ def check_cost_breakdown(models: list[dict]) -> int:
             )
         checked += 1
     if not checked:
+        if dropped:
+            # The merge dropped every breakdown, so nothing is left to check.
+            # That is a window, not a schema change: AA's two routes are
+            # serving two generations and the merge is refusing to decompose
+            # one generation's total with another's breakdown.
+            sys.exit(
+                f"every model's cost breakdown was dropped as another "
+                f"generation's ({len(dropped)} model(s), first "
+                f"{dropped[0]!r}) -- AA's leaderboard and detail routes are "
+                "serving two generations at once; nothing is wrong with the "
+                "schema, and the page will recover on its own once they "
+                "converge"
+            )
         sys.exit("no model carries a cost breakdown -- schema changed")
-    return checked
+    return checked, dropped
 
 
 def balanced_object(text: str, start: int) -> str | None:
@@ -501,7 +528,7 @@ def main() -> None:
 
     captured = capture(args.html, args.detail_html)
     models = captured.models
-    priced = check_cost_breakdown(models)
+    priced, dropped = check_cost_breakdown(models)
     agents_text = fetch_html(args.agents_html, AGENTS_URL)
     agents = coding_agent_rows(flight_payload(agents_text))
 
@@ -515,6 +542,15 @@ def main() -> None:
           f"intelligence index, {priced} with a v{captured.version} cost breakdown "
           f"(gaps filled from /models/{captured.host}; the leaderboard's own "
           "value wins wherever both routes carry the field)")
+    if dropped:
+        # Named, not counted: each is a model whose GDPval cost renders absent
+        # until AA's two routes agree, and a count alone does not say which.
+        print(f"{len(dropped)} model(s) carry the leaderboard's measured cost "
+              "but no cost breakdown to decompose it (the detail route's "
+              "breakdown is another generation's), so their GDPval cost renders "
+              "absent until the routes converge: "
+              + ", ".join(dropped[:10])
+              + (", ..." if len(dropped) > 10 else ""))
     print(f"wrote {AGENTS_OUT.relative_to(ROOT)}: {len(agents)} agent+model rows "
           f"with a paired index score and cost per task")
 

@@ -507,6 +507,39 @@ def undominated(rows, metric="intelligence"):
 # identify which route is stale: a detail page regenerated later still embeds
 # the older corpus. So the leaderboard is published, always, and the detail
 # route is a gap-fill and nothing more.
+# The one field whose two halves must agree or the breakdown goes: the cost
+# object, whose .evaluations decompose .cost.total. AA writes the breakdown as
+# the index weights already applied, so the parts sum to the total exactly.
+SUM_TOLERANCE = 1e-6
+COST_KEY = "intelligenceIndexCostPerTask"
+_NUMBER = (int, float)
+
+
+def breakdown_matches_total(value) -> bool:
+    """Whether `value`'s per-evaluation breakdown decomposes its own total.
+
+    True whenever there is nothing to check -- no breakdown, no numeric total,
+    a non-numeric part: a shape this reader cannot reason about is not evidence
+    of a cross-generation mix, and refusing it would fail a capture that is
+    merely shaped differently from the one measured here.
+    """
+    if not isinstance(value, dict):
+        return True
+    evaluations = value.get("evaluations")
+    if not isinstance(evaluations, list):
+        return True
+    cost = value.get("cost")
+    total = cost.get("total") if isinstance(cost, dict) else None
+    if not isinstance(total, _NUMBER) or isinstance(total, bool):
+        return True
+    parts = [e.get("weightedCostPerTask") for e in evaluations
+             if isinstance(e, dict)]
+    if not parts or not all(isinstance(p, _NUMBER) and not isinstance(p, bool)
+                            for p in parts):
+        return True
+    return abs(sum(parts) - total) <= SUM_TOLERANCE * max(1.0, abs(total))
+
+
 def merge_captures(base: list, detail: list) -> list:
     """Leaderboard records widened with the detail route's extra fields.
 
@@ -521,10 +554,10 @@ def merge_captures(base: list, detail: list) -> list:
     def fill(into, extra):
         """`into` wins; `extra` supplies only what is absent.
 
-        One level deep, because the split runs THROUGH a nested object: the
-        leaderboard kept intelligenceIndexCostPerTask.cost and dropped its
-        .evaluations, so a key-level fill would let the surviving stub shadow
-        the complete breakdown and leave the GDPval axis with no cost.
+        One level deep, because the split runs THROUGH the cost object: the
+        leaderboard drops its .evaluations, so a key-level fill would let a
+        surviving stub shadow the complete breakdown and leave the GDPval axis
+        with no cost.
         """
         out = dict(into)
         for k, v in extra.items():
@@ -532,48 +565,41 @@ def merge_captures(base: list, detail: list) -> list:
                 out[k] = v
             elif isinstance(out[k], dict) and isinstance(v, dict):
                 out[k] = fill(out[k], v)
-            elif isinstance(v, dict) and not isinstance(out[k], dict):
-                # Same key, different SHAPE. The leaderboard flattened
-                # intelligenceIndexCostPerTask to its bare total while the
-                # detail route kept the object with the per-evaluation
-                # breakdown. The leaderboard's number WINS -- it is the
-                # fresh generation's measured total, and it is the value the
-                # cost axis plots. The object is a fill, so it is taken whole
-                # except for that total, and only while its breakdown still
-                # sums to the number it is being hung under: a breakdown from
-                # another generation would decompose someone else's total, so
-                # it is dropped whole and the axis that reads it (GDPval) is
-                # absent for this model until the routes agree. Dropping is
-                # the honest outcome -- the alternative is either publishing a
-                # stale total or failing the refresh red for hours.
+            elif (isinstance(v, dict) and not isinstance(out[k], dict)
+                  and isinstance(out[k], _NUMBER)
+                  and not isinstance(out[k], bool)):
+                # Same key, different SHAPE. The leaderboard flattened the
+                # cost to its bare total while the detail route kept the
+                # object with the per-evaluation breakdown. The leaderboard's
+                # number WINS -- it is the fresh generation's measured total,
+                # and it is the value the cost axis plots -- so the object is
+                # taken as a fill with that number hung under it.
+                #
+                # The flattened scalar is the ONLY case where the two shapes
+                # describe the same measurement. When the leaderboard writes
+                # null or "$undefined" for a model it did not price, that is
+                # not a total to reshape but a published "no cost": taking the
+                # detail object here would promote a stale price for a model
+                # the fresh route says is unpriced, which is exactly what this
+                # precedence exists to prevent. The field stays as the
+                # leaderboard published it and renders absent.
                 cost = v.get("cost")
                 out[k] = {
                     **v,
-                    "cost": fill({"total": out[k]}, cost) if isinstance(cost, dict)
-                    else {"total": out[k]},
+                    "cost": (fill({"total": out[k]}, cost)
+                             if isinstance(cost, dict) else {"total": out[k]}),
                 }
-                if not _breakdown_matches_total(out[k]):
-                    out[k] = out[k]["cost"]["total"]
+            if k == COST_KEY and not breakdown_matches_total(out[k]):
+                # The breakdown is not this total's breakdown, whatever route
+                # it came from, so it is dropped whole and the axis that
+                # decomposes it (GDPval) renders absent for this model until
+                # the routes converge. Dropping is the honest outcome -- the
+                # alternatives are publishing another generation's total or
+                # failing the refresh red for hours. Reached on BOTH shape
+                # arms: the flattened scalar above, and the nested stub AA
+                # shipped before it flattened the field.
+                out[k] = out[k]["cost"]["total"]
         return out
-
-    def _breakdown_matches_total(obj):
-        """Whether `obj`'s per-evaluation breakdown decomposes its own total.
-
-        AA writes the breakdown as the index weights already applied, so the
-        parts sum to the total exactly (SUM_TOLERANCE in fetch_aa.py checks
-        that over a whole capture). A breakdown that does not sum is not this
-        total's breakdown, whatever route it came from.
-        """
-        evaluations = obj.get("evaluations")
-        if not isinstance(evaluations, list):
-            return True
-        parts = [e.get("weightedCostPerTask") for e in evaluations
-                 if isinstance(e, dict)]
-        if not all(isinstance(p, (int, float)) and not isinstance(p, bool)
-                   for p in parts):
-            return True
-        total = obj["cost"]["total"]
-        return abs(sum(parts) - total) <= 1e-6 * max(1.0, abs(total))
 
     by_slug = {m["slug"]: m for m in detail if isinstance(m.get("slug"), str)}
     return [fill(m, by_slug[m["slug"]]) if by_slug.get(m.get("slug")) else m

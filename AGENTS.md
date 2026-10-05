@@ -67,10 +67,9 @@ wins.** AA trimmed the leaderboard payload once, and it still omits
 `licenseName`, `releaseDate`, the parameter count and the per-evaluation cost
 breakdown. Those ship on any model detail page (`/models/<slug>`), which embeds
 the whole corpus for its comparison widgets. `fetch_aa.py` fetches both and
-gap-fills, one level deep — the split runs *through* a nested object, since the
-leaderboard kept `intelligenceIndexCostPerTask.cost` and dropped its
-`.evaluations`, so a key-level merge lets the surviving stub shadow the
-complete breakdown.
+gap-fills, one level deep — the split runs *through* the cost object, whose
+`evaluations` the leaderboard drops, so a key-level merge would let a surviving
+stub shadow the complete breakdown.
 
 **The two routes are not the same generation, and only one of them is
 published.** AA serves each route from its own Vercel cache, so a capture can
