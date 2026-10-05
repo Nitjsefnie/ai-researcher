@@ -107,6 +107,20 @@ name: refresh
 # publishing it is that run's job. Nothing loops: a dropped hour is
 # re-fetched, re-tested and landed by the next hourly run.
 #
+# THE PAYLOAD AND THE TREE MUST BE ONE GENERATION (issue #202). The committer
+# replays this run's payload -- staged by the workflow at GITHUB_SHA -- over
+# whatever main's tip is by the time it fetches. While nothing lands, those
+# are the same commit. When a merge does land mid-run, the payload is shaped
+# by one generation of the workflow and main's tree by a newer one, and
+# copying one over the other stages paths the newer .gitignore refuses: run
+# 37291766447 replayed a6d74a6's payload onto 2e7f6bc and died on `git add
+# data/aa-disagreement-snapshot.json`, a path #200 had just retired. So the
+# committer TIES its payload to its own generation before it copies anything
+# and concedes the hour green when the two disagree -- no commit, no push, no
+# publish, next hour lands it. That is the push job's "main moved under the
+# run" outcome, at the point where the generations actually meet; nothing
+# loops either way.
+#
 # fetch_aa.py exits nonzero when the flight payload or the model schema changes
 # shape, when AA bumps the Intelligence Index version build.py is written
 # against, when the cost breakdown drops a slug build.py reads, or when the
@@ -506,7 +520,10 @@ jobs:
   # the run green when main moved under the tested base, and a rejected
   # push distinguishes "main stood still" (a real error) from "main moved
   # before the push landed" (dropped green; the next hourly run re-fetches,
-  # re-tests and lands it).
+  # re-tests and lands it). The committer takes that outcome EARLIER, on the
+  # one race no base check can see: main landing a newer generation of this
+  # workflow mid-run, so the payload it replays is not this generation's
+  # shape (issue #202).
   publish:
     name: Commit and stage the capture
     runs-on: ubuntu-latest
@@ -578,6 +595,40 @@ jobs:
           git init -q "${scratch}"
           git -C "${scratch}" remote add origin "${remote}"
           git -C "${scratch}" fetch --quiet origin main
+          # THE GENERATION TIE (issue #202). This job replays a payload
+          # produced by THIS run's workflow generation -- the one at
+          # GITHUB_SHA -- over whatever main's tip is when the fetch lands.
+          # Those name one commit only when nothing landed while the hour ran.
+          # When something did, the payload is shaped by an older generation
+          # of the workflow and main's tree by a newer one, and copying the
+          # first over the second stages paths the newer .gitignore refuses:
+          # run 37291766447 replayed a6d74a6's payload onto 2e7f6bc and died
+          # at `git add data/aa-disagreement-snapshot.json`, a path #200 had
+          # just taken out of .gitignore. So the mismatch is CONCEDED here,
+          # before a single payload byte is copied -- the push job's own
+          # "main moved under the run" concession, moved to where the two
+          # generations meet. Nothing is committed, nothing is pushed, nothing
+          # is published, and the next hourly run -- dispatched at main's new
+          # tip, so its payload and its tree are one generation again --
+          # re-fetches, re-tests and lands the hour. An unset GITHUB_SHA
+          # cannot match a SHA, so it concedes here too: this gate fails
+          # toward the dropped hour, never toward a mixed-generation commit.
+          tip_sha="$(git -C "${scratch}" rev-parse FETCH_HEAD)"
+          if [ "${tip_sha}" != "${GITHUB_SHA}" ]; then
+            echo "::notice::main moved under the run (built at ${GITHUB_SHA}, main's tip ${tip_sha}); the next hourly run re-fetches, re-tests and lands it"
+            {
+              echo "### Dropped: the payload's workflow generation is older than main"
+              echo
+              echo "This run's payload was produced by the workflow at ${GITHUB_SHA};"
+              echo "main's tip is now ${tip_sha}. Replaying one generation's payload over"
+              echo "another generation's tree can stage a path the newer .gitignore"
+              echo "refuses (issue #202), so nothing is committed and nothing published."
+              echo "The next hourly run re-fetches, re-tests and lands the hour."
+            } >> "$GITHUB_STEP_SUMMARY"
+            echo "publish=false" >> "$GITHUB_OUTPUT"
+            echo "commits=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
           git -C "${scratch}" checkout -q -B push FETCH_HEAD
           git -C "${scratch}" config user.name 'github-actions[bot]'
           git -C "${scratch}" config user.email \
