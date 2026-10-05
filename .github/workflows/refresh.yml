@@ -186,8 +186,8 @@ jobs:
     # Job-level rather than workflow-level (issue #52), and READ-ONLY since
     # #143: this job runs the capture, third-party installs, a downloaded
     # browser and the suite, so nothing in it may ride a write token. The
-    # hour's commit payload leaves as an artifact for the publish job, the
-    # workflow's only writer.
+    # hour's commit payload leaves as an artifact for the publish job; no
+    # job in this workflow holds a write permission (issue #206).
     permissions:
       contents: read
 
@@ -580,9 +580,8 @@ jobs:
           # built against, tip is the hour's own tip (the bundle tip when
           # commits exist, base itself when not), and the bundle carries the
           # commits only when there are any. The hub job ties its upload
-          # and ref move to `tip`, so both always name the same commit.
-          stage_push_data() {
-            mkdir -p "${RUNNER_TEMP}/push-data"
+          # to `tip`, so the page it serves always names that commit.
+          stage_push_data() {            mkdir -p "${RUNNER_TEMP}/push-data"
             if [ "${1}" = "true" ]; then
               git bundle create "${RUNNER_TEMP}/push-data/push.bundle" \
                 FETCH_HEAD..push
@@ -885,7 +884,7 @@ jobs:
           # summary names both stamps, so a republish hour says which
           # commit the hub was behind to.
           live_page="$(mktemp)"
-          live_stamp="an unstamped page"
+          live_stamp="the hub could not be fetched"
           if curl -fsS --connect-timeout 10 --max-time 30 \
                https://docs.nitjsefni.eu/d/ai-researcher/frontier-models \
                -o "$live_page"; then

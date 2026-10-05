@@ -252,9 +252,10 @@ unclamped and allowed to hang outside the plot rather than be squeezed inside.
   CONTRIBUTING.md). A capture that would render the identical page is silent
   — no commit, no version, no notification — as long as the live page is
   current; when a publish failed or was missed, the next run's live-page
-  check -- the served page's embedded source-commit stamp compared against
-  the freshly built page's -- republishes instead. The stamp file therefore
-  moves when the DATA moves, not every calendar day.
+  check -- the served page compared byte-for-byte against the page main
+  carries, the embedded source-commit stamp among those bytes --
+  republishes instead. The stamp file therefore moves when the DATA
+  moves, not every calendar day.
 - **On-demand refresh** when asked ("update the table", "did GPT-6 land yet").
   Run the same three commands by hand; the workflow is not the only route.
 - **Drift check** at session start: re-run `fetch_aa.py`, diff the model count
