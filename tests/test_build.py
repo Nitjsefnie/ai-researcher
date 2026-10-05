@@ -1799,8 +1799,8 @@ class RetiredMismatchSummaryTests(unittest.TestCase):
             finally:
                 build.RAW, build.AGENTS_RAW, build.OUT = saved
         line = next(
-            l for l in buf.getvalue().splitlines()
-            if "vendor-retired models" in l)
+            cur for cur in buf.getvalue().splitlines()
+            if "vendor-retired models" in cur)
         self.assertIn(
             f"MISMATCH -- still undominated: {name} [frontiers: ", line)
 
