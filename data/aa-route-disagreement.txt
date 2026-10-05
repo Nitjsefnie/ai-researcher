@@ -1,2 +1,0 @@
-1791182853
-routes disagree; the stale route is healed from the recorded last-agreeing capture (issues #176, #189)
