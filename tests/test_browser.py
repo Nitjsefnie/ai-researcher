@@ -197,12 +197,10 @@ class BrowserInteractionTests(unittest.TestCase):
     def _hoverable_point(self, page, selector, attempts=8):
         """The first point at `selector` playwright can actually hover.
 
-        A point's action point can be covered by a later-drawn neighbour --
-        a disputed build redraws every frontier (disputed models sit out
-        while a window lasts, #122), so which point sits on top moves with
-        the window and the DOM-first point is not hoverable on every page
-        shape. Candidates are tried in DOM order; the first that hovers
-        carries the pin, and exhaustion fails naming the selector.
+        A point's action point can be covered by a later-drawn neighbour, so
+        the DOM-first point is not hoverable on every page shape. Candidates
+        are tried in DOM order; the first that hovers carries the pin, and
+        exhaustion fails naming the selector.
         """
         points = page.locator(selector)
         self.assertGreater(
@@ -398,35 +396,20 @@ class BrowserInteractionTests(unittest.TestCase):
         # The colour rule is stated once for the page (AGENTS.md: superseded
         # models draw in de-emphasis gray), so every off-frontier point
         # draws var(--muted) on every chart, and every legend documents the
-        # swatch. On a disputed build the off-frontier set gains the
-        # disputed points (#122): they sit out the frontiers and draw
-        # hollow-in-gray -- var(--surface-1), the disputed marker's fill,
-        # present on a chart exactly when that chart carries disputed
-        # markers and never on a plain build -- while a frontier point
-        # carries neither verdict's fill.
+        # swatch, while a frontier point carries no verdict fill.
         page = self.browser.new_page(viewport={"width": 1280, "height": 900})
         page.goto(build.OUT.as_uri())
-        disputed_build = page.locator("#disputed").count() > 0
         for chart in ("coding", "intelligence", "agentic", "parameters"):
             with self.subTest(chart=chart):
-                markers = page.locator(
-                    f"#svg-{chart} [aria-label*='disputed values']")
                 off_frontier = page.evaluate(
                     "sel => [...new Set([...document.querySelectorAll(sel)]"
                     ".map(c => c.getAttribute('fill')))]",
                     f"#svg-{chart} circle.pt[r='5']",
                 )
-                allowed = {"var(--muted)"}
-                if disputed_build:
-                    allowed.add("var(--surface-1)")
                 self.assertTrue(
-                    off_frontier and set(off_frontier) <= allowed,
+                    off_frontier and set(off_frontier) <= {"var(--muted)"},
                     f"{chart}: off-frontier fills {off_frontier} leave the "
-                    f"legit set {sorted(allowed)}")
-                self.assertEqual(
-                    "var(--surface-1)" in off_frontier, markers.count() > 0,
-                    f"{chart}: the disputed fill appears exactly when the "
-                    "chart carries disputed markers")
+                    "legit set ['var(--muted)']")
 
                 # frontier points keep their weights fill -- the gray is a
                 # superseded verdict, not a repainting of the whole chart
@@ -459,10 +442,9 @@ class BrowserInteractionTests(unittest.TestCase):
         # chart must also survive wherever the pinned row renders on another.
         # #153: the page is this test's own deterministic fixture, and every
         # expectation -- which names exist, how many are pickable -- derives
-        # from that fixture, never from the ambient capture. A disputed
-        # window labels its points "Pin ... (disputed values)" and AA's
-        # rollout size moves freely, so pin expectations read off the live
-        # page break in exactly the hours the suite must stay green.
+        # from that fixture, never from the ambient capture. AA's rollout size
+        # moves freely, so pin expectations read off the live page break in
+        # exactly the hours the suite must stay green.
         page = self.browser.new_page(viewport={"width": 1280, "height": 900})
         chart_labels = {"coding": "Coding Agent Index",
                         "intelligence": "Intelligence Index",
@@ -1575,12 +1557,10 @@ class PerfBudgetTests(unittest.TestCase):
 
     The gated page is built from this class's own DETERMINISTIC fixture
     capture (#153), never the ambient data/: budgets measure code cost
-    and must be capture-size-invariant (issue #112), but an ambient
-    disputed window moves the measured shape anyway -- the disputed
-    layer scales the hover tooltip's DOM work with the page it lands
-    on, and AA's rollout size changes the scale underneath. The fixture
-    is byte-identical every run, so the gate judges ONE fixed workload
-    against the committed ceilings, whatever AA ships.
+    and must be capture-size-invariant (issue #112), but AA's rollout size
+    moves the scale underneath a page built from the ambient capture. The
+    fixture is byte-identical every run, so the gate judges ONE fixed
+    workload against the committed ceilings, whatever AA ships.
     """
 
     @classmethod
@@ -1595,7 +1575,7 @@ class PerfBudgetTests(unittest.TestCase):
         # ambient environment carries. The capture behind the build is
         # the class's deterministic fixture (#153): a fixed synthetic the
         # committed ceilings evaluate, written into the temp dir so the
-        # ambient data/ -- its disputed window included -- never reaches
+        # ambient data/ never reaches
         # the gate.
         cls._saved = (build.RAW, build.AGENTS_RAW, build.OUT)
         # The directory outlives this setup -- tearDownClass cleans it up
@@ -1858,12 +1838,10 @@ _PROBE_AGENTS = [
 class BuildProvenanceTests(unittest.TestCase):
     """#49: the footer's provenance — source commit when the build
     environment carries one, and a sha256 over the build's inputs that a
-    reader can verify today, by hashing the committed files. On a disputed
-    build the page's content includes the disputed layer (#122), so the
-    content hash covers the snapshot then the coding-agents capture --
-    exactly what the footer's own inputs note names -- and the models
-    capture is not an input at all (it may not even exist in a disputed
-    hour)."""
+    reader can verify today, by hashing the committed files. The content
+    hash covers the two capture files, whole bytes concatenated
+    models-then-agents -- exactly what the footer's own inputs note
+    names."""
 
     COMMIT = "e5e10f1c0ffee4215deadbeefcafe0123456789a"
 
@@ -1878,15 +1856,10 @@ class BuildProvenanceTests(unittest.TestCase):
     @staticmethod
     def _expected_digest(data_dir):
         """The sha256 a reader recomputes from the data directory: the two
-        capture files when the build is plain, snapshot-then-agents when
-        the directory carries a disagreement snapshot (#122) -- the same
-        rule build.py states in the footer's inputs note."""
+        capture files, whole and in that order -- the same rule build.py
+        states in the footer's inputs note."""
         digest = hashlib.sha256()
-        snapshot = data_dir / build.DISPUTED_SNAPSHOT_NAME
-        if snapshot.exists():
-            digest.update(snapshot.read_bytes())
-        else:
-            digest.update((data_dir / "aa-raw-models.json").read_bytes())
+        digest.update((data_dir / "aa-raw-models.json").read_bytes())
         digest.update((data_dir / "aa-raw-coding-agents.json").read_bytes())
         return digest.hexdigest()
 
@@ -1934,42 +1907,6 @@ class BuildProvenanceTests(unittest.TestCase):
             # change, so it renders with or without the commit
             self.assertIn(self._expected_digest(build.RAW.parent), foot)
 
-    def test_footer_on_a_disputed_build_hashes_snapshot_then_agents(self):
-        # #122: the disputed page's inputs are the snapshot then the agents
-        # capture -- the models capture is not an input at all, so this
-        # build's data dir does not even carry one -- and the footer states
-        # exactly that: the digest recomputes from those two whole files in
-        # that order, the inputs note names them, and the source-commit
-        # stamp renders beside the disputed hash unchanged.
-        with tempfile.TemporaryDirectory(prefix=".issue-122-build-",
-                                         dir=build.ROOT) as tmp:
-            data = pathlib.Path(tmp) / "data"
-            data.mkdir()
-            snapshot = json.dumps(
-                test_build.disputed_snapshot_fixture(),
-                indent=1).encode("utf-8")
-            (data / build.DISPUTED_SNAPSHOT_NAME).write_bytes(snapshot)
-            agents = build.AGENTS_RAW.read_bytes()
-            (data / "aa-raw-coding-agents.json").write_bytes(agents)
-            (data / "captured-at.txt").write_text("2026-10-04\n",
-                                                  encoding="utf-8")
-            saved_raw = build.RAW
-            build.RAW = data / "aa-raw-models.json"  # deliberately absent
-            try:
-                output = pathlib.Path(tmp) / "frontier-models.html"
-                html = self._build(output, commit=self.COMMIT).decode("utf-8")
-            finally:
-                build.RAW = saved_raw
-
-            foot = self._foot(html)
-            self.assertIn(self.COMMIT, foot)
-            digest = hashlib.sha256()
-            digest.update(snapshot)
-            digest.update(agents)
-            self.assertIn(digest.hexdigest(), foot)
-            self.assertIn("sha256 over data/" + build.DISPUTED_SNAPSHOT_NAME
-                          + " then data/aa-raw-coding-agents.json", foot)
-
     def test_a_malformed_source_commit_renders_no_stamp_and_no_marker_splice(self):
         # AA_SOURCE_COMMIT is build-machine input, so only SHA-shaped values
         # (7-40 hex chars) render. Anything else must be treated exactly like
@@ -2004,186 +1941,15 @@ if __name__ == "__main__":
     unittest.main()
 
 
-class DisputedBrowserTests(unittest.TestCase):
-    """Issue #118: the disputed rendering in a real browser.
-
-    The disputed JS paths -- both-value table cells, hollow markers, the
-    banner, the disputed tooltip lines -- never execute on a normal page,
-    so a runtime error in them would leave the standard browser class
-    green while every disputed hour shipped a broken script. This class
-    builds a disputed page from a synthetic snapshot (fixture from
-    test_build; never a data/ file) and proves the script runs and renders
-    the disputed layer.
-    """
-
-    @classmethod
-    def setUpClass(cls):
-        cls._saved = (build.RAW, build.AGENTS_RAW, build.OUT)
-        # The directory outlives this setup -- tearDownClass cleans it up
-        # after the browser closes -- so it cannot live in a with.
-        cls._dir = tempfile.TemporaryDirectory(  # pylint: disable=consider-using-with
-            prefix=".issue-118-browser-", dir=build.ROOT)
-        data = pathlib.Path(cls._dir.name) / "data"
-        data.mkdir()
-        (data / build.DISPUTED_SNAPSHOT_NAME).write_text(
-            json.dumps(test_build.disputed_snapshot_fixture(
-                lic_lb="Fixture Licence A", lic_dt="Fixture Licence B")),
-            encoding="utf-8")
-        (data / "aa-raw-coding-agents.json").write_text(
-            json.dumps([test_build.agent_fixture()]), encoding="utf-8")
-        (data / "captured-at.txt").write_text("2026-10-04\n",
-                                              encoding="utf-8")
-        build.RAW = data / "aa-raw-models.json"
-        build.AGENTS_RAW = data / "aa-raw-coding-agents.json"
-        build.OUT = pathlib.Path(cls._dir.name) / "frontier-models.html"
-        try:
-            with contextlib.redirect_stdout(io.StringIO()):
-                build.main()
-            cls.playwright = sync_playwright().start()
-            cls.browser = cls.playwright.chromium.launch(
-                executable_path=CHROMIUM_EXECUTABLE,
-                headless=True,
-                args=["--no-sandbox"])
-        except BaseException:
-            build.RAW, build.AGENTS_RAW, build.OUT = cls._saved
-            cls._dir.cleanup()
-            raise
-        # The same V8 block-coverage wiring BrowserInteractionTests uses:
-        # the disputed JS paths run on NO other page, so without this the
-        # JavaScript ratchet reads them as uncovered and reds the coverage
-        # job -- the disputed layer would red every coverage run it should
-        # be proving itself in.
-        cls._coverage_entries = []
-        cls._open_pages = []
-        original_new_page = cls.browser.new_page
-
-        def new_page(**kwargs):
-            page = original_new_page(**kwargs)
-            if kwargs.get("java_script_enabled") is False:
-                return page
-            session = page.context.new_cdp_session(page)
-            session.send("Debugger.enable")
-            session.send("Profiler.enable")
-            session.send("Profiler.startPreciseCoverage",
-                         {"callCount": True, "detailed": True})
-            original_close = page.close
-
-            def close(**close_kwargs):
-                if (page, session) in cls._open_pages:
-                    cls._open_pages.remove((page, session))
-                cls._coverage_entries.extend(collect_page_coverage(session))
-                return original_close(**close_kwargs)
-
-            page.close = close
-            cls._open_pages.append((page, session))
-            return page
-
-        cls.browser.new_page = new_page
-
-    @classmethod
-    def tearDownClass(cls):
-        build.RAW, build.AGENTS_RAW, build.OUT = cls._saved
-        # A test that failed mid-way leaves its page open; take its coverage
-        # here so the dump still describes the whole run.
-        for _page, session in list(cls._open_pages):
-            try:
-                cls._coverage_entries.extend(collect_page_coverage(session))
-            except Exception:
-                pass
-        cls._open_pages.clear()
-        dump = os.environ.get("JS_COVERAGE_OUT")
-        if dump:
-            path = pathlib.Path(dump)
-            entries = cls._coverage_entries
-            if path.exists():
-                try:
-                    entries = json.loads(
-                        path.read_text(encoding="utf-8")) + entries
-                except (OSError, json.JSONDecodeError):
-                    pass
-            path.write_text(json.dumps(entries), encoding="utf-8")
-        cls.browser.close()
-        cls.playwright.stop()
-        cls._dir.cleanup()
-
-    def test_the_disputed_page_renders_its_layer(self):
-        page = self.browser.new_page()
-        try:
-            page.goto(build.OUT.as_uri())
-            # The script ran fillTable to completion -- a runtime error in
-            # any disputed path dies before the rows land.
-            page.wait_for_selector("#tbl tbody tr")
-            banner = page.locator("#disputed")
-            self.assertTrue(banner.is_visible())
-            self.assertIn("AA's two routes disagree", banner.inner_text())
-            # The disputed row's intelligence cell shows both routes'
-            # values, from the live JS render (not the static body).
-            cell = page.locator("#tbl tbody tr",
-                                has_text="Fixture Model (high)").first
-            self.assertIn("51.0 / 52.0", cell.inner_text())
-            self.assertIn("disputed", cell.inner_text())
-            # The disputed point draws the hollow-in-gray treatment.
-            mark = page.locator('[aria-label*="disputed values"]').first
-            self.assertEqual(mark.get_attribute("fill"), "var(--surface-1)")
-            self.assertEqual(mark.get_attribute("stroke"), "var(--muted)")
-            # Hover it: the tooltip shows both routes' values -- the numeric
-            # pair at one decimal, the string licence dispute as TEXT -- and
-            # never a NaN, which a number-coerced string would render.
-            mark.hover()
-            tip = page.locator("#tip-intelligence")
-            self.assertTrue(tip.locator(".tname").is_visible())
-            tip_text = tip.inner_text()
-            self.assertIn("51.0 / 52.0", tip_text)
-            self.assertIn("Fixture Licence A / Fixture Licence B", tip_text)
-            self.assertNotIn("NaN", tip_text)
-            self.assertIn("excluded — disputed", tip_text)
-            # The LIVE frontier pass (fillTable rewrites the tbody on load)
-            # excludes the disputed row in both directions: no frontier tag
-            # on the disputed model, one on the clean model it dominates.
-            row = page.locator("#tbl tbody tr",
-                               has_text="Fixture Model (high)").first
-            self.assertEqual(row.locator("span.tag.f").count(), 0)
-            clean = page.locator("#tbl tbody tr",
-                                 has_text="Fixture Model B").first
-            self.assertGreaterEqual(clean.locator("span.tag.f").count(), 1)
-            # The parameters chart draws the same disputed row (the fixture
-            # model carries a parameter count): its tooltip runs the
-            # capability-chart disputed branch.
-            pmark = page.locator(
-                '[aria-label*="disputed values"]'
-                '[aria-label*="Parameter efficiency chart"]').first
-            if pmark.count():
-                pmark.hover()
-                ptext = page.locator("#tip-parameters").inner_text()
-                self.assertIn("51.0 / 52.0", ptext)
-                self.assertNotIn("NaN", ptext)
-                page.mouse.move(4, 4)
-            # Hide-superseded: the sup-only view runs the disputed frontier
-            # pass -- the disputed model sits out, so only the clean model
-            # remains on the intelligence chart's frontier slice.
-            page.click("#fSup")
-            page.wait_for_timeout(150)
-            sup_text = page.locator("#count").inner_text()
-            self.assertIn("frontiers only", sup_text)
-            page.click("#fSup")
-            # The copy exports carry the disputed rows' base generation.
-            page.click("#copyMd")
-            page.wait_for_timeout(100)
-            page.click("#copyJson")
-            page.wait_for_timeout(100)
-        finally:
-            page.close()
-
-
 class ZeroScoreBrowserTests(unittest.TestCase):
     """Issue #146 in a real browser: a zero capability score is a legal AA
     publication, and the JS fillFrontiers cell for a zero-score frontier row
     must render the em dash the static render shows -- "$Infinity" would
     fail the drift contract and read as a real price. A dedicated class
-    exists for the same reason its disputed sibling does: this JS path never
-    executes on a normal page (the standard capture puts no zero on
-    the frontier), so without coverage wiring the JavaScript ratchet reads it as
-    uncovered and reds the coverage job.
+    exists because this JS path never executes on a normal page (the
+    standard capture puts no zero on the frontier), so without coverage
+    wiring the JavaScript ratchet reads it as uncovered and reds the
+    coverage job.
     """
 
     @classmethod
@@ -2218,7 +1984,7 @@ class ZeroScoreBrowserTests(unittest.TestCase):
             build.RAW, build.AGENTS_RAW, build.OUT = cls._saved
             cls._dir.cleanup()
             raise
-        # The same V8 block-coverage wiring the disputed class uses.
+        # The same V8 block-coverage wiring BrowserInteractionTests uses.
         cls._coverage_entries = []
         cls._open_pages = []
         original_new_page = cls.browser.new_page

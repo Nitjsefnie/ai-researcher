@@ -10,11 +10,17 @@ deploy key, in the main-push environment -- delivers the bundle to main;
 `hub` -- the workflow's only contents:write holder since the split -- uploads
 the verified page and moves the `published` ref.
 Its safety lives in the gating BETWEEN steps and BETWEEN jobs: what runs only
-after the suite passed, what only when the commit actually landed, what heals
-a stale publish. Those contracts are invisible to the Python suite until
-something parses the YAML, so this file does -- structurally, on step shape
-and on substrings that name the mechanism, never on line numbers or
-whole-run-block equality that any reflow would break.
+after the suite passed, what only when the commit actually landed, what
+republishes a stale live page. Those contracts are invisible to the Python
+suite until something parses the YAML, so this file does -- structurally, on
+step shape and on substrings that name the mechanism, never on line numbers
+or whole-run-block equality that any reflow would break.
+
+There is NO route-disagreement state (issue #200): AA's two routes are
+independently cached, the leaderboard is the authority and the detail route
+is a gap-fill only, so the workflow has one capture exit colour and one
+commit message for a moved capture. The pins below cover the recovery and the
+re-raise the Capture step keeps, not a dispute branch.
 """
 import os
 import pathlib
@@ -228,7 +234,7 @@ class GateTests(unittest.TestCase):  # pylint: disable=too-many-public-methods
         self.assertIn('echo "changed=$changed" >> "$GITHUB_OUTPUT"', run)
         # No raw-VCS view of data/ may leak back into this step, whatever
         # the spelling: any `git diff` or `git status` here must not name
-        # data/. (The heal gate's `git diff origin/published HEAD --
+        # data/. (The republish gate's `git diff origin/published HEAD --
         # out/frontier-models.html` stays: it compares pages, not captures.)
         joined = raw.replace("\\\n", " ")
         for line in joined.splitlines():
@@ -249,12 +255,12 @@ class GateTests(unittest.TestCase):  # pylint: disable=too-many-public-methods
         self.assertIn("git checkout -- data/", run)
         self.assertNotIn("git checkout -- data/captured-at.txt", run)
         # The restore stands on the unchanged path: after the gate's answer,
-        # before the heal gate's ref fetch.
+        # before the republish gate's ref fetch.
         self.assertLess(run.index("git checkout -- data/"),
                         run.index("refs/heads/published"))
 
     def test_the_payload_staging_restores_heads_page_when_the_capture_did_not_move(self):
-        # Issue #94, second half: on a heal run the suite's rebuild is now
+        # Issue #94, second half: on a republish run the suite's rebuild is now
         # stamped with THIS run's github.sha (issue #92's env fix), while
         # HEAD's committed page carries the previous tip's sha -- the commit
         # a page lands in always postdates the stamp it carries -- so
@@ -280,27 +286,30 @@ class GateTests(unittest.TestCase):  # pylint: disable=too-many-public-methods
 
     def test_the_staging_step_ships_the_commit_payload(self):
         # The artifact is the exact commit payload the old single job staged:
-        # the fixed add list, the measured base commit, the window files
-        # (unless this hour retires them -- shipping what a removal commits
-        # away would resurrect it), and the differ's message when one ran.
+        # the fixed add list and the differ's message when one ran. The window
+        # files are gone with the disagreement state (issue #200), so the list
+        # is the four payload paths and nothing that varies by hour.
         run = flattened(step(self.wf, "Stage the publish payload")["run"])
 
         for piece in ("data/aa-raw-models.json",
                       "data/aa-raw-coding-agents.json",
                       "data/captured-at.txt",
                       "out/frontier-models.html",
-                      "data/aa-disagreement-snapshot.json",
-                      "data/aa-route-disagreement.txt",
-                      '[ "$RETIRE" = "true" ]',
                       "commit-msg.txt"):
             self.assertIn(piece, run)
+        # No window file and no retirement switch survives on this path.
+        for gone in ("data/aa-disagreement-snapshot.json",
+                     "data/aa-route-disagreement.txt",
+                     "data/aa-last-agreeing-capture.json",
+                     "$RETIRE"):
+            self.assertNotIn(gone, run)
 
     def test_the_unchanged_path_checks_whether_the_live_page_is_current(self):
         # Issue 42: `changed=false` used to skip both commit and publish
-        # forever, so a failed or missed publish never healed. The unchanged
-        # path must now consult the `published` ref: a MISSING ref means
-        # never published, a ref whose page differs from HEAD means stale --
-        # either republishes.
+        # forever, so a failed or missed publish never self-repaired. The
+        # unchanged path must now consult the `published` ref: a MISSING ref
+        # means never published, a ref whose page differs from HEAD means
+        # stale -- either republishes.
         run = flattened(step(self.wf, "Did anything move?")["run"])
 
         self.assertIn("refs/heads/published", run)
@@ -308,7 +317,7 @@ class GateTests(unittest.TestCase):  # pylint: disable=too-many-public-methods
         self.assertIn("--depth=1", run)
 
     def test_the_publish_step_updates_the_published_ref_after_a_successful_upload(self):
-        # The ref records the last successfully published state, so the heal
+        # The ref records the last successfully published state, so the republish
         # check has something to compare against. It must move only after
         # the upload succeeded, in the same step -- the first refs-API
         # command is the GET probe that decides create-vs-update.
@@ -350,8 +359,7 @@ class GateTests(unittest.TestCase):  # pylint: disable=too-many-public-methods
         # "(fetch first)" on every publishing run while the upload itself
         # succeeded, so the run went red and the ref stayed stale. The refs
         # API owns this ref now: no step in either job may git-push to it.
-        # (The heal gate's `git fetch` of the same ref only reads it; the
-        # prose may still name the retired mechanism.)
+        # (The republish gate's `git fetch` of the same ref only reads it.)
         for job in self.wf["jobs"].values():
             for s in job["steps"]:
                 raw = s.get("run", "")
@@ -362,15 +370,15 @@ class GateTests(unittest.TestCase):  # pylint: disable=too-many-public-methods
         # Issue 74: two overlapping runs can both reach this step, and if
         # the OLDER run's upload lands after the newer run's, the hub ends
         # up serving the older page while the `published` ref records the
-        # newer commit — an inversion the heal gate's ref comparison cannot
+        # newer commit — an inversion the republish gate's ref comparison cannot
         # see. Immediately before the upload the step fresh-fetches the ref
-        # (anonymous, same shape as the heal gate) and, when the tip is not
-        # this run's own page commit (`tip`, the publish job's record; the
-        # tie above has already conceded when it is not main's tip), asks
+        # (anonymous, same shape as the republish gate) and, when the tip is
+        # not this run's own page commit (`tip`, the publish job's record;
+        # the tie above has already conceded when it is not main's tip), asks
         # the compare API, whose status names the TIP side relative to the
         # BASE side. Only a tip that is AHEAD (a newer run already
         # published) aborts: green, exit 0, no upload, no ref move.
-        # `behind` is the normal heal and publishes; a failed or
+        # `behind` is the normal republish and publishes; a failed or
         # unrankable answer retries once and then publishes anyway behind a
         # warning, because availability of publish beats the residual
         # seconds-wide window. The newest run NEVER aborts, so within any
@@ -434,6 +442,34 @@ class GateTests(unittest.TestCase):  # pylint: disable=too-many-public-methods
         self.assertIn('echo "commits=true"', flattened(s["run"]))
         self.assertIn('echo "commits=false"', flattened(s["run"]))
 
+    def test_every_message_branch_writes_the_file_the_commit_reads(self):
+        # Review C1/I3 on PR #151: the differ branch appended its trailer to
+        # the payload copy while `git commit -F` read the RUNNER_TEMP file --
+        # nothing wrote it on an ordinary moved-capture hour, and the
+        # workflow's primary publishing path died at the commit, exit 128,
+        # with every structural pin green. The pin follows the dataflow: both
+        # branches leave the commit's file written, no branch mutates the
+        # payload copy, and the commit reads exactly that path.
+        run = flattened(pub_step(self.wf, "Commit the capture")["run"])
+        msg = '"${RUNNER_TEMP}/commit-msg.txt"'
+
+        # The differ branch routes the payload message into it before the
+        # trailer append...
+        idx_differ = run.index('if [ -f "${PAYLOAD}/commit-msg.txt" ]; then')
+        idx_cat = run.index(
+            'cat "${PAYLOAD}/commit-msg.txt" > "${RUNNER_TEMP}/commit-msg.txt"',
+            idx_differ)
+        idx_append = run.index("> " + msg, idx_cat)
+        self.assertLess(idx_cat, idx_append)
+        # ...and the forced branch writes it outright.
+        idx_forced = run.index("Rebuild the page: forced run")
+        self.assertLess(idx_forced, run.index(f"> {msg}", idx_forced))
+        # No branch mutates the payload copy, and the commit consumes the
+        # one file every branch wrote.
+        self.assertNotIn('>> "${PAYLOAD}/commit-msg.txt"', run)
+        self.assertLess(run.index(f"> {msg}"),
+                        run.index("git commit -F " + msg))
+
     def test_the_commit_step_performs_no_push(self):
         # Issue #133: the commit step is the keyless committer -- it stages
         # the verified commits as a bundle and pushes nothing. Every main
@@ -465,8 +501,8 @@ class GateTests(unittest.TestCase):  # pylint: disable=too-many-public-methods
         self.assertIn("moved before the push landed", run)
         self.assertIn("rejected while main stood still", run)
         # The stood-still verdict compares the TESTED BASE, not tip^: the
-        # bundle may carry two commits (the retirement rides along), so
-        # tip^ would name the retirement commit.
+        # bundle carries the hour's own commits on top of that base, so
+        # tip^ is not necessarily the commit the run was tested against.
         self.assertIn('base.txt")" =', run)
 
     def test_the_fetch_runs_above_the_installs_which_gate_on_proceed(self):
@@ -474,8 +510,8 @@ class GateTests(unittest.TestCase):  # pylint: disable=too-many-public-methods
         # majority of runs whose capture is unchanged. fetch_aa.py is pure
         # stdlib (it imports build.py, which is too), so it captures first,
         # above the installs; the installs gate on `proceed` -- not
-        # `changed` -- so a heal run still installs the toolchain the suite
-        # runs under.
+        # `changed` -- so a republish run still installs the toolchain the
+        # suite runs under.
         names = [s.get("name") for s in self.wf["jobs"]["refresh"]["steps"]]
 
         self.assertLess(names.index("Capture the leaderboard"),
@@ -499,256 +535,6 @@ class GateTests(unittest.TestCase):  # pylint: disable=too-many-public-methods
         # setup-python stays unconditional: it is cheap, and fetch_aa.py
         # runs on it.
         self.assertNotIn("if", setup[0])
-
-
-class RouteDisagreementPublishTests(unittest.TestCase):
-    """Issue #118, amending #100: the capture's route-disagreement refusal
-    (exit 3) no longer green-skips the hour -- it publishes the disputed
-    capture. fetch_aa.py writes the disagreement snapshot, the Capture step
-    writes the window stamp and FALLS THROUGH to the rendered gate, and the
-    hour proceeds exactly like a moved-capture one. Since #143 the window
-    files and the retirement travel to the writer as payload, not pushes
-    from the capture step. There is NO time bound on a disputed window: the
-    page's banner is the visible alarm. Pins on mechanism words and ordering
-    over the flattened blocks, never line numbers, in this file's style.
-    """
-
-    def setUp(self):
-        self.wf = load()
-        self.step = step(self.wf, "Capture the leaderboard")
-        self.block = flattened(self.step["run"])
-        self.header = WORKFLOW.read_text(
-            encoding="utf-8").split("\njobs:", 1)[0]
-
-    def test_the_fetch_runs_behind_an_rc_trap_so_the_step_can_classify_it(self):
-        # The capture's stderr is parked in a file because every branch
-        # below needs it: the stamp carries it, the red paths re-emit it.
-        # alert_after is GONE: the 3 h red bound retired with #118.
-        for piece in ("set +e",
-                      "python3 scripts/fetch_aa.py 2> /tmp/fetch-err.txt",
-                      "rc=$?",
-                      "set -e",
-                      "stamp=data/aa-route-disagreement.txt",
-                      "now=$(date -u +%s)"):
-            self.assertIn(piece, self.block)
-        self.assertNotIn("alert_after", self.block)
-
-    def test_the_capture_step_holds_no_push_credentials(self):
-        # #143 and #133: the capture step pushes nothing, and since the
-        # commit step's fetches went anonymous, NO step before the hub job
-        # holds a credential at all. The deploy key lives only in the push
-        # job; the docs-hub key and the job token live only in the hub.
-        self.assertNotIn("GH_TOKEN", self.step.get("env", {}))
-        commit = pub_step(self.wf, "Commit the capture")
-        self.assertNotIn("GH_TOKEN", commit.get("env", {}))
-        self.assertNotIn("MASTER_PUSH_DEPLOY_KEY", commit.get("env", {}))
-        push = self.wf["jobs"]["push"]
-        push_step = step_in(self.wf, "push", "Push the tested tree to main")
-        self.assertEqual(push.get("environment"), "main-push")
-        self.assertEqual(push_step["env"]["MASTER_PUSH_DEPLOY_KEY"],
-                         "${{ secrets.MASTER_PUSH_DEPLOY_KEY }}")
-        self.assertNotIn("GH_TOKEN", push_step.get("env", {}))
-        hub = hub_step(self.wf, "Publish to docs-hub")
-        self.assertEqual(hub["env"]["DOCS_HUB_API_KEY"],
-                         "${{ secrets.DOCS_HUB_API_KEY }}")
-        self.assertEqual(hub["env"]["GH_TOKEN"], "${{ github.token }}")
-        self.assertNotIn("MASTER_PUSH_DEPLOY_KEY", hub.get("env", {}))
-
-    def test_the_three_exit_colours_are_classified_in_order(self):
-        # Recovery (rc 0) stands first, then the disputed publish (rc 3),
-        # then the designed red re-raise for everything else.
-        self.assertLess(self.block.index('[ "$rc" -eq 0 ]'),
-                        self.block.index('[ "$rc" -eq 3 ]'))
-        self.assertLess(self.block.index('[ "$rc" -eq 3 ]'),
-                        self.block.index('exit "$rc"'))
-        self.assertIn("cat /tmp/fetch-err.txt >&2", self.block)
-
-    def test_an_exit_three_refusal_publishes_and_falls_through(self):
-        # captured=true: a disputed capture RAN. The stamp is written before
-        # the fall-through, the summary names the disputed publish, and the
-        # branch holds no exit of its own -- the rendered gate decides moved
-        # vs unchanged downstream, exactly as for a moved capture.
-        idx_open = self.block.index('[ "$rc" -eq 3 ]')
-        idx_true = self.block.index('echo "captured=true"', idx_open)
-        idx_stamp = self.block.index('> "$stamp"', idx_true)
-        idx_summary = self.block.index("building and publishing the disputed capture",
-                                       idx_stamp)
-        # The branch ENDS at its own green exit: a disputed hour must exit 0
-        # and reach the rendered gate -- without it, control falls to the
-        # trailing red handler and exits 3, the exact hold-and-fail this
-        # branch exists to replace (found by review, fixed 2026-10-02).
-        idx_exit = self.block.index("exit 0", idx_summary)
-        idx_fi = self.block.index(" fi", idx_exit)
-        between = self.block[idx_summary:idx_exit]
-        self.assertNotIn("exit 1", between)
-        self.assertLess(idx_true, idx_stamp)
-        self.assertIn("issue #118", self.block[idx_summary:idx_summary + 200])
-        # The exit is the branch's last word before its closing fi.
-        self.assertLess(idx_exit, idx_fi)
-
-    def test_the_stamp_is_written_only_when_absent_and_keeps_the_window_start(self):
-        # The banner names ONE window across hours: an existing stamp's
-        # first line is preserved, only the diagnostic body refreshes.
-        idx_f = self.block.index('if [ ! -f "$stamp" ]; then')
-        idx_keep = self.block.index('head -n 1 "$stamp"', idx_f)
-        self.assertLess(idx_f, idx_keep)
-
-    def test_a_refusal_without_a_snapshot_is_red(self):
-        # fetch_aa exiting 3 without its snapshot is a broken refusal, not
-        # a publishable disputed hour: red with the capture's own stderr.
-        idx_guard = self.block.index(
-            "fetch_aa exited 3 without writing the disagreement snapshot")
-        self.assertLess(
-            idx_guard, self.block.index("exit 1", idx_guard))
-
-    def test_the_disputed_hour_is_not_committed_in_the_capture_step(self):
-        # #100 committed the stamp in this step so a later data/ restore
-        # could not lose the window. #118 moved the commit DOWN: the
-        # rendered gate decides moved vs unchanged first, and only what the
-        # suite passed is committed. #143 moves the commit itself to the
-        # write job: the capture step writes no commit here, and the
-        # conditional adds live in the publish job's commit step.
-        self.assertNotIn("git add data/aa-disagreement-snapshot.json",
-                         self.block)
-        commit = flattened(pub_step(self.wf, "Commit the capture")["run"])
-        self.assertIn(
-            "[ ! -f data/aa-disagreement-snapshot.json ] || "
-            "git add data/aa-disagreement-snapshot.json", commit)
-        self.assertIn(
-            "[ ! -f data/aa-route-disagreement.txt ] || "
-            "git add data/aa-route-disagreement.txt", commit)
-
-    def test_a_recovered_capture_retires_the_stamp_and_the_snapshot(self):
-        # rc == 0 with any window file tracked and NO last-agreeing record
-        # on disk: remove ALL of them from the tree (so the rendered gate
-        # builds a clean page), mark the hour retiring, and let the write
-        # job commit the removal -- a push lost to the race concedes
-        # silently, and the next successful capture retires the stamp
-        # again. The record retires with the stamp and the snapshot: with
-        # the routes agreeing again there is no window to carry a baseline
-        # for (issue #189).
-        self.assertIn('git ls-files --error-unmatch "$stamp"', self.block)
-        self.assertIn(
-            "git ls-files --error-unmatch data/aa-disagreement-snapshot.json",
-            self.block)
-        self.assertIn('git ls-files --error-unmatch "$record"', self.block)
-        self.assertIn("git rm -q --ignore-unmatch", self.block)
-        self.assertIn('echo "retire=true"', self.block)
-        idx_rm = self.block.index("git rm -q --ignore-unmatch")
-        self.assertLess(idx_rm, self.block.index('echo "retire=true"'))
-        # The healed-hour branch stands BEFORE the agreement branch and
-        # exits inside itself: a record on disk means the window is open,
-        # whatever rc says (issue #189).
-        idx_record = self.block.index('if [ -f "$record" ]; then')
-        idx_healed = self.block.index('echo "healed=true"', idx_record)
-        idx_exit = self.block.index("exit 0", idx_healed)
-        idx_agree = self.block.index("Agreement restored", idx_exit)
-        self.assertLess(idx_exit, idx_agree)
-        # The retirement commit itself is the write job's: not a word of it
-        # lives in this step.
-        self.assertNotIn("Route agreement restored", self.block)
-        commit = flattened(pub_step(self.wf, "Commit the capture")["run"])
-        self.assertIn("Route agreement restored; resume captures (issue #100)",
-                      commit)
-        self.assertIn("xargs git rm -q --ignore-unmatch", commit)
-
-    def test_both_stamp_paths_ride_the_push_bundle(self):
-        # The retirement commit rides the bundle with the data commit: it
-        # lands when the push job lands, and a push lost to the race
-        # concedes silently for the retirement too -- the next successful
-        # capture retires the stamp again. Only the commit step's retire
-        # slice is examined: it must hold the retirement commit and none of
-        # the push machinery.
-        commit = flattened(pub_step(self.wf, "Commit the capture")["run"])
-        idx_ret = commit.index("xargs git rm -q --ignore-unmatch")
-        idx_data = commit.index("cp -a")
-        retire = commit[idx_ret:idx_data]
-
-        self.assertIn("git commit -q -m "
-                      "'Route agreement restored; resume captures "
-                      "(issue #100)'", retire)
-        self.assertNotIn("git push", retire)
-        self.assertNotIn("HEAD:main", retire)
-
-    def test_no_time_bound_remains_on_the_disagreement(self):
-        # The banner is the alarm now: no stamp age, no red alarm wording.
-        # The only corrupt-stamp red left names the BANNER's window start --
-        # a non-numeric first line would misname the window, so the refresh
-        # path validates it and reds (issue #118 review, 2026-10-02).
-        self.assertNotIn("3*3600", self.block)
-        self.assertNotIn("older than 3 h", self.block)
-        self.assertIn("stamp is corrupt", self.block)
-        idx_case = self.block.index("''|*[!0-9]*)")
-        self.assertLess(idx_case,
-                        self.block.index("exit 1 ;;", idx_case))
-        self.assertLess(self.block.index('start="$(head -n 1 "$stamp")"'),
-                        idx_case)
-
-    def test_the_header_documents_the_disputed_publish(self):
-        # The file's contract lives in its header; a reader must find the
-        # exit-3 semantics there, not reconstruct them from the step.
-        self.assertIn("EXIT 3 IS THE DISPUTED PUBLISH", self.header)
-        self.assertIn("issue #118", self.header)
-        self.assertIn("data/aa-disagreement-snapshot.json", self.header)
-        self.assertIn("NO time bound", self.header)
-
-    def test_the_commit_step_messages_the_disputed_publish(self):
-        # A commit that adds the disagreement snapshot says so in its
-        # subject and carries the capture's own divergence diagnostic from
-        # the stamp -- never the differ's rendering, which compares the
-        # last-good captures a window does not touch.
-        run = flattened(pub_step(self.wf, "Commit the capture")["run"])
-        # NAME-ONLY (review on PR #192): an hour-2+ disputed hour stages the
-        # tracked snapshot as a MODIFICATION, and its designed disputed
-        # message must fire all the same. A healed hour's snapshot REMOVAL
-        # never reaches this predicate: the healed branch is checked FIRST,
-        # so the same name staging as a deletion cannot read as a disputed
-        # publish (issue #189).
-        self.assertIn(
-            "git diff --cached --name-only | grep -q "
-            "'^data/aa-disagreement-snapshot\\.json$'", run)
-        self.assertNotIn("--diff-filter=A", run)
-        self.assertIn(
-            "Publish disputed capture: AA routes disagree (issue #118)", run)
-        self.assertLess(run.index('if [ "$HEALED" = "true" ]; then'),
-                        run.index("git diff --cached --name-only "
-                                  "| grep -q"))
-        self.assertLess(
-            run.index("sed -n '2,$p' data/aa-route-disagreement.txt"),
-            run.index("git commit -F"))
-
-    def test_every_message_branch_writes_the_file_the_commit_reads(self):
-        # Review C1/I3 on PR #151: the differ branch of the message
-        # selection appended its trailer to the payload copy while
-        # `git commit -F` read the RUNNER_TEMP file -- nothing wrote it on
-        # an ordinary moved-capture hour, and the workflow's primary
-        # publishing path died at the commit, exit 128, with every
-        # structural pin green. The pin follows the dataflow: all three
-        # branches leave the commit's file written, no branch appends to
-        # the payload copy, and the commit reads exactly that path.
-        run = flattened(pub_step(self.wf, "Commit the capture")["run"])
-        msg = '"${RUNNER_TEMP}/commit-msg.txt"'
-
-        # The disputed branch writes it directly...
-        idx_disputed = run.index("Publish disputed capture: AA routes disagree")
-        self.assertLess(run.index(f"> {msg}", idx_disputed),
-                        run.index("elif [ -f"))
-        # ...the differ branch routes the payload message into it before
-        # the trailer append...
-        idx_differ = run.index('elif [ -f "${PAYLOAD}/commit-msg.txt" ]; then')
-        idx_cat = run.index(
-            'cat "${PAYLOAD}/commit-msg.txt" > "${RUNNER_TEMP}/commit-msg.txt"',
-            idx_differ)
-        idx_append = run.index("> " + msg, idx_cat)
-        self.assertLess(idx_cat, idx_append)
-        # ...and the forced branch writes it outright.
-        idx_forced = run.index("Rebuild the page: forced run")
-        self.assertLess(idx_forced, run.index(f"> {msg}", idx_forced))
-        # No branch mutates the payload copy, and the commit consumes the
-        # one file every branch wrote.
-        self.assertNotIn('>> "${PAYLOAD}/commit-msg.txt"', run)
-        self.assertLess(run.index(f"> {msg}"),
-                        run.index("git commit -F " + msg))
 
     def test_the_hub_ties_the_upload_and_the_ref_to_one_commit(self):
         # The ref must never name a page the hub does not serve, and the
@@ -830,101 +616,58 @@ class RouteDisagreementPublishTests(unittest.TestCase):
         self.assertIn("Lost the race", run)
 
 
-class HealedHourWindowTests(unittest.TestCase):
-    """Issues #176 and #189: the provably-stale hour heals, and the window
-    record keeps every healed hour honest. A healed capture is never a
-    baseline; the stamp stays alive through healed hours; only a capture
-    whose routes AGREE retires the window. The healed hour's snapshot
-    removal rides the DATA commit, never a retirement commit of its own.
+class CaptureStepTests(unittest.TestCase):
+    """The Capture step's exit contract, as it stands since issue #200.
+
+    fetch_aa.py has ONE nonzero exit -- the designed red that means go
+    re-read AA by hand -- so the step's trap exists to park the capture's
+    stderr and re-emit it on the red path. There is no exit-3 branch, no
+    window stamp, no baseline record and nothing to retire: the leaderboard
+    route publishes every value it carries and the detail route fills only
+    what it omits.
     """
 
     def setUp(self):
         self.wf = load()
         self.step = step(self.wf, "Capture the leaderboard")
         self.block = flattened(self.step["run"])
-        self.commit = flattened(pub_step(self.wf, "Commit the capture")["run"])
-        self.staging = flattened(
-            step(self.wf, "Stage the publish payload")["run"])
+        self.header = WORKFLOW.read_text(
+            encoding="utf-8").split("\njobs:", 1)[0]
 
-    def test_the_healed_hour_is_classified_before_agreement(self):
-        # The record's presence, not rc, decides the healed hour: the
-        # healed=true output is written and the branch exits before the
-        # agreement branch can retire anything.
-        self.assertIn('record=data/aa-last-agreeing-capture.json', self.block)
-        idx_record = self.block.index('if [ -f "$record" ]; then')
-        idx_healed = self.block.index('echo "healed=true"', idx_record)
-        idx_stamp = self.block.index('if [ ! -f "$stamp" ]; then', idx_healed)
-        idx_exit = self.block.index("exit 0", idx_stamp)
-        idx_agree = self.block.index("Agreement restored", idx_exit)
-        for later in (idx_healed, idx_stamp, idx_exit):
-            self.assertLess(idx_record, later)
-        self.assertLess(idx_exit, idx_agree)
+    def test_the_fetch_runs_behind_an_rc_trap_that_parks_the_stderr(self):
+        # The capture's stderr is parked in a file so the red path can
+        # re-emit it under the step's own log; the rc is captured before
+        # `set -e` restores the fail-fast the job runs under.
+        for piece in ("set +e",
+                      "python3 scripts/fetch_aa.py 2> /tmp/fetch-err.txt",
+                      "rc=$?",
+                      "set -e"):
+            self.assertIn(piece, self.block)
+        self.assertIn("cat /tmp/fetch-err.txt >&2", self.block)
 
-    def test_the_healed_stamp_rebuilds_from_the_records_window_start(self):
-        # A lost push or a retired stamp must leave the window unnamed: the
-        # healed branch rebuilds the stamp's first line from the record.
-        self.assertIn('window_start', self.block)
-        self.assertIn('> "$stamp"', self.block)
+    def test_the_step_has_one_recovery_and_one_red_and_no_third_colour(self):
+        # Recovery (rc 0) stands first and sets the force gate's verdict,
+        # then every other rc is the designed red, re-raised unchanged so
+        # the run's own colour is fetch_aa.py's. Issue #200 removed the
+        # exit-3 dispute branch: nothing between the two.
+        self.assertLess(self.block.index('[ "$rc" -eq 0 ]'),
+                        self.block.index('exit "$rc"'))
+        self.assertLess(self.block.index('[ "$rc" -eq 0 ]'),
+                        self.block.index('echo "captured=true"'))
+        self.assertNotIn('[ "$rc" -eq 3 ]', self.block)
+        for gone in ("data/aa-disagreement-snapshot.json",
+                     "data/aa-route-disagreement.txt",
+                     "data/aa-last-agreeing-capture.json",
+                     "git rm", "git add", "healed", "retire"):
+            self.assertNotIn(gone, self.block)
 
-    def test_the_retirement_removes_the_record_with_the_window(self):
-        # Agreement is the ONLY window-closer, and it closes everything:
-        # stamp, snapshot and last-agreeing record leave the tree together.
-        self.assertIn(
-            'git rm -q --ignore-unmatch "$stamp" '
-            'data/aa-disagreement-snapshot.json "$record"', self.block)
-
-    def test_the_refresh_job_exports_the_heal_verdict(self):
-        # The write half reads needs.refresh.outputs.healed.
-        outputs = self.wf["jobs"]["refresh"]["outputs"]
-        self.assertEqual(outputs["healed"],
-                         "${{ steps.fetch.outputs.healed }}")
-
-    def test_the_staging_step_ships_the_record_on_healed_hours(self):
-        # The record rides the data commit like the window files, and the
-        # retirement's remove list names it too.
-        self.assertIn(
-            "[ ! -f data/aa-last-agreeing-capture.json ] || "
-            "cp --parents data/aa-last-agreeing-capture.json "
-            '"${PAYLOAD}/tree/"', self.staging)
-        retire_idx = self.staging.index('[ "$RETIRE" = "true" ]')
-        remove_idx = self.staging.index(
-            "data/aa-last-agreeing-capture.json", retire_idx)
-        self.assertLess(retire_idx, remove_idx)
-
-    def test_the_healed_snapshot_removal_rides_the_data_commit(self):
-        # The healed hour dropped the snapshot from its tree; the tracked
-        # copy on main must leave in the DATA commit -- phase 1 (the
-        # retirement commit) is for AGREEMENT only.
-        self.assertIn(
-            "if [ \"$HEALED\" = \"true\" ] && git ls-files "
-            "--error-unmatch data/aa-disagreement-snapshot.json",
-            self.staging)
-        phase1 = self.commit[self.commit.index("Phase 1"):
-                             self.commit.index("Phase 2")]
-        self.assertIn('[ "$HEALED" != "true" ]', phase1)
-        phase2_idx = self.commit.index("Phase 2")
-        idx = self.commit.index("xargs git rm -q --ignore-unmatch",
-                                phase2_idx)
-        gated = self.commit[idx - 200:idx]
-        self.assertIn('[ "$HEALED" = "true" ]', gated)
-
-    def test_the_healed_hour_carries_its_own_commit_message(self):
-        # The healed commit names the heal; the differ's numeric rendering
-        # (when the hour ran it) rides as the body. The healed branch stands
-        # FIRST in the executing code -- its snapshot removal stages the
-        # name a disputed publish adds (review on PR #192).
-        run = commands(pub_step(self.wf, "Commit the capture")["run"])
-        self.assertIn(
-            "Heal the stale route: publish the fresh generation "
-            "(issues #176, #189)", self.commit)
-        self.assertLess(run.index('if [ "$HEALED" = "true" ]; then'),
-                        run.index("git diff --cached --name-only "
-                                  "| grep -q"))
-
-    def test_the_commit_step_stages_the_record(self):
-        self.assertIn(
-            "[ ! -f data/aa-last-agreeing-capture.json ] || "
-            "git add data/aa-last-agreeing-capture.json", self.commit)
+    def test_the_header_documents_the_absence_of_a_disagreement_state(self):
+        # The file's contract lives in its header, and the contract changed:
+        # a reader must find the single-generation rule there, not
+        # reconstruct a dispute branch that no longer exists.
+        self.assertIn("THERE IS NO ROUTE-DISAGREEMENT STATE", self.header)
+        self.assertIn("issue #200", self.header)
+        self.assertIn("never exits 3", self.header)
 
 
 class ExecutedCommitMessageTests(unittest.TestCase):
@@ -932,11 +675,13 @@ class ExecutedCommitMessageTests(unittest.TestCase):
 
     The review corpus's ci/run-workflow-step-scripts-dont-read-them, fourth
     sighting on this file: the --diff-filter=A narrowing shipped green over
-    every text pin in this module and demoted the designed disputed message
-    on hour-2+ disputed hours -- only running the step caught it (review on
-    PR #192). These scenarios run the real step over a local origin (the
-    https remote rewritten to it by GIT_CONFIG_GLOBAL) for the three shapes
-    that select a message through the snapshot's staged status.
+    every text pin in this module -- only running the step caught it (review
+    on PR #192). Since #200 the selection has exactly two shapes, one per
+    payload: the differ's own rendering (the hour whose data moved) and the
+    forced rebuild's own subject (the hour the data did not). Both are run
+    here over a local origin -- the https remote rewritten to it by
+    GIT_CONFIG_GLOBAL -- so each scenario's commit is read back, not read
+    about.
     """
 
     BASE_FILES = {
@@ -944,10 +689,6 @@ class ExecutedCommitMessageTests(unittest.TestCase):
         "data/aa-raw-coding-agents.json": "[]\n",
         "data/captured-at.txt": "2026-10-04\n",
         "out/frontier-models.html": "<p>base</p>\n",
-    }
-    WINDOW_FILES = {
-        "data/aa-disagreement-snapshot.json": '{"disagreements": []}\n',
-        "data/aa-route-disagreement.txt": "1759560000\nold diagnostic\n",
     }
     MOVED_FILES = {
         "data/aa-raw-models.json": '{"models": [1]}\n',
@@ -995,29 +736,15 @@ class ExecutedCommitMessageTests(unittest.TestCase):
                   cwd=str(seed), env=env)
         return config
 
-    def _run_hour(self, tmp: pathlib.Path, tracked: dict, healed: bool,
-                  window_files: dict, remove: list, differ_msg):
+    def _run_hour(self, tmp: pathlib.Path, differ_msg):
         """Stage one hour's payload and run the real commit step."""
-        config = self._seed_origin(tmp, {**self.BASE_FILES, **tracked})
+        config = self._seed_origin(tmp, self.BASE_FILES)
         payload = tmp / "publish-payload"
         (payload / "tree").mkdir(parents=True)
         for rel, text in self.MOVED_FILES.items():
             path = payload / "tree" / rel
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_text(text, encoding="utf-8")
-        for rel, text in window_files.items():
-            path = payload / "tree" / rel
-            path.parent.mkdir(parents=True, exist_ok=True)
-            path.write_text(text, encoding="utf-8")
-        (payload / "tree" / "data" / "aa-last-agreeing-capture.json") \
-            .write_text('{"window_start": 7, "baseline": []}\n',
-                        encoding="utf-8")
-        if remove:
-            # Bytes, not text mode: a Windows text-mode write turns the
-            # newlines into CRLF, xargs hands git a CR-suffixed pathspec,
-            # and --ignore-unmatch swallows the miss silently.
-            (payload / "remove.txt").write_bytes(
-                "".join(f"{rel}\n" for rel in remove).encode("utf-8"))
         if differ_msg:
             (payload / "commit-msg.txt").write_text(differ_msg,
                                                     encoding="utf-8")
@@ -1029,7 +756,6 @@ class ExecutedCommitMessageTests(unittest.TestCase):
             "GITHUB_OUTPUT": str(tmp / "output.txt"),
             "GITHUB_STEP_SUMMARY": str(tmp / "summary.txt"),
             "GIT_CONFIG_GLOBAL": config,
-            "HEALED": "true" if healed else "",
         }
         proc = _workflowrun.run_step(tmp, self.step, env)
         self.assertEqual(proc.returncode, 0,
@@ -1038,67 +764,38 @@ class ExecutedCommitMessageTests(unittest.TestCase):
         message = self._git("log", "-1", "--format=%B", cwd=str(scratch)).stdout
         names = self._git("diff-tree", "--no-commit-id", "--name-status",
                           "-r", "HEAD", cwd=str(scratch)).stdout
-        return message, names
+        log = self._git("log", "--format=%s", cwd=str(scratch)).stdout
+        return message, names, log
 
-    def test_an_hour_1_disputed_publish_adds_with_its_own_message(self):
+    def test_a_moved_capture_commits_the_differ_s_own_rendering(self):
         with tempfile.TemporaryDirectory(prefix=".commit-msg-") as raw:
-            tmp = pathlib.Path(raw)
-            window = dict(self.WINDOW_FILES)
-            window["data/aa-route-disagreement.txt"] = (
-                "1759560000\nnew diagnostic\n")
-            message, names = self._run_hour(
-                tmp, tracked={}, healed=False, window_files=window,
-                remove=[], differ_msg=None)
-        self.assertIn(
-            "Publish disputed capture: AA routes disagree (issue #118)",
-            message)
-        self.assertIn("new diagnostic", message)
-        self.assertIn("A\tdata/aa-disagreement-snapshot.json", names)
-
-    def test_an_hour_2_disputed_publish_still_says_disputed(self):
-        # The regression the executed run caught: the tracked snapshot
-        # stages as a MODIFICATION on hour 2+ of a window, and its designed
-        # disputed message must fire all the same -- never the differ's
-        # routine Refresh-capture rendering.
-        with tempfile.TemporaryDirectory(prefix=".commit-msg-") as raw:
-            tmp = pathlib.Path(raw)
-            window = dict(self.WINDOW_FILES)
-            window["data/aa-disagreement-snapshot.json"] = (
-                '{"disagreements": [1]}\n')
-            window["data/aa-route-disagreement.txt"] = (
-                "1759560000\nnewer diagnostic\n")
-            message, names = self._run_hour(
-                tmp, tracked=dict(self.WINDOW_FILES), healed=False,
-                window_files=window, remove=[], differ_msg=None)
-        self.assertIn(
-            "Publish disputed capture: AA routes disagree (issue #118)",
-            message)
-        self.assertIn("newer diagnostic", message)
-        self.assertNotIn("Refresh capture", message)
-        self.assertIn("M\tdata/aa-disagreement-snapshot.json", names)
-
-    def test_a_healed_hour_never_reads_as_a_disputed_publish(self):
-        # The healed hour's snapshot REMOVAL stages the same name: the
-        # healed branch is checked first, the differ's rendering rides as
-        # the body, and no retirement commit exists (the window is open).
-        with tempfile.TemporaryDirectory(prefix=".commit-msg-") as raw:
-            tmp = pathlib.Path(raw)
-            message, names = self._run_hour(
-                tmp, tracked=dict(self.WINDOW_FILES), healed=True,
-                window_files={}, remove=["data/aa-disagreement-snapshot.json"],
+            message, names, log = self._run_hour(
+                pathlib.Path(raw),
                 differ_msg="Refresh capture: 690 models\n\nspeed rows\n")
-            self.assertIn(
-                "Heal the stale route: publish the fresh generation "
-                "(issues #176, #189)", message)
-            self.assertIn("Refresh capture: 690 models", message)
-            self.assertNotIn(
-                "Publish disputed capture: AA routes disagree (issue #118)",
-                message)
-            self.assertIn("D\tdata/aa-disagreement-snapshot.json", names)
-            scratch = tmp / "scratch"
-            log = self._git("log", "--format=%B", cwd=str(scratch)).stdout
-            self.assertNotIn("Route agreement restored", log,
-                             "a healed hour grew a retirement commit")
+        self.assertIn("Refresh capture: 690 models", message)
+        self.assertIn("speed rows", message)
+        self.assertIn("Captured by .github/workflows/refresh.yml.", message)
+        self.assertNotIn("Rebuild the page: forced run", message)
+        self.assertIn("M\tdata/aa-raw-models.json", names)
+        self.assertIn("M\tout/frontier-models.html", names)
+        # The hour's data commit is the only commit it makes.
+        self.assertEqual(log.count("\n"), 2, log)
+
+    def test_a_forced_run_without_a_differ_message_writes_its_own_subject(self):
+        # The republish/force shape: no commit-msg.txt in the payload, so
+        # the step writes the forced rebuild's subject itself -- the one
+        # subject the hour gets when the data did not move.
+        with tempfile.TemporaryDirectory(prefix=".commit-msg-") as raw:
+            message, names, log = self._run_hour(
+                pathlib.Path(raw), differ_msg=None)
+        self.assertIn(
+            "Rebuild the page: forced run, AA capture unchanged", message)
+        self.assertIn(
+            "The build moved, the data did not. Republished so the live "
+            "page matches main.", message)
+        self.assertNotIn("Refresh capture", message)
+        self.assertIn("M\tout/frontier-models.html", names)
+        self.assertEqual(log.count("\n"), 2, log)
 
 
 class DeployKeyPushTests(unittest.TestCase):
@@ -1131,6 +828,29 @@ class DeployKeyPushTests(unittest.TestCase):
                       run)
         self.assertIn("ssh-add <(printf '%s\\n' \"$MASTER_PUSH_DEPLOY_KEY\")",
                       run)
+
+    def test_no_step_before_the_hub_job_holds_a_credential(self):
+        # #143 and #133: the capture step pushes nothing, and the commit
+        # step's fetches went anonymous, so NO step before the hub job
+        # holds a credential at all. The deploy key lives only in the push
+        # job; the docs-hub key and the job token live only in the hub.
+        capture = step(self.wf, "Capture the leaderboard")
+        commit = pub_step(self.wf, "Commit the capture")
+        push_step = step_in(self.wf, "push", "Push the tested tree to main")
+        hub = hub_step(self.wf, "Publish to docs-hub")
+
+        self.assertNotIn("GH_TOKEN", capture.get("env", {}))
+        self.assertNotIn("GH_TOKEN", commit.get("env", {}))
+        self.assertNotIn("MASTER_PUSH_DEPLOY_KEY", commit.get("env", {}))
+        self.assertEqual(self.wf["jobs"]["push"].get("environment"),
+                         "main-push")
+        self.assertEqual(push_step["env"]["MASTER_PUSH_DEPLOY_KEY"],
+                         "${{ secrets.MASTER_PUSH_DEPLOY_KEY }}")
+        self.assertNotIn("GH_TOKEN", push_step.get("env", {}))
+        self.assertEqual(hub["env"]["DOCS_HUB_API_KEY"],
+                         "${{ secrets.DOCS_HUB_API_KEY }}")
+        self.assertEqual(hub["env"]["GH_TOKEN"], "${{ github.token }}")
+        self.assertNotIn("MASTER_PUSH_DEPLOY_KEY", hub.get("env", {}))
 
     def test_the_refresh_trigger_set_stays_frozen(self):
         # Schedule plus the force dispatch. Issue #180's lesson applies to

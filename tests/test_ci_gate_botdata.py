@@ -12,6 +12,7 @@ by path here too.
 from __future__ import annotations
 
 import importlib.util
+import re
 import sys
 from pathlib import Path
 
@@ -37,7 +38,7 @@ DOCS = ["README.md", "docs/guide.md", "LICENSE", ".gitignore"]
 CODE = [
     "build.py", "scripts/fetch_aa.py", ".github/workflows/tests.yml",
     ".github/ci-thresholds.json", "scripts/ci/classify_changes.py",
-    "data/aa-disagreement-snapshot.json",
+    "scripts/capture_gate.py",
 ]
 
 
@@ -62,19 +63,23 @@ def test_bot_signature_is_exactly_the_refresh_bots_four_files():
 
 def test_bot_signature_names_every_file_the_refresh_workflow_adds():
     # Lockstep with refresh.yml: its fixed `git add` list is the
-    # signature's source of truth, and the two conditional adds (the
-    # disputed capture's snapshot and the route-disagreement file) are
-    # deliberately OUTSIDE it — a disputed push must run the full set,
-    # because that is the push a fresh, unverified build ships with.
+    # signature's source of truth, and since issue #200 it is the ONLY
+    # `git add` the workflow runs — the conditional window-file adds are
+    # gone with the disagreement state, so the signature covers every path
+    # an hour's commit stages. A future fifth `git add` must move the
+    # signature with it, so the pin compares the sets, not one spelling.
     raw = (REPO_ROOT / ".github" / "workflows" / "refresh.yml").read_text(
         encoding="utf-8")
     fixed = "git add data/aa-raw-models.json data/aa-raw-coding-agents.json \\\n" \
             "                  data/captured-at.txt out/frontier-models.html"
     assert fixed in raw
-    for conditional in ("data/aa-disagreement-snapshot.json",
-                        "data/aa-route-disagreement.txt"):
-        assert conditional in raw
-        assert conditional not in classify.BOT_SIGNATURE
+    adds = re.findall(r"^\s*git add(?:[^\n\\]|\\\n)*", raw, re.MULTILINE)
+    assert len(adds) == 1, adds
+    # The one `git add` spans a backslash continuation, so flatten it
+    # before reading the paths off it.
+    staged = {path for path in adds[0].replace("\\\n", " ").split()
+              if path.startswith(("data/", "out/"))}
+    assert staged == set(classify.BOT_SIGNATURE)
 
 
 def test_data_only_requires_the_exact_signature():
