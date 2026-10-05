@@ -17,6 +17,7 @@ import urllib.request
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent / "scripts"))
 
+import build  # noqa: E402  # pylint: disable=wrong-import-position
 import fetch_aa  # noqa: E402  # pylint: disable=wrong-import-position
 
 
@@ -154,7 +155,36 @@ class CostBreakdownTests(unittest.TestCase):
     def test_a_consistent_breakdown_passes_and_is_counted(self):
         models = [costed("A"), costed("B"), {"name": "unpriced"}]
 
-        self.assertEqual(fetch_aa.check_cost_breakdown(models), 2)
+        self.assertEqual(fetch_aa.check_cost_breakdown(models), (2, []))
+
+    def test_a_dropped_breakdown_is_reported_and_is_not_an_error(self):
+        # merge_captures leaves the leaderboard's bare number when the detail
+        # route's breakdown is another generation's (issue #200). The validator
+        # reads that as a dropped model and NAMES it -- it is a model whose
+        # GDPval cost renders absent until the routes converge, which a count
+        # alone would not say.
+        models = [costed("A"),
+                  {"slug": "b-dropped", "intelligenceIndexCostPerTask": 1.5}]
+
+        priced, dropped = fetch_aa.check_cost_breakdown(models)
+
+        self.assertEqual(priced, 1)
+        self.assertEqual(dropped, ["b-dropped"])
+
+    def test_a_capture_whose_every_breakdown_was_dropped_names_the_window(self):
+        # The merge is holding the line through a cross-generation window: the
+        # refusal must not blame a schema change for a window that will close
+        # on its own, and must name the models it is talking about.
+        models = [{"slug": f"dropped-{i}", "intelligenceIndexCostPerTask": 1.5}
+                  for i in range(3)]
+
+        with self.assertRaises(SystemExit) as caught:
+            fetch_aa.check_cost_breakdown(models)
+
+        message = str(caught.exception)
+        self.assertIn("dropped-0", message)
+        self.assertIn("two generations", message)
+        self.assertNotIn("schema changed", message)
 
     def test_a_dropped_slug_exits_before_the_chart_can_empty(self):
         # Exactly what v4.3 did to terminalbench-v2-1 and tau3-banking.
@@ -325,22 +355,67 @@ class MergeCapturesTests(unittest.TestCase):
         self.assertEqual(got[0]["modelCreatorName"], "Lab")
 
     def test_a_nested_stub_does_not_shadow_the_complete_breakdown(self):
-        # The leaderboard kept intelligenceIndexCostPerTask.cost and dropped
+        # The shape AA shipped before it flattened the cost to a bare number:
+        # the leaderboard kept intelligenceIndexCostPerTask.cost and dropped
         # .evaluations. A key-level merge leaves the stub in place and the
-        # GDPval axis silently loses its cost.
+        # GDPval axis silently loses its cost. The breakdown here sums to the
+        # leaderboard's total, which is what AA publishes -- so it survives
+        # this arm's sum check as well as the one-level-deep fill.
         base = [{"slug": "a",
                  "intelligenceIndexCostPerTask": {"cost": {"total": 1.0}}}]
         detail = [{"slug": "a", "intelligenceIndexCostPerTask": {
             "cost": {"total": 1.0},
-            "evaluations": [{"slug": "gdpval-aa", "weightedCostPerTask": 0.4}]}}]
+            "evaluations": [{"slug": "gdpval-aa", "weightedCostPerTask": 0.4},
+                            {"slug": "scicode", "weightedCostPerTask": 0.6}]}}]
 
         got = fetch_aa.merge_captures(base, detail)
 
+        cost = got[0]["intelligenceIndexCostPerTask"]
+        self.assertEqual(cost["cost"]["total"], 1.0)
         self.assertEqual(
-            got[0]["intelligenceIndexCostPerTask"]["evaluations"],
-            [{"slug": "gdpval-aa", "weightedCostPerTask": 0.4}])
-        self.assertEqual(
-            got[0]["intelligenceIndexCostPerTask"]["cost"]["total"], 1.0)
+            [e["slug"] for e in cost["evaluations"]], ["gdpval-aa", "scicode"])
+
+    def test_a_nested_stub_whose_breakdown_will_not_sum_is_dropped_too(self):
+        # The same shape, where the detail breakdown does NOT decompose the
+        # leaderboard's total (0.85 against 1.0). This arm carried no sum check
+        # at all, so a cross-generation breakdown decomposing someone else's
+        # total shipped unnoticed -- the flattened-scalar arm's guard is
+        # hoisted so both arms share it. The leaderboard's own number is what
+        # is left, and the GDPval axis reads absent rather than lying.
+        base = [{"slug": "a",
+                 "intelligenceIndexCostPerTask": {"cost": {"total": 1.0}}}]
+        detail = [{"slug": "a", "intelligenceIndexCostPerTask": {
+            "cost": {"total": 1.0},
+            "evaluations": [{"slug": "gdpval-aa", "weightedCostPerTask": 0.4},
+                            {"slug": "scicode", "weightedCostPerTask": 0.45}]}}]
+
+        got = fetch_aa.merge_captures(base, detail)
+
+        self.assertEqual(got[0]["intelligenceIndexCostPerTask"], 1.0)
+
+    def test_an_unpriced_leaderboard_value_is_never_promoted_to_a_price(self):
+        # AA writes "$undefined" for a model it did not price, and null for
+        # one it has no cost for; the detail route describes such a model too,
+        # sometimes with a total from an older generation. Neither is a total
+        # to reshape -- both are a published "no cost" -- so taking the detail
+        # object there would promote a stale price for a model the fresh route
+        # says is unpriced, which is exactly what this precedence prevents.
+        # The field stays as the leaderboard published it and renders absent.
+        for unpriced in ("$undefined", None):
+            with self.subTest(unpriced=unpriced):
+                base = [{"slug": "a", "intelligenceIndexCostPerTask": unpriced}]
+                detail = [{"slug": "a", "intelligenceIndexCostPerTask": {
+                    "cost": {"total": 1.0},
+                    "evaluations": [
+                        {"slug": "gdpval-aa", "weightedCostPerTask": 0.4},
+                        {"slug": "scicode", "weightedCostPerTask": 0.6}]}}]
+
+                got = fetch_aa.merge_captures(base, detail)
+
+                self.assertEqual(
+                    got[0]["intelligenceIndexCostPerTask"], unpriced)
+                # And the cost axis reads it as absent rather than raising.
+                self.assertIsNone(build.cost_per_task(got[0]))
 
     def test_a_flattened_scalar_wins_and_the_breakdown_hangs_under_it(self):
         # AA flattened the leaderboard's intelligenceIndexCostPerTask to its
