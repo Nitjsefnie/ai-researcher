@@ -498,6 +498,32 @@ def undominated(rows, metric="intelligence"):
     ]
 
 
+def retired_frontier_axes(rows, row):
+    """Every rendered axis whose current undominated layer still carries
+    `row`, in page order. Identity, not name: an agent row can share a
+    retired model's display name without being that frontier point."""
+    return [
+        metric
+        for metric in METRIC_ORDER + ("parameters",)
+        if any(u is row for u in undominated(rows, metric))
+    ]
+
+
+def retired_summary(rows, retired_front):
+    """The retired-model summary line's parenthetical (issue #203). MISMATCH
+    is a finding to report, not a bug to fix -- a vendor can retire a model
+    that still sits on an efficient frontier -- so the mismatch state keeps
+    naming the models and every frontier (axis) each one sits on: a
+    count-only phrasing cannot be acted on, or told apart from a stale
+    alarm. Text only; the build's exit status never moves."""
+    if not retired_front:
+        return "metric filter subsumes the vendor flag"
+    named = "; ".join(
+        f"{r['name']} [frontiers: {', '.join(retired_frontier_axes(rows, r))}]"
+        for r in retired_front)
+    return f"MISMATCH -- still undominated: {named}"
+
+
 # The capture's one generation: the leaderboard's copy (Overseer ruling,
 # delegated by the maintainer, 2026-10-05, issue #200). The two routes are
 # independently cached Vercel pages and AA's data lands on them at different
@@ -899,6 +925,7 @@ def main():
     # filters leave, so nothing is baked into the data.
     front = undominated(intelligence_rows)
     kept = {r["name"] for r in front}
+    retired_front = [r for r in intelligence_rows if r["dep"] and r["name"] in kept]
     retired_and_beaten = sum(
         1 for r in intelligence_rows if r["dep"] and r["name"] not in kept
     )
@@ -1020,7 +1047,7 @@ def main():
     print(f"  {len(front)} undominated, "
           f"{len(intelligence_rows) - len(front)} superseded by metric")
     print(f"  of {dep} vendor-retired models, {retired_and_beaten} are also beaten on the "
-          f"numbers ({'metric filter subsumes the vendor flag' if retired_and_beaten == dep else 'MISMATCH -- some retired model is still undominated'})")
+          f"numbers ({retired_summary(rows, retired_front)})")
 
 
 TEMPLATE = r"""<!DOCTYPE html>

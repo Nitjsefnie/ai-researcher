@@ -1695,6 +1695,116 @@ class FrontierZeroScoreTests(unittest.TestCase):
         self.assertIn('<td class="n">—</td>', match.group(1))
 
 
+class RetiredMismatchSummaryTests(unittest.TestCase):
+    """Issue #203: the retired-model summary names each undominated retired
+    model and the frontier (axis) it sits on. AGENTS.md defines MISMATCH as
+    a finding to report, not a bug to fix -- a vendor can retire a model
+    that still sits on an efficient frontier -- but the count-only phrasing
+    could not be acted on, or told apart from a stale alarm. The finding
+    stays a print and never changes the build's exit status, and WHICH
+    builds report a mismatch is unchanged: retired_front is the same set
+    the count subtraction always implied.
+    """
+
+    @staticmethod
+    def _row(name, *, ii, icost, agentic, params=None, dep=False):
+        """A minimal model row carrying exactly what metric_of() and
+        undominated() read: the intelligence and agentic pairs, the
+        parameter pair's inputs, and the retired flag. No coding pair --
+        model rows get none."""
+        return {
+            "name": name, "dep": dep, "params": params,
+            "ii": ii, "cost": icost,
+            "metrics": {
+                "coding": None,
+                "intelligence": {"score": ii, "cost": icost},
+                "agentic": {"score": agentic, "cost": icost},
+            },
+        }
+
+    def _front_of(self, rows):
+        intelligence_rows = [
+            r for r in rows if r["metrics"]["intelligence"] is not None]
+        return [r for r in build.undominated(intelligence_rows) if r["dep"]]
+
+    def test_the_mismatch_names_the_model_and_every_frontier_it_sits_on(self):
+        rows = [
+            self._row("Retired Champ", ii=51, icost=0.75, agentic=47, dep=True),
+            self._row("Pricey Also-ran", ii=40, icost=5.0, agentic=30),
+        ]
+        # Retired Champ is undominated on the intelligence and agentic
+        # frontiers and carries no coding or parameter pair, so both axes
+        # are named, in page order.
+        self.assertEqual(
+            build.retired_summary(rows, self._front_of(rows)),
+            "MISMATCH -- still undominated: Retired Champ "
+            "[frontiers: intelligence, agentic]")
+
+    def test_exact_ties_between_retired_models_name_each_one(self):
+        # Exact ties survive together on the frontier: neither strictly
+        # beats the other, so both are named.
+        rows = [
+            self._row("Twin A", ii=51, icost=0.75, agentic=47, dep=True),
+            self._row("Twin B", ii=51, icost=0.75, agentic=47, dep=True),
+        ]
+        self.assertEqual(
+            build.retired_summary(rows, self._front_of(rows)),
+            "MISMATCH -- still undominated: Twin A "
+            "[frontiers: intelligence, agentic]; "
+            "Twin B [frontiers: intelligence, agentic]")
+
+    def test_when_the_numbers_beat_every_retired_model_the_text_says_so(self):
+        rows = [
+            self._row("Retired Also-ran", ii=40, icost=5.0, agentic=30, dep=True),
+            self._row("Cheaper Champ", ii=51, icost=0.75, agentic=47),
+        ]
+        self.assertEqual(
+            build.retired_summary(rows, self._front_of(rows)),
+            "metric filter subsumes the vendor flag")
+
+    def test_the_printed_line_names_the_undominated_retired_model(self):
+        # Through main() on a mutated real capture: retiring an undominated
+        # frontier model must put its name and frontiers on the printed
+        # line. The target is chosen dynamically so the pin survives
+        # capture churn; the mutation cannot move the frontier (the retired
+        # flag is not a frontier input), so the mismatch is deterministic.
+        models = build.read_capture(build.RAW)
+        agents = build.read_capture(build.AGENTS_RAW)
+        rows = build.build_rows(models) + build.build_agent_rows(agents, models)
+        intelligence_rows = [r for r in rows if r["metrics"]["intelligence"]]
+        target = next(
+            r for r in build.undominated(intelligence_rows)
+            if not r["dep"] and "(" not in r["name"])
+        match = next(
+            m for m in models
+            if build.display_name(m.get("name") or m.get("shortName") or "")
+            == target["name"])
+        match["deprecated"] = True
+        name = target["name"]
+
+        with tempfile.TemporaryDirectory(
+                prefix=".issue-203-build-", dir=build.ROOT) as tmp:
+            raw = pathlib.Path(tmp) / "models.json"
+            agents_raw = pathlib.Path(tmp) / "coding-agents.json"
+            page_path = pathlib.Path(tmp) / "frontier-models.html"
+            raw.write_bytes(json.dumps(models, indent=1).encode("utf-8"))
+            agents_raw.write_bytes(
+                (build.ROOT / "data" / "aa-raw-coding-agents.json").read_bytes())
+            saved = (build.RAW, build.AGENTS_RAW, build.OUT)
+            build.RAW, build.AGENTS_RAW, build.OUT = raw, agents_raw, page_path
+            buf = io.StringIO()
+            try:
+                with contextlib.redirect_stdout(buf):
+                    build.main()
+            finally:
+                build.RAW, build.AGENTS_RAW, build.OUT = saved
+        line = next(
+            l for l in buf.getvalue().splitlines()
+            if "vendor-retired models" in l)
+        self.assertIn(
+            f"MISMATCH -- still undominated: {name} [frontiers: ", line)
+
+
 def gdpval_weighted_cost(m):
     """The model's gdpval-aa weightedCostPerTask, or None when it has no
     parseable one. Test-side mirror of build.evaluation_cost_per_task's
