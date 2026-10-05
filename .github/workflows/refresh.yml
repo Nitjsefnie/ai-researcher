@@ -17,8 +17,9 @@ name: refresh
 # reachable from main alone): it delivers the bundle to main, so the bot
 # commit starts workflow runs and gets a real ci-gate aggregate verdict --
 # the reason the push moved off the GITHUB_TOKEN for issue #133. `hub` then
-# publishes to docs-hub and moves the `published` ref, naming the landed
-# commit. A red capture or a red suite fails the refresh job, and a failed
+# publishes to docs-hub, skipping the upload when the live page already
+# carries this run's bytes. A red capture or a red suite fails the refresh
+# job, and a failed
 # need never starts the write half: NO commit and NO publish, and the
 # hourly cadence stays green-behaved.
 #
@@ -64,29 +65,29 @@ name: refresh
 # and publishes in one run, and the republish gate below, which republishes
 # whenever the live page is behind main.
 #
-# THE `published` REF IS THE REPUBLISH GATE'S MEMORY. The branch
-# refs/heads/published on the remote points at the main commit whose
-# out/frontier-models.html is live on the hub. It moves only in the write
-# job's publish step, only after the upload succeeded, and only forward
-# along main's history (fast-forward by construction). When a run's capture
-# is unchanged, it fetches the ref and compares the page against HEAD: a
-# missing ref (never published) or a differing page (a publish that failed
-# or never ran) sets proceed, so the stale page is republished by the next
-# run instead of being skipped forever. A green no-op now means "the live
+# THE LIVE PAGE IS THE REPUBLISH GATE'S MEMORY (issue #206). The page HTML
+# embeds its own provenance: the source-commit stamp, rendered from
+# AA_SOURCE_COMMIT, names the main commit the page was built from. A branch
+# can be deleted; a stamp inside the page the hub serves cannot -- and it
+# needs no ref, no ref move, and no write permission anywhere in the
+# workflow to keep working. When a run's capture is unchanged, it fetches
+# the live page and compares it byte-for-byte against HEAD's (the stamp is
+# one of those bytes), and the hub job reads the stamp before it uploads:
+# the hub behind, a publish that failed or never ran, an unstamped page, or
+# a failed fetch all set proceed, so the stale page is republished by the
+# next run instead of being skipped forever. A green no-op means "the live
 # page is current", not merely "the data did not move".
 #
 # TWO OVERLAPPING RUNS CAN STILL INVERT THE UPLOAD ORDER (issue #74). The
 # concurrency group serializes runs, but an OLDER run can still reach the
 # publish step after a newer one and land its upload LAST, leaving the hub
-# serving the older page under a ref that names the newer commit — an
-# inversion neither the republish gate's ref comparison nor the commit step can
-# see. Two guards close it: the publish step compares the freshly fetched
-# `published` ref against this run's HEAD via the GitHub compare API and
-# ABORTS green when the ref is ahead (a newer run already published; the
-# newest run never aborts, so within any overlap the newest page always
-# wins), and the republish gate also compares the hub's live page against
-# HEAD byte-for-byte, so even the residual seconds-wide inversion is repaired
-# on the next unchanged-capture run.
+# serving the older page. The hub step's tie closes it: the payload page
+# uploads only while its own commit (`tip`, the publish job's record) is
+# still main's tip, freshly fetched in the hub job -- a newer run has
+# necessarily LANDED before it can publish anything, so a tie that stands
+# means no newer page exists to lose to, and the unchanged path's byte
+# comparison against the live page repairs any residual seconds-wide
+# inversion on the next unchanged-capture run.
 #
 # THE SUITE RUNS BEFORE THE COMMIT JOB, NOT AFTER. A capture can break the
 # page — a new field shape, a model with a null AA never emitted before —
@@ -102,7 +103,7 @@ name: refresh
 # anything is built drops the run green when main moved under the tested
 # base, a rejected push distinguishes "main stood still" (a real error) from
 # "main moved before the push landed" (dropped green), and the hub job then
-# CONCEDES -- green, no upload, no ref move -- whenever the payload page is
+# CONCEDES -- green, no upload -- whenever the payload page is
 # not the page of main's tip, because the winning run's capture stands and
 # publishing it is that run's job. Nothing loops: a dropped hour is
 # re-fetched, re-tested and landed by the next hourly run.
@@ -119,7 +120,12 @@ name: refresh
 # and concedes the hour green when the two disagree -- no commit, no push, no
 # publish, next hour lands it. That is the push job's "main moved under the
 # run" outcome, at the point where the generations actually meet; nothing
-# loops either way.
+# loops either way. The concession's wording is true for every run that can
+# reach it: a run DISPATCHED off main never gets this far (the off-main gate
+# below drops it in the capture step, under its own truthful heading), and a
+# run QUEUED behind a predecessor that landed mid-queue IS a run main moved
+# under -- GITHUB_SHA is the creation-time tip, the checkout built the stale
+# tree, and the next hourly run lands the hour on the new tip.
 #
 # fetch_aa.py exits nonzero when the flight payload or the model schema changes
 # shape, when AA bumps the Intelligence Index version build.py is written
@@ -161,10 +167,12 @@ concurrency:
   cancel-in-progress: false
 
 # Least-privilege floor (issue #52 review): every job here declares its own
-# permissions block -- the refresh and publish jobs read-only (the capture,
-# the installs, the suite, and the keyless commit), the push job read-only
-# behind the deploy key, and the hub job the sole write elevation (the
-# published-ref move). The floor caps what the inheritance can leak: a job
+# permissions block -- and since issue #206 every block is read: the capture,
+# the installs, the suite, and the keyless commit need nothing more, the push
+# authenticates with the deploy key rather than any token, and the docs-hub
+# upload authenticates with its own API key. The last contents:write holder
+# was the published-ref move; the live page's embedded stamp is the publish
+# record now. The floor caps what the inheritance can leak: a job
 # added later WITHOUT its own block inherits read, not the repository
 # default.
 permissions:
@@ -249,7 +257,32 @@ jobs:
         # convention.
         env:
           CAPTURED: ${{ steps.fetch.outputs.captured }}
+          REF: ${{ github.ref }}
         run: |
+          # THE OFF-MAIN DISPATCH GATE (issue #206). workflow_dispatch can
+          # target any branch, and a payload built from a non-main tree must
+          # not land on main: the write half's generation tie would concede
+          # it anyway, but only after a full capture + pip + Chromium + suite
+          # had been paid, and under "main moved under the run" wording that
+          # blames main for a move that never happened. Scheduled runs always
+          # fire on the default branch, so a ref that is not
+          # refs/heads/main IS an off-main dispatch by construction, and the
+          # hour is dropped green here, before anything expensive, under its
+          # own truthful heading. (The ref reaches this shell as the env var
+          # $REF, not an inline template expression -- zizmor's
+          # template-injection audit fails those in run text, and the env
+          # mapping is its sanctioned route.)
+          if [ "$REF" != "refs/heads/main" ]; then
+            {
+              echo "### Dropped: dispatched off main"
+              echo
+              echo "This run was dispatched at ${REF:-no ref}; a payload built"
+              echo "from a non-main tree does not land on main. Dispatch on"
+              echo "main to publish."
+            } >> "$GITHUB_STEP_SUMMARY"
+            echo "proceed=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
           # The rendered gate (see the header): build the page from HEAD's
           # captures and from the fresh ones, normalize the build-machine
           # provenance out of both, reconcile sub-threshold speed re-samples
@@ -269,43 +302,23 @@ jobs:
             # bump it.
             git checkout -- data/
           fi
-          # The republish gate: a run whose publish failed or never ran left the
-          # hub stale while every later capture stayed identical, and plain
-          # "nothing moved" silence would never repair it. The `published`
-          # branch records the last main commit whose page is live; a MISSING
-          # ref means nothing was ever published, and a page under it that
-          # differs from HEAD means the live render is behind main. Either
-          # way this run republishes. ANY fetch failure is treated as stale:
+          # The republish gate (issue #206): a run whose publish failed or
+          # never ran left the hub stale while every later capture stayed
+          # identical, and plain "nothing moved" silence would never repair
+          # it. The live page is the gate's whole memory now: the page HTML
+          # embeds the source-commit stamp naming the commit it was built
+          # from, so the served bytes are their own record of what is live
+          # and no ref has to agree with them. On the unchanged path this
+          # run fetches the hub's live page -- the public /d/ route serves
+          # the stored bytes verbatim, proven byte-identical to the
+          # committed page (2026-09-29) -- and compares it byte-for-byte
+          # against HEAD's page, the stamp and every other byte with it.
+          # Divergence sets hub_stale, as does a failed fetch:
           # republishing a page that was already current costs one hub
-          # version, while a real outage still fails red at the write job's
-          # publish step's ref update.
-          live_stale=false
+          # version, while a real outage fails red at the write job's
+          # publish step.
           hub_stale=false
           if [ "$changed" = false ] && [ "${{ inputs.force }}" != 'true' ]; then
-            # Anonymous fetch: relies on the repo being public. If it ever
-            # goes private, this gate degrades to an hourly republish --
-            # self-consistent, since the ref update still authenticates
-            # via GH_TOKEN in the write job's publish step.
-            if git fetch --depth=1 origin \
-                 refs/heads/published:refs/remotes/origin/published 2>/dev/null; then
-              if ! git diff --quiet origin/published HEAD -- out/frontier-models.html; then
-                live_stale=true
-              fi
-            else
-              live_stale=true
-            fi
-            # The hub check (issue #74). The ref comparison above cannot see
-            # one inversion: an upload that lands AFTER the published ref
-            # moved (two overlapping runs, the older upload arriving last).
-            # The ref then agrees with HEAD while the HUB serves the older
-            # page, and nothing would ever republish. So the unchanged path
-            # also fetches the hub's live page — the public /d/ route serves
-            # the stored bytes verbatim, proven byte-identical to the
-            # committed page (2026-09-29) — and compares it byte-for-byte
-            # against HEAD's page. Divergence sets hub_stale, as does a
-            # failed fetch: same stance as the ref fetch above, an extra
-            # republish costs one hub version, and a real outage fails red
-            # at the write job's publish step.
             hub_page="$(mktemp)"
             if curl -fsS --connect-timeout 10 --max-time 30 \
                  https://docs.nitjsefni.eu/d/ai-researcher/frontier-models \
@@ -322,9 +335,9 @@ jobs:
           # refused capture is terminal against force, so a forced dispatch
           # behind a refused capture has nothing to rebuild -- the last
           # published page already stands -- and the hour is not mislabelled
-          # as an ordinary forced no-op. A run that only republishes the live
-          # page still proceeds, whether the `published` ref's page or the
-          # hub's live page is what is behind. `inputs.force` is the empty
+          # as an ordinary forced no-op. A run whose only cause is the hub
+          # being behind still proceeds: that is the republish hour.
+          # `inputs.force` is the empty
           # string on a schedule run, and `$CAPTURED` is empty only for run
           # shapes older than the output, so both defaults keep the scheduled
           # path unchanged. (The verdict reaches this shell as the env var
@@ -333,27 +346,20 @@ jobs:
           # mapping is its sanctioned route.)
           if [ "$changed" = true ] \
              || { [ "$CAPTURED" != "false" ] && [ "${{ inputs.force }}" = 'true' ]; } \
-             || [ "$live_stale" = true ] || [ "$hub_stale" = true ]; then
+             || [ "$hub_stale" = true ]; then
             echo "proceed=true" >> "$GITHUB_OUTPUT"
           else
             echo "proceed=false" >> "$GITHUB_OUTPUT"
           fi
-          # Independent ifs, not an elif chain: live_stale and hub_stale can
-          # both fire in one run, and the chain printed only the first line.
-          # Each cause prints its own line, so every outcome is summarised.
-          # (Either flag being true already implies changed=false: they are
-          # only ever set under the unchanged path above.)
+          # Independent ifs, not an elif chain: each cause prints its own
+          # line, so every outcome is summarised.
           # A run that proceeds on force alone must never print the quiet
           # line (#80), and a refused capture never earns it either (issue
           # #103): the Capture step's own skip line already explains the
           # hour, and "AA capture unchanged" would mislabel it.
           if [ "$changed" = false ] && [ "${{ inputs.force }}" != 'true' ] \
-             && [ "$CAPTURED" != "false" ] && [ "$live_stale" = false ] && [ "$hub_stale" = false ]; then
+             && [ "$CAPTURED" != "false" ] && [ "$hub_stale" = false ]; then
             echo 'AA capture unchanged and the live page is current — nothing committed, nothing published.' \
-              >> "$GITHUB_STEP_SUMMARY"
-          fi
-          if [ "$live_stale" = true ]; then
-            echo 'AA capture unchanged, but the live page is stale — republishing it.' \
               >> "$GITHUB_STEP_SUMMARY"
           fi
           if [ "$hub_stale" = true ]; then
@@ -505,8 +511,9 @@ jobs:
   # commit a real aggregate verdict on main's tip — the reason the push
   # moved off the token for issue #133.
   #
-  # `hub` publishes the verified page to docs-hub and moves the `published`
-  # ref, after the push job had its turn: the ref names the landed commit.
+  # `hub` publishes the verified page to docs-hub after the push job had
+  # its turn, skipping the upload when the hub already serves the page --
+  # the stamp inside the page HTML is the publish record (issue #206).
   # A red capture or a red suite fails the refresh job, and a failed need
   # never starts the write half — NO commit and NO publish, and the hourly
   # cadence stays green-behaved. A pull request never reaches any of it:
@@ -542,9 +549,10 @@ jobs:
       needs.refresh.outputs.proceed == 'true'
 
     permissions:
-      # Read-only: the published-ref move lives in the hub job, and every
-      # fetch here is anonymous. Everything this job commits or stages is
-      # the artifact of its own run's refresh job, which the suite verified.
+      # Read-only: every fetch here is anonymous, and since issue #206 no
+      # job in this workflow holds a write permission at all. Everything
+      # this job commits or stages is the artifact of its own run's
+      # refresh job, which the suite verified.
       contents: read
 
     outputs:
@@ -809,10 +817,11 @@ jobs:
       (needs.push.result == 'skipped' || needs.push.result == 'success')
 
     permissions:
-      # The published ref moves through the refs API with the job token:
-      # this is the write the hub job exists for, and the workflow floor
-      # stays read everywhere else.
-      contents: write
+      # Read-only like every other job since issue #206: the docs-hub
+      # upload authenticates with its own API key, and the published-ref
+      # move is gone -- the live page's embedded stamp is the publish
+      # record, so the workflow holds no write permission anywhere.
+      contents: read
 
     steps:
       - name: Download the publish payload
@@ -831,30 +840,29 @@ jobs:
         id: hub
         env:
           DOCS_HUB_API_KEY: ${{ secrets.DOCS_HUB_API_KEY }}
-          GH_TOKEN: ${{ github.token }}
-          REPO: ${{ github.repository }}
         run: |
-          # The scratch is read-only plumbing: init and two anonymous
-          # fetches (the repo is public), rev-parse, compare. No
-          # credential sits in it; the ref update authenticates via the
-          # job token through the refs API.
+          # The scratch is read-only plumbing: init, one anonymous fetch
+          # (the repo is public), rev-parse, compare. No credential sits in
+          # it, and nothing in this step writes to GitHub at all: the only
+          # writable surface is the docs-hub endpoint below, authenticated
+          # by its own key.
           scratch="${RUNNER_TEMP}/ref-scratch"
           git init -q "${scratch}"
           git -C "${scratch}" remote add origin "https://github.com/${GITHUB_REPOSITORY}"
           git -C "${scratch}" fetch --quiet origin main
           target="$(git -C "${scratch}" rev-parse FETCH_HEAD)"
-          # THE PAGE-REF TIE. The payload page belongs to the commit the
+          # THE PAGE-TIP TIE. The payload page belongs to the commit the
           # publish job recorded as `tip` -- the bundle tip when the hour
-          # committed, its own base when not. The upload and the ref move
-          # run only when that commit IS main's tip now: a landing whose
-          # tip still stands, or a quiet or republish hour nobody has
-          # superseded. When main has moved past `tip`, a newer run owns
-          # the tip, and its own hub job publishes its page -- this run
-          # uploads nothing, moves nothing, exits 0. This is what makes
-          # "the ref never names a page the hub does not serve" enforced
-          # rather than asserted: the ref below moves to `tip`, and it
-          # moves only when `tip == target` and the page uploaded is the
-          # tip's page.
+          # committed, its own base when not. The upload runs only when
+          # that commit IS main's tip now: a landing whose tip still
+          # stands, or a quiet or republish hour nobody has superseded.
+          # When main has moved past `tip`, a newer run owns the tip, and
+          # its own hub job publishes its page -- this run uploads
+          # nothing, exits 0. This is also what retired the published
+          # ref's compare-API gate (issue #206) without losing its
+          # guarantee: a newer run has necessarily LANDED before it can
+          # publish anything this run could overwrite, so a tie that
+          # stands means no newer page exists to lose to.
           mine="$(cat "${RUNNER_TEMP}/push-data/tip.txt")"
           if [ "$mine" != "$target" ]; then
             echo "Lost the race: main's tip moved past this run's page, and the newer run's hub job publishes it." \
@@ -862,39 +870,39 @@ jobs:
             echo "Nothing published by this run."
             exit 0
           fi
-          # THE NEWER-RUN GATE (issue #74). The ref must never move
-          # backwards: fresh-fetch it and, when it is not already the
-          # target, ask the compare API, whose status names the TIP side
-          # relative to the BASE side. `ahead` - a newer run already
-          # published past this target - aborts green before the upload:
-          # no upload, no ref move, exit 0. `behind` is the normal republish
-          # and publishes; a failed or unrankable answer retries once,
-          # then publishes anyway behind a warning, because availability
-          # of publish beats the residual seconds-wide window.
-          if git -C "${scratch}" fetch --depth=1 origin \
-               refs/heads/published:refs/remotes/origin/published 2>/dev/null; then
-            tip="$(git -C "${scratch}" rev-parse origin/published)"
-            if [ "$tip" != "$target" ]; then
-              status=""
-              for _ in 1 2; do
-                status="$(gh api "repos/$REPO/compare/$target...$tip" --jq .status)" || status=""
-                case "$status" in
-                  ahead|behind|identical) break ;;
-                  *) status="" ;;
-                esac
-              done
-              if [ "$status" = ahead ]; then
-                echo "A newer refresh run already published: the published ref names a commit past this target - nothing uploaded, no ref moved." \
-                  >> "$GITHUB_STEP_SUMMARY"
-                exit 0
-              fi
-              if [ -z "$status" ]; then
-                echo "WARNING: the compare API could not rank refs/heads/published against this target; publishing anyway." \
-                  >> "$GITHUB_STEP_SUMMARY"
-              fi
-              # `behind` (or `identical`) is the normal republish: fall through.
+          # THE LIVE-PAGE GATE (issue #206). What the published ref's
+          # compare-API ranking guarded -- never spending a version, and
+          # never regressing the hub, when nothing needs publishing -- the
+          # page proves for itself: the live page's HTML embeds its
+          # source-commit stamp, so the served bytes carry their own
+          # record. The page is fetched and read BEFORE the upload, and
+          # the hub already serving EXACTLY this run's page -- stamp and
+          # every other byte -- is a green skip: a hub version is not
+          # spent re-storing the same bytes. Any difference (the hub
+          # behind main, a failed or missed publish, an unstamped page)
+          # or a failed fetch publishes: same availability stance as
+          # before, an extra version costs less than a stale page. The
+          # summary names both stamps, so a republish hour says which
+          # commit the hub was behind to.
+          live_page="$(mktemp)"
+          live_stamp="an unstamped page"
+          if curl -fsS --connect-timeout 10 --max-time 30 \
+               https://docs.nitjsefni.eu/d/ai-researcher/frontier-models \
+               -o "$live_page"; then
+            live_stamp="$(grep -oE 'Source commit <code>[0-9a-f]{40}</code>' "$live_page" | head -1)"
+            live_stamp="${live_stamp#Source commit <code>}"
+            live_stamp="${live_stamp%</code>}"
+            [ -n "$live_stamp" ] || live_stamp="an unstamped page"
+            if cmp -s "$live_page" \
+                 "${RUNNER_TEMP}/publish-payload/tree/out/frontier-models.html"; then
+              echo "The hub already serves this run's page (source commit ${live_stamp}) — nothing uploaded." \
+                >> "$GITHUB_STEP_SUMMARY"
+              echo "Nothing uploaded: the hub already serves this page."
+              exit 0
             fi
           fi
+          echo "Publishing: the hub serves ${live_stamp}; this run's page names ${mine}." \
+            >> "$GITHUB_STEP_SUMMARY"
           # THE UPLOAD. The write job runs no repository code, so this is
           # the endpoint's wire format inlined -- scripts/publish_docs.py is
           # the canonical client and the mirror source: keep the two in
@@ -937,29 +945,8 @@ jobs:
             exit 1
           fi
           cat /tmp/publish-response.json
-          # THE REF MOVE. The ref is what the republish gate compares against, so
-          # it must never claim a page the hub does not serve - and the
-          # target here is main's tip fresh-fetched after the push job's
-          # turn, which is structurally on main's history: the state issue
-          # #152's ancestor gate guaranteed, now by construction. The ref
-          # moves through the GitHub refs API, not `git push` (issue #77:
-          # a shallow scratch cannot prove a fast-forward locally; the API
-          # checks server-side):
-          #   - GET first: the shell branches on the GET's exit code, so a
-          #     404 -- or ANY failed GET -- routes to CREATE (POST); a POST
-          #     against an existing ref fails there with 422 "already
-          #     exists", so a transient GET error cannot mis-create.
-          #   - Otherwise PATCH without `force`: the API default is the
-          #     server-side fast-forward check, and a 422 "not a fast
-          #     forward" fails the run -- the same red a rejected push
-          #     produced, now only when the update genuinely is not a
-          #     fast-forward.
-          # Any other API failure fails the run too: a silently stale ref
-          # would make every later hour republish.
-          if gh api "repos/$REPO/git/refs/heads/published" > /dev/null; then
-            gh api --method PATCH "repos/$REPO/git/refs/heads/published" \
-              -f sha="$mine"
-          else
-            gh api --method POST "repos/$REPO/git/refs/heads/published" \
-              -f ref=refs/heads/published -f sha="$mine"
-          fi
+          # No ref move follows (issue #206): the upload response above is
+          # the hub's receipt, and the page it stored carries the stamp --
+          # the record the next run's republish gate reads. The published
+          # branch and its refs-API move are retired; there is nothing
+          # left in this workflow that writes to GitHub.
