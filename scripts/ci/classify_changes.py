@@ -26,10 +26,9 @@ EXACTLY the two captures, their capture stamp and the built page —
 class. The refresh job runs the full suite against the fresh capture
 BEFORE pushing (refresh.yml's own job), so re-running the heavy matrix
 on the bot's push re-verifies nothing. The class matches the exact SET,
-never per-file verdicts: a fifth path — a disputed capture's
-`data/aa-disagreement-snapshot.json`, or anything else — is not the
-bot, has no pre-test behind it, and runs the full set. A lone
-hand-edited capture file does the same.
+never per-file verdicts: a fifth path — any other data/ file, or a
+source path — is not the bot, has no pre-test behind it, and runs the
+full set. A lone hand-edited capture file does the same.
 
 On a PUSH the changed set is read over the verified base rather than
 the push's own `before`: the newest ci-gate run on main whose

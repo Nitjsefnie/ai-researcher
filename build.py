@@ -28,15 +28,6 @@ ROOT = pathlib.Path(__file__).resolve().parent
 RAW = ROOT / "data" / "aa-raw-models.json"
 AGENTS_RAW = ROOT / "data" / "aa-raw-coding-agents.json"
 OUT = ROOT / "out" / "frontier-models.html"
-# fetch_aa.py's route-disagreement refusal (exit 3) writes the two routes'
-# raw payloads plus the disagreement map here instead of refusing to build
-# (issue #118). The file's PRESENCE is the disputed mode's whole trigger:
-# a build with it in data/ renders the disputed layer, one without it
-# renders normally -- so convergence reverts the page with no flag and no
-# state outside the capture itself. It lives beside RAW (the same data/
-# directory the build reads the two captures from), which is also what
-# keeps test-redirected builds hermetic.
-DISPUTED_SNAPSHOT_NAME = "aa-disagreement-snapshot.json"
 
 # The AA Intelligence Index version this file's weights and field names are
 # written against. AA bumps it every few weeks and a bump can rename or drop a
@@ -251,8 +242,11 @@ def cost_per_task(m):
     Two shapes: the object intelligenceIndexCostPerTask.cost.total from the
     detail route, and -- since AA flattened the leaderboard -- a bare number
     that IS the total. The merge restores the object for every model the
-    detail route describes; the bare number is what the one model it cannot
-    describe (the detail host) is left with.
+    detail route describes; a bare number is what the one model it cannot
+    describe (the detail host) is left with, and what a model whose stale
+    breakdown was dropped under the leaderboard's newer total is left with
+    (merge_captures: that model's GDPval cost renders absent until the routes
+    converge, but its measured total is the fresh one and still plots).
     """
     outer = m.get("intelligenceIndexCostPerTask")
     if isinstance(outer, (int, float)):
@@ -319,62 +313,22 @@ def metric_record(m, metric):
     return {"score": round(score, 2), "cost": round(cost, 4)}
 
 
-# The payload fields a disputed cell shows both values for, per metric: the
-# score path first, the cost path second. Coding is absent -- agent rows are
-# not leaderboard records, so a model-route disagreement never reaches them.
-METRIC_DISPUTE_PATHS = {
-    "intelligence": ("intelligenceIndex", "intelligenceIndexCostPerTask"),
-    "agentic": ("gdpvalNormalized", "intelligenceIndexCostPerTask"),
-}
-
-
-def route_cost_total(value):
-    """One route's copy of the measured cost per task, as a number.
-
-    The leaderboard's flattened shape is the number itself; the detail
-    route's is the object whose .cost.total is the number. Anything else
-    (absent, a string, a shape AA has not shipped) is None -- the disputed
-    cell then shows the em dash for that side rather than a guess.
-    """
-    if isinstance(value, (int, float)) and not isinstance(value, bool):
-        return value
-    if isinstance(value, dict):
-        cost = value.get("cost")
-        if isinstance(cost, dict):
-            total = cost.get("total")
-            if isinstance(total, (int, float)) and not isinstance(total, bool):
-                return total
-    return None
-
-
-def build_rows(models, disputes=None):
-    """Model rows; `disputes` carries the disagreement map in disputed mode.
-
-    `disputes` maps slug -> {payload path -> {"lb": leaderboard value,
-    "dt": detail value}} -- the disputed snapshot's disagreement list keyed
-    for the build. A row whose slug appears there carries the map on
-    row["disp"], which is every downstream disputed rendering's single
-    input: the hollow marker, the both-value tooltip and table cells, and
-    the frontier exclusion (undominated skips disp rows) all read it, so no
-    disputed verdict is ever precomputed into the data (issue #118).
-    """
-    by_slug = disputes or {}
+def build_rows(models):
+    """Every model row the page's axes and table render, sorted for display."""
     rows = []
     for m in models:
         metrics = {metric: metric_record(m, metric) for metric in METRIC_ORDER}
         if not any(metrics.values()):
             continue
-        # AA trimmed `name` out of the leaderboard payload; it survives on the
-        # detail route, which fetch_aa.py merges in. `shortName` is the
-        # leaderboard's own label and covers the one model a detail page cannot
-        # describe -- itself.
+        # The leaderboard ships `name`; `shortName` is its own compact label
+        # and covers the one model the gap-fill detail route cannot describe
+        # -- the host page the corpus came from.
         label = m.get("name") or m.get("shortName") or ""
         base, eff = split_effort(label)
         intelligence = metrics["intelligence"]
         # Renamed by AA: totalParameters -> parameters. Same numbers -- every
         # model carrying both across the rename agreed exactly.
         parameters = num(m.get("parameters"))
-        disp = by_slug.get(m.get("slug"))
         row = {
             # The reader-facing name (#88): AA's dict-form effort text is
             # decoded out of it. The RAW label survives only in the capture;
@@ -413,12 +367,6 @@ def build_rows(models, disputes=None):
             "pin": num(m.get("price1mInputTokens")),
             "pout": num(m.get("price1mOutputTokens")),
         }
-        if disp:
-            # The row's own slice of the disagreement map, when the build is
-            # disputed and this model is one of the disputed ones. The key is
-            # ABSENT on every row of every normal build -- which is what
-            # keeps a normal build byte-identical to the page it replaces.
-            row["disp"] = disp
         rows.append(row)
     rows.sort(key=lambda r: (
         -(r["ii"] if r["ii"] is not None else -1),
@@ -532,12 +480,8 @@ def undominated(rows, metric="intelligence"):
     survive together: neither strictly beats the other. Pairs come from
     metric_of(), so the parameters axis is a metric like any other here, as
     it is in the page's frontierMetric()."""
-    # Disputed rows sit out the pass entirely (issue #118): while the window
-    # lasts they neither receive nor confer a superseded verdict, because a
-    # verdict computed against a value one of AA's own routes disagrees with
-    # is not a verdict the page can stand behind.
     pairs = {id(r): pair for r in rows
-             if (pair := metric_of(r, metric)) and not r.get("disp")}
+             if (pair := metric_of(r, metric))}
     eligible = [r for r in rows if id(r) in pairs]
     return [
         r for r in eligible
@@ -554,128 +498,25 @@ def undominated(rows, metric="intelligence"):
     ]
 
 
-# The page's footer states the leaderboard route and the model detail route
-# "agree exactly on every value they share", and the gap-fill merge only holds
-# that claim while it is true: fill-only-absent keeps the leaderboard's copy
-# of any shared value, so a divergence would ship silently under a footer that
-# denies it (issue #44). scripts/fetch_aa.py runs this check on the two routes
-# while they are still separate, before merge_captures. Since issue #118 the
-# refusal itself is buildable: the same check raises RouteDisagreement, which
-# carries the divergence list structurally so the refused read can become a
-# disputed snapshot -- and the footer's agreement clause is substituted from
-# ROUTE_AGREEMENT_CLAUSE / ROUTE_DISPUTE_CLAUSE by main().
-class RouteDisagreement(SystemExit):
-    """check_route_agreement's refusal, carrying the divergences structurally.
-
-    The message is byte-identical to the SystemExit this class replaces (the
-    stderr diagnostic is a pinned contract, and fetch_aa.py's tagging retry
-    catches SystemExit, so the subclass keeps every behavior): the addition
-    is `.divergences` -- the list of (slug, path, leaderboard value, detail
-    value) tuples -- which is what lets fetch_aa.py turn a refused read into
-    a buildable disputed snapshot without re-deriving or re-parsing anything
-    (issue #118).
-    """
-
-    def __init__(self, divergences: list) -> None:
-        self.divergences = divergences
-        lines = "\n".join(
-            f"  {slug}: {path}: leaderboard {lb_value!r}, detail {dt_value!r}"
-            for slug, path, lb_value, dt_value in divergences
-        )
-        super().__init__(
-            f"{len(divergences)} shared value(s) disagree between the "
-            "leaderboard route and the model detail route; the gap-fill merge "
-            f"keeps the leaderboard's copy:\n{lines}"
-        )
-
-
-def check_route_agreement(leaderboard: list, detail: list) -> int:
-    """Every value the two routes share, compared exactly, before the merge.
-
-    Shared means the model (joined by slug, as merge_captures joins them) is
-    present on both routes AND the same field path is reachable on both, with
-    neither side holding "$undefined" -- the string AA writes for an absent
-    field, the reading fetch_aa.py itself applies. Values are compared as
-    parsed structures -- recursive value equality over dicts, lists and
-    scalars -- never as display strings. The leaderboard's flattened
-    intelligenceIndexCostPerTask scalar is its cost.total: a number against an
-    object at a shared key is compared against the object's "total", the same
-    reshape merge_captures applies when it lets the object win.
-
-    Returns the number of shared values compared, so the caller can show the
-    check ran; raises SystemExit listing every divergence -- model slug, field
-    path, both raw values -- when any disagree. Never repairs.
-    """
-    detail_by_slug = {
-        m["slug"]: m for m in detail if isinstance(m.get("slug"), str)
-    }
-    divergences: list[tuple[str, str, object, object]] = []
-    compared = 0
-
-    def is_number(value: object) -> bool:
-        return isinstance(value, (int, float)) and not isinstance(value, bool)
-
-    def walk(leaderboard_value: object, detail_value: object,
-             path: str, owner: str) -> None:
-        nonlocal compared
-        if isinstance(leaderboard_value, dict) and isinstance(detail_value, dict):
-            for key in sorted(set(leaderboard_value) & set(detail_value)):
-                walk(leaderboard_value[key], detail_value[key],
-                     f"{path}.{key}" if path else key, owner)
-            return
-        if isinstance(leaderboard_value, list) and isinstance(detail_value, list):
-            if len(leaderboard_value) != len(detail_value):
-                divergences.append((owner, path, leaderboard_value, detail_value))
-                return
-            for index, (lb_item, dt_item) in enumerate(
-                    zip(leaderboard_value, detail_value)):
-                walk(lb_item, dt_item, f"{path}[{index}]", owner)
-            return
-        if leaderboard_value == "$undefined" or detail_value == "$undefined":
-            # Absent on either route is a field the routes do not share, not
-            # a disagreeing value.
-            return
-        if is_number(leaderboard_value) and isinstance(detail_value, dict):
-            # The leaderboard's flattened scalar is its cost.total; wrap it
-            # into that shape and let the recursion below compare it against
-            # the detail object's own cost.total -- the same reshape
-            # merge_captures applies when it lets the object win.
-            walk({"cost": {"total": leaderboard_value}}, detail_value,
-                 path, owner)
-            return
-        if is_number(detail_value) and isinstance(leaderboard_value, dict):
-            walk(leaderboard_value, {"cost": {"total": detail_value}},
-                 path, owner)
-            return
-        compared += 1
-        if leaderboard_value != detail_value:
-            divergences.append((owner, path, leaderboard_value, detail_value))
-
-    for model in leaderboard:
-        slug = model.get("slug")
-        if not isinstance(slug, str) or slug not in detail_by_slug:
-            continue
-        detail_record = detail_by_slug[slug]
-        for key in sorted(set(model) & set(detail_record)):
-            walk(model[key], detail_record[key], key, slug)
-
-    if divergences:
-        raise RouteDisagreement(sorted(divergences))
-    return compared
-
-
-# The disputed build's one base generation: the leaderboard's copy. This is
-# the merge's existing tiebreak (fill-only-absent keeps the leaderboard's
-# copy of every shared value), reused as the disputed rendering's data rule
-# (issue #118) -- the page never invents a third value.
+# The capture's one generation: the leaderboard's copy (Overseer ruling,
+# delegated by the maintainer, 2026-10-05, issue #200). The two routes are
+# independently cached Vercel pages and AA's data lands on them at different
+# times, so a capture can straddle an update -- but the detail route is
+# MEASURED to be the stale one (its corpus keeps the previous generation's
+# display names and scores), and the per-route generation timestamps do NOT
+# identify which route is stale: a detail page regenerated later still embeds
+# the older corpus. So the leaderboard is published, always, and the detail
+# route is a gap-fill and nothing more.
 def merge_captures(base: list, detail: list) -> list:
     """Leaderboard records widened with the detail route's extra fields.
 
     The leaderboard is the authority on WHICH models exist and on every field
-    it still carries; detail only fills gaps. Overlapping values are identical
-    between the routes, so gap-filling and overwriting would agree -- filling
-    is chosen so a future divergence surfaces on the detail-only fields rather
-    than silently rewriting the leaderboard's own numbers.
+    it ships; the detail route fills only what the leaderboard does not carry
+    (parameters, licence, release date, the per-evaluation cost breakdown).
+    A value the leaderboard HAS is never replaced by the detail route's,
+    silently and always: two generations mixed into one capture is exactly
+    what made the page oscillate, so a conflicting detail value is not a
+    disagreement to resolve -- it simply loses.
     """
     def fill(into, extra):
         """`into` wins; `extra` supplies only what is absent.
@@ -695,10 +536,44 @@ def merge_captures(base: list, detail: list) -> list:
                 # Same key, different SHAPE. The leaderboard flattened
                 # intelligenceIndexCostPerTask to its bare total while the
                 # detail route kept the object with the per-evaluation
-                # breakdown. A scalar cannot hold what the object holds, so
-                # the object wins; the scalar was its `cost.total` anyway.
-                out[k] = v
+                # breakdown. The leaderboard's number WINS -- it is the
+                # fresh generation's measured total, and it is the value the
+                # cost axis plots. The object is a fill, so it is taken whole
+                # except for that total, and only while its breakdown still
+                # sums to the number it is being hung under: a breakdown from
+                # another generation would decompose someone else's total, so
+                # it is dropped whole and the axis that reads it (GDPval) is
+                # absent for this model until the routes agree. Dropping is
+                # the honest outcome -- the alternative is either publishing a
+                # stale total or failing the refresh red for hours.
+                cost = v.get("cost")
+                out[k] = {
+                    **v,
+                    "cost": fill({"total": out[k]}, cost) if isinstance(cost, dict)
+                    else {"total": out[k]},
+                }
+                if not _breakdown_matches_total(out[k]):
+                    out[k] = out[k]["cost"]["total"]
         return out
+
+    def _breakdown_matches_total(obj):
+        """Whether `obj`'s per-evaluation breakdown decomposes its own total.
+
+        AA writes the breakdown as the index weights already applied, so the
+        parts sum to the total exactly (SUM_TOLERANCE in fetch_aa.py checks
+        that over a whole capture). A breakdown that does not sum is not this
+        total's breakdown, whatever route it came from.
+        """
+        evaluations = obj.get("evaluations")
+        if not isinstance(evaluations, list):
+            return True
+        parts = [e.get("weightedCostPerTask") for e in evaluations
+                 if isinstance(e, dict)]
+        if not all(isinstance(p, (int, float)) and not isinstance(p, bool)
+                   for p in parts):
+            return True
+        total = obj["cost"]["total"]
+        return abs(sum(parts) - total) <= 1e-6 * max(1.0, abs(total))
 
     by_slug = {m["slug"]: m for m in detail if isinstance(m.get("slug"), str)}
     return [fill(m, by_slug[m["slug"]]) if by_slug.get(m.get("slug")) else m
@@ -774,69 +649,6 @@ def read_capture_stamp(stamp_path: pathlib.Path) -> str:
     if not valid:
         raise _stamp_refusal(stamp_path, repr(value))
     return value
-
-
-# The disagreement snapshot's shape build.py reads (issue #118). fetch_aa.py
-# writes it on the refused read; anything else in this file is corruption or
-# a hand edit -- both refuse exactly like a corrupt capture.
-DISPUTED_SNAPSHOT_SCHEMA = 1
-
-
-def read_disputed_snapshot(path):
-    """The disagreement snapshot when one sits beside the capture, else None.
-
-    Present means disputed mode: the build merges the snapshot's two raw
-    route payloads with the same leaderboard-wins tiebreak the normal merge
-    uses, and rows carrying entries from the disagreement map render the
-    disputed layer. Missing means the normal capture path, unchanged. A
-    present-but-wrong file refuses (red) rather than half-building: the
-    snapshot is a captured artifact, so a shape this reader did not write is
-    the same signal as a corrupt capture.
-    """
-    if not path.exists():
-        return None
-    try:
-        snapshot = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
-        raise SystemExit(
-            f"{path.name}: corrupt disagreement snapshot ({exc}) -- re-capture "
-            "with scripts/fetch_aa.py rather than building from a hand-edited file"
-        ) from exc
-    if not isinstance(snapshot, dict):
-        raise SystemExit(f"{path.name}: the disagreement snapshot must be an object")
-    if snapshot.get("schema") != DISPUTED_SNAPSHOT_SCHEMA:
-        raise SystemExit(
-            f"{path.name}: schema {snapshot.get('schema')!r} is not "
-            f"{DISPUTED_SNAPSHOT_SCHEMA} -- re-capture with scripts/fetch_aa.py"
-        )
-    for key in ("leaderboard", "detail", "disagreements"):
-        if not isinstance(snapshot.get(key), list):
-            raise SystemExit(
-                f"{path.name}: '{key}' must be a list -- re-capture with "
-                "scripts/fetch_aa.py")
-    for entry in snapshot["disagreements"]:
-        if not (isinstance(entry, dict)
-                and isinstance(entry.get("slug"), str)
-                and isinstance(entry.get("path"), str)
-                and "lb" in entry and "dt" in entry):
-            raise SystemExit(
-                f"{path.name}: malformed disagreement entry -- re-capture with "
-                "scripts/fetch_aa.py")
-    start = snapshot.get("windowStartEpoch")
-    if start is not None and not isinstance(start, int):
-        raise SystemExit(
-            f"{path.name}: windowStartEpoch must be an epoch integer or null")
-    return snapshot
-
-
-def disagreements_by_slug(snapshot):
-    """The snapshot's disagreement list, keyed slug -> {path -> {lb, dt}} --
-    the shape build_rows consumes."""
-    keyed: dict = {}
-    for entry in snapshot["disagreements"]:
-        keyed.setdefault(entry["slug"], {})[entry["path"]] = {
-            "lb": entry["lb"], "dt": entry["dt"]}
-    return keyed
 
 
 def read_capture(path):
@@ -969,64 +781,6 @@ def _tag(text, cls):
     return f'<span class="{cls}">{html.escape(text)}</span>'
 
 
-# The disagreement values the static table cells show as "leaderboard /
-# detail" pairs, formatted exactly as the page's script formats them -- the
-# browser drift test holds the two renders equal cell-for-cell, so a
-# formatting rule may exist in only one of the two.
-def _fmt_dispute_value(value, kind):
-    """One route's raw payload value, in the cell text that route's copy
-    would have rendered: scores to one decimal, the agentic score scaled out
-    of its 0-1 fraction, the cost resolved through route_cost_total, sizes
-    through fmt_params, everything else through show_text."""
-    if value is None:
-        return EM_DASH
-    if kind == "score":
-        return js_to_fixed(value, 1)
-    if kind == "gdpval":
-        return js_to_fixed(value * 100, 1)
-    if kind == "cost":
-        total = route_cost_total(value)
-        return EM_DASH if total is None else fmt_cost(total)
-    if kind == "params":
-        return fmt_params(value)
-    return show_text(value)
-
-
-def dispute_pair(row, path, kind):
-    """\"leaderboard / detail\" for one disputed payload path, or None when
-    this row carries no disagreement on it."""
-    disp = row.get("disp")
-    if not disp or path not in disp:
-        return None
-    entry = disp[path]
-    return (f"{_fmt_dispute_value(entry['lb'], kind)} / "
-            f"{_fmt_dispute_value(entry['dt'], kind)}")
-
-
-def dispute_cost_cell(row):
-    """The cost cell's both-routes text, or None.
-
-    The disagreement map can spell the cost path two ways -- the nested
-    shape when both routes carried the object, the top-level path when the
-    leaderboard's flattened scalar was compared against the object through
-    check_route_agreement's reshape -- and either side may fail to resolve
-    to a number, which renders as the em dash for that side alone.
-    """
-    disp = row.get("disp")
-    if not disp:
-        return None
-    for path in ("intelligenceIndexCostPerTask.cost.total",
-                 "intelligenceIndexCostPerTask"):
-        if path in disp:
-            entry = disp[path]
-            lb = route_cost_total(entry["lb"])
-            dt_total = route_cost_total(entry["dt"])
-            lb_text = EM_DASH if lb is None else fmt_cost(lb)
-            dt_text = EM_DASH if dt_total is None else fmt_cost(dt_total)
-            return f"{lb_text} / {dt_text}"
-    return None
-
-
 def render_main_tbody(rows):
     """#tbl's body: the default-state rows through fillTable's cell rules."""
     front_sets = {
@@ -1047,32 +801,12 @@ def render_main_tbody(rows):
                 cost = fmt_cost(pair["cost"])
             else:
                 score = cost = EM_DASH
-            # A disputed cell shows both routes' values in place of the base
-            # one -- "leaderboard / detail" -- with the disputed pill; the
-            # formatting is the page script's own, so the no-JS render stays
-            # cell-for-cell equal to the live one (issue #118).
-            if metric == "intelligence":
-                dp = dispute_pair(row, "intelligenceIndex", "score")
-                if dp:
-                    score = dp + " " + _tag("disputed", "tag")
-            if metric == "agentic":
-                dp = dispute_pair(row, "gdpvalNormalized", "gdpval")
-                if dp:
-                    score = dp + " " + _tag("disputed", "tag")
-            if metric != "coding":
-                dc = dispute_cost_cell(row)
-                if dc:
-                    cost = dc + " " + _tag("disputed", "tag")
             if pair and id(row) in front_sets[metric]:
                 score += " " + _tag("frontier", "tag f")
             cells.append(f'<td class="n">{score}</td>')
             cells.append(f'<td class="n">{cost}</td>')
             if metric == "intelligence":
-                params = dispute_pair(row, "parameters", "params")
-                if params:
-                    params += " " + _tag("disputed", "tag")
-                else:
-                    params = fmt_params(row["params"])
+                params = fmt_params(row["params"])
                 if metric_of(row, "parameters") and id(row) in front_sets["parameters"]:
                     params += " " + _tag("parameter frontier", "tag f")
                 cells.append(f'<td class="n">{params}</td>')
@@ -1119,19 +853,9 @@ def render_static_tbodies(rows):
 
 
 def main():
-    snapshot = read_disputed_snapshot(RAW.parent / DISPUTED_SNAPSHOT_NAME)
-    if snapshot is None:
-        models = read_capture(RAW)
-        disputes = None
-    else:
-        # One base generation, the merge's existing tiebreak: the leaderboard's
-        # copy of every shared value, widened with the detail route's
-        # detail-only fields. The disagreement map rides on the rows (disp);
-        # nothing disputed is repaired or hidden here.
-        models = merge_captures(snapshot["leaderboard"], snapshot["detail"])
-        disputes = disagreements_by_slug(snapshot)
+    models = read_capture(RAW)
     agents = read_capture(AGENTS_RAW)
-    rows = build_rows(models, disputes) + build_agent_rows(agents, models)
+    rows = build_rows(models) + build_agent_rows(agents, models)
     intelligence_rows = [r for r in rows if r["metrics"]["intelligence"]]
 
     # Reported only -- the page recomputes this layer against whatever the
@@ -1209,31 +933,6 @@ def main():
             "than publishing an empty chart"
         )
 
-    # The disputed layer's data + banner (issue #118). The stats key exists
-    # ONLY in disputed mode so a normal build stays byte-identical to the
-    # page it replaces; the banner is build-time HTML from validated shapes
-    # (counts and an ISO date rendered from a validated epoch), never free
-    # captured strings, and still goes through the template-marker guard.
-    disputed_stats = None
-    if snapshot is not None:
-        # The narrowing assertion is the type narrowing, not a runtime check
-        # that can fire: disputes is assigned in the same branch above.
-        assert disputes is not None
-        start = snapshot.get("windowStartEpoch")
-        disputed_stats = {
-            "models": len(disputes),
-            "values": sum(len(paths) for paths in disputes.values()),
-            "since": (dt.datetime.fromtimestamp(start, tz=dt.timezone.utc)
-                      .strftime("%Y-%m-%dT%H:%M:%SZ")
-                      if start is not None else None),
-            # Epochs, kept numeric in the payload so the capture gate can
-            # mask the two keys wholesale: the routes regenerate their cached
-            # copies inside a live window without any rendered VALUE moving,
-            # and that churn must not publish (issue #118).
-            "leaderboardGeneratedAt": snapshot.get("leaderboardGeneratedAt"),
-            "detailGeneratedAt": snapshot.get("detailGeneratedAt"),
-        }
-        stats["disputed"] = disputed_stats
     payload = json.dumps({"rows": rows, "stats": stats}, separators=(",", ":")).replace(
         "<", "\\u003c"
     )
@@ -1247,16 +946,8 @@ def main():
     # Replaced FIRST so the payload, still inserted last, can never be
     # re-substituted by a captured string carrying this marker.
     digest = hashlib.sha256()
-    if snapshot is None:
-        for capture in (RAW, AGENTS_RAW):
-            digest.update(capture.read_bytes())
-    else:
-        # The disputed page is built from the snapshot plus the last-good
-        # coding-agents capture -- the models capture is not an input at
-        # all (it may not even exist in a disputed hour) -- so the digest
-        # covers exactly those two, snapshot first.
-        digest.update((RAW.parent / DISPUTED_SNAPSHOT_NAME).read_bytes())
-        digest.update(AGENTS_RAW.read_bytes())
+    for capture in (RAW, AGENTS_RAW):
+        digest.update(capture.read_bytes())
     commit = os.environ.get("AA_SOURCE_COMMIT", "")
     # Only a SHA-shaped value renders. The env is build-machine input, and a
     # value carrying a template marker would otherwise be spliced by the
@@ -1266,14 +957,9 @@ def main():
         commit = ""
     commit_note = (f" Source commit <code>{html.escape(commit)}</code>."
                    if commit else "")
-    if snapshot is None:
-        inputs_note = ("data/aa-raw-models.json then "
-                       "data/aa-raw-coding-agents.json, whole files "
-                       "concatenated in that order.")
-    else:
-        inputs_note = ("data/" + DISPUTED_SNAPSHOT_NAME + " then "
-                       "data/aa-raw-coding-agents.json, whole files "
-                       "concatenated in that order.")
+    inputs_note = ("data/aa-raw-models.json then "
+                   "data/aa-raw-coding-agents.json, whole files "
+                   "concatenated in that order.")
     provenance = ("Capture <code>" + digest.hexdigest() + "</code> &mdash; sha256 over "
                   + inputs_note + commit_note)
     # The tbody substitutions run between the captured stamp and the payload:
@@ -1283,28 +969,7 @@ def main():
     # it -- can never re-splice a rendered tbody. render_static_tbodies has
     # already refused any rendered body that carries a marker.
     frontier_tbody, main_tbody = render_static_tbodies(rows)
-    # The three disputed-mode substitutions: the banner, the legend's disputed
-    # swatch, and the footer's route-agreement clause. All three collapse to
-    # the empty string / normal text when there is no snapshot -- which is
-    # what keeps a normal build byte-identical to the page it replaces.
-    if snapshot is not None:
-        banner = render_disputed_banner(disputed_stats)
-        legend_disputed = DISPUTED_LEGEND_ITEM
-        agreement_clause = ROUTE_DISPUTE_CLAUSE
-    else:
-        banner = ""
-        legend_disputed = ""
-        agreement_clause = ROUTE_AGREEMENT_CLAUSE
-    for built in (banner, legend_disputed):
-        for marker in TEMPLATE_MARKERS:
-            if marker in built:
-                raise SystemExit(
-                    "the disputed layer carries the template marker "
-                    f"{marker} -- refusing to build")
-    OUT.write_text(TEMPLATE.replace("__DISPUTED_BANNER__", banner)
-                   .replace("__ROUTE_AGREEMENT_CLAUSE__", agreement_clause)
-                   .replace("__DISPUTED_LEGEND__", legend_disputed)
-                   .replace("__PROVENANCE__", provenance)
+    OUT.write_text(TEMPLATE.replace("__PROVENANCE__", provenance)
                    .replace("__CAPTURED__", captured)
                    .replace("__TBODY_FRONTIER__", frontier_tbody)
                    .replace("__TBODY_MAIN__", main_tbody)
@@ -1312,12 +977,6 @@ def main():
                    encoding="utf-8")
     dep = sum(1 for r in intelligence_rows if r["dep"])
     print(f"wrote {OUT.relative_to(ROOT)}")
-    if snapshot is not None:
-        assert disputed_stats is not None
-        print(f"  DISPUTED build from {DISPUTED_SNAPSHOT_NAME}: "
-              f"{disputed_stats['models']} model(s) carry "
-              f"{disputed_stats['values']} disputed value(s); they sit out "
-              "the frontiers while the window lasts")
     print(f"  {stats['plotted']} models plotted "
           f"({stats['prop']} proprietary / {stats['open']} open-weights, "
           f"{stats['creators']} labs)")
@@ -1325,36 +984,6 @@ def main():
           f"{len(intelligence_rows) - len(front)} superseded by metric")
     print(f"  of {dep} vendor-retired models, {retired_and_beaten} are also beaten on the "
           f"numbers ({'metric filter subsumes the vendor flag' if retired_and_beaten == dep else 'MISMATCH -- some retired model is still undominated'})")
-
-
-# The disputed layer's three build-time renders. The banner's only variable
-# content is counts and one ISO date rendered from a validated epoch -- never
-# free captured strings -- and it still passes the template-marker guard.
-def render_disputed_banner(s):
-    """The disputed capture's banner, as build-time HTML."""
-    since = s["since"] or "an unknown time"
-    return (
-        '<div class="callout disputed" id="disputed" role="status">'
-        "<b>Disputed capture &mdash; AA's two routes disagree.</b> "
-        "Since <code>" + html.escape(since) + "</code> the leaderboard and the "
-        "model-detail routes have served different generations of the same "
-        "data: " + str(s["models"]) + " model(s) carry " + str(s["values"])
-        + " conflicting value(s). Every chart renders the leaderboard's copy; "
-        "hover a disputed point draws hollow in the de-emphasis gray; the "
-        "tooltip and the table show both routes' values, each labeled with "
-        "its route and the time that route's copy was generated. Disputed "
-        "models sit out the efficient frontiers while the window lasts; the "
-        "page returns to the normal rendering on its own when the routes "
-        "agree again."
-        "</div>")
-
-
-DISPUTED_LEGEND_ITEM = ('<span class="item"><span class="swatch disp"></span>'
-                        'Disputed</span>')
-
-ROUTE_AGREEMENT_CLAUSE = "and agree exactly on every value they share"
-ROUTE_DISPUTE_CLAUSE = ("<b>currently disagree</b> &mdash; the disputed "
-                        "banner above names the window and its models")
 
 
 TEMPLATE = r"""<!DOCTYPE html>
@@ -1480,10 +1109,6 @@ TEMPLATE = r"""<!DOCTYPE html>
   .legend .item{display:inline-flex;align-items:center;gap:7px}
   .legend .swatch{width:11px;height:11px;border-radius:50%;display:inline-block}
   .legend .swatch.hollow{background:none !important;border:2px solid var(--series-prop);box-sizing:border-box}
-  /* Disputed (issue #118): the hollow SHAPE in the de-emphasis GRAY -- the
-     page's two existing non-hue idioms composited, so the scatter keeps its
-     three-hue cap and disputed is never a fourth color. */
-  .legend .swatch.disp{background:none !important;border:2px solid var(--muted);box-sizing:border-box}
   .legend .line{width:20px;height:0;border-top:2px dashed var(--frontier-line);display:inline-block}
 
   .tip{position:absolute;pointer-events:none;opacity:0;
@@ -1554,7 +1179,6 @@ TEMPLATE = r"""<!DOCTYPE html>
       AA's reported total parameter count and so sits apart, last. Together they show both economic and
       parameter efficiency without stitching numbers from different sources.</p>
   </header>
-__DISPUTED_BANNER__
 
   <div class="method">
     <div class="label">Method</div>
@@ -1642,7 +1266,7 @@ __DISPUTED_BANNER__
         <span class="item"><span class="swatch" style="background:var(--series-open)"></span>Open-weights</span>
         <span class="item"><span class="swatch hollow"></span>Weights unpublished</span>
         <span class="item"><span class="swatch" style="background:var(--muted)"></span>Superseded</span>
-        <span class="item"><span class="line"></span>Efficient frontier</span>__DISPUTED_LEGEND__
+        <span class="item"><span class="line"></span>Efficient frontier</span>
       </div>
     </div>
   </section>
@@ -1662,7 +1286,7 @@ __DISPUTED_BANNER__
         <span class="item"><span class="swatch" style="background:var(--series-prop)"></span>Proprietary</span>
         <span class="item"><span class="swatch" style="background:var(--series-open)"></span>Open-weights</span>
         <span class="item"><span class="swatch" style="background:var(--muted)"></span>Superseded</span>
-        <span class="item"><span class="line"></span>Efficient frontier</span>__DISPUTED_LEGEND__
+        <span class="item"><span class="line"></span>Efficient frontier</span>
       </div>
     </div>
   </section>
@@ -1684,7 +1308,7 @@ __DISPUTED_BANNER__
         <span class="item"><span class="swatch" style="background:var(--series-prop)"></span>Proprietary</span>
         <span class="item"><span class="swatch" style="background:var(--series-open)"></span>Open-weights</span>
         <span class="item"><span class="swatch" style="background:var(--muted)"></span>Superseded</span>
-        <span class="item"><span class="line"></span>Efficient frontier</span>__DISPUTED_LEGEND__
+        <span class="item"><span class="line"></span>Efficient frontier</span>
       </div>
     </div>
   </section>
@@ -1706,7 +1330,7 @@ __DISPUTED_BANNER__
         <span class="item"><span class="swatch" style="background:var(--series-prop)"></span>Proprietary</span>
         <span class="item"><span class="swatch" style="background:var(--series-open)"></span>Open-weights</span>
         <span class="item"><span class="swatch" style="background:var(--muted)"></span>Superseded</span>
-        <span class="item"><span class="line"></span>Parameter-efficiency frontier</span>__DISPUTED_LEGEND__
+        <span class="item"><span class="line"></span>Parameter-efficiency frontier</span>
       </div>
     </div>
   </section>
@@ -1759,8 +1383,9 @@ __DISPUTED_BANNER__
   <div class="foot">
     <p>Sourced entirely from Artificial Analysis. Intelligence Index v4.3 comprises
       <span id="evals"></span>. The Coding Agent Index carries its own measured cost per task, and the
-      Intelligence Index cost is AA's own total, and the model rows are one AA snapshot stitched from its
-      leaderboard and a model detail page, which carry different halves of the record __ROUTE_AGREEMENT_CLAUSE__. GDPval-AA's cost is AA's figure for that evaluation with
+      Intelligence Index cost is AA's own total, and the model rows are the leaderboard's own records,
+      widened only where the leaderboard omits a field the page needs by a value from a model detail
+      page; where both carry a field, the leaderboard's value is the one published. GDPval-AA's cost is AA's figure for that evaluation with
       its 10% index weight divided back out &mdash; AA reports each component's task cost pre-weighted, and
       the components sum exactly to the published total. No score, token price or task measurement is
       estimated, and nothing is filled in from another source. Rebuild with
@@ -1865,16 +1490,10 @@ const DATA = __DATA__;
   }
 
   function frontierMetric(rows,key){
-    // Disputed rows sit out BOTH roles (issue #118), exactly as the build's
-    // own undominated() does: no disputed model is a frontier candidate, and
-    // no disputed model dominates anyone -- a verdict computed against a
-    // value one of AA's own routes disagrees with is not a verdict the page
-    // can stand behind.
     return rows.filter(r=>{
-      if(r.disp) return false;
       const m=metricOf(r,key);
       return !rows.some(o=>{
-        if(o===r||o.disp) return false;
+        if(o===r) return false;
         const om=metricOf(o,key);
         return om.score>=m.score && om.cost<=m.cost &&
           (om.score>m.score || om.cost<m.cost);
@@ -1913,94 +1532,6 @@ const DATA = __DATA__;
     ["Output speed", show(r.tps == null ? null : r.tps + " tok/s")],
     ["Context", fmtCtx(r.ctx)],
   ];
-
-  /* ---------- disputed layer (issue #118) ---------- */
-  // The disputed rendering reads exactly two things: the row's own disp map
-  // (which of its values the two AA routes disagree on, both values each)
-  // and stats.disputed (the window + per-route generation times). Both exist
-  // only in a disputed build, so every rule here is inert on a normal page.
-  const DISPUTE_LABELS = {
-    "intelligenceIndex": "Intelligence Index",
-    "intelligenceIndexCostPerTask": "Cost per task",
-    "intelligenceIndexCostPerTask.cost.total": "Cost per task",
-    "gdpvalNormalized": "GDPval-AA v2",
-    "parameters": "Parameters",
-    "price1mInputTokens": "$ / 1M in",
-    "price1mOutputTokens": "$ / 1M out",
-    "medianOutputTokensPerSecond": "Output speed",
-    "contextWindowTokens": "Context",
-    "releaseDate": "Released",
-    "licenseName": "Weights licence",
-    "modelCreatorName": "Lab",
-    "name": "Name",
-    "shortName": "AA label",
-  };
-  const routeCostTotal = v =>
-    typeof v === "number" ? v
-      : (v && typeof v === "object" && v.cost && typeof v.cost.total === "number"
-          ? v.cost.total : null);
-  // The kind a disputed path renders with, mirroring the build's own
-  // _fmt_dispute_value kind-for-kind; the fallback is the page's show() --
-  // a string-valued dispute (a label, a licence, a date) renders as text,
-  // never as a number that is not one.
-  const DISPUTE_KINDS = {
-    "intelligenceIndex": "score",
-    "intelligenceIndexCostPerTask": "cost",
-    "intelligenceIndexCostPerTask.cost.total": "cost",
-    "gdpvalNormalized": "gdpval",
-    "parameters": "params",
-    "price1mInputTokens": "price",
-    "price1mOutputTokens": "price",
-    "medianOutputTokensPerSecond": "num",
-    "contextWindowTokens": "ctx",
-    "releaseDate": "text",
-    "licenseName": "text",
-    "modelCreatorName": "text",
-    "name": "text",
-    "shortName": "text",
-  };
-  const fmtDisp = (v, kind) => {
-    if (v == null) return "—";
-    if (kind === "gdpval") return (v * 100).toFixed(1);
-    if (kind === "cost") {
-      const t = routeCostTotal(v);
-      return t == null ? "—" : fmtCost(t);
-    }
-    if (kind === "params") return fmtParams(v);
-    if (kind === "price") return "$" + v;
-    if (kind === "ctx") return fmtCtx(v);
-    if (kind === "score") return typeof v === "number" ? v.toFixed(1) : String(v);
-    if (kind === "num") return String(v);
-    return show(v);
-  };
-  const dispPair = (r, path) => {
-    if (!r.disp || !(path in r.disp)) return null;
-    const e = r.disp[path];
-    return fmtDisp(e.lb, DISPUTE_KINDS[path]) + " / "
-         + fmtDisp(e.dt, DISPUTE_KINDS[path]);
-  };
-  // The cost cell's both-routes text: the disagreement map can spell the
-  // cost path two ways (the nested shape, or the top-level path when the
-  // leaderboard's flattened scalar was compared through the check's
-  // reshape), and either side that fails to resolve to a number renders the
-  // em dash for that side alone -- never a guess.
-  const dispCostPair = r => dispPair(r, "intelligenceIndexCostPerTask.cost.total")
-    || dispPair(r, "intelligenceIndexCostPerTask");
-  const dispTagCell = cell => {
-    cell.appendChild(document.createTextNode(" "));
-    const tag = document.createElement("span");
-    tag.className = "tag"; tag.textContent = "disputed";
-    cell.appendChild(tag);
-  };
-  // The per-route generation times, rendered once per disputed tooltip: the
-  // route label on each pair plus the time that route's copy was generated,
-  // as the banner promises. Epoch ints from stats.disputed.
-  const dispIso = e => e == null ? "unknown"
-    : new Date(e * 1000).toISOString().replace(/\.\d{3}Z$/, "Z");
-  const dispGeneratedLine = () => !S.disputed ? null :
-    ["Route copies generated",
-     "leaderboard " + dispIso(S.disputed.leaderboardGeneratedAt) +
-     " · detail " + dispIso(S.disputed.detailGeneratedAt)];
 
   /* ---------- scatter ---------- */
   // The plot fills whatever width the page gives it. The viewBox width tracks
@@ -2142,16 +1673,11 @@ const DATA = __DATA__;
       const cx=X(r.cost), cy=Y(r.ii), on=frontSet.has(r);
       // the de-emphasis gray is page-wide, matching drawCapability: a point
       // off this chart's frontier draws var(--muted); a frontier point keeps
-      // its weights fill. A DISPUTED point (issue #118) overrides both: the
-      // hollow shape in the de-emphasis gray -- no fourth hue, the same
-      // idioms the legend's swatch renders.
-      const disp=!!r.disp;
+      // its weights fill.
       const c=el("circle",{cx:cx,cy:cy,r:on?6:5,
-        fill:disp?"var(--surface-1)":(on?fillOf(r):"var(--muted)"),
-        stroke:disp?"var(--muted)":strokeOf(r),"stroke-width":2,
+        fill:on?fillOf(r):"var(--muted)",stroke:strokeOf(r),"stroke-width":2,
         class:"pt"+(pins.has(r.name)?" pinned":""),role:"button",tabindex:0,
-        "aria-label":"Pin "+r.name+" on the Intelligence Index chart"
-          +(disp?" (disputed values)":""),
+        "aria-label":"Pin "+r.name+" on the Intelligence Index chart",
         "aria-pressed":String(pins.has(r.name))});
       svg.appendChild(c);
       pts.push({r:r,x:cx,y:cy,el:c});
@@ -2326,27 +1852,7 @@ const DATA = __DATA__;
       const rows=[["Intelligence Index",r.ii.toFixed(1)],
                   ["Cost per task",fmtCost(r.cost)],
                   ...secondaryRows(r)];
-      if(r.disp){
-        // Both routes' values for the rendered fields, each labeled with its
-        // route (the pairs' "leaderboard / detail" order is fixed), plus the
-        // per-route generation times and one line for the rest of the map --
-        // the reader learns the record is wider-disputed without the tooltip
-        // becoming a raw dump (#118).
-        const entries=Object.entries(r.disp);
-        let shown=0;
-        for(const [path,e] of entries){
-          const label=DISPUTE_LABELS[path];
-          if(!label) continue;
-          rows.push([label+" — both routes", dispPair(r, path)]);
-          shown++;
-        }
-        if(entries.length>shown)
-          rows.push(["Other fields disputed", String(entries.length-shown)]);
-        const gen=dispGeneratedLine();
-        if(gen) rows.push(gen);
-      }
-      rows.push(["On frontier", r.disp ? "excluded — disputed"
-               : frontSet.has(r) ? "yes" : "no — superseded"]);
+      rows.push(["On frontier", frontSet.has(r) ? "yes" : "no — superseded"]);
       if(r.dep) rows.push(["Vendor status","retired"]);
       for(const [k,v] of rows){
         const d=document.createElement("div"); d.className="trow";
@@ -2458,14 +1964,12 @@ const DATA = __DATA__;
       const m=metricOf(r,key), x=X(m.cost), y=Y(m.score), on=front.has(r);
       // the de-emphasis gray is page-wide: a point off THIS chart's frontier
       // draws var(--muted) here and on the other three charts alike, while a
-      // frontier point keeps its weights fill. Disputed (issue #118) draws
-      // hollow in the gray, on every chart alike.
-      const fill=r.disp?"var(--surface-1)":(!on?"var(--muted)":fillOf(r));
+      // frontier point keeps its weights fill.
+      const fill=on?fillOf(r):"var(--muted)";
       const mark=el("circle",{cx:x,cy:y,r:on?6:5,fill:fill,
-        stroke:r.disp?"var(--muted)":strokeOf(r),"stroke-width":2,
+        stroke:strokeOf(r),"stroke-width":2,
         class:"pt"+(pins.has(r.name)?" pinned":""),role:"button",tabindex:0,
-        "aria-label":"Pin "+r.name+" on the "+cfg.label+" chart"
-          +(r.disp?" (disputed values)":""),
+        "aria-label":"Pin "+r.name+" on the "+cfg.label+" chart",
         "aria-pressed":String(pins.has(r.name))});
       chart.appendChild(mark); pts.push({r,x,y,el:mark});
     }
@@ -2560,23 +2064,8 @@ const DATA = __DATA__;
            ...secondaryRows(hit.r)]
         : [[cfg.label,m.score.toFixed(1)],["Cost per task",fmtCost(m.cost)],
            ...secondaryRows(hit.r)];
-      if(hit.r.disp){
-        const entries=Object.entries(hit.r.disp);
-        let shown=0;
-        for(const [path,e] of entries){
-          const label=DISPUTE_LABELS[path];
-          if(!label) continue;
-          lines.push([label+" — both routes", dispPair(hit.r, path)]);
-          shown++;
-        }
-        if(entries.length>shown)
-          lines.push(["Other fields disputed", String(entries.length-shown)]);
-        const gen=dispGeneratedLine();
-        if(gen) lines.push(gen);
-      }
       lines.push([key==="parameters" ? "On parameter frontier" : "On frontier",
-                  hit.r.disp ? "excluded — disputed"
-                  : plot.front.has(hit.r) ? "yes" : "no — superseded"]);
+                  plot.front.has(hit.r) ? "yes" : "no — superseded"]);
       if(hit.r.dep) lines.push(["Vendor status","retired"]);
       for(const [k,v] of lines){
         const row=document.createElement("div"); row.className="trow";
@@ -2689,13 +2178,8 @@ const DATA = __DATA__;
       for(const key of Object.keys(METRICS)){
         const m=metricOf(r,key), score=document.createElement("td"), cost=document.createElement("td");
         score.className="n"; cost.className="n";
-        const dsp = key==="intelligence" ? dispPair(r,"intelligenceIndex")
-                  : key==="agentic" ? dispPair(r,"gdpvalNormalized") : null;
-        const dcost = key!=="coding" ? dispCostPair(r) : null;
-        score.textContent = dsp || (m?m.score.toFixed(1):"—");
-        cost.textContent = dcost || (m?fmtCost(m.cost):"—");
-        if(dsp) dispTagCell(score);
-        if(dcost) dispTagCell(cost);
+        score.textContent = m ? m.score.toFixed(1) : "—";
+        cost.textContent = m ? fmtCost(m.cost) : "—";
         if(m&&frontSets[key].has(r)){
           score.appendChild(document.createTextNode(" "));
           const tag=document.createElement("span"); tag.className="tag f";
@@ -2705,10 +2189,8 @@ const DATA = __DATA__;
         if(key==="intelligence"){
           const parameters=document.createElement("td");
           parameters.className="n";
-          const pdp=dispPair(r,"parameters");
-          parameters.textContent = pdp || fmtParams(r.params);
-          if(pdp) dispTagCell(parameters);
-          else if(metricOf(r,"parameters")&&frontSets.parameters.has(r)){
+          parameters.textContent = fmtParams(r.params);
+          if(metricOf(r,"parameters")&&frontSets.parameters.has(r)){
             parameters.appendChild(document.createTextNode(" "));
             const tag=document.createElement("span"); tag.className="tag f";
             tag.textContent="parameter frontier"; parameters.appendChild(tag);

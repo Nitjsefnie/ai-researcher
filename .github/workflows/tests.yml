@@ -23,7 +23,7 @@ name: tests
 # stages the raise as the `ratchet-data` artifact for that workflow. `page`
 # is the committed-page check
 # (issue #105): the source-commit stamp is set only on the refresh path, so a
-# page a PR commits by hand could go out stamp-less and the #94 heal run
+# page a PR commits by hand could go out stamp-less and the #94 republish run
 # would publish it — that job refuses a committed page lacking the stamp or
 # differing from its own stamp-less rebuild.
 #
@@ -570,7 +570,7 @@ jobs:
   # Issue #105: out/frontier-models.html gets its "Source commit <code>…
   # </code>" stamp only when AA_SOURCE_COMMIT is set at build time, and only
   # refresh.yml sets it — so a page a pull request builds and commits by
-  # hand goes out stamp-less, and the #94 hourly heal run republishes HEAD's
+  # hand goes out stamp-less, and the #94 hourly republish run restores HEAD's
   # committed page byte for byte, stamp-less. This job refuses a committed
   # page that (i) lacks exactly one well-shaped source-commit stamp or
   # (ii) differs from a stamp-less rebuild of the same tree once build

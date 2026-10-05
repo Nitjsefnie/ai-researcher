@@ -62,17 +62,39 @@ cost cannot go on a cost axis, and estimating the missing half is forbidden by
 the single-source rule above. This is why the coding axis moved to a different
 AA product rather than being dropped.
 
-**The model capture is TWO ROUTES stitched together.** AA trimmed the
-leaderboard payload to 50 fields, dropping `name`, `licenseName`,
-`releaseDate`, the parameter count and the per-evaluation cost breakdown. All
-of those still ship on any model detail page (`/models/<slug>`), which embeds
+**The model capture is TWO ROUTES stitched together — and the leaderboard
+wins.** AA trimmed the leaderboard payload once, and it still omits
+`licenseName`, `releaseDate`, the parameter count and the per-evaluation cost
+breakdown. Those ship on any model detail page (`/models/<slug>`), which embeds
 the whole corpus for its comparison widgets. `fetch_aa.py` fetches both and
 gap-fills, one level deep — the split runs *through* a nested object, since the
 leaderboard kept `intelligenceIndexCostPerTask.cost` and dropped its
 `.evaluations`, so a key-level merge lets the surviving stub shadow the
-complete breakdown. The routes render from one snapshot (every shared
-`intelligenceIndex` and `cost.total` agrees exactly), which is what keeps the
-score/cost pairing on a single AA run.
+complete breakdown.
+
+**The two routes are not the same generation, and only one of them is
+published.** AA serves each route from its own Vercel cache, so a capture can
+straddle an update. The detail route's embedded corpus is measured to be the
+stale one, and the per-route generation timestamps do NOT identify it — a detail
+page regenerated later still embeds the older corpus, so comparing dates picks
+the wrong side. The rule is therefore not a comparison but a fixed precedence
+(Overseer ruling, delegated by the maintainer, 2026-10-05, issue #200): the
+leaderboard publishes every value it carries, the detail route fills only what
+the leaderboard omits, and a conflicting detail value simply loses. There is no
+disagreement state, no heal, no skip, no baseline, and no exit code for a
+disagreement. A field the leaderboard ever drops is a *fill* from the detail
+route, not a disagreement.
+
+One place needs care, because the merge is where two generations could still
+mix: `intelligenceIndexCostPerTask` ships as a **bare number** on the
+leaderboard (its flattened `cost.total`) and as the full **object** on the
+detail route. The leaderboard's number wins, and the detail object is taken as a
+fill under it — but only while its per-evaluation breakdown still sums to that
+number. A breakdown that does not sum is not this total's breakdown, whatever
+route it came from, so it is dropped whole and the plain scalar is left. That
+model's GDPval cost then renders absent until the routes converge, which is the
+honest outcome: the alternatives are publishing a stale total or failing the
+refresh red for hours.
 
 A detail page lists every model **except** its own, so the host slug loses its
 detail-only fields. `detail_host_slug` therefore picks a model with no measured
@@ -80,8 +102,9 @@ cost — without one it cannot be on any chart — and picks it deterministicall
 so the capture does not churn.
 
 Field renames absorbed: `totalParameters` → `parameters` (identical values
-across the rename), `name` → falls back to `shortName`. `modelCreatorCountry`
-is gone from every route; nothing rendered it.
+across the rename), `name` → falls back to `shortName` — the leaderboard ships
+`name` again as of 2026-10-05. `modelCreatorCountry` is gone from every route;
+nothing rendered it.
 
 **Coding rows are scattered across arrays, so the extractor anchors on the
 PAIR, not on an array shape.** AA splits them between `rows` (its highlighted
@@ -141,17 +164,11 @@ retry or to hand-fix JSON — when any of these move:
   factors of 2–3 for a day. The pin is the only place that can be caught;
 - the cost breakdown drops a slug `build.py` reads, or the per-evaluation costs
   stop summing to the published total;
-- the leaderboard and model-detail routes disagree on a shared field's value —
-  `check_route_agreement` runs before the gap-fill merge and names the slug,
-  the field path and both values. Since #118 the refusal is also buildable:
-  it exits 3 but writes `data/aa-disagreement-snapshot.json` (both routes'
-  raw payloads plus the disagreement map), which the disputed rendering
-  builds from. Since the Overseer ruling (delegated by the maintainer),
-  2026-10-04 (issue #176), the refusal first attempts the staleness heal:
-  when one route is provably the last agreeing capture's copy, the fresh
-  route publishes undisputed through the normal capture path and nothing
-  disputed is written — see the failure modes below;
 - the Coding Agent Index collapses below `CODING_ROW_FLOOR` paired rows.
+
+A disagreement between the two routes is deliberately NOT one of these: it is
+resolved by the fixed precedence above, silently and always, and never turns
+the refresh red.
 
 `build.py` additionally refuses to write a page where a rendered axis has no
 rows, so an emptied chart is a build failure rather than a published blank.
@@ -248,53 +265,23 @@ The scheduled commits are authored by `github-actions[bot]` and carry **no**
 model co-author trailer, because no model wrote them. A refresh a person or an
 agent drives by hand still carries one.
 
-Three failure modes are deliberate. `fetch_aa.py` exiting nonzero on a schema
-change turns the scheduled run red rather than committing a mangled capture —
-that is the signal to go re-read the leaderboard by hand, and those refusals
-stay red on the disputed merge too. A cross-route disagreement is different:
-AA's two routes are independently cached and its data lands on them at
-different times, so that refusal exits with code 3 — but since the Overseer
-ruling (delegated by the maintainer), 2026-10-04 (issue #176), it first
-attempts the staleness heal. When ALL of one route's disputed values equal the
-last agreeing capture and NONE of the other route's do, the matching route is
-serving that capture unchanged — it is stale — and the refresh drops its
-disagreeing values, committing and publishing an **undisputed** page from the
-fresh route through the normal capture path. The baseline is the last capture
-BOTH routes agreed on, never a healed one: the first healed hour records it
-in `data/aa-last-agreeing-capture.json`, every healed hour of the window
-re-proves staleness against that same record, and a healed capture is never a
-baseline (the pre-#189 code read `data/aa-raw-models.json` at HEAD instead,
-so each heal became the next hour's baseline and the stale route flipped
-every hour — issue #189). With no agreeing capture on record, the disputed
-rendering stands. When the stale route is the detail route, its
-detail-only fields (per-evaluation cost breakdown, parameters, license,
-release date) stay at their last capture, and any field that would mix the two
-generations renders absent (—) until the routes agree — for a model whose
-`cost.total` moved, the GDPval-AA cost recovered from the stale breakdown is
-absent, and the breakdown-sum check remains the refusal of the mixed pairing.
-Every value still comes only from AA; nothing is estimated or interpolated.
-Generation timestamps never identify the stale route: #117's window had
-copies 3 s apart carrying different data. This amends the maintainer's #118
-ruling (2026-10-02, "render the disagreement, never pick a side") ONLY for
-the provably-stale case; #118 stands wherever staleness cannot be shown —
-mixed matches, both routes differing from the last capture, a disputed slug
-with no row in the last capture — and there the disputed rendering is
-unchanged: the refusal writes `data/aa-disagreement-snapshot.json` (both
-routes' raw payloads plus the disagreement map), the refresh builds and
-publishes the disputed page the same hour, and the page renders the dispute
-instead of holding: one base generation (the leaderboard's copy — the merge's
-existing tiebreak), a disputed banner naming the window, both values in
-disputed tooltips and table cells (each labeled with its route and
-generated-at), and disputed models sitting out the efficient frontiers and
-carrying no superseded tag while the window lasts. There is no time bound on
-a window: the disputed banner is the visible alarm, and the page reverts to
-the normal rendering automatically when the next agreeing capture retires the
-stamp, the snapshot and the last-agreeing record. A healed hour does NOT
-close the window — it keeps the stamp and the record alive (the healed page
-renders clean, the disagreement continues) and retires nothing. The disputed treatment
-reuses the page's existing hollow/de-emphasis idioms — the scatter keeps its
-three-hue cap. And the suite runs BEFORE the commit, so a capture that breaks
-the page leaves the last good capture committed and the last good page live.
+Two failure modes are deliberate. `fetch_aa.py` exiting nonzero on a schema
+change, an index bump or a transport failure turns the scheduled run red rather
+than committing a mangled capture — that is the signal to go re-read the
+leaderboard by hand. And the suite runs BEFORE the commit, so a capture that
+breaks the page leaves the last good capture committed and the last good page
+live.
+
+A third thing that used to be a failure mode is not one any more. A cross-route
+disagreement — AA's two routes independently cached, serving two generations of
+the same data — used to exit 3, or heal, or publish a disputed page, and it is
+what made the published document oscillate between generations hour by hour
+(issues #100, #118, #176, #189). Under the fixed precedence documented above it
+is simply resolved: the leaderboard publishes, the detail route fills, and the
+hour is an ordinary one whose only scheduled commit is `Refresh capture: …`.
+There is no window to open, close, record or heal, and no disagreement that can
+turn a run red. Every value still comes only from AA; nothing is estimated or
+interpolated, and nothing from the older generation reaches the page.
 
 ## Commit / co-author trailer
 

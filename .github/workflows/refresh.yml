@@ -8,10 +8,9 @@ name: refresh
 # `refresh` captures, gates, rebuilds, installs third-party dependencies,
 # downloads Chromium and runs the full suite -- so it holds NOTHING but a
 # read-only token, and the hour's commit payload (the fresh captures, the
-# built page, the window files, the differ's message) leaves it as an
-# artifact of this same run. `publish` is a keyless committer: it downloads
-# the artifact, replays the hour's commits (the window retirement first,
-# then the data commit) against main in a scratch repo with git plumbing
+# built page, the differ's message) leaves it as an artifact of this same
+# run. `publish` is a keyless committer: it downloads the artifact and replays
+# the hour's single data commit against main in a scratch repo with git plumbing
 # alone -- no checkout, no pip, no browser, no script from the tree, and no
 # push; it stages the commits for the push job as a git bundle. `push` is
 # the only job that loads the deploy key (the main-push environment,
@@ -62,10 +61,10 @@ name: refresh
 # would skip, leaving docs-hub serving the old render until AA happened to
 # move on its own, indefinitely, on a quiet weekend. Two paths bring a
 # build-only change to the hub: the `force` dispatch input, which rebuilds
-# and publishes in one run, and the heal gate below, which republishes
+# and publishes in one run, and the republish gate below, which republishes
 # whenever the live page is behind main.
 #
-# THE `published` REF IS THE HEAL GATE'S MEMORY. The branch
+# THE `published` REF IS THE REPUBLISH GATE'S MEMORY. The branch
 # refs/heads/published on the remote points at the main commit whose
 # out/frontier-models.html is live on the hub. It moves only in the write
 # job's publish step, only after the upload succeeded, and only forward
@@ -80,14 +79,14 @@ name: refresh
 # concurrency group serializes runs, but an OLDER run can still reach the
 # publish step after a newer one and land its upload LAST, leaving the hub
 # serving the older page under a ref that names the newer commit — an
-# inversion neither the heal gate's ref comparison nor the commit step can
+# inversion neither the republish gate's ref comparison nor the commit step can
 # see. Two guards close it: the publish step compares the freshly fetched
 # `published` ref against this run's HEAD via the GitHub compare API and
 # ABORTS green when the ref is ahead (a newer run already published; the
 # newest run never aborts, so within any overlap the newest page always
-# wins), and the heal gate also compares the hub's live page against HEAD
-# byte-for-byte, so even the residual seconds-wide window heals on the next
-# unchanged-capture run.
+# wins), and the republish gate also compares the hub's live page against
+# HEAD byte-for-byte, so even the residual seconds-wide inversion is repaired
+# on the next unchanged-capture run.
 #
 # THE SUITE RUNS BEFORE THE COMMIT JOB, NOT AFTER. A capture can break the
 # page — a new field shape, a model with a null AA never emitted before —
@@ -115,50 +114,16 @@ name: refresh
 # designed signals to go re-read the leaderboard and the methodology page by
 # hand; a red run here means read them, not retry.
 #
-# EXIT 3 IS THE DISPUTED PUBLISH (issue #118, amending #100). AA's two routes
-# are independently cached Vercel pages whose data lands at different times --
-# measured windows from ~20 minutes to 3.5+ hours -- and re-reads never
-# converge inside any retry bound, so a capture that straddles an update
-# cannot be made consistent by retrying. Since #118 the refusal is buildable:
-# fetch_aa.py exits 3 but writes data/aa-disagreement-snapshot.json (both
-# routes' raw payloads plus the disagreement map), the Capture step writes
-# the window stamp and FALLS THROUGH, and the rendered gate decides moved vs
-# unchanged like any hour. The disputed page -- a disputed banner, both
-# routes' values in disputed tooltips and table cells, disputed models
-# sitting out the frontiers -- publishes the same hour and reverts
-# automatically at convergence, when the next agreeing capture retires the
-# stamp and the snapshot. There is NO time bound on this mode: the disputed
-# banner is the visible alarm, so the 3 h red bound of #100 is retired for
-# this exit code.
-#
-# THE PROVABLY-STALE HOUR HEALS INSTEAD (issues #176, #189). When ALL of one
-# route's disputed values equal the last agreeing capture and NONE of the
-# other route's do, fetch_aa.py heals the stale route: the fresh route
-# publishes undisputed through the normal capture path, exit 0, and the hour
-# records the baseline it healed from in data/aa-last-agreeing-capture.json.
-# THE RECORD KEEPS THE WINDOW OPEN: a healed capture is never a baseline,
-# every healed hour re-proves staleness against the SAME capture, the stamp
-# stays alive, and the window retires only when a capture's routes AGREE. A
-# window that worsens (staleness no longer provable) falls back to the
-# disputed rendering, stamp intact. The schema guards run on the disputed
-# merge too, so exit 1
-# (schema change, index bump, transport failure) still fails red immediately
-# -- only the disagreement itself stopped being red. When a capture succeeds
-# again, the hour marks the window RETIRING: the capture step removes the
-# stamp AND the snapshot from its tree and stages their removal for the
-# write half: the publish job commits "Route agreement restored; resume
-# captures (issue #100)" into the bundle, the push job lands it, and a push
-# lost to the race concedes green either way -- a lost stamp is self-healing
-# on the next run.
-#
-# FORCE DURING A WINDOW NOW REBUILDS (issue #118, amending #103). A forced
-# dispatch used to be terminal behind a refused capture because there was
-# nothing to republish -- the last good page already stood while the hour
-# green-skipped. Since #118 a disputed hour captures and builds like any
-# other, so force during a window rebuilds and republishes the disputed
-# page; the Capture step's `captured` verdict stays true on exit 3. (The
-# verdict remains the force gate's input: were an exit ever classified as
-# refused again, force would be vetoed exactly as #103 built it.)
+# THERE IS NO ROUTE-DISAGREEMENT STATE (issue #200). AA's two routes are
+# independently cached Vercel pages whose data lands at different times, and a
+# capture can straddle an update -- but the detail route's embedded corpus is
+# MEASURED to be the stale one, and the per-route generation timestamps do not
+# identify it (a detail page regenerated later still embeds the older corpus).
+# So there is nothing to dispute, nothing to retry and nothing to heal: the
+# leaderboard publishes every value it carries, the detail route fills only
+# what it omits, and the only scheduled commit is "Refresh capture: ...".
+# A field the leaderboard drops is a FILL from the detail route, not a
+# disagreement, and fetch_aa.py never exits 3.
 
 on:
   schedule:
@@ -205,19 +170,14 @@ jobs:
       contents: read
 
     outputs:
-      # The writer's gate: proceed is the rendered-gate + heal verdict the
-      # publish job's `if` reads through needs.refresh.outputs.
+      # The writer's gate: proceed is the rendered-gate + republish verdict
+      # the publish job's `if` reads through needs.refresh.outputs.
       proceed: ${{ steps.capture.outputs.proceed }}
-      # A healed hour (issues #176, #189): the capture healed a provably
-      # stale route from the recorded last-agreeing capture, so the window
-      # is NOT over. The write half reads it to keep the retirement commit
-      # out of the healed hour and to carry the healed message instead.
-      healed: ${{ steps.fetch.outputs.healed }}
 
-    # Sized for a FULL heal run — pip + Chromium installs, the full suite
-    # with the browser — not the 13-second unchanged-capture
-    # skip that most hours are. A hung run fails in 30 minutes instead of
-    # holding GitHub's 6-hour default.
+    # Sized for a FULL run -- pip + Chromium installs, the full suite with the
+    # browser -- not the 13-second unchanged-capture skip that most hours are.
+    # A hung run fails in 30 minutes instead of holding GitHub's 6-hour
+    # default.
     timeout-minutes: 30
 
     steps:
@@ -241,120 +201,27 @@ jobs:
       # whether the toolchain is needed at all, instead of paying 40-50 s of
       # pip + Chromium on every no-op hour.
       #
-      # The refusals are not all the same colour (issues #100, #118). Exit 1
-      # is the designed red: schema change, index bump, fetch failure -- go
-      # re-read AA by hand. Exit 3 is the route-disagreement refusal, and
-      # since #118 it is buildable: fetch_aa.py writes the disagreement
-      # snapshot, this step writes the window stamp, and the hour proceeds
-      # to the rendered gate -- the disputed page publishes and carries the
-      # banner until the routes agree. There is no time bound on a window.
+      # One exit code, one colour: nonzero is the designed red -- schema
+      # change, index bump, fetch failure -- the signal to go re-read AA by
+      # hand. There is no route-disagreement exit (issue #200).
       - name: Capture the leaderboard
         # The id is the force gate's handle: "Did anything move?" reads this
-        # step's `captured` verdict through it (issue #103), and the staging
-        # step reads `retire` the same way (#143).
+        # step's `captured` verdict through it (issue #103).
         id: fetch
         run: |
           set +e
           python3 scripts/fetch_aa.py 2> /tmp/fetch-err.txt
           rc=$?
           set -e
-          stamp=data/aa-route-disagreement.txt
-          now=$(date -u +%s)
 
           if [ "$rc" -eq 0 ]; then
             # captured=true is this step's verdict for the force gate in
             # "Did anything move?" (issue #103): only a capture that ran
             # may honor a forced rebuild.
             echo "captured=true" >> "$GITHUB_OUTPUT"
-            record=data/aa-last-agreeing-capture.json
-            if [ -f "$record" ]; then
-              # Healed hour (issues #176, #189): the capture healed a
-              # provably stale route from the recorded last-agreeing
-              # capture, so the window is NOT over -- retire NOTHING. The
-              # stamp stays alive (recreated from the record's window start
-              # if a lost push or a retired stamp left the window unnamed),
-              # and a tracked disputed snapshot must leave the tree: the
-              # healed page renders clean. The write job carries the
-              # snapshot's removal in the data commit (the HEALED output),
-              # never in a retirement commit of its own.
-              echo "healed=true" >> "$GITHUB_OUTPUT"
-              if [ ! -f "$stamp" ]; then
-                {
-                  python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["window_start"])' "$record"
-                  echo "routes disagree; the stale route is healed from the recorded last-agreeing capture (issues #176, #189)"
-                } > "$stamp"
-              fi
-              echo "AA's routes still disagree -- the hour healed the stale route from the recorded last-agreeing capture; the window stays open until the routes agree (issues #176, #189)." \
-                >> "$GITHUB_STEP_SUMMARY"
-              exit 0
-            fi
-            # Agreement restored after a skipped stretch: retire the stamp
-            # so its age can never trip an alarm. The window files leave
-            # this tree too -- so the rendered gate builds a clean page --
-            # and the removal is staged for the write job, which commits it
-            # against main. A push lost to the race concedes SILENTLY (see
-            # the publish job): the next successful capture retires the
-            # stamp again. The last-agreeing record leaves with them
-            # (issue #189): with the routes agreeing again there is no
-            # window to carry a baseline for.
-            if git ls-files --error-unmatch "$stamp" > /dev/null 2>&1 \
-               || git ls-files --error-unmatch data/aa-disagreement-snapshot.json > /dev/null 2>&1 \
-               || git ls-files --error-unmatch "$record" > /dev/null 2>&1; then
-              # The window closes: the stamp, the disputed snapshot and the
-              # last-agreeing record leave the tree together, so the next
-              # build renders normally.
-              git rm -q --ignore-unmatch "$stamp" data/aa-disagreement-snapshot.json "$record"
-              echo "retire=true" >> "$GITHUB_OUTPUT"
-              echo "AA's routes agree again — disagreement stamp, snapshot and last-agreeing record staged for removal; captures resume (issue #118)." \
-                >> "$GITHUB_STEP_SUMMARY"
-            fi
             exit 0
           fi
 
-          if [ "$rc" -eq 3 ]; then
-            # Issue #118: the refusal now carries a buildable disputed
-            # snapshot. The stamp records the window's start once (the
-            # banner names one window across hours) and refreshes the
-            # window's diagnostic after it; the snapshot is the hour's own
-            # capture. Nothing is committed HERE -- the rendered gate
-            # decides moved vs unchanged, and the write job commits only
-            # what the suite passed. From here a disputed hour proceeds
-            # exactly like a moved-capture hour.
-            echo "captured=true" >> "$GITHUB_OUTPUT"
-            if [ ! -f "$stamp" ]; then
-              {
-                echo "$now"
-                cat /tmp/fetch-err.txt
-              } > "$stamp"
-            else
-              start="$(head -n 1 "$stamp")"
-              case "$start" in
-                ''|*[!0-9]*)
-                  echo "AA route-disagreement stamp is corrupt (first line: '$start') -- the disputed banner could not name the window; re-read AA by hand (issue #118)." >&2
-                  cat /tmp/fetch-err.txt >&2
-                  exit 1 ;;
-              esac
-              {
-                head -n 1 "$stamp"
-                cat /tmp/fetch-err.txt
-              } > "$stamp.new" && mv "$stamp.new" "$stamp"
-            fi
-            if [ ! -f data/aa-disagreement-snapshot.json ]; then
-              echo "fetch_aa exited 3 without writing the disagreement snapshot -- go re-read AA by hand (issue #118)." >&2
-              cat /tmp/fetch-err.txt >&2
-              exit 1
-            fi
-            echo "AA's routes disagree -- building and publishing the disputed capture (issue #118). The page carries the disputed banner until the routes agree." \
-              >> "$GITHUB_STEP_SUMMARY"
-            # The disputed hour is a GREEN hour: the rendered gate below
-            # decides moved vs unchanged. Without this exit the branch would
-            # fall through to the red handler and exit 3 -- the exact
-            # hold-and-fail behavior this branch exists to replace.
-            exit 0
-          fi
-
-          # Every other exit code is the designed red -- schema change,
-          # index bump, fetch failure -- exactly as before issue #100.
           cat /tmp/fetch-err.txt >&2
           exit "$rc"
 
@@ -388,7 +255,7 @@ jobs:
             # bump it.
             git checkout -- data/
           fi
-          # The heal gate: a run whose publish failed or never ran left the
+          # The republish gate: a run whose publish failed or never ran left the
           # hub stale while every later capture stayed identical, and plain
           # "nothing moved" silence would never repair it. The `published`
           # branch records the last main commit whose page is live; a MISSING
@@ -439,21 +306,17 @@ jobs:
           # we rebuild and publish" — a forced run says yes to the second
           # alone, but ONLY when the capture actually ran (issue #103): a
           # refused capture is terminal against force, so a forced dispatch
-          # during a live disagreement window has nothing to rebuild -- the
-          # last published page already stands -- and the hour is not
-          # mislabelled as an ordinary forced no-op. A run that only heals
-          # the live page still proceeds, whether the `published` ref's page
-          # or the hub's live page is what is behind. `inputs.force` is the
-          # empty string on a schedule run, and `$CAPTURED` is empty only
-          # for run shapes older than the output, so both defaults keep the
-          # scheduled path unchanged. (The verdict reaches this shell as
-          # the env var $CAPTURED, not an inline template expression --
-          # zizmor's template-injection audit fails those in run text, and
-          # the env mapping is its sanctioned route.)
-          #
-          # A forced dispatch during a disputed hour is honored since
-          # #118: there is something to rebuild. The `CAPTURED != "false"`
-          # veto (#103) stays for any future refused classification.
+          # behind a refused capture has nothing to rebuild -- the last
+          # published page already stands -- and the hour is not mislabelled
+          # as an ordinary forced no-op. A run that only republishes the live
+          # page still proceeds, whether the `published` ref's page or the
+          # hub's live page is what is behind. `inputs.force` is the empty
+          # string on a schedule run, and `$CAPTURED` is empty only for run
+          # shapes older than the output, so both defaults keep the scheduled
+          # path unchanged. (The verdict reaches this shell as the env var
+          # $CAPTURED, not an inline template expression -- zizmor's
+          # template-injection audit fails those in run text, and the env
+          # mapping is its sanctioned route.)
           if [ "$changed" = true ] \
              || { [ "$CAPTURED" != "false" ] && [ "${{ inputs.force }}" = 'true' ]; } \
              || [ "$live_stale" = true ] || [ "$hub_stale" = true ]; then
@@ -484,8 +347,8 @@ jobs:
               >> "$GITHUB_STEP_SUMMARY"
           fi
 
-      # Both installs gate on `proceed`, not `changed`: a heal run has an
-      # unchanged capture but still rebuilds and runs the suite, so it needs
+      # Both installs gate on `proceed`, not `changed`: a republish run has
+      # an unchanged capture but still rebuilds and runs the suite, so it needs
       # the toolchain exactly when a moved-capture run does.
       - name: Install the test toolchain
         if: steps.capture.outputs.proceed == 'true'
@@ -567,22 +430,20 @@ jobs:
       - name: Stage the publish payload
         # The hour's write side, packed: the staging step is what turns a
         # verified tree into the artifact the publish job consumes. It runs
-        # on `proceed` -- a heal run packs too (the hub may be behind even
-        # when the capture is quiet) -- and its stamp-churn guard is the old
-        # commit step's, moved wholesale.
+        # on `proceed` -- a republish run packs too (the hub may be behind
+        # even when the capture is quiet) -- and its stamp-churn guard is the
+        # old commit step's, moved wholesale.
         if: steps.capture.outputs.proceed == 'true'
         env:
           CHANGED: ${{ steps.capture.outputs.changed }}
           FORCE: ${{ inputs.force }}
-          RETIRE: ${{ steps.fetch.outputs.retire }}
-          HEALED: ${{ steps.fetch.outputs.healed }}
         run: |
           PAYLOAD="${RUNNER_TEMP}/publish-payload"
           mkdir -p "${PAYLOAD}/tree"
           # Issue #94's stamp-churn guard, moved from the old commit step: on
-          # a heal run the rebuilt page is stamped with THIS run's sha -- the
-          # only thing that differs from HEAD's page -- so restore HEAD's page
-          # before it ships; a forced run may commit stamp churn, accepted
+          # a republish run the rebuilt page is stamped with THIS run's sha --
+          # the only thing that differs from HEAD's page -- so restore HEAD's
+          # page before it ships; a forced run may commit stamp churn, accepted
           # because force is manual and rare.
           if [ "$CHANGED" != "true" ] && [ "$FORCE" != "true" ]; then
             git show HEAD:out/frontier-models.html > out/frontier-models.html
@@ -594,26 +455,6 @@ jobs:
                    data/captured-at.txt out/frontier-models.html; do
             cp --parents "$p" "${PAYLOAD}/tree/"
           done
-          # The window files ride the data commit when the hour opens or
-          # continues a window (untracked-new or tracked-refreshed). When the
-          # hour RETIRES the window (rc 0 + tracked), they do not ship:
-          # shipping what the retirement commit removes would resurrect it.
-          if [ "$RETIRE" = "true" ]; then
-            printf '%s\n' data/aa-disagreement-snapshot.json data/aa-route-disagreement.txt data/aa-last-agreeing-capture.json \
-              > "${PAYLOAD}/remove.txt"
-          else
-            [ ! -f data/aa-disagreement-snapshot.json ] || cp --parents data/aa-disagreement-snapshot.json "${PAYLOAD}/tree/"
-            [ ! -f data/aa-route-disagreement.txt ] || cp --parents data/aa-route-disagreement.txt "${PAYLOAD}/tree/"
-            [ ! -f data/aa-last-agreeing-capture.json ] || cp --parents data/aa-last-agreeing-capture.json "${PAYLOAD}/tree/"
-          fi
-          # A healed hour dropped the disputed snapshot from the tree (the
-          # healed page renders clean), but the tracked copy on main must
-          # leave too: name it so the write job's DATA commit removes it --
-          # never a retirement commit, because the window is not over
-          # (issues #176, #189).
-          if [ "$HEALED" = "true" ] && git ls-files --error-unmatch data/aa-disagreement-snapshot.json > /dev/null 2>&1; then
-            printf '%s\n' data/aa-disagreement-snapshot.json >> "${PAYLOAD}/remove.txt"
-          fi
           # The differ's message travels when the hour ran it (CHANGED=true);
           # the write job's message selection reads it exactly as the old
           # commit step read the workspace copy.
@@ -634,8 +475,8 @@ jobs:
   # commit, push, publish.
   #
   # `publish` (the keyless committer) downloads the payload, replays the
-  # hour's commits — the window retirement first, then the data commit —
-  # against main in a scratch repo with git plumbing alone, and stages the
+  # hour's commit — the data commit, and only that one — against main in a
+  # scratch repo with git plumbing alone, and stages the
   # result for the push job as a git bundle. It runs no repository code: no
   # checkout, no pip, no browser, no script from the tree, and it pushes
   # nothing: the fetches are anonymous.
@@ -665,9 +506,7 @@ jobs:
   # the run green when main moved under the tested base, and a rejected
   # push distinguishes "main stood still" (a real error) from "main moved
   # before the push landed" (dropped green; the next hourly run re-fetches,
-  # re-tests and lands it). The retirement commit rides the same bundle as
-  # the data commit: they land together or the hour drops together, and the
-  # next successful capture retires the window again.
+  # re-tests and lands it).
   publish:
     name: Commit and stage the capture
     runs-on: ubuntu-latest
@@ -693,12 +532,12 @@ jobs:
 
     outputs:
       # Whether the commit step staged a bundle for the push job: false on a
-      # quiet or heal hour (nothing to push) and after a staging failure.
+      # quiet or republish hour (nothing to push) and after a staging failure.
       commits: ${{ steps.commit.outputs.commits }}
       # The publish verdict: publish=true whenever the run reached a
       # publishable state - a forced run with nothing committed is exactly
-      # the shape of a heal run, where the page to serve is HEAD's but the
-      # hub is behind it. The hub job's own tie check decides the rest.
+      # the shape of a republish run, where the page to serve is HEAD's but
+      # the hub is behind it. The hub job's own tie check decides the rest.
       publish: ${{ steps.commit.outputs.publish }}
 
     steps:
@@ -710,10 +549,6 @@ jobs:
 
       - name: Commit the capture
         id: commit
-        env:
-          # The healed hour's shape changes phase 1/2 below; the env form is
-          # the zizmor-sanctioned route for step-output interpolation.
-          HEALED: ${{ needs.refresh.outputs.healed }}
         run: |
           PAYLOAD="${RUNNER_TEMP}/publish-payload"
           # The push-data staging helper: base is main's tip the hour was
@@ -735,7 +570,7 @@ jobs:
           # Anonymous remote: the repo is public, and this job pushes nothing
           # -- the push job owns the deploy key, and this job stages the
           # verified commits for it as a bundle. A private repo degrades red
-          # here exactly as the heal gate's anonymous fetches do.
+          # here exactly as the republish gate's anonymous fetches do.
           remote="https://github.com/${GITHUB_REPOSITORY}"
           scratch="${RUNNER_TEMP}/scratch"
           # Scratch repo at main's tip: git plumbing only, nothing executed
@@ -748,70 +583,20 @@ jobs:
           git -C "${scratch}" config user.email \
             '41898282+github-actions[bot]@users.noreply.github.com'
           cd "${scratch}"
-          # Phase 1 -- the window retirement (issues #100/#118), AGREEMENT
-          # only: a healed hour names its stale-snapshot removal in
-          # remove.txt too, and that one rides the DATA commit instead --
-          # the window is not over (issues #176, #189). Applied only when
-          # it still bites: if a concurrent run already retired the window
-          # on a moved main, the staged removal is empty and the notice
-          # records it. The retirement commit joins the bundle: it lands
-          # with the data commit, in the push job.
-          if [ -f "${PAYLOAD}/remove.txt" ] && [ -s "${PAYLOAD}/remove.txt" ] \
-             && [ "$HEALED" != "true" ]; then
-            xargs git rm -q --ignore-unmatch < "${PAYLOAD}/remove.txt"
-            if ! git diff --cached --quiet; then
-              git commit -q -m 'Route agreement restored; resume captures (issue #100)'
-            else
-              echo "::notice::The window files are already gone from main; nothing to retire." \
-                >> "$GITHUB_STEP_SUMMARY"
-            fi
-          fi
-          # Phase 2 -- the hour's data commit, staged over main's tip in the
-          # scratch. The staging step restored HEAD's page on a heal hour, so
-          # the tree copy stages only what differs from main; the fixed add
-          # list is the old commit step's, widened to the payload's own
-          # staging shape.
+          # The hour's data commit, staged over main's tip in the scratch. The
+          # staging step restored HEAD's page on a republish hour, so the tree
+          # copy stages only what differs from main; the fixed add list is the
+          # old commit step's, widened to the payload's own staging shape.
           #
           # The message is diff_aa.py's own rendering, subject line included —
           # not truncated here. A long one means a lot genuinely moved, and
           # that is the day you want the detail. A run with an unchanged
-          # capture never ran the differ, so it writes its own subject.
-          # A commit that adds the disagreement snapshot is a DISPUTED
-          # publish (issue #118): its message names that and carries the
-          # capture's own divergence diagnostic from the stamp, never the
-          # differ's "nothing moved" rendering (the differ compares the
-          # last-good captures, which a window does not touch).
+          # capture never ran the differ, so it writes its own subject. The
+          # only other subject is the forced rebuild.
           cp -a "${PAYLOAD}/tree/." ./
           git add data/aa-raw-models.json data/aa-raw-coding-agents.json \
                   data/captured-at.txt out/frontier-models.html
-          [ ! -f data/aa-disagreement-snapshot.json ] || git add data/aa-disagreement-snapshot.json
-          [ ! -f data/aa-route-disagreement.txt ] || git add data/aa-route-disagreement.txt
-          [ ! -f data/aa-last-agreeing-capture.json ] || git add data/aa-last-agreeing-capture.json
-          # A healed hour's stale-snapshot removal rides the DATA commit
-          # (issues #176, #189): the healed page renders clean, so the
-          # tracked disputed snapshot must leave with it.
-          if [ "$HEALED" = "true" ] && [ -f "${PAYLOAD}/remove.txt" ] && [ -s "${PAYLOAD}/remove.txt" ]; then
-            xargs git rm -q --ignore-unmatch < "${PAYLOAD}/remove.txt"
-          fi
-          # The healed hour's message stands FIRST (review on PR #192):
-          # its snapshot REMOVAL stages the same name a disputed publish
-          # adds, so the disputed predicate below must never see a healed
-          # hour. That predicate stays NAME-ONLY: an hour-2+ disputed hour
-          # stages the snapshot as a tracked MODIFICATION, not an addition,
-          # and its designed disputed message must fire all the same.
-          if [ "$HEALED" = "true" ]; then
-            printf '%s\n\n%s\n' \
-              'Heal the stale route: publish the fresh generation (issues #176, #189)' \
-              'One route was provably still serving the last agreeing capture; its disagreeing values are dropped and the fresh route publishes undisputed through the normal capture path. The window stays open until the routes agree.' \
-              > "${RUNNER_TEMP}/commit-msg.txt"
-            [ ! -f "${PAYLOAD}/commit-msg.txt" ] || cat "${PAYLOAD}/commit-msg.txt" >> "${RUNNER_TEMP}/commit-msg.txt"
-          elif git diff --cached --name-only | grep -q '^data/aa-disagreement-snapshot\.json$'; then
-            printf '%s\n\n%s\n' \
-              'Publish disputed capture: AA routes disagree (issue #118)' \
-              'Both routes'"'"' raw payloads and the disagreement map are committed as data/aa-disagreement-snapshot.json; the page renders the disputed layer until the routes agree again.' \
-              > "${RUNNER_TEMP}/commit-msg.txt"
-            sed -n '2,$p' data/aa-route-disagreement.txt >> "${RUNNER_TEMP}/commit-msg.txt"
-          elif [ -f "${PAYLOAD}/commit-msg.txt" ]; then
+          if [ -f "${PAYLOAD}/commit-msg.txt" ]; then
             cat "${PAYLOAD}/commit-msg.txt" > "${RUNNER_TEMP}/commit-msg.txt"
             printf '\n%s\n' 'Captured by .github/workflows/refresh.yml.' \
               >> "${RUNNER_TEMP}/commit-msg.txt"
@@ -826,8 +611,8 @@ jobs:
           # a forced run can produce a page identical to HEAD's; committing
           # nothing is the correct outcome, and `git commit` would fail on
           # it. The publish still happens (publish=true): this is exactly
-          # the shape of a heal run, where the page to serve is HEAD's but
-          # the hub is behind it.
+          # the shape of a republish run, where the page to serve is HEAD's
+          # but the hub is behind it.
           if git diff --cached --quiet; then
             echo "Staged tree matches main's tip — nothing committed." \
               >> "$GITHUB_STEP_SUMMARY"
@@ -865,7 +650,7 @@ jobs:
     needs: publish
 
     # The push runs only when the committer staged a bundle: a quiet or
-    # heal hour has nothing to land.
+    # republish hour has nothing to land.
     if: needs.publish.outputs.commits == 'true'
 
     # The ONLY environment declaration in this workflow: the main-push
@@ -938,9 +723,9 @@ jobs:
           if ! git -C "${RUNNER_TEMP}/push-repo" push origin \
             "$(cat "${RUNNER_TEMP}/push-data/tip.txt"):refs/heads/main"; then
             git -C "${RUNNER_TEMP}/push-repo" fetch --quiet origin main
-            # base.txt, not tip^: the bundle may carry two commits (the
-            # window retirement rides with the data commit), so tip^ names
-            # the retirement, not the tested base.
+            # base.txt, not tip^: tip^ would only be the tested base while
+            # the bundle carries exactly the one hour's commit, and the
+            # recorded base is what this comparison asserts.
             if [ "$(cat "${RUNNER_TEMP}/push-data/base.txt")" = \
                  "$(git -C "${RUNNER_TEMP}/push-repo" rev-parse FETCH_HEAD)" ]; then
               echo "the push was rejected while main stood still" >&2
@@ -964,7 +749,7 @@ jobs:
     needs: [publish, push]
 
     # The hub job runs whenever the run reached a publishable state - a
-    # quiet or heal hour too, where the push job skipped (nothing to
+    # quiet or republish hour too, where the push job skipped (nothing to
     # commit). A FAILED push (the stood-still error) holds it back: the
     # run is red, and the hub publishes nothing it did not verify.
     if: >-
@@ -1011,7 +796,7 @@ jobs:
           # publish job recorded as `tip` -- the bundle tip when the hour
           # committed, its own base when not. The upload and the ref move
           # run only when that commit IS main's tip now: a landing whose
-          # tip still stands, or a quiet or heal hour nobody has
+          # tip still stands, or a quiet or republish hour nobody has
           # superseded. When main has moved past `tip`, a newer run owns
           # the tip, and its own hub job publishes its page -- this run
           # uploads nothing, moves nothing, exits 0. This is what makes
@@ -1031,7 +816,7 @@ jobs:
           # target, ask the compare API, whose status names the TIP side
           # relative to the BASE side. `ahead` - a newer run already
           # published past this target - aborts green before the upload:
-          # no upload, no ref move, exit 0. `behind` is the normal heal
+          # no upload, no ref move, exit 0. `behind` is the normal republish
           # and publishes; a failed or unrankable answer retries once,
           # then publishes anyway behind a warning, because availability
           # of publish beats the residual seconds-wide window.
@@ -1056,7 +841,7 @@ jobs:
                 echo "WARNING: the compare API could not rank refs/heads/published against this target; publishing anyway." \
                   >> "$GITHUB_STEP_SUMMARY"
               fi
-              # `behind` (or `identical`) is the normal heal: fall through.
+              # `behind` (or `identical`) is the normal republish: fall through.
             fi
           fi
           # THE UPLOAD. The write job runs no repository code, so this is
@@ -1101,7 +886,7 @@ jobs:
             exit 1
           fi
           cat /tmp/publish-response.json
-          # THE REF MOVE. The ref is what the heal gate compares against, so
+          # THE REF MOVE. The ref is what the republish gate compares against, so
           # it must never claim a page the hub does not serve - and the
           # target here is main's tip fresh-fetched after the push job's
           # turn, which is structurally on main's history: the state issue
