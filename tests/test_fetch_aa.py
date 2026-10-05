@@ -17,8 +17,8 @@ import urllib.request
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent / "scripts"))
 
-import build  # noqa: E402  # pylint: disable=wrong-import-position
 import fetch_aa  # noqa: E402  # pylint: disable=wrong-import-position
+import build  # noqa: E402  # pylint: disable=wrong-import-position
 
 
 def flight_html(*payloads: str) -> str:

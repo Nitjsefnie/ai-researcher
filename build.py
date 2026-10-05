@@ -515,6 +515,19 @@ COST_KEY = "intelligenceIndexCostPerTask"
 _NUMBER = (int, float)
 
 
+def _breakdown_parts(evaluations) -> list | None:
+    """A breakdown's per-evaluation costs, or None when it is not one to check."""
+    parts: list[float] = []
+    for entry in evaluations:
+        if not isinstance(entry, dict):
+            return None
+        part = entry.get("weightedCostPerTask")
+        if not isinstance(part, (int, float)) or isinstance(part, bool):
+            return None
+        parts.append(part)
+    return parts or None
+
+
 def breakdown_matches_total(value) -> bool:
     """Whether `value`'s per-evaluation breakdown decomposes its own total.
 
@@ -530,12 +543,10 @@ def breakdown_matches_total(value) -> bool:
         return True
     cost = value.get("cost")
     total = cost.get("total") if isinstance(cost, dict) else None
-    if not isinstance(total, _NUMBER) or isinstance(total, bool):
+    if not isinstance(total, (int, float)) or isinstance(total, bool):
         return True
-    parts = [e.get("weightedCostPerTask") for e in evaluations
-             if isinstance(e, dict)]
-    if not parts or not all(isinstance(p, _NUMBER) and not isinstance(p, bool)
-                            for p in parts):
+    parts = _breakdown_parts(evaluations)
+    if parts is None:
         return True
     return abs(sum(parts) - total) <= SUM_TOLERANCE * max(1.0, abs(total))
 
