@@ -949,8 +949,10 @@ class MergeCapturesTests(unittest.TestCase):
         self.assertEqual(merged["intelligenceIndexCostPerTask"], 0.75)
         self.assertIsNone(
             build.capability_cost_per_task(merged, "agentic"))
-        # The intelligence axis, which reads the scalar, is untouched.
-        self.assertAlmostEqual(
+        # The intelligence axis, which reads the scalar, is untouched: the
+        # LEADERBOARD's number, carried through untouched rather than
+        # recomputed, so equality is the exact claim here.
+        self.assertEqual(
             build.capability_cost_per_task(merged, "intelligence"), 0.75)
 
     def test_a_detail_value_never_overrides_a_leaderboard_value(self):
