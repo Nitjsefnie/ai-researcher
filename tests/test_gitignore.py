@@ -60,9 +60,15 @@ def added_paths():
         "expected exactly one 'Commit the capture' step in the publish "
         f"job, found {len(steps)}")
     # Join backslash continuations first, so an add split across lines
-    # is read whole.
+    # is read whole. Comment lines are dropped BEFORE the join, not after:
+    # prose in the step mentions the adds it makes -- `git add <path>` in
+    # a rationale for issue #202 -- and a comment is not an add, so a
+    # path named only in one must not join the pin and be measured
+    # against .gitignore's rules for a file the refresh never stages.
     joined = []
     for line in steps[0]["run"].splitlines():
+        if line.lstrip().startswith("#"):
+            continue
         if joined and joined[-1].rstrip().endswith("\\"):
             joined[-1] = joined[-1].rstrip().rstrip("\\") + " " + line.strip()
         else:

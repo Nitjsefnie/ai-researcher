@@ -670,7 +670,67 @@ class CaptureStepTests(unittest.TestCase):
         self.assertIn("never exits 3", self.header)
 
 
-class ExecutedCommitMessageTests(unittest.TestCase):
+class _SeededOrigin:
+    """A local git origin the commit step really fetches, plus the runner
+    environment it really runs under.
+
+    Every executed test of the publish job's commit step needs the same
+    three things: an `origin` the step's `https://github.com/...` remote
+    resolves to (via `insteadOf`, never a real network), the SHA the run was
+    dispatched at (`GITHUB_SHA`, the workflow generation its payload belongs
+    to), and a writable HOME/RUNNER_TEMP. One seed helper serves them all, so
+    a scenario differs only in the files it lands.
+    """
+
+    def _git(self, *args, cwd=None, env=None):
+        return subprocess.run(
+            ["git", *args], cwd=cwd, env=env, check=True,
+            capture_output=True, text=True)
+
+    def _seed_origin(self, root: pathlib.Path, files: dict):
+        """Seed a local origin; return (config, base sha, origin, seed, env)."""
+        origin = root / "origin.git"
+        seed = root / "seed"
+        self._git("init", "-q", "--bare", str(origin))
+        self._git("init", "-q", str(seed))
+        config = root / "gitconfig"
+        # as_uri(): file:///C:/Users/... on Windows, file:///tmp/... on
+        # POSIX -- a raw str(Path) renders backslashes the file:// transport
+        # eats (the windows-latest matrix cell caught exactly that).
+        config.write_text(
+            f'[url "{origin.as_uri()}"]\n'
+            "    insteadOf = https://github.com/Nitjsefnie/ai-researcher\n",
+            encoding="utf-8")
+        env = {
+            "GIT_CONFIG_GLOBAL": str(config),
+            "GIT_AUTHOR_NAME": "seed", "GIT_AUTHOR_EMAIL": "seed@example",
+            "GIT_COMMITTER_NAME": "seed", "GIT_COMMITTER_EMAIL": "seed@example",
+        }
+        for rel, text in files.items():
+            path = seed / rel
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(text, encoding="utf-8")
+        self._git("add", "-A", cwd=str(seed), env=env)
+        self._git("commit", "-q", "-m", "seed", cwd=str(seed), env=env)
+        self._git("push", "-q", str(origin), "HEAD:main",
+                  cwd=str(seed), env=env)
+        base = self._git("rev-parse", "HEAD", cwd=str(seed)).stdout.strip()
+        return str(config), base, origin, seed, env
+
+    def _env(self, tmp: pathlib.Path, config: str, sha: str) -> dict:
+        return {
+            "PATH": os.environ["PATH"],
+            "HOME": str(tmp),
+            "RUNNER_TEMP": str(tmp),
+            "GITHUB_REPOSITORY": "Nitjsefnie/ai-researcher",
+            "GITHUB_OUTPUT": str(tmp / "output.txt"),
+            "GITHUB_STEP_SUMMARY": str(tmp / "summary.txt"),
+            "GIT_CONFIG_GLOBAL": config,
+            "GITHUB_SHA": sha,
+        }
+
+
+class ExecutedCommitMessageTests(_SeededOrigin, unittest.TestCase):
     """The commit step's message selection, EXECUTED, not pinned as text.
 
     The review corpus's ci/run-workflow-step-scripts-dont-read-them, fourth
@@ -702,43 +762,7 @@ class ExecutedCommitMessageTests(unittest.TestCase):
         cls.step = _workflowrun.step_by_name(
             WORKFLOW, "publish", "Commit the capture")
 
-    def _git(self, *args, cwd=None, env=None):
-        return subprocess.run(
-            ["git", *args], cwd=cwd, env=env, check=True,
-            capture_output=True, text=True)
-
-    def _seed_origin(self, root: pathlib.Path, files: dict) -> str:
-        origin = root / "origin.git"
-        seed = root / "seed"
-        self._git("init", "-q", "--bare", str(origin))
-        self._git("init", "-q", str(seed))
-        config = str(root / "gitconfig")
-        config_path = pathlib.Path(config)
-        # as_uri(): file:///C:/Users/... on Windows, file:///tmp/... on
-        # POSIX -- a raw str(Path) renders backslashes the file:// transport
-        # eats (the windows-latest matrix cell caught exactly that).
-        config_path.write_text(
-            f'[url "{origin.as_uri()}"]\n'
-            "    insteadOf = https://github.com/Nitjsefnie/ai-researcher\n",
-            encoding="utf-8")
-        env = {
-            "GIT_CONFIG_GLOBAL": config,
-            "GIT_AUTHOR_NAME": "seed", "GIT_AUTHOR_EMAIL": "seed@example",
-            "GIT_COMMITTER_NAME": "seed", "GIT_COMMITTER_EMAIL": "seed@example",
-        }
-        for rel, text in files.items():
-            path = seed / rel
-            path.parent.mkdir(parents=True, exist_ok=True)
-            path.write_text(text, encoding="utf-8")
-        self._git("add", "-A", cwd=str(seed), env=env)
-        self._git("commit", "-q", "-m", "seed", cwd=str(seed), env=env)
-        self._git("push", "-q", str(origin), "HEAD:main",
-                  cwd=str(seed), env=env)
-        return config
-
-    def _run_hour(self, tmp: pathlib.Path, differ_msg):
-        """Stage one hour's payload and run the real commit step."""
-        config = self._seed_origin(tmp, self.BASE_FILES)
+    def _stage_payload(self, tmp: pathlib.Path, differ_msg):
         payload = tmp / "publish-payload"
         (payload / "tree").mkdir(parents=True)
         for rel, text in self.MOVED_FILES.items():
@@ -748,15 +772,14 @@ class ExecutedCommitMessageTests(unittest.TestCase):
         if differ_msg:
             (payload / "commit-msg.txt").write_text(differ_msg,
                                                     encoding="utf-8")
-        env = {
-            "PATH": os.environ["PATH"],
-            "HOME": str(tmp),
-            "RUNNER_TEMP": str(tmp),
-            "GITHUB_REPOSITORY": "Nitjsefnie/ai-researcher",
-            "GITHUB_OUTPUT": str(tmp / "output.txt"),
-            "GITHUB_STEP_SUMMARY": str(tmp / "summary.txt"),
-            "GIT_CONFIG_GLOBAL": config,
-        }
+
+    def _run_hour(self, tmp: pathlib.Path, differ_msg):
+        """Stage one hour's payload and run the real commit step."""
+        config, base, _, _, _ = self._seed_origin(tmp, self.BASE_FILES)
+        self._stage_payload(tmp, differ_msg)
+        # The run's own workflow generation is the commit it was dispatched
+        # at: the payload and the tree it lands on are one generation.
+        env = self._env(tmp, config, base)
         proc = _workflowrun.run_step(tmp, self.step, env)
         self.assertEqual(proc.returncode, 0,
                          f"step failed: {proc.stderr}")
@@ -796,6 +819,125 @@ class ExecutedCommitMessageTests(unittest.TestCase):
         self.assertNotIn("Refresh capture", message)
         self.assertIn("M\tout/frontier-models.html", names)
         self.assertEqual(log.count("\n"), 2, log)
+
+
+class ExecutedGenerationTieTests(_SeededOrigin, unittest.TestCase):
+    """The generation tie (issue #202), EXECUTED against a moved main.
+
+    Run 37291766447 replayed a6d74a6's payload -- produced by a generation
+    of this workflow whose payload still carried the disagreement snapshot --
+    onto a main whose .gitignore no longer named it back, and died at
+    `git add`. The tie is proved here the same way the failure was: the
+    seed names `data/aa-disagreement-snapshot.json` back and the payload
+    carries one, exactly as the older generation's did; then main moves a
+    commit that drops the rule. With the tie in place the step concedes the
+    hour green -- the deliberate outcome -- instead of staging a payload of
+    another generation's shape.
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        cls.step = _workflowrun.step_by_name(
+            WORKFLOW, "publish", "Commit the capture")
+        cls.base_files = {
+            "data/aa-raw-models.json": '{"models": []}\n',
+            "data/aa-raw-coding-agents.json": "[]\n",
+            "data/captured-at.txt": "2026-10-04\n",
+            "out/frontier-models.html": "<p>base</p>\n",
+            # The older generation named the snapshot back; #200 removed
+            # the rule, and the payload of that older generation still has
+            # the file to stage.
+            ".gitignore": (
+                "*\n!/data/\n/data/*\n!/data/aa-raw-models.json\n"
+                "!/data/aa-raw-coding-agents.json\n!/data/captured-at.txt\n"
+                "!/data/aa-disagreement-snapshot.json\n"
+                "!/out/\n/out/*\n!/out/frontier-models.html\n"),
+            "data/aa-disagreement-snapshot.json": '{"older": true}\n',
+        }
+
+    @staticmethod
+    def _has_commit(scratch: pathlib.Path) -> bool:
+        """Whether the scratch repo holds any commit at all.
+
+        `git init` runs before the fetch, so the scratch exists even on the
+        conceding path; what must be absent is a checkout of main's tree and
+        the commit on top of it.
+        """
+        probe = subprocess.run(
+            ["git", "rev-parse", "--verify", "HEAD"], cwd=str(scratch),
+            check=False, capture_output=True, text=True)
+        return probe.returncode == 0
+
+    def _payload(self, tmp: pathlib.Path):
+        payload = tmp / "publish-payload" / "tree"
+        files = {
+            "data/aa-raw-models.json": '{"models": [1]}\n',
+            "data/aa-raw-coding-agents.json": "[1]\n",
+            "data/captured-at.txt": "2026-10-04T11\n",
+            "out/frontier-models.html": "<p>moved</p>\n",
+            "data/aa-disagreement-snapshot.json": '{"older": true}\n',
+        }
+        for rel, text in files.items():
+            path = payload / rel
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(text, encoding="utf-8")
+        (tmp / "publish-payload" / "commit-msg.txt").write_text(
+            "Refresh capture: 690 models\n\nspeed rows\n", encoding="utf-8")
+
+    def _land_newer_generation(self, seed, origin, env):
+        """Land the #200 tree: the snapshot's .gitignore rule is gone."""
+        (seed / ".gitignore").write_text(
+            "*\n!/data/\n/data/*\n!/data/aa-raw-models.json\n"
+            "!/data/aa-raw-coding-agents.json\n!/data/captured-at.txt\n"
+            "!/out/\n/out/*\n!/out/frontier-models.html\n", encoding="utf-8")
+        self._git("rm", "-q", "data/aa-disagreement-snapshot.json",
+                  cwd=str(seed), env=env)
+        self._git("commit", "-q", "-m", "retire the window files (#200)",
+                  cwd=str(seed), env=env)
+        self._git("push", "-q", str(origin), "HEAD:main", cwd=str(seed),
+                  env=env)
+        return self._git("rev-parse", "HEAD", cwd=str(seed)).stdout.strip()
+
+    def test_a_payload_older_than_main_concedes_the_hour_instead_of_staging_it(self):
+        with tempfile.TemporaryDirectory(prefix=".generation-tie-") as raw:
+            tmp = pathlib.Path(raw)
+            config, base, origin, seed, git_env = self._seed_origin(
+                tmp, self.base_files)
+            self._payload(tmp)
+            newer = self._land_newer_generation(seed, origin, git_env)
+            self.assertNotEqual(base, newer)
+            proc = _workflowrun.run_step(
+                tmp, self.step, self._env(tmp, config, base))
+            # Green, and nothing committed: the deliberate outcome.
+            self.assertEqual(proc.returncode, 0, proc.stderr)
+            outputs = (tmp / "output.txt").read_text(encoding="utf-8")
+            self.assertIn("publish=false", outputs)
+            self.assertIn("commits=false", outputs)
+            # The scratch repo exists (it is inited before the fetch) but
+            # never held a commit: main's newer tree was never checked out
+            # and no payload byte was ever copied over it.
+            self.assertFalse(self._has_commit(tmp / "scratch"))
+            summary = (tmp / "summary.txt").read_text(encoding="utf-8")
+            self.assertIn("Dropped: the payload's workflow generation",
+                          summary)
+            self.assertIn(base, summary)
+            self.assertIn(newer, summary)
+
+    def test_an_unset_sha_still_concedes(self):
+        # The tie fails toward the dropped hour: an unset GITHUB_SHA cannot
+        # equal a SHA, so the step concedes rather than committing a
+        # payload whose generation it cannot name.
+        with tempfile.TemporaryDirectory(prefix=".generation-tie-") as raw:
+            tmp = pathlib.Path(raw)
+            config, _, _, _, _ = self._seed_origin(tmp, self.base_files)
+            self._payload(tmp)
+            env = self._env(tmp, config, "")
+            del env["GITHUB_SHA"]
+            proc = _workflowrun.run_step(tmp, self.step, env)
+            self.assertEqual(proc.returncode, 0, proc.stderr)
+            self.assertIn("publish=false",
+                          (tmp / "output.txt").read_text(encoding="utf-8"))
+            self.assertFalse(self._has_commit(tmp / "scratch"))
 
 
 class DeployKeyPushTests(unittest.TestCase):
