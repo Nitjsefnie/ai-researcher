@@ -128,6 +128,13 @@ DERIVED_EXACT = {
 # variant list, once per model, in field changes.
 DISPUTES_KEY = "genVariants"
 DISPUTES_CLASS = "disputes"
+# The cross-run presence layer's record key (issue #211): a record merged
+# from the previous committed capture carries it, and its transitions
+# coincide with the genVariants transitions the Disputes section already
+# counts, so it files under the same class -- the "significant" fall-through
+# would print "crossRunMerged: none -> true" once per merged model instead
+# of sectioning.
+CROSS_RUN_KEY = "crossRunMerged"
 
 
 def is_derived(path):
@@ -244,7 +251,7 @@ def flatten(value, prefix=""):
 
 
 def classify(path):
-    if path == DISPUTES_KEY:
+    if path in (DISPUTES_KEY, CROSS_RUN_KEY):
         return DISPUTES_CLASS
     leaf = path.rsplit(".", 1)[-1]
     if leaf in COSMETIC:
