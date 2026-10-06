@@ -1,10 +1,10 @@
 """The ci-gate bot-data class: classifier and fold pins.
 
-The bot-data classification (the refresh bot's exact push signature ->
-the cheap class) and the aggregate fold's data-only branch are the
-narrowing additions to the ci-gate classifier and aggregate fold, so
-their pins live in their own module rather than growing
-test_ci_gate_modules.py past the test size ceiling. Loader shape
+The bot-data classification (any non-empty subset of the refresh bot's
+push signature -> the cheap class) and the aggregate fold's data-only
+branch are the narrowing additions to the ci-gate classifier and
+aggregate fold, so their pins live in their own module rather than
+growing test_ci_gate_modules.py past the test size ceiling. Loader shape
 matches that file: scripts/ci is not a package and deliberately has no
 __init__.py — it holds standalone CI entry points, so both modules load
 by path here too.
@@ -49,10 +49,11 @@ CODE = [
 
 def test_bot_signature_is_exactly_the_refresh_bots_four_files():
     # The hourly refresh's fixed `git add` list in refresh.yml stages
-    # exactly the two captures, their capture stamp and the built page
-    # as ONE commit, and the refresh job runs the full suite against the
-    # fresh capture BEFORE pushing, so only this exact set carries that
-    # pre-test and gets the cheap class.
+    # the two captures, their capture stamp and the built page as ONE
+    # commit, though an hour's diff stages only the subset whose bytes
+    # moved. The refresh job runs the full suite against the fresh
+    # capture BEFORE pushing, so the signature's paths are exactly the
+    # ones that pre-test covers.
     assert classify.BOT_SIGNATURE == frozenset({
         "data/aa-raw-models.json",
         "data/aa-raw-coding-agents.json",
@@ -82,7 +83,7 @@ def test_bot_signature_names_every_file_the_refresh_workflow_adds():
     assert staged == set(classify.BOT_SIGNATURE)
 
 
-def test_data_only_requires_the_exact_signature():
+def test_data_only_accepts_the_signature_and_its_subsets():
     assert not classify.data_only([])
     assert classify.data_only([
         "data/aa-raw-models.json", "data/aa-raw-coding-agents.json",
@@ -92,6 +93,13 @@ def test_data_only_requires_the_exact_signature():
         "out/frontier-models.html", "data/captured-at.txt",
         "data/aa-raw-models.json", "data/aa-raw-coding-agents.json",
         "data/aa-raw-models.json"])
+    # An hour's commit carries only the subset of the four whose bytes
+    # moved (git omits byte-identical files from the diff) — the real
+    # refresh push that ran the full matrix by mistake (issue #212,
+    # run 37490807791) touched exactly these two.
+    assert classify.data_only([
+        "data/aa-raw-models.json", "out/frontier-models.html"])
+    assert classify.data_only(["data/captured-at.txt"])
 
 
 def test_data_only_refuses_a_fifth_path():
@@ -102,13 +110,15 @@ def test_data_only_refuses_a_fifth_path():
             intruder]), intruder
 
 
-def test_data_only_refuses_any_proper_subset():
-    # Any three of the four files is not the bot: the class is the SET
-    # of changed paths, never individual files.
+def test_data_only_accepts_any_proper_subset():
+    # Any non-empty subset of the four is a shape the bot's push takes:
+    # an hour's commit carries only the files whose bytes moved, so a
+    # dropped file is an hour with one byte-identical artifact, not a
+    # hand-staged change to run the full matrix over.
     full = ["data/aa-raw-models.json", "data/aa-raw-coding-agents.json",
             "data/captured-at.txt", "out/frontier-models.html"]
     for dropped in full:
-        assert not classify.data_only(
+        assert classify.data_only(
             [path for path in full if path != dropped]), dropped
 
 
