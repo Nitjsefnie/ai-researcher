@@ -83,7 +83,9 @@ def test_bot_signature_names_every_file_the_refresh_workflow_adds():
     assert staged == set(classify.BOT_SIGNATURE)
 
 
-def test_data_only_accepts_the_signature_and_its_subsets():
+def test_data_only_accepts_the_signature_and_only_its_subsets():
+    # The empty set opens the refusals the name's "only" covers: nothing
+    # changed is not a bot push, and not data-only either.
     assert not classify.data_only([])
     assert classify.data_only([
         "data/aa-raw-models.json", "data/aa-raw-coding-agents.json",
