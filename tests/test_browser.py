@@ -2055,3 +2055,295 @@ class ZeroScoreBrowserTests(unittest.TestCase):
             self.assertEqual(cells[5], "—")
         finally:
             page.close()
+
+
+def _disputed_probe_model():
+    """_probe_models(1)[0] widened into a disputed record: the plain fields
+    stay the canonical-first variant's published values, and `genVariants`
+    carries each generation's own flat map, canonical order. Variant 2 drops
+    `pin` -- a missing marker folds to a fill, never a dispute -- and carries
+    no speed field, so the page's never-red rule holds visibly."""
+    probe = _probe_models(1)[0]  # ii 80.0, cost 0.5, gdpval 0.4
+    probe.update({
+        "contextWindowTokens": 200000,
+        "price1mInputTokens": 0.5,
+        "price1mOutputTokens": 1.0,
+    })
+    probe["genVariants"] = [
+        {"ii": 80.0, "cost": 0.5, "gdpval": 0.4, "gdpvalCost": 0.5,
+         "pin": 0.5, "pout": 1.0, "ctx": 200000},
+        {"ii": 78.0, "cost": 0.9, "gdpval": 0.38, "gdpvalCost": 1.1,
+         "pout": 1.4, "ctx": 100000},
+    ]
+    return probe
+
+
+class DisputeBrowserTests(unittest.TestCase):
+    """Issue #208 in a browser on a synthetic two-generation capture. The
+    class exists as its own fixture-built page for the same reason
+    ZeroScoreBrowserTests does: the dispute JS paths never execute on a
+    single-generation page, so without coverage wiring the JavaScript
+    ratchet reads them as uncovered and reds the coverage job."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls._saved = (build.RAW, build.AGENTS_RAW, build.OUT)
+        cls._dir = tempfile.TemporaryDirectory(  # pylint: disable=consider-using-with
+            prefix=".issue-208-browser-", dir=build.ROOT)
+        data = pathlib.Path(cls._dir.name) / "data"
+        data.mkdir()
+        models = _probe_models(6)
+        models[0] = _disputed_probe_model()
+        (data / "aa-raw-models.json").write_text(json.dumps(models),
+                                                 encoding="utf-8")
+        (data / "aa-raw-coding-agents.json").write_text(
+            json.dumps(_PROBE_AGENTS), encoding="utf-8")
+        (data / "captured-at.txt").write_text("2026-10-06\n", encoding="utf-8")
+        build.RAW = data / "aa-raw-models.json"
+        build.AGENTS_RAW = data / "aa-raw-coding-agents.json"
+        build.OUT = pathlib.Path(cls._dir.name) / "frontier-models.html"
+        try:
+            with contextlib.redirect_stdout(io.StringIO()):
+                build.main()
+            cls.playwright = sync_playwright().start()
+            cls.browser = cls.playwright.chromium.launch(
+                executable_path=CHROMIUM_EXECUTABLE,
+                headless=True,
+                args=["--no-sandbox"])
+        except BaseException:
+            build.RAW, build.AGENTS_RAW, build.OUT = cls._saved
+            cls._dir.cleanup()
+            raise
+        # The same V8 block-coverage wiring BrowserInteractionTests uses.
+        cls._coverage_entries = []
+        cls._open_pages = []
+        original_new_page = cls.browser.new_page
+
+        def new_page(**kwargs):
+            page = original_new_page(**kwargs)
+            if kwargs.get("java_script_enabled") is False:
+                return page
+            session = page.context.new_cdp_session(page)
+            session.send("Debugger.enable")
+            session.send("Profiler.enable")
+            session.send("Profiler.startPreciseCoverage",
+                         {"callCount": True, "detailed": True})
+            original_close = page.close
+
+            def close(**close_kwargs):
+                if (page, session) in cls._open_pages:
+                    cls._open_pages.remove((page, session))
+                cls._coverage_entries.extend(collect_page_coverage(session))
+                return original_close(**close_kwargs)
+
+            page.close = close
+            cls._open_pages.append((page, session))
+            return page
+
+        cls.browser.new_page = new_page
+
+    @classmethod
+    def tearDownClass(cls):
+        build.RAW, build.AGENTS_RAW, build.OUT = cls._saved
+        for _page, session in list(cls._open_pages):
+            try:
+                cls._coverage_entries.extend(collect_page_coverage(session))
+            except Exception:  # pylint: disable=broad-exception-caught
+                pass
+        cls._open_pages.clear()
+        dump = os.environ.get("JS_COVERAGE_OUT")
+        if dump:
+            path = pathlib.Path(dump)
+            entries = cls._coverage_entries
+            if path.exists():
+                try:
+                    entries = json.loads(
+                        path.read_text(encoding="utf-8")) + entries
+                except (OSError, json.JSONDecodeError):
+                    pass
+            path.write_text(json.dumps(entries), encoding="utf-8")
+        cls.browser.close()
+        cls.playwright.stop()
+        cls._dir.cleanup()
+
+    def _loaded_page(self):
+        page = self.browser.new_page(viewport={"width": 1280, "height": 900})
+        page.goto(build.OUT.as_uri())
+        # render()'s most visible act is the filter count line, which the
+        # static HTML ships as an em dash -- a non-em-dash counter proves
+        # the initial render has settled before any assertion reads a
+        # JS-built surface.
+        page.wait_for_function(
+            "document.getElementById('count').textContent !== '—'")
+        return page
+
+    # Both tables' tbody DOM, cell-for-cell: className and textContent per
+    # td, row order preserved -- the same expression the #97 drift test
+    # reads, so both drift contracts stay one comparison.
+    _TBODY_DOM = """(tid) => [...document.querySelectorAll(`#${tid} tbody tr`)]
+      .map(tr => [...tr.children].map(td => [td.className, td.textContent]))"""
+
+    def test_disputed_points_and_connector_render_per_chart(self):
+        for key in ("intelligence", "agentic"):
+            with self.subTest(chart=key):
+                page = self._loaded_page()
+                points = page.locator(f"#svg-{key} circle.dispute")
+                self.assertEqual(points.count(), 2,
+                                 "the disputed row renders one mark per "
+                                 "generation: the canonical anchor and the "
+                                 "second generation's red point")
+                links = page.locator(f"#svg-{key} .dispute-link")
+                self.assertEqual(links.count(), 1)
+                # The connector joins the two variant points exactly: its
+                # endpoints are the canonical anchor's center and the second
+                # variant point's center, in canonical order.
+                canonical = points.nth(0)
+                extra = points.nth(1)
+                d = links.first.get_attribute("d")
+                expected = (
+                    f"M {canonical.get_attribute('cx')} "
+                    f"{canonical.get_attribute('cy')} L "
+                    f"{extra.get_attribute('cx')} {extra.get_attribute('cy')}")
+                self.assertEqual(d, expected)
+                page.close()
+
+    def test_one_label_per_disputed_model_anchored_at_the_canonical_variant(
+            self):
+        page = self._loaded_page()
+
+        labels = page.locator("#svg-intelligence text.lbl").all_text_contents()
+
+        self.assertEqual(
+            sum(1 for t in labels if t.startswith("Probe Model 0000")), 1)
+
+    def test_disputed_tooltip_lists_both_variants(self):
+        page = self._loaded_page()
+        page.locator("#svg-intelligence circle.dispute").first.hover()
+
+        rows = page.locator("#tip-intelligence .trow").all()
+        values = {r.locator("span").first.inner_text():
+                  r.locator("span").last.inner_text() for r in rows}
+        self.assertEqual(values["Intelligence Index"], "80.0 / 78.0")
+        self.assertEqual(values["Cost per task"], "$0.500 / $0.900")
+        dispute_rows = page.locator("#tip-intelligence .trow .tv.dispute")
+        self.assertGreaterEqual(dispute_rows.count(), 2)
+
+        # The capability charts' tooltip follows the same rule, with the
+        # gdpval score scaled *100 per variant exactly as the single value
+        # is.
+        page.locator("#svg-agentic circle.dispute").first.hover()
+        rows = page.locator("#tip-agentic .trow").all()
+        values = {r.locator("span").first.inner_text():
+                  r.locator("span").last.inner_text() for r in rows}
+        self.assertEqual(values["GDPval-AA v2"], "40.0 / 38.0")
+        self.assertEqual(values["Cost per task"], "$0.500 / $1.10")
+        page.close()
+
+    def test_hovering_one_variant_highlights_the_whole_variant_set(self):
+        # Nearest-point hover resolves to the ROW: hovering either variant
+        # point fades every other row and keeps both of this row's points at
+        # full opacity, so the pair reads as one model, not two.
+        page = self._loaded_page()
+        page.locator("#svg-intelligence circle.dispute").nth(1).hover()
+
+        faded = page.locator("#svg-intelligence circle.pt.fade").count()
+        self.assertEqual(faded, 5,
+                         "every other row's points fade; the disputed row's "
+                         "two points stay lit")
+        page.close()
+
+    def test_disputed_table_cells_render_red_pairs(self):
+        page = self._loaded_page()
+        cells = page.locator("#tbl td.dispute").all_text_contents()
+        # The disputed model fronts every axis it carries, so both score
+        # cells also carry the frontier tag's text in their textContent.
+        self.assertIn("80.0 / 78.0 frontier", cells)
+        self.assertIn("$0.500 / $0.900", cells)
+        self.assertIn("40.0 / 38.0 frontier", cells)
+        self.assertIn("$0.500 / $1.10", cells)
+        self.assertIn("$1 / $1.4", cells)
+        self.assertIn("200K / 100K", cells)
+        # Red, not the primary ink: light theme computes the --dispute hue.
+        color = page.locator("#tbl td.dispute").first.evaluate(
+            "el => getComputedStyle(el).color")
+        self.assertEqual(color, "rgb(208, 59, 59)")
+        page.close()
+
+    def test_the_static_tbody_equals_the_js_tbody_on_the_disputed_page(self):
+        # #97's drift contract, extended to the dispute cells: the rows
+        # build.py renders statically must be exactly the rows fillTable /
+        # fillFrontiers build in the default state, cell-for-cell --
+        # className and textContent both.
+        on = self._loaded_page()
+        off = self.browser.new_page(
+            viewport={"width": 1280, "height": 900}, java_script_enabled=False)
+        off.goto(build.OUT.as_uri())
+
+        for table in ("fTable", "tbl"):
+            with self.subTest(table=table):
+                self.assertEqual(
+                    on.evaluate(self._TBODY_DOM, table),
+                    off.evaluate(self._TBODY_DOM, table))
+        on.close()
+        off.close()
+
+    def test_the_never_disputing_charts_render_no_dispute_marks(self):
+        # The parameters axis pairs the Intelligence Index with a single
+        # in-run source (the parameter count), so it never disputes; the
+        # coding chart's rows are agent rows, which never carry gv at all.
+        # Both render exactly today's marks on a disputed capture.
+        page = self._loaded_page()
+        for chart in ("coding", "parameters"):
+            with self.subTest(chart=chart):
+                self.assertEqual(
+                    page.locator(f"#svg-{chart} circle.dispute").count(), 0)
+                self.assertEqual(
+                    page.locator(f"#svg-{chart} .dispute-link").count(), 0)
+        page.close()
+
+    def test_copy_exports_carry_the_dispute(self):
+        # Both copy surfaces export the dispute: Markdown as the same "a / b"
+        # pair the table cell shows (canonical first), JSON as the row's gv
+        # arrays -- absent variant keys absent.
+        page = self._loaded_page()
+        page.evaluate("""() => {
+          window.__copied = null;
+          Object.defineProperty(navigator, 'clipboard', {
+            value: { writeText: t => { window.__copied = t;
+                                       return Promise.resolve(); } },
+            configurable: true,
+          });
+        }""")
+        try:
+            page.locator("#copyMd").click()
+            md = page.evaluate("() => window.__copied")
+            line = next(l for l in md.split("\n")
+                        if l.startswith("| Probe Model 0000 "))
+            cells = [c.strip() for c in line.strip("|").split("|")]
+            self.assertEqual(cells[4], "80.0 / 78.0")
+            self.assertEqual(cells[5], "$0.500 / $0.900")
+            self.assertEqual(cells[7], "40.0 / 38.0")
+            self.assertEqual(cells[8], "$0.500 / $1.10")
+            # pin folded to a fill, never a pair: absent in variant 2
+            self.assertEqual(cells[9], "$0.5")
+            self.assertEqual(cells[10], "$1 / $1.4")
+            self.assertEqual(cells[11], "200K / 100K")
+
+            page.evaluate("() => { window.__copied = null; }")
+            page.locator("#copyJson").click()
+            exported = json.loads(page.evaluate("() => window.__copied"))
+            row = next(m for m in exported["models"]
+                       if m["name"] == "Probe Model 0000")
+            self.assertEqual([v["ii"] for v in row["gv"]], [80.0, 78.0])
+            self.assertNotIn("pin", row["gv"][1])
+        finally:
+            page.close()
+
+    def test_the_dispute_legend_renders_in_the_footer(self):
+        page = self._loaded_page()
+
+        foot = page.locator(".foot").inner_text()
+        self.assertIn("two inconsistent generations", foot)
+        self.assertIn("first is the canonical generation", foot)
+        self.assertIn("pair order is canonical", foot)
+        page.close()
