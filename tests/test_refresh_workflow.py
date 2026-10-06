@@ -627,7 +627,8 @@ class CaptureStepTests(unittest.TestCase):
         # re-emit it under the step's own log; the rc is captured before
         # `set -e` restores the fail-fast the job runs under.
         for piece in ("set +e",
-                      "python3 scripts/fetch_aa.py 2> /tmp/fetch-err.txt",
+                      "python3 scripts/fetch_aa.py --cross-run-lookback "
+                      "2> /tmp/fetch-err.txt",
                       "rc=$?",
                       "set -e"):
             self.assertIn(piece, self.block)

@@ -1776,5 +1776,413 @@ class GenVariantsSeamTests(unittest.TestCase):
         self.assertEqual(added, {diff_aa.DISPUTES_KEY})
 
 
+class CrossRunPresenceMergeTests(unittest.TestCase):
+    """Issue #211's cross-run half (Overseer ruling, 2026-10-06, on the
+    reopened issue): a model present in the previous committed capture and
+    absent from this run's own fetch -- or the reverse -- is MERGED and
+    marked disputed, never quietly dropped or re-added, so the published
+    set does not flip hour to hour. The layer is presence-only:
+    hour-to-hour value movement is ordinary data, so the previous corpus
+    participates only through the diff slugs -- a shared model raises no
+    cross-run value dispute and takes no previous-generation slot."""
+
+    def merge(self, current, prev, run_corpora=None):
+        return fetch_aa.cross_run_presence_merge(
+            current, prev,
+            run_corpora if run_corpora is not None else [current])
+
+    def test_matching_slug_sets_change_nothing(self):
+        # The quiet hour: the slug sets agree, the corpus is byte-what the
+        # caller passed and no synthetic key exists anywhere.
+        current = [_look("a"), _look("b")]
+        out, cross_run = self.merge(current, [_look("b"), _look("a")])
+
+        self.assertEqual((cross_run.dropped, cross_run.readded), ([], []))
+        self.assertEqual(json.dumps(out), json.dumps(current))
+        self.assertTrue(all("genVariants" not in m for m in out))
+        self.assertTrue(all(fetch_aa.CROSS_RUN_KEY not in m for m in out))
+
+    def test_a_dropped_model_is_merged_and_marked(self):
+        # AA stopped serving b: the union keeps it, the record is the
+        # previous generation's own values, `crossRunMerged` marks it as
+        # dispute state rather than serving evidence, and exactly one
+        # variant slot is the empty map (the run's own generation). Shared
+        # models are untouched -- no genVariants anywhere else.
+        current = [_look("a")]
+        out, cross_run = self.merge(current, [_look("a"), _look("b", ii=48.5)])
+
+        self.assertEqual(cross_run.dropped, ["b"])
+        self.assertEqual(cross_run.readded, [])
+        self.assertEqual([m["slug"] for m in out], ["a", "b"])
+        b = out[1]
+        self.assertIs(b[fetch_aa.CROSS_RUN_KEY], True)
+        self.assertEqual(b["intelligenceIndex"], 48.5)
+        self.assertEqual(len(b["genVariants"]), 2)
+        self.assertEqual(sum(1 for v in b["genVariants"] if not v), 1)
+        carried = next(v for v in b["genVariants"] if v)
+        self.assertEqual(carried, fetch_aa.variant_fields(_look("b", ii=48.5)))
+        self.assertNotIn("genVariants", out[0])
+
+    def test_a_returned_model_is_disputed_by_presence(self):
+        # AA started serving b again: the model is kept (it IS this run's
+        # own fetch), the empty map marks the generation that does not
+        # carry it, and the record carries no marker -- it is serving
+        # evidence the moment this run's fetch returned it.
+        prev = [_look("a")]
+        current = [_look("a"), _look("b", ii=48.5)]
+        out, cross_run = self.merge(current, prev)
+
+        self.assertEqual(cross_run.dropped, [])
+        self.assertEqual(cross_run.readded, ["b"])
+        b = next(m for m in out if m["slug"] == "b")
+        self.assertNotIn(fetch_aa.CROSS_RUN_KEY, b)
+        self.assertEqual(b["intelligenceIndex"], 48.5)
+        self.assertEqual(len(b["genVariants"]), 2)
+        self.assertEqual(sum(1 for v in b["genVariants"] if not v), 1)
+        carried = next(v for v in b["genVariants"] if v)
+        self.assertEqual(carried, fetch_aa.variant_fields(_look("b", ii=48.5)))
+        self.assertNotIn("genVariants", out[0])
+
+    def test_slots_are_ordered_by_generation_key(self):
+        # Canonical order is ascending generation_key over the joint field
+        # universe, the same rule the in-run padding follows, so the
+        # previous generation's slot lands where its corpus key ranks.
+        current = [_look("a")]
+        out, _ = self.merge(current, [_look("b", ii=48.5)])
+
+        b = out[1]
+        corpora = [[_look("b", ii=48.5)], [_look("a")]]
+        universe = fetch_aa.leaderboard_universe(corpora)
+        ranked = sorted(range(2), key=lambda i: fetch_aa.generation_key(
+            corpora[i], universe))
+        prev_at = ranked.index(0)
+
+        carried_at = next(i for i, v in enumerate(b["genVariants"]) if v)
+        self.assertEqual(carried_at, prev_at)
+        self.assertEqual(b["genVariants"][1 - prev_at], {})
+
+    def test_canonical_bytes_do_not_depend_on_input_order(self):
+        # The previous capture's record order must not move the corpus
+        # bytes: generation_key ranking positions the slot, never the
+        # order the look-back happened to read.
+        current = [_look("a")]
+        x = self.merge(current, [_look("a"), _look("b", ii=48.5)])
+        y = self.merge(current, [_look("b", ii=48.5), _look("a")])
+
+        self.assertEqual(json.dumps(x[0]), json.dumps(y[0]))
+
+    def test_a_settling_model_leaves_cleanly(self):
+        # b was merged and marked last hour and AA still does not serve it:
+        # a marked record is dispute state, not serving evidence, so it
+        # neither merges nor disputes again -- the model settles out and
+        # every record is clean. THIS is what keeps a stable retirement
+        # from being pinned disputed forever.
+        prev = [_look("a"), dict(_look("b", ii=48.5),
+                                 **{fetch_aa.CROSS_RUN_KEY: True})]
+        out, cross_run = self.merge([_look("a")], prev)
+
+        self.assertEqual((cross_run.dropped, cross_run.readded), ([], []))
+        self.assertEqual([m["slug"] for m in out], ["a"])
+        self.assertTrue(all("genVariants" not in m for m in out))
+
+    def test_a_returned_model_is_clean_once_both_runs_serve_it(self):
+        # The hour after a re-add: b is firm in both (this run's fetch
+        # served it, so it is firm in the next look-back), the dispute is
+        # resolved by AA's own return, and the record carries no variant.
+        prev = [_look("a"), _look("b")]
+        current = [_look("a"), _look("b", ii=41.0)]
+        out, cross_run = self.merge(current, prev)
+
+        self.assertEqual((cross_run.dropped, cross_run.readded), ([], []))
+        self.assertTrue(all("genVariants" not in m for m in out))
+        b = next(m for m in out if m["slug"] == "b")
+        self.assertEqual(b["intelligenceIndex"], 41.0)
+
+    def test_a_disputed_previous_capture_is_read_canonically(self):
+        # The previous run disputed b's own value (two in-run variants);
+        # the look-back reads the record's CANONICAL view -- the plain
+        # fields, which are the first carrying variant's -- and merges
+        # that, never the variant list.
+        prev_b = dict(_look("b", ii=41.0))
+        prev_b["genVariants"] = [
+            fetch_aa.variant_fields(_look("b", ii=41.0)),
+            fetch_aa.variant_fields(_look("b", ii=40.5)),
+        ]
+        out, cross_run = self.merge([_look("a")], [dict(_look("a")), prev_b])
+
+        self.assertEqual(cross_run.dropped, ["b"])
+        b = out[1]
+        self.assertEqual(b["intelligenceIndex"], 41.0)
+        carried = next(v for v in b["genVariants"] if v)
+        self.assertEqual(carried, fetch_aa.variant_fields(_look("b", ii=41.0)))
+
+    def test_an_in_run_dispute_and_a_cross_run_dispute_coexist(self):
+        # The looks disagreed on a's ii AND b was re-added this hour: b's
+        # variant list spans all three generations -- the two look slots
+        # preserved in order, the previous generation's empty map inserted
+        # at its own rank -- while `a`, disputed in-run but firm in both
+        # runs, keeps exactly its two look slots.
+        c1 = [_look("a", ii=40.5), _look("b", ii=48.5)]
+        c2 = [_look("a", ii=41.0), _look("b", ii=48.5)]
+        models = fetch_aa.cross_generation_merge([c1, c2])
+
+        out, cross_run = self.merge(models, [_look("a")], run_corpora=[c1, c2])
+
+        self.assertEqual(cross_run.readded, ["b"])
+        by_slug = {m["slug"]: m for m in out}
+        b_gv = by_slug["b"]["genVariants"]
+        self.assertEqual(len(b_gv), 3)
+        self.assertEqual(sum(1 for v in b_gv if not v), 1)
+        self.assertEqual(sorted(v["ii"] for v in b_gv if v),
+                         [48.5, 48.5])
+        self.assertEqual(len(by_slug["a"]["genVariants"]), 2)
+
+    def test_the_layer_adds_exactly_two_synthetic_keys(self):
+        # The producer/differ seam, extended: the in-run layer adds exactly
+        # genVariants over a quiet corpus (pinned above); the cross-run
+        # layer adds exactly one more, and the differ files it under the
+        # disputes class so it sections instead of printing a per-model
+        # field line for every merged record.
+        quiet = [_look("a"), _look("b")]
+        marked = self.merge([_look("a")], quiet)[0]
+
+        added = {k for record in marked for k in record} \
+            - {k for record in quiet for k in record}
+
+        self.assertEqual(added,
+                         {diff_aa.DISPUTES_KEY, fetch_aa.CROSS_RUN_KEY})
+        self.assertEqual(diff_aa.classify(fetch_aa.CROSS_RUN_KEY),
+                         diff_aa.DISPUTES_CLASS)
+
+    def test_the_marker_never_reaches_the_page_rows(self):
+        # build_rows reads named fields; the dispute marker is capture-side
+        # state. The page row carries the gv pair but never the marker, so
+        # the published payload asserts no serving state of its own.
+        out, _ = self.merge([_look("a")], [_look("a"), _look("b", ii=48.5)])
+        b = next(m for m in out if m["slug"] == "b")
+
+        row = build.build_rows([b])[0]
+
+        self.assertNotIn(fetch_aa.CROSS_RUN_KEY, row)
+        self.assertEqual(len(row["gv"]), 2)
+
+
+class CrossRunCaptureTests(unittest.TestCase):
+    """capture() threading the previous capture through to the cross-run
+    merge: a run whose looks agree holds ONE generation in-run, so the
+    slug-set flip the live page suffered (46c4e24 re-adding solar-pro-2
+    with both looks agreeing) is invisible to the in-run layer and must be
+    caught against the previous capture. Same stubbed-urlopen boundary as
+    MultiLookCaptureTests; no test touches the network."""
+
+    DETAIL_URL = fetch_aa.MODEL_DETAIL_URL.format(slug="detail-host-model")
+
+    def capture_with_prev(self, leaderboard_pages, prev_records,
+                          **detail_overrides):
+        stub = LoudUrlopenStub({
+            fetch_aa.URL: flaky(*leaderboard_pages),
+            self.DETAIL_URL: lambda: _FakeResponse(
+                flight_html(detail_payload(**detail_overrides))),
+        })
+        sleeps: list = []
+        with unittest.mock.patch.object(urllib.request, "urlopen", stub), \
+                unittest.mock.patch.object(fetch_aa, "_sleep",
+                                           side_effect=sleeps.append,
+                                           create=True):
+            return fetch_aa.capture(None, None, prev_records)
+
+    def flip_pages(self):
+        """The reopened issue's live shape: BOTH looks serve solar-pro-2
+        (agreeing -- the in-run layer cannot see it) while the previous
+        capture's corpus lacks it. Same churned-value shape as
+        MultiLookCaptureTests.presence_flip_pages."""
+        def page(records):
+            return flight_html(json.dumps(
+                {"intro": f"Intelligence Index v{fetch_aa.INDEX_VERSION}",
+                 "models": records}, separators=(",", ":")))
+
+        host = {"slug": "detail-host-model",
+                "intelligenceIndexCostPerTask": "$undefined"}
+        solar = {"slug": "solar-pro-2", "name": "Solar Pro 2",
+                 "intelligenceIndex": 48.5,
+                 "intelligenceIndexCostPerTask": None,
+                 "contextWindowTokens": 200000}
+        look = [host,
+                leaderboard_record(intelligenceIndex=51,
+                                   intelligenceIndexCostPerTask=None,
+                                   medianOutputTokensPerSecond=120.0),
+                solar]
+        return page(look), page(look)
+
+    def test_a_quiet_hour_with_a_matching_previous_capture_is_unchanged(self):
+        # Threading a matching previous capture through a quiet hour must
+        # be byte-invisible: the corpus is exactly the no-lookback
+        # capture's and the layer raises nothing.
+        pages = [flight_html(look_payload(51))]
+        prev = build.merge_captures(
+            [{"slug": "detail-host-model",
+              "intelligenceIndexCostPerTask": "$undefined"},
+             leaderboard_record()],
+            [detail_record()])
+
+        without = self.capture_with_prev(pages, None)
+        with_prev = self.capture_with_prev(pages, prev)
+
+        self.assertEqual(json.dumps(with_prev.models),
+                         json.dumps(without.models))
+        self.assertFalse(with_prev.disputed)
+        self.assertEqual((with_prev.cross_run.dropped,
+                          with_prev.cross_run.readded), ([], []))
+
+    def test_the_live_flip_is_caught_against_the_previous_capture(self):
+        prev = [{"slug": "detail-host-model",
+                 "intelligenceIndexCostPerTask": "$undefined"},
+                leaderboard_record(intelligenceIndex=51,
+                                   intelligenceIndexCostPerTask=None,
+                                   medianOutputTokensPerSecond=120.0)]
+        captured = self.capture_with_prev(self.flip_pages(), prev)
+
+        self.assertTrue(captured.disputed)
+        self.assertEqual((captured.cross_run.dropped,
+                          captured.cross_run.readded),
+                         ([], ["solar-pro-2"]))
+        by_slug = {m["slug"]: m for m in captured.models}
+        solar = by_slug["solar-pro-2"]
+        self.assertEqual(len(solar["genVariants"]), 2)
+        self.assertEqual(sum(1 for v in solar["genVariants"] if not v), 1)
+        self.assertEqual(solar["intelligenceIndex"], 48.5)
+        # The shared models take no previous-generation slot: no
+        # genVariants key exists on them at all.
+        self.assertNotIn("genVariants", by_slug["fixture-model"])
+        self.assertNotIn("genVariants", by_slug["detail-host-model"])
+
+
+class CrossRunLookbackFlagTests(unittest.TestCase):
+    """--cross-run-lookback scopes the layer to the context where the
+    working copy of data/aa-raw-models.json IS the previous committed
+    capture -- the hourly refresh's checkout of main. Without the flag a
+    presence diff is not a dispute; with it the previous capture is read
+    before the fetch writes, a missing file is no look-back, and a
+    malformed one refuses: it is our own committed artifact, and a parse
+    failure is repo damage, not an AA event."""
+
+    DETAIL_URL = fetch_aa.MODEL_DETAIL_URL.format(slug="detail-host-model")
+
+    def run_main(self, argv, prev_text=None):
+        """fetch_aa.main() over a stubbed urlopen, with an optional
+        previous capture staged at OUT. -> (stdout, OUT text after the
+        run, the SystemExit or None)."""
+        agents = flight_html(agent_payload(
+            [agent_row(f"Agent - Model {i}") for i in range(5)]))
+        stub = LoudUrlopenStub({
+            fetch_aa.URL: lambda: _FakeResponse(
+                flight_html(leaderboard_payload())),
+            self.DETAIL_URL: lambda: _FakeResponse(
+                flight_html(detail_payload())),
+            fetch_aa.AGENTS_URL: lambda: _FakeResponse(agents),
+        })
+        old = (fetch_aa.ROOT, fetch_aa.OUT, fetch_aa.AGENTS_OUT,
+               fetch_aa.STAMP)
+        argv_saved = sys.argv
+        try:
+            with tempfile.TemporaryDirectory(prefix=".issue-211b-") as tmp:
+                root = pathlib.Path(tmp)
+                fetch_aa.ROOT = root
+                fetch_aa.OUT = root / "aa-raw-models.json"
+                fetch_aa.AGENTS_OUT = root / "aa-raw-coding-agents.json"
+                fetch_aa.STAMP = root / "captured-at.txt"
+                if prev_text is not None:
+                    fetch_aa.OUT.write_text(prev_text, encoding="utf-8")
+                sys.argv = argv
+                with unittest.mock.patch.object(
+                        urllib.request, "urlopen", stub), \
+                        unittest.mock.patch.object(
+                            fetch_aa, "_sleep",
+                            side_effect=lambda s: None):
+                    buffer = io.StringIO()
+                    exit_exc = None
+                    with contextlib.redirect_stdout(buffer):
+                        try:
+                            fetch_aa.main()
+                        except SystemExit as exc:
+                            exit_exc = exc
+                    return (buffer.getvalue(),
+                            fetch_aa.OUT.read_text(encoding="utf-8"),
+                            exit_exc)
+        finally:
+            sys.argv = argv_saved
+            (fetch_aa.ROOT, fetch_aa.OUT, fetch_aa.AGENTS_OUT,
+             fetch_aa.STAMP) = old
+
+    def prev_without_fixture(self):
+        host = {"slug": "detail-host-model",
+                "intelligenceIndexCostPerTask": "$undefined"}
+        return json.dumps([host], indent=1)
+
+    def test_without_the_flag_a_presence_diff_is_not_a_dispute(self):
+        # The scoping pin: the previous capture sits on disk missing
+        # fixture-model, the fresh fetch serves it, and -- with no flag --
+        # the corpus stays byte-clean. Drift checks and manual runs must
+        # not start disputing against a stale tree.
+        stdout, out_text, _exit = self.run_main(
+            ["fetch_aa.py"], prev_text=self.prev_without_fixture())
+        models = json.loads(out_text)
+
+        self.assertNotIn("cross-run presence", stdout)
+        self.assertTrue(all("genVariants" not in m for m in models))
+
+    def test_the_flag_holds_a_presence_diff_as_a_cross_run_dispute(self):
+        # Same staged previous capture, flag passed: fixture-model is
+        # kept, disputed by presence (two slots, one empty), and the log
+        # names it as the layer's own line.
+        stdout, out_text, _exit = self.run_main(
+            ["fetch_aa.py", "--cross-run-lookback"],
+            prev_text=self.prev_without_fixture())
+        models = json.loads(out_text)
+
+        self.assertIn("cross-run presence", stdout)
+        self.assertIn("fixture-model", stdout)
+        self.assertEqual(len(models), 2)
+        fixture = next(m for m in models
+                       if m["slug"] == "fixture-model")
+        self.assertEqual(len(fixture["genVariants"]), 2)
+        self.assertEqual(sum(1 for v in fixture["genVariants"] if not v), 1)
+
+    def test_a_missing_previous_capture_is_no_lookback(self):
+        stdout, out_text, _exit = self.run_main(
+            ["fetch_aa.py", "--cross-run-lookback"])
+        models = json.loads(out_text)
+
+        self.assertNotIn("cross-run presence", stdout)
+        self.assertTrue(all("genVariants" not in m for m in models))
+
+    def test_a_malformed_previous_capture_refuses(self):
+        # The loader exits guarded BEFORE any fetch writes: the staged
+        # malformed text is still the file's content after the run.
+        malformed = '{"not": "an array"'
+        _stdout, out_text, exit_exc = self.run_main(
+            ["fetch_aa.py", "--cross-run-lookback"], prev_text=malformed)
+
+        self.assertIsInstance(exit_exc, SystemExit)
+        self.assertIn("does not read back as JSON", str(exit_exc))
+        self.assertEqual(out_text, malformed)
+
+    def test_a_matching_previous_capture_is_silent(self):
+        prev = build.merge_captures(
+            [{"slug": "detail-host-model",
+              "intelligenceIndexCostPerTask": "$undefined"},
+             leaderboard_record()],
+            [detail_record()])
+
+        stdout, out_text, exit_exc = self.run_main(
+            ["fetch_aa.py", "--cross-run-lookback"],
+            prev_text=json.dumps(prev, indent=1))
+        models = json.loads(out_text)
+
+        self.assertIsNone(exit_exc)
+        self.assertNotIn("cross-run presence", stdout)
+        self.assertTrue(all("genVariants" not in m for m in models))
+
+
 if __name__ == "__main__":
     unittest.main()
