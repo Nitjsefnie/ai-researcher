@@ -62,7 +62,9 @@ python3 ~/.agent-bundle/scripts/docs_hub.py publish ./out/frontier-models.html \
 shape, when AA bumps the Intelligence Index version `build.py` is pinned to,
 when the cost breakdown drops a slug the build reads or stops summing to the
 published total, or when the Coding Agent Index table collapses. `build.py`
-refuses to write a page with an empty chart on it. All of those are signals to
+refuses to write a page with an empty chart on it — except an all-dropped
+two-generation window hour, which publishes with the agentic axis empty and a
+note on the page (issue #217). All of those are signals to
 re-read AA by hand, not to retry or to hand-fix JSON — never hand-edit either
 capture.
 

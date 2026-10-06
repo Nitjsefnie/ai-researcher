@@ -188,7 +188,9 @@ three-generation corner (the looks disagree AND the detail route matches
 neither fingerprint): the detail route then fills nothing, the parameter
 count is absent everywhere, and the parameters axis empties into `build.py`'s
 empty-axis guard. That nonzero exit is the designed go-re-read-AA-by-hand
-signal, not a dispute-layer failure. Without the cross-run look-back, a
+signal, not a dispute-layer failure. A window hour is not that corner: the
+`data/cost-breakdown-window.txt` marker covers the agentic axis only, and the
+parameters-axis corner stays red. Without the cross-run look-back, a
 run whose looks agree writes no `genVariants` key anywhere and is
 byte-identical to the single-generation capture; with it, the same holds
 exactly when the two slug sets agree, and a caught flip writes the
@@ -274,6 +276,10 @@ the refresh red.
 
 `build.py` additionally refuses to write a page where a rendered axis has no
 rows, so an emptied chart is a build failure rather than a published blank.
+One exemption: an all-dropped two-generation window hour (marked by
+`data/cost-breakdown-window.txt`, written by `fetch_aa.py`) publishes with
+the agentic axis empty and a named on-page note; every other empty axis
+remains a refusal.
 
 Never hand-edit either capture; both are captured artifacts.
 
