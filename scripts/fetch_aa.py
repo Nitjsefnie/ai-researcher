@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import argparse
 import datetime as dt
+import hashlib
 import http.client
 import json
 import os
@@ -39,7 +40,8 @@ ROOT_FOR_IMPORT = pathlib.Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT_FOR_IMPORT))
 
 from build import (  # noqa: E402  # pylint: disable=wrong-import-position
-    GDPVAL_SLUG, INDEX_VERSION, SUM_TOLERANCE, merge_captures,
+    GDPVAL_INDEX_WEIGHT, GDPVAL_SLUG, INDEX_VERSION, SUM_TOLERANCE,
+    breakdown_matches_total, evaluation_cost_per_task, merge_captures,
 )
 
 URL = "https://artificialanalysis.ai/leaderboards/models"
@@ -100,6 +102,48 @@ FETCH_TIMEOUT_SECONDS = 25
 # and the job's headroom is what absorbs the difference.
 PAGE_ATTEMPTS = 3
 PAGE_BACKOFF_SECONDS = 5
+
+# Issue #208: AA's two routes can serve two different generations of the
+# corpus at once, and a single leaderboard read takes whichever half is
+# cached at that instant. So each run reads the leaderboard TWICE, this
+# many seconds apart -- far enough that the two reads land on different
+# Vercel cache generations when a window is live -- plus the detail page.
+# The spacing is a lower bound on how long an update stays detectable, not
+# a retry: both looks are published, both are kept when they disagree.
+DISPUTE_LOOK_SPACING_SECONDS = 180
+
+# Fields that NEVER go red and never identify a generation: AA's speed and
+# latency family re-samples every hour BY DESIGN (median/quartile output
+# speed, time-to-first-token, end-to-end latency, and the timescale chart
+# data built from them), so two looks of the SAME generation routinely
+# disagree on them and a dispute raised on that movement would hold the
+# page red permanently. The set is hardcoded and never widened silently:
+# a new speed-shaped field starts as a dispute (the safe direction) and
+# joins this set only by a reviewed change to this constant.
+NEVER_RED_FIELDS = frozenset({
+    "endToEndResponseTime",
+    "intelligenceIndexTimePerTask",
+    "medianEndToEndResponseTimeSeconds",
+    "medianOutputTokensPerSecond",
+    "medianReasoningTimeSeconds",
+    "medianTimeToFirstAnswerTokenSeconds",
+    "medianTimeToFirstTokenSeconds",
+    "quartile25OutputTokensPerSecond",
+    "quartile25TimeToFirstTokenSeconds",
+    "quartile75OutputTokensPerSecond",
+    "quartile75TimeToFirstTokenSeconds",
+    "timeToFirstAnswerToken",
+    "timeToFirstChunkVariance",
+    "timescaleData",
+})
+
+# The record fields a DISPUTE-CAPABLE value can come from -- the variant
+# axes' own sources. Everything else is canonical-first silent: a field
+# outside this list never renders twice, so two published values for it
+# are not a dispute (the canonical generation's value simply wins).
+DISPUTE_CAPABLE = ("intelligenceIndex", "intelligenceIndexCostPerTask",
+                   "gdpvalNormalized", "contextWindowTokens",
+                   "price1mInputTokens", "price1mOutputTokens")
 
 
 def _sleep(seconds: float) -> None:
@@ -427,6 +471,194 @@ def detail_host_slug(models: list[dict]) -> str:
     return unpriced[0]
 
 
+# The dispute layer (issue #208). Detection is in-run and has no cross-run
+# state: the two spaced leaderboard looks are compared on their shared
+# slugs over the leaderboard field universe, and a disagreement holds BOTH
+# generations in the capture rather than picking one.
+
+
+def _number(value):
+    """The value when it is a published number, else None. AA writes absent
+    fields as the string "$undefined" and unmeasured ones as null; neither
+    is a number to plot."""
+    if isinstance(value, (int, float)) and not isinstance(value, bool):
+        return value
+    return None
+
+
+def normalize_for_comparison(value):
+    """One comparison form for a published value.
+
+    The missing markers AA writes -- null, the empty string, the literal
+    "$undefined" -- fold to ONE marker, so a look that stopped carrying a
+    field is a fill and never a dispute; a cost object compares as the
+    scalar of its own cost.total, so the leaderboard's flattened shape and
+    the detail route's full object compare equal whenever they publish the
+    same measurement. Everything else compares as itself, recursively.
+    """
+    if value is None or value == "" or value == "$undefined":
+        return None
+    if isinstance(value, dict):
+        cost = value.get("cost")
+        if isinstance(cost, dict) and "total" in cost:
+            return normalize_for_comparison(cost.get("total"))
+        return {k: normalize_for_comparison(v) for k, v in sorted(value.items())}
+    if isinstance(value, list):
+        return [normalize_for_comparison(v) for v in value]
+    return value
+
+
+def generation_key(records: list[dict], universe: set[str]) -> str:
+    """One corpus generation's fingerprint: a 16-hex sha256 prefix over the
+    slug-sorted records normalized on `universe - NEVER_RED_FIELDS`.
+
+    Equal keys mean every shared field carries the same published value,
+    so grouping the reads by key is the dispute test; the speed and latency
+    family is excluded first, because it moves every hour by design and
+    never means a generation. The key is order-stable: records are sorted
+    by slug and the field dict is built in sorted order, so two runs that
+    read the same bytes compute the same key.
+    """
+    fields = sorted(universe - NEVER_RED_FIELDS)
+    normalized = [
+        {f: normalize_for_comparison(rec.get(f)) for f in fields}
+        for rec in sorted((r for r in records if isinstance(r, dict)),
+                          key=lambda r: str(r.get("slug", "")))
+    ]
+    blob = json.dumps(normalized, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(blob.encode("utf-8")).hexdigest()[:16]
+
+
+def leaderboard_universe(looks: list[list[dict]]) -> set[str]:
+    """Every field carried by at least one leaderboard look -- the field set
+    generation comparisons run on. The detail-only fields (parameters,
+    licence, release date, the per-evaluation cost breakdown) are absent by
+    construction: they are computed from the leaderboard reads alone.
+    """
+    universe: set[str] = set()
+    for look in looks:
+        for rec in look:
+            if isinstance(rec, dict):
+                universe.update(rec)
+    return universe
+
+
+def _cost_total(record):
+    """The record's measured cost total in either published shape: the bare
+    scalar AA flattened the leaderboard to, or the object's cost.total."""
+    outer = record.get("intelligenceIndexCostPerTask")
+    total = _number(outer)
+    if total is None and isinstance(outer, dict):
+        cost = outer.get("cost")
+        if isinstance(cost, dict):
+            total = _number(cost.get("total"))
+    return total
+
+
+def variant_fields(record) -> dict:
+    """The per-generation flat map the page renders from: {"ii", "cost",
+    "gdpval", "gdpvalCost", "ctx", "pin", "pout"}, absent keys absent.
+
+    gdpvalCost is recovered from THIS record's own breakdown and is absent
+    when that breakdown does not decompose its own total -- never supplied
+    from another generation's parts, which is what makes a disputed axis
+    honest: each variant carries exactly what its generation published.
+    """
+    fields: dict = {}
+    ii = _number(record.get("intelligenceIndex"))
+    if ii is not None:
+        fields["ii"] = ii
+    total = _cost_total(record)
+    if total is not None:
+        fields["cost"] = total
+    gdp = _number(record.get("gdpvalNormalized"))
+    if gdp is not None:
+        fields["gdpval"] = gdp
+    outer = record.get("intelligenceIndexCostPerTask")
+    if isinstance(outer, dict) and breakdown_matches_total(outer):
+        gdpval_cost = evaluation_cost_per_task(record, GDPVAL_SLUG,
+                                               GDPVAL_INDEX_WEIGHT)
+        if gdpval_cost is not None:
+            fields["gdpvalCost"] = gdpval_cost
+    ctx = _number(record.get("contextWindowTokens"))
+    if ctx is not None:
+        fields["ctx"] = ctx
+    pin = _number(record.get("price1mInputTokens"))
+    if pin is not None:
+        fields["pin"] = pin
+    pout = _number(record.get("price1mOutputTokens"))
+    if pout is not None:
+        fields["pout"] = pout
+    return fields
+
+
+def _dispute_columns(record):
+    """The record's dispute-capable values, normalized, in DISPUTE_CAPABLE
+    order -- one column per field for the pairwise conflict test."""
+    return [normalize_for_comparison(record.get(f)) for f in DISPUTE_CAPABLE]
+
+
+def _conflicting(values) -> bool:
+    """Whether two PUBLISHED values in one field's column differ.
+
+    The missing marker never conflicts: absent/null/""/"$undefined" fold to
+    one marker, so a look that stopped carrying a field is a fill, and a
+    model a look did not price is not a dispute with one that did.
+    """
+    for i, a in enumerate(values):
+        if a is None:
+            continue
+        for b in values[i + 1:]:
+            if b is not None and a != b:
+                return True
+    return False
+
+
+def cross_generation_merge(corpora: list[list[dict]]) -> list[dict]:
+    """Union the per-generation corpora by slug and hold every generation.
+
+    The corpora arrive in any order; canonical order is ASCENDING
+    generation_key, so the output bytes are identical whichever look a run
+    read first, and a record's plain fields are the FIRST variant's --
+    the canonical generation's published value, filled only where that
+    record lacks the field (a missing marker is a fill, never a winner).
+    When any record's dispute-capable fields carry two different published
+    values, EVERY record gets genVariants -- one entry per generation that
+    carries it, whose fields are that generation's own values -- so the
+    page's dispute layer can hold the whole run red; otherwise the corpus
+    is exactly the single-generation union and no genVariants key exists.
+
+    Identity/flag fields and every field outside DISPUTE_CAPABLE are
+    never disputed: they render the canonical generation's value, silent.
+    """
+    universe = leaderboard_universe(corpora)
+    ranked = sorted(corpora, key=lambda c: generation_key(c, universe))
+    by_slug = [{m["slug"]: m for m in corpus if isinstance(m.get("slug"), str)}
+               for corpus in ranked]
+    slugs = sorted(set().union(*by_slug))
+    rows = []
+    disputed = False
+    for slug in slugs:
+        present = [(i, by_slug[i][slug]) for i in range(len(ranked))
+                   if slug in by_slug[i]]
+        plain = dict(present[0][1])
+        for _, rec in present[1:]:
+            for k, v in rec.items():
+                if ((k not in plain or normalize_for_comparison(plain[k]) is None)
+                        and normalize_for_comparison(v) is not None):
+                    plain[k] = v
+        record_disputed = False
+        if len(present) > 1:
+            columns = list(zip(*[_dispute_columns(rec) for _, rec in present]))
+            record_disputed = any(_conflicting(list(col)) for col in columns)
+        disputed = disputed or record_disputed
+        rows.append((plain, [rec for _, rec in present]))
+    if not disputed:
+        return [plain for plain, _ in rows]
+    return [dict(plain, genVariants=[variant_fields(rec) for rec in recs])
+            for plain, recs in rows]
+
+
 def coding_agent_rows(payload: str) -> list[dict]:
     """Every agent+model row in the Coding Agent Index, wherever it is nested.
 
@@ -491,11 +723,16 @@ class Capture(typing.NamedTuple):
 
     `host` and `version` are what the capture log names: which model detail
     page filled the gaps, and which Intelligence Index the costs belong to.
+    `generations` counts the distinct generation fingerprints the run
+    observed across its three reads, and `disputed` says the written corpus
+    carries genVariants -- the looks disagreed on a published value.
     """
 
     models: list
     host: str
     version: str
+    generations: int
+    disputed: bool
 
 
 def capture(cached_base: str | None, cached_detail: str | None) -> Capture:
@@ -507,16 +744,77 @@ def capture(cached_base: str | None, cached_detail: str | None) -> Capture:
     merge_captures', and its rule is the whole contract: the leaderboard's
     value wins wherever both routes carry a field, and the detail route fills
     only what the leaderboard omits (issue #200).
+
+    Issue #208 adds the second, spaced leaderboard look. The DISPUTE DECISION
+    compares THE LOOKS on their shared slugs over the leaderboard universe:
+    a run whose looks agree is one generation and merges exactly as before,
+    byte for byte. A run whose looks disagree holds both -- each generation's
+    corpus is that generation's own look, widened by the detail page only
+    when the detail corpus IS that generation, and stitched by
+    cross_generation_merge. The detail route is ONE generation's snapshot:
+    it never raises a dispute by itself (a stale detail corpus is the known,
+    precedence-handled state of issue #200) and it fills the generation it
+    belongs to.
     """
     base_text = fetch_html(cached_base)
     payload = flight_payload(base_text)
     version = check_index_version(payload)
-    base = richest_models_array(payload)
+    look1 = richest_models_array(payload)
 
-    host = detail_host_slug(base)
+    host = detail_host_slug(look1)
     detail = richest_models_array(
         flight_payload(fetch_html(cached_detail, MODEL_DETAIL_URL.format(slug=host))))
-    return Capture(merge_captures(base, detail), host, version)
+
+    _sleep(DISPUTE_LOOK_SPACING_SECONDS)
+    look2 = richest_models_array(flight_payload(fetch_html(cached_base)))
+
+    universe = leaderboard_universe([look1, look2])
+    slugs = [
+        {m.get("slug") for m in look if isinstance(m.get("slug"), str)}
+        for look in (look1, look2)]
+    shared = slugs[0] & slugs[1]
+
+    def keyed(records, keep):
+        """generation_key over the records whose slug is in `keep` -- the
+        structural restriction that makes two reads comparable: the detail
+        page omits exactly one model (its own host), and a model AA added
+        or retired between the looks is a corpus union, never a value
+        conflict."""
+        return generation_key(
+            [r for r in records
+             if isinstance(r.get("slug"), str) and r.get("slug") in keep],
+            universe)
+
+    look1_key = keyed(look1, shared)
+    look2_key = keyed(look2, shared)
+
+    detail_slugs = {m.get("slug") for m in detail
+                    if isinstance(m.get("slug"), str)}
+
+    def same_generation(look, look_slugs) -> bool:
+        """Whether the detail corpus IS this look's generation, compared on
+        the slugs both reads carry."""
+        with_detail = look_slugs & detail_slugs
+        return keyed(look, with_detail) == keyed(detail, with_detail)
+
+    if look1_key == look2_key:
+        # One leaderboard generation: today's merge, byte for byte, with
+        # the detail route filling what the leaderboard omits whatever
+        # generation the detail corpus itself is (issue #200).
+        models = merge_captures(look1, detail)
+        disputed = False
+        generations = 1 + (0 if same_generation(look1, slugs[0]) else 1)
+    else:
+        matches1 = same_generation(look1, slugs[0])
+        matches2 = same_generation(look2, slugs[1])
+        corpora = [
+            merge_captures(look1, detail) if matches1 else look1,
+            merge_captures(look2, detail) if matches2 else look2,
+        ]
+        models = cross_generation_merge(corpora)
+        disputed = any("genVariants" in m for m in models)
+        generations = 2 + (0 if matches1 or matches2 else 1)
+    return Capture(models, host, version, generations, disputed)
 
 
 def main() -> None:
@@ -542,6 +840,13 @@ def main() -> None:
           f"intelligence index, {priced} with a v{captured.version} cost breakdown "
           f"(gaps filled from /models/{captured.host}; the leaderboard's own "
           "value wins wherever both routes carry the field)")
+    # The run's one-line generation summary (issue #208): how many distinct
+    # generations the three reads observed, and how many records the
+    # dispute layer holds. The quiet hour prints the 1 / 0 shape the
+    # capture-log test pins.
+    disputed = sum(1 for m in models if "genVariants" in m)
+    print(f"{captured.generations} generation(s) observed in-run; "
+          f"{disputed} models carry disputed values")
     if dropped:
         # Named, not counted: each is a model whose GDPval cost renders absent
         # until AA's two routes agree, and a count alone does not say which.
