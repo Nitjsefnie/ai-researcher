@@ -19,6 +19,10 @@ what the page says:
                counts, per-eval cost splits, blended prices, gdpval CIs.
                Discarded unless --derived
   cosmetic     lab branding (colour, logo) -- always discarded, counted only
+  disputes     the capture's generation layer (issue #208): `genVariants`
+               appearing on / disappearing from / changing on N models,
+               one line per shape in its own section -- never a per-model
+               field line, which would print the whole variant list
 
 It also recomputes every Pareto layer the page draws -- one per scatter, in page order:
 coding-agent, intelligence, GDPval-AA and parameter-efficiency -- on either side, using build.py's
@@ -113,6 +117,17 @@ DERIVED_EXACT = {
     "gdpval", "briefcaseTotalCost", "canonicalIntelligenceIndexTokenCount",
     "reasoningTokens",
 }
+
+# The dispute layer's record key (issue #208), and the class name it files
+# under. fetch_aa.py writes `genVariants` at the TOP LEVEL of every record of
+# a disputed run -- one flat map per corpus generation -- so its appearance,
+# disappearance or change between two captures is one news item per shape.
+# The key is top-level and not jitter-shaped, so no existing classifier would
+# swallow it; the explicit class exists so it is sectioned, not printed: the
+# default fall-through would classify it "significant" and print the whole
+# variant list, once per model, in field changes.
+DISPUTES_KEY = "genVariants"
+DISPUTES_CLASS = "disputes"
 
 
 def is_derived(path):
@@ -229,6 +244,8 @@ def flatten(value, prefix=""):
 
 
 def classify(path):
+    if path == DISPUTES_KEY:
+        return DISPUTES_CLASS
     leaf = path.rsplit(".", 1)[-1]
     if leaf in COSMETIC:
         return "cosmetic"
@@ -526,6 +543,50 @@ def main():
     print_report(args)
 
 
+def print_disputes(old_by_id, new_by_id):
+    """The Disputes section: the capture's dispute layer (issue #208) moving
+    between the two captures, one line per shape.
+
+    The field-changes loop files a `genVariants` transition under its own
+    class precisely so it never prints here as a per-model field line -- the
+    value is the whole per-generation list, and that is the per-field spam
+    the section exists to prevent. The count's scope is the models both
+    captures carry: a model added or removed whole is models-added/removed
+    news, and double-filing it under disputes would conflate two kinds of
+    news. Prints nothing at all when the layer did not move: a quiet capture
+    gains no section, and a disputed state that both captures carry
+    identically is not news either.
+
+    The multi-variant count is the reader's bridge between the capture log's
+    "M models carry disputed values" -- which counts genVariants-CARRYING
+    records, i.e. every record of a disputed run -- and the models that
+    actually hold more than one generation. It is labeled as multiplicity,
+    never as conflict: two variants that agree render no red cell, so a
+    model carrying two maps is not by itself a model in dispute.
+    """
+    news = dict.fromkeys(("added", "removed", "changed"), 0)
+    for i in new_by_id:
+        if i not in old_by_id:
+            continue
+        a, b = old_by_id[i].get(DISPUTES_KEY), new_by_id[i].get(DISPUTES_KEY)
+        if a == b:
+            continue
+        news["added" if a is None else "removed" if b is None else "changed"] += 1
+    if not any(news.values()):
+        return
+    multi = sum(1 for i, m in new_by_id.items()
+                if i in old_by_id and len(m.get(DISPUTES_KEY) or ()) > 1)
+    print("\n== disputes: the generation layer moved (issue #208)")
+    if news["added"]:
+        print(f"  genVariants appeared on {news['added']} model(s)")
+    if news["removed"]:
+        print(f"  genVariants disappeared from {news['removed']} model(s)")
+    if news["changed"]:
+        print(f"  genVariants changed on {news['changed']} model(s)")
+    if multi:
+        print(f"  {multi} model(s) carry more than one variant (one per generation)")
+
+
 def print_report(args):
 
     old, new = load(args.old), load(args.new)
@@ -585,6 +646,13 @@ def print_report(args):
             if a == b:
                 continue
             cls = classify(path)
+            if cls == DISPUTES_CLASS:
+                # Section news, not a field line: the value is the whole
+                # per-generation list, and printing it per model is exactly
+                # the per-field spam the Disputes section exists to prevent.
+                # Never thresholded and never dropped -- the section below
+                # counts it, whatever --all/--tol say.
+                continue
             if not args.all:
                 if cls in ("cosmetic", "jitter-unused") or (
                         cls == "derived" and not args.derived):
@@ -612,6 +680,8 @@ def print_report(args):
                   f"{fmt(a)} -> {fmt(b)}{delta_note(a, b)}")
     if not changed_models:
         print("  (none)")
+
+    print_disputes(old_by_id, new_by_id)
 
     if speed_moves:
         print(f"\n== rendered speed re-sampled by more than "
