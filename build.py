@@ -791,6 +791,19 @@ def read_capture_stamp(stamp_path: pathlib.Path) -> str:
     return value
 
 
+def cost_breakdown_window(data_dir: pathlib.Path) -> bool:
+    """Whether fetch_aa.py left the all-dropped window marker (issue #217).
+
+    fetch_aa.py writes data/cost-breakdown-window.txt when the merge dropped
+    EVERY model's cost breakdown -- a two-generation AA window, not a schema
+    change. EXISTENCE is the whole signal: the file's one-line content is a
+    git-history note for a human, and the page renders build.py's own fixed
+    wording, so no marker text is ever interpolated into the page. (The stamp
+    is validated exactly because it IS rendered; nothing here is.)
+    """
+    return (data_dir / "cost-breakdown-window.txt").exists()
+
+
 def read_capture(path):
     """The capture at path, parsed -- or a guarded exit naming the file.
 
@@ -833,6 +846,16 @@ VIEW_ORDER = ("coding", "intelligence", "parameters", "agentic")
 # the marker, the same fail-red culture as the stamp and commit-shape
 # validations.
 TEMPLATE_MARKERS = ("__DATA__", "__PROVENANCE__", "__CAPTURED__", "__TBODY_")
+
+# The window hour's on-page note (issue #217): the copy the build renders for
+# the empty agentic chart, verbatim, when costBreakdownWindow rides the
+# payload. A literal here -- never marker-file content -- because the marker
+# file is pipeline state for a human, and page copy is build.py's own.
+AGENTIC_WINDOW_NOTE = (
+    '<div class="empty-state">Empty during a two-generation window &mdash; '
+    "AA's leaderboard and detail routes disagree on every cost breakdown; "
+    "GDPval costs return when they converge.</div>"
+)
 
 
 def frontier_layer(rows, metric):
@@ -1084,6 +1107,15 @@ def main():
             if r["params"] is not None and r["metrics"]["intelligence"] is not None
         ),
     }
+    # Issue #217: fetch_aa.py leaves data/cost-breakdown-window.txt when the
+    # merge dropped EVERY model's cost breakdown -- a two-generation AA
+    # window, whose one legitimately-empty axis is agentic (GDPval). The flag
+    # rides the payload only when the page is actually IN that state --
+    # marker present AND the agentic count zero -- so a stale marker beside a
+    # healthy capture renders no note.
+    window = cost_breakdown_window(RAW.parent)
+    if window and not stats["metricCounts"]["agentic"]:
+        stats["costBreakdownWindow"] = True
     # A rendered axis with nothing on it means the capture moved under us --
     # a renamed field, a dropped cost slug. The page must not be published in
     # that state: an empty scatter reads as "nothing qualifies" rather than
@@ -1094,9 +1126,20 @@ def main():
     # (issue #60) -- so the enumeration here covers both stats, and a stale
     # capture (AA's totalParameters rename) fails red instead of publishing
     # an empty parameters chart.
+    #
+    # The window marker covers the agentic axis ONLY: a marker hour whose
+    # agentic axis is the single empty one publishes, with the page naming
+    # the window; an hour that empties anything else -- with or without the
+    # marker, including the designed three-generation parameters corner --
+    # still refuses.
     rendered = {**stats["metricCounts"], "parameters": stats["parameterCount"]}
     empty = [axis for axis, n in rendered.items() if not n]
-    if empty:
+    if empty and window and set(empty) == {"agentic"}:
+        print("cost-breakdown window: every model's GDPval cost was dropped as "
+              "another generation's -- publishing with the agentic axis empty "
+              "and a note on the page instead of refusing; the axis returns "
+              "when AA's routes converge")
+    elif empty:
         raise SystemExit(
             "no rows carry a score/cost pair for: " + ", ".join(sorted(empty))
             + " -- the AA capture changed shape; re-read the leaderboard rather "
@@ -1106,6 +1149,17 @@ def main():
     payload = json.dumps({"rows": rows, "stats": stats}, separators=(",", ":")).replace(
         "<", "\\u003c"
     )
+
+    # The window note (issue #217): the guard's own rationale is that an empty
+    # scatter reads as "nothing qualifies", so a window hour's empty agentic
+    # chart carries the cause on the page instead of sitting silently blank.
+    # A build.py literal -- no captured content -- keyed on the same flag the
+    # guard tolerated the axis by, and substituted FIRST in the template
+    # chain: the placeholder is gone before any captured string reaches the
+    # template, so a captured marker can never splice it and the marker needs
+    # no TEMPLATE_MARKERS entry.
+    window_note = (AGENTIC_WINDOW_NOTE
+                   if stats.get("costBreakdownWindow") else "")
 
     OUT.parent.mkdir(parents=True, exist_ok=True)
     # Provenance. The content hash is a sha256 over the two capture files,
@@ -1141,7 +1195,8 @@ def main():
     # it -- can never re-splice a rendered tbody. render_static_tbodies has
     # already refused any rendered body that carries a marker.
     frontier_tbody, main_tbody = render_static_tbodies(rows)
-    OUT.write_text(TEMPLATE.replace("__PROVENANCE__", provenance)
+    OUT.write_text(TEMPLATE.replace("__AGENTIC_WINDOW_NOTE__", window_note)
+                   .replace("__PROVENANCE__", provenance)
                    .replace("__CAPTURED__", captured)
                    .replace("__TBODY_FRONTIER__", frontier_tbody)
                    .replace("__TBODY_MAIN__", main_tbody)
@@ -1488,7 +1543,7 @@ TEMPLATE = r"""<!DOCTYPE html>
       the cost it measured running it, and both come off the same run.</p>
     <div class="card">
       <div class="cap">GDPval-AA v2 vs its measured cost per task &middot; log cost axis &middot; up-and-left is better
-        &middot; click any point to pin its name</div>
+        &middot; click any point to pin its name</div>__AGENTIC_WINDOW_NOTE__
       <div class="plotwrap">
         <svg id="svg-agentic" viewBox="0 0 980 560" role="img"
              aria-label="Scatter plot of GDPval-AA v2 against its measured cost per task in US dollars"></svg>
