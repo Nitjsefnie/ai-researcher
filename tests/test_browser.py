@@ -65,6 +65,14 @@ def collect_page_coverage(session):
     return entries
 
 
+# Both tables' tbody DOM, cell-for-cell: className and textContent per
+# td, row order preserved -- one expression shared by the #97 drift test
+# and both dispute drift contracts, so every drift contract stays one
+# comparison.
+TBODY_DOM = """(tid) => [...document.querySelectorAll(`#${tid} tbody tr`)]
+  .map(tr => [...tr.children].map(td => [td.className, td.textContent]))"""
+
+
 class BrowserInteractionTests(unittest.TestCase):
     # pylint: disable=too-many-public-methods
     # One behaviour, one test: #85's per-chart label-distinctness guarantee is
@@ -1422,9 +1430,10 @@ class BrowserInteractionTests(unittest.TestCase):
 
     # Both tables' tbody DOM, cell-for-cell: className and textContent per
     # td, row order preserved. evaluate() runs even with script execution
-    # disabled, so one expression reads both pages the same way.
-    _TBODY_DOM = """(tid) => [...document.querySelectorAll(`#${tid} tbody tr`)]
-      .map(tr => [...tr.children].map(td => [td.className, td.textContent]))"""
+    # disabled, so one expression reads both pages the same way. The
+    # expression itself is the module's TBODY_DOM, shared with the dispute
+    # drift contracts so there is exactly one comparison.
+    _TBODY_DOM = TBODY_DOM
 
     def _tbody_dom(self, page, table_id):
         return page.evaluate(self._TBODY_DOM, table_id)
@@ -2239,10 +2248,9 @@ class DisputeBrowserTests(unittest.TestCase):
         return page
 
     # Both tables' tbody DOM, cell-for-cell: className and textContent per
-    # td, row order preserved -- the same expression the #97 drift test
-    # reads, so both drift contracts stay one comparison.
-    _TBODY_DOM = """(tid) => [...document.querySelectorAll(`#${tid} tbody tr`)]
-      .map(tr => [...tr.children].map(td => [td.className, td.textContent]))"""
+    # td, row order preserved -- the module's TBODY_DOM expression, the same
+    # one the #97 drift test reads, so every drift contract is one comparison.
+    _TBODY_DOM = TBODY_DOM
 
     def test_disputed_points_and_connector_render_per_chart(self):
         for key in ("intelligence", "agentic"):
@@ -2415,3 +2423,190 @@ class DisputeBrowserTests(unittest.TestCase):
         self.assertIn("first is the canonical generation", foot)
         self.assertIn("pair order is canonical", foot)
         page.close()
+
+
+def _presence_probe_model():
+    """_probe_models(1)[0] widened into a PRESENCE-disputed record (issue
+    #211): variant 2 is the EMPTY map -- that generation does not carry the
+    model at all -- and variant 1 is the carried generation's full map,
+    never `{}` by construction."""
+    probe = _probe_models(1)[0]  # ii 80.0, cost 0.5, gdpval 0.4
+    probe.update({
+        "contextWindowTokens": 200000,
+        "price1mInputTokens": 0.5,
+        "price1mOutputTokens": 1.0,
+    })
+    probe["genVariants"] = [
+        {"ii": 80.0, "cost": 0.5, "gdpval": 0.4, "gdpvalCost": 0.5,
+         "pin": 0.5, "pout": 1.0, "ctx": 200000},
+        {},
+    ]
+    return probe
+
+
+class PresenceDisputeBrowserTests(unittest.TestCase):
+    """Issue #211 in a browser: a presence-disputed row -- one variant the
+    empty map -- keeps exactly today's marks (the canonical anchor's red
+    ring; no second point, no connector) while every carried field renders
+    its "value / —" pair red. Sibling of DisputeBrowserTests with the same
+    V8-coverage wiring, on its own fixture page: the padded JS paths never
+    execute on a page without a presence row, so without coverage wiring the
+    JavaScript ratchet reads them as uncovered and reds the coverage job."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls._saved = (build.RAW, build.AGENTS_RAW, build.OUT)
+        cls._dir = tempfile.TemporaryDirectory(  # pylint: disable=consider-using-with
+            prefix=".issue-211-browser-", dir=build.ROOT)
+        data = pathlib.Path(cls._dir.name) / "data"
+        data.mkdir()
+        models = _probe_models(6)
+        models[0] = _presence_probe_model()
+        (data / "aa-raw-models.json").write_text(json.dumps(models),
+                                                 encoding="utf-8")
+        (data / "aa-raw-coding-agents.json").write_text(
+            json.dumps(_PROBE_AGENTS), encoding="utf-8")
+        (data / "captured-at.txt").write_text("2026-10-06\n", encoding="utf-8")
+        build.RAW = data / "aa-raw-models.json"
+        build.AGENTS_RAW = data / "aa-raw-coding-agents.json"
+        build.OUT = pathlib.Path(cls._dir.name) / "frontier-models.html"
+        try:
+            with contextlib.redirect_stdout(io.StringIO()):
+                build.main()
+            cls.playwright = sync_playwright().start()
+            cls.browser = cls.playwright.chromium.launch(
+                executable_path=CHROMIUM_EXECUTABLE,
+                headless=True,
+                args=["--no-sandbox"])
+        except BaseException:
+            build.RAW, build.AGENTS_RAW, build.OUT = cls._saved
+            cls._dir.cleanup()
+            raise
+        # The same V8 block-coverage wiring DisputeBrowserTests uses.
+        cls._coverage_entries = []
+        cls._open_pages = []
+        original_new_page = cls.browser.new_page
+
+        def new_page(**kwargs):
+            page = original_new_page(**kwargs)
+            if kwargs.get("java_script_enabled") is False:
+                return page
+            session = page.context.new_cdp_session(page)
+            session.send("Debugger.enable")
+            session.send("Profiler.enable")
+            session.send("Profiler.startPreciseCoverage",
+                         {"callCount": True, "detailed": True})
+            original_close = page.close
+
+            def close(**close_kwargs):
+                if (page, session) in cls._open_pages:
+                    cls._open_pages.remove((page, session))
+                cls._coverage_entries.extend(collect_page_coverage(session))
+                return original_close(**close_kwargs)
+
+            page.close = close
+            cls._open_pages.append((page, session))
+            return page
+
+        cls.browser.new_page = new_page
+
+    @classmethod
+    def tearDownClass(cls):
+        build.RAW, build.AGENTS_RAW, build.OUT = cls._saved
+        for _page, session in list(cls._open_pages):
+            try:
+                cls._coverage_entries.extend(collect_page_coverage(session))
+            except Exception:  # pylint: disable=broad-exception-caught
+                pass
+        cls._open_pages.clear()
+        dump = os.environ.get("JS_COVERAGE_OUT")
+        if dump:
+            path = pathlib.Path(dump)
+            entries = cls._coverage_entries
+            if path.exists():
+                try:
+                    entries = json.loads(
+                        path.read_text(encoding="utf-8")) + entries
+                except (OSError, json.JSONDecodeError):
+                    pass
+            path.write_text(json.dumps(entries), encoding="utf-8")
+        cls.browser.close()
+        cls.playwright.stop()
+        cls._dir.cleanup()
+
+    def _loaded_page(self):
+        page = self.browser.new_page(viewport={"width": 1280, "height": 900})
+        page.goto(build.OUT.as_uri())
+        page.wait_for_function(
+            "document.getElementById('count').textContent !== '—'")
+        return page
+
+    def test_a_presence_row_gets_a_red_ring_and_no_second_point(self):
+        # variantPair maps the empty variant to null: addDisputeMarks rings
+        # the canonical anchor and never draws a second circle or a
+        # connector -- "no projectable pair yields no extra mark".
+        for key in ("intelligence", "agentic"):
+            with self.subTest(chart=key):
+                page = self._loaded_page()
+                points = page.locator(f"#svg-{key} circle.dispute")
+                self.assertEqual(points.count(), 1)
+                self.assertEqual(
+                    page.locator(f"#svg-{key} .dispute-link").count(), 0)
+                page.close()
+
+    def test_a_presence_row_tooltip_reads_value_over_em_dash(self):
+        page = self._loaded_page()
+        page.locator("#svg-intelligence circle.dispute").first.hover()
+
+        rows = page.locator("#tip-intelligence .trow").all()
+        values = {r.locator("span").first.inner_text():
+                  r.locator("span").last.inner_text() for r in rows}
+        self.assertEqual(values["Intelligence Index"], "80.0 / —")
+        self.assertEqual(values["Cost per task"], "$0.500 / —")
+        self.assertEqual(values["Context"], "200K / —")
+        dispute_rows = page.locator("#tip-intelligence .trow .tv.dispute")
+        self.assertEqual(dispute_rows.count(), 3,
+                         "score, cost and context render red; the em-dash "
+                         "side is the generation that does not carry the "
+                         "model")
+
+        page.locator("#svg-agentic circle.dispute").first.hover()
+        rows = page.locator("#tip-agentic .trow").all()
+        values = {r.locator("span").first.inner_text():
+                  r.locator("span").last.inner_text() for r in rows}
+        self.assertEqual(values["GDPval-AA v2"], "40.0 / —")
+        self.assertEqual(values["Cost per task"], "$0.500 / —")
+        self.assertEqual(values["Context"], "200K / —")
+        page.close()
+
+    def test_a_presence_row_renders_red_in_the_table(self):
+        page = self._loaded_page()
+        cells = page.locator("#tbl td.dispute").all_text_contents()
+        self.assertIn("80.0 / — frontier", cells)
+        self.assertIn("$0.500 / —", cells)
+        self.assertIn("40.0 / — frontier", cells)
+        self.assertIn("$0.5 / —", cells)
+        self.assertIn("200K / —", cells)
+        # Red, not the primary ink -- the same computed hue the value
+        # dispute renders.
+        color = page.locator("#tbl td.dispute").first.evaluate(
+            "el => getComputedStyle(el).color")
+        self.assertEqual(color, "rgb(208, 59, 59)")
+        page.close()
+
+    def test_the_static_tbody_equals_the_js_tbody_on_the_presence_page(self):
+        # The same drift contract DisputeBrowserTests holds for the value
+        # dispute, on the padded shape: the static rows are exactly what
+        # fillTable / fillFrontiers build, cell-for-cell.
+        on = self._loaded_page()
+        off = self.browser.new_page(
+            viewport={"width": 1280, "height": 900}, java_script_enabled=False)
+        off.goto(build.OUT.as_uri())
+
+        for table in ("fTable", "tbl"):
+            with self.subTest(table=table):
+                self.assertEqual(
+                    on.evaluate(TBODY_DOM, table),
+                    off.evaluate(TBODY_DOM, table))
+        on.close()
+        off.close()
