@@ -340,9 +340,11 @@ def check_cost_breakdown(models: list[dict]) -> tuple[int, list[str]]:
     breakdown that does not sum to the leaderboard's total is not that
     total's breakdown, so the merge leaves the leaderboard's number alone and
     the GDPval axis reads absent for that model until the routes converge
-    (issue #200). It is reported so a capture that drops EVERY breakdown reads
-    as what it is -- a cross-generation window the merge is holding honest
-    through -- rather than as the schema change the refusal below names.
+    (issue #200). When the merge dropped EVERY breakdown, the hour is a
+    cross-generation window the merge is holding honest through, not a schema
+    change: it is reported and returned as (0, dropped) -- main() records the
+    state to the window marker, and the refresh publishes through the hour
+    rather than refusing one the page recovers from on its own (issue #217).
     """
     checked = 0
     dropped: list[str] = []
@@ -379,8 +381,11 @@ def check_cost_breakdown(models: list[dict]) -> tuple[int, list[str]]:
             # The merge dropped every breakdown, so nothing is left to check.
             # That is a window, not a schema change: AA's two routes are
             # serving two generations and the merge is refusing to decompose
-            # one generation's total with another's breakdown.
-            sys.exit(
+            # one generation's total with another's breakdown. Reported and
+            # returned, never refused -- during a window the refresh
+            # publishes from the fresh route or leaves the page as-is, and
+            # only a real schema change fails the capture (issue #217).
+            print(
                 f"every model's cost breakdown was dropped as another "
                 f"generation's ({len(dropped)} model(s), first "
                 f"{dropped[0]!r}) -- AA's leaderboard and detail routes are "
@@ -388,8 +393,37 @@ def check_cost_breakdown(models: list[dict]) -> tuple[int, list[str]]:
                 "schema, and the page will recover on its own once they "
                 "converge"
             )
+            return 0, dropped
         sys.exit("no model carries a cost breakdown -- schema changed")
     return checked, dropped
+
+
+# The sidecar marker for the all-dropped window (issue #217): check_cost_
+# breakdown's (0, dropped) return lands here as pipeline state the build
+# layer reads. Beside the capture, like the stamp it complements.
+COST_WINDOW_MARKER = ROOT / "data" / "cost-breakdown-window.txt"
+
+
+def record_cost_window(priced: int, dropped: list[str],
+                       path: pathlib.Path = COST_WINDOW_MARKER) -> None:
+    """Record -- or clear -- the all-dropped window marker beside the capture.
+
+    A window hour (priced == 0 with a non-empty `dropped`, issue #217) writes
+    the file with ONE human-readable line -- count and first dropped slug, a
+    git-history note for whoever reads it. Nothing from the file is page
+    input: build.py reads its EXISTENCE and renders its own fixed wording, so
+    no marker text is ever interpolated into the page. Any other hour removes
+    the file (missing_ok=True), so a stale marker can never outlive its own
+    hour, and the schema sys.exit paths in check_cost_breakdown run BEFORE
+    this call -- a schema-broken run exits without ever writing a marker.
+    """
+    if priced == 0 and dropped:
+        path.write_text(
+            f"every cost breakdown dropped as another generation's: "
+            f"{len(dropped)} model(s), first {dropped[0]}\n",
+            encoding="utf-8")
+        return
+    path.unlink(missing_ok=True)
 
 
 def balanced_object(text: str, start: int) -> str | None:
@@ -1003,6 +1037,7 @@ def main() -> None:
     captured = capture(args.html, args.detail_html, prev_records)
     models = captured.models
     priced, dropped = check_cost_breakdown(models)
+    record_cost_window(priced, dropped)
     agents_text = fetch_html(args.agents_html, AGENTS_URL)
     agents = coding_agent_rows(flight_payload(agents_text))
 

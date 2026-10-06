@@ -174,18 +174,49 @@ class CostBreakdownTests(unittest.TestCase):
 
     def test_a_capture_whose_every_breakdown_was_dropped_names_the_window(self):
         # The merge is holding the line through a cross-generation window: the
-        # refusal must not blame a schema change for a window that will close
-        # on its own, and must name the models it is talking about.
+        # all-dropped state is REPORTED AND RETURNED, never refused -- during
+        # a window the refresh publishes from the fresh route or leaves the
+        # page as-is, and only a real schema change fails the capture (issue
+        # #217). The report still names the models it is talking about and
+        # still refuses to blame the schema for a window that closes on its
+        # own.
         models = [{"slug": f"dropped-{i}", "intelligenceIndexCostPerTask": 1.5}
                   for i in range(3)]
+        stdout = io.StringIO()
 
-        with self.assertRaises(SystemExit) as caught:
-            fetch_aa.check_cost_breakdown(models)
+        with contextlib.redirect_stdout(stdout):
+            priced, dropped = fetch_aa.check_cost_breakdown(models)
 
-        message = str(caught.exception)
-        self.assertIn("dropped-0", message)
+        self.assertEqual(priced, 0)
+        self.assertEqual(dropped, ["dropped-0", "dropped-1", "dropped-2"])
+        message = stdout.getvalue()
         self.assertIn("two generations", message)
+        self.assertIn("dropped-0", message)
         self.assertNotIn("schema changed", message)
+
+    def test_the_window_marker_is_written_on_a_window_and_cleared_after(self):
+        # The capture step records the window state to a sidecar marker so
+        # the build layer can tell a window hour from a broken capture (issue
+        # #217). Window on: the file appears with ONE human-readable line.
+        # Window off: the file goes, so a stale marker can never outlive its
+        # hour. Clearing when it is already absent is not an error -- that is
+        # the common hour, and the schema sys.exit paths run BEFORE any
+        # record call, so a schema-broken run never leaves a marker.
+        with tempfile.TemporaryDirectory() as tmp:
+            marker = pathlib.Path(tmp) / "cost-breakdown-window.txt"
+
+            fetch_aa.record_cost_window(
+                0, ["dropped-0", "dropped-1"], marker)
+            note = marker.read_text(encoding="utf-8")
+            self.assertIn("every cost breakdown dropped", note)
+            self.assertIn("dropped-0", note)
+            self.assertEqual(len(note.splitlines()), 1)
+
+            fetch_aa.record_cost_window(2, ["dropped-3"], marker)
+            self.assertFalse(marker.exists(), "stale marker outlived its hour")
+
+            fetch_aa.record_cost_window(2, [], marker)
+            self.assertFalse(marker.exists())
 
     def test_a_dropped_slug_exits_before_the_chart_can_empty(self):
         # Exactly what v4.3 did to terminalbench-v2-1 and tau3-banking.
