@@ -110,16 +110,26 @@ to one missing marker before any comparison, and a cost object compares as
 the scalar of its own `cost.total`), reads sharing a fingerprint are one
 generation, and the detail route joins whichever generation it IS — it never
 raises a dispute by itself, a stale detail corpus being the known,
-precedence-handled state above. One fingerprint → the merge above, byte for
-byte. Two → the capture holds both, every record carrying `genVariants`: one
-flat map per generation whose fields are that generation's own published
+precedence-handled state above. One fingerprint **on the same slug set** →
+the merge above, byte for byte. Two fingerprints, or one fingerprint on
+different slug sets — a model present in one look and absent from the other,
+which the Overseer ruled an inconsistency between the generations (2026-10-06,
+issue #211) — and the capture holds both, every record carrying `genVariants`:
+one flat map per generation whose fields are that generation's own published
 values.
 
 **`genVariants` encoding: canonical order, canonical-first silence.** The
 variants are ordered by ascending `generation_key`, so the corpus bytes do
 not depend on which look a run read first, and a record's plain fields are
 the first variant's — the canonical generation's value, gap-filled only where
-it lacks the field (a missing marker is a fill, never a winner). Identity and
+it lacks the field (a missing marker is a fill, never a winner). The map list
+is padded to one entry per generation, with the empty map (`{}`) at every
+generation that does not carry the model — `{}` means *not carried*, and a
+carried variant is never `{}` (a carried record always publishes at least one
+variant field). Presence in one look and absence from the other keeps the
+model in the union, disputed by presence; it supersedes the earlier reading
+that a model AA added or retired between the looks is a corpus union, never a
+conflict (Overseer ruling, 2026-10-06, issue #211). Identity and
 flag fields (`name`, `shortName`, `slug`, `creator`, `modelCreatorName`,
 `isOpenWeights`, `deprecated`, `isReasoning`,
 `intelligenceIndexIsEstimated`) and everything outside the variant map's
