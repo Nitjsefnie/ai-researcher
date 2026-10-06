@@ -414,8 +414,10 @@ def record_cost_window(priced: int, dropped: list[str],
     input: build.py reads its EXISTENCE and renders its own fixed wording, so
     no marker text is ever interpolated into the page. Any other hour removes
     the file (missing_ok=True), so a stale marker can never outlive its own
-    hour, and the schema sys.exit paths in check_cost_breakdown run BEFORE
-    this call -- a schema-broken run exits without ever writing a marker.
+    hour. The function guarantees only what its arguments say: the schema
+    sys.exit paths live in check_cost_breakdown, and a schema-broken run
+    escapes there only because main() records the returned verdict -- call
+    order, not a property of this function.
     """
     if priced == 0 and dropped:
         path.write_text(
