@@ -82,7 +82,9 @@ leaderboard publishes every value it carries, the detail route fills only what
 the leaderboard omits, and a conflicting detail value simply loses. There is no
 disagreement state, no heal, no skip, no baseline, and no exit code for a
 disagreement. A field the leaderboard ever drops is a *fill* from the detail
-route, not a disagreement.
+route, not a disagreement. That is the routes against each other; the two
+leaderboard looks one run takes against each other are the dispute layer
+below (issue #208) — the one place two published values are both held.
 
 One place needs care, because the merge is where two generations could still
 mix: `intelligenceIndexCostPerTask` ships as a **bare number** on the
@@ -94,6 +96,57 @@ route it came from, so it is dropped whole and the plain scalar is left. That
 model's GDPval cost then renders absent until the routes converge, which is the
 honest outcome: the alternatives are publishing a stale total or failing the
 refresh red for hours.
+
+**When the run's two leaderboard looks disagree, both generations are held —
+the dispute layer.** The precedence above settles the routes against each
+other; it cannot settle a run against itself. AA serves the leaderboard from
+its own Vercel cache, so the two looks one run takes — 180 seconds apart
+(`DISPUTE_LOOK_SPACING_SECONDS`) — can land on different generations while a
+publish window is live. Detection is in-run with no cross-run state: each
+read is fingerprinted (`generation_key`, a sha256 over the slug-sorted
+records normalized on the leaderboard field universe minus the never-red
+speed/latency family — absent, null, `""` and `$undefined` fold to one
+missing marker before any comparison, and a cost object compares as the
+scalar of its own `cost.total`), reads sharing a fingerprint are one
+generation, and the detail route joins whichever generation it IS — it never
+raises a dispute by itself, a stale detail corpus being the known,
+precedence-handled state above. One fingerprint → the merge above, byte for
+byte. Two → the capture holds both, every record carrying `genVariants`: one
+flat map per generation whose fields are that generation's own published
+values.
+
+**`genVariants` encoding: canonical order, canonical-first silence.** The
+variants are ordered by ascending `generation_key`, so the corpus bytes do
+not depend on which look a run read first, and a record's plain fields are
+the first variant's — the canonical generation's value, gap-filled only where
+it lacks the field (a missing marker is a fill, never a winner). Identity and
+flag fields (`name`, `shortName`, `slug`, `creator`, `modelCreatorName`,
+`isOpenWeights`, `deprecated`, `isReasoning`,
+`intelligenceIndexIsEstimated`) and everything outside the variant map's
+fields (`ii`, `cost`, `gdpval`, `gdpvalCost`, `ctx`, `pin`, `pout`) are never
+disputed: they render the canonical value, silent — the PM-approved
+canonical-first rule. parameters, licence and release date are detail-fills
+with a single in-run source, so they cannot dispute either. The never-red
+family (`NEVER_RED_FIELDS`, hardcoded, never widened silently — a new
+speed-shaped field joins it only by a reviewed change) is the speed/latency
+set: it re-samples every hour by design, so two looks of the SAME generation
+routinely disagree on it and a dispute there would hold the page red
+permanently. `gdpvalCost` is recovered from each variant's own cost breakdown
+and is absent when that breakdown does not sum to its own total — never
+supplied from another generation's parts, which is what makes a disputed axis
+honest.
+
+This supersedes issue #200's no-dispute-layer rule for one case only — the two
+leaderboard looks against each other (maintainer ruling, 2026-10-06, issue
+#208). Route against route, #200 stands unchanged. A disputed capture is an
+ordinary hour: the run never exits red, the page renders both values red with
+the pair order canonical, and the scheduled commit's body carries the differ's
+Disputes section. A run whose looks agree writes no `genVariants` key anywhere
+and is byte-identical to the single-generation capture. The provenance
+consequence is worth saying plainly: the models capture is a merged,
+dispute-bearing artifact — two routes, and while a window is live two
+generations — so the page's raw-byte provenance digest is a sha256 over
+merged, dispute-bearing content, never over AA's raw payload.
 
 A detail page lists every model **except** its own, so the host slug loses its
 detail-only fields. `detail_host_slug` therefore picks a model with no measured
@@ -282,7 +335,10 @@ is simply resolved: the leaderboard publishes, the detail route fills, and the
 hour is an ordinary one whose only scheduled commit is `Refresh capture: …`.
 There is no window to open, close, record or heal, and no disagreement that can
 turn a run red. Every value still comes only from AA; nothing is estimated or
-interpolated, and nothing from the older generation reaches the page.
+interpolated, and nothing from the older generation reaches the page. (The two
+leaderboard LOOKS disagreeing with each other is the one thing precedence
+cannot absorb — that is the dispute layer above, which holds both generations
+red and is just as never-red.)
 
 ## Commit / co-author trailer
 
