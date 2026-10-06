@@ -19,7 +19,8 @@ what the page says:
                counts, per-eval cost splits, blended prices, gdpval CIs.
                Discarded unless --derived
   cosmetic     lab branding (colour, logo) -- always discarded, counted only
-  disputes     the capture's generation layer (issue #208): `genVariants`
+  disputes     the capture's generation layer (issues #208/#211):
+               `genVariants` and the cross-run `crossRunMerged` marker
                appearing on / disappearing from / changing on N models,
                one line per shape in its own section -- never a per-model
                field line, which would print the whole variant list

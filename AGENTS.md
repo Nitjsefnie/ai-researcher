@@ -188,9 +188,11 @@ three-generation corner (the looks disagree AND the detail route matches
 neither fingerprint): the detail route then fills nothing, the parameter
 count is absent everywhere, and the parameters axis empties into `build.py`'s
 empty-axis guard. That nonzero exit is the designed go-re-read-AA-by-hand
-signal, not a dispute-layer failure. A run whose looks agree writes no
-`genVariants` key anywhere and is byte-identical to the single-generation
-capture. The provenance
+signal, not a dispute-layer failure. Without the cross-run look-back, a
+run whose looks agree writes no `genVariants` key anywhere and is
+byte-identical to the single-generation capture; with it, the same holds
+exactly when the two slug sets agree, and a caught flip writes the
+disputed shape the cross-run section above defines. The provenance
 consequence is worth saying plainly: the models capture is a merged,
 dispute-bearing artifact — two routes, and while a window is live two
 generations — so the page's raw-byte provenance digest is a sha256 over
