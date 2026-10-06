@@ -601,6 +601,123 @@ class ReportTests(unittest.TestCase):
                                  for line in text.splitlines()))
 
 
+class DisputeSectionTests(unittest.TestCase):
+    """The differ learns the dispute layer (issue #208).
+
+    `genVariants` is a TOP-LEVEL record key carrying the whole per-generation
+    list, so its movement between two captures is section news -- one line
+    per shape -- and never a per-model field line: printing the variant list
+    per model is exactly the per-field spam the section exists to prevent.
+    """
+
+    def setUp(self):
+        self.tmp = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, self.tmp)
+
+    def render(self, old, new):
+        root = pathlib.Path(self.tmp)
+        for name, data in (("old.json", old), ("new.json", new)):
+            (root / name).write_text(json.dumps(data), encoding="utf-8")
+        args = argparse.Namespace(old=str(root / "old.json"),
+                                  new=str(root / "new.json"),
+                                  speed_tol=0.25, tol=0.0, derived=False,
+                                  all=False, commit_msg=False)
+        buffer = io.StringIO()
+        with contextlib.redirect_stdout(buffer):
+            diff_aa.print_report(args)
+        return buffer.getvalue()
+
+    def test_the_dispute_key_is_its_own_class(self):
+        # Explicit classification: the key is top-level and not jitter-shaped,
+        # so nothing in the JITTER/derived/cosmetic machinery files it -- but
+        # the class must be its own, never "significant": the default would
+        # print the whole variant list, once per model, in field changes.
+        self.assertEqual(diff_aa.classify("genVariants"), "disputes")
+
+    def test_variants_appearing_are_one_section_line_never_per_model_lines(self):
+        old = [capture("Incumbent", intelligence=50)]
+        new = [dict(capture("Incumbent", intelligence=50), genVariants=[
+            {"ii": 50.0, "cost": 0.75, "gdpval": 0.50},
+            {"ii": 51.0, "cost": 0.80, "gdpval": 0.49},
+        ])]
+
+        report = self.render(old, new)
+
+        self.assertIn("== disputes", report)
+        self.assertIn("genVariants appeared on 1 model(s)", report)
+        # The only cheap per-model conflict count there is: models whose
+        # genVariants carry more than one variant. Labeled as what it is --
+        # multiplicity -- because two agreeing variants render no red cell.
+        self.assertIn("1 model(s) carry more than one variant", report)
+        self.assertNotIn("genVariants:", report)
+
+    def test_variants_disappearing_and_changing_are_one_line_each(self):
+        pair = [{"ii": 50.0, "cost": 0.75}, {"ii": 51.0, "cost": 0.80}]
+        old = [
+            dict(capture("Dropped", ident="dropped", intelligence=50),
+                 genVariants=[{"ii": 50.0, "cost": 0.75}]),
+            dict(capture("Moved", ident="moved", intelligence=50),
+                 genVariants=pair),
+            dict(capture("Quiet", ident="quiet", intelligence=50),
+                 genVariants=pair),
+        ]
+        new = [
+            capture("Dropped", ident="dropped", intelligence=50),
+            dict(capture("Moved", ident="moved", intelligence=50),
+                 genVariants=[{"ii": 50.0, "cost": 0.75},
+                              {"ii": 52.0, "cost": 0.80}]),
+            dict(capture("Quiet", ident="quiet", intelligence=50),
+                 genVariants=pair),
+        ]
+
+        report = self.render(old, new)
+
+        self.assertIn("== disputes", report)
+        self.assertIn("genVariants disappeared from 1 model(s)", report)
+        self.assertIn("genVariants changed on 1 model(s)", report)
+        self.assertNotIn("genVariants appeared on", report)
+        # The multi-variant count is a property of the new capture -- the
+        # news-free "Quiet" model counts too, because it is the bridge
+        # between the capture log's carriers count and the real thing.
+        self.assertIn("2 model(s) carry more than one variant", report)
+
+    def test_no_variants_on_either_side_prints_no_section(self):
+        # Today's output byte-shape: a quiet capture gains no section at all.
+        old = [capture("Incumbent", intelligence=50, cost=1.0)]
+        new = [capture("Incumbent", intelligence=58, cost=1.0)]
+
+        report = self.render(old, new)
+
+        self.assertNotIn("== disputes", report)
+        self.assertNotIn("genVariants", report)
+
+    def test_identical_variants_on_both_sides_print_no_section(self):
+        # A disputed state that did not move between the captures is not
+        # news either -- the same discipline that omits unchanged frontiers.
+        pair = [{"ii": 50.0, "cost": 0.75}, {"ii": 51.0, "cost": 0.80}]
+        old = [dict(capture("Steady", intelligence=50), genVariants=pair)]
+        new = [dict(capture("Steady", intelligence=50), genVariants=list(pair))]
+
+        report = self.render(old, new)
+
+        self.assertNotIn("== disputes", report)
+        self.assertNotIn("genVariants:", report)
+
+    def test_the_disputes_section_reaches_the_commit_message_body(self):
+        # as_commit_message carries the full report as its body, so the one
+        # place a scheduled refresh says anything is the commit itself.
+        old = [capture("Incumbent", intelligence=50)]
+        new = [dict(capture("Incumbent", intelligence=50), genVariants=[
+            {"ii": 50.0, "cost": 0.75}, {"ii": 51.0, "cost": 0.80},
+        ])]
+
+        report = self.render(old, new)
+        message = diff_aa.as_commit_message(report)
+
+        self.assertIn("== disputes", message)
+        self.assertIn("genVariants appeared on 1 model(s)", message)
+
+
 class DisplayNameTests(unittest.TestCase):
     """Issue #88 in the differ: no report line carries AA's dict-form effort.
 
