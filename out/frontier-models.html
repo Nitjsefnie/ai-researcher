@@ -426,8 +426,10 @@
       Where a cell reads "a / b", the first is the canonical generation's
       published value &mdash; the one the sort order and every frontier are
       computed from &mdash; and the pair order is canonical, fixed by the
-      capture's generation order. Agreeing values render once, unchanged.</p>
-    <p>Capture <code>f0eeed10152950e12fd7161c71872fbac4b8b002caa8f10c732f39ff3eda5afd</code> &mdash; sha256 over data/aa-raw-models.json -- the merged, dispute-bearing capture of AA's leaderboard looks and model detail route, holding every generation a dispute caught -- then data/aa-raw-coding-agents.json, whole files concatenated in that order. Source commit <code>c446eb5b0f72261a3ad0c6550402d76e9ac6effa</code>.</p>
+      capture's generation order. Agreeing values render once, unchanged;
+      an em-dash side marks a generation that does not carry the model at
+      all (issue #211).</p>
+    <p>Capture <code>f0eeed10152950e12fd7161c71872fbac4b8b002caa8f10c732f39ff3eda5afd</code> &mdash; sha256 over data/aa-raw-models.json -- the merged, dispute-bearing capture of AA's leaderboard looks and model detail route, holding every generation a dispute caught -- then data/aa-raw-coding-agents.json, whole files concatenated in that order.</p>
     <p>&copy; 2026 Peter Z (Nitjsefnie) &middot;
       <a href="https://github.com/Nitjsefnie/ai-researcher/blob/main/LICENSE">MIT licence</a></p>
   </div>
@@ -531,12 +533,17 @@ const DATA = {"rows":[{"name":"Claude Opus 5.5 (Max, Default Fallback)","base":"
   };
   // The per-variant values of one rendered field, or null when the cell
   // shows today's single value: not disputed, or no two PRESENT variant
-  // values differ (a missing marker is a fill, never a conflict).
+  // values differ and no variant is the empty map (a missing marker in a
+  // genuine variant is a fill, never a conflict; a padded `{}` is a
+  // generation that does not carry the model at all, issue #211, so a
+  // carried value against it IS a dispute).
   const disputedOf=(r,f)=>{
     const vs=variantsOf(r);
     if(!vs) return null;
     const vals=vs.map(v=>v[f]);
-    return new Set(vals.filter(v=>v!=null).map(Number)).size>1?vals:null;
+    return new Set(vals.filter(v=>v!=null).map(Number)).size>1
+        ||(vals.some(v=>v!=null)&&vs.some(v=>!Object.keys(v).length))
+      ?vals:null;
   };
   const pairText=(vals,fmt)=>vals.map(v=>v==null?"—":fmt(v)).join(" / ");
   // The variant fields a metric's score/cost cells render -- [score field,
