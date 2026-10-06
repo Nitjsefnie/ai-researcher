@@ -84,7 +84,8 @@ disagreement state, no heal, no skip, no baseline, and no exit code for a
 disagreement. A field the leaderboard ever drops is a *fill* from the detail
 route, not a disagreement. That is the routes against each other; the two
 leaderboard looks one run takes against each other are the dispute layer
-below (issue #208) — the one place two published values are both held.
+below (issue #208); the previous run's committed capture against this run's
+fetch is the second — the cross-run presence layer, also below.
 
 One place needs care, because the merge is where two generations could still
 mix: `intelligenceIndexCostPerTask` ships as a **bare number** on the
@@ -102,7 +103,7 @@ the dispute layer.** The precedence above settles the routes against each
 other; it cannot settle a run against itself. AA serves the leaderboard from
 its own Vercel cache, so the two looks one run takes — 180 seconds apart
 (`DISPUTE_LOOK_SPACING_SECONDS`) — can land on different generations while a
-publish window is live. Detection is in-run with no cross-run state: each
+publish window is live. Detection starts in-run: each
 read is fingerprinted (`generation_key`, a 16-hex sha256 prefix over the
 slug-sorted records normalized on the leaderboard field universe minus the
 never-red speed/latency family — absent, null, `""` and `$undefined` fold
@@ -147,6 +148,35 @@ permanently. `gdpvalCost` is recovered from each variant's own cost breakdown
 and is absent when that breakdown does not sum to its own total — never
 supplied from another generation's parts, which is what makes a disputed axis
 honest.
+
+**The cross-run presence layer: the previous capture against this run's fetch
+(Overseer ruling, 2026-10-06, evening, on the reopened issue #211).** The
+in-run layer above cannot see a flip that happens between runs: a run whose
+own looks agree holds one generation, and an AA-side serving change lands as
+a one-model flip of the published set. So the hourly refresh reads the
+previous committed capture before the fetch overwrites it
+(`fetch_aa.py --cross-run-lookback`, the refresh workflow's flag), and a
+model present in that capture's **firm set** — the records it holds without
+the `crossRunMerged` marker — and absent from this run's fetch, or the
+reverse, is merged and marked disputed: kept, both generations shown, red,
+paired. The layer is presence-only, and the previous corpus participates
+only through the diff slugs: hour-to-hour value movement is ordinary data
+movement, never a dispute, so shared models take no previous-generation slot
+and raise no cross-run value dispute. A record the layer merges from the
+previous capture carries `crossRunMerged: true` — this run's own fetch did
+not serve the model, and the marker is what lets the NEXT run read its
+look-back correctly: a marked record is dispute state, not serving
+evidence, so it neither merges nor disputes again and the model settles out
+the first hour AA still does not serve it. A stable retirement therefore
+settles within one further hour; a look-back that pinned a model disputed
+forever would be wrong. A re-added model — served now, absent from the firm
+set (a brand-new model included, which therefore disputes red for its first
+hour) — takes the empty-map previous slot and carries no marker: it is
+serving evidence the moment the run's own fetch returned it. A
+cross-run-disputed record's `genVariants` extends to one entry per
+generation the record is disputed across — the run's own generations plus
+the previous run's, the previous slot positioned by ascending
+`generation_key` over the joint field universe.
 
 This supersedes issue #200's no-dispute-layer rule for one case only — the two
 leaderboard looks against each other (maintainer ruling, 2026-10-06, issue
