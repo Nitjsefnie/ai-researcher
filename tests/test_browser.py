@@ -2317,8 +2317,8 @@ class DisputeBrowserTests(unittest.TestCase):
         try:
             page.locator("#copyMd").click()
             md = page.evaluate("() => window.__copied")
-            line = next(l for l in md.split("\n")
-                        if l.startswith("| Probe Model 0000 "))
+            line = next(row for row in md.split("\n")
+                        if row.startswith("| Probe Model 0000 "))
             cells = [c.strip() for c in line.strip("|").split("|")]
             self.assertEqual(cells[4], "80.0 / 78.0")
             self.assertEqual(cells[5], "$0.500 / $0.900")
