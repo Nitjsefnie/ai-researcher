@@ -2125,7 +2125,7 @@ class DisputeRenderTests(unittest.TestCase):
         page = _build_in_temp_dir()
 
         self.assertIn(DISPUTE_LEGEND_MARK, page)
-        self.assertIn("first is the canonical generation", page)
+        self.assertIn("first is the carrying generation", page)
         self.assertIn("pair order is canonical", page)
 
     def test_the_provenance_inputs_note_names_the_merged_dispute_bearing_capture(

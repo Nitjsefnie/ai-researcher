@@ -2420,7 +2420,7 @@ class DisputeBrowserTests(unittest.TestCase):
 
         foot = page.locator(".foot").inner_text()
         self.assertIn("two inconsistent generations", foot)
-        self.assertIn("first is the canonical generation", foot)
+        self.assertIn("first is the carrying generation", foot)
         self.assertIn("pair order is canonical", foot)
         page.close()
 
