@@ -18,6 +18,7 @@ import urllib.request
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent / "scripts"))
 
 import fetch_aa  # noqa: E402  # pylint: disable=wrong-import-position
+import diff_aa  # noqa: E402  # pylint: disable=wrong-import-position
 import build  # noqa: E402  # pylint: disable=wrong-import-position
 
 
@@ -1614,6 +1615,37 @@ class MultiLookCaptureTests(unittest.TestCase):
         self.assertEqual(len(fixture_variants), 2)
         for variant in fixture_variants:
             self.assertAlmostEqual(variant["gdpvalCost"], 3.0)
+
+
+class GenVariantsSeamTests(unittest.TestCase):
+    """The producer→consumer seam of issue #208's dispute layer, pinned on
+    real function output: cross_generation_merge's disputed corpus feeds
+    build_rows (which must carry it as `gv`), and the one key the disputed
+    corpus adds over the quiet corpus is exactly the key diff_aa's Disputes
+    class files. The minimal `_look` fixture above is the whole corpus --
+    this is a seam pin, not a behavior re-test."""
+
+    def test_a_disputed_merge_feeds_build_rows_as_gv(self):
+        disputed = fetch_aa.cross_generation_merge(
+            [[_look("a", ii=41.0)], [_look("a", ii=40.5)]])
+
+        rows = build.build_rows(disputed)
+
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(
+            sorted(v["ii"] for v in rows[0]["gv"]), [40.5, 41.0])
+        # Canonical-first: the row's plain values are the first variant's.
+        self.assertEqual(rows[0]["ii"], rows[0]["gv"][0]["ii"])
+
+    def test_diff_aa_files_exactly_the_key_the_producer_writes(self):
+        quiet = fetch_aa.cross_generation_merge([[_look("a")], [_look("a")]])
+        disputed = fetch_aa.cross_generation_merge(
+            [[_look("a", ii=41.0)], [_look("a", ii=40.5)]])
+
+        added = {k for record in disputed for k in record} \
+            - {k for record in quiet for k in record}
+
+        self.assertEqual(added, {diff_aa.DISPUTES_KEY})
 
 
 if __name__ == "__main__":

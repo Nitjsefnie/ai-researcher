@@ -1521,6 +1521,67 @@ class BrowserInteractionTests(unittest.TestCase):
                 f"light-theme {name} measures {ratio:.2f}:1, below the WCAG "
                 f"AA 4.5:1 floor (fg={pair['fg']}, bg={pair['bg']})")
 
+    def test_dispute_red_meets_the_contrast_the_css_comment_claims(self):
+        # Issue #208's CSS comment states its own ratios -- 4.68:1 for the
+        # light text and the light mark, 3.62:1 for the mark on dark,
+        # 4.92:1 for the stepped dark text -- and they are pinned here by
+        # recomputing them from the hexes the stylesheet ships, so a retint
+        # that drops below the WCAG floors, or drifts from the comment,
+        # fails. The var() chain is pinned with them, so the computed ratio
+        # is what td.n.dispute and the tooltip's dispute rows actually
+        # render.
+        css = build.TEMPLATE
+
+        def token_hexes(token):
+            values = re.findall(rf"--{token}:#([0-9a-f]{{6}})", css)
+            self.assertTrue(
+                values, f"--{token} carries no hex in the stylesheet")
+            return values
+
+        surface = token_hexes("surface-1")
+        dispute_text = token_hexes("dispute-text")
+        mark = token_hexes("dispute")[0]
+        # The dark blocks (media query and data-theme scope) must agree per
+        # token -- a mode-specific override landing on only one of them
+        # would leave the other mode on the light value.
+        self.assertEqual(len(set(surface[1:])), 1)
+        self.assertEqual(len(set(dispute_text[1:])), 1)
+        light_bg, dark_bg = surface[0], surface[-1]
+        light_fg, dark_fg = dispute_text[0], dispute_text[-1]
+
+        def rgb(hex_text):
+            return [int(hex_text[i:i + 2], 16) for i in (0, 2, 4)]
+
+        text_light = self._wcag_contrast(rgb(light_fg), rgb(light_bg))
+        text_dark = self._wcag_contrast(rgb(dark_fg), rgb(dark_bg))
+        mark_light = self._wcag_contrast(rgb(mark), rgb(light_bg))
+        mark_dark = self._wcag_contrast(rgb(mark), rgb(dark_bg))
+
+        # Text carries WCAG AA's 4.5:1 in BOTH modes; the mark carries the
+        # 3:1 graphics floor in both.
+        self.assertGreaterEqual(
+            text_light, 4.5,
+            f"light --dispute-text measures {text_light:.2f}:1")
+        self.assertGreaterEqual(
+            text_dark, 4.5,
+            f"dark --dispute-text measures {text_dark:.2f}:1")
+        self.assertGreaterEqual(
+            mark_light, 3.0,
+            f"--dispute on the light surface measures {mark_light:.2f}:1")
+        self.assertGreaterEqual(
+            mark_dark, 3.0,
+            f"--dispute on the dark surface measures {mark_dark:.2f}:1")
+        # And the comment's own figures are what hold, at the precision it
+        # prints them -- so the comment cannot silently go stale either.
+        self.assertEqual(round(text_light, 2), 4.68)
+        self.assertEqual(round(mark_light, 2), 4.68)
+        self.assertEqual(round(mark_dark, 2), 3.62)
+        self.assertEqual(round(text_dark, 2), 4.92)
+
+        self.assertIn("td.n.dispute{color:var(--dispute-text)}", css)
+        self.assertIn(".tip .trow .tv.dispute{color:var(--dispute-text)}",
+                      css)
+
 
 def _load_perf_budgets():
     """Import scripts/ci/perf_budgets.py by path.
@@ -2225,8 +2286,14 @@ class DisputeBrowserTests(unittest.TestCase):
                   r.locator("span").last.inner_text() for r in rows}
         self.assertEqual(values["Intelligence Index"], "80.0 / 78.0")
         self.assertEqual(values["Cost per task"], "$0.500 / $0.900")
+        # Context is dispute-capable like any priced field, and the table's
+        # Context cell renders the pair -- the tooltip row reads the same,
+        # in the same canonical pair order.
+        self.assertEqual(values["Context"], "200K / 100K")
         dispute_rows = page.locator("#tip-intelligence .trow .tv.dispute")
-        self.assertGreaterEqual(dispute_rows.count(), 2)
+        self.assertEqual(dispute_rows.count(), 3,
+                         "the three disputed values -- score, cost and "
+                         "context -- render red; nothing else does")
 
         # The capability charts' tooltip follows the same rule, with the
         # gdpval score scaled *100 per variant exactly as the single value
@@ -2237,6 +2304,7 @@ class DisputeBrowserTests(unittest.TestCase):
                   r.locator("span").last.inner_text() for r in rows}
         self.assertEqual(values["GDPval-AA v2"], "40.0 / 38.0")
         self.assertEqual(values["Cost per task"], "$0.500 / $1.10")
+        self.assertEqual(values["Context"], "200K / 100K")
         page.close()
 
     def test_hovering_one_variant_highlights_the_whole_variant_set(self):

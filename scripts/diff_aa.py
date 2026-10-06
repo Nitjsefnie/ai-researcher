@@ -446,6 +446,7 @@ def as_commit_message(report: str) -> str:
     lines = report.splitlines()
 
     models = added = removed = speed = 0
+    disputes = multi = 0
     frontier = ""
     for line in lines:
         if line.startswith("new: ") and "(" in line:
@@ -458,6 +459,15 @@ def as_commit_message(report: str) -> str:
             speed = int(line.split(": ")[1].split()[0])
         elif line.startswith("== efficient frontier (expanded): ") and not frontier:
             frontier = line.split(": ", 1)[1].split(" of ")[0].strip()
+        elif line.startswith("  genVariants appeared on "):
+            disputes += int(line.split(" on ")[1].split()[0])
+        elif line.startswith("  genVariants disappeared from "):
+            disputes += int(line.split(" from ")[1].split()[0])
+        elif line.startswith("  genVariants changed on "):
+            disputes += int(line.split(" on ")[1].split()[0])
+        elif line.startswith("  ") and line[2:3].isdigit() and line.endswith(
+                " carry more than one variant (one per generation)"):
+            multi = int(line.split()[0])
 
     moves = frontier_moves(lines)
     head = f"Refresh capture: {models} models"
@@ -467,10 +477,13 @@ def as_commit_message(report: str) -> str:
         width budget spends itself on.
 
         Who is on the efficient frontier is the analytical payload, so it
-        outranks the model count; re-sampled throughput is the noisiest thing
-        that still clears the tolerance, so it goes last and is the first to be
-        dropped. Nothing is lost by dropping it: the body carries every section
-        in full, and the subject is a headline, not a summary.
+        outranks the model count; a moved dispute layer is rarer than an
+        add or a remove and names real published disagreement, so it sits
+        between the counts and the speed noise; re-sampled throughput is
+        the noisiest thing that still clears the tolerance, so it goes last
+        and is the first to be dropped. Nothing is lost by dropping it: the
+        body carries every section in full, and the subject is a headline,
+        not a summary.
         """
         out = []
         phrase = frontier_phrase(moves, named)
@@ -479,6 +492,16 @@ def as_commit_message(report: str) -> str:
         if added or removed:
             # Not "+1/-0 models" -- the head already said "models" once.
             out.append(f"+{added}/-{removed}")
+        if disputes:
+            # print_disputes' count lines, read back: N moved values, M
+            # models carrying more than one variant in the new capture.
+            # The "across" half is printed only where the two counts
+            # differ -- on the common appearance hour every carrier is a
+            # mover, and the short form is what lets the clause co-fit a
+            # frontier phrase within the width.
+            across = f" across {multi} models" if multi and multi != disputes else ""
+            out.append(f"{disputes} disputed value"
+                       + ("" if disputes == 1 else "s") + across)
         if speed:
             out.append(f"{speed} rendered speed move" + ("" if speed == 1 else "s"))
         return out

@@ -1783,12 +1783,18 @@ const DATA = __DATA__;
   // same wherever it is hovered; the chart's own metric rows stay
   // chart-specific and come first. Each value goes through show(), so a
   // field the record does not carry renders as the em dash, never blank.
-  const secondaryRows = r => [
-    ["Lab", show(r.creator)],
-    ["Weights", weightsOf(r)],
-    ["Output speed", show(r.tps == null ? null : r.tps + " tok/s")],
-    ["Context", fmtCtx(r.ctx)],
-  ];
+  // Context is dispute-capable and the table renders its pair, so the row
+  // shows the same red pair the cell does; agreeing keys stay single.
+  const secondaryRows = r => {
+    const dCtx=disputedOf(r,"ctx");
+    return [
+      ["Lab", show(r.creator)],
+      ["Weights", weightsOf(r)],
+      ["Output speed", show(r.tps == null ? null : r.tps + " tok/s")],
+      ["Context", dCtx?pairText(dCtx,fmtCtx):fmtCtx(r.ctx),
+       dCtx?"dispute":null],
+    ];
+  };
 
   /* ---------- scatter ---------- */
   // The plot fills whatever width the page gives it. The viewBox width tracks
