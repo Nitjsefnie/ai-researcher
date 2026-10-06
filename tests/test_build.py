@@ -938,6 +938,29 @@ class EmptyAxisGuardTests(unittest.TestCase):
             self.assertIn("parameters", message)
             self.assertFalse(output.exists(), "refusal still wrote the page")
 
+    def test_a_window_marker_does_not_cover_a_second_empty_axis(self):
+        # The separating case of the exemption predicate: a marker hour whose
+        # agentic AND intelligence axes are BOTH empty must refuse. The
+        # shipped reading -- agentic is the SINGLE empty axis -- refuses;
+        # the cheaper reading, "agentic is among the empty axes", would
+        # publish a page with two empty charts justified by one marker.
+        # This row is what keeps that simplification from going silent.
+        with self.capture(
+                [model_fixture(intelligence=None, gdpval=None)],
+                [agent_fixture()]) as output:
+            (output.parent / "cost-breakdown-window.txt").write_text(
+                "every cost breakdown dropped as another generation's: "
+                "1 model(s), first fixture-model\n", encoding="utf-8")
+            with self.assertRaises(SystemExit) as raised:
+                self.run_build()
+
+            message = str(raised.exception)
+            self.assertIn(
+                "no rows carry a score/cost pair for: agentic, intelligence",
+                message)
+            self.assertIn("parameters", message)
+            self.assertFalse(output.exists(), "refusal still wrote the page")
+
     def test_a_stale_marker_with_a_healthy_capture_renders_no_note(self):
         # The flag rides the payload only when the page is actually IN the
         # window state -- agentic empty -- so a marker that outlived its hour

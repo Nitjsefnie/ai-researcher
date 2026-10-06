@@ -276,6 +276,32 @@ class CostBreakdownTests(unittest.TestCase):
         self.assertIn("schema changed", str(caught.exception))
 
 
+class WindowMarkerSpanTests(unittest.TestCase):
+    """The marker filename is a three-leg contract, and each leg has a test
+    on its own side -- but nothing held the legs together. The producer
+    writes under fetch_aa.COST_WINDOW_MARKER, the build layer's reader
+    accepts that name by its own literal, and the deny-by-default .gitignore
+    must carry the negation for the same name or the marker is invisible to
+    git. One span test: a rename on any leg fails here instead of silently
+    orphaning the other two (review finding, issue #217).
+    """
+
+    def test_producer_consumer_and_gitignore_share_one_marker_name(self):
+        # Passes as written against the shipped code -- the pin exists so a
+        # future rename on any leg fails, not to drive a change.
+        with tempfile.TemporaryDirectory() as tmp:
+            data_dir = pathlib.Path(tmp)
+
+            fetch_aa.record_cost_window(
+                0, ["x"], data_dir / fetch_aa.COST_WINDOW_MARKER.name)
+
+            self.assertTrue(build.cost_breakdown_window(data_dir))
+
+        gitignore = (pathlib.Path(fetch_aa.ROOT) / ".gitignore").read_text(
+            encoding="utf-8")
+        self.assertIn(f"!/data/{fetch_aa.COST_WINDOW_MARKER.name}", gitignore)
+
+
 def agent_row(label: str, score: float | None = 0.64,
               cost: float | None = 1.5) -> dict:
     row: dict = {"id": label, "displayLabel": label,
