@@ -2000,8 +2000,9 @@ class DisputeRenderTests(unittest.TestCase):
         # copy-as-JSON serializes the payload's row objects verbatim, so the
         # gv arrays reaching the payload IS the copy-JSON arrays contract.
         page = _build_in_temp_dir()
-        payload = json.loads(re.search(
-            r"const DATA = (.*?);\n", page, re.S).group(1))
+        match = re.search(r"const DATA = (.*?);\n", page, re.S)
+        assert match is not None
+        payload = json.loads(match.group(1))
 
         self.assertTrue(payload["rows"][0]["gv"])
         self.assertEqual(payload["rows"][0]["gv"][0]["ii"], 51)
@@ -2015,8 +2016,9 @@ class DisputeRenderTests(unittest.TestCase):
             json.dumps(models), encoding="utf-8")
 
         page = _build_in_temp_dir()
-        payload = json.loads(re.search(
-            r"const DATA = (.*?);\n", page, re.S).group(1))
+        match = re.search(r"const DATA = (.*?);\n", page, re.S)
+        assert match is not None
+        payload = json.loads(match.group(1))
 
         self.assertNotIn("gv", payload["rows"][0])
 
