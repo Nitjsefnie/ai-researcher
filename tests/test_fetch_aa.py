@@ -1898,6 +1898,68 @@ class CrossRunPresenceMergeTests(unittest.TestCase):
         b = next(m for m in out if m["slug"] == "b")
         self.assertEqual(b["intelligenceIndex"], 41.0)
 
+    def test_a_dropped_model_spans_both_looks(self):
+        # The dropped branch under a two-generation in-run run: the
+        # previous generation's carried slot lands at its own rank among
+        # BOTH look slots, each an empty map.
+        c1 = [_look("a", ii=40.5)]
+        c2 = [_look("a", ii=41.0)]
+        models = fetch_aa.cross_generation_merge([c1, c2])
+
+        out, cross_run = self.merge(models, [_look("a"), _look("b", ii=48.5)],
+                                    run_corpora=[c1, c2])
+
+        self.assertEqual(cross_run.dropped, ["b"])
+        b = next(m for m in out if m["slug"] == "b")
+        self.assertIs(b[fetch_aa.CROSS_RUN_KEY], True)
+        self.assertEqual(len(b["genVariants"]), 3)
+        self.assertEqual(sum(1 for v in b["genVariants"] if not v), 2)
+        carried = next(v for v in b["genVariants"] if v)
+        self.assertEqual(carried, fetch_aa.variant_fields(_look("b", ii=48.5)))
+
+    def test_canonical_bytes_do_not_depend_on_look_order(self):
+        # Reversing the run's corpora -- the order the looks were read --
+        # must not move the corpus bytes: prev_position counts
+        # strictly-smaller generation keys, never positions.
+        current = [_look("a", ii=40.5)]
+        other = [_look("a", ii=41.0)]
+        models = fetch_aa.cross_generation_merge([current, other])
+        prev = [_look("b", ii=48.5)]
+
+        x = self.merge(models, prev, run_corpora=[current, other])
+        y = self.merge(models, prev, run_corpora=[other, current])
+
+        self.assertEqual(json.dumps(x[0]), json.dumps(y[0]))
+
+    def test_a_returned_marked_model_is_disputed_once_then_clean(self):
+        # The oscillating-AA seam: b was merged and marked last hour and
+        # AA serves it again. The hour of the return is one red readd
+        # (no marker -- the fresh fetch is serving evidence), and the
+        # hour after is clean.
+        marked = dict(_look("b", ii=48.5),
+                      **{fetch_aa.CROSS_RUN_KEY: True})
+        current = [_look("a"), _look("b", ii=48.5)]
+
+        out, cross_run = self.merge(current, [_look("a"), marked])
+
+        self.assertEqual(cross_run.readded, ["b"])
+        b = next(m for m in out if m["slug"] == "b")
+        self.assertNotIn(fetch_aa.CROSS_RUN_KEY, b)
+        self.assertEqual(sum(1 for v in b["genVariants"] if not v), 1)
+        out2, cross_run2 = self.merge(current, out)
+        self.assertEqual((cross_run2.dropped, cross_run2.readded), ([], []))
+        self.assertTrue(all("genVariants" not in m for m in out2))
+
+    def test_a_slugless_previous_capture_holds_no_evidence(self):
+        # A parseable previous capture whose records all lack a usable
+        # slug cannot be keyed: it holds no presence evidence, so the
+        # layer stays silent rather than reading every slug as a readd.
+        out, cross_run = self.merge([_look("a"), _look("b")], [{"x": 1}])
+
+        self.assertEqual((cross_run.dropped, cross_run.readded), ([], []))
+        self.assertEqual(json.dumps(out),
+                         json.dumps([_look("a"), _look("b")]))
+
     def test_a_disputed_previous_capture_is_read_canonically(self):
         # The previous run disputed b's own value (two in-run variants);
         # the look-back reads the record's CANONICAL view -- the plain
@@ -2166,6 +2228,18 @@ class CrossRunLookbackFlagTests(unittest.TestCase):
         self.assertIsInstance(exit_exc, SystemExit)
         self.assertIn("does not read back as JSON", str(exit_exc))
         self.assertEqual(out_text, malformed)
+
+    def test_a_non_array_previous_capture_refuses(self):
+        # Valid JSON that is not the capture's array shape is the same
+        # repo-damage class as unparseable JSON: refuse before any fetch
+        # writes, leaving the staged file unmodified.
+        staged = '{"not": "an array"}'
+        _stdout, out_text, exit_exc = self.run_main(
+            ["fetch_aa.py", "--cross-run-lookback"], prev_text=staged)
+
+        self.assertIsInstance(exit_exc, SystemExit)
+        self.assertIn("not a JSON array", str(exit_exc))
+        self.assertEqual(out_text, staged)
 
     def test_a_matching_previous_capture_is_silent(self):
         prev = build.merge_captures(

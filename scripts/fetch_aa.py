@@ -736,10 +736,11 @@ def cross_run_presence_merge(models, prev_records, run_corpora):
     current_slugs = {m.get("slug") for m in models}
     dropped = sorted(firm - current_slugs)
     readded = sorted(current_slugs - firm)
-    # An empty previous capture holds no presence evidence: every slug
-    # would read as a readd against it, which is the wrong reading of an
-    # empty file, not a dispute the layer should hold.
-    if not prev_records or not (dropped or readded):
+    # An unusable previous capture holds no presence evidence: an empty
+    # file, or one whose records all lack a usable slug or all carry the
+    # marker, would read every slug as a readd against it -- the wrong
+    # reading of a file the layer cannot key, not a dispute to hold.
+    if not prev_records or not firm or not (dropped or readded):
         return models, CrossRun([], [])
 
     prev_corpus = [canonical[slug] for slug in dropped]
