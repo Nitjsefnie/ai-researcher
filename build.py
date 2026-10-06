@@ -952,6 +952,10 @@ def render_main_tbody(rows):
                 score = score if score_disp else EM_DASH
                 cost = cost if cost_disp else EM_DASH
             if pair and id(row) in front_sets[metric]:
+                # Neither path above can leave None: the pair branch fills it
+                # from the canonical pair, and a true score_disp means the
+                # dispute text by _variant_cells' contract.
+                assert score is not None
                 score += " " + _tag("frontier", "tag f")
             cells.append(f'<td class="n{" dispute" if score_disp else ""}">{score}</td>')
             cells.append(f'<td class="n{" dispute" if cost_disp else ""}">{cost}</td>')
