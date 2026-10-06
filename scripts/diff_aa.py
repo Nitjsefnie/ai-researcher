@@ -583,9 +583,11 @@ def print_disputes(old_by_id, new_by_id):
     The multi-variant count is the reader's bridge between the capture log's
     "M models carry disputed values" -- which counts genVariants-CARRYING
     records, i.e. every record of a disputed run -- and the models that
-    actually hold more than one generation. It is labeled as multiplicity,
-    never as conflict: two variants that agree render no red cell, so a
-    model carrying two maps is not by itself a model in dispute.
+    actually hold more than one generation. A padded empty map is not a
+    carrying generation (issue #211: `{}` = this generation does not carry
+    the model), so only non-empty variants count. It is labeled as
+    multiplicity, never as conflict: two variants that agree render no red
+    cell, so a model carrying two maps is not by itself a model in dispute.
     """
     news = dict.fromkeys(("added", "removed", "changed"), 0)
     for i in new_by_id:
@@ -598,7 +600,8 @@ def print_disputes(old_by_id, new_by_id):
     if not any(news.values()):
         return
     multi = sum(1 for i, m in new_by_id.items()
-                if i in old_by_id and len(m.get(DISPUTES_KEY) or ()) > 1)
+                if i in old_by_id
+                and sum(1 for v in m.get(DISPUTES_KEY) or () if v) > 1)
     print("\n== disputes: the generation layer moved (issue #208)")
     if news["added"]:
         print(f"  genVariants appeared on {news['added']} model(s)")
