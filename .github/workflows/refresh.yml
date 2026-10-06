@@ -232,7 +232,7 @@ jobs:
         id: fetch
         run: |
           set +e
-          python3 scripts/fetch_aa.py 2> /tmp/fetch-err.txt
+          python3 scripts/fetch_aa.py --cross-run-lookback 2> /tmp/fetch-err.txt
           rc=$?
           set -e
 

@@ -472,10 +472,15 @@ def detail_host_slug(models: list[dict]) -> str:
     return unpriced[0]
 
 
-# The dispute layer (issue #208). Detection is in-run and has no cross-run
-# state: the two spaced leaderboard looks are compared on their shared
-# slugs over the leaderboard field universe, and a disagreement holds BOTH
-# generations in the capture rather than picking one.
+# The dispute layer (issues #208 and #211). Detection is IN-RUN -- the two
+# spaced leaderboard looks are compared on their shared slugs over the
+# leaderboard field universe, and a disagreement holds BOTH generations in
+# the capture rather than picking one -- plus a CROSS-RUN presence
+# look-back (cross_run_presence_merge below): the hourly refresh passes
+# --cross-run-lookback, and a model present in the previous committed
+# capture's firm set and absent from this run's own fetch, or the reverse,
+# is merged and marked disputed the same way, because a flip that happens
+# between runs is invisible to any number of in-run looks.
 
 
 def _number(value):
@@ -673,6 +678,100 @@ def cross_generation_merge(corpora: list[list[dict]]) -> list[dict]:
             for plain, recs in rows]
 
 
+# The synthetic key a record merged from the PREVIOUS committed capture
+# carries (issue #211's cross-run half): this run's own fetch did not serve
+# the model; the record is the previous generation's, held across the run
+# boundary. The next run strips it when it reads its own look-back -- the
+# model's presence in that file is dispute state, not serving evidence --
+# and that is what lets a stable retirement settle within one further hour:
+# a look-back that pinned a model disputed forever would be wrong.
+CROSS_RUN_KEY = "crossRunMerged"
+
+
+class CrossRun(typing.NamedTuple):
+    """The cross-run presence layer's summary for one capture (issue #211):
+    the slugs each presence direction caught, sorted. `dropped` -- the
+    previous capture's firm set carries them, this run's fetch does not;
+    merged back and marked. `readded` -- this run serves them, the firm set
+    lacks them; kept, disputed by the empty previous-generation slot."""
+
+    dropped: list
+    readded: list
+
+
+def cross_run_presence_merge(models, prev_records, run_corpora):
+    """Issue #211's cross-run half (Overseer ruling, 2026-10-06, on the
+    reopened issue): a model present in the previous committed capture and
+    absent from this run's own fetch -- or the reverse -- is MERGED and
+    marked disputed, never quietly dropped or re-added, so the published
+    set does not flip hour to hour. Presence-only: the previous corpus
+    participates only through the diff slugs, so a shared model raises no
+    cross-run value dispute and takes no previous-generation slot.
+
+    A record the previous capture held only by CROSS_RUN_KEY is dispute
+    state, not serving evidence: it neither merges nor disputes again, and
+    the model settles out the first hour AA still does not serve it --
+    the settling bound one-capture-back demands.
+
+    The previous capture's records are read canonically: genVariants and
+    the marker stripped, the plain fields being that generation's view.
+    `run_corpora` are the run's own per-generation corpora in the order
+    the in-run merge ranked them; the previous generation's slot is
+    positioned among them by ascending generation_key over the joint
+    field universe.
+    """
+    canonical: dict[str, dict] = {}
+    firm: set[str] = set()
+    for rec in prev_records:
+        if not isinstance(rec, dict):
+            continue
+        slug = rec.get("slug")
+        if not isinstance(slug, str) or not slug:
+            continue
+        canonical[slug] = {k: v for k, v in rec.items()
+                           if k not in ("genVariants", CROSS_RUN_KEY)}
+        if not rec.get(CROSS_RUN_KEY):
+            firm.add(slug)
+
+    current_slugs = {m.get("slug") for m in models}
+    dropped = sorted(firm - current_slugs)
+    readded = sorted(current_slugs - firm)
+    # An empty previous capture holds no presence evidence: every slug
+    # would read as a readd against it, which is the wrong reading of an
+    # empty file, not a dispute the layer should hold.
+    if not prev_records or not (dropped or readded):
+        return models, CrossRun([], [])
+
+    prev_corpus = [canonical[slug] for slug in dropped]
+    universe = leaderboard_universe(run_corpora + [prev_corpus])
+    run_keys = [generation_key(c, universe) for c in run_corpora]
+    prev_key = generation_key(prev_corpus, universe)
+    # The previous generation's rank among the run's own: how many run
+    # corpora rank before it. A key tie with a run corpus is an identical
+    # generation, and either position renders identically.
+    prev_position = sum(1 for k in run_keys if k < prev_key)
+
+    readded_set = set(readded)
+    out = []
+    for m in models:
+        if m.get("slug") not in readded_set:
+            out.append(m)
+            continue
+        m = dict(m)
+        run_slots = list(m.get("genVariants") or []) or [variant_fields(m)]
+        m["genVariants"] = (list(run_slots[:prev_position]) + [{}]
+                            + list(run_slots[prev_position:]))
+        out.append(m)
+    for slug in dropped:
+        base = dict(canonical[slug])
+        base[CROSS_RUN_KEY] = True
+        base["genVariants"] = ([{}] * prev_position
+                               + [variant_fields(canonical[slug])]
+                               + [{}] * (len(run_corpora) - prev_position))
+        out.append(base)
+    return out, CrossRun(dropped, readded)
+
+
 def coding_agent_rows(payload: str) -> list[dict]:
     """Every agent+model row in the Coding Agent Index, wherever it is nested.
 
@@ -747,9 +846,13 @@ class Capture(typing.NamedTuple):
     version: str
     generations: int
     disputed: bool
+    # The cross-run presence layer's summary (issue #211); empty when the
+    # look-back was not engaged or found no presence diff.
+    cross_run: CrossRun = CrossRun([], [])
 
 
-def capture(cached_base: str | None, cached_detail: str | None) -> Capture:
+def capture(cached_base: str | None, cached_detail: str | None,
+            prev_records: list | None = None) -> Capture:
     """Fetch both routes fresh, parse each from its own bytes, and merge.
 
     detail_host_slug is computed from THIS leaderboard's own rows: the detail
@@ -769,6 +872,12 @@ def capture(cached_base: str | None, cached_detail: str | None) -> Capture:
     it never raises a dispute by itself (a stale detail corpus is the known,
     precedence-handled state of issue #200) and it fills the generation it
     belongs to.
+
+    Issue #211 adds the cross-run look-back: when `prev_records` is passed,
+    a model present in the previous committed capture's firm set and absent
+    from this run's fetch -- or the reverse -- is merged and marked
+    disputed on top of whatever the in-run layer held; see
+    cross_run_presence_merge.
     """
     base_text = fetch_html(cached_base)
     payload = flight_payload(base_text)
@@ -812,6 +921,7 @@ def capture(cached_base: str | None, cached_detail: str | None) -> Capture:
         with_detail = look_slugs & detail_slugs
         return keyed(look, with_detail) == keyed(detail, with_detail)
 
+    run_corpora: list[list[dict]]
     if look1_key == look2_key and slugs[0] == slugs[1]:
         # One leaderboard generation: today's merge, byte for byte, with
         # the detail route filling what the leaderboard omits whatever
@@ -819,6 +929,7 @@ def capture(cached_base: str | None, cached_detail: str | None) -> Capture:
         models = merge_captures(look1, detail)
         disputed = False
         generations = 1 + (0 if same_generation(look1, slugs[0]) else 1)
+        run_corpora = [models]
     else:
         # The looks disagree on a published value, or on WHICH SLUGS the
         # generation carries (issue #211): a model present in one look and
@@ -839,7 +950,38 @@ def capture(cached_base: str | None, cached_detail: str | None) -> Capture:
         models = cross_generation_merge(corpora)
         disputed = any("genVariants" in m for m in models)
         generations = 2 + (0 if matches1 or matches2 else 1)
-    return Capture(models, host, version, generations, disputed)
+        run_corpora = corpora
+
+    cross_run = CrossRun([], [])
+    if prev_records:
+        models, cross_run = cross_run_presence_merge(models, prev_records,
+                                                     run_corpora)
+        disputed = disputed or bool(cross_run.dropped or cross_run.readded)
+    return Capture(models, host, version, generations, disputed, cross_run)
+
+
+def load_previous_capture() -> list | None:
+    """The previous committed capture, read before the fetch overwrites it.
+
+    --cross-run-lookback's source. The refresh checks main out, so the
+    working copy IS the last committed capture at fetch time -- read here,
+    never from a second network source. A missing file is no look-back
+    (the first capture ever); a malformed one refuses: it is our own
+    committed artifact, and a parse failure is repo damage, not an AA
+    event the hour should paper over.
+    """
+    if not OUT.exists():
+        return None
+    try:
+        records = json.loads(OUT.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError) as exc:
+        sys.exit(f"{OUT}: the previous capture does not read back as JSON "
+                 f"({exc}) -- the cross-run look-back refuses to guess; "
+                 "repair or drop the file, then re-run")
+    if not isinstance(records, list):
+        sys.exit(f"{OUT}: the previous capture is not a JSON array -- "
+                 "schema changed")
+    return records
 
 
 def main() -> None:
@@ -847,9 +989,17 @@ def main() -> None:
     ap.add_argument("--html", help="use a cached copy of the leaderboard HTML")
     ap.add_argument("--detail-html", help="use a cached copy of a model detail page")
     ap.add_argument("--agents-html", help="use a cached copy of the coding-agents HTML")
+    ap.add_argument("--cross-run-lookback", action="store_true",
+                    help="hold a slug-set diff against the previous "
+                         "committed capture as a cross-run presence "
+                         "dispute (issue #211); pass it where the working "
+                         "copy of data/aa-raw-models.json IS that capture "
+                         "-- the hourly refresh")
     args = ap.parse_args()
 
-    captured = capture(args.html, args.detail_html)
+    prev_records = (load_previous_capture()
+                    if args.cross_run_lookback else None)
+    captured = capture(args.html, args.detail_html, prev_records)
     models = captured.models
     priced, dropped = check_cost_breakdown(models)
     agents_text = fetch_html(args.agents_html, AGENTS_URL)
@@ -872,6 +1022,16 @@ def main() -> None:
     disputed = sum(1 for m in models if "genVariants" in m)
     print(f"{captured.generations} generation(s) observed in-run; "
           f"{disputed} models carry disputed values")
+    cross_run = captured.cross_run
+    if cross_run.dropped or cross_run.readded:
+        def names(slugs):
+            return ", ".join(slugs[:10]) + (", ..." if len(slugs) > 10
+                                            else "")
+        print(f"cross-run presence: {len(cross_run.dropped)} model(s) "
+              f"merged from the previous capture "
+              f"({names(cross_run.dropped)}); "
+              f"{len(cross_run.readded)} re-added since it "
+              f"({names(cross_run.readded)})")
     if dropped:
         # Named, not counted: each is a model whose GDPval cost renders absent
         # until AA's two routes agree, and a count alone does not say which.
