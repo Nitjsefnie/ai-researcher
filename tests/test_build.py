@@ -770,6 +770,28 @@ class CaptureStampTests(unittest.TestCase):
         self.assertIn("\\xff", message)
 
 
+class CostBreakdownWindowReaderTests(unittest.TestCase):
+    """Issue #217: the build layer's one question about the window marker.
+
+    fetch_aa.py writes data/cost-breakdown-window.txt when the merge dropped
+    EVERY model's cost breakdown -- a two-generation window, not a schema
+    change. The reader answers EXISTENCE and nothing else: the file's content
+    is a git-history note for a human, and the page renders build.py's own
+    fixed wording, so no marker text is ever interpolated into the page.
+    """
+
+    def test_the_reader_answers_existence_only(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            data_dir = pathlib.Path(tmp)
+            marker = data_dir / "cost-breakdown-window.txt"
+
+            self.assertFalse(build.cost_breakdown_window(data_dir))
+
+            marker.write_text("not page input -- any bytes count\n",
+                              encoding="utf-8")
+            self.assertTrue(build.cost_breakdown_window(data_dir))
+
+
 class EmptyAxisGuardTests(unittest.TestCase):
     """Issues #54 + #60: the guard refusing a capture that leaves a rendered
     axis with nothing on it.
@@ -880,12 +902,64 @@ class EmptyAxisGuardTests(unittest.TestCase):
             self.assertIn("no rows carry a score/cost pair for: parameters", str(raised.exception))
             self.assertFalse(output.exists(), "refusal still wrote the page")
 
+    def test_a_window_hour_publishes_with_the_agentic_axis_empty_and_named(self):
+        # Issue #217: a two-generation AA window can drop EVERY model's cost
+        # breakdown, which leaves the agentic (GDPval) axis legitimately
+        # empty. fetch_aa.py marks the hour with
+        # data/cost-breakdown-window.txt and the guard publishes through it
+        # -- naming the window and letting the page say so -- instead of
+        # refusing at a state the page recovers from on its own once AA's
+        # routes converge.
+        with self.capture([model_fixture(gdpval=None)], [agent_fixture()]) as output:
+            (output.parent / "cost-breakdown-window.txt").write_text(
+                "every cost breakdown dropped as another generation's: "
+                "1 model(s), first fixture-model\n", encoding="utf-8")
+            self.run_build()
+
+            stats = self.payload_of(output)["stats"]
+            self.assertTrue(stats["costBreakdownWindow"])
+            self.assertEqual(stats["metricCounts"]["agentic"], 0)
+            self.assertIn("Empty during a two-generation window",
+                          output.read_text(encoding="utf-8"))
+
+    def test_a_window_marker_covers_the_agentic_axis_only(self):
+        # The marker marks the all-dropped cost breakdown, whose ONLY empty
+        # axis is agentic. An hour that also empties another axis is a shape
+        # change the marker does not cover: still refused.
+        with self.capture([model_fixture(intelligence=None)], [agent_fixture()]) as output:
+            (output.parent / "cost-breakdown-window.txt").write_text(
+                "every cost breakdown dropped as another generation's: "
+                "1 model(s), first fixture-model\n", encoding="utf-8")
+            with self.assertRaises(SystemExit) as raised:
+                self.run_build()
+
+            message = str(raised.exception)
+            self.assertIn("no rows carry a score/cost pair for: intelligence", message)
+            self.assertIn("parameters", message)
+            self.assertFalse(output.exists(), "refusal still wrote the page")
+
+    def test_a_stale_marker_with_a_healthy_capture_renders_no_note(self):
+        # The flag rides the payload only when the page is actually IN the
+        # window state -- agentic empty -- so a marker that outlived its hour
+        # beside a healthy capture renders no note and sets no flag.
+        with self.capture([model_fixture()], [agent_fixture()]) as output:
+            (output.parent / "cost-breakdown-window.txt").write_text(
+                "every cost breakdown dropped as another generation's: "
+                "1 model(s), first fixture-model\n", encoding="utf-8")
+            self.run_build()
+
+            stats = self.payload_of(output)["stats"]
+            self.assertNotIn("costBreakdownWindow", stats)
+            self.assertNotIn("Empty during a two-generation window",
+                             output.read_text(encoding="utf-8"))
+
     def test_a_fully_measured_capture_builds_and_names_all_four_axes_nonzero(self):
         # The healthy control: the guard enumerates the same stats the page
         # renders, so a fully measured capture must build -- and its payload
         # must show every rendered axis nonzero, the exact numbers the guard
         # reads. (One model row carrying intelligence + gdpval + parameters,
-        # one agent row carrying the coding pair.)
+        # one agent row carrying the coding pair.) A healthy page carries no
+        # window note: the note is a build-time conditional, not page chrome.
         with self.capture([model_fixture()], [agent_fixture()]) as output:
             self.run_build()
 
@@ -893,6 +967,8 @@ class EmptyAxisGuardTests(unittest.TestCase):
             self.assertEqual(
                 stats["metricCounts"], {"coding": 1, "intelligence": 1, "agentic": 1})
             self.assertEqual(stats["parameterCount"], 1)
+            self.assertNotIn("Empty during a two-generation window",
+                             output.read_text(encoding="utf-8"))
 
 
 class MergeCapturesTests(unittest.TestCase):
