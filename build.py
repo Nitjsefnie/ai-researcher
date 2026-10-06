@@ -502,18 +502,22 @@ VARIANT_PAIR_FIELDS = {
 
 def disputed_field_values(row, field):
     """The per-variant values of one variant-capable field, or None when the
-    cell renders today's single value: no `gv` on the row, or no two
-    PRESENT variant values differ (a missing marker never conflicts, so an
-    absent-in-one-variant field is not a dispute).
+    cell renders today's single value: no `gv` on the row (or fewer than
+    two variants); no two PRESENT variant values differ and no variant is
+    the empty map (a missing marker in a genuine variant is a fill, never a
+    conflict; a padded `{}` is a generation that does not carry the model
+    at all, issue #211, so a carried value against it IS a dispute).
     """
     gv = row.get("gv")
-    if not gv:
+    if not gv or len(gv) < 2:
         return None
     values = [v.get(field) for v in gv]
     present = {float(v) for v in values if v is not None}
-    if len(present) < 2:
-        return None
-    return values
+    if len(present) >= 2:
+        return values
+    if present and any(not v for v in gv):
+        return values
+    return None
 
 
 def dispute_text(values, fmt):
@@ -1582,7 +1586,9 @@ TEMPLATE = r"""<!DOCTYPE html>
       Where a cell reads "a / b", the first is the canonical generation's
       published value &mdash; the one the sort order and every frontier are
       computed from &mdash; and the pair order is canonical, fixed by the
-      capture's generation order. Agreeing values render once, unchanged.</p>
+      capture's generation order. Agreeing values render once, unchanged;
+      an em-dash side marks a generation that does not carry the model at
+      all (issue #211).</p>
     <p>__PROVENANCE__</p>
     <p>&copy; 2026 Peter Z (Nitjsefnie) &middot;
       <a href="https://github.com/Nitjsefnie/ai-researcher/blob/main/LICENSE">MIT licence</a></p>
@@ -1687,12 +1693,17 @@ const DATA = __DATA__;
   };
   // The per-variant values of one rendered field, or null when the cell
   // shows today's single value: not disputed, or no two PRESENT variant
-  // values differ (a missing marker is a fill, never a conflict).
+  // values differ and no variant is the empty map (a missing marker in a
+  // genuine variant is a fill, never a conflict; a padded `{}` is a
+  // generation that does not carry the model at all, issue #211, so a
+  // carried value against it IS a dispute).
   const disputedOf=(r,f)=>{
     const vs=variantsOf(r);
     if(!vs) return null;
     const vals=vs.map(v=>v[f]);
-    return new Set(vals.filter(v=>v!=null).map(Number)).size>1?vals:null;
+    return new Set(vals.filter(v=>v!=null).map(Number)).size>1
+        ||(vals.some(v=>v!=null)&&vs.some(v=>!Object.keys(v).length))
+      ?vals:null;
   };
   const pairText=(vals,fmt)=>vals.map(v=>v==null?"—":fmt(v)).join(" / ");
   // The variant fields a metric's score/cost cells render -- [score field,

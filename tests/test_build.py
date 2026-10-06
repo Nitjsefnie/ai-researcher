@@ -1878,6 +1878,24 @@ def disputed_model_fixture():
     return m
 
 
+def presence_disputed_model_fixture(carrier_first=True):
+    """A presence-disputed record per issue #211's padded interface: one
+    variant is the EMPTY map -- that generation does not carry the model at
+    all -- and the other variant is the carried generation's full map, which
+    is never `{}` by construction. `carrier_first` orders the padding so
+    both render directions are reachable from one fixture."""
+    m = model_fixture()  # ii 51, cost 0.75, gdpval 0.47, gdpvalCost 8.0
+    m.update({
+        "contextWindowTokens": 400000,
+        "price1mInputTokens": 0.5,
+        "price1mOutputTokens": 1.5,
+    })
+    carrier = {"ii": 51, "cost": 0.75, "gdpval": 0.47, "gdpvalCost": 8.0,
+               "pin": 0.5, "pout": 1.5, "ctx": 400000}
+    m["genVariants"] = [carrier, {}] if carrier_first else [{}, carrier]
+    return m
+
+
 class DisputeRenderTests(unittest.TestCase):
     """Issue #208's rendering half: when the capture carries `genVariants`,
     the page holds both generations -- red "a / b" cells on every table the
@@ -1966,6 +1984,69 @@ class DisputeRenderTests(unittest.TestCase):
 
         self.assertIn('<td class="n">$0.5</td>', main)
         self.assertNotIn("$0.5 /", main)
+
+    def test_a_presence_row_renders_value_over_em_dash(self):
+        # Issue #211: variant 2 is `{}` -- that generation does not carry
+        # the model. Every carried field disputes: each absent side renders
+        # the em dash, red, canonical-first.
+        rows = build.build_rows([presence_disputed_model_fixture()])
+        frontier, main = build.render_static_tbodies(rows)
+
+        self.assertIn('<td class="n dispute">51.0 / —</td>', frontier)
+        self.assertIn('<td class="n dispute">$0.750 / —</td>', frontier)
+        self.assertIn('<td class="n dispute">47.0 / —</td>', frontier)
+        self.assertIn('<td class="n dispute">$8.00 / —</td>', frontier)
+        self.assertIn('51.0 / —', main)
+        self.assertIn('47.0 / —', main)
+        self.assertIn('$0.750 / —', main)
+        self.assertIn('$0.5 / —', main)
+        self.assertIn('$1.5 / —', main)
+        self.assertIn('400K / —', main)
+
+    def test_a_presence_row_renders_em_dash_over_value(self):
+        # Mirror padding: `{}` first, the carrier second. The pair order is
+        # the genVariants order, byte-stable either way.
+        rows = build.build_rows(
+            [presence_disputed_model_fixture(carrier_first=False)])
+        frontier, _main = build.render_static_tbodies(rows)
+
+        self.assertIn('<td class="n dispute">— / 51.0</td>', frontier)
+        self.assertIn('<td class="n dispute">— / $0.750</td>', frontier)
+
+    def test_a_field_absent_from_every_presence_variant_renders_single(self):
+        # The carrier does not publish pin either: the field is absent from
+        # every variant AND from the plain record, so the cell renders
+        # today's single em dash, never a pair of dashes.
+        m = presence_disputed_model_fixture()
+        del m["price1mInputTokens"]
+        m["genVariants"][0] = {k: v for k, v in m["genVariants"][0].items()
+                               if k != "pin"}
+        rows = build.build_rows([m])
+        _, main = build.render_static_tbodies(rows)
+
+        self.assertIn('<td class="n">—</td>', main)
+        self.assertNotIn("$0.5 /", main)
+        self.assertNotIn("/ $0.5", main)
+
+    def test_disputed_field_values_on_both_variant_shapes(self):
+        # The gate, unit-pinned on real built rows: a missing key in one
+        # GENUINE (non-empty) variant is a fill -- None, single value; on a
+        # presence row every carried field disputes, each absent side None.
+        rows = build.build_rows([disputed_model_fixture()])
+        self.assertIsNone(build.disputed_field_values(rows[0], "pin"))
+        self.assertEqual(build.disputed_field_values(rows[0], "ii"),
+                         [51, 50.5])
+
+        rows = build.build_rows([presence_disputed_model_fixture()])
+        self.assertEqual(build.disputed_field_values(rows[0], "ii"),
+                         [51, None])
+        self.assertEqual(build.disputed_field_values(rows[0], "pin"),
+                         [0.5, None])
+
+        rows = build.build_rows(
+            [presence_disputed_model_fixture(carrier_first=False)])
+        self.assertEqual(build.disputed_field_values(rows[0], "ii"),
+                         [None, 51])
 
     def test_the_speed_field_never_renders_as_a_dispute(self):
         # medianOutputTokensPerSecond sits in fetch_aa.py's NEVER_RED_FIELDS:
