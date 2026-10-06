@@ -651,6 +651,31 @@ class DisputeSectionTests(unittest.TestCase):
         self.assertIn("1 model(s) carry more than one variant", report)
         self.assertNotIn("genVariants:", report)
 
+    def test_the_multi_count_ignores_padded_empty_variants(self):
+        # Issue #211: genVariants is padded to one entry per generation, with
+        # `{}` at every generation that does not carry the model. A padded
+        # empty is not a carrying generation: one non-empty map plus one
+        # empty is NOT more than one variant; two non-empty still count.
+        old = [capture("Incumbent", intelligence=50)]
+        new = [dict(capture("Incumbent", intelligence=50), genVariants=[
+            {"ii": 50.0, "cost": 0.75},
+            {},
+        ])]
+
+        report = self.render(old, new)
+
+        self.assertIn("== disputes", report)
+        self.assertNotIn("carry more than one variant", report)
+
+        new = [dict(capture("Incumbent", intelligence=50), genVariants=[
+            {"ii": 50.0, "cost": 0.75},
+            {"ii": 51.0, "cost": 0.80},
+        ])]
+
+        report = self.render(old, new)
+
+        self.assertIn("1 model(s) carry more than one variant", report)
+
     def test_variants_disappearing_and_changing_are_one_line_each(self):
         pair = [{"ii": 50.0, "cost": 0.75}, {"ii": 51.0, "cost": 0.80}]
         old = [
