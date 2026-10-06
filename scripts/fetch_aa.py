@@ -118,8 +118,9 @@ DISPUTE_LOOK_SPACING_SECONDS = 180
 # data built from them), so two looks of the SAME generation routinely
 # disagree on them and a dispute raised on that movement would hold the
 # page red permanently. The set is hardcoded and never widened silently:
-# a new speed-shaped field starts as a dispute (the safe direction) and
-# joins this set only by a reviewed change to this constant.
+# a new speed-shaped field starts as a generation-identity difference that
+# never reds (it is not dispute-capable) and joins this set only by a
+# reviewed change to this constant.
 NEVER_RED_FIELDS = frozenset({
     "endToEndResponseTime",
     "intelligenceIndexTimePerTask",
@@ -618,8 +619,11 @@ def cross_generation_merge(corpora: list[list[dict]]) -> list[dict]:
     """Union the per-generation corpora by slug and hold every generation.
 
     The corpora arrive in any order; canonical order is ASCENDING
-    generation_key, so the output bytes are identical whichever look a run
-    read first, and a record's plain fields are the FIRST variant's --
+    generation_key, so corpora with differing keys give identical bytes
+    whichever look a run read first (corpora ranking equal keep input
+    order -- a domain capture()'s disputed path never reaches, since it
+    only passes corpora built from two looks whose keys differ). A
+    record's plain fields are the FIRST variant's --
     the canonical generation's published value, filled only where that
     record lacks the field (a missing marker is a fill, never a winner).
     When any record's dispute-capable fields carry two different published
@@ -805,6 +809,11 @@ def capture(cached_base: str | None, cached_detail: str | None) -> Capture:
         disputed = False
         generations = 1 + (0 if same_generation(look1, slugs[0]) else 1)
     else:
+        # Both matches can hold at once when the looks' disagreement sits
+        # entirely on slugs the detail route omits (its own host), so "D
+        # matches both" is reachable, and both corpora then take the fill
+        # -- gap-only either way, merge_captures precedence keeping each
+        # look's own values.
         matches1 = same_generation(look1, slugs[0])
         matches2 = same_generation(look2, slugs[1])
         corpora = [

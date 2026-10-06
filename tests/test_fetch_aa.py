@@ -1352,14 +1352,28 @@ class RetryBoundArithmeticTests(unittest.TestCase):
         fake.assert_called_once_with(5)
 
 
-def look_payload(ii: float) -> str:
-    """A leaderboard flight payload whose fixture model carries `ii`; the
-    unpriced detail host is unchanged, so the host pick never churns."""
+def look_payload(ii: float, **overrides: object) -> str:
+    """A leaderboard flight payload whose fixture model carries `ii` plus
+    any record overrides; the unpriced detail host is unchanged, so the
+    host pick never churns."""
     host = {"slug": "detail-host-model",
             "intelligenceIndexCostPerTask": "$undefined"}
     return json.dumps({
         "intro": f"Intelligence Index v{fetch_aa.INDEX_VERSION}",
-        "models": [host, leaderboard_record(intelligenceIndex=ii)],
+        "models": [host, leaderboard_record(intelligenceIndex=ii, **overrides)],
+    }, separators=(",", ":"))
+
+
+def host_priced_payload(host_ii: float, host_cost: object,
+                        fixture_ii: float) -> str:
+    """A leaderboard payload whose HOST carries `host_ii`/`host_cost` --
+    the lever for disputes that live on a slug the detail route never
+    carries (its own subject)."""
+    host = {"slug": "detail-host-model", "intelligenceIndex": host_ii,
+            "intelligenceIndexCostPerTask": host_cost}
+    return json.dumps({
+        "intro": f"Intelligence Index v{fetch_aa.INDEX_VERSION}",
+        "models": [host, leaderboard_record(intelligenceIndex=fixture_ii)],
     }, separators=(",", ":"))
 
 
@@ -1461,14 +1475,16 @@ class MultiLookCaptureTests(unittest.TestCase):
 
     DETAIL_URL = fetch_aa.MODEL_DETAIL_URL.format(slug="detail-host-model")
 
-    def capture_two_looks(self, leaderboard_pages):
+    def capture_two_looks(self, leaderboard_pages, **detail_overrides):
         """capture(None, None) over a stubbed urlopen that answers the
         leaderboard route with `leaderboard_pages` in sequence (the two
         looks read that route twice) and the detail route with the standard
-        detail page. -> (Capture, recorded sleeps, stub)."""
+        detail page, record-overridden by `detail_overrides`.
+        -> (Capture, recorded sleeps, stub)."""
         stub = LoudUrlopenStub({
             fetch_aa.URL: flaky(*leaderboard_pages),
-            self.DETAIL_URL: lambda: _FakeResponse(flight_html(detail_payload())),
+            self.DETAIL_URL: lambda: _FakeResponse(
+                flight_html(detail_payload(**detail_overrides))),
         })
         sleeps: list = []
         with unittest.mock.patch.object(urllib.request, "urlopen", stub), \
@@ -1529,6 +1545,75 @@ class MultiLookCaptureTests(unittest.TestCase):
         self.assertIn("gdpvalCost", by_ii[51])
         self.assertAlmostEqual(by_ii[51]["gdpvalCost"], 3.0)
         self.assertNotIn("gdpvalCost", by_ii[52])
+
+    def test_a_speed_only_difference_between_looks_is_not_a_generation(self):
+        # Review Focus 2's capture-level pin: the speed family re-samples
+        # every hour BY DESIGN, so a mutant that stopped subtracting
+        # NEVER_RED_FIELDS in generation_key would flip every hourly run
+        # onto the disputed path (and, with the detail route then matching
+        # no look's mutated key, strip its detail fills). Both looks here
+        # differ ONLY on medianOutputTokensPerSecond; the capture must
+        # hold the quiet shape end to end.
+        host = {"slug": "detail-host-model",
+                "intelligenceIndexCostPerTask": "$undefined"}
+        look1 = [host, leaderboard_record(intelligenceIndex=51,
+                                          medianOutputTokensPerSecond=120.0)]
+        captured, sleeps, stub = self.capture_two_looks(
+            [flight_html(look_payload(51, medianOutputTokensPerSecond=120.0)),
+             flight_html(look_payload(51, medianOutputTokensPerSecond=999.0))])
+
+        self.assertEqual(stub.calls, [fetch_aa.URL, self.DETAIL_URL,
+                                      fetch_aa.URL])
+        self.assertEqual(sleeps, [fetch_aa.DISPUTE_LOOK_SPACING_SECONDS])
+        self.assertFalse(captured.disputed)
+        self.assertEqual(captured.generations, 1)
+        self.assertTrue(all("genVariants" not in m for m in captured.models))
+        self.assertEqual(captured.models,
+                         build.merge_captures(look1, [detail_record()]))
+
+    def test_a_detail_generation_matching_neither_look_fills_nothing(self):
+        # D a third generation: it widens no corpus that hour -- both
+        # variants render their own generation's values with the GDPval
+        # cost absent (no breakdown is that generation's own), the summary
+        # counts three observed generations, and the hour self-heals once
+        # the routes converge.
+        captured, _sleeps, _stub = self.capture_two_looks(
+            [flight_html(look_payload(51)), flight_html(look_payload(52))],
+            intelligenceIndex=53)
+
+        self.assertTrue(captured.disputed)
+        self.assertEqual(captured.generations, 3)
+        by_slug = {m["slug"]: m for m in captured.models}
+        variants = by_slug["fixture-model"]["genVariants"]
+        self.assertEqual(sorted(v["ii"] for v in variants), [51, 52])
+        self.assertTrue(all("gdpvalCost" not in v for v in variants))
+
+    def test_a_dispute_off_the_detail_slugs_widens_both_generations(self):
+        # The both-matches cell, which IS reachable: the looks disagree
+        # only on a slug the detail route never carries (its own host), so
+        # same_generation passes for both and each generation's corpus
+        # takes the fill. The fill is gap-only either way -- merge_captures
+        # precedence keeps each look's own values -- so this pins honest
+        # behavior, it does not invent it.
+        captured, _sleeps, _stub = self.capture_two_looks(
+            [flight_html(host_priced_payload(30, "$undefined", 51)),
+             flight_html(host_priced_payload(31, 1.25, 51))])
+
+        self.assertTrue(captured.disputed)
+        self.assertEqual(captured.generations, 2)
+        by_slug = {m["slug"]: m for m in captured.models}
+        # The host dispute itself: two published ii values on the slug the
+        # detail route omits, and exactly one generation priced it.
+        host_variants = by_slug["detail-host-model"]["genVariants"]
+        self.assertEqual(sorted(v["ii"] for v in host_variants), [30, 31])
+        self.assertEqual(sorted(v["cost"] for v in host_variants
+                                if "cost" in v), [1.25])
+        # Both corpora were widened by the same detail snapshot, so both
+        # fixture-model variants carry its recovered gdpvalCost.
+        fixture_variants = by_slug["fixture-model"]["genVariants"]
+        self.assertEqual(len(fixture_variants), 2)
+        for variant in fixture_variants:
+            self.assertAlmostEqual(variant["gdpvalCost"], 3.0)
 
 
 if __name__ == "__main__":
