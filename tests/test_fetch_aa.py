@@ -603,7 +603,9 @@ class CaptureGapFillWiringTests(unittest.TestCase):
 
     @contextlib.contextmanager
     def cached_routes(self, **record_overrides: object):
-        """Two cached pages for capture(cached_base, cached_detail) to read."""
+        """Two cached pages for capture(cached_base, cached_detail) to read.
+        The dispute-look spacing wait (issue #208) is real in production and
+        stubbed at the seam like every other wait."""
         with tempfile.TemporaryDirectory(prefix=".issue-200-gapfill-") as tmp:
             root = pathlib.Path(tmp)
             base = root / "leaderboard.html"
@@ -611,7 +613,9 @@ class CaptureGapFillWiringTests(unittest.TestCase):
             base.write_text(flight_html(leaderboard_payload()), encoding="utf-8")
             detail.write_text(flight_html(detail_payload(**record_overrides)),
                               encoding="utf-8")
-            yield str(base), str(detail)
+            with unittest.mock.patch.object(fetch_aa, "_sleep",
+                                            side_effect=lambda s: None):
+                yield str(base), str(detail)
 
     def test_capture_names_the_host_it_widened_from_and_the_index_version(self):
         # detail_host_slug is computed from THIS leaderboard's rows: the
@@ -660,7 +664,11 @@ class CaptureGapFillWiringTests(unittest.TestCase):
                             "--detail-html", str(pages[1]),
                             "--agents-html", str(pages[2])]
                 buffer = io.StringIO()
-                with contextlib.redirect_stdout(buffer):
+                # The dispute-look spacing wait (issue #208) is real in
+                # production and stubbed at the seam like every other wait.
+                with contextlib.redirect_stdout(buffer), \
+                        unittest.mock.patch.object(fetch_aa, "_sleep",
+                                                   side_effect=lambda s: None):
                     fetch_aa.main()
             finally:
                 sys.argv = argv
@@ -672,6 +680,9 @@ class CaptureGapFillWiringTests(unittest.TestCase):
         self.assertIn("the leaderboard's own value wins wherever both routes "
                       "carry the field", stdout)
         self.assertIn(f"v{fetch_aa.INDEX_VERSION} cost breakdown", stdout)
+        # Issue #208: the run's one-line generation summary, quiet shape.
+        self.assertIn("1 generation(s) observed in-run; 0 models carry "
+                      "disputed values", stdout)
 
 
 class AtomicCaptureWritesTests(unittest.TestCase):
@@ -729,7 +740,14 @@ class AtomicCaptureWritesTests(unittest.TestCase):
 
                 def run() -> str:
                     buffer = io.StringIO()
-                    with contextlib.redirect_stdout(buffer):
+                    # The dispute-look spacing wait (issue #208) is real in
+                    # production and stubbed at the seam like every other
+                    # wait; a recorder here would only restate that the
+                    # healthy path waits once.
+                    with contextlib.redirect_stdout(buffer), \
+                            unittest.mock.patch.object(
+                                fetch_aa, "_sleep",
+                                side_effect=lambda s: None):
                         fetch_aa.main()
                     return buffer.getvalue()
 
@@ -923,8 +941,12 @@ class TransportErrorTests(unittest.TestCase):
         # urlopen call shape (leaderboard, detail, agents) to its writes.
         stub, stdout = self.run_capture_through_boundary(self.healthy_routes())
 
+        # Issue #208: the leaderboard route is read TWICE (the dispute
+        # looks), so the healthy capture is four pages in this order -- the
+        # first look, the detail page, the spaced second look, the coding
+        # agents.
         self.assertEqual(stub.calls, [fetch_aa.URL, self.DETAIL_URL,
-                                      fetch_aa.AGENTS_URL])
+                                      fetch_aa.URL, fetch_aa.AGENTS_URL])
         self.assertIn("wrote aa-raw-models.json", stdout)
 
     def test_transport_failures_exit_as_a_guarded_refusal(self):
@@ -1090,8 +1112,10 @@ class PageFetchRetryTests(unittest.TestCase):
 
             self.assertEqual(stub.calls,
                              [fetch_aa.URL, fetch_aa.URL, self.DETAIL_URL,
-                              fetch_aa.AGENTS_URL])
-            self.assertEqual(sleeps, [fetch_aa.PAGE_BACKOFF_SECONDS])
+                              fetch_aa.URL, fetch_aa.AGENTS_URL])
+            self.assertEqual(sleeps,
+                             [fetch_aa.PAGE_BACKOFF_SECONDS,
+                              fetch_aa.DISPUTE_LOOK_SPACING_SECONDS])
             self.assertIn("attempt 1 of 3", stderr)
             self.assertIn(
                 f"retrying in {fetch_aa.PAGE_BACKOFF_SECONDS}s", stderr)
@@ -1188,8 +1212,10 @@ class PageFetchRetryTests(unittest.TestCase):
             self.assertEqual(
                 stub.calls,
                 [fetch_aa.URL, self.DETAIL_URL, self.DETAIL_URL,
-                 fetch_aa.AGENTS_URL])
-            self.assertEqual(sleeps, [fetch_aa.PAGE_BACKOFF_SECONDS])
+                 fetch_aa.URL, fetch_aa.AGENTS_URL])
+            self.assertEqual(sleeps,
+                             [fetch_aa.PAGE_BACKOFF_SECONDS,
+                              fetch_aa.DISPUTE_LOOK_SPACING_SECONDS])
             self.assertIn(
                 f"retrying in {fetch_aa.PAGE_BACKOFF_SECONDS}s", stderr)
             self.assertIn("wrote aa-raw-models.json", stdout)
@@ -1294,15 +1320,17 @@ class RetryBoundArithmeticTests(unittest.TestCase):
     PAGE_BOUND = (fetch_aa.PAGE_ATTEMPTS * fetch_aa.FETCH_TIMEOUT_SECONDS
                   + sum(k * fetch_aa.PAGE_BACKOFF_SECONDS
                         for k in range(1, fetch_aa.PAGE_ATTEMPTS)))
-    # The capture fetches exactly three pages (leaderboard, detail, coding
-    # agents), each at that bound, and the page retry is the only retry level
-    # left (issue #200). 1200 s is the capture budget that leaves the ~7-min
-    # remainder room in the job's 1800 s, with slack.
+    # The capture fetches exactly four pages (two spaced leaderboard looks,
+    # the detail page, the coding agents), each at that bound, plus one
+    # dispute-look spacing wait (issue #208); the page retry is the only
+    # retry level left (issue #200). 1200 s is the capture budget that
+    # leaves the ~7-min remainder room in the job's 1800 s, with slack.
     CAPTURE_BUDGET = 1200
 
     def test_worst_case_stays_within_the_capture_budget(self):
         # The comment in fetch_aa.py commits to exactly this arithmetic.
-        worst_case = 3 * self.PAGE_BOUND
+        worst_case = (4 * self.PAGE_BOUND
+                      + fetch_aa.DISPUTE_LOOK_SPACING_SECONDS)
 
         self.assertLessEqual(worst_case, self.CAPTURE_BUDGET)
 
@@ -1322,6 +1350,185 @@ class RetryBoundArithmeticTests(unittest.TestCase):
             fetch_aa._sleep(5)  # pylint: disable=protected-access
 
         fake.assert_called_once_with(5)
+
+
+def look_payload(ii: float) -> str:
+    """A leaderboard flight payload whose fixture model carries `ii`; the
+    unpriced detail host is unchanged, so the host pick never churns."""
+    host = {"slug": "detail-host-model",
+            "intelligenceIndexCostPerTask": "$undefined"}
+    return json.dumps({
+        "intro": f"Intelligence Index v{fetch_aa.INDEX_VERSION}",
+        "models": [host, leaderboard_record(intelligenceIndex=ii)],
+    }, separators=(",", ":"))
+
+
+def _look(slug, ii=40.0, cost=2.0, gdp=0.31, speed=120.0, **extra):
+    rec = {"slug": slug, "name": slug, "intelligenceIndex": ii,
+           "intelligenceIndexCostPerTask": cost, "gdpvalNormalized": gdp,
+           "medianOutputTokensPerSecond": speed, "contextWindowTokens": 200000,
+           "price1mInputTokens": 0.5, "price1mOutputTokens": 1.5}
+    rec.update(extra)
+    return rec
+
+
+def priced_look(slug, total, gdpval_part, **extra):
+    """A look whose cost carries the per-evaluation breakdown shape; its
+    parts sum to the total unless the caller breaks them on purpose."""
+    rec = _look(slug, **extra)
+    rec["intelligenceIndexCostPerTask"] = {
+        "cost": {"total": total},
+        "evaluations": [
+            {"slug": "gdpval-aa", "weightedCostPerTask": gdpval_part},
+            {"slug": "scicode", "weightedCostPerTask": total - gdpval_part},
+        ],
+    }
+    return rec
+
+
+class TestCrossGenerationMerge(unittest.TestCase):
+    """Issue #208: when the two leaderboard looks carry DIFFERENT published
+    values, the corpus holds both generations -- genVariants per record,
+    canonical (ascending generation_key) order -- while agreeing looks, a
+    speed-only movement and a missing-marker-vs-value flip all stay exactly
+    today's single-generation corpus."""
+
+    def test_agreeing_looks_write_no_variants(self):
+        out = fetch_aa.cross_generation_merge([[_look("a")], [_look("a")]])
+        self.assertTrue(all("genVariants" not in r for r in out))
+
+    def test_speed_only_difference_is_not_a_generation(self):
+        out = fetch_aa.cross_generation_merge(
+            [[_look("a")], [_look("a", speed=999.0)]])
+        self.assertTrue(all("genVariants" not in r for r in out))
+
+    def test_disagreement_writes_variants_canonical_order(self):
+        out = fetch_aa.cross_generation_merge(
+            [[_look("a", ii=41.0)], [_look("a", ii=40.5)]])
+        r = out[0]
+        self.assertEqual(len(r["genVariants"]), 2)
+        self.assertEqual([v["ii"] for v in r["genVariants"]],
+                         sorted(v["ii"] for v in r["genVariants"]))
+        self.assertEqual(r["intelligenceIndex"],
+                         r["genVariants"][0]["ii"])
+
+    def test_reversed_look_order_identical_bytes(self):
+        x = fetch_aa.cross_generation_merge(
+            [[_look("a", ii=41.0)], [_look("a", ii=40.5)]])
+        y = fetch_aa.cross_generation_merge(
+            [[_look("a", ii=40.5)], [_look("a", ii=41.0)]])
+        self.assertEqual(json.dumps(x), json.dumps(y))
+
+    def test_union_of_models(self):
+        out = fetch_aa.cross_generation_merge(
+            [[_look("a"), _look("b")], [_look("a"), _look("c")]])
+        self.assertEqual(sorted(m["slug"] for m in out), ["a", "b", "c"])
+
+    def test_undefined_folds_to_missing_not_a_dispute(self):
+        out = fetch_aa.cross_generation_merge(
+            [[_look("a", price1mInputTokens="$undefined")],
+             [_look("a", price1mInputTokens=2.5)]])
+        r = out[0]
+        self.assertNotIn("genVariants", r)
+        self.assertEqual(r["price1mInputTokens"], 2.5)
+
+    def test_variant_fields_recovered_per_generation(self):
+        # gdpvalCost comes from EACH variant's own breakdown; the variant
+        # whose breakdown does not sum to its own total renders that axis
+        # absent, never fabricated from the other generation's parts.
+        good = priced_look("a", total=2.0, gdpval_part=0.16, ii=40.0)
+        bad = priced_look("a", total=2.0, gdpval_part=0.40, ii=40.5)
+        bad["intelligenceIndexCostPerTask"]["evaluations"] = [
+            {"slug": "gdpval-aa", "weightedCostPerTask": 0.40},
+            {"slug": "scicode", "weightedCostPerTask": 0.45},
+        ]
+        out = fetch_aa.cross_generation_merge([[good], [bad]])
+
+        r = out[0]
+        self.assertEqual(len(r["genVariants"]), 2)
+        by_ii = {v["ii"]: v for v in r["genVariants"]}
+        self.assertIn("gdpvalCost", by_ii[40.0])
+        self.assertNotIn("gdpvalCost", by_ii[40.5])
+        self.assertAlmostEqual(by_ii[40.0]["gdpvalCost"], 1.6)
+
+
+class MultiLookCaptureTests(unittest.TestCase):
+    """Issue #208: capture() reads the leaderboard TWICE -- L1, the detail
+    page, one DISPUTE_LOOK_SPACING_SECONDS wait, then L2 -- and holds both
+    generations when the looks disagree. The boundary is the stubbed
+    urlopen (unmodeled URLs raise), and the sleep seam is a recorder, so no
+    test really sleeps or touches the network."""
+
+    DETAIL_URL = fetch_aa.MODEL_DETAIL_URL.format(slug="detail-host-model")
+
+    def capture_two_looks(self, leaderboard_pages):
+        """capture(None, None) over a stubbed urlopen that answers the
+        leaderboard route with `leaderboard_pages` in sequence (the two
+        looks read that route twice) and the detail route with the standard
+        detail page. -> (Capture, recorded sleeps, stub)."""
+        stub = LoudUrlopenStub({
+            fetch_aa.URL: flaky(*leaderboard_pages),
+            self.DETAIL_URL: lambda: _FakeResponse(flight_html(detail_payload())),
+        })
+        sleeps: list = []
+        with unittest.mock.patch.object(urllib.request, "urlopen", stub), \
+                unittest.mock.patch.object(fetch_aa, "_sleep",
+                                           side_effect=sleeps.append,
+                                           create=True):
+            return fetch_aa.capture(None, None), sleeps, stub
+
+    def test_one_generation_writes_no_variants_and_keeps_todays_corpus(self):
+        # The quiet hour: both looks and the detail route carry one
+        # generation, the wiring is exactly today's (L1, D, L2, agents
+        # never), the one wait is the spacing, and the corpus is byte-what
+        # today's writer produces -- no genVariants key anywhere.
+        captured, sleeps, stub = self.capture_two_looks(
+            [flight_html(look_payload(51))])
+
+        self.assertEqual(stub.calls, [fetch_aa.URL, self.DETAIL_URL,
+                                      fetch_aa.URL])
+        self.assertEqual(sleeps, [fetch_aa.DISPUTE_LOOK_SPACING_SECONDS])
+        self.assertFalse(captured.disputed)
+        self.assertEqual(captured.generations, 1)
+        self.assertTrue(all("genVariants" not in m for m in captured.models))
+        host = {"slug": "detail-host-model",
+                "intelligenceIndexCostPerTask": "$undefined"}
+        self.assertEqual(captured.models,
+                         build.merge_captures(
+                             [host, leaderboard_record()],
+                             [detail_record()]))
+
+    def test_two_generations_are_held_as_variants(self):
+        # The update lands between the looks: L1 says 51, L2 says 52, and
+        # the capture holds BOTH, canonical (ascending generation_key)
+        # first, with the plain fields the canonical generation's.
+        captured, sleeps, _stub = self.capture_two_looks(
+            [flight_html(look_payload(51)), flight_html(look_payload(52))])
+
+        self.assertEqual(sleeps, [fetch_aa.DISPUTE_LOOK_SPACING_SECONDS])
+        self.assertTrue(captured.disputed)
+        self.assertEqual(captured.generations, 2)
+        by_slug = {m["slug"]: m for m in captured.models}
+        variants = by_slug["fixture-model"]["genVariants"]
+        iis = [v["ii"] for v in variants]
+        self.assertEqual(iis, sorted(iis))
+        self.assertEqual(by_slug["fixture-model"]["intelligenceIndex"], iis[0])
+
+    def test_the_detail_fill_lands_on_the_generation_it_belongs_to(self):
+        # The detail route carries ii 51, so its breakdown widens the 51
+        # generation ONLY: that variant's gdpvalCost is recovered from its
+        # own parts, and the 52 variant -- whose corpus the detail route
+        # did not describe -- renders the axis absent rather than
+        # decomposing another generation's total.
+        captured, _sleeps, _stub = self.capture_two_looks(
+            [flight_html(look_payload(51)), flight_html(look_payload(52))])
+
+        by_slug = {m["slug"]: m for m in captured.models}
+        by_ii = {v["ii"]: v
+                 for v in by_slug["fixture-model"]["genVariants"]}
+        self.assertIn("gdpvalCost", by_ii[51])
+        self.assertAlmostEqual(by_ii[51]["gdpvalCost"], 3.0)
+        self.assertNotIn("gdpvalCost", by_ii[52])
 
 
 if __name__ == "__main__":
