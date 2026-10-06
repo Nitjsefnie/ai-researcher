@@ -19,16 +19,19 @@ full change and run every leg. An API failure that under-runs would
 skip gates over code; one that over-runs only wastes minutes.
 
 A second class narrows the refresh bot's data: its hourly push changes
-EXACTLY the two captures, their capture stamp and the built page —
+only the two captures, their capture stamp and the built page —
 `data/aa-raw-models.json`, `data/aa-raw-coding-agents.json`,
 `data/captured-at.txt` and `out/frontier-models.html` — the fixed
-`git add` list in refresh.yml, so that exact changed set gets the cheap
-class. The refresh job runs the full suite against the fresh capture
-BEFORE pushing (refresh.yml's own job), so re-running the heavy matrix
-on the bot's push re-verifies nothing. The class matches the exact SET,
-never per-file verdicts: a fifth path — any other data/ file, or a
-source path — is not the bot, has no pre-test behind it, and runs the
-full set. A lone hand-edited capture file does the same.
+`git add` list in refresh.yml. The refresh job runs the full suite
+against the fresh capture BEFORE pushing (refresh.yml's own job), so
+re-running the heavy matrix on the bot's push re-verifies nothing. An
+hour's commit carries only the subset of those four whose bytes moved
+(git omits byte-identical files from the diff), so the class matches
+any non-empty SUBSET of the four, never per-file verdicts: a fifth
+path — any other data/ file, or a source path — is not the bot, has no
+pre-test behind it, and runs the full set. The trade-off is accepted:
+a hand-staged commit confined to those four generated paths also gets
+the cheap class, although nothing pre-tested it (issue #212).
 
 On a PUSH the changed set is read over the verified base rather than
 the push's own `before`: the newest ci-gate run on main whose
@@ -60,9 +63,12 @@ DOC_PATTERNS = ('**/*.md', 'LICENSE', '.gitignore')
 # The refresh bot's push signature: the hourly refresh's fixed `git add`
 # list in refresh.yml, staged and pushed as ONE commit. A signature, not
 # a filter: the cheap class exists for generated data the refresh job
-# already tested, so only the exact set gets it — lint and actionlint
-# still run, and a lone hand-edited capture file is untested data that
-# keeps the full matrix.
+# already tested. An hour's commit stages only the subset of these four
+# whose bytes moved, so any non-empty subset gets it — lint and
+# actionlint still run, and the accepted cost is that a hand-staged
+# commit confined to these four generated paths gets the cheap class
+# without its pre-test. A fifth path is untested data and keeps the
+# full matrix.
 BOT_SIGNATURE = frozenset({
     'data/aa-raw-models.json',
     'data/aa-raw-coding-agents.json',
@@ -127,8 +133,8 @@ def documentation_only(paths):
 
 
 def data_only(paths):
-    """Whether `paths` is exactly the refresh bot's push signature."""
-    return bool(paths) and set(paths) == BOT_SIGNATURE
+    """Whether `paths` sits inside the refresh bot's push signature."""
+    return bool(paths) and set(paths) <= BOT_SIGNATURE
 
 
 def _hex40(value):

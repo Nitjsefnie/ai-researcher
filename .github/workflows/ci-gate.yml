@@ -11,13 +11,15 @@ name: ci gate
 # a change. This workflow starts on every push and pull request,
 # classifies the changed paths, and either runs every gate leg or
 # narrows: a docs-only run skips the conditioned legs, a bot-data-only
-# run (the hourly refresh bot's exact four-file signature — the refresh
-# job already ran the full suite against the fresh capture before
-# pushing) runs only the cheap legs lint and actionlint, and the
-# aggregate still reports either way. The classifier and its over-run
-# fallbacks live in scripts/ci/classify_changes.py; the fold over the
-# legs' results is scripts/ci/aggregate_gate.py, and its one check name
-# is what a future ruleset requires.
+# run (the hourly refresh bot's four-file signature, any non-empty
+# subset of it — an hour's commit stages only the files whose bytes
+# moved, and the refresh job already ran the full suite against the
+# fresh capture before pushing) runs only the cheap legs lint and
+# actionlint, and the aggregate still reports either way. The
+# classifier and its over-run fallbacks live in
+# scripts/ci/classify_changes.py; the fold over the legs' results is
+# scripts/ci/aggregate_gate.py, and its one check name is what a future
+# ruleset requires.
 #
 # TRIGGER OWNERSHIP. The six gate workflows below are called as
 # reusable workflows; they keep `workflow_call`, their crons (audit
