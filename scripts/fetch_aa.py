@@ -621,16 +621,20 @@ def cross_generation_merge(corpora: list[list[dict]]) -> list[dict]:
     The corpora arrive in any order; canonical order is ASCENDING
     generation_key, so corpora with differing keys give identical bytes
     whichever look a run read first (corpora ranking equal keep input
-    order -- a domain capture()'s disputed path never reaches, since it
-    only passes corpora built from two looks whose keys differ). A
-    record's plain fields are the FIRST variant's --
+    order -- the one shape a disputed run cannot reach, since presence
+    and value disagreements both imply differing keys). A record's plain
+    fields are the FIRST variant's --
     the canonical generation's published value, filled only where that
     record lacks the field (a missing marker is a fill, never a winner).
-    When any record's dispute-capable fields carry two different published
-    values, EVERY record gets genVariants -- one entry per generation that
-    carries it, whose fields are that generation's own values -- so the
-    page's dispute layer can hold the whole run red; otherwise the corpus
-    is exactly the single-generation union and no genVariants key exists.
+    When any record is disputed -- by a value conflict on its
+    dispute-capable fields, or by PRESENCE, one generation carrying the
+    model and another not (issue #211) -- EVERY record gets genVariants:
+    one entry per ranked corpus, padded to the run's generation count
+    with the empty map at every position whose corpus does not carry the
+    record (`{}` = this generation does not carry this model), whose
+    fields are that generation's own values -- so the page's dispute
+    layer can hold the whole run red; otherwise the corpus is exactly
+    the single-generation union and no genVariants key exists.
 
     Identity/flag fields and every field outside DISPUTE_CAPABLE are
     never disputed: they render the canonical generation's value, silent.
@@ -651,15 +655,20 @@ def cross_generation_merge(corpora: list[list[dict]]) -> list[dict]:
                 if ((k not in plain or normalize_for_comparison(plain[k]) is None)
                         and normalize_for_comparison(v) is not None):
                     plain[k] = v
-        record_disputed = False
+        columns: list = []
         if len(present) > 1:
             columns = list(zip(*[_dispute_columns(rec) for _, rec in present]))
-            record_disputed = any(_conflicting(list(col)) for col in columns)
+        record_disputed = ((len(present) < len(ranked))
+                           or (len(present) > 1
+                               and any(_conflicting(list(col))
+                                       for col in columns)))
         disputed = disputed or record_disputed
-        rows.append((plain, [rec for _, rec in present]))
+        rows.append((plain, [by_slug[i][slug] if slug in by_slug[i] else None
+                             for i in range(len(ranked))]))
     if not disputed:
         return [plain for plain, _ in rows]
-    return [dict(plain, genVariants=[variant_fields(rec) for rec in recs])
+    return [dict(plain, genVariants=[variant_fields(rec) if rec is not None
+                                     else {} for rec in recs])
             for plain, recs in rows]
 
 
@@ -781,9 +790,10 @@ def capture(cached_base: str | None, cached_detail: str | None) -> Capture:
     def keyed(records, keep):
         """generation_key over the records whose slug is in `keep` -- the
         structural restriction that makes two reads comparable: the detail
-        page omits exactly one model (its own host), and a model AA added
-        or retired between the looks is a corpus union, never a value
-        conflict."""
+        page omits exactly one model (its own host). A model AA added or
+        retired between the looks is an inconsistency between the
+        generations (issue #211): the union keeps the model and marks it
+        disputed -- a presence dispute."""
         return generation_key(
             [r for r in records
              if isinstance(r.get("slug"), str) and r.get("slug") in keep],
@@ -801,7 +811,7 @@ def capture(cached_base: str | None, cached_detail: str | None) -> Capture:
         with_detail = look_slugs & detail_slugs
         return keyed(look, with_detail) == keyed(detail, with_detail)
 
-    if look1_key == look2_key:
+    if look1_key == look2_key and slugs[0] == slugs[1]:
         # One leaderboard generation: today's merge, byte for byte, with
         # the detail route filling what the leaderboard omits whatever
         # generation the detail corpus itself is (issue #200).
@@ -809,6 +819,11 @@ def capture(cached_base: str | None, cached_detail: str | None) -> Capture:
         disputed = False
         generations = 1 + (0 if same_generation(look1, slugs[0]) else 1)
     else:
+        # The looks disagree on a published value, or on WHICH SLUGS the
+        # generation carries (issue #211): a model present in one look and
+        # absent from the other is an inconsistency between the two
+        # generations, not a corpus union to take quietly.
+        #
         # Both matches can hold at once when the looks' disagreement sits
         # entirely on slugs the detail route omits (its own host), so "D
         # matches both" is reachable, and both corpora then take the fill

@@ -1439,6 +1439,44 @@ class TestCrossGenerationMerge(unittest.TestCase):
             [[_look("a"), _look("b")], [_look("a"), _look("c")]])
         self.assertEqual(sorted(m["slug"] for m in out), ["a", "b", "c"])
 
+    def test_a_model_in_one_corpus_only_is_a_presence_dispute(self):
+        # Issue #211 (Overseer ruling, 2026-10-06): presence in one
+        # generation and absence from the other is an inconsistency between
+        # the generations. The union keeps the model, disputed by presence,
+        # and every record's genVariants is padded to one entry per corpus
+        # in canonical order -- `{}` at each position whose corpus does not
+        # carry the record.
+        corpora = [[_look("a")], [_look("a"), _look("b")]]
+        universe = fetch_aa.leaderboard_universe(corpora)
+        ranked = sorted(range(len(corpora)),
+                        key=lambda i: fetch_aa.generation_key(corpora[i],
+                                                              universe))
+        carrier_at = ranked.index(1)
+
+        out = fetch_aa.cross_generation_merge(corpora)
+
+        self.assertTrue(all("genVariants" in r for r in out))
+        b = next(r for r in out if r["slug"] == "b")
+        self.assertEqual(len(b["genVariants"]), 2)
+        self.assertEqual(b["genVariants"][carrier_at],
+                         fetch_aa.variant_fields(_look("b")))
+        self.assertEqual(b["genVariants"][1 - carrier_at], {})
+        # The carried variant is never `{}`: variant_fields emits at least
+        # one field for any record the leaderboard writes.
+        self.assertTrue(b["genVariants"][carrier_at])
+        # The plain fields are the carrier's own values.
+        self.assertEqual(b["intelligenceIndex"],
+                         _look("b")["intelligenceIndex"])
+
+    def test_presence_dispute_reversed_corpora_identical_bytes(self):
+        # Canonical order is ascending generation_key, so the padded corpus
+        # does not depend on which corpus the caller listed first.
+        x = fetch_aa.cross_generation_merge(
+            [[_look("a")], [_look("a"), _look("b")]])
+        y = fetch_aa.cross_generation_merge(
+            [[_look("a"), _look("b")], [_look("a")]])
+        self.assertEqual(json.dumps(x), json.dumps(y))
+
     def test_undefined_folds_to_missing_not_a_dispute(self):
         out = fetch_aa.cross_generation_merge(
             [[_look("a", price1mInputTokens="$undefined")],
@@ -1588,6 +1626,79 @@ class MultiLookCaptureTests(unittest.TestCase):
         variants = by_slug["fixture-model"]["genVariants"]
         self.assertEqual(sorted(v["ii"] for v in variants), [51, 52])
         self.assertTrue(all("gdpvalCost" not in v for v in variants))
+
+    def presence_flip_pages(self):
+        """Two leaderboard pages shaped like the real alternating captures
+        this pins (305b827 / 75eb62b / c18d95a): every shared slug carries
+        IDENTICAL normalized values -- the cost field churns null on the
+        first look and "$undefined" on the second, which
+        normalize_for_comparison folds to one marker, and the speed family
+        re-samples -- while the slug sets differ by exactly one model:
+        solar-pro-2 present in the first look only."""
+        def page(records):
+            return flight_html(json.dumps(
+                {"intro": f"Intelligence Index v{fetch_aa.INDEX_VERSION}",
+                 "models": records}, separators=(",", ":")))
+
+        host = {"slug": "detail-host-model",
+                "intelligenceIndexCostPerTask": "$undefined"}
+        solar = {"slug": "solar-pro-2", "name": "Solar Pro 2",
+                 "intelligenceIndex": 48.5,
+                 "intelligenceIndexCostPerTask": None,
+                 "contextWindowTokens": 200000}
+        look1 = [host,
+                 leaderboard_record(intelligenceIndex=51,
+                                    intelligenceIndexCostPerTask=None,
+                                    medianOutputTokensPerSecond=120.0),
+                 solar]
+        look2 = [host,
+                 leaderboard_record(intelligenceIndex=51,
+                                    intelligenceIndexCostPerTask="$undefined",
+                                    medianOutputTokensPerSecond=999.0)]
+        return page(look1), page(look2)
+
+    def test_a_slug_set_flip_between_looks_is_a_presence_dispute(self):
+        # Issue #211's real flip, pinned at the boundary the dispute decision
+        # actually runs at: the looks' shared slugs carry identical values
+        # under every churn AA's two cache generations show (cost null vs
+        # "$undefined", a never-red speed re-sample), so the old branch
+        # condition -- shared-slug keys equal -- took the quiet path and the
+        # published slug set flipped with AA's cache. Presence in one look
+        # and absence from the other is an inconsistency between the
+        # generations: 2 generations, disputed, the union keeps the model.
+        page1, page2 = self.presence_flip_pages()
+        # The detail route shows the same churned shape as the looks (its
+        # own cache generation), so its fill lands on both corpora.
+        captured, sleeps, stub = self.capture_two_looks(
+            [page1, page2], intelligenceIndexCostPerTask=None)
+
+        self.assertEqual(stub.calls, [fetch_aa.URL, self.DETAIL_URL,
+                                      fetch_aa.URL])
+        self.assertEqual(sleeps, [fetch_aa.DISPUTE_LOOK_SPACING_SECONDS])
+        self.assertTrue(captured.disputed)
+        self.assertEqual(captured.generations, 2)
+        by_slug = {m["slug"]: m for m in captured.models}
+        self.assertIn("solar-pro-2", by_slug)
+        solar = by_slug["solar-pro-2"]
+        self.assertEqual(len(solar["genVariants"]), 2)
+        self.assertEqual(sum(1 for v in solar["genVariants"] if v), 1)
+        self.assertEqual(solar["intelligenceIndex"], 48.5)
+        # The shared slugs are carried by both corpora: non-empty variants.
+        fixture = by_slug["fixture-model"]
+        self.assertEqual(len(fixture["genVariants"]), 2)
+        self.assertTrue(all(fixture["genVariants"]))
+
+    def test_the_presence_flip_corpus_is_order_independent(self):
+        # Canonical order is ascending generation_key, and a presence
+        # disagreement is two different slug sets, so the keys differ and
+        # the corpus does not depend on which look a run read first.
+        page1, page2 = self.presence_flip_pages()
+        one, _, _ = self.capture_two_looks(
+            [page1, page2], intelligenceIndexCostPerTask=None)
+        two, _, _ = self.capture_two_looks(
+            [page2, page1], intelligenceIndexCostPerTask=None)
+
+        self.assertEqual(json.dumps(one.models), json.dumps(two.models))
 
     def test_a_dispute_off_the_detail_slugs_widens_both_generations(self):
         # The both-matches cell, which IS reachable: the looks disagree
