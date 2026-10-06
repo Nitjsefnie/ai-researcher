@@ -367,6 +367,16 @@ def build_rows(models):
             "pin": num(m.get("price1mInputTokens")),
             "pout": num(m.get("price1mOutputTokens")),
         }
+        # fetch_aa.py's dispute layer (issue #208): when the capture caught
+        # AA serving two inconsistent generations, every record carries
+        # `genVariants` -- one flat map per generation in canonical order,
+        # whose fields are THAT generation's published values. The row
+        # carries them verbatim as `gv`; the page renders both generations
+        # red on every disputed surface. A quiet capture has no key and no
+        # `gv`: the payload is byte-what it has always shipped. Agent rows
+        # never carry it -- the agents capture has one in-run source.
+        if m.get("genVariants"):
+            row["gv"] = [dict(v) for v in m["genVariants"]]
         rows.append(row)
     rows.sort(key=lambda r: (
         -(r["ii"] if r["ii"] is not None else -1),
@@ -471,6 +481,69 @@ def metric_of(row, metric):
             return {"score": row["ii"], "cost": row["params"]}
         return None
     return row.get("metrics", {}).get(metric)
+
+
+# Issue #208's dispute rendering. A disputed row carries `gv` -- one flat
+# map per AA generation in canonical order -- and every surface that renders
+# a disputed VALUE shows both generations red as "a / b": first value the
+# canonical generation's, pair order canonical. A field whose variants agree
+# (and a field absent from one variant -- a missing marker is a fill, never
+# a conflict) renders exactly today's single value, so red marks a real
+# published disagreement and nothing else. Speed/latency fields are not
+# variant-capable and can never reach these helpers.
+VARIANT_PAIR_FIELDS = {
+    # metric -> (score field, cost field, per-variant score formatter).
+    # gdpvalNormalized is a 0-1 fraction; the score axis renders *100, so a
+    # disputed score scales the same way the single value does.
+    "intelligence": ("ii", "cost", lambda v: js_to_fixed(v, 1)),
+    "agentic": ("gdpval", "gdpvalCost", lambda v: js_to_fixed(v * 100, 1)),
+}
+
+
+def disputed_field_values(row, field):
+    """The per-variant values of one variant-capable field, or None when the
+    cell renders today's single value: no `gv` on the row, or no two
+    PRESENT variant values differ (a missing marker never conflicts, so an
+    absent-in-one-variant field is not a dispute).
+    """
+    gv = row.get("gv")
+    if not gv:
+        return None
+    values = [v.get(field) for v in gv]
+    present = {float(v) for v in values if v is not None}
+    if len(present) < 2:
+        return None
+    return values
+
+
+def dispute_text(values, fmt):
+    """The red pair text: per-variant renderings joined " / ", an absent
+    variant's field rendered as the page's em dash."""
+    return " / ".join(EM_DASH if v is None else fmt(v) for v in values)
+
+
+def _variant_cells(row, metric):
+    """A metric's disputed score/cost cell texts and dispute flags:
+    (score_text, cost_text, score_disputed, cost_disputed). A None text
+    renders today's single value; the flag says whether the cell is one of
+    the disputed ones. A metric with no variant pair (coding) disputes
+    nothing."""
+    spec = VARIANT_PAIR_FIELDS.get(metric)
+    if not spec:
+        return None, None, False, False
+    score_field, cost_field, score_fmt = spec
+    score_vals = disputed_field_values(row, score_field)
+    cost_vals = disputed_field_values(row, cost_field)
+    return (None if score_vals is None else dispute_text(score_vals, score_fmt),
+            None if cost_vals is None else dispute_text(cost_vals, fmt_cost),
+            score_vals is not None, cost_vals is not None)
+
+
+def _dispute_cell(row, field, fmt):
+    """One scalar field's disputed cell text ("a / b"), or None when the
+    cell renders today's single canonical value."""
+    values = disputed_field_values(row, field)
+    return None if values is None else dispute_text(values, fmt)
 
 
 def undominated(rows, metric="intelligence"):
@@ -813,13 +886,21 @@ def render_frontier_tbody(rows):
             # present; the assertion narrows for the reader below.
             pair = metric_of(row, metric)
             assert pair is not None, f"{metric} pair missing for {row['name']}"
+            # Disputed cells carry both generations red ("a / b"); the $ /
+            # point derivation stays the frontier layer's own canonical
+            # computation -- it is not a value AA publishes per generation.
+            score, cost, score_disp, cost_disp = _variant_cells(row, metric)
+            score = js_to_fixed(pair["score"], 1) if score is None else score
+            cost = fmt_cost(pair["cost"]) if cost is None else cost
+            score_cls = "n dispute" if score_disp else "n"
+            cost_cls = "n dispute" if cost_disp else "n"
             parts.append(
                 "<tr>"
                 + f"<td>{html.escape(METRIC_LABELS[metric])}</td>"
                 + f'<td class="name">{html.escape(row["name"])}</td>'
                 + f"<td>{html.escape(show_text(row['creator']))}</td>"
-                + f'<td class="n">{js_to_fixed(pair["score"], 1)}</td>'
-                + f'<td class="n">{fmt_cost(pair["cost"])}</td>'
+                + f'<td class="{score_cls}">{score}</td>'
+                + f'<td class="{cost_cls}">{cost}</td>'
                 + '<td class="n">'
                 # A zero score is a legal AA publication (gdpvalNormalized
                 # carries literal zeros in the capture), and a score-0 row
@@ -859,33 +940,50 @@ def render_main_tbody(rows):
         cells.append(f"<td>{html.escape(show_text(row['creator']))}</td>")
         for metric in METRIC_ORDER:
             pair = metric_of(row, metric)
+            score, cost, score_disp, cost_disp = _variant_cells(row, metric)
+            # A disputed value renders its pair even when the row's
+            # canonical pair is absent (variant one published the score but
+            # no cost, say): the disagreement is published on that field.
+            # Only a non-disputed missing pair renders the em dash.
             if pair:
-                score = js_to_fixed(pair["score"], 1)
-                cost = fmt_cost(pair["cost"])
+                score = js_to_fixed(pair["score"], 1) if score is None else score
+                cost = fmt_cost(pair["cost"]) if cost is None else cost
             else:
-                score = cost = EM_DASH
+                score = score if score_disp else EM_DASH
+                cost = cost if cost_disp else EM_DASH
             if pair and id(row) in front_sets[metric]:
                 score += " " + _tag("frontier", "tag f")
-            cells.append(f'<td class="n">{score}</td>')
-            cells.append(f'<td class="n">{cost}</td>')
+            cells.append(f'<td class="n{" dispute" if score_disp else ""}">{score}</td>')
+            cells.append(f'<td class="n{" dispute" if cost_disp else ""}">{cost}</td>')
             if metric == "intelligence":
+                # Parameters are a detail-fill with a single in-run source:
+                # never a disputed value, in a disputed row as much as any
+                # other.
                 params = fmt_params(row["params"])
                 if metric_of(row, "parameters") and id(row) in front_sets["parameters"]:
                     params += " " + _tag("parameter frontier", "tag f")
                 cells.append(f'<td class="n">{params}</td>')
+        pin = _dispute_cell(row, "pin", lambda v: "$" + js_number(v))
+        pout = _dispute_cell(row, "pout", lambda v: "$" + js_number(v))
         cells.append(
-            "<td class=\"n\">"
-            + (EM_DASH if row["pin"] is None else "$" + js_number(row["pin"]))
+            f'<td class="n{" dispute" if pin is not None else ""}">'
+            + (pin if pin is not None
+               else (EM_DASH if row["pin"] is None else "$" + js_number(row["pin"])))
             + "</td>")
         cells.append(
-            "<td class=\"n\">"
-            + (EM_DASH if row["pout"] is None else "$" + js_number(row["pout"]))
+            f'<td class="n{" dispute" if pout is not None else ""}">'
+            + (pout if pout is not None
+               else (EM_DASH if row["pout"] is None else "$" + js_number(row["pout"])))
             + "</td>")
         cells.append(
             "<td class=\"n\">"
             + (EM_DASH if row["tps"] is None else js_number(row["tps"]))
             + "</td>")
-        cells.append(f'<td class="n">{fmt_ctx(row["ctx"])}</td>')
+        ctx = _dispute_cell(row, "ctx", fmt_ctx)
+        cells.append(
+            f'<td class="n{" dispute" if ctx is not None else ""}">'
+            + (ctx if ctx is not None else fmt_ctx(row["ctx"]))
+            + "</td>")
         cells.append(f"<td>{html.escape(show_text(row['rel']))}</td>")
         cells.append(f"<td>{html.escape(weights_text(row))}</td>")
         cells.append("</tr>")
@@ -1021,7 +1119,9 @@ def main():
         commit = ""
     commit_note = (f" Source commit <code>{html.escape(commit)}</code>."
                    if commit else "")
-    inputs_note = ("data/aa-raw-models.json then "
+    inputs_note = ("data/aa-raw-models.json -- the merged, dispute-bearing "
+                   "capture of AA's leaderboard looks and model detail route, "
+                   "holding every generation a dispute caught -- then "
                    "data/aa-raw-coding-agents.json, whole files "
                    "concatenated in that order.")
     provenance = ("Capture <code>" + digest.hexdigest() + "</code> &mdash; sha256 over "
@@ -1068,6 +1168,16 @@ TEMPLATE = r"""<!DOCTYPE html>
     --grid:#e1e0d9; --axis:#c3c2b7; --border:rgba(11,11,11,0.10);
     --series-prop:#2a78d6; --series-open:#eb6834; --dim:#a9a7a0;
     --accent:#2468c0;
+    /* Issue #208's dispute red. A STATUS color from the dataviz skill's
+       fixed status palette (critical #d03b3b) -- never a series hue, and
+       the same hex in both modes: it clears the 3:1 mark floor on the
+       light surface (4.68:1) and the dark one (3.62:1). Text needs 4.5:1,
+       which the red meets in light (4.68:1) but not on dark (3.62:1), so
+       --dispute-text steps lighter for the dark surface (#e05e5e, 4.92:1)
+       -- the same text-role move the palette's success-text token makes.
+       Both stepped with the skill validator's contrast(), not eyeballed. */
+    --dispute:#d03b3b;
+    --dispute-text:#d03b3b;
     /* Dedicated token for the dashed frontier line: the line used to borrow
        --muted, which now also fills every superseded point on every chart.
        It keeps the original gray -- --muted itself was darkened to 4.5:1 for
@@ -1086,7 +1196,7 @@ TEMPLATE = r"""<!DOCTYPE html>
       --text-primary:#ffffff; --text-secondary:#c3c2b7; --muted:#898781;
       --grid:#2c2c2a; --axis:#383835; --border:rgba(255,255,255,0.10);
       --series-prop:#3987e5; --series-open:#d95926; --dim:#6f6d67;
-      --accent:#3987e5;
+      --accent:#3987e5; --dispute-text:#e05e5e;
     }
   }
   :root[data-theme="dark"] .viz-root, :root[data-theme="dark"] body {
@@ -1095,7 +1205,7 @@ TEMPLATE = r"""<!DOCTYPE html>
     --text-primary:#ffffff; --text-secondary:#c3c2b7; --muted:#898781;
     --grid:#2c2c2a; --axis:#383835; --border:rgba(255,255,255,0.10);
     --series-prop:#3987e5; --series-open:#d95926; --dim:#6f6d67;
-    --accent:#3987e5;
+    --accent:#3987e5; --dispute-text:#e05e5e;
   }
   *{margin:0;padding:0;box-sizing:border-box}
   body{font-family:var(--sans);background:var(--plane);color:var(--text-secondary);
@@ -1206,6 +1316,14 @@ TEMPLATE = r"""<!DOCTYPE html>
   .tag{font-family:var(--mono);font-size:10px;padding:1px 7px;border-radius:999px;
     border:1px solid var(--border);color:var(--text-secondary);white-space:nowrap}
   .tag.f{border-color:var(--accent);color:var(--accent)}
+  /* Issue #208: disputed cells and tooltip values render red -- the
+     --dispute-text token, 4.5:1 in both modes (see the token block above). */
+  td.n.dispute{color:var(--dispute-text)}
+  .tip .trow .tv.dispute{color:var(--dispute-text)}
+  /* The footer legend's dispute swatch: the mark red, ringed by the
+     surface so it reads on both themes. */
+  .dswatch{display:inline-block;width:10px;height:10px;border-radius:50%;
+    background:var(--dispute);border:2px solid var(--surface-1);box-sizing:border-box}
   .scroll{max-height:560px;overflow:auto;border:1px solid var(--border);border-radius:var(--radius)}
   /* An empty filtered slice says so inside the table region instead of
      leaving a silent zero-row body; aria-live announces the change. */
@@ -1454,6 +1572,13 @@ TEMPLATE = r"""<!DOCTYPE html>
       the components sum exactly to the published total. No score, token price or task measurement is
       estimated, and nothing is filled in from another source. Rebuild with
       <code>python3 scripts/fetch_aa.py &amp;&amp; python3 build.py</code>.</p>
+    <p id="dispute-legend"><span class="dswatch" aria-hidden="true"></span>
+      <b>Red marks a disputed value:</b> the capture caught AA serving
+      <span>two inconsistent generations</span> of the same leaderboard.
+      Where a cell reads "a / b", the first is the canonical generation's
+      published value &mdash; the one the sort order and every frontier are
+      computed from &mdash; and the pair order is canonical, fixed by the
+      capture's generation order. Agreeing values render once, unchanged.</p>
     <p>__PROVENANCE__</p>
     <p>&copy; 2026 Peter Z (Nitjsefnie) &middot;
       <a href="https://github.com/Nitjsefnie/ai-researcher/blob/main/LICENSE">MIT licence</a></p>
@@ -1538,6 +1663,74 @@ const DATA = __DATA__;
   const metricOf=(r,key)=>key==="parameters"
     ? (r.params!=null && r.ii!=null ? {score:r.ii,cost:r.params} : null)
     : r.metrics[key];
+
+  // Issue #208's dispute layer. variantsOf hands back a disputed row's
+  // per-generation maps, canonical order -- null when the row is not
+  // disputed (no gv, or a single generation: genVariants rides only on
+  // disputed runs). A disputed cell shows every generation red as "a / b";
+  // agreeing fields render today's single value.
+  const variantsOf=r=>(r.gv&&r.gv.length>1)?r.gv:null;
+  // Per-axis variant points, canonical order: the pair a variant plots on
+  // one chart, or null for a variant missing half its pair. Coding and
+  // parameters never dispute -- both have a single in-run source -- so they
+  // return null however the row carries.
+  const variantPair=(r,key)=>{
+    const vs=variantsOf(r);
+    if(!vs||key==="parameters"||key==="coding") return null;
+    return vs.map(v=>key==="intelligence"
+      ?(v.ii!=null&&v.cost!=null?{score:v.ii,cost:v.cost}:null)
+      :(v.gdpval!=null&&v.gdpvalCost!=null?{score:v.gdpval*100,cost:v.gdpvalCost}:null));
+  };
+  // The per-variant values of one rendered field, or null when the cell
+  // shows today's single value: not disputed, or no two PRESENT variant
+  // values differ (a missing marker is a fill, never a conflict).
+  const disputedOf=(r,f)=>{
+    const vs=variantsOf(r);
+    if(!vs) return null;
+    const vals=vs.map(v=>v[f]);
+    return new Set(vals.filter(v=>v!=null).map(Number)).size>1?vals:null;
+  };
+  const pairText=(vals,fmt)=>vals.map(v=>v==null?"—":fmt(v)).join(" / ");
+  // The variant fields a metric's score/cost cells render -- [score field,
+  // cost field, score scale] -- or null for a metric that never disputes:
+  // coding (the agents capture has one in-run source; model rows carry no
+  // coding pair) and parameters. Mirrors build.py's VARIANT_PAIR_FIELDS one
+  // for one; the scale is gdpval's 0-1 fraction rendered *100.
+  const metricVariantFields=key=>key==="agentic"?["gdpval","gdpvalCost",100]
+    :key==="intelligence"?["ii","cost",1]:null;
+  // The dispute marks for one row: a red ring on the canonical anchor, a
+  // red point per further generation, and a thin solid red connector in
+  // canonical order -- drawn behind the extra points. Extra points join
+  // `pts`, so nearest-point hover treats every variant as its row and the
+  // label placer keeps its distance from the pair.
+  function addDisputeMarks(canonical,r,key,project,svg,el,pts,cx,cy){
+    const vp=variantPair(r,key);
+    if(!vp) return;
+    canonical.setAttribute("stroke","var(--dispute)");
+    canonical.classList.add("dispute");
+    const chain=[[cx,cy]];
+    for(let i=1;i<vp.length;i++){
+      const p=vp[i];
+      if(!p) continue;
+      const [x,y]=project(p.cost,p.score);
+      chain.push([x,y]);
+    }
+    if(chain.length>1){
+      svg.appendChild(el("path",{fill:"none",stroke:"var(--dispute)",
+        "stroke-width":1.5,class:"dispute-link",
+        d:"M "+chain.map(q=>q[0]+" "+q[1]).join(" L ")}));
+    }
+    for(let i=1;i<vp.length;i++){
+      const p=vp[i];
+      if(!p) continue;
+      const [x,y]=project(p.cost,p.score);
+      const mark=el("circle",{cx:x,cy:y,r:5,fill:"var(--dispute)",
+        stroke:"var(--surface-1)","stroke-width":2,
+        class:"pt dispute","aria-hidden":"true"});
+      svg.appendChild(mark);
+      pts.push({r:r,x:x,y:y,el:mark});
+    }
+  }
 
   // Collapse a model's effort settings to one row: its ceiling (highest index,
   // cheapest variant if two tie there). Deliberately runs BEFORE the dominance
@@ -1675,7 +1868,14 @@ const DATA = __DATA__;
       svg.appendChild(t); pts=[]; frontSet=new Set(); return;
     }
 
-    const costs=rows.map(r=>r.cost), iis=rows.map(r=>r.ii);
+    // The domain spans every variant point too, or a second generation
+    // outside the canonical range would plot off-chart.
+    const costs=[], iis=[];
+    for(const r of rows){
+      costs.push(r.cost); iis.push(r.ii);
+      const vp=variantPair(r,"intelligence");
+      if(vp) for(const p of vp) if(p){costs.push(p.cost); iis.push(p.score);}
+    }
     const lo=Math.log10(Math.min(...costs)), hi=Math.log10(Math.max(...costs));
     const p=(hi-lo)*0.06 || 0.3, x0=lo-p, x1=hi+p;
     const yMax=Math.min(100,Math.ceil((Math.max(...iis)+4)/10)*10);
@@ -1738,13 +1938,15 @@ const DATA = __DATA__;
       // the de-emphasis gray is page-wide, matching drawCapability: a point
       // off this chart's frontier draws var(--muted); a frontier point keeps
       // its weights fill.
-      const c=el("circle",{cx:cx,cy:cy,r:on?6:5,
+      const c=el("circle",{
+        cx:cx,cy:cy,r:on?6:5,
         fill:on?fillOf(r):"var(--muted)",stroke:strokeOf(r),"stroke-width":2,
         class:"pt"+(pins.has(r.name)?" pinned":""),role:"button",tabindex:0,
         "aria-label":"Pin "+r.name+" on the Intelligence Index chart",
         "aria-pressed":String(pins.has(r.name))});
       svg.appendChild(c);
       pts.push({r:r,x:cx,y:cy,el:c});
+      addDisputeMarks(c,r,"intelligence",(x,y)=>[X(x),Y(y)],svg,el,pts,cx,cy);
     }
 
     // ---- direct labels, placed only where they collide with NOTHING ----
@@ -1906,23 +2108,31 @@ const DATA = __DATA__;
     const best=nearestAt(ev);
     if(!best){ hideTip(); return; }
     const b=svg.getBoundingClientRect();
-    for(const p of pts) p.el.classList.toggle("fade", p!==best);
+    // Hover resolves to the ROW: hovering either of a disputed row's
+    // variant points keeps the whole variant set lit and fades the others.
+    for(const p of pts) p.el.classList.toggle("fade", p.r!==best.r);
     const r=best.r;
     if(lastHovered.intelligence!==r){
       lastHovered.intelligence=r;
       tip.innerHTML="";
       const n=document.createElement("div"); n.className="tname";
       n.textContent=r.name; tip.appendChild(n);
-      const rows=[["Intelligence Index",r.ii.toFixed(1)],
-                  ["Cost per task",fmtCost(r.cost)],
+      const dv=disputedOf(r,"ii"), dc=disputedOf(r,"cost");
+      const rows=[["Intelligence Index",
+                   dv?pairText(dv,v=>v.toFixed(1)):r.ii.toFixed(1),
+                   dv?"dispute":null],
+                  ["Cost per task",
+                   dc?pairText(dc,fmtCost):fmtCost(r.cost),
+                   dc?"dispute":null],
                   ...secondaryRows(r)];
       rows.push(["On frontier", frontSet.has(r) ? "yes" : "no — superseded"]);
       if(r.dep) rows.push(["Vendor status","retired"]);
-      for(const [k,v] of rows){
-        const d=document.createElement("div"); d.className="trow";
+      for(const [k,v,d] of rows){
+        const row=document.createElement("div"); row.className="trow";
         const a=document.createElement("span"); a.textContent=k;
-        const c=document.createElement("span"); c.className="tv"; c.textContent=v;
-        d.appendChild(a); d.appendChild(c); tip.appendChild(d);
+        const c=document.createElement("span"); c.className="tv"+(d?" "+d:"");
+        c.textContent=v;
+        row.appendChild(a); row.appendChild(c); tip.appendChild(row);
       }
     }
     tip.classList.add("on");
@@ -1976,8 +2186,15 @@ const DATA = __DATA__;
       msg.textContent="No models match these filters."; chart.appendChild(msg);
       extraPlots[key]={w,h,pts:[],front:new Set()}; return;
     }
-    const values=rows.map(r=>metricOf(r,key));
-    const costs=values.map(m=>m.cost), scores=values.map(m=>m.score);
+    // The domain spans every variant point too, or a second generation
+    // outside the canonical range would plot off-chart.
+    const costs=[], scores=[];
+    for(const r of rows){
+      const m=metricOf(r,key);
+      costs.push(m.cost); scores.push(m.score);
+      const vp=variantPair(r,key);
+      if(vp) for(const p of vp) if(p){costs.push(p.cost); scores.push(p.score);}
+    }
     const lo=Math.log10(Math.min(...costs)), hi=Math.log10(Math.max(...costs));
     const pad=(hi-lo)*.06||.3, x0=lo-pad, x1=hi+pad;
     const yMax=Math.min(100,Math.ceil((Math.max(...scores)+4)/10)*10);
@@ -2036,6 +2253,7 @@ const DATA = __DATA__;
         "aria-label":"Pin "+r.name+" on the "+cfg.label+" chart",
         "aria-pressed":String(pins.has(r.name))});
       chart.appendChild(mark); pts.push({r,x,y,el:mark});
+      addDisputeMarks(mark,r,key,(x,y)=>[X(x),Y(y)],chart,el,pts,x,y);
     }
 
     // Pinned names get first claim on space, followed by frontier names. A pin
@@ -2118,23 +2336,34 @@ const DATA = __DATA__;
     const hit=nearestCapability(key,ev), cfg=PLOTS[key], chart=$(cfg.svg), box=chart.getBoundingClientRect();
     if(!hit){hideCapabilityTip(key);return;}
     const plot=extraPlots[key], m=metricOf(hit.r,key), popup=$(cfg.tip);
-    for(const p of plot.pts) p.el.classList.toggle("fade",p!==hit);
+    // Hover resolves to the ROW: hovering either of a disputed row's
+    // variant points keeps the whole variant set lit and fades the others.
+    for(const p of plot.pts) p.el.classList.toggle("fade",p.r!==hit.r);
     if(lastHovered[key]!==hit.r){
       lastHovered[key]=hit.r;
       popup.innerHTML="";
       const name=document.createElement("div"); name.className="tname"; name.textContent=hit.r.name; popup.appendChild(name);
+      const fields=metricVariantFields(key);
+      const dv=fields?disputedOf(hit.r,fields[0]):null;
+      const dc=fields?disputedOf(hit.r,fields[1]):null;
       const lines=key==="parameters"
         ? [["Intelligence Index",m.score.toFixed(1)],["Parameters",fmtParams(m.cost)],
            ...secondaryRows(hit.r)]
-        : [[cfg.label,m.score.toFixed(1)],["Cost per task",fmtCost(m.cost)],
+        : [[cfg.label,
+            dv?pairText(dv,v=>(v*fields[2]).toFixed(1)):m.score.toFixed(1),
+            dv?"dispute":null],
+           ["Cost per task",
+            dc?pairText(dc,fmtCost):fmtCost(m.cost),
+            dc?"dispute":null],
            ...secondaryRows(hit.r)];
       lines.push([key==="parameters" ? "On parameter frontier" : "On frontier",
                   plot.front.has(hit.r) ? "yes" : "no — superseded"]);
       if(hit.r.dep) lines.push(["Vendor status","retired"]);
-      for(const [k,v] of lines){
+      for(const [k,v,d] of lines){
         const row=document.createElement("div"); row.className="trow";
         const a=document.createElement("span"); a.textContent=k;
-        const b=document.createElement("span"); b.className="tv"; b.textContent=v;
+        const b=document.createElement("span"); b.className="tv"+(d?" "+d:"");
+        b.textContent=v;
         row.appendChild(a); row.appendChild(b); popup.appendChild(row);
       }
     }
@@ -2174,7 +2403,16 @@ const DATA = __DATA__;
         const add=(txt,cls)=>{const td=document.createElement("td");
           if(cls) td.className=cls; td.textContent=txt; tr.appendChild(td);};
         add(METRICS[key].label); add(r.name,"name"); add(show(r.creator));
-        add(m.score.toFixed(1),"n"); add(fmtCost(m.cost),"n");
+        // Disputed cells show both generations red, "a / b" -- the same
+        // cells the static render emits (the drift test holds them equal).
+        // The gdpval scale is per-variant: the raw 0-1 fraction renders *100
+        // exactly as the single value does.
+        const fields=metricVariantFields(key);
+        const dv=fields?disputedOf(r,fields[0]):null;
+        const dc=fields?disputedOf(r,fields[1]):null;
+        add(dv?pairText(dv,v=>(v*fields[2]).toFixed(1))
+              :m.score.toFixed(1), dv?"n dispute":"n");
+        add(dc?pairText(dc,fmtCost):fmtCost(m.cost), dc?"n dispute":"n");
         // Zero is a legal AA score (#146); $/point at 0 capability is not
         // a number -- em dash, matching the static render, never
         // "$Infinity".
@@ -2241,9 +2479,18 @@ const DATA = __DATA__;
       add(show(r.creator));
       for(const key of Object.keys(METRICS)){
         const m=metricOf(r,key), score=document.createElement("td"), cost=document.createElement("td");
+        // Disputed cells show both generations red, "a / b" -- the same
+        // cells the static render emits (the drift test holds the two
+        // renders equal cell-for-cell).
+        const fields=metricVariantFields(key);
+        const dv=fields?disputedOf(r,fields[0]):null;
+        const dc=fields?disputedOf(r,fields[1]):null;
         score.className="n"; cost.className="n";
-        score.textContent = m ? m.score.toFixed(1) : "—";
-        cost.textContent = m ? fmtCost(m.cost) : "—";
+        score.textContent = dv?pairText(dv,v=>(v*fields[2]).toFixed(1))
+                              :(m?m.score.toFixed(1):"—");
+        cost.textContent = dc?pairText(dc,fmtCost):(m?fmtCost(m.cost):"—");
+        if(dv) score.classList.add("dispute");
+        if(dc) cost.classList.add("dispute");
         if(m&&frontSets[key].has(r)){
           score.appendChild(document.createTextNode(" "));
           const tag=document.createElement("span"); tag.className="tag f";
@@ -2262,10 +2509,14 @@ const DATA = __DATA__;
           tr.appendChild(parameters);
         }
       }
-      add(r.pin==null?"—":"$"+r.pin,"n");
-      add(r.pout==null?"—":"$"+r.pout,"n");
+      const dPin=disputedOf(r,"pin"), dPout=disputedOf(r,"pout"),
+            dCtx=disputedOf(r,"ctx");
+      add(dPin?pairText(dPin,v=>"$"+v):(r.pin==null?"—":"$"+r.pin),
+          dPin?"n dispute":"n");
+      add(dPout?pairText(dPout,v=>"$"+v):(r.pout==null?"—":"$"+r.pout),
+          dPout?"n dispute":"n");
       add(r.tps==null?"—":String(r.tps),"n");
-      add(fmtCtx(r.ctx),"n");
+      add(dCtx?pairText(dCtx,fmtCtx):fmtCtx(r.ctx), dCtx?"n dispute":"n");
       add(show(r.rel));
       add(weightsOf(r));
       tb.appendChild(tr);
@@ -2316,6 +2567,10 @@ const DATA = __DATA__;
   $("copyMd").addEventListener("click",()=>{
     const views=metricViews(), rows=[...new Set(Object.values(views).flat())];
     const val=(r,key,field)=>metricOf(r,key)?(field==="score"?metricOf(r,key).score.toFixed(1):fmtCost(metricOf(r,key).cost)):"—";
+    // A disputed field exports its pair "a / b" (canonical first), the same
+    // text the table cell shows; an agreeing field exports its single value.
+    const disp=(r,f,fmt,single)=>{const dv=disputedOf(r,f);
+      return dv?pairText(dv,fmt):single;};
     const head="| Model | Lab | Coding Agent | Coding Agent $/task | Intelligence | Intelligence $/task | Parameters | GDPval-AA | GDPval $/task | $/1M in | $/1M out | Context | Weights |\n"
               +"|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|\n";
     // Every cell goes through mdCell, so a captured name or lab carrying a
@@ -2323,11 +2578,15 @@ const DATA = __DATA__;
     // the pasted row.
     const body=rows.map(r=>"| "+[r.name,show(r.creator),
       val(r,"coding","score"),val(r,"coding","cost"),
-      val(r,"intelligence","score"),val(r,"intelligence","cost"),
+      disp(r,"ii",v=>v.toFixed(1),val(r,"intelligence","score")),
+      disp(r,"cost",fmtCost,val(r,"intelligence","cost")),
       fmtParams(r.params),
-      val(r,"agentic","score"),val(r,"agentic","cost"),
-      r.pin==null?"—":"$"+r.pin, r.pout==null?"—":"$"+r.pout,
-      fmtCtx(r.ctx), weightsOf(r)].map(mdCell).join(" | ")+" |").join("\n");
+      disp(r,"gdpval",v=>(v*100).toFixed(1),val(r,"agentic","score")),
+      disp(r,"gdpvalCost",fmtCost,val(r,"agentic","cost")),
+      disp(r,"pin",v=>"$"+v,r.pin==null?"—":"$"+r.pin),
+      disp(r,"pout",v=>"$"+v,r.pout==null?"—":"$"+r.pout),
+      disp(r,"ctx",fmtCtx,fmtCtx(r.ctx)),
+      weightsOf(r)].map(mdCell).join(" | ")+" |").join("\n");
     clip(head+body+"\n\nSource: Artificial Analysis (artificialanalysis.ai), captured __CAPTURED__.",
          "✓ "+rows.length+" rows copied");
   });

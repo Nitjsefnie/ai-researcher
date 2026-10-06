@@ -1844,3 +1844,240 @@ def gdpval_weighted_cost(m):
                 and not isinstance(e.get("weightedCostPerTask"), bool)):
             return e["weightedCostPerTask"]
     return None
+
+
+DISPUTE_LEGEND_MARK = "two inconsistent generations"
+PROVENANCE_DISPUTE_NOTE = "dispute-bearing"
+
+
+def disputed_model_fixture():
+    """A disputed record per Task 1's pinned interface: the plain fields are
+    the canonical-FIRST variant's values, and `genVariants` carries every
+    generation's own published values in canonical order, flat maps with
+    absent keys absent.
+
+    Variant 2 drops `pin` entirely -- an absent key is a missing marker, and
+    a missing-vs-value flip is a fill, never a dispute -- so the pin cell
+    must render the single canonical value even in a disputed row. The
+    record's `medianOutputTokensPerSecond` is the never-red speed family:
+    no variant carries it, and no cell of it may go red.
+    """
+    m = model_fixture()  # ii 51, cost 0.75, gdpval 0.47, gdpvalCost 8.0
+    m.update({
+        "contextWindowTokens": 400000,
+        "price1mInputTokens": 0.5,
+        "price1mOutputTokens": 1.5,
+        "medianOutputTokensPerSecond": 120.0,
+    })
+    m["genVariants"] = [
+        {"ii": 51, "cost": 0.75, "gdpval": 0.47, "gdpvalCost": 8.0,
+         "pin": 0.5, "pout": 1.5, "ctx": 400000},
+        {"ii": 50.5, "cost": 0.82, "gdpval": 0.46, "gdpvalCost": 8.4,
+         "pout": 1.6, "ctx": 300000},
+    ]
+    return m
+
+
+class DisputeRenderTests(unittest.TestCase):
+    """Issue #208's rendering half: when the capture carries `genVariants`,
+    the page holds both generations -- red "a / b" cells on every table the
+    page renders, `gv` in the payload, and the legend + provenance wording
+    that says so. Agreeing cells inside a disputed row render exactly
+    today's single value; an undisputed capture renders byte-what it does
+    today."""
+
+    def setUp(self):
+        self._saved = (build.RAW, build.AGENTS_RAW)
+        self._dir = tempfile.TemporaryDirectory(  # pylint: disable=consider-using-with
+            prefix=".issue-208-build-", dir=build.ROOT)
+        data = pathlib.Path(self._dir.name) / "data"
+        data.mkdir()
+        (data / "aa-raw-models.json").write_text(
+            json.dumps([disputed_model_fixture()]), encoding="utf-8")
+        (data / "aa-raw-coding-agents.json").write_text(
+            json.dumps([agent_fixture()]), encoding="utf-8")
+        (data / "captured-at.txt").write_text("2026-10-06\n", encoding="utf-8")
+        build.RAW = data / "aa-raw-models.json"
+        build.AGENTS_RAW = data / "aa-raw-coding-agents.json"
+
+    def tearDown(self):
+        build.RAW, build.AGENTS_RAW = self._saved
+        self._dir.cleanup()
+
+    def test_a_disputed_record_carries_gv_on_its_row(self):
+        rows = build.build_rows([disputed_model_fixture()])
+
+        self.assertEqual(rows[0]["gv"], disputed_model_fixture()["genVariants"])
+
+    def test_an_undisputed_record_carries_no_gv(self):
+        # The single-generation contract: no genVariants in, no gv out --
+        # the payload stays byte-what it is today for every quiet capture.
+        rows = build.build_rows([model_fixture()])
+
+        self.assertNotIn("gv", rows[0])
+
+    def test_disputed_static_cells_match_the_js_cell_shape(self):
+        # The pinned cell shape the page's JS produces for a disputed cell:
+        # className "n dispute", textContent "a / b". The static tbody must
+        # be the string equality twin of it -- the browser drift test holds
+        # the two renders equal cell-for-cell on the same fixture.
+        rows = build.build_rows([disputed_model_fixture()])
+        frontier, main = build.render_static_tbodies(rows)
+
+        self.assertEqual(frontier, (
+            '<tr><td>Intelligence Index</td><td class="name">'
+            'Fixture Model (high)</td><td>Fixture Lab</td>'
+            '<td class="n dispute">51.0 / 50.5</td>'
+            '<td class="n dispute">$0.750 / $0.820</td>'
+            '<td class="n">$0.0147</td>'
+            '<td><span class="tag">proprietary</span></td></tr>'
+            '<tr><td>GDPval-AA v2</td><td class="name">Fixture Model (high)</td>'
+            '<td>Fixture Lab</td>'
+            '<td class="n dispute">47.0 / 46.0</td>'
+            '<td class="n dispute">$8.00 / $8.40</td>'
+            '<td class="n">$0.1702</td>'
+            '<td><span class="tag">proprietary</span></td></tr>'
+        ))
+        self.assertEqual(main, (
+            '<tr><td class="name">Fixture Model (high) </td><td>Fixture Lab</td>'
+            '<td class="n">—</td><td class="n">—</td>'
+            '<td class="n dispute">51.0 / 50.5 '
+            '<span class="tag f">frontier</span></td>'
+            '<td class="n dispute">$0.750 / $0.820</td>'
+            '<td class="n">27B <span class="tag f">parameter frontier</span></td>'
+            '<td class="n dispute">47.0 / 46.0 '
+            '<span class="tag f">frontier</span></td>'
+            '<td class="n dispute">$8.00 / $8.40</td>'
+            '<td class="n">$0.5</td>'
+            '<td class="n dispute">$1.5 / $1.6</td>'
+            '<td class="n">120</td>'
+            '<td class="n dispute">400K / 300K</td>'
+            '<td>—</td><td>proprietary</td></tr>'
+        ))
+
+    def test_an_agreeing_field_in_a_disputed_row_renders_single(self):
+        # pin agrees across the variants (absent in variant 2 is a fill, not
+        # a conflict), so the pin cell renders the single canonical value --
+        # never "$0.5 / $0.5", never red. Asserted against the exact cell,
+        # so a pair-with-dashes regression cannot sneak past a count-only
+        # oracle.
+        rows = build.build_rows([disputed_model_fixture()])
+        _, main = build.render_static_tbodies(rows)
+
+        self.assertIn('<td class="n">$0.5</td>', main)
+        self.assertNotIn("$0.5 /", main)
+
+    def test_the_speed_field_never_renders_as_a_dispute(self):
+        # medianOutputTokensPerSecond sits in fetch_aa.py's NEVER_RED_FIELDS:
+        # it is not a variant field, so the tok/s cell renders the single
+        # canonical number even in a disputed row, with no dispute class.
+        rows = build.build_rows([disputed_model_fixture()])
+        _, main = build.render_static_tbodies(rows)
+
+        self.assertIn('<td class="n">120</td>', main)
+
+    def test_pair_order_is_canonical_first(self):
+        # The pair's first value is generation one's published value -- the
+        # value the plain record carries, the value the sort reads. Variant
+        # order in the pair text is the genVariants order, byte-stable.
+        rows = build.build_rows([disputed_model_fixture()])
+        self.assertEqual(rows[0]["ii"], 51)
+        self.assertEqual(rows[0]["cost"], 0.75)
+        _, main = build.render_static_tbodies(rows)
+        self.assertIn('<td class="n dispute">51.0 / 50.5', main)
+
+    def test_the_parameters_axis_never_disputes(self):
+        # Parameters are a detail-fill with one in-run source: the params
+        # cell renders fmt_params exactly as today even in a disputed row.
+        rows = build.build_rows([disputed_model_fixture()])
+        _, main = build.render_static_tbodies(rows)
+
+        self.assertIn(
+            '<td class="n">27B <span class="tag f">parameter frontier</span></td>',
+            main)
+
+    def test_a_disputed_capture_builds_through_main_with_gv_in_the_payload(self):
+        # copy-as-JSON serializes the payload's row objects verbatim, so the
+        # gv arrays reaching the payload IS the copy-JSON arrays contract.
+        page = _build_in_temp_dir()
+        payload = json.loads(re.search(
+            r"const DATA = (.*?);\n", page, re.S).group(1))
+
+        self.assertTrue(payload["rows"][0]["gv"])
+        self.assertEqual(payload["rows"][0]["gv"][0]["ii"], 51)
+
+    def test_an_undisputed_capture_builds_a_page_without_gv(self):
+        # Agreement renders as today: the whole point of the dispute layer
+        # is that a quiet capture is byte-what the page has always shipped.
+        models = build.read_capture(build.RAW)
+        del models[0]["genVariants"]
+        (pathlib.Path(self._dir.name) / "data" / "aa-raw-models.json").write_text(
+            json.dumps(models), encoding="utf-8")
+
+        page = _build_in_temp_dir()
+        payload = json.loads(re.search(
+            r"const DATA = (.*?);\n", page, re.S).group(1))
+
+        self.assertNotIn("gv", payload["rows"][0])
+
+    def test_the_empty_axis_guard_still_fires_on_a_disputed_capture(self):
+        # The dispute layer must not have softened the guard: a disputed
+        # capture whose rows carry no parameters still fails red naming the
+        # emptied axis, not a silent empty parameters chart.
+        models = build.read_capture(build.RAW)
+        del models[0]["parameters"]
+        (pathlib.Path(self._dir.name) / "data" / "aa-raw-models.json").write_text(
+            json.dumps(models), encoding="utf-8")
+
+        with self.assertRaises(SystemExit) as raised:
+            _build_in_temp_dir()
+
+        self.assertIn("parameters", str(raised.exception))
+
+    def test_the_dispute_legend_renders_under_the_methodology_text(self):
+        # PM rider 1: the canonical-first + canonical-pair-order rule is
+        # written down on the page, not silent. The legend names red as two
+        # inconsistent AA generations and pins the first value as the
+        # canonical one.
+        page = _build_in_temp_dir()
+
+        self.assertIn(DISPUTE_LEGEND_MARK, page)
+        self.assertIn("first is the canonical generation", page)
+        self.assertIn("pair order is canonical", page)
+
+    def test_the_provenance_inputs_note_names_the_merged_dispute_bearing_capture(
+            self):
+        # PM rider 3: the digest's inputs note says what the hashed bytes
+        # ARE -- the merged, dispute-bearing models capture.
+        page = _build_in_temp_dir()
+
+        self.assertIn(PROVENANCE_DISPUTE_NOTE, page)
+        self.assertIn("merged", page)
+
+    def test_a_disputed_score_renders_its_pair_without_a_canonical_cost(self):
+        # Edge parity with the JS: variant one published the score but no
+        # cost for the axis (the canonical pair is absent), variant two
+        # published both and the score conflicts. The score cell shows the
+        # disputed pair -- the disagreement IS published -- while the cost
+        # cell stays the em dash; the JS disputedOf/pairText path renders
+        # exactly these cells, and the drift test holds them equal.
+        model = model_fixture(
+            evaluations=[{"slug": "scicode", "weightedCostPerTask": 0.24}])
+        model["genVariants"] = [
+            {"ii": 51, "cost": 0.75, "gdpval": 0.47},
+            {"ii": 51, "cost": 0.75, "gdpval": 0.46, "gdpvalCost": 8.4},
+        ]
+        rows = build.build_rows([model])
+        _, main = build.render_static_tbodies(rows)
+
+        self.assertIn('<td class="n dispute">47.0 / 46.0</td>', main)
+        self.assertIn('<td class="n">—</td>', main)
+        # the canonical intelligence pair next to it renders as ever
+        self.assertIn('<td class="n">51.0', main)
+
+    def test_agent_rows_never_carry_gv(self):
+        # The agents capture has a single in-run source for every rendered
+        # field; no agent row may grow a gv key.
+        rows = build.build_agent_rows([agent_fixture()], [model_fixture()])
+
+        self.assertNotIn("gv", rows[0])
