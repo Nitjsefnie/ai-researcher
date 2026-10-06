@@ -133,7 +133,7 @@ def documentation_only(paths):
 
 
 def data_only(paths):
-    """Whether `paths` sits inside the refresh bot's push signature."""
+    """Whether non-empty `paths` sits inside the refresh bot's signature."""
     return bool(paths) and set(paths) <= BOT_SIGNATURE
 
 
