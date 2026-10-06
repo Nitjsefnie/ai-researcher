@@ -5511,7 +5511,7 @@
   "omniscience": -21.9,
   "omniscienceAccuracy": 0.31683333333333336,
   "omniscienceNonHallucination": 0.2156623566723591,
-  "gdpvalNormalized": 0.34867499999999996,
+  "gdpvalNormalized": 0.34842499999999993,
   "analystAgent": null,
   "terminalbenchHard": null,
   "terminalBench21": 0.696629213483146,
@@ -5627,7 +5627,7 @@
   },
   "omniscienceHallucinationRate": 0.7843376433276409,
   "gdpPdfAllPass": 0.112,
-  "gdpval": 1197.35,
+  "gdpval": 1196.85,
   "itBenchSre": null,
   "terminalBenchScience": null,
   "livecodebench": null,
@@ -5664,13 +5664,13 @@
   "intelligenceIndexEvaluations": [
    {
     "slug": "aa-briefcase",
-    "score": 1012.04,
+    "score": 1012.32,
     "outputTokensPerTask": 156667.27472527474,
     "costPerTask": 1.0381916191755265
    },
    {
     "slug": "gdpval-aa",
-    "score": 1197.35,
+    "score": 1196.85,
     "outputTokensPerTask": 87215.18636363637,
     "costPerTask": 0.4770445859003894
    },
@@ -5725,20 +5725,20 @@
   ],
   "briefcaseBreakdown": {
    "overall": {
-    "elo": 1012.04,
-    "lower95ci": 1002.68,
-    "upper95ci": 1022.37
+    "elo": 1012.32,
+    "lower95ci": 1002.66,
+    "upper95ci": 1022.43
    },
    "rubricPassRate": 0.2937563971340839,
    "analyticalQuality": {
-    "elo": 1055.82,
-    "lower95ci": 1038.52,
-    "upper95ci": 1074.61
+    "elo": 1056.07,
+    "lower95ci": 1038.27,
+    "upper95ci": 1074.49
    },
    "presentation": {
-    "elo": 920.15,
-    "lower95ci": 901,
-    "upper95ci": 937.62
+    "elo": 921.15,
+    "lower95ci": 903.52,
+    "upper95ci": 939.6
    }
   },
   "briefcaseTotalCost": 94.4754373449729,
@@ -9267,7 +9267,7 @@
    "type": "firstParty",
    "providerName": "Kimi"
   },
-  "hostModelCount": 14,
+  "hostModelCount": 13,
   "creator": {
    "id": "0a177021-87dd-4250-9a37-f01df196bfe0",
    "slug": "kimi",
@@ -10374,7 +10374,7 @@
    "type": "firstParty",
    "providerName": "Kimi"
   },
-  "hostModelCount": 12,
+  "hostModelCount": 11,
   "creator": {
    "id": "0a177021-87dd-4250-9a37-f01df196bfe0",
    "slug": "kimi",
@@ -11199,7 +11199,7 @@
    "type": "firstParty",
    "providerName": "Xiaomi"
   },
-  "hostModelCount": 3,
+  "hostModelCount": 4,
   "creator": {
    "id": "5147c8b4-61d5-4070-9324-8adf8aa144c2",
    "slug": "xiaomi",
@@ -20421,7 +20421,7 @@
    "type": "firstParty",
    "providerName": "Xiaomi"
   },
-  "hostModelCount": 4,
+  "hostModelCount": 5,
   "creator": {
    "id": "5147c8b4-61d5-4070-9324-8adf8aa144c2",
    "slug": "xiaomi",
@@ -27560,7 +27560,7 @@
    "type": "firstParty",
    "providerName": "Anthropic"
   },
-  "hostModelCount": 8,
+  "hostModelCount": 9,
   "creator": {
    "id": "f0aa413f-e8ae-4fcd-9c48-0e049f4f3128",
    "slug": "anthropic",
@@ -42194,7 +42194,7 @@
    "type": "firstParty",
    "providerName": "Kimi"
   },
-  "hostModelCount": 4,
+  "hostModelCount": 5,
   "creator": {
    "id": "0a177021-87dd-4250-9a37-f01df196bfe0",
    "slug": "kimi",
@@ -48029,7 +48029,7 @@
   },
   "omniscienceHallucinationRate": 0.7539081004263383,
   "gdpPdfAllPass": 0.064,
-  "gdpval": 873.04,
+  "gdpval": 872.64,
   "itBenchSre": null,
   "terminalBenchScience": null,
   "livecodebench": null,
@@ -48066,13 +48066,13 @@
   "intelligenceIndexEvaluations": [
    {
     "slug": "aa-briefcase",
-    "score": 738.51,
+    "score": 739.8,
     "outputTokensPerTask": 33470.846153846156,
     "costPerTask": 0.14614740557089864
    },
    {
     "slug": "gdpval-aa",
-    "score": 873.04,
+    "score": 872.64,
     "outputTokensPerTask": 35778.895454545454,
     "costPerTask": 0.0859964074171894
    },
@@ -48134,20 +48134,20 @@
   },
   "briefcaseBreakdown": {
    "overall": {
-    "elo": 738.51,
-    "lower95ci": 728.46,
-    "upper95ci": 748.07
+    "elo": 739.8,
+    "lower95ci": 729.7,
+    "upper95ci": 749.03
    },
    "rubricPassRate": 0.16873706004140787,
    "analyticalQuality": {
-    "elo": 581.38,
-    "lower95ci": 562.74,
-    "upper95ci": 598.22
+    "elo": 585.21,
+    "lower95ci": 565.73,
+    "upper95ci": 603.59
    },
    "presentation": {
-    "elo": 793.12,
-    "lower95ci": 774.77,
-    "upper95ci": 810.65
+    "elo": 793.31,
+    "lower95ci": 776.79,
+    "upper95ci": 809.53
    }
   },
   "briefcaseTotalCost": 13.299413906951775,
@@ -59548,7 +59548,7 @@
    "type": "firstParty",
    "providerName": "Mistral"
   },
-  "hostModelCount": 2,
+  "hostModelCount": 3,
   "creator": {
    "id": "b5c0639a-cc9c-443b-a07e-bae6b7088933",
    "slug": "mistral",
@@ -61099,7 +61099,7 @@
    "type": "firstParty",
    "providerName": "DeepSeek"
   },
-  "hostModelCount": 7,
+  "hostModelCount": 8,
   "creator": {
    "id": "58b835bf-4c87-4f87-a846-df4b692c6e7d",
    "slug": "deepseek",
@@ -66112,7 +66112,7 @@
    "type": "firstParty",
    "providerName": "OpenAI"
   },
-  "hostModelCount": 1,
+  "hostModelCount": 2,
   "creator": {
    "id": "e67e56e3-15cd-43db-b679-da4660a69f41",
    "slug": "openai",
@@ -69404,7 +69404,7 @@
   "omniscience": 0.8333333333333334,
   "omniscienceAccuracy": 0.491,
   "omniscienceNonHallucination": 0.05173542894564509,
-  "gdpvalNormalized": 0.47755999999999993,
+  "gdpvalNormalized": 0.47707000000000005,
   "analystAgent": null,
   "terminalbenchHard": null,
   "terminalBench21": 0.786516853932584,
@@ -69527,7 +69527,7 @@
   "omniscienceHallucinationRate": 0.9482645710543549,
   "mlcrOverall": 0.177777777777778,
   "gdpPdfAllPass": 0.114,
-  "gdpval": 1455.12,
+  "gdpval": 1454.14,
   "itBenchSre": null,
   "terminalBenchScience": 0.0571428571428571,
   "livecodebench": null,
@@ -69566,14 +69566,14 @@
   "intelligenceIndexEvaluations": [
    {
     "slug": "aa-briefcase",
-    "score": 1256.34,
+    "score": 1256.39,
     "outputTokensPerTask": 92150.20879120879,
     "costPerTask": 0.9954881431146125,
     "timePerTask": 722.1810607578025
    },
    {
     "slug": "gdpval-aa",
-    "score": 1455.12,
+    "score": 1454.14,
     "outputTokensPerTask": 69326.27272727272,
     "costPerTask": 0.5804609355867755,
     "timePerTask": 543.3099049184453
@@ -69644,20 +69644,20 @@
   },
   "briefcaseBreakdown": {
    "overall": {
-    "elo": 1256.34,
-    "lower95ci": 1248.47,
-    "upper95ci": 1264.44
+    "elo": 1256.39,
+    "lower95ci": 1248.77,
+    "upper95ci": 1263.75
    },
    "rubricPassRate": 0.4351851851851852,
    "analyticalQuality": {
-    "elo": 1385.99,
-    "lower95ci": 1372.02,
-    "upper95ci": 1401.37
+    "elo": 1385.19,
+    "lower95ci": 1369.36,
+    "upper95ci": 1398.99
    },
    "presentation": {
-    "elo": 1118.27,
-    "lower95ci": 1103.9,
-    "upper95ci": 1131.63
+    "elo": 1118.56,
+    "lower95ci": 1105.72,
+    "upper95ci": 1131.93
    }
   },
   "briefcaseTotalCost": 90.58942102342974,
@@ -73400,9 +73400,9 @@
   "itbenchSre": null,
   "mmmuPro": 0.531791907514451,
   "intelligenceIndexCostPerTask": "$undefined",
-  "price1mInputTokens": 0.195,
-  "price1mOutputTokens": 1.095,
-  "cacheHitPrice": 0.195,
+  "price1mInputTokens": 0.3,
+  "price1mOutputTokens": 0.9,
+  "cacheHitPrice": 0.1,
   "cacheWritePrice": null,
   "medianOutputTokensPerSecond": 271.120931661122,
   "percentile05OutputTokensPerSecond": 241.779107935294,
@@ -73444,13 +73444,13 @@
   "terminalBenchScience": null,
   "livecodebench": null,
   "aime25": null,
-  "cacheHitDiscountPercent": null,
+  "cacheHitDiscountPercent": 0.8,
   "pricePer1k1mpImages": 0.3117,
-  "price1mBlended0To3To1": 0.42,
-  "price1mBlended7To2To1": 0.285,
-  "price1mBlended0To1To1": 0.645,
-  "price1mBlended100To1To1": 0.2038235294117647,
-  "price1mBlended0To100To1": 0.2039108910891089,
+  "price1mBlended0To3To1": 0.44999999999999996,
+  "price1mBlended7To2To1": 0.22000000000000003,
+  "price1mBlended0To1To1": 0.6,
+  "price1mBlended100To1To1": 0.10980392156862746,
+  "price1mBlended0To100To1": 0.30594059405940593,
   "intelligenceIndexEvaluations": [],
   "openness": {
    "opennessIndex": 55.55555555555556,
@@ -73517,7 +73517,7 @@
   "performanceDataSource": {
    "type": "median"
   },
-  "hostModelCount": 2,
+  "hostModelCount": 3,
   "creator": {
    "id": "0c303112-430d-4367-a484-51defaa2e166",
    "slug": "nvidia",
@@ -76125,9 +76125,9 @@
   "itbenchSre": null,
   "mmmuPro": 0.621387283236994,
   "intelligenceIndexCostPerTask": "$undefined",
-  "price1mInputTokens": 0.26,
-  "price1mOutputTokens": 0.9099999999999999,
-  "cacheHitPrice": 0.245,
+  "price1mInputTokens": 0.25,
+  "price1mOutputTokens": 0.87,
+  "cacheHitPrice": 0.24,
   "cacheWritePrice": null,
   "medianOutputTokensPerSecond": 61.8070106267855,
   "percentile05OutputTokensPerSecond": 18.8084939869484,
@@ -76175,13 +76175,13 @@
   "livecodebench": 0.396825396825397,
   "aime25": 0.193333333333333,
   "automationBenchPartialScore": 0.002121918776569101,
-  "cacheHitDiscountPercent": 0.5142857142857142,
+  "cacheHitDiscountPercent": 0.6571428571428571,
   "pricePer1k1mpImages": 0.34848,
-  "price1mBlended0To3To1": 0.4225,
-  "price1mBlended7To2To1": 0.31449999999999995,
-  "price1mBlended0To1To1": 0.585,
-  "price1mBlended100To1To1": 0.2516666666666667,
-  "price1mBlended0To100To1": 0.26643564356435645,
+  "price1mBlended0To3To1": 0.405,
+  "price1mBlended7To2To1": 0.305,
+  "price1mBlended0To1To1": 0.56,
+  "price1mBlended100To1To1": 0.24627450980392157,
+  "price1mBlended0To100To1": 0.25613861386138614,
   "intelligenceIndexEvaluations": [],
   "openness": {
    "opennessIndex": 27.77777777777778,
@@ -76208,7 +76208,7 @@
     "upper95ci": 0
    }
   },
-  "briefcaseTotalCost": 16.2472934,
+  "briefcaseTotalCost": 15.6199656,
   "timescaleData": {
    "medianOutputSpeed": 61.8070106267855,
    "medianTimeToFirstChunk": 1.26123396049997
@@ -76267,7 +76267,7 @@
   "performanceDataSource": {
    "type": "median"
   },
-  "hostModelCount": 6,
+  "hostModelCount": 7,
   "creator": {
    "id": "e1694725-0192-4e54-b1b8-c97e816c6cbe",
    "slug": "meta",
@@ -79473,7 +79473,7 @@
   "omniscience": -9.716666666666667,
   "omniscienceAccuracy": 0.245,
   "omniscienceNonHallucination": 0.5467991169977925,
-  "gdpvalNormalized": 0.5665650000000001,
+  "gdpvalNormalized": 0.566175,
   "analystAgent": null,
   "terminalbenchHard": null,
   "terminalBench21": 0.861423220973783,
@@ -79589,7 +79589,7 @@
   },
   "omniscienceHallucinationRate": 0.4532008830022075,
   "gdpPdfAllPass": 0.156,
-  "gdpval": 1633.13,
+  "gdpval": 1632.35,
   "itBenchSre": null,
   "terminalBenchScience": null,
   "livecodebench": null,
@@ -79627,14 +79627,14 @@
   "intelligenceIndexEvaluations": [
    {
     "slug": "aa-briefcase",
-    "score": 1582.71,
+    "score": 1582.62,
     "outputTokensPerTask": 311692.0989010989,
     "costPerTask": 1.6047017800096701,
     "timePerTask": 4386.936462542456
    },
    {
     "slug": "gdpval-aa",
-    "score": 1633.13,
+    "score": 1632.35,
     "outputTokensPerTask": 153798.56363636363,
     "costPerTask": 0.29744017633263636,
     "timePerTask": 2164.6507212783285
@@ -79705,20 +79705,20 @@
   },
   "briefcaseBreakdown": {
    "overall": {
-    "elo": 1582.71,
-    "lower95ci": 1573.71,
-    "upper95ci": 1591.15
+    "elo": 1582.62,
+    "lower95ci": 1574.59,
+    "upper95ci": 1591.54
    },
    "rubricPassRate": 0.5410010649627263,
    "analyticalQuality": {
-    "elo": 1889.64,
-    "lower95ci": 1873.48,
-    "upper95ci": 1906.58
+    "elo": 1888.41,
+    "lower95ci": 1872.32,
+    "upper95ci": 1906.08
    },
    "presentation": {
-    "elo": 1441.74,
-    "lower95ci": 1428.08,
-    "upper95ci": 1457.34
+    "elo": 1442.36,
+    "lower95ci": 1428.01,
+    "upper95ci": 1456.79
    }
   },
   "briefcaseTotalCost": 146.02786198087998,
@@ -103903,7 +103903,7 @@
    "type": "firstParty",
    "providerName": "Z AI"
   },
-  "hostModelCount": 4,
+  "hostModelCount": 5,
   "creator": {
    "id": "67437eb6-7dc1-4e93-befd-22c8b8ec2065",
    "slug": "zai",
@@ -104807,7 +104807,7 @@
    "type": "firstParty",
    "providerName": "Google"
   },
-  "hostModelCount": 12,
+  "hostModelCount": 13,
   "creator": {
    "id": "faddc6d9-2c14-445f-9b28-56726f59c793",
    "slug": "google",
@@ -106234,7 +106234,7 @@
   "itbenchSre": null,
   "mmmuPro": 0.703468208092486,
   "intelligenceIndexCostPerTask": "$undefined",
-  "price1mInputTokens": 0.15,
+  "price1mInputTokens": 0.16499999999999998,
   "price1mOutputTokens": 0.4,
   "cacheHitPrice": 0.14,
   "cacheWritePrice": null,
@@ -106278,13 +106278,13 @@
   "terminalBenchScience": null,
   "livecodebench": null,
   "aime25": null,
-  "cacheHitDiscountPercent": 0.6,
+  "cacheHitDiscountPercent": 0.7,
   "pricePer1k1mpImages": 0.03221,
-  "price1mBlended0To3To1": 0.2125,
-  "price1mBlended7To2To1": 0.168,
-  "price1mBlended0To1To1": 0.275,
-  "price1mBlended100To1To1": 0.14264705882352943,
-  "price1mBlended0To100To1": 0.15247524752475247,
+  "price1mBlended0To3To1": 0.22375,
+  "price1mBlended7To2To1": 0.17099999999999999,
+  "price1mBlended0To1To1": 0.2825,
+  "price1mBlended100To1To1": 0.14279411764705885,
+  "price1mBlended0To100To1": 0.16732673267326728,
   "intelligenceIndexEvaluations": [],
   "openness": {
    "opennessIndex": 38.888888888888886,
@@ -106351,7 +106351,7 @@
   "performanceDataSource": {
    "type": "median"
   },
-  "hostModelCount": 9,
+  "hostModelCount": 10,
   "creator": {
    "id": "faddc6d9-2c14-445f-9b28-56726f59c793",
    "slug": "google",
@@ -108212,11 +108212,11 @@
   "mmmuPro": null,
   "intelligenceIndexCostPerTask": {
    "cost": {
-    "total": 0.47742401619163854,
-    "input": 0.36199210711479757,
+    "total": 0.4552528984420853,
+    "input": 0.3398209893652443,
     "nonCacheInput": 0.011747916689191404,
-    "cacheRead": 0.1310729843254109,
-    "cacheWrite": 0.2191712061001953,
+    "cacheRead": 0.1318375056271196,
+    "cacheWrite": 0.1962355670489333,
     "output": 0.11543190907684102,
     "reasoning": 0,
     "answer": 0.11543190907684102
@@ -108224,19 +108224,19 @@
    "evaluations": [
     {
      "slug": "aa-briefcase",
-     "weightedCostPerTask": 0.0680334078382418
+     "weightedCostPerTask": 0.06551565569437053
     },
     {
      "slug": "gdpval-aa",
-     "weightedCostPerTask": 0.018568005590399998
+     "weightedCostPerTask": 0.01800217347844871
     },
     {
      "slug": "automationbench-aa",
-     "weightedCostPerTask": 0.01570790589866667
+     "weightedCostPerTask": 0.015260098992425784
     },
     {
      "slug": "terminalbench-4-0",
-     "weightedCostPerTask": 0.36059876214399994
+     "weightedCostPerTask": 0.34195903555651014
     },
     {
      "slug": "scicode",
@@ -108316,7 +108316,7 @@
   "livecodebench": null,
   "aime25": null,
   "automationBenchPartialScore": 0.3490865332353694,
-  "cacheHitDiscountPercent": 0.9433333333333334,
+  "cacheHitDiscountPercent": 0.9666666666666667,
   "pricePer1k1mpImages": null,
   "price1mBlended0To3To1": 1.98,
   "price1mBlended7To2To1": 0.6908,
@@ -108325,11 +108325,11 @@
   "price1mBlended0To100To1": 1.3461386138613862,
   "intelligenceIndexTimePerTask": 167.91009853702928,
   "intelligenceIndexCost": {
-   "total": 566.0471713776,
-   "input": 406.68249161759996,
+   "total": 545.0885021349434,
+   "input": 385.7238223749434,
    "nonCacheInput": 20.1807474,
-   "cacheRead": 123.9051344256,
-   "cacheWrite": 262.596609792,
+   "cacheRead": 124.6278471581054,
+   "cacheWrite": 240.91522781683798,
    "output": 159.36467976,
    "reasoning": 0,
    "answer": 159.36467976
@@ -108350,28 +108350,28 @@
     "slug": "aa-briefcase",
     "score": 928.85,
     "outputTokensPerTask": 29111.472527472528,
-    "costPerTask": 0.45355605225494533,
+    "costPerTask": 0.4367710379624702,
     "timePerTask": 167.69120972323464
    },
    {
     "slug": "gdpval-aa",
     "score": 1061.9,
     "outputTokensPerTask": 17244.631818181817,
-    "costPerTask": 0.18568005590399997,
+    "costPerTask": 0.1800217347844871,
     "timePerTask": 99.33448636422368
    },
    {
     "slug": "automationbench-aa",
     "score": 0.3490865332353694,
     "outputTokensPerTask": 22689.293759512937,
-    "costPerTask": 0.3141581179733334,
+    "costPerTask": 0.30520197984851566,
     "timePerTask": 130.69744633178462
    },
    {
     "slug": "terminalbench-4-0",
     "score": 0.0151515151515152,
     "outputTokensPerTask": 212248.28787878787,
-    "costPerTask": 3.6059876214399997,
+    "costPerTask": 3.4195903555651017,
     "timePerTask": 1222.6166890902177
    },
    {
@@ -108435,7 +108435,7 @@
     "upper95ci": 993.6
    }
   },
-  "briefcaseTotalCost": 41.27360075520002,
+  "briefcaseTotalCost": 39.746164454584786,
   "timescaleData": {
    "medianOutputSpeed": 171.348725955202,
    "medianTimeToFirstChunk": 1.76871930000004
@@ -108494,7 +108494,7 @@
   "performanceDataSource": {
    "type": "median"
   },
-  "hostModelCount": 3,
+  "hostModelCount": 4,
   "creator": {
    "id": "58b835bf-4c87-4f87-a846-df4b692c6e7d",
    "slug": "deepseek",
@@ -124085,7 +124085,7 @@
   "omniscience": 4.433333333333334,
   "omniscienceAccuracy": 0.24333333333333335,
   "omniscienceNonHallucination": 0.7370044052863436,
-  "gdpvalNormalized": 0.43729499999999993,
+  "gdpvalNormalized": 0.43697,
   "analystAgent": null,
   "terminalbenchHard": 0.507575757575758,
   "terminalBench21": 0.779026217228464,
@@ -124209,7 +124209,7 @@
   "mlcrOverall": 0.0722222222222222,
   "harveyLab": 0.909683022145028,
   "gdpPdfAllPass": 0.104,
-  "gdpval": 1374.59,
+  "gdpval": 1373.94,
   "itBenchSre": 0.426553672316384,
   "terminalBenchScience": null,
   "livecodebench": null,
@@ -124248,14 +124248,14 @@
   "intelligenceIndexEvaluations": [
    {
     "slug": "aa-briefcase",
-    "score": 1228.61,
+    "score": 1228.56,
     "outputTokensPerTask": 115122.5054945055,
     "costPerTask": 2.8211023983101766,
     "timePerTask": 1112.9351849387522
    },
    {
     "slug": "gdpval-aa",
-    "score": 1374.59,
+    "score": 1373.94,
     "outputTokensPerTask": 78756.51363636364,
     "costPerTask": 1.3915511765573343,
     "timePerTask": 761.3706346340862
@@ -124326,20 +124326,20 @@
   },
   "briefcaseBreakdown": {
    "overall": {
-    "elo": 1228.61,
-    "lower95ci": 1221.61,
-    "upper95ci": 1235.72
+    "elo": 1228.56,
+    "lower95ci": 1222.24,
+    "upper95ci": 1236.19
    },
    "rubricPassRate": 0.3606060606060606,
    "analyticalQuality": {
-    "elo": 1263.81,
-    "lower95ci": 1251.06,
-    "upper95ci": 1278.22
+    "elo": 1262.99,
+    "lower95ci": 1249.84,
+    "upper95ci": 1276.59
    },
    "presentation": {
-    "elo": 1260.76,
-    "lower95ci": 1249.01,
-    "upper95ci": 1273.3
+    "elo": 1261.03,
+    "lower95ci": 1248.83,
+    "upper95ci": 1274.32
    }
   },
   "briefcaseTotalCost": 256.72031824622604,
@@ -124731,7 +124731,7 @@
    "type": "firstParty",
    "providerName": "Kimi"
   },
-  "hostModelCount": 20,
+  "hostModelCount": 21,
   "creator": {
    "id": "0a177021-87dd-4250-9a37-f01df196bfe0",
    "slug": "kimi",
