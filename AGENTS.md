@@ -121,8 +121,10 @@ values.
 **`genVariants` encoding: canonical order, canonical-first silence.** The
 variants are ordered by ascending `generation_key`, so the corpus bytes do
 not depend on which look a run read first, and a record's plain fields are
-the first variant's — the canonical generation's value, gap-filled only where
-it lacks the field (a missing marker is a fill, never a winner). The map list
+the first carrying variant's — the canonical generation's value, gap-filled
+only where it lacks the field (a missing marker is a fill, never a winner);
+an em-dash side marks a generation that does not carry the model at all.
+The map list
 is padded to one entry per generation, with the empty map (`{}`) at every
 generation that does not carry the model — `{}` means *not carried*, and a
 carried variant is never `{}` (a carried record always publishes at least one

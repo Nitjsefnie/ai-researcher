@@ -623,9 +623,10 @@ def cross_generation_merge(corpora: list[list[dict]]) -> list[dict]:
     whichever look a run read first (corpora ranking equal keep input
     order -- the one shape a disputed run cannot reach, since presence
     and value disagreements both imply differing keys). A record's plain
-    fields are the FIRST variant's --
-    the canonical generation's published value, filled only where that
-    record lacks the field (a missing marker is a fill, never a winner).
+    fields are the first CARRYING variant's --
+    the canonical generation's published value where that generation
+    carries the record, filled only where that record lacks the field (a
+    missing marker is a fill, never a winner).
     When any record is disputed -- by a value conflict on its
     dispute-capable fields, or by PRESENCE, one generation carrying the
     model and another not (issue #211) -- EVERY record gets genVariants:

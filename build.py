@@ -1583,7 +1583,7 @@ TEMPLATE = r"""<!DOCTYPE html>
     <p id="dispute-legend"><span class="dswatch" aria-hidden="true"></span>
       <b>Red marks a disputed value:</b> the capture caught AA serving
       <span>two inconsistent generations</span> of the same leaderboard.
-      Where a cell reads "a / b", the first is the canonical generation's
+      Where a cell reads "a / b", the first is the carrying generation's
       published value &mdash; the one the sort order and every frontier are
       computed from &mdash; and the pair order is canonical, fixed by the
       capture's generation order. Agreeing values render once, unchanged;

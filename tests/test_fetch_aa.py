@@ -1505,6 +1505,23 @@ class TestCrossGenerationMerge(unittest.TestCase):
         self.assertAlmostEqual(by_ii[40.0]["gdpvalCost"], 1.6)
 
 
+class CarriedVariantNeverEmptyTests(unittest.TestCase):
+    """The padded interface's load-bearing invariant, enforced on the one
+    corpus a reviewer cannot hand-pick: variant_fields() emits at least one
+    field for EVERY record in the committed capture. The page reads `{}` as
+    "this generation does not carry the model" (issue #211), so a genuine
+    `{}` variant would flip carried fields to false red "value / —" cells;
+    if a real record can be empty, the encoding needs a third marker, not a
+    silent lie."""
+
+    def test_every_committed_record_yields_a_non_empty_variant_map(self):
+        capture_path = (pathlib.Path(__file__).resolve().parent.parent
+                        / "data" / "aa-raw-models.json")
+        records = json.loads(capture_path.read_text(encoding="utf-8"))
+
+        self.assertTrue(all(fetch_aa.variant_fields(m) for m in records))
+
+
 class MultiLookCaptureTests(unittest.TestCase):
     """Issue #208: capture() reads the leaderboard TWICE -- L1, the detail
     page, one DISPUTE_LOOK_SPACING_SECONDS wait, then L2 -- and holds both
