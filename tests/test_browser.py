@@ -65,6 +65,92 @@ def collect_page_coverage(session):
     return entries
 
 
+def install_page_coverage_wiring(cls):
+    """Wire V8 block coverage onto every page a test class's browser opens.
+
+    Called from a browser test class's setUpClass after the page is built
+    and the browser launched: sets the class's _coverage_entries and
+    _open_pages lists, then replaces browser.new_page so every
+    JavaScript-enabled page records V8 block coverage into the class list,
+    dumped when the class tears down.
+    """
+    # The class-internal state this wiring installs is the classes' own
+    # fixture plumbing, reached through the cls argument by design.
+    # pylint: disable=protected-access
+    cls._coverage_entries = []
+    cls._open_pages = []
+    original_new_page = cls.browser.new_page
+
+    def new_page(**kwargs):
+        page = original_new_page(**kwargs)
+        if kwargs.get("java_script_enabled") is False:
+            # A JavaScript-disabled page compiles no script, so it has no
+            # V8 block coverage to give: wiring a Profiler session onto it
+            # would only add empty records to the dump js_coverage.py
+            # folds. Skipped, the dump stays the JS-enabled run's.
+            return page
+        # playwright-python ships no page.coverage wrapper, so the V8
+        # block coverage comes straight from Chromium's Profiler domain
+        # over a CDP session — the same {url, source,
+        # functions[].ranges[]} evidence stop_js_coverage() would have
+        # handed back.
+        session = page.context.new_cdp_session(page)
+        session.send("Debugger.enable")
+        session.send("Profiler.enable")
+        session.send("Profiler.startPreciseCoverage",
+                     {"callCount": True, "detailed": True})
+        original_close = page.close
+
+        def close(**close_kwargs):
+            # the list holds (page, session) pairs — membership must be
+            # tested the same way, or a closed page stays queued for a
+            # second, doomed collection in tearDownClass
+            if (page, session) in cls._open_pages:
+                cls._open_pages.remove((page, session))
+            cls._coverage_entries.extend(collect_page_coverage(session))
+            return original_close(**close_kwargs)
+
+        page.close = close
+        cls._open_pages.append((page, session))
+        return page
+
+    cls.browser.new_page = new_page
+
+
+def flush_page_coverage(cls):
+    """Sweep any still-open pages' coverage and write the class's dump.
+
+    Called from a browser test class's tearDownClass, positioned by each
+    class wherever its own restore/cleanup ordering wants it.
+    """
+    # The class-internal state this sweep reads is the classes' own
+    # fixture plumbing, reached through the cls argument by design.
+    # pylint: disable=protected-access
+    # A test that failed mid-way leaves its page open; take its coverage
+    # here so the dump still describes the whole run.
+    for _page, session in list(cls._open_pages):
+        try:
+            cls._coverage_entries.extend(collect_page_coverage(session))
+        except Exception:  # pylint: disable=broad-exception-caught
+            pass
+    cls._open_pages.clear()
+    dump = os.environ.get("JS_COVERAGE_OUT")
+    if dump:
+        # The coverage job runs more than one page-building class, and
+        # each dumps at ITS teardown: merge with whatever an earlier
+        # class already wrote, or the later teardown would erase the
+        # earlier class's whole contribution.
+        path = pathlib.Path(dump)
+        entries = cls._coverage_entries
+        if path.exists():
+            try:
+                entries = json.loads(
+                    path.read_text(encoding="utf-8")) + entries
+            except (OSError, json.JSONDecodeError):
+                pass
+        path.write_text(json.dumps(entries), encoding="utf-8")
+
+
 # Both tables' tbody DOM, cell-for-cell: className and textContent per
 # td, row order preserved -- one expression shared by the #97 drift test
 # and both dispute drift contracts, so every drift contract stays one
@@ -115,44 +201,7 @@ class BrowserInteractionTests(unittest.TestCase):
             build.OUT = cls._saved_out
             cls._page_dir.cleanup()
             raise
-        cls._coverage_entries = []
-        cls._open_pages = []
-        original_new_page = cls.browser.new_page
-
-        def new_page(**kwargs):
-            page = original_new_page(**kwargs)
-            if kwargs.get("java_script_enabled") is False:
-                # A JavaScript-disabled page compiles no script, so it has no
-                # V8 block coverage to give: wiring a Profiler session onto it
-                # would only add empty records to the dump js_coverage.py
-                # folds. Skipped, the dump stays the JS-enabled run's.
-                return page
-            # playwright-python ships no page.coverage wrapper, so the V8
-            # block coverage comes straight from Chromium's Profiler domain
-            # over a CDP session — the same {url, source,
-            # functions[].ranges[]} evidence stop_js_coverage() would have
-            # handed back.
-            session = page.context.new_cdp_session(page)
-            session.send("Debugger.enable")
-            session.send("Profiler.enable")
-            session.send("Profiler.startPreciseCoverage",
-                         {"callCount": True, "detailed": True})
-            original_close = page.close
-
-            def close(**close_kwargs):
-                # the list holds (page, session) pairs — membership must be
-                # tested the same way, or a closed page stays queued for a
-                # second, doomed collection in tearDownClass
-                if (page, session) in cls._open_pages:
-                    cls._open_pages.remove((page, session))
-                cls._coverage_entries.extend(collect_page_coverage(session))
-                return original_close(**close_kwargs)
-
-            page.close = close
-            cls._open_pages.append((page, session))
-            return page
-
-        cls.browser.new_page = new_page
+        install_page_coverage_wiring(cls)
 
     @classmethod
     def tearDownClass(cls):
@@ -161,29 +210,7 @@ class BrowserInteractionTests(unittest.TestCase):
         # into this class's deleted temp dir.
         build.OUT = cls._saved_out
         cls._page_dir.cleanup()
-        # A test that failed mid-way leaves its page open; take its coverage
-        # here so the dump still describes the whole run.
-        for _page, session in list(cls._open_pages):
-            try:
-                cls._coverage_entries.extend(collect_page_coverage(session))
-            except Exception:
-                pass
-        cls._open_pages.clear()
-        dump = os.environ.get("JS_COVERAGE_OUT")
-        if dump:
-            # The coverage job runs more than one page-building class, and
-            # each dumps at ITS teardown: merge with whatever an earlier
-            # class already wrote, or the later teardown would erase the
-            # earlier class's whole contribution.
-            path = pathlib.Path(dump)
-            entries = cls._coverage_entries
-            if path.exists():
-                try:
-                    entries = json.loads(
-                        path.read_text(encoding="utf-8")) + entries
-                except (OSError, json.JSONDecodeError):
-                    pass
-            path.write_text(json.dumps(entries), encoding="utf-8")
+        flush_page_coverage(cls)
         cls.browser.close()
         cls.playwright.stop()
 
@@ -2054,54 +2081,12 @@ class ZeroScoreBrowserTests(unittest.TestCase):
             build.RAW, build.AGENTS_RAW, build.OUT = cls._saved
             cls._dir.cleanup()
             raise
-        # The same V8 block-coverage wiring BrowserInteractionTests uses.
-        cls._coverage_entries = []
-        cls._open_pages = []
-        original_new_page = cls.browser.new_page
-
-        def new_page(**kwargs):
-            page = original_new_page(**kwargs)
-            if kwargs.get("java_script_enabled") is False:
-                return page
-            session = page.context.new_cdp_session(page)
-            session.send("Debugger.enable")
-            session.send("Profiler.enable")
-            session.send("Profiler.startPreciseCoverage",
-                         {"callCount": True, "detailed": True})
-            original_close = page.close
-
-            def close(**close_kwargs):
-                if (page, session) in cls._open_pages:
-                    cls._open_pages.remove((page, session))
-                cls._coverage_entries.extend(collect_page_coverage(session))
-                return original_close(**close_kwargs)
-
-            page.close = close
-            cls._open_pages.append((page, session))
-            return page
-
-        cls.browser.new_page = new_page
+        install_page_coverage_wiring(cls)
 
     @classmethod
     def tearDownClass(cls):
         build.RAW, build.AGENTS_RAW, build.OUT = cls._saved
-        for _page, session in list(cls._open_pages):
-            try:
-                cls._coverage_entries.extend(collect_page_coverage(session))
-            except Exception:  # pylint: disable=broad-exception-caught
-                pass
-        cls._open_pages.clear()
-        dump = os.environ.get("JS_COVERAGE_OUT")
-        if dump:
-            path = pathlib.Path(dump)
-            entries = cls._coverage_entries
-            if path.exists():
-                try:
-                    entries = json.loads(
-                        path.read_text(encoding="utf-8")) + entries
-                except (OSError, json.JSONDecodeError):
-                    pass
-            path.write_text(json.dumps(entries), encoding="utf-8")
+        flush_page_coverage(cls)
         cls.browser.close()
         cls.playwright.stop()
         cls._dir.cleanup()
@@ -2184,54 +2169,12 @@ class DisputeBrowserTests(unittest.TestCase):
             build.RAW, build.AGENTS_RAW, build.OUT = cls._saved
             cls._dir.cleanup()
             raise
-        # The same V8 block-coverage wiring BrowserInteractionTests uses.
-        cls._coverage_entries = []
-        cls._open_pages = []
-        original_new_page = cls.browser.new_page
-
-        def new_page(**kwargs):
-            page = original_new_page(**kwargs)
-            if kwargs.get("java_script_enabled") is False:
-                return page
-            session = page.context.new_cdp_session(page)
-            session.send("Debugger.enable")
-            session.send("Profiler.enable")
-            session.send("Profiler.startPreciseCoverage",
-                         {"callCount": True, "detailed": True})
-            original_close = page.close
-
-            def close(**close_kwargs):
-                if (page, session) in cls._open_pages:
-                    cls._open_pages.remove((page, session))
-                cls._coverage_entries.extend(collect_page_coverage(session))
-                return original_close(**close_kwargs)
-
-            page.close = close
-            cls._open_pages.append((page, session))
-            return page
-
-        cls.browser.new_page = new_page
+        install_page_coverage_wiring(cls)
 
     @classmethod
     def tearDownClass(cls):
         build.RAW, build.AGENTS_RAW, build.OUT = cls._saved
-        for _page, session in list(cls._open_pages):
-            try:
-                cls._coverage_entries.extend(collect_page_coverage(session))
-            except Exception:  # pylint: disable=broad-exception-caught
-                pass
-        cls._open_pages.clear()
-        dump = os.environ.get("JS_COVERAGE_OUT")
-        if dump:
-            path = pathlib.Path(dump)
-            entries = cls._coverage_entries
-            if path.exists():
-                try:
-                    entries = json.loads(
-                        path.read_text(encoding="utf-8")) + entries
-                except (OSError, json.JSONDecodeError):
-                    pass
-            path.write_text(json.dumps(entries), encoding="utf-8")
+        flush_page_coverage(cls)
         cls.browser.close()
         cls.playwright.stop()
         cls._dir.cleanup()
@@ -2482,54 +2425,12 @@ class PresenceDisputeBrowserTests(unittest.TestCase):
             build.RAW, build.AGENTS_RAW, build.OUT = cls._saved
             cls._dir.cleanup()
             raise
-        # The same V8 block-coverage wiring DisputeBrowserTests uses.
-        cls._coverage_entries = []
-        cls._open_pages = []
-        original_new_page = cls.browser.new_page
-
-        def new_page(**kwargs):
-            page = original_new_page(**kwargs)
-            if kwargs.get("java_script_enabled") is False:
-                return page
-            session = page.context.new_cdp_session(page)
-            session.send("Debugger.enable")
-            session.send("Profiler.enable")
-            session.send("Profiler.startPreciseCoverage",
-                         {"callCount": True, "detailed": True})
-            original_close = page.close
-
-            def close(**close_kwargs):
-                if (page, session) in cls._open_pages:
-                    cls._open_pages.remove((page, session))
-                cls._coverage_entries.extend(collect_page_coverage(session))
-                return original_close(**close_kwargs)
-
-            page.close = close
-            cls._open_pages.append((page, session))
-            return page
-
-        cls.browser.new_page = new_page
+        install_page_coverage_wiring(cls)
 
     @classmethod
     def tearDownClass(cls):
         build.RAW, build.AGENTS_RAW, build.OUT = cls._saved
-        for _page, session in list(cls._open_pages):
-            try:
-                cls._coverage_entries.extend(collect_page_coverage(session))
-            except Exception:  # pylint: disable=broad-exception-caught
-                pass
-        cls._open_pages.clear()
-        dump = os.environ.get("JS_COVERAGE_OUT")
-        if dump:
-            path = pathlib.Path(dump)
-            entries = cls._coverage_entries
-            if path.exists():
-                try:
-                    entries = json.loads(
-                        path.read_text(encoding="utf-8")) + entries
-                except (OSError, json.JSONDecodeError):
-                    pass
-            path.write_text(json.dumps(entries), encoding="utf-8")
+        flush_page_coverage(cls)
         cls.browser.close()
         cls.playwright.stop()
         cls._dir.cleanup()
