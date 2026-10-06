@@ -717,6 +717,129 @@ class DisputeSectionTests(unittest.TestCase):
         self.assertIn("== disputes", message)
         self.assertIn("genVariants appeared on 1 model(s)", message)
 
+    def test_a_disputes_only_hour_is_material_in_the_subject(self):
+        # A run whose ONLY news is the Disputes section used to be committed
+        # as "nothing the page renders" -- while the page genuinely changed,
+        # both generations rendering red on it. The section's count lines are
+        # news, and the subject carries them.
+        old = [capture("Incumbent", intelligence=50)]
+        new = [dict(capture("Incumbent", intelligence=50), genVariants=[
+            {"ii": 50.0, "cost": 0.75}, {"ii": 51.0, "cost": 0.80},
+        ])]
+
+        report = self.render(old, new)
+        subject = diff_aa.as_commit_message(report).splitlines()[0]
+
+        self.assertIn("disputed value", subject)
+        self.assertNotIn("nothing the page renders", subject)
+
+    def test_the_disputes_clause_is_derived_from_the_sections_count_lines(self):
+        # N is the moved values (appeared + disappeared + changed), M the
+        # models the new capture carries more than one variant on. The
+        # "across" half is printed only where the two counts differ, so the
+        # common appearance hour -- every carrier is a mover -- keeps the
+        # clause short enough to co-fit a frontier clause within the width.
+        gv = [{"ii": 50.0, "cost": 0.75}, {"ii": 51.0, "cost": 0.80}]
+        old = [capture("Incumbent", intelligence=50)]
+        new = [dict(capture("Incumbent", intelligence=50), genVariants=gv)]
+
+        subject = diff_aa.as_commit_message(
+            self.render(old, new)).splitlines()[0]
+        self.assertEqual(
+            subject, "Refresh capture: 1 models, 1 disputed value")
+
+        carrier = dict(capture("Carrier", ident="carrier", intelligence=49),
+                       genVariants=[{"ii": 49.0, "cost": 0.75},
+                                    {"ii": 48.5, "cost": 0.80}])
+        old = [capture("Incumbent", intelligence=50), carrier]
+        new = [dict(capture("Incumbent", intelligence=50), genVariants=gv),
+               dict(carrier)]
+
+        subject = diff_aa.as_commit_message(
+            self.render(old, new)).splitlines()[0]
+        self.assertEqual(
+            subject,
+            "Refresh capture: 2 models, 1 disputed value across 2 models")
+
+    def test_disputes_and_frontier_moves_coexist_in_the_subject(self):
+        # Both clauses present: the frontier phrase names the move, the
+        # disputes clause names the layer, and the pair fits the
+        # conventional width -- a disputes hour is not silently demoted to
+        # the body the moment a frontier also moved.
+        gv = [{"ii": 50.0, "cost": 0.75}, {"ii": 49.5, "cost": 0.80}]
+
+        def gdp(model, weighted):
+            out = dict(model)
+            out["intelligenceIndexCostPerTask"] = {
+                "cost": {"total": 0.75},
+                "evaluations": [
+                    {"slug": "gdpval-aa", "weightedCostPerTask": weighted},
+                    {"slug": "scicode",
+                     "weightedCostPerTask": 0.75 - weighted},
+                ],
+            }
+            return out
+
+        old = [gdp(capture("Alpha", intelligence=50), 0.075),
+               gdp(capture("Ex", ident="ex", intelligence=49), 0.030)]
+        new = [dict(gdp(capture("Alpha", intelligence=50), 0.025),
+                    genVariants=gv),
+               gdp(capture("Ex", ident="ex", intelligence=49), 0.030)]
+
+        subject = diff_aa.as_commit_message(
+            self.render(old, new)).splitlines()[0]
+
+        self.assertEqual(
+            subject,
+            "Refresh capture: 2 models, GDPval-AA frontier: Ex out, "
+            "1 disputed value")
+
+    def test_the_disputes_clause_outranks_the_speed_clause(self):
+        # The width budget spends itself most-newsworthy first: a moved
+        # dispute layer outranks a re-sampled speed number, so when the two
+        # clauses cannot both fit, the speed clause is the one dropped --
+        # into the body, which carries every section in full.
+        gv = [{"ii": 50.0, "cost": 0.75}, {"ii": 49.5, "cost": 0.80}]
+
+        def gdp(model, weighted):
+            out = dict(model)
+            out["intelligenceIndexCostPerTask"] = {
+                "cost": {"total": 0.75},
+                "evaluations": [
+                    {"slug": "gdpval-aa", "weightedCostPerTask": weighted},
+                    {"slug": "scicode",
+                     "weightedCostPerTask": 0.75 - weighted},
+                ],
+            }
+            return out
+
+        old = [gdp(capture("Alpha", intelligence=50,
+                           medianOutputTokensPerSecond=100.0), 0.075),
+               gdp(capture("Ex", ident="ex", intelligence=49), 0.030)]
+        new = [dict(gdp(capture("Alpha", intelligence=50,
+                                medianOutputTokensPerSecond=180.0), 0.025),
+                    genVariants=gv),
+               gdp(capture("Ex", ident="ex", intelligence=49), 0.030)]
+
+        message = diff_aa.as_commit_message(self.render(old, new))
+        subject = message.splitlines()[0]
+
+        self.assertIn("1 disputed value", subject)
+        self.assertNotIn("rendered speed", subject)
+        self.assertIn("rendered speed", message)
+
+    def test_the_subject_is_unchanged_when_no_dispute_moved(self):
+        # The quiet capture's subject is byte-what it was before the clause
+        # existed: no disputes section, no disputes clause.
+        old = [capture("Incumbent", intelligence=50)]
+        new = [capture("Incumbent", intelligence=50)]
+
+        subject = diff_aa.as_commit_message(
+            self.render(old, new)).splitlines()[0]
+
+        self.assertEqual(
+            subject, "Refresh capture: 1 models, nothing the page renders")
+
 
 class DisplayNameTests(unittest.TestCase):
     """Issue #88 in the differ: no report line carries AA's dict-form effort.

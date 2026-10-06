@@ -103,11 +103,11 @@ other; it cannot settle a run against itself. AA serves the leaderboard from
 its own Vercel cache, so the two looks one run takes — 180 seconds apart
 (`DISPUTE_LOOK_SPACING_SECONDS`) — can land on different generations while a
 publish window is live. Detection is in-run with no cross-run state: each
-read is fingerprinted (`generation_key`, a sha256 over the slug-sorted
-records normalized on the leaderboard field universe minus the never-red
-speed/latency family — absent, null, `""` and `$undefined` fold to one
-missing marker before any comparison, and a cost object compares as the
-scalar of its own `cost.total`), reads sharing a fingerprint are one
+read is fingerprinted (`generation_key`, a 16-hex sha256 prefix over the
+slug-sorted records normalized on the leaderboard field universe minus the
+never-red speed/latency family — absent, null, `""` and `$undefined` fold
+to one missing marker before any comparison, and a cost object compares as
+the scalar of its own `cost.total`), reads sharing a fingerprint are one
 generation, and the detail route joins whichever generation it IS — it never
 raises a dispute by itself, a stale detail corpus being the known,
 precedence-handled state above. One fingerprint → the merge above, byte for
@@ -141,8 +141,14 @@ leaderboard looks against each other (maintainer ruling, 2026-10-06, issue
 #208). Route against route, #200 stands unchanged. A disputed capture is an
 ordinary hour: the run never exits red, the page renders both values red with
 the pair order canonical, and the scheduled commit's body carries the differ's
-Disputes section. A run whose looks agree writes no `genVariants` key anywhere
-and is byte-identical to the single-generation capture. The provenance
+Disputes section — the one red hour a dispute can still produce is the
+three-generation corner (the looks disagree AND the detail route matches
+neither fingerprint): the detail route then fills nothing, the parameter
+count is absent everywhere, and the parameters axis empties into `build.py`'s
+empty-axis guard. That nonzero exit is the designed go-re-read-AA-by-hand
+signal, not a dispute-layer failure. A run whose looks agree writes no
+`genVariants` key anywhere and is byte-identical to the single-generation
+capture. The provenance
 consequence is worth saying plainly: the models capture is a merged,
 dispute-bearing artifact — two routes, and while a window is live two
 generations — so the page's raw-byte provenance digest is a sha256 over

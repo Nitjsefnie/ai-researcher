@@ -427,7 +427,7 @@
       published value &mdash; the one the sort order and every frontier are
       computed from &mdash; and the pair order is canonical, fixed by the
       capture's generation order. Agreeing values render once, unchanged.</p>
-    <p>Capture <code>91466b5c9b30477156c038e999d5b3b9acc4a93d3516c801092a0f4510327aca</code> &mdash; sha256 over data/aa-raw-models.json -- the merged, dispute-bearing capture of AA's leaderboard looks and model detail route, holding every generation a dispute caught -- then data/aa-raw-coding-agents.json, whole files concatenated in that order. Source commit <code>d734abd2e4891382d9c558a05e56db9d081a1e39</code>.</p>
+    <p>Capture <code>91466b5c9b30477156c038e999d5b3b9acc4a93d3516c801092a0f4510327aca</code> &mdash; sha256 over data/aa-raw-models.json -- the merged, dispute-bearing capture of AA's leaderboard looks and model detail route, holding every generation a dispute caught -- then data/aa-raw-coding-agents.json, whole files concatenated in that order. Source commit <code>bd8f193124f887f8c0ed605057c7a72cc2626780</code>.</p>
     <p>&copy; 2026 Peter Z (Nitjsefnie) &middot;
       <a href="https://github.com/Nitjsefnie/ai-researcher/blob/main/LICENSE">MIT licence</a></p>
   </div>
@@ -631,12 +631,18 @@ const DATA = {"rows":[{"name":"Claude Opus 5.5 (Max, Default Fallback)","base":"
   // same wherever it is hovered; the chart's own metric rows stay
   // chart-specific and come first. Each value goes through show(), so a
   // field the record does not carry renders as the em dash, never blank.
-  const secondaryRows = r => [
-    ["Lab", show(r.creator)],
-    ["Weights", weightsOf(r)],
-    ["Output speed", show(r.tps == null ? null : r.tps + " tok/s")],
-    ["Context", fmtCtx(r.ctx)],
-  ];
+  // Context is dispute-capable and the table renders its pair, so the row
+  // shows the same red pair the cell does; agreeing keys stay single.
+  const secondaryRows = r => {
+    const dCtx=disputedOf(r,"ctx");
+    return [
+      ["Lab", show(r.creator)],
+      ["Weights", weightsOf(r)],
+      ["Output speed", show(r.tps == null ? null : r.tps + " tok/s")],
+      ["Context", dCtx?pairText(dCtx,fmtCtx):fmtCtx(r.ctx),
+       dCtx?"dispute":null],
+    ];
+  };
 
   /* ---------- scatter ---------- */
   // The plot fills whatever width the page gives it. The viewBox width tracks
