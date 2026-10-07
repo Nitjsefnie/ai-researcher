@@ -1174,8 +1174,7 @@ def main():
         generations = window_generations(RAW.parent)
         count_phrase = (f"{generations} generation(s) observed in-run"
                         if generations is not None
-                        else "generation count not recorded by this hour's "
-                             "fetch_aa.py")
+                        else "the marker carries no generation count")
         raise SystemExit(
             "no rows carry a score/cost pair for: " + ", ".join(sorted(empty))
             + " -- the capture records a cross-generation AA window, not a "

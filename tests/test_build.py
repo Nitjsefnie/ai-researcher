@@ -921,6 +921,11 @@ class EmptyAxisGuardTests(unittest.TestCase):
                 self.run_build()
 
             self.assertIn("no rows carry a score/cost pair for: parameters", str(raised.exception))
+            # The window branch must not have swallowed this one: the
+            # shape-change wording stays the no-window capture's refusal
+            # (issue #223), so pin it positively, not by the absence of an
+            # edit.
+            self.assertIn("changed shape", str(raised.exception))
             self.assertFalse(output.exists(), "refusal still wrote the page")
 
     def test_a_window_hour_publishes_with_the_agentic_axis_empty_and_named(self):
@@ -1047,7 +1052,7 @@ class EmptyAxisGuardTests(unittest.TestCase):
 
             message = str(raised.exception)
             self.assertIn("records a cross-generation AA window", message)
-            self.assertIn("generation count not recorded", message)
+            self.assertIn("the marker carries no generation count", message)
             self.assertNotIn("changed shape", message)
             self.assertFalse(output.exists(), "refusal still wrote the page")
 
