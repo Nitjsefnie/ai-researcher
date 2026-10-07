@@ -922,6 +922,29 @@ class EmptyAxisGuardTests(unittest.TestCase):
             self.assertIn("Empty during a two-generation window",
                           output.read_text(encoding="utf-8"))
 
+    def test_a_production_window_row_is_the_dropped_cost_not_the_score(self):
+        # The production window shape is the INVERSE of the fixture above:
+        # the merge dropped every breakdown, so each model keeps its GDPval
+        # SCORE but loses its decomposable COST -- the leaderboard's bare
+        # scalar with no evaluations beside it (exactly what
+        # check_cost_breakdown counts as dropped). Composed through the
+        # build with the marker present, the hour publishes: flag true,
+        # agentic count zero, intelligence alive, note on the page.
+        window_model = model_fixture()
+        window_model["intelligenceIndexCostPerTask"] = 0.75
+        with self.capture([window_model], [agent_fixture()]) as output:
+            (output.parent / "cost-breakdown-window.txt").write_text(
+                "every cost breakdown dropped as another generation's: "
+                "1 model(s), first fixture-model\n", encoding="utf-8")
+            self.run_build()
+
+            stats = self.payload_of(output)["stats"]
+            self.assertTrue(stats["costBreakdownWindow"])
+            self.assertEqual(stats["metricCounts"]["agentic"], 0)
+            self.assertEqual(stats["metricCounts"]["intelligence"], 1)
+            self.assertIn("Empty during a two-generation window",
+                          output.read_text(encoding="utf-8"))
+
     def test_a_window_marker_covers_the_agentic_axis_only(self):
         # The marker marks the all-dropped cost breakdown, whose ONLY empty
         # axis is agentic. An hour that also empties another axis is a shape
