@@ -261,16 +261,27 @@ class CostBreakdownTests(unittest.TestCase):
         # Window off: the file goes, so a stale marker can never outlive its
         # hour. Clearing when it is already absent is not an error -- that is
         # the common hour, and the schema sys.exit paths run BEFORE any
-        # record call, so a schema-broken run never leaves a marker.
+        # record call, so a schema-broken run never leaves a marker. Since
+        # #223 the line also carries the observed in-run generation count
+        # when the caller supplies one -- the build layer's refusal reads
+        # that integer, so a window hour that empties an axis beyond the
+        # #217 exemption names the window instead of blaming a shape change.
         with tempfile.TemporaryDirectory() as tmp:
             marker = pathlib.Path(tmp) / "cost-breakdown-window.txt"
 
             fetch_aa.record_cost_window(
-                0, ["dropped-0", "dropped-1"], marker)
+                0, ["dropped-0", "dropped-1"], marker, generations=3)
             note = marker.read_text(encoding="utf-8")
             self.assertIn("every cost breakdown dropped", note)
             self.assertIn("dropped-0", note)
+            self.assertIn("; 3 generation(s) observed in-run", note)
             self.assertEqual(len(note.splitlines()), 1)
+
+            fetch_aa.record_cost_window(0, ["dropped-2"], marker)
+            self.assertNotIn(
+                "generation(s) observed in-run",
+                marker.read_text(encoding="utf-8"),
+                "a countless hour must not inherit the previous one's count")
 
             fetch_aa.record_cost_window(2, ["dropped-3"], marker)
             self.assertFalse(marker.exists(), "stale marker outlived its hour")
@@ -360,6 +371,24 @@ class WindowMarkerSpanTests(unittest.TestCase):
         gitignore = (pathlib.Path(fetch_aa.ROOT) / ".gitignore").read_text(
             encoding="utf-8")
         self.assertIn(f"!/data/{fetch_aa.COST_WINDOW_MARKER.name}", gitignore)
+
+    def test_the_generation_count_round_trips_from_producer_to_reader(self):
+        # Issue #223's second contract leg: the integer record_cost_window
+        # writes into the marker is the integer build.py's refusal reads.
+        # The name was already pinned leg-by-leg above; this pins the
+        # FORMAT -- a producer rename or reformat must fail here, not as a
+        # "generation count not recorded" refusal on the next window hour.
+        with tempfile.TemporaryDirectory() as tmp:
+            data_dir = pathlib.Path(tmp)
+
+            fetch_aa.record_cost_window(
+                0, ["x"], data_dir / fetch_aa.COST_WINDOW_MARKER.name,
+                generations=3)
+            self.assertEqual(build.window_generations(data_dir), 3)
+
+            fetch_aa.record_cost_window(
+                0, ["y"], data_dir / fetch_aa.COST_WINDOW_MARKER.name)
+            self.assertIsNone(build.window_generations(data_dir))
 
 
 def agent_row(label: str, score: float | None = 0.64,
