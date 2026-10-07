@@ -53,6 +53,56 @@ def churn(models: bytes) -> bytes:
     return json.dumps(json.loads(models), indent=1, sort_keys=True).encode()
 
 
+def disputed_capture(models: bytes) -> bytes:
+    """The capture with five models carrying the in-run disputed encoding
+    (issue #226's fixture): `genVariants` -- one map per generation, the
+    empty map the generation that does NOT carry the model (a missing key
+    would be a missing marker, a different thing) and the carried map the
+    record's own published values, so the plain fields stay the
+    canonical-first variant's.
+
+    Four carry the cross-run readded shape refresh run 37682958494 caught
+    (three with the pad FIRST, one with it last), and one carries a
+    cross-run dropped record (crossRunMerged: true) -- every shape
+    genVariants takes. The mutation lives in memory only -- never a data/
+    write. Self-contained by this file's convention: no import from the
+    build tests.
+    """
+    parsed = json.loads(models)
+    widened = 0
+    for m in parsed:
+        if widened >= 5:
+            break
+        ii = m.get("intelligenceIndex")
+        outer = m.get("intelligenceIndexCostPerTask")
+        total = (outer.get("cost", {}).get("total")
+                 if isinstance(outer, dict) else None)
+        if not isinstance(ii, (int, float)) or isinstance(ii, bool):
+            continue
+        if not isinstance(total, (int, float)) or isinstance(total, bool):
+            continue
+        carried = {"ii": ii, "cost": total}
+        for key in ("contextWindowTokens", "price1mInputTokens",
+                    "price1mOutputTokens"):
+            value = m.get(key)
+            if isinstance(value, (int, float)) and not isinstance(value, bool):
+                carried[{"contextWindowTokens": "ctx",
+                         "price1mInputTokens": "pin",
+                         "price1mOutputTokens": "pout"}[key]] = value
+        if widened == 3:
+            m["genVariants"] = [carried, {}]
+        elif widened == 4:
+            m["crossRunMerged"] = True
+            m["genVariants"] = [{}, carried]
+        else:
+            m["genVariants"] = [{}, carried]
+        widened += 1
+    if widened < 5:
+        raise AssertionError("fewer than five renderable models in the "
+                             "fixture capture")
+    return json.dumps(parsed, indent=1).encode()
+
+
 def rendered_field_changed(models: bytes) -> bytes:
     """The same capture with one model's rendered number moved: the first
     model whose Intelligence Index the page actually renders (score AND paired
@@ -158,6 +208,18 @@ class CaptureGateTests(unittest.TestCase):
 
         self.assertEqual((code, out), (0, "false\n"))
 
+        # Issue #226: the same churn over a disputed capture. genVariants
+        # rides the rows, and a page that let the capture's key layout into
+        # the embedded dispute maps votes true on exactly this fixture --
+        # the vote that turned refresh run 37682958494's hour red. The true
+        # vote for a real change stays pinned by
+        # test_a_rendered_change_is_a_change on both capture shapes below.
+        disputed = disputed_capture(REAL_MODELS)
+        with head_serving(churn(disputed), churn(REAL_AGENTS)):
+            code, out = run_gate()
+
+        self.assertEqual((code, out), (0, "false\n"))
+
     def test_the_only_difference_masked_away_is_the_capture_digest(self):
         # On raw-only churn the two built pages genuinely differ -- in the
         # 64-hex digest inside `Capture <code>...</code>` and nowhere else --
@@ -172,6 +234,36 @@ class CaptureGateTests(unittest.TestCase):
                          capture_gate.mask_digest(new_page))
         for page in (old_page, new_page):
             self.assertEqual(len(capture_gate.DIGEST_RE.findall(page)), 1)
+
+        # Issue #226: the disputed capture too. genVariants may be the ONLY
+        # raw difference (the churned keys inside its maps), so the masked
+        # pages must be byte-equal here as well -- the digest stays the one
+        # masked difference, and any OTHER rendered change still votes true
+        # (test_a_rendered_change_is_a_change, run over the disputed shape
+        # below).
+        disputed = disputed_capture(REAL_MODELS)
+        with head_serving(churn(disputed), churn(REAL_AGENTS)):
+            old_page, new_page = capture_gate.build_page_pair(
+                (churn(disputed), churn(REAL_AGENTS)),
+                (disputed, REAL_AGENTS))
+
+        self.assertNotEqual(old_page, new_page)
+        self.assertEqual(capture_gate.mask_digest(old_page),
+                         capture_gate.mask_digest(new_page))
+        for page in (old_page, new_page):
+            self.assertEqual(len(capture_gate.DIGEST_RE.findall(page)), 1)
+
+    def test_a_rendered_change_on_a_disputed_capture_is_a_change(self):
+        # The true-vote control on the disputed shape (issue #226): a real
+        # rendered move -- one model's Intelligence Index, re-rendered
+        # through build.metric_record exactly as the quiet control mutates
+        # its field -- must still vote true when the capture carries
+        # genVariants, so the dispute fold can never swallow news.
+        disputed = disputed_capture(REAL_MODELS)
+        with head_serving(rendered_field_changed(disputed), REAL_AGENTS):
+            code, out = run_gate()
+
+        self.assertEqual((code, out), (0, "true\n"))
 
     def test_the_mask_never_touches_hex_outside_the_provenance_prose(self):
         # A 64-hex string anywhere else -- a sha in a payload string, a

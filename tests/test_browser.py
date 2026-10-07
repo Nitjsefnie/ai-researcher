@@ -183,10 +183,19 @@ class BrowserInteractionTests(unittest.TestCase):
         # after the browser closes -- so it cannot live in a with.
         cls._page_dir = tempfile.TemporaryDirectory(  # pylint: disable=consider-using-with
             prefix=".issue-114-browser-", dir=build.ROOT)
+        # Issue #226: the class's second fixture page, built from the in-run
+        # disputed capture the interaction pins must also hold on. The
+        # ambient capture is a quiet single-generation one, so the dispute
+        # paths never execute on it; a disputed hour publishes, and the
+        # disputed page is a first-class subject of these pins, not a
+        # separate class's property.
+        cls._disputed_dir = tempfile.TemporaryDirectory(  # pylint: disable=consider-using-with
+            prefix=".issue-226-disputed-", dir=build.ROOT)
         build.OUT = pathlib.Path(cls._page_dir.name) / "frontier-models.html"
         try:
             with contextlib.redirect_stdout(io.StringIO()):
                 build.main()
+            cls._disputed_uri = cls._build_disputed_fixture_page()
             # The launch is inside the handler's reach too: setUpClass
             # failure skips tearDownClass, so a raise from playwright's
             # start or the launch itself would strand build.OUT at the
@@ -200,8 +209,42 @@ class BrowserInteractionTests(unittest.TestCase):
         except BaseException:
             build.OUT = cls._saved_out
             cls._page_dir.cleanup()
+            cls._disputed_dir.cleanup()
             raise
         install_page_coverage_wiring(cls)
+
+    @classmethod
+    def _build_disputed_fixture_page(cls):
+        """Build the in-run disputed fixture page; return its file URI.
+
+        The fixture capture is the class's own synthetic one (_in_run_
+        disputed_models: five models carrying genVariants across two
+        generations); it is written into the disputed temp dir and built
+        with build.py itself, and build's module paths -- including the
+        ambient page's OUT this class's other tests read -- are restored
+        no matter how the build ends.
+        """
+        data = pathlib.Path(cls._disputed_dir.name) / "data"
+        data.mkdir()
+        (data / "aa-raw-models.json").write_text(
+            json.dumps(_in_run_disputed_models()), encoding="utf-8")
+        (data / "aa-raw-coding-agents.json").write_text(
+            json.dumps(_PROBE_AGENTS), encoding="utf-8")
+        (data / "captured-at.txt").write_text("2026-10-07\n",
+                                              encoding="utf-8")
+        ambient_out = build.OUT
+        old_raw, old_agents = build.RAW, build.AGENTS_RAW
+        try:
+            build.RAW = data / "aa-raw-models.json"
+            build.AGENTS_RAW = data / "aa-raw-coding-agents.json"
+            build.OUT = pathlib.Path(cls._disputed_dir.name) / \
+                "frontier-models.html"
+            with contextlib.redirect_stdout(io.StringIO()):
+                build.main()
+            return build.OUT.as_uri()
+        finally:
+            build.RAW, build.AGENTS_RAW = old_raw, old_agents
+            build.OUT = ambient_out
 
     @classmethod
     def tearDownClass(cls):
@@ -210,9 +253,32 @@ class BrowserInteractionTests(unittest.TestCase):
         # into this class's deleted temp dir.
         build.OUT = cls._saved_out
         cls._page_dir.cleanup()
+        cls._disputed_dir.cleanup()
         flush_page_coverage(cls)
         cls.browser.close()
         cls.playwright.stop()
+
+    # The two captures the dispute-class interaction pins hold on: the
+    # ambient single-generation capture, and the class's own in-run
+    # disputed fixture (issue #226) -- a disputed hour publishes, so the
+    # pins are disputed-capture pins too.
+    CAPTURES = ("ambient", "disputed")
+
+    def _capture_page(self, capture):
+        """A settled page on the named capture's build.
+
+        The disputed page waits for the initial render the same way
+        DisputeBrowserTests does -- the count line is the render's most
+        visible act -- so the chart DOM the pins read is settled.
+        """
+        page = self.browser.new_page(viewport={"width": 1280, "height": 900})
+        if capture == "disputed":
+            page.goto(self._disputed_uri)
+            page.wait_for_function(
+                "document.getElementById('count').textContent !== '—'")
+        else:
+            page.goto(build.OUT.as_uri())
+        return page
 
     def first_point(self, page, selector):
         """A point locator that fails SAYING SO rather than timing out.
@@ -432,41 +498,158 @@ class BrowserInteractionTests(unittest.TestCase):
         # models draw in de-emphasis gray), so every off-frontier point
         # draws var(--muted) on every chart, and every legend documents the
         # swatch, while a frontier point carries no verdict fill.
-        page = self.browser.new_page(viewport={"width": 1280, "height": 900})
-        page.goto(build.OUT.as_uri())
-        for chart in ("coding", "intelligence", "agentic", "parameters"):
-            with self.subTest(chart=chart):
-                off_frontier = page.evaluate(
-                    "sel => [...new Set([...document.querySelectorAll(sel)]"
-                    ".map(c => c.getAttribute('fill')))]",
-                    f"#svg-{chart} circle.pt[r='5']",
-                )
-                self.assertTrue(
-                    off_frontier and set(off_frontier) <= {"var(--muted)"},
-                    f"{chart}: off-frontier fills {off_frontier} leave the "
-                    "legit set ['var(--muted)']")
+        # Issue #226: the rule is pinned against the in-run disputed
+        # fixture capture too -- a disputed hour publishes, and the
+        # disputed encoding's red variant marks are the one fill the
+        # de-emphasis set must admit (only on circles the page actually
+        # marks disputed, checked inside the body).
+        for capture in self.CAPTURES:
+            with self.subTest(capture=capture):
+                self._de_emphasis_gray_holds(capture)
 
-                # frontier points keep their weights fill -- the gray is a
-                # superseded verdict, not a repainting of the whole chart
-                on_frontier = page.locator(f"#svg-{chart} circle.pt[r='6']")
-                self.assertGreater(on_frontier.count(), 0)
-                self.assertNotIn(
-                    "var(--muted)",
-                    page.evaluate(
+    def _de_emphasis_gray_holds(self, capture):
+        page = self._capture_page(capture)
+        try:
+            for chart in ("coding", "intelligence", "agentic", "parameters"):
+                with self.subTest(chart=chart):
+                    off_frontier = page.evaluate(
                         "sel => [...new Set([...document.querySelectorAll(sel)]"
                         ".map(c => c.getAttribute('fill')))]",
-                        f"#svg-{chart} circle.pt[r='6']",
-                    ),
-                )
+                        f"#svg-{chart} circle.pt[r='5']",
+                    )
+                    self.assertTrue(
+                        off_frontier and set(off_frontier) <= {"var(--muted)"},
+                        f"{capture} {chart}: off-frontier fills "
+                        f"{off_frontier} leave the legit set ['var(--muted)']")
 
-                legend = page.locator(f"#{chart} .legend .item").filter(
-                    has_text="Superseded"
-                )
-                self.assertEqual(legend.count(), 1)
-                style = legend.locator(".swatch").first.get_attribute("style")
-                assert style is not None, "Superseded swatch has no style attribute"
-                self.assertIn("var(--muted)", style)
-        page.close()
+                    # frontier points keep their weights fill -- the gray is
+                    # a superseded verdict, not a repainting of the whole
+                    # chart
+                    on_frontier = page.locator(
+                        f"#svg-{chart} circle.pt[r='6']")
+                    self.assertGreater(on_frontier.count(), 0)
+                    self.assertNotIn(
+                        "var(--muted)",
+                        page.evaluate(
+                            "sel => [...new Set("
+                            "[...document.querySelectorAll(sel)]"
+                            ".map(c => c.getAttribute('fill')))]",
+                            f"#svg-{chart} circle.pt[r='6']",
+                        ),
+                    )
+
+                    legend = page.locator(f"#{chart} .legend .item").filter(
+                        has_text="Superseded")
+                    self.assertEqual(legend.count(), 1)
+                    style = legend.locator(".swatch").first.get_attribute(
+                        "style")
+                    assert style is not None, \
+                        "Superseded swatch has no style attribute"
+                    self.assertIn("var(--muted)", style)
+        finally:
+            page.close()
+
+    def test_the_disputed_fixture_renders_its_dispute_matrix(self):
+        # Issue #226's fixture matrix, asserted on the RENDERED disputed
+        # page: red "a / b" pairs exactly where two generations published
+        # different values for a field (score and cost on the value row,
+        # the presence rows' "value / —", the price-only and context-only
+        # rows in their own columns), and today's single value where a
+        # generation merely fills the other's missing field or the two
+        # generations agree -- red marks a real published disagreement and
+        # nothing else. Chart marks answer the same test per ROW: only the
+        # rows whose chart axes dispute are marked, every mark names its
+        # row, and the value row's second generation is the one red-filled
+        # point.
+        page = self._capture_page("disputed")
+        try:
+            def row_cells(name):
+                row = page.locator("#tbl tbody tr").filter(has_text=name)
+                self.assertEqual(row.count(), 1, name)
+                return row.locator("td").all_text_contents()
+
+            with self.subTest(entry="value dispute"):
+                cells = row_cells("Probe Model 0002")
+                self.assertIn("79.9 / 77.9", cells)
+                self.assertIn("$2.30 / $4.14", cells)
+                self.assertIn("42.0 / 40.0 frontier", cells)
+                self.assertIn("$2.30 / $5.06", cells)
+                self.assertIn("200K / 100K", cells)
+                self.assertIn("$1 / $1.5", cells)
+                self.assertIn("$0.5", cells)  # pin agrees: single value
+
+            # The presence pairs read in canonical generation order: the
+            # pad-first rows' previous generation (which does not carry the
+            # model) ranks first, the pad-last row's carries first.
+            for name, score, cost in (("Probe Model 0000",
+                                       "— / 80.0 frontier",
+                                       "— / $0.500"),
+                                      ("Probe Model 0001", "— / 80.0",
+                                       "— / $1.40"),
+                                      ("Probe Model 0003", "— / 79.9",
+                                       "— / $3.20"),
+                                      ("Probe Model 0004", "— / 79.8",
+                                       "— / $4.10")):
+                with self.subTest(entry=f"presence pad-first: {name}"):
+                    cells = row_cells(name)
+                    self.assertIn(score, cells)
+                    self.assertIn(cost, cells)
+                    self.assertIn("— / $0.5", cells)
+                    self.assertIn("— / $1", cells)
+                    self.assertIn("— / 200K", cells)
+
+            with self.subTest(entry="presence pad-last"):
+                cells = row_cells("Probe Model 0005")
+                self.assertIn("79.8 / —", cells)
+                self.assertIn("$5.00 / —", cells)
+                self.assertIn("$0.5 / —", cells)
+                self.assertIn("$1 / —", cells)
+                self.assertIn("200K / —", cells)
+
+            with self.subTest(entry="agreeing generations"):
+                cells = row_cells("Probe Model 0006")
+                self.assertNotIn("79.8 / 79.8", cells)
+                for cell in cells:
+                    self.assertNotIn(" / ", cell)
+
+            with self.subTest(entry="canonical-first fill"):
+                cells = row_cells("Probe Model 0007")
+                for cell in cells:
+                    self.assertNotIn(" / ", cell)
+                self.assertIn("$1", cells)
+                self.assertIn("200K", cells)
+
+            with self.subTest(entry="price-only dispute"):
+                cells = row_cells("Probe Model 0008")
+                self.assertIn("$0.5 / $0.7", cells)
+                self.assertIn("$1 / $1.9", cells)
+                self.assertIn("79.7", cells)
+                self.assertIn("200K", cells)
+
+            with self.subTest(entry="context-only dispute"):
+                cells = row_cells("Probe Model 0009")
+                self.assertIn("200K / 320K", cells)
+                self.assertIn("79.6", cells)
+                self.assertIn("$8.60", cells)
+
+            with self.subTest(entry="chart marks"):
+                marks = page.evaluate(
+                    "sel => [...document.querySelectorAll(sel)]"
+                    ".map(c => {const a = c.getAttribute('aria-label');"
+                    "return a === null ? 'UNLABELLED' : a.slice(4,"
+                    "a.lastIndexOf(' on the '));})",
+                    "#svg-intelligence circle.dispute")
+                self.assertEqual(
+                    sorted(marks),
+                    sorted(f"Probe Model {i:04d}"
+                           for i in (0, 1, 2, 2, 3, 4, 5)),
+                    "only the rows whose chart axes dispute are marked: "
+                    "five presence anchors, the value row's anchor and its "
+                    "second-generation point -- every mark labelled, the "
+                    "agreeing, filled, price-only and context-only rows "
+                    "unmarked")
+        finally:
+            page.close()
 
     def test_pinned_names_stay_labelled_on_every_chart(self):
         # #27: a pin is an explicit reader request. The capability charts
@@ -864,76 +1047,91 @@ class BrowserInteractionTests(unittest.TestCase):
         # rows the three capability tooltips omitted. All four tooltips now
         # share one secondary-row builder; the chart's own metric rows stay
         # chart-specific and first.
-        page = self.browser.new_page(viewport={"width": 1280, "height": 900})
-        page.goto(build.OUT.as_uri())
-        chart_labels = {"coding": "Coding Agent Index",
-                        "intelligence": "Intelligence Index",
-                        "agentic": "GDPval-AA v2",
-                        "parameters": "Parameter efficiency"}
-        secondary = ["Lab", "Weights", "Output speed", "Context"]
+        # Issue #226: pinned against the in-run disputed fixture capture
+        # too -- a disputed hour publishes, and a disputed row's circles
+        # (the canonical anchor plus any second-generation point) must all
+        # carry the canonical pin label, or this pin crashes building its
+        # name sets before it hovers anything.
+        for capture in self.CAPTURES:
+            with self.subTest(capture=capture):
+                self._tooltip_secondary_rows_match(capture)
 
-        def tip_rows(chart):
-            out = {}
-            rows = page.locator(f"#tip-{chart} .trow")
-            for i in range(rows.count()):
-                row = rows.nth(i)
-                out[row.locator("span").first.inner_text()] = \
-                    row.locator("span.tv").inner_text()
-            return out
+    def _tooltip_secondary_rows_match(self, capture):
+        page = self._capture_page(capture)
+        try:
+            chart_labels = {"coding": "Coding Agent Index",
+                            "intelligence": "Intelligence Index",
+                            "agentic": "GDPval-AA v2",
+                            "parameters": "Parameter efficiency"}
+            secondary = ["Lab", "Weights", "Output speed", "Context"]
 
-        def hover_by_name(chart, name):
-            aria = f"Pin {name} on the {chart_labels[chart]} chart"
-            self.assertNotIn('"', name)
-            page.locator(
-                f'#svg-{chart} circle.pt[aria-label="{aria}"]').hover()
-            return tip_rows(chart)
+            def tip_rows(chart):
+                out = {}
+                rows = page.locator(f"#tip-{chart} .trow")
+                for i in range(rows.count()):
+                    row = rows.nth(i)
+                    out[row.locator("span").first.inner_text()] = \
+                        row.locator("span.tv").inner_text()
+                return out
 
-        # a model present on the intelligence, agentic and parameter charts
-        name_sets = {}
-        for chart in ("intelligence", "agentic", "parameters"):
+            def hover_by_name(chart, name):
+                aria = f"Pin {name} on the {chart_labels[chart]} chart"
+                self.assertNotIn('"', name)
+                page.locator(
+                    f'#svg-{chart} circle.pt[aria-label="{aria}"]').hover()
+                return tip_rows(chart)
+
+            # a model present on the intelligence, agentic and parameter
+            # charts
+            name_sets = {}
+            for chart in ("intelligence", "agentic", "parameters"):
+                aris = page.evaluate(
+                    "sel => [...document.querySelectorAll(sel)]"
+                    ".map(c => c.getAttribute('aria-label'))",
+                    f"#svg-{chart} circle.pt")
+                suffix = f" on the {chart_labels[chart]} chart"
+                name_sets[chart] = {
+                    a[len("Pin "):-len(suffix)] for a in aris
+                    if a.startswith("Pin ") and a.endswith(suffix)
+                }
+            common = name_sets["intelligence"] & name_sets["agentic"] \
+                & name_sets["parameters"]
+            self.assertTrue(common)
+            model = sorted(n for n in common if '"' not in n)[0]
+
+            snapshots = {chart: hover_by_name(chart, model)
+                         for chart in ("intelligence", "agentic",
+                                       "parameters")}
+            for chart, rows in snapshots.items():
+                with self.subTest(chart=chart):
+                    for key in secondary:
+                        self.assertIn(key, rows)
+            for key in secondary:
+                values = {snapshots[c][key]
+                          for c in ("intelligence", "agentic", "parameters")}
+                self.assertEqual(len(values), 1,
+                                 f"{key} differs across charts: {values}")
+
+            # agent rows carry no speed/context fields -- the shared builder
+            # must render those as the em dash rather than omitting the rows
             aris = page.evaluate(
                 "sel => [...document.querySelectorAll(sel)]"
                 ".map(c => c.getAttribute('aria-label'))",
-                f"#svg-{chart} circle.pt")
-            suffix = f" on the {chart_labels[chart]} chart"
-            name_sets[chart] = {
-                a[len("Pin "):-len(suffix)] for a in aris
-                if a.startswith("Pin ") and a.endswith(suffix)
-            }
-        common = name_sets["intelligence"] & name_sets["agentic"] \
-            & name_sets["parameters"]
-        self.assertTrue(common)
-        model = sorted(n for n in common if '"' not in n)[0]
-
-        snapshots = {chart: hover_by_name(chart, model)
-                     for chart in ("intelligence", "agentic", "parameters")}
-        for chart, rows in snapshots.items():
-            with self.subTest(chart=chart):
-                for key in secondary:
-                    self.assertIn(key, rows)
-        for key in secondary:
-            values = {snapshots[c][key]
-                      for c in ("intelligence", "agentic", "parameters")}
-            self.assertEqual(len(values), 1,
-                             f"{key} differs across charts: {values}")
-
-        # agent rows carry no speed/context fields -- the shared builder must
-        # render those as the em dash rather than omitting the rows
-        aris = page.evaluate(
-            "sel => [...document.querySelectorAll(sel)]"
-            ".map(c => c.getAttribute('aria-label'))", "#svg-coding circle.pt")
-        agent_names = [
-            a[len("Pin "):-len(" on the Coding Agent Index chart")]
-            for a in aris
-            if a.startswith("Pin ") and a.endswith(" on the Coding Agent Index chart")
-        ]
-        agent = next(n for n in agent_names if '"' not in n)
-        agent_rows = hover_by_name("coding", agent)
-        for key in secondary:
-            self.assertIn(key, agent_rows)
-        self.assertEqual(agent_rows["Output speed"], "—")
-        self.assertEqual(agent_rows["Context"], "—")
-        page.close()
+                "#svg-coding circle.pt")
+            agent_names = [
+                a[len("Pin "):-len(" on the Coding Agent Index chart")]
+                for a in aris
+                if a.startswith("Pin ")
+                and a.endswith(" on the Coding Agent Index chart")
+            ]
+            agent = next(n for n in agent_names if '"' not in n)
+            agent_rows = hover_by_name("coding", agent)
+            for key in secondary:
+                self.assertIn(key, agent_rows)
+            self.assertEqual(agent_rows["Output speed"], "—")
+            self.assertEqual(agent_rows["Context"], "—")
+        finally:
+            page.close()
 
     def test_script_terminators_in_remote_strings_cannot_execute(self):
         lower = "</script><script>document.documentElement.dataset.auditLower=1</script>"
@@ -1311,66 +1509,88 @@ class BrowserInteractionTests(unittest.TestCase):
         # while nearer slots on the SAME side sat clear. The intelligence
         # chart has sorted candidates by distance since 9c74397; the placer
         # must drift a label only as far as the crowd genuinely forces it.
-        page = self.browser.new_page(viewport={"width": 1280, "height": 900})
-        page.goto(build.OUT.as_uri())
-        for chart in ("coding", "agentic", "parameters"):
-            with self.subTest(chart=chart):
-                res = page.evaluate(self._REPLAY_NEAREST_CLEAR_SLOT,
-                                    f"svg-{chart}")
-                # a broken page must fail here, saying so -- both sides of
-                # the comparison below are vacuously equal on an empty chart
-                self.assertGreater(res["n_pts"], 0,
-                                   f"{chart} rendered empty")
-                self.assertTrue(res["dom"], f"{chart} has no labels")
-                unmatched = []
-                for want in res["replay"]:
-                    hit = next((d for d in res["dom"] if not d["claimed"]
-                                and d["text"] == want["text"]
-                                and abs(d["x"] - want["x"]) <= 0.5
-                                and abs(d["y"] - want["y"]) <= 0.5), None)
-                    if hit:
-                        hit["claimed"] = True
-                    else:
-                        unmatched.append(want)
-                leftover = [d for d in res["dom"] if not d["claimed"]]
-                self.assertEqual(
-                    (unmatched, leftover), ([], []),
-                    f"labels not at their nearest clear slot on {chart}: "
-                    f"{[(w['text'], (w['x'], w['y'])) for w in unmatched]}"
-                    f"{[(d['text'], (d['x'], d['y'])) for d in leftover]}")
+        # Issue #226: pinned against the in-run disputed fixture capture
+        # too -- a disputed row's own variant points never block their own
+        # row's label, so the replay must judge clearance per ROW, the way
+        # the page does, not per DOM circle.
+        for capture in self.CAPTURES:
+            with self.subTest(capture=capture):
+                self._labels_take_the_nearest_clear_slot(capture)
 
-        # #84's first invariant, same page: a click that does not change
-        # which points are drawn must leave every label exactly where it
-        # was. Table sort is the page's pure no-op control; a
+        # #84's first invariant, same ambient page: a click that does not
+        # change which points are drawn must leave every label exactly
+        # where it was. Table sort is the page's pure no-op control; a
         # Hide-superseded round trip must restore the identical layout,
-        # because the placer is a pure function of the drawn state.
-        with self.subTest(phase="no-op clicks"):
-            snap = ("charts => Object.fromEntries(charts.map(c => [c, "
-                    "Object.fromEntries([...document.querySelectorAll("
-                    "`#svg-${c} text.lbl`)].map(t => "
-                    "[t.textContent, [t.getAttribute('x'), "
-                    "t.getAttribute('y')]]))]))")
-            charts = ["coding", "intelligence", "agentic", "parameters"]
-            before = page.evaluate(snap, charts)
-            # an empty snapshot compares vacuously equal to everything --
-            # the page must have rendered labels before any click is judged
-            self.assertTrue(any(before[c] for c in charts),
-                            "no chart rendered any label; nothing to compare")
+        # because the placer is a pure function of the drawn state. The
+        # click-stability contract is dispute-independent, so it runs once,
+        # on the ambient page.
+        page = self._capture_page("ambient")
+        try:
+            with self.subTest(phase="no-op clicks"):
+                snap = ("charts => Object.fromEntries(charts.map(c => [c, "
+                        "Object.fromEntries([...document.querySelectorAll("
+                        "`#svg-${c} text.lbl`)].map(t => "
+                        "[t.textContent, [t.getAttribute('x'), "
+                        "t.getAttribute('y')]]))]))")
+                charts = ["coding", "intelligence", "agentic", "parameters"]
+                before = page.evaluate(snap, charts)
+                # an empty snapshot compares vacuously equal to everything --
+                # the page must have rendered labels before any click is
+                # judged
+                self.assertTrue(
+                    any(before[c] for c in charts),
+                    "no chart rendered any label; nothing to compare")
 
-            header = page.locator("#tbl th[data-k='ii']")
-            header.click()
-            self.assertEqual(page.evaluate(snap, charts), before,
-                             "a table-sort click moved chart labels")
-            header.click()
-            self.assertEqual(page.evaluate(snap, charts), before,
-                             "the second sort click moved chart labels")
+                header = page.locator("#tbl th[data-k='ii']")
+                header.click()
+                self.assertEqual(page.evaluate(snap, charts), before,
+                                 "a table-sort click moved chart labels")
+                header.click()
+                self.assertEqual(page.evaluate(snap, charts), before,
+                                 "the second sort click moved chart labels")
 
-            page.locator("#fSup").click()
-            page.locator("#fSup").click()
-            self.assertEqual(page.evaluate(snap, charts), before,
-                             "a Hide-superseded round trip did not restore "
-                             "the identical label layout")
-        page.close()
+                page.locator("#fSup").click()
+                page.locator("#fSup").click()
+                self.assertEqual(
+                    page.evaluate(snap, charts), before,
+                    "a Hide-superseded round trip did not restore "
+                    "the identical label layout")
+        finally:
+            page.close()
+
+    def _labels_take_the_nearest_clear_slot(self, capture):
+        page = self._capture_page(capture)
+        try:
+            for chart in ("coding", "agentic", "parameters"):
+                with self.subTest(chart=chart):
+                    res = page.evaluate(self._REPLAY_NEAREST_CLEAR_SLOT,
+                                        f"svg-{chart}")
+                    # a broken page must fail here, saying so -- both sides
+                    # of the comparison below are vacuously equal on an
+                    # empty chart
+                    self.assertGreater(res["n_pts"], 0,
+                                       f"{chart} rendered empty")
+                    self.assertTrue(res["dom"], f"{chart} has no labels")
+                    unmatched = []
+                    for want in res["replay"]:
+                        hit = next(
+                            (d for d in res["dom"] if not d["claimed"]
+                             and d["text"] == want["text"]
+                             and abs(d["x"] - want["x"]) <= 0.5
+                             and abs(d["y"] - want["y"]) <= 0.5), None)
+                        if hit:
+                            hit["claimed"] = True
+                        else:
+                            unmatched.append(want)
+                    leftover = [d for d in res["dom"] if not d["claimed"]]
+                    self.assertEqual(
+                        (unmatched, leftover), ([], []),
+                        f"{capture}: labels not at their nearest clear slot "
+                        f"on {chart}: "
+                        f"{[(w['text'], (w['x'], w['y'])) for w in unmatched]}"
+                        f"{[(d['text'], (d['x'], d['y'])) for d in leftover]}")
+        finally:
+            page.close()
 
     def test_chart_labels_are_distinct_on_every_chart(self):
         # #85: a chart label identifies exactly one row. Four effort variants
@@ -2131,6 +2351,110 @@ def _disputed_probe_model():
          "pout": 1.4, "ctx": 100000},
     ]
     return probe
+
+
+# Issue #226's disputed-capture fixture: the shape refresh run 37682958494
+# (2026-10-07T20:33Z) captured and the suite then failed six tests against --
+# five models carrying `genVariants` across two generations, in the encoding
+# the page's dispute layer reads. It lives in the suite permanently, so a
+# disputed capture can never fail these pins again without a red suite here.
+IN_RUN_DISPUTED_MODELS = 5
+
+
+def _carried_variant_map(model):
+    """The carrying generation's own flat variant map for a probe model.
+
+    Built from the record's own published values exactly as
+    fetch_aa.variant_fields builds one -- so the plain fields (the
+    canonical-first variant's values) and the carried map agree field for
+    field, and the empty map stays the ONLY not-carried marker.
+    """
+    return {
+        "ii": model["intelligenceIndex"],
+        "cost": model["intelligenceIndexCostPerTask"]["cost"]["total"],
+        "gdpval": model["gdpvalNormalized"],
+        "gdpvalCost": (model["intelligenceIndexCostPerTask"]["evaluations"][0]
+                       ["weightedCostPerTask"] / build.GDPVAL_INDEX_WEIGHT),
+        "ctx": 200000,
+        "pin": 0.5,
+        "pout": 1.0,
+    }
+
+
+def _variant_probe_model(model, variants):
+    """One probe model widened into a disputed record.
+
+    The record gains the context/price fields the variant maps carry (a
+    variant map key absent from the record is unreadable, and identity
+    fields are never disputed); the plain fields stay untouched -- the
+    canonical-first variant's published values.
+    """
+    m = dict(model)
+    m.update({
+        "contextWindowTokens": 200000,
+        "price1mInputTokens": 0.5,
+        "price1mOutputTokens": 1.0,
+    })
+    m["genVariants"] = variants
+    return m
+
+
+def _in_run_disputed_models(total=14):
+    """Issue #226's disputed-capture fixture: the shape refresh run
+    37682958494 (2026-10-07T20:33Z) captured and the suite then failed six
+    tests against -- five models carrying `genVariants` across two
+    generations -- plus one fixture entry per detection branch of the
+    page's dispute layer, one varied property per entry.
+
+    The run's five: four cross-run readded records (the empty map FIRST --
+    the previous generation did not carry the model) and one genuine value
+    dispute (two carried maps, differing), whose second-generation point
+    is the page's one designed red fill. The matrix entries pin the
+    branches the run's shape does not reach: the pad on the OTHER side, an
+    agreeing generation (red marks a real published disagreement and
+    nothing else), a canonical-first fill (the canonical generation lacks
+    the field; the next carrying generation's value fills it, single,
+    never red), and chart-agreeing price/context disputes (red in their
+    own columns, never on the charts).
+    """
+    models = _probe_models(total)
+    carried = {i: _carried_variant_map(models[i]) for i in range(10)}
+    # The run's five. Model 0000 sits on every chart's frontier, so its
+    # disputed anchor keeps a label -- the pin the label-slot test reads.
+    for i in (0, 1, 3, 4):
+        models[i] = _variant_probe_model(models[i], [{}, carried[i]])
+    second = dict(carried[2])
+    second.update({
+        "ii": carried[2]["ii"] - 2.0,
+        "cost": carried[2]["cost"] * 1.8,
+        "gdpval": carried[2]["gdpval"] - 0.02,
+        "gdpvalCost": carried[2]["gdpvalCost"] * 2.2,
+        "pout": 1.5,
+        "ctx": 100000,
+    })
+    models[2] = _variant_probe_model(models[2], [carried[2], second])
+    # Pad LAST: the same presence dispute, pad side the one varied
+    # property (#211's original encoding).
+    models[5] = _variant_probe_model(models[5], [carried[5], {}])
+    # Agreeing generations: genVariants present, nothing disputed -- every
+    # field renders today's single value and the charts draw no marks.
+    models[6] = _variant_probe_model(models[6],
+                                     [carried[6], dict(carried[6])])
+    # Canonical-first fill: the canonical generation lacks pout and ctx;
+    # the next carrying generation's values fill them. A missing marker is
+    # a fill, never a dispute -- single values, never red.
+    fill = {k: v for k, v in carried[7].items() if k not in ("pout", "ctx")}
+    models[7] = _variant_probe_model(models[7], [fill, carried[7]])
+    # Price-only dispute: pin and pout differ, every chart axis agrees --
+    # red in the price columns, no marks on any chart.
+    price = dict(carried[8])
+    price.update({"pin": 0.7, "pout": 1.9})
+    models[8] = _variant_probe_model(models[8], [carried[8], price])
+    # Context-only dispute: red in the Context column, charts untouched.
+    ctx = dict(carried[9])
+    ctx.update({"ctx": 320000})
+    models[9] = _variant_probe_model(models[9], [carried[9], ctx])
+    return models
 
 
 class DisputeBrowserTests(unittest.TestCase):
