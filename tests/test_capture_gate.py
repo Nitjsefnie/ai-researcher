@@ -751,7 +751,8 @@ class WindowMarkerStagingTests(unittest.TestCase):
             (root / "data").mkdir()
             with mock.patch.object(capture_gate, "ROOT", root):
                 self.assertIsNone(capture_gate.read_fresh_window_marker())
-            (root / "data" / capture_gate.WINDOW_MARKER_NAME).write_text("w\n")
+            (root / "data" / capture_gate.WINDOW_MARKER_NAME).write_bytes(
+                b"w\n")
             with mock.patch.object(capture_gate, "ROOT", root):
                 self.assertEqual(
                     capture_gate.read_fresh_window_marker(), b"w\n")
