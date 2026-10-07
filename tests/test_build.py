@@ -791,6 +791,27 @@ class CostBreakdownWindowReaderTests(unittest.TestCase):
                               encoding="utf-8")
             self.assertTrue(build.cost_breakdown_window(data_dir))
 
+    def test_the_generation_count_reader_parses_the_marker_line(self):
+        # Issue #223: the marker's "; N generation(s) observed in-run" tail
+        # is the one integer the refusal reads back. Absent and countless
+        # markers read as None -- the refusal then names the window
+        # generically -- and nothing here reaches the page.
+        with tempfile.TemporaryDirectory() as tmp:
+            data_dir = pathlib.Path(tmp)
+
+            self.assertIsNone(build.window_generations(data_dir))
+
+            (data_dir / "cost-breakdown-window.txt").write_text(
+                "every cost breakdown dropped as another generation's: "
+                "185 model(s), first apodex-1-1; 3 generation(s) observed "
+                "in-run\n", encoding="utf-8")
+            self.assertEqual(build.window_generations(data_dir), 3)
+
+            (data_dir / "cost-breakdown-window.txt").write_text(
+                "every cost breakdown dropped as another generation's: "
+                "1 model(s), first fixture-model\n", encoding="utf-8")
+            self.assertIsNone(build.window_generations(data_dir))
+
 
 class EmptyAxisGuardTests(unittest.TestCase):
     """Issues #54 + #60: the guard refusing a capture that leaves a rendered
@@ -982,6 +1003,52 @@ class EmptyAxisGuardTests(unittest.TestCase):
                 "no rows carry a score/cost pair for: agentic, intelligence",
                 message)
             self.assertIn("parameters", message)
+            self.assertFalse(output.exists(), "refusal still wrote the page")
+
+    def test_the_three_generation_corner_refusal_names_the_window(self):
+        # Issue #223: the designed-red three-generation corner (the looks
+        # disagree AND the detail route matches neither fingerprint) empties
+        # agentic AND parameters -- run 37676392811 is the reproduction. The
+        # exit stays nonzero, but the capture records the window, so the
+        # refusal names it -- the marker's generation count -- instead of
+        # blaming an AA capture shape change.
+        corner = model_fixture(gdpval=None)
+        del corner["parameters"]
+        with self.capture([corner], [agent_fixture()]) as output:
+            (output.parent / "cost-breakdown-window.txt").write_text(
+                "every cost breakdown dropped as another generation's: "
+                "185 model(s), first apodex-1-1; 3 generation(s) observed "
+                "in-run\n", encoding="utf-8")
+            with self.assertRaises(SystemExit) as raised:
+                self.run_build()
+
+            message = str(raised.exception)
+            self.assertIn(
+                "no rows carry a score/cost pair for: agentic, parameters",
+                message)
+            self.assertIn("3 generation(s) observed in-run", message)
+            self.assertIn("re-read the AA leaderboard by hand", message)
+            self.assertNotIn("changed shape", message)
+            self.assertFalse(output.exists(), "refusal still wrote the page")
+
+    def test_a_countless_window_marker_names_the_window_generically(self):
+        # A marker written by an older fetch_aa.py carries no generation
+        # count (this repo shipped those before #223). The refusal still
+        # names the window -- generically -- and still never blames a shape
+        # change.
+        corner = model_fixture(gdpval=None)
+        del corner["parameters"]
+        with self.capture([corner], [agent_fixture()]) as output:
+            (output.parent / "cost-breakdown-window.txt").write_text(
+                "every cost breakdown dropped as another generation's: "
+                "1 model(s), first fixture-model\n", encoding="utf-8")
+            with self.assertRaises(SystemExit) as raised:
+                self.run_build()
+
+            message = str(raised.exception)
+            self.assertIn("records a cross-generation AA window", message)
+            self.assertIn("generation count not recorded", message)
+            self.assertNotIn("changed shape", message)
             self.assertFalse(output.exists(), "refusal still wrote the page")
 
     def test_a_stale_marker_with_a_healthy_capture_renders_no_note(self):

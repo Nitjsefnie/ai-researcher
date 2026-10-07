@@ -440,24 +440,30 @@ COST_WINDOW_MARKER = ROOT / "data" / "cost-breakdown-window.txt"
 
 
 def record_cost_window(priced: int, dropped: list[str],
-                       path: pathlib.Path = COST_WINDOW_MARKER) -> None:
+                       path: pathlib.Path = COST_WINDOW_MARKER, *,
+                       generations: int | None = None) -> None:
     """Record -- or clear -- the all-dropped window marker beside the capture.
 
     A window hour (priced == 0 with a non-empty `dropped`, issue #217) writes
-    the file with ONE human-readable line -- count and first dropped slug, a
-    git-history note for whoever reads it. Nothing from the file is page
-    input: build.py reads its EXISTENCE and renders its own fixed wording, so
-    no marker text is ever interpolated into the page. Any other hour removes
-    the file (missing_ok=True), so a stale marker can never outlive its own
-    hour. The function guarantees only what its arguments say: the schema
-    sys.exit paths live in check_cost_breakdown, and a schema-broken run
-    escapes there only because main() records the returned verdict -- call
-    order, not a property of this function.
+    the file with ONE human-readable line -- count and first dropped slug,
+    plus the in-run generation count when the caller supplies one (issue
+    #223: the build layer's refusal reads it, so a window hour that empties
+    an axis beyond the #217 exemption names the window instead of blaming a
+    capture shape change). The line stays a git-history note first: nothing
+    from the file is page input, build.py reads EXISTENCE plus this one
+    integer, and no marker text is ever interpolated into the page. Any other
+    hour removes the file (missing_ok=True), so a stale marker can never
+    outlive its own hour. The function guarantees only what its arguments
+    say: the schema sys.exit paths live in check_cost_breakdown, and a
+    schema-broken run escapes there only because main() records the returned
+    verdict -- call order, not a property of this function.
     """
     if priced == 0 and dropped:
+        count = (f"; {generations} generation(s) observed in-run"
+                 if generations is not None else "")
         path.write_text(
             f"every cost breakdown dropped as another generation's: "
-            f"{len(dropped)} model(s), first {dropped[0]}\n",
+            f"{len(dropped)} model(s), first {dropped[0]}{count}\n",
             encoding="utf-8")
         return
     path.unlink(missing_ok=True)
@@ -1086,7 +1092,7 @@ def main() -> None:
                        prev_records)
     models = captured.models
     priced, dropped = check_cost_breakdown(models)
-    record_cost_window(priced, dropped)
+    record_cost_window(priced, dropped, generations=captured.generations)
     agents_text = fetch_html(args.agents_html, AGENTS_URL)
     agents = coding_agent_rows(flight_payload(agents_text))
 

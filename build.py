@@ -798,14 +798,36 @@ def read_capture_stamp(stamp_path: pathlib.Path) -> str:
 def cost_breakdown_window(data_dir: pathlib.Path) -> bool:
     """Whether fetch_aa.py left the all-dropped window marker (issue #217).
 
-    fetch_aa.py writes data/cost-breakdown-window.txt when the merge dropped
-    EVERY model's cost breakdown -- a two-generation AA window, not a schema
-    change. EXISTENCE is the whole signal: the file's one-line content is a
-    git-history note for a human, and the page renders build.py's own fixed
-    wording, so no marker text is ever interpolated into the page. (The stamp
-    is validated exactly because it IS rendered; nothing here is.)
+    fetch_aa.py writes data/cost-breakdown-window.txt when the merge
+    dropped EVERY model's cost breakdown -- a two-generation AA window, not a
+    schema change. EXISTENCE is the whole signal: the file's one-line content
+    is a git-history note for a human, and the page renders build.py's own
+    fixed wording, so no marker text is ever interpolated into the page. (The
+    stamp is validated exactly because it IS rendered; nothing here is.)
     """
     return (data_dir / "cost-breakdown-window.txt").exists()
+
+
+def window_generations(data_dir: pathlib.Path) -> int | None:
+    """The in-run generation count the window marker records, or None.
+
+    Issue #223: a window hour that empties an axis the #217 exemption does
+    not cover (the designed three-generation parameters corner among them)
+    is refused, but the refusal must name the window it is instead of
+    blaming a capture shape change. The count rides the marker's one line as
+    "; N generation(s) observed in-run" -- record_cost_window writes it, and
+    this reads the ONE integer back by its own literal; a marker without it
+    (an older fetch_aa.py wrote those) reads as None and the refusal names
+    the window generically. Nothing here reaches the page: the count feeds
+    the refusal message on stderr, exactly like the axis names.
+    """
+    try:
+        text = (data_dir / "cost-breakdown-window.txt").read_text(
+            encoding="utf-8")
+    except OSError:
+        return None
+    match = re.search(r"; (\d+) generation\(s\) observed in-run", text)
+    return int(match.group(1)) if match else None
 
 
 def read_capture(path):
@@ -1135,7 +1157,12 @@ def main():
     # agentic axis is the single empty one publishes, with the page naming
     # the window; an hour that empties anything else -- with or without the
     # marker, including the designed three-generation parameters corner --
-    # still refuses.
+    # still refuses. When the capture DOES record the window, the refusal
+    # names it -- the observed in-run generation count when the marker
+    # carries one -- instead of blaming an AA capture shape change, while
+    # staying nonzero: AGENTS.md's designed go-re-read-AA-by-hand signal
+    # (issue #223). The shape-change message stays for a capture that does
+    # NOT record a window, where shape change is the honest cause.
     rendered = {**stats["metricCounts"], "parameters": stats["parameterCount"]}
     empty = [axis for axis, n in rendered.items() if not n]
     if empty and window and set(empty) == {"agentic"}:
@@ -1143,6 +1170,20 @@ def main():
               "another generation's -- publishing with the agentic axis empty "
               "and a note on the page instead of refusing; the axis returns "
               "when AA's routes converge")
+    elif empty and window:
+        generations = window_generations(RAW.parent)
+        count_phrase = (f"{generations} generation(s) observed in-run"
+                        if generations is not None
+                        else "generation count not recorded by this hour's "
+                             "fetch_aa.py")
+        raise SystemExit(
+            "no rows carry a score/cost pair for: " + ", ".join(sorted(empty))
+            + " -- the capture records a cross-generation AA window, not a "
+            "shape change: " + count_phrase + ", and the merge dropped every "
+            "cost breakdown and every detail-route fill as another "
+            "generation's, emptying these axes -- re-read the AA leaderboard "
+            "by hand; the page recovers when AA's routes converge"
+        )
     elif empty:
         raise SystemExit(
             "no rows carry a score/cost pair for: " + ", ".join(sorted(empty))
