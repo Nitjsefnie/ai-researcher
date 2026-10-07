@@ -498,7 +498,9 @@ jobs:
         # three red runs with zero artifacts). `failure()` fires on any
         # failed step; the `captured` guard keeps the artifact honest: it is
         # true only when fetch_aa.py exited 0, so the files on disk are this
-        # hour's capture. A red CAPTURE (fetch_aa.py nonzero) uploads
+        # hour's capture (or HEAD's, when the gate restored an unchanged
+        # capture -- the bytes the failing steps actually ran against). A red
+        # CAPTURE (fetch_aa.py nonzero) uploads
         # nothing -- the files under data/ would be HEAD's, or half-written,
         # and naming them this hour's would mislead the reproduction. The
         # write half stays down either way: a failed refresh job never
