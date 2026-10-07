@@ -490,6 +490,29 @@ jobs:
           path: ${{ runner.temp }}/publish-payload
           if-no-files-found: error
 
+      - name: Upload the capture on failure
+        # Issue #230: a run that fails AFTER the capture -- the gate, the
+        # rebuild or the suite -- used to leave that hour's capture files
+        # unretrievable, so a suite-vs-capture failure had to be reproduced
+        # from log lines instead of the exact capture that triggered it (the
+        # three red runs with zero artifacts). `failure()` fires on any
+        # failed step; the `captured` guard keeps the artifact honest: it is
+        # true only when fetch_aa.py exited 0, so the files on disk are this
+        # hour's capture. A red CAPTURE (fetch_aa.py nonzero) uploads
+        # nothing -- the files under data/ would be HEAD's, or half-written,
+        # and naming them this hour's would mislead the reproduction. The
+        # write half stays down either way: a failed refresh job never
+        # reaches the publish job, so this artifact is diagnosability only.
+        if: failure() && steps.fetch.outputs.captured == 'true'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: failed-hour-capture
+          path: |
+            data/aa-raw-models.json
+            data/aa-raw-coding-agents.json
+          if-no-files-found: error
+          retention-days: 7
+
   # --- The write half: commit, push, publish --------------------------------
   # Issues #143 and #133: the write side is three jobs in a fixed order —
   # commit, push, publish.
