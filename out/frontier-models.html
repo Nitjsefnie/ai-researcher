@@ -18,12 +18,11 @@
     --accent:#2468c0;
     /* Issue #208's dispute red. A STATUS color from the dataviz skill's
        fixed status palette (critical #d03b3b) -- never a series hue, and
-       the same hex in both modes: it clears the 3:1 mark floor on the
-       light surface (4.68:1) and the dark one (3.62:1). Text needs 4.5:1,
-       which the red meets in light (4.68:1) but not on dark (3.62:1), so
-       --dispute-text steps lighter for the dark surface (#e05e5e, 4.92:1)
-       -- the same text-role move the palette's success-text token makes.
-       Both stepped with the skill validator's contrast(), not eyeballed. */
+       the same hex in both modes: it clears the 3:1 mark floor in both
+       modes (4.68:1 light, 3.62:1 dark). Text needs 4.5:1, which dark
+       misses, so --dispute-text steps lighter there (#e05e5e, 4.92:1) --
+       the palette's success-text move. Both stepped with the skill
+       validator's contrast(), not eyeballed. */
     --dispute:#d03b3b;
     --dispute-text:#d03b3b;
     /* Dedicated token for the dashed frontier line: the line used to borrow
@@ -429,7 +428,7 @@
       capture's generation order. Agreeing values render once, unchanged;
       an em-dash side marks a generation that does not carry the model at
       all (issue #211).</p>
-    <p>Capture <code>125ac86352cb898a2882586f1a6d55bdd0fa70d30a65a20a86776e63f4e0fb43</code> &mdash; sha256 over data/aa-raw-models.json -- the merged, dispute-bearing capture of AA's leaderboard looks and model detail route, holding every generation a dispute caught -- then data/aa-raw-coding-agents.json, whole files concatenated in that order. Source commit <code>d36c23ed7c6d0b083690ec7fef01584a65afde11</code>.</p>
+    <p>Capture <code>125ac86352cb898a2882586f1a6d55bdd0fa70d30a65a20a86776e63f4e0fb43</code> &mdash; sha256 over data/aa-raw-models.json -- the merged, dispute-bearing capture of AA's leaderboard looks and model detail route, holding every generation a dispute caught -- then data/aa-raw-coding-agents.json, whole files concatenated in that order.</p>
     <p>&copy; 2026 Peter Z (Nitjsefnie) &middot;
       <a href="https://github.com/Nitjsefnie/ai-researcher/blob/main/LICENSE">MIT licence</a></p>
   </div>
@@ -515,15 +514,13 @@ const DATA = {"rows":[{"name":"Claude Opus 5.5 (Max, Default Fallback)","base":"
     : r.metrics[key];
 
   // Issue #208's dispute layer. variantsOf hands back a disputed row's
-  // per-generation maps, canonical order -- null when the row is not
-  // disputed (no gv, or a single generation: genVariants rides only on
-  // disputed runs). A disputed cell shows every generation red as "a / b";
-  // agreeing fields render today's single value.
+  // per-generation maps, canonical order -- null when the row carries no
+  // gv. A disputed cell shows every generation red as "a / b"; agreeing
+  // fields render today's single value.
   const variantsOf=r=>(r.gv&&r.gv.length>1)?r.gv:null;
   // Per-axis variant points, canonical order: the pair a variant plots on
   // one chart, or null for a variant missing half its pair. Coding and
-  // parameters never dispute -- both have a single in-run source -- so they
-  // return null however the row carries.
+  // parameters never dispute -- both have a single in-run source.
   const variantPair=(r,key)=>{
     const vs=variantsOf(r);
     if(!vs||key==="parameters"||key==="coding") return null;
@@ -532,11 +529,10 @@ const DATA = {"rows":[{"name":"Claude Opus 5.5 (Max, Default Fallback)","base":"
       :(v.gdpval!=null&&v.gdpvalCost!=null?{score:v.gdpval*100,cost:v.gdpvalCost}:null));
   };
   // The per-variant values of one rendered field, or null when the cell
-  // shows today's single value: not disputed, or no two PRESENT variant
-  // values differ and no variant is the empty map (a missing marker in a
-  // genuine variant is a fill, never a conflict; a padded `{}` is a
-  // generation that does not carry the model at all, issue #211, so a
-  // carried value against it IS a dispute).
+  // shows today's single value: no two PRESENT variant values differ and
+  // no variant is the empty map (a missing marker is a fill, never a
+  // conflict; a padded `{}` is a generation that does not carry the model
+  // at all, issue #211, so a carried value against it IS a dispute).
   const disputedOf=(r,f)=>{
     const vs=variantsOf(r);
     if(!vs) return null;
@@ -547,27 +543,30 @@ const DATA = {"rows":[{"name":"Claude Opus 5.5 (Max, Default Fallback)","base":"
   };
   const pairText=(vals,fmt)=>vals.map(v=>v==null?"—":fmt(v)).join(" / ");
   // The variant fields a metric's score/cost cells render -- [score field,
-  // cost field, score scale] -- or null for a metric that never disputes:
-  // coding (the agents capture has one in-run source; model rows carry no
-  // coding pair) and parameters. Mirrors build.py's VARIANT_PAIR_FIELDS one
-  // for one; the scale is gdpval's 0-1 fraction rendered *100.
+  // cost field, score scale] -- or null for a metric that never disputes
+  // (coding, parameters). Mirrors build.py's VARIANT_PAIR_FIELDS one for
+  // one; the scale is gdpval's 0-1 fraction rendered *100.
   const metricVariantFields=key=>key==="agentic"?["gdpval","gdpvalCost",100]
     :key==="intelligence"?["ii","cost",1]:null;
   // The dispute marks for one row: a red ring on the canonical anchor, a
-  // red point per further generation, and a thin solid red connector in
-  // canonical order -- drawn behind the extra points. Extra points join
-  // `pts`, so nearest-point hover treats every variant as its row and the
-  // label placer keeps its distance from the pair.
+  // red point per FURTHER generation, a thin solid red connector. Extra
+  // points join `pts`, so hover resolves every variant to its row.
+  // Disputedness is per-FIELD, as disputedOf reads it -- a row whose chart
+  // axes agree renders exactly today's marks, and a variant restating the
+  // anchor's own point (the presence encoding's carried map, #226) is not
+  // a second point: a generation that does not carry the model (#211)
+  // publishes nothing to draw, pad side independent.
   function addDisputeMarks(canonical,r,key,project,svg,el,pts,cx,cy){
-    const vp=variantPair(r,key);
-    if(!vp) return;
+    const fields=metricVariantFields(key);
+    if(!fields||(!disputedOf(r,fields[0])&&!disputedOf(r,fields[1]))) return;
     canonical.setAttribute("stroke","var(--dispute)");
     canonical.classList.add("dispute");
-    const chain=[[cx,cy]];
+    const vp=variantPair(r,key), chain=[[cx,cy]];
     for(let i=1;i<vp.length;i++){
       const p=vp[i];
       if(!p) continue;
       const [x,y]=project(p.cost,p.score);
+      if(x===cx&&y===cy) continue;
       chain.push([x,y]);
     }
     if(chain.length>1){
@@ -575,15 +574,13 @@ const DATA = {"rows":[{"name":"Claude Opus 5.5 (Max, Default Fallback)","base":"
         "stroke-width":1.5,class:"dispute-link",
         d:"M "+chain.map(q=>q[0]+" "+q[1]).join(" L ")}));
     }
-    for(let i=1;i<vp.length;i++){
-      const p=vp[i];
-      if(!p) continue;
-      const [x,y]=project(p.cost,p.score);
-      const mark=el("circle",{cx:x,cy:y,r:5,fill:"var(--dispute)",
-        stroke:"var(--surface-1)","stroke-width":2,
-        class:"pt dispute","aria-hidden":"true"});
+    for(let i=1;i<chain.length;i++){
+      const mark=el("circle",{cx:chain[i][0],cy:chain[i][1],r:5,
+        fill:"var(--dispute)",stroke:"var(--surface-1)","stroke-width":2,
+        class:"pt dispute","aria-hidden":"true",
+        "aria-label":canonical.getAttribute("aria-label")});
       svg.appendChild(mark);
-      pts.push({r:r,x:x,y:y,el:mark});
+      pts.push({r:r,x:chain[i][0],y:chain[i][1],el:mark});
     }
   }
 
@@ -635,11 +632,10 @@ const DATA = {"rows":[{"name":"Claude Opus 5.5 (Max, Default Fallback)","base":"
   const weightsOf = r => unknownWeights(r) ? "not published"
                        : (r.open ? (r.lic || "open") : "proprietary");
   // Secondary tooltip rows shared by every chart, so one record reads the
-  // same wherever it is hovered; the chart's own metric rows stay
-  // chart-specific and come first. Each value goes through show(), so a
-  // field the record does not carry renders as the em dash, never blank.
-  // Context is dispute-capable and the table renders its pair, so the row
-  // shows the same red pair the cell does; agreeing keys stay single.
+  // same wherever it is hovered; the chart's own metric rows come first.
+  // Each value goes through show(), so a field the record does not carry
+  // renders as the em dash, never blank; Context is dispute-capable and
+  // shows the same red pair the table cell does, agreeing keys single.
   const secondaryRows = r => {
     const dCtx=disputedOf(r,"ctx");
     return [
