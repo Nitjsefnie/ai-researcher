@@ -687,11 +687,15 @@ jobs:
                   data/captured-at.txt out/frontier-models.html
           # The window marker rides the commit both ways (issue #227): a
           # window hour's payload carries it in, and the first healthy
-          # hour's payload leaves it out -- but the scratch checkout at
-          # main's tip materializes the tracked marker into the tree, so the
-          # removal is staged with `git rm`, not an add. Neither branch
-          # fires in a normal hour: absent from both payload and main.
-          if [ -f data/cost-breakdown-window.txt ]; then
+          # hour's payload leaves it out, which stages its removal with
+          # `git rm`. The add keys on the PAYLOAD, never on the worktree
+          # file: the checkout at main's tip materializes a tracked marker
+          # into the tree and `cp -a` never deletes, so a worktree probe
+          # would fire the add branch on exactly the heal hour this elif
+          # exists for and the marker would never leave main. Neither
+          # branch fires in a normal hour: absent from both payload and
+          # main.
+          if [ -f "${PAYLOAD}/tree/data/cost-breakdown-window.txt" ]; then
             git add data/cost-breakdown-window.txt
           elif git cat-file -e HEAD:data/cost-breakdown-window.txt 2>/dev/null; then
             git rm -q data/cost-breakdown-window.txt

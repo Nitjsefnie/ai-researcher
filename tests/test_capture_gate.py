@@ -739,3 +739,27 @@ class WindowMarkerStagingTests(unittest.TestCase):
 
         self.assertNotEqual(code, 0)
         self.assertIn("changed shape", err.getvalue())
+
+    def test_the_fresh_marker_reader_converts_only_absence(self):
+        # The None conversion against the real substrate, not a mock: a
+        # marker missing from the live data dir reads as None -- a
+        # regression propagating the FileNotFoundError would turn every
+        # no-marker hour red through main()'s broad catch with the wrong
+        # "capture broke the build" attribution.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = pathlib.Path(tmp)
+            (root / "data").mkdir()
+            with mock.patch.object(capture_gate, "ROOT", root):
+                self.assertIsNone(capture_gate.read_fresh_window_marker())
+            (root / "data" / capture_gate.WINDOW_MARKER_NAME).write_text("w\n")
+            with mock.patch.object(capture_gate, "ROOT", root):
+                self.assertEqual(
+                    capture_gate.read_fresh_window_marker(), b"w\n")
+
+    def test_the_head_marker_reader_converts_git_failure_to_none(self):
+        # Same pin for the HEAD side: ROOT pointed at a non-repo makes the
+        # real `git show` fail, and the failure reads as absent -- the
+        # normal hour's answer -- never as a build break.
+        with tempfile.TemporaryDirectory() as tmp:
+            with mock.patch.object(capture_gate, "ROOT", pathlib.Path(tmp)):
+                self.assertIsNone(capture_gate.read_head_window_marker())
