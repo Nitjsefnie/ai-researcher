@@ -475,6 +475,12 @@ jobs:
                    data/captured-at.txt out/frontier-models.html; do
             cp --parents "$p" "${PAYLOAD}/tree/"
           done
+          # The window marker (issue #227): build.py's empty-axis guard reads
+          # it from the data dir beside the capture, and the capture gate's
+          # HEAD-side rebuild reads it from GIT at HEAD -- so a window hour's
+          # commit must carry it, and the first healthy hour's commit removes
+          # it again. Absent is the normal state and copies nothing.
+          [ ! -f data/cost-breakdown-window.txt ] || cp --parents data/cost-breakdown-window.txt "${PAYLOAD}/tree/"
           # The differ's message travels when the hour ran it (CHANGED=true);
           # the write job's message selection reads it exactly as the old
           # commit step read the workspace copy.
@@ -679,6 +685,17 @@ jobs:
           cp -a "${PAYLOAD}/tree/." ./
           git add data/aa-raw-models.json data/aa-raw-coding-agents.json \
                   data/captured-at.txt out/frontier-models.html
+          # The window marker rides the commit both ways (issue #227): a
+          # window hour's payload carries it in, and the first healthy
+          # hour's payload leaves it out -- but the scratch checkout at
+          # main's tip materializes the tracked marker into the tree, so the
+          # removal is staged with `git rm`, not an add. Neither branch
+          # fires in a normal hour: absent from both payload and main.
+          if [ -f data/cost-breakdown-window.txt ]; then
+            git add data/cost-breakdown-window.txt
+          elif git cat-file -e HEAD:data/cost-breakdown-window.txt 2>/dev/null; then
+            git rm -q data/cost-breakdown-window.txt
+          fi
           if [ -f "${PAYLOAD}/commit-msg.txt" ]; then
             cat "${PAYLOAD}/commit-msg.txt" > "${RUNNER_TEMP}/commit-msg.txt"
             printf '\n%s\n' 'Captured by .github/workflows/refresh.yml.' \

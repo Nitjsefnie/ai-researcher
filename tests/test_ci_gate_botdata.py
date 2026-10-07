@@ -47,40 +47,46 @@ CODE = [
 # ---------------------------------------------------------------------------
 
 
-def test_bot_signature_is_exactly_the_refresh_bots_four_files():
+def test_bot_signature_is_exactly_the_refresh_bots_five_files():
     # The hourly refresh's fixed `git add` list in refresh.yml stages
     # the two captures, their capture stamp and the built page as ONE
     # commit, though an hour's diff stages only the subset whose bytes
-    # moved. The refresh job runs the full suite against the fresh
+    # moved. The window marker (issue #227) rides the same commit --
+    # in when the hour recorded a window, out on the first healthy
+    # hour -- and the refresh job runs the full suite against the fresh
     # capture BEFORE pushing, so the signature's paths are exactly the
     # ones that pre-test covers.
     assert classify.BOT_SIGNATURE == frozenset({
         "data/aa-raw-models.json",
         "data/aa-raw-coding-agents.json",
         "data/captured-at.txt",
+        "data/cost-breakdown-window.txt",
         "out/frontier-models.html",
     })
 
 
 def test_bot_signature_names_every_file_the_refresh_workflow_adds():
-    # Lockstep with refresh.yml: its fixed `git add` list is the
-    # signature's source of truth, and since issue #200 it is the ONLY
-    # `git add` the workflow runs — the conditional window-file adds are
-    # gone with the disagreement state, so the signature covers every path
-    # an hour's commit stages. A future fifth `git add` must move the
-    # signature with it, so the pin compares the sets, not one spelling.
+    # Lockstep with refresh.yml: its `git add` list is the signature's
+    # source of truth, and since issue #200 the fixed list is the ONLY
+    # unconditional `git add` -- issue #227 put the window marker's add
+    # and its `git rm` behind conditionals, so the signature covers every
+    # path an hour's commit can stage. The pin compares the sets, not one
+    # spelling.
     raw = (REPO_ROOT / ".github" / "workflows" / "refresh.yml").read_text(
         encoding="utf-8")
     fixed = "git add data/aa-raw-models.json data/aa-raw-coding-agents.json \\\n" \
             "                  data/captured-at.txt out/frontier-models.html"
     assert fixed in raw
     adds = re.findall(r"^\s*git add(?:[^\n\\]|\\\n)*", raw, re.MULTILINE)
-    assert len(adds) == 1, adds
-    # The one `git add` spans a backslash continuation, so flatten it
-    # before reading the paths off it.
-    staged = {path for path in adds[0].replace("\\\n", " ").split()
+    assert len(adds) == 2, adds
+    staged = {path for add in adds for path in add.replace("\\\n", " ").split()
               if path.startswith(("data/", "out/"))}
     assert staged == set(classify.BOT_SIGNATURE)
+    # And the marker's removal stays conditional: never an unconditional
+    # `git rm` of a data path.
+    rms = re.findall(r"^\s*git rm(?:[^\n\\]|\\\n)*", raw, re.MULTILINE)
+    assert [rm.lstrip() for rm in rms] == \
+        ["git rm -q data/cost-breakdown-window.txt"], rms
 
 
 def test_data_only_accepts_the_signature_and_only_its_subsets():

@@ -63,16 +63,17 @@ DOC_PATTERNS = ('**/*.md', 'LICENSE', '.gitignore')
 # The refresh bot's push signature: the hourly refresh's fixed `git add`
 # list in refresh.yml, staged and pushed as ONE commit. A signature, not
 # a filter: the cheap class exists for generated data the refresh job
-# already tested. An hour's commit stages only the subset of these four
+# already tested. An hour's commit stages only the subset of these five
 # whose bytes moved, so any non-empty subset gets it — lint and
 # actionlint still run, and the accepted cost is that a hand-staged
-# commit confined to these four generated paths gets the cheap class
-# without its pre-test. A fifth path is untested data and keeps the
-# full matrix.
+# commit confined to these five generated paths gets the cheap class
+# without its pre-test. A path outside the signature is untested data
+# and keeps the full matrix.
 BOT_SIGNATURE = frozenset({
     'data/aa-raw-models.json',
     'data/aa-raw-coding-agents.json',
     'data/captured-at.txt',
+    'data/cost-breakdown-window.txt',
     'out/frontier-models.html',
 })
 

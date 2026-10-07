@@ -552,3 +552,190 @@ class ZeroScoreCaptureGateTests(unittest.TestCase):
         self.assertNotEqual(code, 0)
         self.assertIn("no rows carry", err.getvalue())
         self.assertNotIn("Traceback", err.getvalue())
+
+
+# --- issue #227: the window marker on the gate path --------------------------
+
+
+def window_capture(models: bytes) -> bytes:
+    """The capture in the production window shape (issue #217): every model
+    that carried a decomposable cost breakdown now carries the bare scalar
+    the merge leaves when it drops every breakdown as another generation's.
+    The agentic axis empties; intelligence (the scalar IS the measured total,
+    build.cost_per_task) and parameters survive -- the two-generation
+    window's exact shape. Self-contained by this file's convention: no
+    import from the build tests."""
+    parsed = json.loads(models)
+    for m in parsed:
+        if isinstance(m.get("intelligenceIndexCostPerTask"), dict):
+            m["intelligenceIndexCostPerTask"] = 0.75
+    return json.dumps(parsed, indent=1).encode("utf-8")
+
+
+def corner_capture(models: bytes) -> bytes:
+    """window_capture with every parameter count deleted too: the designed
+    three-generation corner -- the detail route fills nothing, so the
+    parameters axis empties beside agentic. #223's refusal shape, and run
+    37691148949's failure exactly."""
+    parsed = json.loads(window_capture(models))
+    for m in parsed:
+        m.pop("parameters", None)
+    return json.dumps(parsed, indent=1).encode("utf-8")
+
+
+WINDOW_MARKER = ("every cost breakdown dropped as another generation's: "
+                 "185 model(s), first apodex-1-1; 3 generation(s) observed "
+                 "in-run\n").encode("utf-8")
+
+
+class WindowMarkerStagingTests(unittest.TestCase):
+    """Issue #227: the marker staged into the temp data dirs is what makes
+    the #217 exemption and the #223 refusal wording reachable on the GATE
+    path -- the gap that let #223's fix ship half-landed, its tests calling
+    build.py directly and never the gate. Each side stages its OWN source's
+    marker (HEAD's from git, the hour's from data/), because a committed
+    window hour must rebuild its published note-page on the old side too."""
+
+    def test_the_corner_refusal_names_the_window_through_the_gate(self):
+        # Run 37691148949's failure, pinned at the gate: HEAD healthy, the
+        # fresh capture in the three-generation corner, the hour's marker
+        # recorded -- the refusal stays nonzero but names the window, and
+        # never blames a shape change.
+        err = io.StringIO()
+        with head_serving(REAL_MODELS, REAL_AGENTS), \
+             mock.patch.object(capture_gate, "read_head_window_marker",
+                               return_value=None), \
+             mock.patch.object(capture_gate, "read_fresh_captures",
+                               return_value=(corner_capture(REAL_MODELS),
+                                             REAL_AGENTS)), \
+             mock.patch.object(capture_gate, "read_fresh_window_marker",
+                               return_value=WINDOW_MARKER), \
+             contextlib.redirect_stderr(err):
+            code = capture_gate.main()
+
+        self.assertEqual(code, 1)
+        self.assertIn("3 generation(s) observed in-run", err.getvalue())
+        self.assertNotIn("changed shape", err.getvalue())
+
+    def test_no_marker_staged_the_shape_change_wording_stands(self):
+        # The wording split itself: the same corner capture with NO marker
+        # recorded is a shape change to build.py, and the gate relays that
+        # wording verbatim. The marker's presence is the whole difference.
+        err = io.StringIO()
+        with head_serving(REAL_MODELS, REAL_AGENTS), \
+             mock.patch.object(capture_gate, "read_head_window_marker",
+                               return_value=None), \
+             mock.patch.object(capture_gate, "read_fresh_captures",
+                               return_value=(corner_capture(REAL_MODELS),
+                                             REAL_AGENTS)), \
+             mock.patch.object(capture_gate, "read_fresh_window_marker",
+                               return_value=None), \
+             contextlib.redirect_stderr(err):
+            code = capture_gate.main()
+
+        self.assertEqual(code, 1)
+        self.assertIn("changed shape", err.getvalue())
+
+    def test_a_two_generation_window_publishes_through_the_gate(self):
+        # The #217 exemption, killed on the gate path by the same staging
+        # drop: marker staged, fresh in the two-generation shape -- agentic
+        # empty, everything else alive -- and the gate answers true (the
+        # window hour's note-page differs from HEAD's healthy page).
+        with head_serving(REAL_MODELS, REAL_AGENTS), \
+             mock.patch.object(capture_gate, "read_head_window_marker",
+                               return_value=None), \
+             mock.patch.object(capture_gate, "read_fresh_captures",
+                               return_value=(window_capture(REAL_MODELS),
+                                             REAL_AGENTS)), \
+             mock.patch.object(capture_gate, "read_fresh_window_marker",
+                               return_value=WINDOW_MARKER):
+            code, out = run_gate()
+
+        self.assertEqual((code, out), (0, "true\n"))
+
+    def test_the_window_note_rides_the_gate_built_pages(self):
+        # The exemption's page half: the note renders on the fresh side's
+        # page and on no other -- through the gate's own build, not a
+        # build.py call.
+        with head_serving(REAL_MODELS, REAL_AGENTS), \
+             mock.patch.object(capture_gate, "read_head_window_marker",
+                               return_value=None), \
+             mock.patch.object(capture_gate, "read_fresh_window_marker",
+                               return_value=WINDOW_MARKER):
+            old_page, new_page = capture_gate.build_page_pair(
+                (REAL_MODELS, REAL_AGENTS),
+                (window_capture(REAL_MODELS), REAL_AGENTS))
+
+        self.assertNotIn("Empty during a two-generation window", old_page)
+        self.assertIn("Empty during a two-generation window", new_page)
+
+    def test_a_committed_window_hour_rebuilds_from_heads_marker(self):
+        # A window hour's commit carries the capture AND its marker, so the
+        # NEXT hour's old side rebuilds the published note-page instead of
+        # refusing -- and the hour answers on the data's own movement (here:
+        # a rendered move past tolerance, so true).
+        head = window_capture(REAL_MODELS)
+        fresh = rendered_field_changed(head)
+        with head_serving(head, REAL_AGENTS), \
+             mock.patch.object(capture_gate, "read_head_window_marker",
+                               return_value=WINDOW_MARKER), \
+             mock.patch.object(capture_gate, "read_fresh_captures",
+                               return_value=(fresh, REAL_AGENTS)), \
+             mock.patch.object(capture_gate, "read_fresh_window_marker",
+                               return_value=WINDOW_MARKER):
+            code, out = run_gate()
+
+        self.assertEqual((code, out), (0, "true\n"))
+
+    def test_an_unchanged_window_hour_stays_silent(self):
+        # The same state with no movement: two window captures, both sides
+        # carrying their own marker, build equal note-pages and the gate
+        # answers false -- a quiet window hour commits nothing.
+        head = window_capture(REAL_MODELS)
+        with head_serving(head, REAL_AGENTS), \
+             mock.patch.object(capture_gate, "read_head_window_marker",
+                               return_value=WINDOW_MARKER), \
+             mock.patch.object(capture_gate, "read_fresh_captures",
+                               return_value=(head, REAL_AGENTS)), \
+             mock.patch.object(capture_gate, "read_fresh_window_marker",
+                               return_value=WINDOW_MARKER):
+            code, out = run_gate()
+
+        self.assertEqual((code, out), (0, "false\n"))
+
+    def test_the_first_healthy_hour_after_a_window_heals(self):
+        # Window ended: fetch cleared the marker, HEAD still tracks it, the
+        # fresh capture is healthy. Old note-page vs new healthy page
+        # differs, so the hour commits -- and its payload leaves the marker
+        # out, which is what the workflow's `git rm` branch removes (pinned
+        # in test_refresh_workflow.py).
+        head = window_capture(REAL_MODELS)
+        with head_serving(head, REAL_AGENTS), \
+             mock.patch.object(capture_gate, "read_head_window_marker",
+                               return_value=WINDOW_MARKER), \
+             mock.patch.object(capture_gate, "read_fresh_captures",
+                               return_value=(REAL_MODELS, REAL_AGENTS)), \
+             mock.patch.object(capture_gate, "read_fresh_window_marker",
+                               return_value=None):
+            code, out = run_gate()
+
+        self.assertEqual((code, out), (0, "true\n"))
+
+    def test_a_window_capture_at_HEAD_without_its_marker_refuses(self):
+        # The workflow half of the fix, pinned from the gate side: if
+        # refresh.yml ever stops committing the marker, HEAD holds a window
+        # capture whose note-page the old side cannot rebuild -- this exact
+        # red is the symptom to expect, not a gate bug to chase.
+        err = io.StringIO()
+        with head_serving(window_capture(REAL_MODELS), REAL_AGENTS), \
+             mock.patch.object(capture_gate, "read_head_window_marker",
+                               return_value=None), \
+             mock.patch.object(capture_gate, "read_fresh_captures",
+                               return_value=(REAL_MODELS, REAL_AGENTS)), \
+             mock.patch.object(capture_gate, "read_fresh_window_marker",
+                               return_value=None), \
+             contextlib.redirect_stderr(err):
+            code = capture_gate.main()
+
+        self.assertNotEqual(code, 0)
+        self.assertIn("changed shape", err.getvalue())

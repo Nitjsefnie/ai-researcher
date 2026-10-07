@@ -283,23 +283,53 @@ class GateTests(unittest.TestCase):  # pylint: disable=too-many-public-methods
 
     def test_the_staging_step_ships_the_commit_payload(self):
         # The artifact is the exact commit payload the old single job staged:
-        # the fixed add list and the differ's message when one ran. The window
-        # files are gone with the disagreement state (issue #200), so the list
-        # is the four payload paths and nothing that varies by hour.
+        # the fixed add list and the differ's message when one ran. The
+        # disagreement-era files are gone with the disagreement state (issue
+        # #200), so the list is the four payload paths, the window marker
+        # behind its own presence guard (issue #227), and nothing that
+        # varies by hour.
         run = flattened(step(self.wf, "Stage the publish payload")["run"])
 
         for piece in ("data/aa-raw-models.json",
                       "data/aa-raw-coding-agents.json",
                       "data/captured-at.txt",
                       "out/frontier-models.html",
+                      "data/cost-breakdown-window.txt",
                       "commit-msg.txt"):
             self.assertIn(piece, run)
-        # No window file and no retirement switch survives on this path.
+        # The marker copies only when this hour actually recorded one.
+        self.assertIn(
+            "[ ! -f data/cost-breakdown-window.txt ] || "
+            "cp --parents data/cost-breakdown-window.txt", run)
+        # No disagreement-era file and no retirement switch survives on this
+        # path; the window marker is the one conditional payload file, and
+        # the guard above is its whole conditional.
         for gone in ("data/aa-disagreement-snapshot.json",
                      "data/aa-route-disagreement.txt",
                      "data/aa-last-agreeing-capture.json",
                      "$RETIRE"):
             self.assertNotIn(gone, run)
+
+    def test_the_write_job_stages_the_window_marker_both_ways(self):
+        # Issue #227: the gate's HEAD-side rebuild reads the window marker
+        # from GIT at HEAD, so a window hour's commit must carry it and the
+        # first healthy hour's commit must remove it. The scratch checkout
+        # at main's tip materializes a tracked marker into the tree before
+        # the payload copy, so a removal cannot be staged with an add -- it
+        # takes `git rm`. Neither branch fires in a normal hour.
+        run = flattened(step_in(self.wf, "publish",
+                                "Commit the capture")["run"])
+
+        self.assertIn("if [ -f data/cost-breakdown-window.txt ]; then", run)
+        self.assertIn("git add data/cost-breakdown-window.txt", run)
+        self.assertIn(
+            "git cat-file -e HEAD:data/cost-breakdown-window.txt", run)
+        self.assertIn("git rm -q data/cost-breakdown-window.txt", run)
+        # Presence stages before absence is considered, and the rm is the
+        # elif -- never an unconditional removal.
+        self.assertLess(
+            run.index("git add data/cost-breakdown-window.txt"),
+            run.index("git rm -q data/cost-breakdown-window.txt"))
 
     def test_the_unchanged_path_checks_whether_the_live_page_is_current(self):
         # Issue 42 taught the unchanged path to check; issue #206 changed

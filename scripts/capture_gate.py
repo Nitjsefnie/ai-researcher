@@ -57,6 +57,7 @@ import build  # noqa: E402  # pylint: disable=wrong-import-position
 MODELS_NAME = "aa-raw-models.json"
 AGENTS_NAME = "aa-raw-coding-agents.json"
 STAMP_NAME = "captured-at.txt"
+WINDOW_MARKER_NAME = "cost-breakdown-window.txt"
 
 # Both gate builds run stamp-less: an unset AA_SOURCE_COMMIT renders nothing
 # extra (build.py renders only a SHA-shaped value), so the source-commit
@@ -219,24 +220,61 @@ def read_fresh_captures() -> tuple[bytes, bytes]:
             f"{data / MODELS_NAME} / {data / AGENTS_NAME}: {exc}") from exc
 
 
+def read_head_window_marker() -> bytes | None:
+    """The window marker exactly as HEAD committed it, or None when absent.
+
+    refresh.yml commits the marker beside the captures in a window hour, and
+    the first healthy hour's commit removes it again -- so None is the normal
+    hour's answer, and presence at HEAD means exactly that the committed
+    capture is a window capture, which is exactly when the old side's rebuild
+    needs it: without it the note-page that WAS published from those captures
+    cannot be rebuilt and the old side refuses with the shape-change wording
+    (issue #227).
+    """
+    try:
+        return _git_show(f"data/{WINDOW_MARKER_NAME}")
+    except HeadCaptureError:
+        return None
+
+
+def read_fresh_window_marker() -> bytes | None:
+    """The window marker as fetch_aa.py just wrote or cleared it, or None."""
+    try:
+        return (ROOT / "data" / WINDOW_MARKER_NAME).read_bytes()
+    except FileNotFoundError:
+        return None
+
+
 # --- build both sides --------------------------------------------------------
 
 
-def _stage(side_dir: pathlib.Path, captures: tuple[bytes, bytes]) -> None:
-    """One side's temp data dir: the two captures plus the synthetic stamp.
+def _stage(side_dir: pathlib.Path, captures: tuple[bytes, bytes],
+           window_marker: bytes | None) -> None:
+    """One side's temp data dir: the two captures, the synthetic stamp, and
+    that side's own window marker.
 
     The real stamps (tree and HEAD) are never read: the date is build-machine
     metadata, and building both sides from the same synthetic date is what
     keeps a date-only difference from voting.
+
+    The marker, unlike the stamp, is DATA state build.py reads back from
+    RAW.parent (cost_breakdown_window / window_generations) -- the one file
+    beyond the captures and the stamp that build.main() opens there. Staging
+    each side's OWN source's marker is what makes the #217 exemption and the
+    #223 window-naming refusal reachable on the gate path at all: without it
+    a window hour refused with the shape-change wording (issue #227).
     """
     side_dir.mkdir(parents=True)
     (side_dir / MODELS_NAME).write_bytes(captures[0])
     (side_dir / AGENTS_NAME).write_bytes(captures[1])
     (side_dir / STAMP_NAME).write_text(SYNTHETIC_STAMP, encoding="utf-8")
+    if window_marker is not None:
+        (side_dir / WINDOW_MARKER_NAME).write_bytes(window_marker)
 
 
 def _render_side(side_dir: pathlib.Path,
-                 captures: tuple[bytes, bytes]) -> str:
+                 captures: tuple[bytes, bytes],
+                 window_marker: bytes | None) -> str:
     """Stage one side and build its page; return the page HTML.
 
     The temp dir lives under build.ROOT because build.main() prints
@@ -244,7 +282,7 @@ def _render_side(side_dir: pathlib.Path,
     module globals and AA_SOURCE_COMMIT are restored no matter how the build
     ends, so a failed gate build cannot poison the caller's tree state.
     """
-    _stage(side_dir, captures)
+    _stage(side_dir, captures, window_marker)
     page_path = side_dir / "frontier-models.html"
     saved = (build.RAW, build.AGENTS_RAW, build.OUT)
     env_saved = os.environ.pop(STAMP_ENV, None)
@@ -274,11 +312,13 @@ def build_page_pair(head: tuple[bytes, bytes],
     for a capture build.py refuses) -- a build failure is red, not "changed".
     """
     fresh = reconcile_speed(head, fresh)
+    head_marker = read_head_window_marker()
+    fresh_marker = read_fresh_window_marker()
     with tempfile.TemporaryDirectory(prefix=".capture-gate-",
                                      dir=build.ROOT) as tmp:
         tmp_root = pathlib.Path(tmp)
-        old_page = _render_side(tmp_root / "old", head)
-        new_page = _render_side(tmp_root / "new", fresh)
+        old_page = _render_side(tmp_root / "old", head, head_marker)
+        new_page = _render_side(tmp_root / "new", fresh, fresh_marker)
     return old_page, new_page
 
 
