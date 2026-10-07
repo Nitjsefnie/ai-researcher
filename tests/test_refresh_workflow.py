@@ -1089,6 +1089,14 @@ def test_the_marker_conditional_behaves_on_the_four_hours(tmp_path):
         git = ["git", "-C", str(repo)]
         subprocess.run([*git, "init", "-q", "-b", "main"], check=True,
                        capture_output=True)
+        # A runner carries no global git identity (the commit-scopes hook
+        # governs OUR commits, not a fixture's throwaway repo); the scratch
+        # gets the same local identity the write job's own scratch uses.
+        subprocess.run([*git, "config", "user.name", "github-actions[bot]"],
+                       check=True, capture_output=True)
+        subprocess.run([*git, "config", "user.email",
+                        "41898282+github-actions[bot]@users.noreply.github.com"],
+                       check=True, capture_output=True)
         (repo / "data" / "captured-at.txt").write_text("2026-10-08\n")
         if tracked:
             (repo / "data" / "cost-breakdown-window.txt").write_text("w\n")
