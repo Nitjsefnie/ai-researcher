@@ -2024,6 +2024,22 @@ class GenVariantsSeamTests(unittest.TestCase):
 
         self.assertEqual(added, {diff_aa.DISPUTES_KEY})
 
+    def test_the_gv_field_order_matches_variant_fields_emission_order(self):
+        # The shared-literal seam (issue #226): build.py's GV_FIELD_ORDER
+        # restates variant_fields' emission order so a disputed row's gv
+        # maps cannot depend on the capture's raw key layout. The
+        # correspondence lives in two modules, so the pin spans both: a
+        # record carrying every dispute-capable field, through the
+        # producer, comes out in exactly the consumer's declared order --
+        # and the row build.py emits carries its gv in the same order.
+        record = priced_look("a", 1.0, 0.1)
+
+        variant = fetch_aa.variant_fields(record)
+
+        self.assertEqual(list(variant), list(build.GV_FIELD_ORDER))
+        rows = build.build_rows([dict(record, genVariants=[variant])])
+        self.assertEqual(list(rows[0]["gv"][0]), list(build.GV_FIELD_ORDER))
+
 
 class CrossRunPresenceMergeTests(unittest.TestCase):
     """Issue #211's cross-run half (Overseer ruling, 2026-10-06, on the
