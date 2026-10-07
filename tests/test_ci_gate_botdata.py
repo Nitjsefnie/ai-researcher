@@ -96,18 +96,20 @@ def test_data_only_accepts_the_signature_and_only_its_subsets():
     assert classify.data_only([
         "data/aa-raw-models.json", "data/aa-raw-coding-agents.json",
         "data/captured-at.txt", "out/frontier-models.html"])
-    # Listing order and duplicates are set noise, not a fifth path.
+    # Listing order and duplicates are set noise: the classifier is a set
+    # subset test, not a spelling check.
     assert classify.data_only([
         "out/frontier-models.html", "data/captured-at.txt",
         "data/aa-raw-models.json", "data/aa-raw-coding-agents.json",
         "data/aa-raw-models.json"])
-    # An hour's commit carries only the subset of the four whose bytes
+    # An hour's commit carries only the subset of the five whose bytes
     # moved (git omits byte-identical files from the diff) — the real
     # refresh push that ran the full matrix by mistake (issue #212,
     # run 37490807791) touched exactly these two.
     assert classify.data_only([
         "data/aa-raw-models.json", "out/frontier-models.html"])
     assert classify.data_only(["data/captured-at.txt"])
+    assert classify.data_only(["data/cost-breakdown-window.txt"])
 
 
 def test_data_only_refuses_a_fifth_path():
@@ -119,12 +121,14 @@ def test_data_only_refuses_a_fifth_path():
 
 
 def test_data_only_accepts_any_proper_subset():
-    # Any non-empty subset of the four is a shape the bot's push takes:
+    # Any non-empty subset of the five is a shape the bot's push takes:
     # an hour's commit carries only the files whose bytes moved, so a
     # dropped file is an hour with one byte-identical artifact, not a
-    # hand-staged change to run the full matrix over.
+    # hand-staged change to run the full matrix over. Dropping the window
+    # marker (issue #227) is the heal hour's own shape.
     full = ["data/aa-raw-models.json", "data/aa-raw-coding-agents.json",
-            "data/captured-at.txt", "out/frontier-models.html"]
+            "data/captured-at.txt", "out/frontier-models.html",
+            "data/cost-breakdown-window.txt"]
     for dropped in full:
         assert classify.data_only(
             [path for path in full if path != dropped]), dropped

@@ -25,6 +25,7 @@ re-raise the Capture step keeps, not a dispute branch.
 import os
 import pathlib
 import re
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -313,14 +314,19 @@ class GateTests(unittest.TestCase):  # pylint: disable=too-many-public-methods
     def test_the_write_job_stages_the_window_marker_both_ways(self):
         # Issue #227: the gate's HEAD-side rebuild reads the window marker
         # from GIT at HEAD, so a window hour's commit must carry it and the
-        # first healthy hour's commit must remove it. The scratch checkout
-        # at main's tip materializes a tracked marker into the tree before
-        # the payload copy, so a removal cannot be staged with an add -- it
-        # takes `git rm`. Neither branch fires in a normal hour.
+        # first healthy hour's commit must remove it. The add keys on the
+        # PAYLOAD, never on the worktree file -- the scratch checkout at
+        # main's tip materializes a tracked marker into the tree and
+        # `cp -a` never deletes, so a worktree probe would fire the add on
+        # exactly the heal hour and the marker would never leave main (the
+        # reviewer-reproduced defect this condition fixes). The removal is
+        # the elif's `git rm`. Neither branch fires in a normal hour.
         run = flattened(step_in(self.wf, "publish",
                                 "Commit the capture")["run"])
 
-        self.assertIn("if [ -f data/cost-breakdown-window.txt ]; then", run)
+        self.assertIn(
+            'if [ -f "${PAYLOAD}/tree/data/cost-breakdown-window.txt" ]; then',
+            run)
         self.assertIn("git add data/cost-breakdown-window.txt", run)
         self.assertIn(
             "git cat-file -e HEAD:data/cost-breakdown-window.txt", run)
@@ -1040,3 +1046,96 @@ class DeployKeyPushTests(unittest.TestCase):
         self.assertEqual(up["with"]["name"], down["with"]["name"])
         self.assertEqual(up["with"]["if-no-files-found"], "error")
         self.assertEqual(self.wf["jobs"]["push"]["needs"], "publish")
+
+
+# ---------------------------------------------------------------------------
+# issue #227: the marker conditional's operator semantics
+# ---------------------------------------------------------------------------
+
+
+def _commit_capture_step():
+    return step_in(load(), "publish", "Commit the capture")
+
+
+def _marker_conditional() -> str:
+    """The if/elif block extracted verbatim from the commit step's run."""
+    lines = _commit_capture_step()["run"].splitlines()
+    start = next(i for i, line in enumerate(lines)
+                 if 'if [ -f "${PAYLOAD}/tree/data/'
+                 'cost-breakdown-window.txt" ]; then' in line)
+    end = next(i for i in range(start, len(lines))
+               if lines[i].strip() == "fi")
+    return "\n".join(lines[start:end + 1])
+
+
+def test_the_marker_conditional_behaves_on_the_four_hours(tmp_path):
+    # The operator semantics behind the source-text pin above, because the
+    # text alone cannot carry them -- the first draft pinned the text and
+    # was green over a dead elif whose add branch fired on the checkout's
+    # own materialized copy. The block is extracted from refresh.yml
+    # VERBATIM and run in a scratch repo shaped like the write job's --
+    # sitting at the tip being committed onto, the payload tree copied
+    # over it -- across the four hours of the marker lifecycle.
+    block = _marker_conditional()
+    payload_data = tmp_path / "payload" / "tree" / "data"
+    payload_data.mkdir(parents=True)
+    env = {**os.environ, "PAYLOAD": str(tmp_path / "payload")}
+
+    def scratch(hour: str, tracked: bool) -> pathlib.Path:
+        # One FRESH repo per hour: a reused path would carry the previous
+        # hour's staged state into the next commit and pollute the case.
+        repo = tmp_path / f"scratch-{hour}"
+        (repo / "data").mkdir(parents=True)
+        git = ["git", "-C", str(repo)]
+        subprocess.run([*git, "init", "-q", "-b", "main"], check=True,
+                       capture_output=True)
+        (repo / "data" / "captured-at.txt").write_text("2026-10-08\n")
+        if tracked:
+            (repo / "data" / "cost-breakdown-window.txt").write_text("w\n")
+            subprocess.run([*git, "add", "data/"], check=True,
+                           capture_output=True)
+        else:
+            subprocess.run([*git, "add", "data/captured-at.txt"], check=True,
+                           capture_output=True)
+        subprocess.run([*git, "commit", "-qm", "tip"], check=True,
+                       capture_output=True)
+        return repo
+
+    def status(repo: pathlib.Path) -> str:
+        return subprocess.run(
+            ["git", "-C", str(repo), "status", "--porcelain"],
+            check=True, capture_output=True, text=True).stdout
+
+    def run_block(repo: pathlib.Path) -> None:
+        # The write job's sequence: the payload tree overlays the checkout
+        # (`cp -a` -- copies over, never deletes), THEN the conditional.
+        shutil.copytree(tmp_path / "payload" / "tree", repo,
+                        dirs_exist_ok=True)
+        proc = subprocess.run(["bash", "-c", block], cwd=repo, env=env,
+                              capture_output=True, text=True)
+        assert proc.returncode == 0, (
+            f"marker conditional rc={proc.returncode}: {proc.stderr}")
+
+    # Heal hour: tracked at the tip, absent from the payload -- the
+    # checkout's own materialized copy must not fire the add branch; the
+    # removal stages.
+    repo = scratch("heal", tracked=True)
+    run_block(repo)
+    assert "D  data/cost-breakdown-window.txt" in status(repo)
+
+    # Window hour: the payload carries it -- staged in, tracked or not.
+    (payload_data / "cost-breakdown-window.txt").write_text("w\n")
+    repo = scratch("window", tracked=False)
+    run_block(repo)
+    assert "A  data/cost-breakdown-window.txt" in status(repo)
+
+    # Persist hour: tracked and unchanged in the payload -- a no-op.
+    repo = scratch("persist", tracked=True)
+    run_block(repo)
+    assert status(repo) == ""
+
+    # Quiet hour: absent from both -- a no-op.
+    (payload_data / "cost-breakdown-window.txt").unlink()
+    repo = scratch("quiet", tracked=False)
+    run_block(repo)
+    assert status(repo) == ""

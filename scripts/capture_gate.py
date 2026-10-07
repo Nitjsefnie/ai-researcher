@@ -229,7 +229,9 @@ def read_head_window_marker() -> bytes | None:
     capture is a window capture, which is exactly when the old side's rebuild
     needs it: without it the note-page that WAS published from those captures
     cannot be rebuilt and the old side refuses with the shape-change wording
-    (issue #227).
+    (issue #227). Any _git_show failure reads as None -- the captures were
+    already read from the same tree by the time this runs, so a plumbing
+    failure here is unheard-of rather than a state to distinguish.
     """
     try:
         return _git_show(f"data/{WINDOW_MARKER_NAME}")
