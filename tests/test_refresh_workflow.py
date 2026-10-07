@@ -31,6 +31,7 @@ import sys
 import tempfile
 import unittest
 
+import pytest
 import yaml
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
@@ -1076,6 +1077,12 @@ def test_the_marker_conditional_behaves_on_the_four_hours(tmp_path):
     # VERBATIM and run in a scratch repo shaped like the write job's --
     # sitting at the tip being committed onto, the payload tree copied
     # over it -- across the four hours of the marker lifecycle.
+    if os.name == "nt":
+        pytest.skip(
+            "the block under test is GitHub-runner bash against a "
+            "POSIX payload path, and the write job itself runs on "
+            "ubuntu; the same skip shape as the stub-gh classifier "
+            "tests")
     block = _marker_conditional()
     payload_data = tmp_path / "payload" / "tree" / "data"
     payload_data.mkdir(parents=True)
@@ -1119,8 +1126,10 @@ def test_the_marker_conditional_behaves_on_the_four_hours(tmp_path):
         # (`cp -a` -- copies over, never deletes), THEN the conditional.
         shutil.copytree(tmp_path / "payload" / "tree", repo,
                         dirs_exist_ok=True)
+        # check stays off on purpose: the nonzero case is asserted below,
+        # with the block's own stderr in the message.
         proc = subprocess.run(["bash", "-c", block], cwd=repo, env=env,
-                              capture_output=True, text=True)
+                              check=False, capture_output=True, text=True)
         assert proc.returncode == 0, (
             f"marker conditional rc={proc.returncode}: {proc.stderr}")
 
