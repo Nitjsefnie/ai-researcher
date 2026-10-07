@@ -128,28 +128,88 @@ def costed(name="M", *, total=1.0, evaluations=None):
 
 
 class IndexVersionTests(unittest.TestCase):
-    def test_the_pinned_version_passes(self):
-        payload = f"blah Intelligence Index v{fetch_aa.INDEX_VERSION} blah"
+    """Issue #220: the version string left the leaderboard payload, so the pin
+    reads AA's methodology page. The contract has two halves: a genuinely
+    bumped major.minor still refuses the capture (the v4.2 rebalance shipped
+    well-formed data with wrong costs, which is the whole point of the pin),
+    and an ABSENT version string proves nothing and must NOT fail."""
 
-        self.assertEqual(fetch_aa.check_index_version(payload),
-                         fetch_aa.INDEX_VERSION)
+    def test_a_point_release_within_the_pinned_generation_passes(self):
+        # AA ships point releases (v4.3.2) inside a generation without
+        # rebalancing, so the pin compares at MAJOR.MINOR granularity -- and
+        # the FULL found version is what the capture log reports.
+        text = (f"Artificial Analysis Intelligence Index "
+                f"v{fetch_aa.INDEX_VERSION}.2 incorporates 10 evaluations")
+
+        self.assertEqual(fetch_aa.check_index_version(text),
+                         f"{fetch_aa.INDEX_VERSION}.2")
+
+    def test_a_historical_citation_alone_names_no_version(self):
+        # The page's prose cites superseded generations WITHOUT the brand
+        # prefix ("Superseded by Terminal-Bench 4.0 in Intelligence Index
+        # v4.3"); only the full prefix identifies the live version, so such a
+        # citation alone is absence -- and absence passes (contract b).
+        stderr, stdout = io.StringIO(), io.StringIO()
+
+        with contextlib.redirect_stderr(stderr), \
+                contextlib.redirect_stdout(stdout):
+            got = fetch_aa.check_index_version(
+                "Superseded by Terminal-Bench 4.0 in Intelligence Index v4.3")
+
+        self.assertIsNone(got)
+        # The absence note reaches BOTH streams, and both are pinned: the
+        # refresh's capture step tees only stdout into its log on a green
+        # run (stderr is cat'd on the failure branch alone), so a stdout-
+        # only note would leave the green hour silent about the pass.
+        for stream in (stderr, stdout):
+            self.assertIn("methodology", stream.getvalue())
+            self.assertIn("proves nothing", stream.getvalue())
+
+    def test_unrelated_text_passes_on_absence_with_a_note_on_both_streams(self):
+        stderr, stdout = io.StringIO(), io.StringIO()
+
+        with contextlib.redirect_stderr(stderr), \
+                contextlib.redirect_stdout(stdout):
+            got = fetch_aa.check_index_version("nothing here")
+
+        self.assertIsNone(got)
+        for stream in (stderr, stdout):
+            self.assertIn("methodology", stream.getvalue())
+            self.assertIn("proves nothing", stream.getvalue())
 
     def test_a_bumped_version_exits_naming_both_versions(self):
         # v4.2 rebalanced the weights without changing a single field name --
         # undetectable from the data, which is the whole reason for the pin.
         with self.assertRaises(SystemExit) as caught:
-            fetch_aa.check_index_version("Intelligence Index v9.9")
+            fetch_aa.check_index_version(
+                "Artificial Analysis Intelligence Index v9.9")
 
         message = str(caught.exception)
         self.assertIn("v9.9", message)
         self.assertIn(f"v{fetch_aa.INDEX_VERSION}", message)
         self.assertIn("methodology", message)
 
-    def test_a_payload_with_no_version_at_all_exits(self):
+    def test_a_multi_part_minor_bump_exits_against_the_string_compare(self):
+        # "4.10" sorts below "4.3" as a plain string; the pin compares the
+        # integer parts, so a v4.10 page refuses the v4.3 pin exactly like a
+        # single-digit bump would.
         with self.assertRaises(SystemExit) as caught:
-            fetch_aa.check_index_version("nothing here")
+            fetch_aa.check_index_version(
+                "Artificial Analysis Intelligence Index v4.10")
 
-        self.assertIn("page structure changed", str(caught.exception))
+        message = str(caught.exception)
+        self.assertIn("v4.10", message)
+        self.assertIn(f"v{fetch_aa.INDEX_VERSION}", message)
+
+    def test_the_live_version_is_the_maximum_full_prefix_citation(self):
+        # The page's prose can quote an older generation's full name verbatim;
+        # the live version is the version-sorted MAXIMUM of every full-prefix
+        # match, never the first.
+        text = ("Earlier the Artificial Analysis Intelligence Index v4.1 ran "
+                "three evals. Today the Artificial Analysis Intelligence "
+                "Index v4.3.2 incorporates 10 evaluations")
+
+        self.assertEqual(fetch_aa.check_index_version(text), "4.3.2")
 
 
 class CostBreakdownTests(unittest.TestCase):
@@ -644,6 +704,19 @@ def detail_payload(**record_overrides: object) -> str:
                       separators=(",", ":"))
 
 
+def methodology_html(version: str | None = fetch_aa.INDEX_VERSION) -> str:
+    """The methodology page as a plain HTML document -- no flight wrapper,
+    the version pin reads the page text directly (issue #220). The default
+    version is exactly the pin, so fixtures that expect a pass need no
+    argument; None writes a page that names no index version at all."""
+    if version is None:
+        return ("<html><body>The methodology page describes the benchmark "
+                "suite.</body></html>")
+    return (f"<html><body><h1>Artificial Analysis Intelligence Index "
+            f"v{version}</h1><p>incorporates 10 evaluations</p></body>"
+            "</html>")
+
+
 class CaptureGapFillWiringTests(unittest.TestCase):
     """Issue #200: capture() reads both routes and merges them under one rule.
 
@@ -661,26 +734,32 @@ class CaptureGapFillWiringTests(unittest.TestCase):
 
     @contextlib.contextmanager
     def cached_routes(self, **record_overrides: object):
-        """Two cached pages for capture(cached_base, cached_detail) to read.
-        The dispute-look spacing wait (issue #208) is real in production and
-        stubbed at the seam like every other wait."""
+        """Three cached pages for capture(cached_base, cached_detail,
+        cached_methodology) to read. The dispute-look spacing wait (issue
+        #208) is real in production and stubbed at the seam like every other
+        wait."""
         with tempfile.TemporaryDirectory(prefix=".issue-200-gapfill-") as tmp:
             root = pathlib.Path(tmp)
             base = root / "leaderboard.html"
             detail = root / "detail.html"
+            methodology = root / "methodology.html"
             base.write_text(flight_html(leaderboard_payload()), encoding="utf-8")
             detail.write_text(flight_html(detail_payload(**record_overrides)),
                               encoding="utf-8")
+            methodology.write_text(methodology_html(), encoding="utf-8")
             with unittest.mock.patch.object(fetch_aa, "_sleep",
                                             side_effect=lambda s: None):
-                yield str(base), str(detail)
+                yield str(base), str(detail), str(methodology)
 
     def test_capture_names_the_host_it_widened_from_and_the_index_version(self):
         # detail_host_slug is computed from THIS leaderboard's rows: the
         # detail page is chosen for what its page excludes, so the corpus
         # must never be paired with a host picked from a different read.
-        with self.cached_routes() as (base, detail):
-            captured = fetch_aa.capture(base, detail)
+        # capture() pins the version from the methodology page BEFORE the
+        # leaderboard fetches, so a bumped index fails the capture without
+        # spending the other page reads (issue #220).
+        with self.cached_routes() as (base, detail, methodology):
+            captured = fetch_aa.capture(base, detail, methodology)
 
         self.assertEqual(captured.host, "detail-host-model")
         self.assertEqual(captured.version, fetch_aa.INDEX_VERSION)
@@ -692,8 +771,9 @@ class CaptureGapFillWiringTests(unittest.TestCase):
         # is no longer a state to detect or resolve, it is simply a detail
         # value that loses. The capture lands, and the leaderboard's 51 is
         # what build.py reads.
-        with self.cached_routes(intelligenceIndex=52) as (base, detail):
-            captured = fetch_aa.capture(base, detail)
+        with self.cached_routes(intelligenceIndex=52) as (base, detail,
+                                                          methodology):
+            captured = fetch_aa.capture(base, detail, methodology)
 
         by_slug = {m["slug"]: m for m in captured.models}
         self.assertEqual(by_slug["fixture-model"]["intelligenceIndex"], 51)
@@ -704,12 +784,16 @@ class CaptureGapFillWiringTests(unittest.TestCase):
         with tempfile.TemporaryDirectory(prefix=".issue-200-log-") as tmp:
             root = pathlib.Path(tmp)
             pages = [root / name for name in
-                     ("leaderboard.html", "detail.html", "agents.html")]
+                     ("leaderboard.html", "detail.html", "agents.html",
+                      "methodology.html")]
             payloads = (leaderboard_payload(), detail_payload(),
                         agent_payload([agent_row(f"Agent - Model {i}")
                                        for i in range(5)]))
             for path, payload in zip(pages, payloads):
                 path.write_text(flight_html(payload), encoding="utf-8")
+            # The methodology page is plain HTML -- the pin reads the page
+            # text directly, no flight wrapper (issue #220).
+            pages[3].write_text(methodology_html(), encoding="utf-8")
             old = (fetch_aa.ROOT, fetch_aa.OUT, fetch_aa.AGENTS_OUT,
                    fetch_aa.STAMP)
             argv = sys.argv
@@ -720,7 +804,8 @@ class CaptureGapFillWiringTests(unittest.TestCase):
                 fetch_aa.STAMP = root / "captured-at.txt"
                 sys.argv = ["fetch_aa.py", "--html", str(pages[0]),
                             "--detail-html", str(pages[1]),
-                            "--agents-html", str(pages[2])]
+                            "--agents-html", str(pages[2]),
+                            "--methodology-html", str(pages[3])]
                 buffer = io.StringIO()
                 # The dispute-look spacing wait (issue #208) is real in
                 # production and stubbed at the seam like every other wait.
@@ -741,6 +826,53 @@ class CaptureGapFillWiringTests(unittest.TestCase):
         # Issue #208: the run's one-line generation summary, quiet shape.
         self.assertIn("1 generation(s) observed in-run; 0 models carry "
                       "disputed values", stdout)
+
+    def test_the_capture_log_stays_honest_when_the_page_names_no_version(self):
+        # Contract b, end to end: a methodology page with no version string
+        # does not fail the run, and the success line does not interpolate a
+        # version where none was found -- no "vNone", and the absence is
+        # named for the operator who reads the log.
+        with tempfile.TemporaryDirectory(prefix=".issue-220-log-") as tmp:
+            root = pathlib.Path(tmp)
+            pages = [root / name for name in
+                     ("leaderboard.html", "detail.html", "agents.html",
+                      "methodology.html")]
+            payloads = (leaderboard_payload(), detail_payload(),
+                        agent_payload([agent_row(f"Agent - Model {i}")
+                                       for i in range(5)]))
+            for path, payload in zip(pages, payloads):
+                path.write_text(flight_html(payload), encoding="utf-8")
+            pages[3].write_text(methodology_html(None), encoding="utf-8")
+            old = (fetch_aa.ROOT, fetch_aa.OUT, fetch_aa.AGENTS_OUT,
+                   fetch_aa.STAMP)
+            argv = sys.argv
+            stderr = io.StringIO()
+            try:
+                fetch_aa.ROOT = root
+                fetch_aa.OUT = root / "aa-raw-models.json"
+                fetch_aa.AGENTS_OUT = root / "aa-raw-coding-agents.json"
+                fetch_aa.STAMP = root / "captured-at.txt"
+                sys.argv = ["fetch_aa.py", "--html", str(pages[0]),
+                            "--detail-html", str(pages[1]),
+                            "--agents-html", str(pages[2]),
+                            "--methodology-html", str(pages[3])]
+                buffer = io.StringIO()
+                with contextlib.redirect_stdout(buffer), \
+                        contextlib.redirect_stderr(stderr), \
+                        unittest.mock.patch.object(fetch_aa, "_sleep",
+                                                   side_effect=lambda s: None):
+                    fetch_aa.main()
+            finally:
+                sys.argv = argv
+                (fetch_aa.ROOT, fetch_aa.OUT, fetch_aa.AGENTS_OUT,
+                 fetch_aa.STAMP) = old
+
+        stdout = buffer.getvalue()
+        self.assertIn("wrote aa-raw-models.json", stdout)
+        self.assertNotIn("vNone", stdout)
+        self.assertIn("whose index version the methodology page did not "
+                      "name", stdout)
+        self.assertIn("proves nothing", stderr.getvalue())
 
 
 class AtomicCaptureWritesTests(unittest.TestCase):
@@ -764,12 +896,17 @@ class AtomicCaptureWritesTests(unittest.TestCase):
         with tempfile.TemporaryDirectory(prefix=".issue-66-atomic-") as tmp:
             root = pathlib.Path(tmp)
             pages = [root / name for name in
-                     ("leaderboard.html", "detail.html", "agents.html")]
+                     ("leaderboard.html", "detail.html", "agents.html",
+                      "methodology.html")]
             payloads = (leaderboard_payload(), detail_payload(),
                         agent_payload([agent_row(f"Agent - Model {i}")
                                        for i in range(5)]))
             for path, payload in zip(pages, payloads):
                 path.write_text(flight_html(payload), encoding="utf-8")
+            # The methodology page is plain HTML, no flight wrapper (issue
+            # #220), and it must be cached for these tests: with every page
+            # flag passed, no test here can reach the real network.
+            pages[3].write_text(methodology_html(), encoding="utf-8")
             old = (fetch_aa.ROOT, fetch_aa.OUT, fetch_aa.AGENTS_OUT,
                    fetch_aa.STAMP)
             argv = sys.argv
@@ -792,7 +929,8 @@ class AtomicCaptureWritesTests(unittest.TestCase):
                 fetch_aa.STAMP.write_text("2020-01-01\n", encoding="utf-8")
                 sys.argv = ["fetch_aa.py", "--html", str(pages[0]),
                             "--detail-html", str(pages[1]),
-                            "--agents-html", str(pages[2])]
+                            "--agents-html", str(pages[2]),
+                            "--methodology-html", str(pages[3])]
                 if patcher is not None:
                     patcher.start()
 
@@ -988,6 +1126,7 @@ class TransportErrorTests(unittest.TestCase):
         agents = flight_html(agent_payload(
             [agent_row(f"Agent - Model {i}") for i in range(5)]))
         return {
+            fetch_aa.METHODOLOGY_URL: lambda: _FakeResponse(methodology_html()),
             fetch_aa.URL: lambda: _FakeResponse(flight_html(leaderboard_payload())),
             self.DETAIL_URL: lambda: _FakeResponse(flight_html(detail_payload())),
             fetch_aa.AGENTS_URL: lambda: _FakeResponse(agents),
@@ -995,16 +1134,20 @@ class TransportErrorTests(unittest.TestCase):
 
     def test_a_healthy_fetch_still_succeeds_through_the_boundary(self):
         # The control: the wrap must catch transport failures only, and the
-        # healthy capture runs all three modeled pages through the real
-        # urlopen call shape (leaderboard, detail, agents) to its writes.
+        # healthy capture runs all four modeled pages through the real
+        # urlopen call shape (methodology, leaderboard, detail, agents) to
+        # its writes.
         stub, stdout = self.run_capture_through_boundary(self.healthy_routes())
 
         # Issue #208: the leaderboard route is read TWICE (the dispute
-        # looks), so the healthy capture is four pages in this order -- the
-        # first look, the detail page, the spaced second look, the coding
-        # agents.
-        self.assertEqual(stub.calls, [fetch_aa.URL, self.DETAIL_URL,
-                                      fetch_aa.URL, fetch_aa.AGENTS_URL])
+        # looks), so the healthy capture is five pages in this order -- the
+        # methodology version pin FIRST (issue #220: fail fast before
+        # spending the other fetches), the first look, the detail page, the
+        # spaced second look, the coding agents.
+        self.assertEqual(stub.calls,
+                         [fetch_aa.METHODOLOGY_URL, fetch_aa.URL,
+                          self.DETAIL_URL, fetch_aa.URL,
+                          fetch_aa.AGENTS_URL])
         self.assertIn("wrote aa-raw-models.json", stdout)
 
     def test_transport_failures_exit_as_a_guarded_refusal(self):
@@ -1026,8 +1169,14 @@ class TransportErrorTests(unittest.TestCase):
                 def raiser(e=error):
                     raise e
 
+                # The methodology pin passes (fail fast lives BEFORE the
+                # leaderboard only when the page itself is healthy), then the
+                # leaderboard fetch exercises the transport failure.
                 with self.assertRaises(SystemExit) as caught:
-                    self.run_capture_through_boundary({fetch_aa.URL: raiser})
+                    self.run_capture_through_boundary({
+                        fetch_aa.METHODOLOGY_URL: lambda: _FakeResponse(
+                            methodology_html()),
+                        fetch_aa.URL: raiser})
 
                 message = str(caught.exception)
                 self.assertIn(fetch_aa.URL, message)
@@ -1156,6 +1305,7 @@ class PageFetchRetryTests(unittest.TestCase):
         # the real page, and the capture lands -- with the backoff sleep
         # and the stderr retry line as the only traces.
         routes = {
+            fetch_aa.METHODOLOGY_URL: lambda: _FakeResponse(methodology_html()),
             fetch_aa.URL: flaky(
                 urllib.error.HTTPError(fetch_aa.URL, 500,
                                        "Internal Server Error",
@@ -1169,8 +1319,9 @@ class PageFetchRetryTests(unittest.TestCase):
             stdout, stderr = run()
 
             self.assertEqual(stub.calls,
-                             [fetch_aa.URL, fetch_aa.URL, self.DETAIL_URL,
-                              fetch_aa.URL, fetch_aa.AGENTS_URL])
+                             [fetch_aa.METHODOLOGY_URL, fetch_aa.URL,
+                              fetch_aa.URL, self.DETAIL_URL, fetch_aa.URL,
+                              fetch_aa.AGENTS_URL])
             self.assertEqual(sleeps,
                              [fetch_aa.PAGE_BACKOFF_SECONDS,
                               fetch_aa.DISPUTE_LOOK_SPACING_SECONDS])
@@ -1192,7 +1343,9 @@ class PageFetchRetryTests(unittest.TestCase):
                                          "Service Unavailable",
                                          email.message.Message(), None)
 
-        routes = {fetch_aa.URL: unavailable}
+        routes = {fetch_aa.METHODOLOGY_URL: lambda: _FakeResponse(
+                      methodology_html()),
+                  fetch_aa.URL: unavailable}
         with self.capture_over_boundary(routes, seed=True) as (root, stub,
                                                                sleeps, run,
                                                                _captured):
@@ -1210,8 +1363,10 @@ class PageFetchRetryTests(unittest.TestCase):
                 sleeps,
                 [k * fetch_aa.PAGE_BACKOFF_SECONDS
                  for k in range(1, fetch_aa.PAGE_ATTEMPTS)])
-            self.assertEqual(stub.calls,
-                             [fetch_aa.URL] * fetch_aa.PAGE_ATTEMPTS)
+            self.assertEqual(
+                stub.calls,
+                [fetch_aa.METHODOLOGY_URL]
+                + [fetch_aa.URL] * fetch_aa.PAGE_ATTEMPTS)
             self.assertEqual((root / "aa-raw-models.json").read_bytes(),
                              b"SENTINEL MODELS CAPTURE")
             self.assertEqual((root / "aa-raw-coding-agents.json").read_bytes(),
@@ -1228,7 +1383,9 @@ class PageFetchRetryTests(unittest.TestCase):
             raise urllib.error.HTTPError(fetch_aa.URL, 404, "Not Found",
                                          email.message.Message(), None)
 
-        routes = {fetch_aa.URL: not_found}
+        routes = {fetch_aa.METHODOLOGY_URL: lambda: _FakeResponse(
+                      methodology_html()),
+                  fetch_aa.URL: not_found}
         with self.capture_over_boundary(routes, seed=True) as (root, stub,
                                                                sleeps, run,
                                                                captured):
@@ -1240,7 +1397,9 @@ class PageFetchRetryTests(unittest.TestCase):
             self.assertIn("fetch failed", message)
             self.assertIn("404", message)
             self.assertEqual(sleeps, [], "the 404 was retried")
-            self.assertEqual(stub.calls, [fetch_aa.URL], "the 404 was retried")
+            self.assertEqual(stub.calls,
+                             [fetch_aa.METHODOLOGY_URL, fetch_aa.URL],
+                             "the 404 was retried")
             self.assertNotIn("retrying", captured["stderr"])
             self.assertNotIn("wrote", captured["stdout"])
             self.assertEqual((root / "aa-raw-models.json").read_bytes(),
@@ -1255,6 +1414,7 @@ class PageFetchRetryTests(unittest.TestCase):
         # read of each route (four calls, one wait) with the LEADERBOARD's
         # copy of the shared value in the written capture.
         routes = {
+            fetch_aa.METHODOLOGY_URL: lambda: _FakeResponse(methodology_html()),
             fetch_aa.URL: lambda: _FakeResponse(self.LEADERBOARD),
             self.DETAIL_URL: flaky(
                 urllib.error.HTTPError(self.DETAIL_URL, 500,
@@ -1269,8 +1429,8 @@ class PageFetchRetryTests(unittest.TestCase):
 
             self.assertEqual(
                 stub.calls,
-                [fetch_aa.URL, self.DETAIL_URL, self.DETAIL_URL,
-                 fetch_aa.URL, fetch_aa.AGENTS_URL])
+                [fetch_aa.METHODOLOGY_URL, fetch_aa.URL, self.DETAIL_URL,
+                 self.DETAIL_URL, fetch_aa.URL, fetch_aa.AGENTS_URL])
             self.assertEqual(sleeps,
                              [fetch_aa.PAGE_BACKOFF_SECONDS,
                               fetch_aa.DISPUTE_LOOK_SPACING_SECONDS])
@@ -1378,16 +1538,17 @@ class RetryBoundArithmeticTests(unittest.TestCase):
     PAGE_BOUND = (fetch_aa.PAGE_ATTEMPTS * fetch_aa.FETCH_TIMEOUT_SECONDS
                   + sum(k * fetch_aa.PAGE_BACKOFF_SECONDS
                         for k in range(1, fetch_aa.PAGE_ATTEMPTS)))
-    # The capture fetches exactly four pages (two spaced leaderboard looks,
-    # the detail page, the coding agents), each at that bound, plus one
-    # dispute-look spacing wait (issue #208); the page retry is the only
-    # retry level left (issue #200). 1200 s is the capture budget that
-    # leaves the ~7-min remainder room in the job's 1800 s, with slack.
+    # The capture fetches exactly five pages (the methodology version pin,
+    # two spaced leaderboard looks, the detail page, the coding agents),
+    # each at that bound, plus one dispute-look spacing wait (issue #208);
+    # the page retry is the only retry level left (issue #200). 1200 s is
+    # the capture budget that leaves the ~7-min remainder room in the job's
+    # 1800 s, with slack.
     CAPTURE_BUDGET = 1200
 
     def test_worst_case_stays_within_the_capture_budget(self):
         # The comment in fetch_aa.py commits to exactly this arithmetic.
-        worst_case = (4 * self.PAGE_BOUND
+        worst_case = (5 * self.PAGE_BOUND
                       + fetch_aa.DISPUTE_LOOK_SPACING_SECONDS)
 
         self.assertLessEqual(worst_case, self.CAPTURE_BUDGET)
@@ -1589,12 +1750,14 @@ class MultiLookCaptureTests(unittest.TestCase):
     DETAIL_URL = fetch_aa.MODEL_DETAIL_URL.format(slug="detail-host-model")
 
     def capture_two_looks(self, leaderboard_pages, **detail_overrides):
-        """capture(None, None) over a stubbed urlopen that answers the
+        """capture(None, None, None) over a stubbed urlopen that answers the
         leaderboard route with `leaderboard_pages` in sequence (the two
-        looks read that route twice) and the detail route with the standard
-        detail page, record-overridden by `detail_overrides`.
+        looks read that route twice), the methodology route with the pinned
+        generation's page, and the detail route with the standard detail
+        page, record-overridden by `detail_overrides`.
         -> (Capture, recorded sleeps, stub)."""
         stub = LoudUrlopenStub({
+            fetch_aa.METHODOLOGY_URL: lambda: _FakeResponse(methodology_html()),
             fetch_aa.URL: flaky(*leaderboard_pages),
             self.DETAIL_URL: lambda: _FakeResponse(
                 flight_html(detail_payload(**detail_overrides))),
@@ -1604,7 +1767,7 @@ class MultiLookCaptureTests(unittest.TestCase):
                 unittest.mock.patch.object(fetch_aa, "_sleep",
                                            side_effect=sleeps.append,
                                            create=True):
-            return fetch_aa.capture(None, None), sleeps, stub
+            return fetch_aa.capture(None, None, None), sleeps, stub
 
     def test_one_generation_writes_no_variants_and_keeps_todays_corpus(self):
         # The quiet hour: both looks and the detail route carry one
@@ -1614,8 +1777,8 @@ class MultiLookCaptureTests(unittest.TestCase):
         captured, sleeps, stub = self.capture_two_looks(
             [flight_html(look_payload(51))])
 
-        self.assertEqual(stub.calls, [fetch_aa.URL, self.DETAIL_URL,
-                                      fetch_aa.URL])
+        self.assertEqual(stub.calls, [fetch_aa.METHODOLOGY_URL, fetch_aa.URL,
+                                      self.DETAIL_URL, fetch_aa.URL])
         self.assertEqual(sleeps, [fetch_aa.DISPUTE_LOOK_SPACING_SECONDS])
         self.assertFalse(captured.disputed)
         self.assertEqual(captured.generations, 1)
@@ -1675,8 +1838,8 @@ class MultiLookCaptureTests(unittest.TestCase):
             [flight_html(look_payload(51, medianOutputTokensPerSecond=120.0)),
              flight_html(look_payload(51, medianOutputTokensPerSecond=999.0))])
 
-        self.assertEqual(stub.calls, [fetch_aa.URL, self.DETAIL_URL,
-                                      fetch_aa.URL])
+        self.assertEqual(stub.calls, [fetch_aa.METHODOLOGY_URL, fetch_aa.URL,
+                                      self.DETAIL_URL, fetch_aa.URL])
         self.assertEqual(sleeps, [fetch_aa.DISPUTE_LOOK_SPACING_SECONDS])
         self.assertFalse(captured.disputed)
         self.assertEqual(captured.generations, 1)
@@ -1746,8 +1909,8 @@ class MultiLookCaptureTests(unittest.TestCase):
         captured, sleeps, stub = self.capture_two_looks(
             [page1, page2], intelligenceIndexCostPerTask=None)
 
-        self.assertEqual(stub.calls, [fetch_aa.URL, self.DETAIL_URL,
-                                      fetch_aa.URL])
+        self.assertEqual(stub.calls, [fetch_aa.METHODOLOGY_URL, fetch_aa.URL,
+                                      self.DETAIL_URL, fetch_aa.URL])
         self.assertEqual(sleeps, [fetch_aa.DISPUTE_LOOK_SPACING_SECONDS])
         self.assertTrue(captured.disputed)
         self.assertEqual(captured.generations, 2)
@@ -2099,6 +2262,7 @@ class CrossRunCaptureTests(unittest.TestCase):
     def capture_with_prev(self, leaderboard_pages, prev_records,
                           **detail_overrides):
         stub = LoudUrlopenStub({
+            fetch_aa.METHODOLOGY_URL: lambda: _FakeResponse(methodology_html()),
             fetch_aa.URL: flaky(*leaderboard_pages),
             self.DETAIL_URL: lambda: _FakeResponse(
                 flight_html(detail_payload(**detail_overrides))),
@@ -2108,7 +2272,7 @@ class CrossRunCaptureTests(unittest.TestCase):
                 unittest.mock.patch.object(fetch_aa, "_sleep",
                                            side_effect=sleeps.append,
                                            create=True):
-            return fetch_aa.capture(None, None, prev_records)
+            return fetch_aa.capture(None, None, None, prev_records)
 
     def flip_pages(self):
         """The reopened issue's live shape: BOTH looks serve solar-pro-2
@@ -2194,6 +2358,7 @@ class CrossRunLookbackFlagTests(unittest.TestCase):
         agents = flight_html(agent_payload(
             [agent_row(f"Agent - Model {i}") for i in range(5)]))
         stub = LoudUrlopenStub({
+            fetch_aa.METHODOLOGY_URL: lambda: _FakeResponse(methodology_html()),
             fetch_aa.URL: lambda: _FakeResponse(
                 flight_html(leaderboard_payload())),
             self.DETAIL_URL: lambda: _FakeResponse(
