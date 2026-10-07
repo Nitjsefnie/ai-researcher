@@ -267,7 +267,8 @@ retry or to hand-fix JSON — when any of these move:
   four weights that way and the page silently shipped costs that were wrong by
   factors of 2–3 for a day. The pin is the only place that can be caught;
 - the cost breakdown drops a slug `build.py` reads, or the per-evaluation costs
-  stop summing to the published total;
+  stop summing to the published total — except an all-dropped window hour, which
+  is reported and returned (issue #217);
 - the Coding Agent Index collapses below `CODING_ROW_FLOOR` paired rows.
 
 A disagreement between the two routes is deliberately NOT one of these: it is
