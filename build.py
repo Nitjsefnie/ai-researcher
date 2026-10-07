@@ -34,7 +34,11 @@ OUT = ROOT / "out" / "frontier-models.html"
 # cost-breakdown slug -- v4.3 replaced tau3-banking with automationbench-aa and
 # Terminal-Bench v2.1 with v4.0. The weights are published on AA's methodology
 # page and are NOT in the payload, so nothing can detect a rebalance for us;
-# fetch_aa.py refuses a version this file was not written against instead.
+# fetch_aa.py refuses a version this file was not written against instead,
+# checked against the methodology page's LIVE version at MAJOR.MINOR
+# granularity (issue #220 -- the version string left the leaderboard payload).
+# AA ships point releases (v4.3.2) within a generation without rebalancing,
+# so those pass the pin unchanged.
 INDEX_VERSION = "4.3"
 
 # AA Intelligence Index v4.3 component evals, as listed on the source site.
