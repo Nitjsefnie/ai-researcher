@@ -208,14 +208,16 @@ class CaptureGateTests(unittest.TestCase):
 
         self.assertEqual((code, out), (0, "false\n"))
 
-        # Issue #226: the same churn over a disputed capture. genVariants
-        # rides the rows, and a page that let the capture's key layout into
-        # the embedded dispute maps votes true on exactly this fixture --
-        # the vote that turned refresh run 37682958494's hour red. The true
-        # vote for a real change stays pinned by
-        # test_a_rendered_change_is_a_change on both capture shapes below.
+        # Issue #226: the same churn over a disputed capture, both sides
+        # disputed (the fresh side patched the same way the speed tests
+        # patch theirs). genVariants rides the rows, and a page that let
+        # the capture's key layout into the embedded dispute maps votes
+        # true on exactly this fixture -- the vote that turned refresh run
+        # 37682958494's hour red.
         disputed = disputed_capture(REAL_MODELS)
-        with head_serving(churn(disputed), churn(REAL_AGENTS)):
+        with head_serving(churn(disputed), churn(REAL_AGENTS)), \
+             mock.patch.object(capture_gate, "read_fresh_captures",
+                               return_value=(disputed, REAL_AGENTS)):
             code, out = run_gate()
 
         self.assertEqual((code, out), (0, "false\n"))
@@ -258,9 +260,11 @@ class CaptureGateTests(unittest.TestCase):
         # rendered move -- one model's Intelligence Index, re-rendered
         # through build.metric_record exactly as the quiet control mutates
         # its field -- must still vote true when the capture carries
-        # genVariants, so the dispute fold can never swallow news.
+        # genVariants, so the dispute handling can never swallow news.
         disputed = disputed_capture(REAL_MODELS)
-        with head_serving(rendered_field_changed(disputed), REAL_AGENTS):
+        with head_serving(rendered_field_changed(disputed), REAL_AGENTS), \
+             mock.patch.object(capture_gate, "read_fresh_captures",
+                               return_value=(disputed, REAL_AGENTS)):
             code, out = run_gate()
 
         self.assertEqual((code, out), (0, "true\n"))

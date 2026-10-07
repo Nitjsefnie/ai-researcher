@@ -229,7 +229,7 @@ class BrowserInteractionTests(unittest.TestCase):
         (data / "aa-raw-models.json").write_text(
             json.dumps(_in_run_disputed_models()), encoding="utf-8")
         (data / "aa-raw-coding-agents.json").write_text(
-            json.dumps(_PROBE_AGENTS), encoding="utf-8")
+            json.dumps(DISPUTED_FIXTURE_AGENTS), encoding="utf-8")
         (data / "captured-at.txt").write_text("2026-10-07\n",
                                               encoding="utf-8")
         ambient_out = build.OUT
@@ -517,10 +517,25 @@ class BrowserInteractionTests(unittest.TestCase):
                         ".map(c => c.getAttribute('fill')))]",
                         f"#svg-{chart} circle.pt[r='5']",
                     )
+                    # A var(--dispute) FILL is the disputed encoding's
+                    # second-generation point (#226) and nothing else: the
+                    # de-emphasis set admits it only on a circle the page
+                    # actually marks disputed -- on a plain off-frontier
+                    # point it is still a bug.
+                    red_on_plain = page.evaluate(
+                        "sel => [...document.querySelectorAll(sel)]"
+                        ".some(c => c.getAttribute('fill') === "
+                        "'var(--dispute)' && !c.classList.contains('dispute'))",
+                        f"#svg-{chart} circle.pt[r='5']",
+                    )
                     self.assertTrue(
-                        off_frontier and set(off_frontier) <= {"var(--muted)"},
+                        off_frontier
+                        and set(off_frontier) <= {"var(--muted)",
+                                                  "var(--dispute)"}
+                        and not red_on_plain,
                         f"{capture} {chart}: off-frontier fills "
-                        f"{off_frontier} leave the legit set ['var(--muted)']")
+                        f"{off_frontier} leave the legit set ['var(--muted)']"
+                        " plus the disputed encoding's red variant marks")
 
                     # frontier points keep their weights fill -- the gray is
                     # a superseded verdict, not a repainting of the whole
@@ -1077,8 +1092,12 @@ class BrowserInteractionTests(unittest.TestCase):
             def hover_by_name(chart, name):
                 aria = f"Pin {name} on the {chart_labels[chart]} chart"
                 self.assertNotIn('"', name)
+                # A disputed row's circles share the canonical pin label;
+                # hovering the first -- the canonical anchor -- is hovering
+                # the row either way (#226).
                 page.locator(
-                    f'#svg-{chart} circle.pt[aria-label="{aria}"]').hover()
+                    f'#svg-{chart} circle.pt[aria-label="{aria}"]'
+                ).first.hover()
                 return tip_rows(chart)
 
             # a model present on the intelligence, agentic and parameter
@@ -1089,6 +1108,15 @@ class BrowserInteractionTests(unittest.TestCase):
                     "sel => [...document.querySelectorAll(sel)]"
                     ".map(c => c.getAttribute('aria-label'))",
                     f"#svg-{chart} circle.pt")
+                # Issue #226: every circle.pt carries a label -- the
+                # disputed encoding's second-generation marks included. A
+                # disputed point still has canonical values to be labelled
+                # by, and a label-less point breaks this pin before it
+                # hovers anything.
+                self.assertTrue(
+                    aris and all(aris),
+                    f"{chart}: circle.pt without an aria-label: "
+                    f"{[a for a in aris if not a]}")
                 suffix = f" on the {chart_labels[chart]} chart"
                 name_sets[chart] = {
                     a[len("Pin "):-len(suffix)] for a in aris
@@ -1488,7 +1516,11 @@ class BrowserInteractionTests(unittest.TestCase):
           if (box.x < 4 || box.x + box.w > W - 4 ||
               box.y < T || box.y + box.h > T + PY) continue;
           if (boxes.some(q => hits(box, q))) continue;
-          if (pts.some(q => q !== p &&
+          // Clearance is judged per ROW, the way the page's placer judges
+          // it (p.r !== r there): a disputed row's own variant marks --
+          // labelled with the row's own pin label since #226 -- never
+          // block their own row's label, while every OTHER row's points do.
+          if (pts.some(q => q.name !== p.name &&
               q.x >= box.x - 7 && q.x <= box.x + box.w + 7 &&
               q.y >= box.y - 7 && q.y <= box.y + box.h + 7)) continue;
           chosen = {x: bx, y: by}; break;
@@ -2353,12 +2385,12 @@ def _disputed_probe_model():
     return probe
 
 
-# Issue #226's disputed-capture fixture: the shape refresh run 37682958494
-# (2026-10-07T20:33Z) captured and the suite then failed six tests against --
-# five models carrying `genVariants` across two generations, in the encoding
-# the page's dispute layer reads. It lives in the suite permanently, so a
-# disputed capture can never fail these pins again without a red suite here.
-IN_RUN_DISPUTED_MODELS = 5
+# Issue #226's disputed-capture fixture (_in_run_disputed_models): the
+# shape refresh run 37682958494 (2026-10-07T20:33Z) captured and the suite
+# then failed six tests against -- five models carrying `genVariants`
+# across two generations, in the encoding the page's dispute layer reads.
+# It lives in the suite permanently, so a disputed capture can never fail
+# these pins again without a red suite here.
 
 
 def _carried_variant_map(model):
@@ -2397,6 +2429,22 @@ def _variant_probe_model(model, variants):
     })
     m["genVariants"] = variants
     return m
+
+
+# The disputed fixture page's own coding rows: the two shared probe agents
+# dominate each other's frontier, so the page's coding chart would carry no
+# off-frontier point at all and the de-emphasis pin's non-vacuous guard
+# could not run on it. The third run is dominated -- r=5, muted -- and
+# nothing about it is disputed (agent rows never carry genVariants).
+DISPUTED_FIXTURE_AGENTS = list(_PROBE_AGENTS) + [
+    {"id": "probe-agent-3", "displayLabel": "Probe Agent Three",
+     "agentName": "Probe Agent Three CLI",
+     "hostModelSlug": "probe-model-0000",
+     "display": {"creator": {"agent": "Probe Agent Lab",
+                             "model": "Probe Lab"}},
+     "indexScore": 0.30, "mean": {"costUsd": 5.0,
+                                  "agentWallTimeSec": 1200.0}},
+]
 
 
 def _in_run_disputed_models(total=14):
