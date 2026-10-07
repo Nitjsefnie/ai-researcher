@@ -26,8 +26,11 @@ def js_to_fixed(value, digits):
     exact expansion, and ROUND_HALF_UP picks the larger candidate on a tie;
     the two only diverge on negative values, which the page never formats.
     """
-    return str(decimal.Decimal(float(value)).quantize(
-        decimal.Decimal(1).scaleb(-digits), rounding=decimal.ROUND_HALF_UP))
+    return str(
+        decimal.Decimal(float(value)).quantize(
+            decimal.Decimal(1).scaleb(-digits), rounding=decimal.ROUND_HALF_UP
+        )
+    )
 
 
 def js_number(value):
@@ -60,45 +63,7 @@ def math_round(value):
 
 def show_text(value):
     """The page's show(): a missing value is the em dash, never blank."""
-    return EM_DASH if value is None or value == "" else str(value)
-
-
-def fmt_cost(value):
-    """The page's fmtCost: two decimals at a dollar, three below."""
-    if value >= 1:
-        return "$" + js_to_fixed(value, 2)
-    return "$" + js_to_fixed(value, 3)
-
-
-def fmt_params(value):
-    """The page's fmtParams: the count renders as T/B/M exactly as V8 does,
-    with a decimal only where the script prints one."""
-    if value is None:
+    # Treat None, empty string, or NaN as missing values.
+    if value is None or value == "" or (isinstance(value, float) and math.isnan(value)):
         return EM_DASH
-    if value >= 1000:
-        return js_to_fixed(value / 1000, 1 if value % 1000 else 0) + "T"
-    if value >= 1:
-        return js_to_fixed(value, 1 if value < 10 else 0) + "B"
-    return str(math_round(value * 1000)) + "M"
-
-
-def fmt_ctx(value):
-    """The page's fmtCtx: M/K compact forms at the same thresholds."""
-    if value is None:
-        return EM_DASH
-    if value >= 1e6:
-        return js_to_fixed(value / 1e6, 1 if value % 1e6 else 0) + "M"
-    if value >= 1e3:
-        return str(math_round(value / 1e3)) + "K"
-    return js_number(value)
-
-
-def weights_text(row):
-    """The page's weightsOf(): weights status belongs to the model a row
-    measures, and a run on a model the leaderboard does not carry is honest
-    about it rather than defaulted."""
-    if row["open"] is None:
-        return "not published"
-    if row["open"]:
-        return row["lic"] or "open"
-    return "proprietary"
+    return str(value)
