@@ -821,8 +821,15 @@ class ExecutedHoldProbeTests(unittest.TestCase):
         # the hold is named; a dispatch that asked for force learns from
         # its override line that nothing was rebuilt; the ordinary held
         # hour stays PATH-NEUTRAL -- it names no cause it does not have
-        # (the round-1 minor a716d08 fixed, here pinned by execution); and
-        # the log line prints exactly once.
+        # (the round-1 minor a716d08 fixed, here pinned by execution):
+        # not the force override, asserted on an unforced hour by the
+        # exact line's absence -- the lowercase-substring pin alone
+        # cannot see the line, which carries no "forced" -- and not a
+        # hub cause, the held branch exiting before the live-page check
+        # runs. And the held hour writes EXACTLY ONE proceed= line: the
+        # held branch exits after its write, so no verdict write can
+        # follow it -- the harness reads only the first proceed= line,
+        # which is why the count, not the first-line value, is the pin.
         for gate in ("true", "false"):
             for force in (False, True):
                 for hub in ("same", "stale"):
@@ -834,6 +841,8 @@ class ExecutedHoldProbeTests(unittest.TestCase):
                                 force=force, hub=hub)
                         self.assertEqual(hour["rc"], 0, hour["stderr"])
                         self.assertEqual(hour["proceed"], "false")
+                        self.assertEqual(hour["outputs"].count("proceed="),
+                                         1)
                         self.assertEqual(hour["capture"], "head\n")
                         self.assertTrue(hour["marker"])
                         self.assertIn("### Held", hour["summary"])
@@ -842,6 +851,9 @@ class ExecutedHoldProbeTests(unittest.TestCase):
                                           hour["summary"])
                         else:
                             self.assertNotIn("forced", hour["summary"])
+                            self.assertNotIn("Force was requested",
+                                             hour["summary"])
+                            self.assertNotIn("stale", hour["summary"])
                         self.assertEqual(hour["stdout"].count("hold probe:"),
                                          1)
                         self.assertEqual(hour["hub_fetches"], 0)
@@ -900,12 +912,19 @@ STUB_PYTHON3 = """\
 #!/bin/bash
 # The test double for python3 inside the "Did anything move?" step: the
 # no-argument call is the rendered gate, --fresh-held the hold probe, each
-# answering from its fixture variable.
-if [ "$2" = "--fresh-held" ]; then
+# answering from its fixture variable. A FAILURE prints nothing on stdout,
+# byte-faithful to the real scripts/capture_gate.py, whose diagnostics go
+# to stderr (measured: exit 1, 0 bytes on stdout) -- so a failed probe or
+# gate leaves the step's command substitution empty exactly as the real
+# script does.
+if [ "$2" = "--fresh-held" ] && [ -n "$HELD_OUT" ]; then
   printf '%s\\n' "$HELD_OUT"
   exit "$HELD_RC"
 fi
-printf '%s\\n' "$GATE_OUT"
+if [ "$2" = "--fresh-held" ]; then
+  exit "$HELD_RC"
+fi
+[ -n "$GATE_OUT" ] && printf '%s\\n' "$GATE_OUT"
 exit "$GATE_RC"
 """
 
