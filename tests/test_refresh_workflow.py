@@ -705,14 +705,21 @@ class HoldProbeTests(unittest.TestCase):
                         self.run.index("docs.nitjsefni.eu/d/ai-researcher"))
 
     def test_the_held_hour_writes_its_own_summary_and_a_clean_tree(self):
-        # The hour's own truthful line names the hold; the workspace ends
-        # clean (data/ restored on the held path too); and the probe line
-        # rides the held path only -- a healthy hour logs nothing about it.
+        # The hour's own truthful line names the hold, PATH-NEUTRAL: an
+        # ordinary held hour is held with no force or hub-stale cause to
+        # name, so the sentence must not assert one. The force override
+        # line is the single keyed exception -- a dispatch that asked for
+        # force must learn from the summary that nothing was rebuilt. The
+        # workspace ends clean (data/ restored on the held path too); the
+        # probe line rides the held path only.
         block = self.held_block()
         self.assertIn("### Held", block)
         self.assertIn("three-generation", block)
         self.assertIn("last good page stays live", block)
         self.assertIn("nothing commits or publishes", block)
+        self.assertNotIn("A forced or hub-stale run is held", block)
+        self.assertIn("Force was requested", block)
+        self.assertIn("inputs.force", block)
         self.assertIn("git checkout -- data/", block)
         self.assertIn("hold probe:", block)
         self.assertEqual(self.run.count("hold probe:"), 1)

@@ -312,7 +312,14 @@ jobs:
             {
               echo '### Held: three-generation AA window'
               echo
-              echo 'A forced or hub-stale run is held like an ordinary hour: the last good page stays live, and nothing commits or publishes.'
+              echo 'The three-generation AA window holds the hour: the last good page stays live, nothing commits or publishes.'
+              # A dispatch that asked for force gets its own line: the hold
+              # outranks it, and without this the forced run would read as
+              # if it had rebuilt. One line on purpose -- the held branch
+              # exits before the live-page check runs, so no second cause
+              # can be named here. (inputs.force reaches the shell inline,
+              # exactly as the verdict below reads it.)
+              if [ "${{ inputs.force }}" = 'true' ]; then echo 'Force was requested; the hold outranks it, so nothing was rebuilt.'; fi
             } >> "$GITHUB_STEP_SUMMARY"
             git checkout -- data/
             echo "proceed=false" >> "$GITHUB_OUTPUT"
