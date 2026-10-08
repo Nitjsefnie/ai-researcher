@@ -889,12 +889,15 @@ class FreshHoldProbeTests(unittest.TestCase):
         self.assertEqual(err, "")
 
     def test_a_converged_corner_capture_is_refused_not_held(self):
-        # THE PM'S RED-PATH PIN: a forced or hub-stale run on a CONVERGED
-        # capture (2 generations) with an emptied axis must still fail red.
-        # The shape is a REFUSED capture -- the 2-generation marker plus
-        # the corner axes -- and the probe relays the refusal: exit 1, the
-        # reason on stderr, no answer on stdout. A probe that answered yes
-        # here would hold a genuinely broken hour green.
+        # PROBE-LAYER PIN: handed a CONVERGED (2-generation) corner capture
+        # -- the marker plus the corner axes -- the probe itself relays the
+        # refusal: exit 1, the reason on stderr, no answer on stdout. A
+        # probe that answered yes here would hold a genuinely broken hour
+        # green. The WORKFLOW never brings this shape to the probe -- the
+        # no-argument gate refuses it earlier in the same step (issue
+        # #236 review) -- so the workflow-level red for it is pinned by
+        # test_refresh_workflow.py's ExecutedHoldProbeTests (the forced,
+        # gate-failure case), not here.
         err = io.StringIO()
         with mock.patch.object(capture_gate, "read_fresh_captures",
                                return_value=(corner_capture(REAL_MODELS),
