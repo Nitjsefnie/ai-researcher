@@ -1010,13 +1010,15 @@ class EmptyAxisGuardTests(unittest.TestCase):
             self.assertIn("parameters", message)
             self.assertFalse(output.exists(), "refusal still wrote the page")
 
-    def test_the_three_generation_corner_refusal_names_the_window(self):
-        # Issue #223: the designed-red three-generation corner (the looks
+    def test_the_three_generation_corner_holds_the_page(self):
+        # Issue #232: the designed three-generation corner (the looks
         # disagree AND the detail route matches neither fingerprint) empties
         # agentic AND parameters -- run 37676392811 is the reproduction. The
-        # exit stays nonzero, but the capture records the window, so the
-        # refusal names it -- the marker's generation count -- instead of
-        # blaming an AA capture shape change.
+        # capture records the window and the page self-heals when AA's
+        # routes converge, so the hour is not a shape change: main() raises
+        # WindowHold and writes nothing -- the capture gate catches it on
+        # the fresh side and reports the hour unchanged -- instead of the
+        # refusal's nonzero exit that went red although nothing was broken.
         corner = model_fixture(gdpval=None)
         del corner["parameters"]
         with self.capture([corner], [agent_fixture()]) as output:
@@ -1024,7 +1026,7 @@ class EmptyAxisGuardTests(unittest.TestCase):
                 "every cost breakdown dropped as another generation's: "
                 "185 model(s), first apodex-1-1; 3 generation(s) observed "
                 "in-run\n", encoding="utf-8")
-            with self.assertRaises(SystemExit) as raised:
+            with self.assertRaises(build.WindowHold) as raised:
                 self.run_build()
 
             message = str(raised.exception)
@@ -1032,9 +1034,63 @@ class EmptyAxisGuardTests(unittest.TestCase):
                 "no rows carry a score/cost pair for: agentic, parameters",
                 message)
             self.assertIn("3 generation(s) observed in-run", message)
-            self.assertIn("re-read the AA leaderboard by hand", message)
+            self.assertIn("unchanged / window", message)
+            self.assertIn("holding the page", message)
+            self.assertNotIn("changed shape", message)
+            self.assertFalse(output.exists(), "hold still wrote the page")
+
+    def test_a_converged_hour_with_an_empty_parameters_axis_still_refuses(self):
+        # The ruling's BOTH-DIRECTION mutation check, one test: the same
+        # corner fixture built twice, at two generation counts. At 2 the
+        # hour is an ordinary (converged-by-count) window whose emptied
+        # axes the exemption does not cover, and the refusal stands; at 3
+        # the hold fires. Dropping the `>= 3` condition from the hold
+        # predicate turns the first assertion red -- this pair is the
+        # mutation check the issue ruling mandates.
+        corner = model_fixture(gdpval=None)
+        del corner["parameters"]
+        marker = ("every cost breakdown dropped as another generation's: "
+                  "185 model(s), first apodex-1-1; {n} generation(s) observed "
+                  "in-run\n")
+        with self.capture([corner], [agent_fixture()]) as output:
+            (output.parent / "cost-breakdown-window.txt").write_text(
+                marker.format(n=2), encoding="utf-8")
+            with self.assertRaises(SystemExit) as raised:
+                self.run_build()
+
+            message = str(raised.exception)
+            self.assertIn("2 generation(s) observed in-run", message)
+            self.assertIn("records a cross-generation AA window", message)
             self.assertNotIn("changed shape", message)
             self.assertFalse(output.exists(), "refusal still wrote the page")
+
+        with self.capture([corner], [agent_fixture()]) as output:
+            (output.parent / "cost-breakdown-window.txt").write_text(
+                marker.format(n=3), encoding="utf-8")
+            with self.assertRaises(build.WindowHold):
+                self.run_build()
+
+            self.assertFalse(output.exists(), "hold still wrote the page")
+
+    def test_a_three_generation_hour_with_only_agentic_empty_still_publishes(self):
+        # Precedence pin: #217's branch fires before the corner hold at ANY
+        # generation count -- a marker hour whose agentic axis is the SINGLE
+        # empty one publishes with the note even when the marker records 3
+        # generations, because the hold requires the emptied axes to be a
+        # subset of the window-droppable pair and MORE than agentic to be
+        # gone.
+        with self.capture([model_fixture(gdpval=None)], [agent_fixture()]) as output:
+            (output.parent / "cost-breakdown-window.txt").write_text(
+                "every cost breakdown dropped as another generation's: "
+                "185 model(s), first apodex-1-1; 3 generation(s) observed "
+                "in-run\n", encoding="utf-8")
+            self.run_build()
+
+            stats = self.payload_of(output)["stats"]
+            self.assertTrue(stats["costBreakdownWindow"])
+            self.assertEqual(stats["metricCounts"]["agentic"], 0)
+            self.assertIn("Empty during a two-generation window",
+                          output.read_text(encoding="utf-8"))
 
     def test_a_countless_window_marker_names_the_window_generically(self):
         # A marker written by an older fetch_aa.py carries no generation

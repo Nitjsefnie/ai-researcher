@@ -861,6 +861,19 @@ def window_generations(data_dir: pathlib.Path) -> int | None:
     return int(match.group(1)) if match else None
 
 
+class WindowHold(Exception):
+    """A window hour that holds the page instead of building one.
+
+    Issue #232: when the window marker records three or more generations
+    observed in-run, the merge has dropped every cost breakdown and every
+    detail-route fill, and no honest page exists to build. main() raises
+    instead of writing: the capture gate catches it on the fresh side and
+    reports the hour unchanged, so the last good page stays live and
+    nothing commits or publishes. Never caught inside build.py's own main()
+    -- the CLI wrapper below translates it to a printed report and exit 0.
+    """
+
+
 def read_capture(path):
     """The capture at path, parsed -- or a guarded exit naming the file.
 
@@ -1201,6 +1214,18 @@ def main():
               "another generation's -- publishing with the agentic axis empty "
               "and a note on the page instead of refusing; the axis returns "
               "when AA's routes converge")
+    elif (empty and window and set(empty) <= {"agentic", "parameters"}
+          and (window_generations(RAW.parent) or 0) >= 3):
+        raise WindowHold(
+            "unchanged / window: no rows carry a score/cost pair for: "
+            + ", ".join(sorted(empty))
+            + f" -- the capture records "
+            f"{window_generations(RAW.parent)} generation(s) observed in-run, "
+            "not a shape change: the merge dropped every cost breakdown and "
+            "every detail-route fill as another generation's, and no honest "
+            "page exists to build -- holding the page: the last good page "
+            "stays live, nothing commits or publishes this hour, and the "
+            "axes return when AA's routes converge")
     elif empty and window:
         generations = window_generations(RAW.parent)
         count_phrase = (f"{generations} generation(s) observed in-run"
@@ -2838,4 +2863,7 @@ if __name__ == "__main__":
         description="Build out/frontier-models.html from the AA captures "
                     "in data/ (no arguments needed).")
     ap.parse_args()
-    main()
+    try:
+        main()
+    except WindowHold as held:
+        print(held)

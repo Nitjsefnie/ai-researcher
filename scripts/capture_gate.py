@@ -30,6 +30,8 @@ Exit codes:
       signal to re-read the leaderboard, never a quiet "nothing moved".
 No capture at HEAD (the first capture ever) is NOT broken: it fails OPEN,
 printing `true`, so the first run publishes instead of skipping forever.
+A held page (issue #232) is not broken either: it answers `false` (unchanged)
+on stdout with the reason on stderr -- still exit 0, still one word of stdout.
 """
 from __future__ import annotations
 
@@ -93,6 +95,16 @@ class HeadCaptureError(Exception):
 
 class FreshCaptureError(Exception):
     """A fresh capture file is missing or unreadable."""
+
+
+class FreshWindowHold(Exception):
+    """The FRESH side of the gate held the page (issue #232).
+
+    build_page_pair raises it only for the fresh side; the old side raising
+    build.WindowHold propagates unwrapped and stays red -- HEAD never
+    carries a corner marker under this design, so that state is unexpected
+    and must fail loudly, never read as "unchanged".
+    """
 
 
 # --- speed quantization ------------------------------------------------------
@@ -320,7 +332,10 @@ def build_page_pair(head: tuple[bytes, bytes],
                                      dir=build.ROOT) as tmp:
         tmp_root = pathlib.Path(tmp)
         old_page = _render_side(tmp_root / "old", head, head_marker)
-        new_page = _render_side(tmp_root / "new", fresh, fresh_marker)
+        try:
+            new_page = _render_side(tmp_root / "new", fresh, fresh_marker)
+        except build.WindowHold as exc:
+            raise FreshWindowHold(str(exc)) from exc
     return old_page, new_page
 
 
@@ -351,6 +366,12 @@ def main() -> int:
 
     try:
         old_page, new_page = build_page_pair(head, fresh)
+    except FreshWindowHold as exc:
+        print("capture-gate: three-generation AA window -- the build held "
+              "the page: reporting the hour unchanged, the last good page "
+              f"stays live ({exc})", file=sys.stderr)
+        print("false")
+        return 0
     except (SystemExit, Exception) as exc:  # pylint: disable=broad-exception-caught
         # build.py's own refusals (SystemExit) already carry their named
         # reason. An unexpected crash gets the traceback appended, so the
