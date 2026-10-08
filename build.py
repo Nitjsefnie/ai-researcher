@@ -1197,16 +1197,20 @@ def main():
     # capture (AA's totalParameters rename) fails red instead of publishing
     # an empty parameters chart.
     #
-    # The window marker covers the agentic axis ONLY: a marker hour whose
-    # agentic axis is the single empty one publishes, with the page naming
-    # the window; an hour that empties anything else -- with or without the
-    # marker, including the designed three-generation parameters corner --
-    # still refuses. When the capture DOES record the window, the refusal
-    # names it -- the observed in-run generation count when the marker
-    # carries one -- instead of blaming an AA capture shape change, while
-    # staying nonzero: AGENTS.md's designed go-re-read-AA-by-hand signal
-    # (issue #223). The shape-change message stays for a capture that does
-    # NOT record a window, where shape change is the honest cause.
+    # The guard's arms, narrowest first. A marker hour whose agentic axis is
+    # the SINGLE empty one is #217's window branch: the hour publishes with
+    # the note, the page naming the window. The next arm is the designed
+    # three-generation corner (issue #232): the marker records >= 3
+    # generations AND the emptied axes are only the window-droppable pair
+    # (agentic, parameters) -- the hour HOLDS rather than refuses:
+    # WindowHold, which scripts/capture_gate.py reports as the hour
+    # unchanged -- the last good page stays live, nothing commits or
+    # publishes -- until AA's routes converge. Every other emptied axis
+    # still refuses (SystemExit, nonzero): AGENTS.md's designed
+    # go-re-read-AA-by-hand signal, naming the observed in-run generation
+    # count when the marker carries one, with the shape-change wording only
+    # for a capture that does NOT record a window, where shape change is
+    # the honest cause (issue #223).
     rendered = {**stats["metricCounts"], "parameters": stats["parameterCount"]}
     empty = [axis for axis, n in rendered.items() if not n]
     if empty and window and set(empty) == {"agentic"}:
