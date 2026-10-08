@@ -888,6 +888,13 @@ class ExecutedHoldProbeTests(unittest.TestCase):
                         self.assertEqual(hour["hub_fetches"], fetches)
                         self.assertEqual(hour["capture"], capture)
                         self.assertTrue(hour["marker"])
+                        # Exactly one proceed= line on the verdict path
+                        # too (issue #240): the value read by the harness
+                        # takes the FIRST proceed= line, so a stray second
+                        # write behind a correct first one passes the value
+                        # assertion and must fail the count instead.
+                        self.assertEqual(
+                            hour["outputs"].count("proceed="), 1)
 
     def test_an_undefined_probe_token_is_red_never_a_fall_through(self):
         # The `case` guard: the probe's stdout is the step's verdict, and a
@@ -906,6 +913,13 @@ class ExecutedHoldProbeTests(unittest.TestCase):
                     self.assertNotEqual(hour["rc"], 0, hour["stderr"])
                     self.assertNotIn("proceed=", hour["outputs"])
                     self.assertEqual(hour["capture"], self.FRESH)
+                    # The red names the token it refused (issue #240): the
+                    # case's *) arm echoes the diagnostic to stderr before
+                    # exit 1, so an exit-1 with the echo deleted -- red for
+                    # the same rc, the same missing output, the same
+                    # restored capture -- fails on this pin alone.
+                    self.assertIn("hold probe: undefined answer 'maybe'",
+                                  hour["stderr"])
 
 
 STUB_PYTHON3 = """\
