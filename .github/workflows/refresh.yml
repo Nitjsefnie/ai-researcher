@@ -339,7 +339,7 @@ jobs:
               exit 0
               ;;
             no) ;;
-            *) exit 1 ;;
+            *) echo "hold probe: undefined answer '$held'" >&2 ; exit 1 ;;
           esac
           if [ "$changed" = false ]; then
             # The fresh captures render identically to HEAD's, so restore the
