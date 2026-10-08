@@ -916,8 +916,9 @@ class ExecutedHoldProbeTests(unittest.TestCase):
                     # The red names the token it refused (issue #240): the
                     # case's *) arm echoes the diagnostic to stderr before
                     # exit 1, so an exit-1 with the echo deleted -- red for
-                    # the same rc, the same missing output, the same
-                    # restored capture -- fails on this pin alone.
+                    # the same rc, the same missing output, the same fresh
+                    # capture left on disk (the arm exits before any
+                    # restore) -- fails on this pin alone.
                     self.assertIn("hold probe: undefined answer 'maybe'",
                                   hour["stderr"])
 
