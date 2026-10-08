@@ -641,88 +641,272 @@ class GateTests(unittest.TestCase):  # pylint: disable=too-many-public-methods
         self.assertIn("grep -oE 'Source commit <code>[0-9a-f]{40}</code>'", run)
 
 
-class HoldProbeTests(unittest.TestCase):
-    """Issue #236: the hold probe's place in the proceed verdict.
+class ExecutedHoldProbeTests(unittest.TestCase):
+    """The hold probe's hour, EXECUTED, not read (issue #236).
 
-    Since #233 an ordinary hour held in a three-generation window (the gate
-    answered false and proceed stayed false), but a FORCED or HUB-STALE run
-    set proceed=true in the same hour and went red at the rebuild. The probe
-    runs before the verdict, so held drops EVERY path. The pins are
-    structural because the step itself cannot run hermetically: the gate and
-    the probe resolve their repository from their own file location, and the
-    step's later half fetches the hub's live page.
+    The structural pins this class replaces asserted the held branch's
+    shape by substring and index, on the premise that the step cannot run
+    hermetically -- a premise the corpus's
+    ci/run-workflow-step-scripts-dont-read-them lesson (its fifth sighting
+    on this file) disposes of: the step is executable code, so the contract
+    is pinned by running the real run block. python3 and curl are stubbed
+    (the only tools the step reaches beyond git), the gate and the probe
+    answer from fixtures, and every executed case asserts the exit code,
+    the proceed output, the data/ state and -- where the case's meaning
+    needs it -- the summary and the hub fetch.
+
+    Two layers pin the failure paths. THIS class is the workflow layer:
+    a gate or probe exit 1 must turn the STEP red before any verdict can
+    be computed, an undefined probe token must never fall through, and the
+    hold outranks the force and hub_stale arms. The probe's own exit-code
+    contract at the probe layer lives in tests/test_capture_gate.py's
+    FreshHoldProbeTests -- including the converged corner capture, which
+    the workflow never brings to the probe (the no-argument gate refuses
+    it earlier in the step); the workflow-level pin for that red is the
+    forced, gate-failure case below.
     """
 
+    HEAD_FILES = {
+        "data/aa-raw-models.json": "head\n",
+        "out/frontier-models.html": "page\n",
+    }
+    FRESH = "fresh\n"
+
     def setUp(self):
-        self.wf = load()
-        self.raw = step(self.wf, "Did anything move?")["run"]
+        if os.name == "nt":
+            # The step is a GitHub-runner bash script exercising POSIX
+            # tooling (mktemp, cmp, curl, a stub PATH); the refresh job
+            # itself runs on ubuntu, the same skip shape as the
+            # stub-gh classifier tests.
+            raise unittest.SkipTest(
+                "the step is a POSIX script; the Windows cells skip its "
+                "execution")
 
-    def held_block(self) -> str:
-        """The held branch, extracted verbatim from the run block."""
-        lines = self.raw.splitlines()
-        start = next(i for i, line in enumerate(lines)
-                     if 'if [ "$held" = yes ]; then' in line)
-        end = next(i for i in range(start, len(lines))
-                   if lines[i].strip() == "fi")
-        return flattened("\n".join(lines[start:end + 1]))
+    def _run_hour(self, tmp: pathlib.Path, *, gate, probe, force, hub_same):
+        """Seed one scratch repo at HEAD, dirty it with the fresh capture
+        and the untracked window marker, install the python3/curl doubles,
+        and run the real run block.
 
-    def test_the_probe_runs_after_the_gate_and_before_the_restore(self):
-        # The probe reads the fresh captures off disk, so it must precede
-        # the restore; and it must precede the verdict whose force and
-        # hub_stale arms it exists to overrule.
-        run = flattened(self.raw)
-        idx_gate = run.index('changed="$(python3 scripts/capture_gate.py)"')
-        idx_probe = run.index(
-            'held="$(python3 scripts/capture_gate.py --fresh-held)"')
-        idx_restore = run.index("git checkout -- data/")
-        idx_verdict = run.index('if [ "$changed" = true ]')
-        self.assertLess(idx_gate, idx_probe)
-        self.assertLess(idx_probe, idx_restore)
-        self.assertLess(idx_probe, idx_verdict)
+        `gate` is the no-argument capture_gate.py answer -- `true`, `false`
+        or the string `rc1` for exit 1 -- and `probe` the --fresh-held
+        answer: `yes`, `no`, `rc1`, or a token the step does not define.
+        Returns the observables: the exit code, the step output text, the
+        parsed proceed, the tracked capture's content, whether the
+        untracked marker survived, the summary and the hub fetch count.
+        """
+        gate_out = {"true": "true", "false": "false"}.get(gate, "")
+        gate_rc = 1 if gate == "rc1" else 0
+        held_out = {"yes": "yes", "no": "no", "maybe": "maybe"}.get(probe, "")
+        held_rc = 1 if probe == "rc1" else 0
 
-    def test_a_held_hour_drops_every_path_and_exits_green(self):
-        # proceed=false INSIDE the held branch: the force arm and the
-        # hub_stale arm below it never get a vote, and the branch leaves
-        # green before either can run.
-        block = self.held_block()
-        idx_proceed = block.index(
-            'echo "proceed=false" >> "$GITHUB_OUTPUT"')
-        self.assertIn("exit 0", block)
-        self.assertLess(idx_proceed, block.index("exit 0", idx_proceed))
+        repo = tmp / "repo"
+        (repo / "data").mkdir(parents=True)
+        (repo / "out").mkdir()
+        for rel, text in self.HEAD_FILES.items():
+            (repo / rel).write_text(text, encoding="utf-8")
+        git = ["git", "-C", str(repo)]
+        # A fixture's throwaway repo: the commit-identity rule governs OUR
+        # commits, not scratch seeds (the same note the marker conditional
+        # test carries).
+        seed_env = {**os.environ, "GIT_AUTHOR_NAME": "seed",
+                    "GIT_AUTHOR_EMAIL": "seed@example",
+                    "GIT_COMMITTER_NAME": "seed",
+                    "GIT_COMMITTER_EMAIL": "seed@example"}
+        subprocess.run([*git, "init", "-q"], check=True, capture_output=True)
+        subprocess.run([*git, "add", "."], check=True, capture_output=True)
+        subprocess.run([*git, "commit", "-qm", "head"], env=seed_env,
+                       check=True, capture_output=True)
+        # The hour's raw material: the fresh capture, dirty against HEAD,
+        # and fetch_aa.py's window marker -- untracked-but-whitelisted, so
+        # `git checkout -- data/` cannot remove it. Exactly the tree state
+        # a real window hour leaves.
+        (repo / "data" / "aa-raw-models.json").write_text(self.FRESH,
+                                                          encoding="utf-8")
+        (repo / "data" / "cost-breakdown-window.txt").write_text(
+            "3\n", encoding="utf-8")
 
-    def test_a_held_hour_skips_the_hub_fetch_and_its_republish_lines(self):
-        # The hub_stale fetch and its two summary lines would promise a
-        # republish a held hour must not do; the held branch ends before
-        # either runs.
-        block = self.held_block()
-        self.assertNotIn("docs.nitjsefni.eu", block)
-        self.assertNotIn("hub_stale", block)
-        self.assertNotIn("republishing", block)
-        run = flattened(self.raw)
-        idx_held = run.index('if [ "$held" = yes ]; then')
-        self.assertLess(idx_held,
-                        run.index("docs.nitjsefni.eu/d/ai-researcher"))
+        stub = tmp / "bin"
+        stub.mkdir()
+        (stub / "python3").write_text(STUB_PYTHON3, encoding="utf-8")
+        (stub / "curl").write_text(STUB_CURL, encoding="utf-8")
+        for tool in stub.iterdir():
+            tool.chmod(0o755)
 
-    def test_the_held_hour_writes_its_own_summary_and_a_clean_tree(self):
-        # The hour's own truthful line names the hold, PATH-NEUTRAL: an
-        # ordinary held hour is held with no force or hub-stale cause to
-        # name, so the sentence must not assert one. The force override
-        # line is the single keyed exception -- a dispatch that asked for
-        # force must learn from the summary that nothing was rebuilt. The
-        # workspace ends clean (data/ restored on the held path too); the
-        # probe line rides the held path only.
-        block = self.held_block()
-        self.assertIn("### Held", block)
-        self.assertIn("three-generation", block)
-        self.assertIn("last good page stays live", block)
-        self.assertIn("nothing commits or publishes", block)
-        self.assertNotIn("A forced or hub-stale run is held", block)
-        self.assertIn("Force was requested", block)
-        self.assertIn("inputs.force", block)
-        self.assertIn("git checkout -- data/", block)
-        self.assertIn("hold probe:", block)
-        run = flattened(self.raw)
-        self.assertEqual(run.count("hold probe:"), 1)
+        step_ = _workflowrun.step_by_name(
+            WORKFLOW, "refresh", "Did anything move?")
+        # The workflow engine substitutes ${{ }} in run text before a
+        # script exists; the harness plays that part for the expression
+        # the verdict and the quiet line still read inline. The held
+        # branch reads $FORCE from the step env instead.
+        script = step_["run"].replace("${{ inputs.force }}",
+                                      "true" if force else "")
+        env = {
+            "PATH": f"{stub}:{os.environ['PATH']}",
+            "HOME": str(tmp),
+            "CAPTURED": "true",
+            "REF": "refs/heads/main",
+            "FORCE": "true" if force else "",
+            "GITHUB_OUTPUT": str(tmp / "output.txt"),
+            "GITHUB_STEP_SUMMARY": str(tmp / "summary.txt"),
+            "GATE_OUT": gate_out,
+            "GATE_RC": str(gate_rc),
+            "HELD_OUT": held_out,
+            "HELD_RC": str(held_rc),
+            "HUB_SAME": "1" if hub_same else "0",
+            "STUB_CALLS": str(tmp / "curl-calls.txt"),
+        }
+        done = _workflowrun.run_step(repo, dict(step_, run=script), env)
+
+        def read(path: pathlib.Path) -> str:
+            return path.read_text(encoding="utf-8") if path.exists() else ""
+
+        outputs = read(tmp / "output.txt")
+        return {
+            "rc": done.returncode,
+            "outputs": outputs,
+            "proceed": next(
+                (line.split("=", 1)[1]
+                 for line in outputs.splitlines()
+                 if line.startswith("proceed=")),
+                None),
+            "capture": (repo / "data" / "aa-raw-models.json").read_text(
+                encoding="utf-8"),
+            "marker": (repo / "data" / "cost-breakdown-window.txt").exists(),
+            "summary": read(tmp / "summary.txt"),
+            "hub_fetches": read(tmp / "curl-calls.txt").count("\n"),
+            "stderr": done.stderr,
+        }
+
+    def test_a_gate_or_probe_failure_turns_the_step_red(self):
+        # bash -e is the step's whole failure discipline, and no `||` on
+        # either gate or probe line may swallow it: a gate or probe that
+        # exits 1 must end the step red BEFORE any verdict is computed --
+        # every shape here, a forced dispatch included, which is the real
+        # red-path pin: a forced run on a refused (converged, empty-axis)
+        # capture must exit red, never proceed=true. Asserted: exit
+        # nonzero, no proceed output written, the fresh capture left on
+        # disk, the marker with it.
+        for gate in ("rc1", "true", "false"):
+            for probe in ("yes", "no", "rc1"):
+                if gate != "rc1" and probe != "rc1":
+                    continue
+                for force in (False, True):
+                    for hub_same in (True, False):
+                        with self.subTest(gate=gate, probe=probe,
+                                          force=force, hub_same=hub_same):
+                            with tempfile.TemporaryDirectory(
+                                    prefix=".hold-probe-") as raw:
+                                hour = self._run_hour(
+                                    pathlib.Path(raw), gate=gate, probe=probe,
+                                    force=force, hub_same=hub_same)
+                            self.assertNotEqual(hour["rc"], 0, hour["stderr"])
+                            self.assertNotIn("proceed=", hour["outputs"])
+                            self.assertEqual(hour["capture"], self.FRESH)
+                            self.assertTrue(hour["marker"])
+
+    def test_a_held_probe_drops_every_path_to_proceed_false(self):
+        # probe=yes is the hold on every other axis: even a gate that saw
+        # the capture MOVE, a forced dispatch and a stale hub all drop to
+        # proceed=false, green. The tracked capture is restored to HEAD;
+        # the fresh untracked window marker is left on disk -- inert,
+        # because a held hour stages no payload -- which is the honest
+        # tree state the old structural pin misdescribed as a clean tree;
+        # the summary names the hold; and the hub fetch never runs: the
+        # held branch exits before the live-page check could.
+        for gate in ("true", "false"):
+            for force in (False, True):
+                for hub_same in (True, False):
+                    with self.subTest(gate=gate, force=force,
+                                      hub_same=hub_same):
+                        with tempfile.TemporaryDirectory(
+                                prefix=".hold-probe-") as raw:
+                            hour = self._run_hour(
+                                pathlib.Path(raw), gate=gate, probe="yes",
+                                force=force, hub_same=hub_same)
+                        self.assertEqual(hour["rc"], 0, hour["stderr"])
+                        self.assertEqual(hour["proceed"], "false")
+                        self.assertEqual(hour["capture"], "head\n")
+                        self.assertTrue(hour["marker"])
+                        self.assertIn("### Held", hour["summary"])
+                        self.assertEqual(hour["hub_fetches"], 0)
+
+    def test_a_not_held_probe_leaves_the_hour_to_its_verdict(self):
+        # probe=no on a healthy capture: the hour's answer is the verdict's
+        # alone. Moved (gate true) proceeds whatever the dispatch asked;
+        # unchanged + force proceeds (the build-only rebuild, its capture
+        # restored); unchanged + stale hub proceeds (the republish hour);
+        # unchanged + current hub stays quiet. The hub fetch runs exactly
+        # on the unchanged, unforced shape.
+        for gate in ("true", "false"):
+            for force in (False, True):
+                for hub_same in (True, False):
+                    with self.subTest(gate=gate, force=force,
+                                      hub_same=hub_same):
+                        with tempfile.TemporaryDirectory(
+                                prefix=".hold-probe-") as raw:
+                            hour = self._run_hour(
+                                pathlib.Path(raw), gate=gate, probe="no",
+                                force=force, hub_same=hub_same)
+                        self.assertEqual(hour["rc"], 0, hour["stderr"])
+                        if gate == "true":
+                            proceed, fetches, capture = "true", 0, self.FRESH
+                        elif force:
+                            proceed, fetches, capture = "true", 0, "head\n"
+                        elif not hub_same:
+                            proceed, fetches, capture = "true", 1, "head\n"
+                        else:
+                            proceed, fetches, capture = "false", 1, "head\n"
+                        self.assertEqual(hour["proceed"], proceed)
+                        self.assertEqual(hour["hub_fetches"], fetches)
+                        self.assertEqual(hour["capture"], capture)
+                        self.assertTrue(hour["marker"])
+
+    def test_an_undefined_probe_token_is_red_never_a_fall_through(self):
+        # The `case` guard: the probe's stdout is the step's verdict, and a
+        # token outside {yes, no} -- a swallowed failure's empty answer, a
+        # half-written one, a typo'd word in the script itself -- is a
+        # broken probe, red under bash -e, never a silent fall through to
+        # the verdict.
+        for force in (False, True):
+            for hub_same in (True, False):
+                with self.subTest(force=force, hub_same=hub_same):
+                    with tempfile.TemporaryDirectory(
+                            prefix=".hold-probe-") as raw:
+                        hour = self._run_hour(
+                            pathlib.Path(raw), gate="false", probe="maybe",
+                            force=force, hub_same=hub_same)
+                    self.assertNotEqual(hour["rc"], 0, hour["stderr"])
+                    self.assertNotIn("proceed=", hour["outputs"])
+                    self.assertEqual(hour["capture"], self.FRESH)
+
+
+STUB_PYTHON3 = """\
+#!/bin/bash
+# The test double for python3 inside the "Did anything move?" step: the
+# no-argument call is the rendered gate, --fresh-held the hold probe, each
+# answering from its fixture variable.
+if [ "$2" = "--fresh-held" ]; then
+  printf '%s\\n' "$HELD_OUT"
+  exit "$HELD_RC"
+fi
+printf '%s\\n' "$GATE_OUT"
+exit "$GATE_RC"
+"""
+
+STUB_CURL = """\
+#!/bin/bash
+# The test double for the hub's live-page fetch: writes HEAD's page when
+# HUB_SAME=1 and a stale page otherwise, recording every invocation.
+while [ $# -gt 0 ]; do
+  if [ "$1" = "-o" ]; then
+    shift
+    if [ "$HUB_SAME" = 1 ]; then printf 'page\\n' > "$1"; else printf 'old\\n' > "$1"; fi
+    printf '%s\\n' "$1" >> "$STUB_CALLS"
+  fi
+  shift
+done
+exit 0
+"""
 
 
 class CaptureStepTests(unittest.TestCase):

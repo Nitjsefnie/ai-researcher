@@ -42,8 +42,10 @@ evidence the hold mandates. `yes` (held) or `no` (a page built) on stdout,
 exit 0 both ways; a refused capture (build's SystemExit), a missing fresh
 capture, or anything unexpected is broken, not held -- exit 1, the reason on
 stderr, the refresh run turns red. The workflow runs this probe before its
-proceed verdict, so a forced or hub-stale run is held like an ordinary one
-while a converged hour with an emptied axis stays red.
+proceed verdict, so a forced or hub-stale run is held like an ordinary one.
+The converged hour with an emptied axis is NOT the probe's to answer: the
+no-argument gate refuses it (exit 1) earlier in the same step, and that
+refusal -- not the probe -- is the designed red for that shape.
 """
 from __future__ import annotations
 
