@@ -23,7 +23,7 @@ under the threshold -- and they cannot lag further, because each hour
 compares against the last committed value, so a sustained crawl crosses
 the threshold cumulatively and commits.
 
-Exit codes:
+Exit codes (the gate, run with no argument):
   0   an answer was reached: stdout carries `true` (moved) or `false`.
   1   broken, not unchanged: a fresh capture file is missing, or the build
       failed. The refresh run turns red -- a broken capture is the designed
@@ -32,6 +32,18 @@ No capture at HEAD (the first capture ever) is NOT broken: it fails OPEN,
 printing `true`, so the first run publishes instead of skipping forever.
 A held page (issue #232) is not broken either: it answers `false` (unchanged)
 on stdout with the reason on stderr -- still exit 0, still one word of stdout.
+
+One second mode, the hold probe (`--fresh-held`, issue #236): answers whether
+the FRESH capture is in the #232 hold state -- `build.WindowHold` raised by a
+render of the fresh side alone. That exception fires only on the #232
+predicate (the marker records >= 3 generations in-run AND the emptied axes
+are a subset of {agentic, parameters}), so the answer keys on exactly the
+evidence the hold mandates. `yes` (held) or `no` (a page built) on stdout,
+exit 0 both ways; a refused capture (build's SystemExit), a missing fresh
+capture, or anything unexpected is broken, not held -- exit 1, the reason on
+stderr, the refresh run turns red. The workflow runs this probe before its
+proceed verdict, so a forced or hub-stale run is held like an ordinary one
+while a converged hour with an emptied axis stays red.
 """
 from __future__ import annotations
 
@@ -348,6 +360,74 @@ def mask_digest(page: str) -> str:
         lambda m: m.group(1) + MASKED_DIGEST + m.group(2), page)
 
 
+# --- the hold probe (issue #236) ---------------------------------------------
+
+
+def fresh_held() -> bool:
+    """Whether the FRESH capture is in the #232 hold state.
+
+    The probe renders the fresh side alone -- no HEAD side, no comparison,
+    no speed reconciliation, none of which can move the empty-axis
+    predicate the hold turns on -- and answers from the typed exception:
+    `build.WindowHold` is raised only on the #232 predicate, so "held"
+    keys on exactly the evidence the hold mandates, never on output
+    message text and never on which refresh path asked. A page built is
+    "not held", whatever else the hour goes on to decide. The fresh reads
+    are the same factored ones the gate uses, so a test stays hermetic on
+    the same two patches.
+    """
+    fresh = read_fresh_captures()
+    marker = read_fresh_window_marker()
+    with tempfile.TemporaryDirectory(prefix=".capture-gate-probe-",
+                                     dir=build.ROOT) as tmp:
+        try:
+            _render_side(pathlib.Path(tmp) / "fresh", fresh, marker)
+        except build.WindowHold:
+            return True
+    return False
+
+
+def held_main() -> int:
+    """The --fresh-held CLI: one word on stdout, exit 0; broken is exit 1.
+
+    `yes` = held, `no` = a page built. A refused capture (build's
+    SystemExit) and a missing fresh capture (FreshCaptureError) are the
+    named breakages; anything unexpected gets the traceback appended, so
+    the next occurrence names its site the way main()'s broad catch does
+    (issue #146). Every broken shape exits 1 with the reason on stderr and
+    no answer on stdout -- still the designed red, never a hold.
+    """
+    try:
+        held = fresh_held()
+    except (FreshCaptureError, SystemExit) as exc:
+        print(f"capture-gate: --fresh-held: broken, not held: {exc}",
+              file=sys.stderr)
+        return 1
+    except Exception as exc:  # pylint: disable=broad-exception-caught
+        detail = str(exc) + "\n" + traceback.format_exc()
+        print(f"capture-gate: --fresh-held: broken, not held ({detail})",
+              file=sys.stderr)
+        return 1
+    print("yes" if held else "no")
+    return 0
+
+
+def cli(argv: list[str]) -> int:
+    """The command line: no argument runs the gate, --fresh-held the probe.
+
+    Anything else is refused: the gate's one word of stdout is the
+    workflow's verdict, so an unparseable invocation must never fall
+    through to an answer.
+    """
+    if argv == ["--fresh-held"]:
+        return held_main()
+    if argv:
+        print(f"capture-gate: unknown argument(s) {' '.join(argv)} -- "
+              "expected no argument or exactly --fresh-held", file=sys.stderr)
+        return 2
+    return main()
+
+
 # --- the gate ----------------------------------------------------------------
 
 
@@ -394,4 +474,4 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    sys.exit(cli(sys.argv[1:]))

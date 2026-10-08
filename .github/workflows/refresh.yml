@@ -293,6 +293,31 @@ jobs:
           # ever) fails OPEN as changed, so the first run publishes.
           changed="$(python3 scripts/capture_gate.py)"
           echo "changed=$changed" >> "$GITHUB_OUTPUT"
+          # THE HOLD PROBE (issue #236). A forced or hub-stale run must be
+          # held by a three-generation window hour exactly as an ordinary
+          # one is, so the hold is decided here -- before the verdict below
+          # could set proceed=true on its force or hub_stale arm, and while
+          # the fresh captures are still on disk. The probe answers from
+          # build.WindowHold, which build.py raises only on the #232
+          # predicate (>= 3 generations in-run, emptied axes within agentic
+          # and parameters), so a held hour drops proceed to false on EVERY
+          # path: the last good page stays live, and nothing commits or
+          # publishes. A refused capture -- a converged (one or two
+          # generation) hour with an emptied axis among them -- exits 1 and
+          # fails this step under bash -e: still the designed red, never a
+          # hold.
+          held="$(python3 scripts/capture_gate.py --fresh-held)"
+          if [ "$held" = yes ]; then
+            echo "hold probe: the fresh capture holds the page -- dropping the hour"
+            {
+              echo '### Held: three-generation AA window'
+              echo
+              echo 'A forced or hub-stale run is held like an ordinary hour: the last good page stays live, and nothing commits or publishes.'
+            } >> "$GITHUB_STEP_SUMMARY"
+            git checkout -- data/
+            echo "proceed=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
           if [ "$changed" = false ]; then
             # The fresh captures render identically to HEAD's, so restore the
             # whole directory, not only the stamp: leaving either capture in
