@@ -1246,6 +1246,32 @@ class WindowHoldTests(unittest.TestCase):
             self.assertIn("Empty during a two-generation window",
                           output.read_text(encoding="utf-8"))
 
+    def test_a_counted_marker_with_a_fully_measured_capture_still_builds(self):
+        # Kills the missing-conjunct mutant of the hold predicate (issue
+        # #234): deleting `empty and ` from the elif leaves
+        # set([]) <= {"agentic", "parameters"} vacuously true, so a FULLY
+        # measured capture beside a >= 3-generation marker would hold instead
+        # of building -- this row is what goes red under that mutant.
+        # Mirrors EmptyAxisGuardTests' stale-marker control at a counted
+        # marker: the healthy pair builds, all four axes nonzero, no window
+        # flag, no note on the page.
+        with self.capture([model_fixture()], [agent_fixture()]) as output:
+            (output.parent / "cost-breakdown-window.txt").write_text(
+                "every cost breakdown dropped as another generation's: "
+                "185 model(s), first apodex-1-1; 3 generation(s) observed "
+                "in-run\n", encoding="utf-8")
+            self.run_build()
+
+            self.assertTrue(output.exists(), "hold swallowed a healthy hour")
+            stats = self.payload_of(output)["stats"]
+            self.assertEqual(
+                stats["metricCounts"],
+                {"coding": 1, "intelligence": 1, "agentic": 1})
+            self.assertEqual(stats["parameterCount"], 1)
+            self.assertNotIn("costBreakdownWindow", stats)
+            self.assertNotIn("Empty during a two-generation window",
+                             output.read_text(encoding="utf-8"))
+
     def run_cli_with_corner(self) -> tuple[subprocess.CompletedProcess,
                                            pathlib.Path]:
         """The real command line over a corner capture, driven the way
