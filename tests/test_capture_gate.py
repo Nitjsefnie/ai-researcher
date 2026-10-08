@@ -587,6 +587,10 @@ WINDOW_MARKER = ("every cost breakdown dropped as another generation's: "
                  "185 model(s), first apodex-1-1; 3 generation(s) observed "
                  "in-run\n").encode("utf-8")
 
+CONVERGED_WINDOW_MARKER = ("every cost breakdown dropped as another "
+                           "generation's: 185 model(s), first apodex-1-1; "
+                           "2 generation(s) observed in-run\n").encode("utf-8")
+
 
 class WindowMarkerStagingTests(unittest.TestCase):
     """Issue #227: the marker staged into the temp data dirs is what makes
@@ -596,12 +600,15 @@ class WindowMarkerStagingTests(unittest.TestCase):
     marker (HEAD's from git, the hour's from data/), because a committed
     window hour must rebuild its published note-page on the old side too."""
 
-    def test_the_corner_refusal_names_the_window_through_the_gate(self):
-        # Run 37691148949's failure, pinned at the gate: HEAD healthy, the
-        # fresh capture in the three-generation corner, the hour's marker
-        # recorded -- the refusal stays nonzero but names the window, and
-        # never blames a shape change.
+    def test_the_corner_holds_through_the_gate(self):
+        # Issue #232, run 37691148949's state pinned at the gate: HEAD
+        # healthy, the fresh capture in the three-generation corner, the
+        # hour's marker recorded -- the build holds the page, the gate
+        # answers false (unchanged) with the hold's reason on stderr, and
+        # the refusal's nonzero exit is gone: the last good page stays
+        # live and nothing commits.
         err = io.StringIO()
+        out = io.StringIO()
         with head_serving(REAL_MODELS, REAL_AGENTS), \
              mock.patch.object(capture_gate, "read_head_window_marker",
                                return_value=None), \
@@ -610,12 +617,55 @@ class WindowMarkerStagingTests(unittest.TestCase):
                                              REAL_AGENTS)), \
              mock.patch.object(capture_gate, "read_fresh_window_marker",
                                return_value=WINDOW_MARKER), \
+             contextlib.redirect_stderr(err), \
+             contextlib.redirect_stdout(out):
+            code = capture_gate.main()
+
+        self.assertEqual(code, 0)
+        self.assertEqual(out.getvalue(), "false\n")
+        self.assertIn("unchanged", err.getvalue())
+        self.assertIn("3 generation(s) observed in-run", err.getvalue())
+        self.assertNotIn("changed shape", err.getvalue())
+
+    def test_a_converged_parameters_empty_hour_stays_red_through_the_gate(self):
+        # The gate must not start swallowing converged hours: the SAME
+        # corner capture with a 2-generation marker still refuses (the
+        # count is below the hold's threshold), and the gate relays that
+        # refusal as broken-red exactly as before -- the paired mutation
+        # check to the build-side test above.
+        err = io.StringIO()
+        with head_serving(REAL_MODELS, REAL_AGENTS), \
+             mock.patch.object(capture_gate, "read_head_window_marker",
+                               return_value=None), \
+             mock.patch.object(capture_gate, "read_fresh_captures",
+                               return_value=(corner_capture(REAL_MODELS),
+                                             REAL_AGENTS)), \
+             mock.patch.object(capture_gate, "read_fresh_window_marker",
+                               return_value=CONVERGED_WINDOW_MARKER), \
              contextlib.redirect_stderr(err):
             code = capture_gate.main()
 
         self.assertEqual(code, 1)
-        self.assertIn("3 generation(s) observed in-run", err.getvalue())
-        self.assertNotIn("changed shape", err.getvalue())
+        self.assertIn("2 generation(s) observed in-run", err.getvalue())
+        self.assertIn("the capture broke the build", err.getvalue())
+
+    def test_a_held_page_at_HEAD_is_red_not_unchanged(self):
+        # The typed exception is a FRESH-side answer only: an old-side
+        # build.WindowHold propagates unwrapped and fails loudly -- HEAD
+        # never carries a corner marker under this design, so that state is
+        # unexpected and must never read as "unchanged".
+        err = io.StringIO()
+        with head_serving(corner_capture(REAL_MODELS), REAL_AGENTS), \
+             mock.patch.object(capture_gate, "read_head_window_marker",
+                               return_value=WINDOW_MARKER), \
+             mock.patch.object(capture_gate, "read_fresh_captures",
+                               return_value=(REAL_MODELS, REAL_AGENTS)), \
+             mock.patch.object(capture_gate, "read_fresh_window_marker",
+                               return_value=None), \
+             contextlib.redirect_stderr(err):
+            code = capture_gate.main()
+
+        self.assertEqual(code, 1)
 
     def test_no_marker_staged_the_shape_change_wording_stands(self):
         # The wording split itself: the same corner capture with NO marker

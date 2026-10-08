@@ -183,14 +183,17 @@ leaderboard looks against each other (maintainer ruling, 2026-10-06, issue
 #208). Route against route, #200 stands unchanged. A disputed capture is an
 ordinary hour: the run never exits red, the page renders both values red with
 the pair order canonical, and the scheduled commit's body carries the differ's
-Disputes section — the one red hour a dispute can still produce is the
-three-generation corner (the looks disagree AND the detail route matches
-neither fingerprint): the detail route then fills nothing, the parameter
-count is absent everywhere, and the parameters axis empties into `build.py`'s
-empty-axis guard. That nonzero exit is the designed go-re-read-AA-by-hand
-signal, not a dispute-layer failure. A window hour is not that corner: the
-`data/cost-breakdown-window.txt` marker covers the agentic axis only, and the
-parameters-axis corner stays red. Without the cross-run look-back, a
+Disputes section — The three-generation corner (the looks disagree AND the
+detail route matches neither fingerprint) is the one state a dispute can
+still produce that builds no page: the detail route fills nothing, the
+parameter count is absent everywhere, and the parameters axis empties beside
+the agentic one. That corner holds the page rather than exiting red — the
+window marker records ≥ 3 generations observed in-run, the emptied axes are
+only the window-droppable ones (agentic, parameters), so `build.py` raises
+instead of writing, the gate reports the hour unchanged, the last good page
+stays live, and nothing commits or publishes until the routes converge. Any
+other emptied axis still refuses — the go-re-read-AA-by-hand signal for a
+real shape change. Without the cross-run look-back, a
 run whose looks agree writes no `genVariants` key anywhere and is
 byte-identical to the single-generation capture; with it, the same holds
 exactly when the two slug sets agree, and a caught flip writes the
@@ -277,10 +280,14 @@ the refresh red.
 
 `build.py` additionally refuses to write a page where a rendered axis has no
 rows, so an emptied chart is a build failure rather than a published blank.
-One exemption: an all-dropped two-generation window hour (marked by
+Two exemptions. An all-dropped two-generation window hour (marked by
 `data/cost-breakdown-window.txt`, written by `fetch_aa.py`) publishes with
-the agentic axis empty and a named on-page note; every other empty axis
-remains a refusal.
+the agentic axis empty and a named on-page note. A three-generation window
+hour — the marker records ≥ 3 generations observed in-run — empties agentic
+and parameters together and builds no page at all: the build holds, the hour
+reports unchanged, the last good page stays live, and nothing commits or
+publishes until the routes converge. Every other empty axis remains a
+refusal.
 
 Never hand-edit either capture; both are captured artifacts.
 
