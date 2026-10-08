@@ -322,8 +322,11 @@ def build_page_pair(head: tuple[bytes, bytes],
     to the last committed value (or a structural change) stays and differs.
 
     Returns the two pages UNMASKED, in that order; the caller applies the
-    digest mask before comparing. Raises whatever the build raises (SystemExit
-    for a capture build.py refuses) -- a build failure is red, not "changed".
+    digest mask before comparing. The fresh side raising build.WindowHold is
+    re-raised as FreshWindowHold and the hour answers unchanged (false,
+    exit 0); any other build failure -- a SystemExit for a capture build.py
+    refuses, an unexpected crash, or an old-side WindowHold propagating
+    unwrapped -- is red, not "changed".
     """
     fresh = reconcile_speed(head, fresh)
     head_marker = read_head_window_marker()
