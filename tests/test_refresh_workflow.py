@@ -682,7 +682,7 @@ class ExecutedHoldProbeTests(unittest.TestCase):
                 "the step is a POSIX script; the Windows cells skip its "
                 "execution")
 
-    def _run_hour(self, tmp: pathlib.Path, *, gate, probe, force, hub_same):
+    def _run_hour(self, tmp: pathlib.Path, *, gate, probe, force, hub):
         """Seed one scratch repo at HEAD, dirty it with the fresh capture
         and the untracked window marker, install the python3/curl doubles,
         and run the real run block.
@@ -690,9 +690,12 @@ class ExecutedHoldProbeTests(unittest.TestCase):
         `gate` is the no-argument capture_gate.py answer -- `true`, `false`
         or the string `rc1` for exit 1 -- and `probe` the --fresh-held
         answer: `yes`, `no`, `rc1`, or a token the step does not define.
-        Returns the observables: the exit code, the step output text, the
-        parsed proceed, the tracked capture's content, whether the
-        untracked marker survived, the summary and the hub fetch count.
+        `hub` drives the live-page fetch double: `same` (the hub serves
+        HEAD's page), `stale` (it serves a stale one) or `fail` (the fetch
+        itself fails). Returns the observables: the exit code, the step
+        output text, the parsed proceed, the tracked capture's content,
+        whether the untracked marker survived, the summary, the log the
+        step wrote and the hub fetch count.
         """
         gate_out = {"true": "true", "false": "false"}.get(gate, "")
         gate_rc = 1 if gate == "rc1" else 0
@@ -752,7 +755,7 @@ class ExecutedHoldProbeTests(unittest.TestCase):
             "GATE_RC": str(gate_rc),
             "HELD_OUT": held_out,
             "HELD_RC": str(held_rc),
-            "HUB_SAME": "1" if hub_same else "0",
+            "HUB_SAME": {"same": "1", "stale": "0", "fail": "fail"}[hub],
             "STUB_CALLS": str(tmp / "curl-calls.txt"),
         }
         done = _workflowrun.run_step(repo, dict(step_, run=script), env)
@@ -773,6 +776,7 @@ class ExecutedHoldProbeTests(unittest.TestCase):
                 encoding="utf-8"),
             "marker": (repo / "data" / "cost-breakdown-window.txt").exists(),
             "summary": read(tmp / "summary.txt"),
+            "stdout": done.stdout,
             "hub_fetches": read(tmp / "curl-calls.txt").count("\n"),
             "stderr": done.stderr,
         }
@@ -791,14 +795,14 @@ class ExecutedHoldProbeTests(unittest.TestCase):
                 if gate != "rc1" and probe != "rc1":
                     continue
                 for force in (False, True):
-                    for hub_same in (True, False):
+                    for hub in ("same", "stale"):
                         with self.subTest(gate=gate, probe=probe,
-                                          force=force, hub_same=hub_same):
+                                          force=force, hub=hub):
                             with tempfile.TemporaryDirectory(
                                     prefix=".hold-probe-") as raw:
                                 hour = self._run_hour(
                                     pathlib.Path(raw), gate=gate, probe=probe,
-                                    force=force, hub_same=hub_same)
+                                    force=force, hub=hub)
                             self.assertNotEqual(hour["rc"], 0, hour["stderr"])
                             self.assertNotIn("proceed=", hour["outputs"])
                             self.assertEqual(hour["capture"], self.FRESH)
@@ -811,51 +815,63 @@ class ExecutedHoldProbeTests(unittest.TestCase):
         # the fresh untracked window marker is left on disk -- inert,
         # because a held hour stages no payload -- which is the honest
         # tree state the old structural pin misdescribed as a clean tree;
-        # the summary names the hold; and the hub fetch never runs: the
-        # held branch exits before the live-page check could.
+        # and the hub fetch never runs: the held branch exits before the
+        # live-page check could. The summary carries the pins the old
+        # structural class owned and the first executed draft dropped:
+        # the hold is named; a dispatch that asked for force learns from
+        # its override line that nothing was rebuilt; the ordinary held
+        # hour stays PATH-NEUTRAL -- it names no cause it does not have
+        # (the round-1 minor a716d08 fixed, here pinned by execution); and
+        # the log line prints exactly once.
         for gate in ("true", "false"):
             for force in (False, True):
-                for hub_same in (True, False):
-                    with self.subTest(gate=gate, force=force,
-                                      hub_same=hub_same):
+                for hub in ("same", "stale"):
+                    with self.subTest(gate=gate, force=force, hub=hub):
                         with tempfile.TemporaryDirectory(
                                 prefix=".hold-probe-") as raw:
                             hour = self._run_hour(
                                 pathlib.Path(raw), gate=gate, probe="yes",
-                                force=force, hub_same=hub_same)
+                                force=force, hub=hub)
                         self.assertEqual(hour["rc"], 0, hour["stderr"])
                         self.assertEqual(hour["proceed"], "false")
                         self.assertEqual(hour["capture"], "head\n")
                         self.assertTrue(hour["marker"])
                         self.assertIn("### Held", hour["summary"])
+                        if force:
+                            self.assertIn("Force was requested",
+                                          hour["summary"])
+                        else:
+                            self.assertNotIn("forced", hour["summary"])
+                        self.assertEqual(hour["stdout"].count("hold probe:"),
+                                         1)
                         self.assertEqual(hour["hub_fetches"], 0)
 
     def test_a_not_held_probe_leaves_the_hour_to_its_verdict(self):
         # probe=no on a healthy capture: the hour's answer is the verdict's
         # alone. Moved (gate true) proceeds whatever the dispatch asked;
         # unchanged + force proceeds (the build-only rebuild, its capture
-        # restored); unchanged + stale hub proceeds (the republish hour);
+        # restored); unchanged + a stale hub OR a failed live-page fetch
+        # proceeds (the republish hour -- both causes set hub_stale);
         # unchanged + current hub stays quiet. The hub fetch runs exactly
         # on the unchanged, unforced shape.
         for gate in ("true", "false"):
             for force in (False, True):
-                for hub_same in (True, False):
-                    with self.subTest(gate=gate, force=force,
-                                      hub_same=hub_same):
+                for hub in ("same", "stale", "fail"):
+                    with self.subTest(gate=gate, force=force, hub=hub):
                         with tempfile.TemporaryDirectory(
                                 prefix=".hold-probe-") as raw:
                             hour = self._run_hour(
                                 pathlib.Path(raw), gate=gate, probe="no",
-                                force=force, hub_same=hub_same)
+                                force=force, hub=hub)
                         self.assertEqual(hour["rc"], 0, hour["stderr"])
                         if gate == "true":
                             proceed, fetches, capture = "true", 0, self.FRESH
                         elif force:
                             proceed, fetches, capture = "true", 0, "head\n"
-                        elif not hub_same:
-                            proceed, fetches, capture = "true", 1, "head\n"
-                        else:
+                        elif hub == "same":
                             proceed, fetches, capture = "false", 1, "head\n"
+                        else:
+                            proceed, fetches, capture = "true", 1, "head\n"
                         self.assertEqual(hour["proceed"], proceed)
                         self.assertEqual(hour["hub_fetches"], fetches)
                         self.assertEqual(hour["capture"], capture)
@@ -868,13 +884,13 @@ class ExecutedHoldProbeTests(unittest.TestCase):
         # broken probe, red under bash -e, never a silent fall through to
         # the verdict.
         for force in (False, True):
-            for hub_same in (True, False):
-                with self.subTest(force=force, hub_same=hub_same):
+            for hub in ("same", "stale"):
+                with self.subTest(force=force, hub=hub):
                     with tempfile.TemporaryDirectory(
                             prefix=".hold-probe-") as raw:
                         hour = self._run_hour(
                             pathlib.Path(raw), gate="false", probe="maybe",
-                            force=force, hub_same=hub_same)
+                            force=force, hub=hub)
                     self.assertNotEqual(hour["rc"], 0, hour["stderr"])
                     self.assertNotIn("proceed=", hour["outputs"])
                     self.assertEqual(hour["capture"], self.FRESH)
@@ -896,12 +912,15 @@ exit "$GATE_RC"
 STUB_CURL = """\
 #!/bin/bash
 # The test double for the hub's live-page fetch: writes HEAD's page when
-# HUB_SAME=1 and a stale page otherwise, recording every invocation.
+# HUB_SAME=1, a stale page when HUB_SAME=0, and a failed fetch when
+# HUB_SAME=fail -- the step's else hub_stale=true arm. Every invocation
+# is recorded, the failed ones included.
 while [ $# -gt 0 ]; do
   if [ "$1" = "-o" ]; then
     shift
-    if [ "$HUB_SAME" = 1 ]; then printf 'page\\n' > "$1"; else printf 'old\\n' > "$1"; fi
     printf '%s\\n' "$1" >> "$STUB_CALLS"
+    if [ "$HUB_SAME" = fail ]; then exit 1; fi
+    if [ "$HUB_SAME" = 1 ]; then printf 'page\\n' > "$1"; else printf 'old\\n' > "$1"; fi
   fi
   shift
 done
