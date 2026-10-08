@@ -1010,6 +1010,113 @@ class EmptyAxisGuardTests(unittest.TestCase):
             self.assertIn("parameters", message)
             self.assertFalse(output.exists(), "refusal still wrote the page")
 
+    def test_a_countless_window_marker_names_the_window_generically(self):
+        # A marker written by an older fetch_aa.py carries no generation
+        # count (this repo shipped those before #223). The refusal still
+        # names the window -- generically -- and still never blames a shape
+        # change.
+        corner = model_fixture(gdpval=None)
+        del corner["parameters"]
+        with self.capture([corner], [agent_fixture()]) as output:
+            (output.parent / "cost-breakdown-window.txt").write_text(
+                "every cost breakdown dropped as another generation's: "
+                "1 model(s), first fixture-model\n", encoding="utf-8")
+            with self.assertRaises(SystemExit) as raised:
+                self.run_build()
+
+            message = str(raised.exception)
+            self.assertIn("records a cross-generation AA window", message)
+            self.assertIn("the marker carries no generation count", message)
+            self.assertNotIn("changed shape", message)
+            self.assertFalse(output.exists(), "refusal still wrote the page")
+
+    def test_a_stale_marker_with_a_healthy_capture_renders_no_note(self):
+        # The flag rides the payload only when the page is actually IN the
+        # window state -- agentic empty -- so a marker that outlived its hour
+        # beside a healthy capture renders no note and sets no flag.
+        with self.capture([model_fixture()], [agent_fixture()]) as output:
+            (output.parent / "cost-breakdown-window.txt").write_text(
+                "every cost breakdown dropped as another generation's: "
+                "1 model(s), first fixture-model\n", encoding="utf-8")
+            self.run_build()
+
+            stats = self.payload_of(output)["stats"]
+            self.assertNotIn("costBreakdownWindow", stats)
+            self.assertNotIn("Empty during a two-generation window",
+                             output.read_text(encoding="utf-8"))
+
+    def test_a_fully_measured_capture_builds_and_names_all_four_axes_nonzero(self):
+        # The healthy control: the guard enumerates the same stats the page
+        # renders, so a fully measured capture must build -- and its payload
+        # must show every rendered axis nonzero, the exact numbers the guard
+        # reads. (One model row carrying intelligence + gdpval + parameters,
+        # one agent row carrying the coding pair.) A healthy page carries no
+        # window note: the note is a build-time conditional, not page chrome.
+        with self.capture([model_fixture()], [agent_fixture()]) as output:
+            self.run_build()
+
+            stats = self.payload_of(output)["stats"]
+            self.assertEqual(
+                stats["metricCounts"], {"coding": 1, "intelligence": 1, "agentic": 1})
+            self.assertEqual(stats["parameterCount"], 1)
+            self.assertNotIn("Empty during a two-generation window",
+                             output.read_text(encoding="utf-8"))
+
+
+class WindowHoldTests(unittest.TestCase):
+    """Issue #232: the three-generation corner holds the page instead of
+    failing red.
+
+    The hold predicate and its evidence: the window marker records >= 3
+    generations observed in-run AND the emptied axes are only the
+    window-droppable ones (agentic, parameters). One row per direction of
+    that conjunction -- the 2/3 boundary pair, a 4-generation marker still
+    holds, a non-droppable axis still refuses -- plus the #217 precedence
+    pin at a counted marker, and the real command line proving the typed
+    exception never escapes the wrapper as a traceback.
+    """
+
+    # The stamp fetch_aa.py writes, so a refusal below can only come from the
+    # axis guard and not from the stamp guard that runs ahead of it.
+    STAMP = "2026-09-29\n"
+
+    @contextlib.contextmanager
+    def capture(self, models, agents):
+        """A hermetic capture of the given model/agent records.
+
+        Yields the output path inside the live temp directory (so a refusal
+        test can assert nothing was written to it) and restores the module
+        paths in `finally`, the same redirection convention the stamp and
+        escaping tests use.
+        """
+        with tempfile.TemporaryDirectory(prefix=".issue-54-build-", dir=build.ROOT) as tmp:
+            root = pathlib.Path(tmp)
+            raw = root / "aa-raw-models.json"
+            agents_raw = root / "aa-raw-coding-agents.json"
+            output = root / "frontier-models.html"
+            raw.write_text(json.dumps(models), encoding="utf-8")
+            agents_raw.write_text(json.dumps(agents), encoding="utf-8")
+            (root / "captured-at.txt").write_text(self.STAMP, encoding="utf-8")
+            old_raw, old_agents, old_out = build.RAW, build.AGENTS_RAW, build.OUT
+            try:
+                build.RAW, build.AGENTS_RAW, build.OUT = raw, agents_raw, output
+                yield output
+            finally:
+                build.RAW, build.AGENTS_RAW, build.OUT = old_raw, old_agents, old_out
+
+    @staticmethod
+    def run_build():
+        with contextlib.redirect_stdout(io.StringIO()):
+            build.main()
+
+    @staticmethod
+    def payload_of(output: pathlib.Path) -> dict:
+        html = output.read_text(encoding="utf-8")
+        marker = "const DATA = "
+        start = html.index(marker) + len(marker)
+        end = html.index(";\n(function(){", start)
+        return json.loads(html[start:end])
+
     def test_the_three_generation_corner_holds_the_page(self):
         # Issue #232: the designed three-generation corner (the looks
         # disagree AND the detail route matches neither fingerprint) empties
@@ -1197,58 +1304,6 @@ class EmptyAxisGuardTests(unittest.TestCase):
         self.assertFalse(
             (root / "out" / "frontier-models.html").exists(),
             "the held hour still wrote a page")
-
-    def test_a_countless_window_marker_names_the_window_generically(self):
-        # A marker written by an older fetch_aa.py carries no generation
-        # count (this repo shipped those before #223). The refusal still
-        # names the window -- generically -- and still never blames a shape
-        # change.
-        corner = model_fixture(gdpval=None)
-        del corner["parameters"]
-        with self.capture([corner], [agent_fixture()]) as output:
-            (output.parent / "cost-breakdown-window.txt").write_text(
-                "every cost breakdown dropped as another generation's: "
-                "1 model(s), first fixture-model\n", encoding="utf-8")
-            with self.assertRaises(SystemExit) as raised:
-                self.run_build()
-
-            message = str(raised.exception)
-            self.assertIn("records a cross-generation AA window", message)
-            self.assertIn("the marker carries no generation count", message)
-            self.assertNotIn("changed shape", message)
-            self.assertFalse(output.exists(), "refusal still wrote the page")
-
-    def test_a_stale_marker_with_a_healthy_capture_renders_no_note(self):
-        # The flag rides the payload only when the page is actually IN the
-        # window state -- agentic empty -- so a marker that outlived its hour
-        # beside a healthy capture renders no note and sets no flag.
-        with self.capture([model_fixture()], [agent_fixture()]) as output:
-            (output.parent / "cost-breakdown-window.txt").write_text(
-                "every cost breakdown dropped as another generation's: "
-                "1 model(s), first fixture-model\n", encoding="utf-8")
-            self.run_build()
-
-            stats = self.payload_of(output)["stats"]
-            self.assertNotIn("costBreakdownWindow", stats)
-            self.assertNotIn("Empty during a two-generation window",
-                             output.read_text(encoding="utf-8"))
-
-    def test_a_fully_measured_capture_builds_and_names_all_four_axes_nonzero(self):
-        # The healthy control: the guard enumerates the same stats the page
-        # renders, so a fully measured capture must build -- and its payload
-        # must show every rendered axis nonzero, the exact numbers the guard
-        # reads. (One model row carrying intelligence + gdpval + parameters,
-        # one agent row carrying the coding pair.) A healthy page carries no
-        # window note: the note is a build-time conditional, not page chrome.
-        with self.capture([model_fixture()], [agent_fixture()]) as output:
-            self.run_build()
-
-            stats = self.payload_of(output)["stats"]
-            self.assertEqual(
-                stats["metricCounts"], {"coding": 1, "intelligence": 1, "agentic": 1})
-            self.assertEqual(stats["parameterCount"], 1)
-            self.assertNotIn("Empty during a two-generation window",
-                             output.read_text(encoding="utf-8"))
 
 
 class MergeCapturesTests(unittest.TestCase):
