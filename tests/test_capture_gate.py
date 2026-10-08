@@ -809,8 +809,168 @@ class WindowMarkerStagingTests(unittest.TestCase):
 
     def test_the_head_marker_reader_converts_git_failure_to_none(self):
         # Same pin for the HEAD side: ROOT pointed at a non-repo makes the
-        # real `git show` fail, and the failure reads as absent -- the
-        # normal hour's answer -- never as a build break.
+        # real `git show` in read_head_window_marker fail, and the failure
+        # reads as absent -- the normal hour's answer -- never as a build
+        # break.
         with tempfile.TemporaryDirectory() as tmp:
             with mock.patch.object(capture_gate, "ROOT", pathlib.Path(tmp)):
                 self.assertIsNone(capture_gate.read_head_window_marker())
+
+
+class FreshHoldProbeTests(unittest.TestCase):
+    """Issue #236: the --fresh-held probe the refresh verdict consumes.
+
+    The probe answers ONE question about the FRESH capture alone -- is it
+    in the #232 hold state? -- from the typed exception a fresh-side render
+    raises. These pins run held_main() over the same patched reads the
+    gate tests use: a held capture answers yes, any capture that builds a
+    page answers no, and every broken shape (a refused capture, a missing
+    fresh capture, an unexpected crash) exits 1 with the reason on stderr
+    and no answer on stdout. The no-argument gate's own contract is pinned
+    by the classes above and stays untouched.
+    """
+
+    def setUp(self):
+        # Whatever the probe does to build's module globals, it must hand
+        # them back: the suite runs other tests against the real data/ and
+        # the real out/.
+        self._saved = (build.RAW, build.AGENTS_RAW, build.OUT)
+
+    def tearDown(self):
+        self.assertEqual((build.RAW, build.AGENTS_RAW, build.OUT), self._saved)
+
+    @staticmethod
+    def run_probe():
+        out = io.StringIO()
+        err = io.StringIO()
+        with contextlib.redirect_stdout(out), \
+             contextlib.redirect_stderr(err):
+            code = capture_gate.held_main()
+        return code, out.getvalue(), err.getvalue()
+
+    def test_a_held_capture_answers_yes(self):
+        # The production corner: the fresh capture in the three-generation
+        # shape with its marker recorded -- the same state the gate tests
+        # pin as "unchanged" through main(), here pinned as the probe's
+        # whole question.
+        with mock.patch.object(capture_gate, "read_fresh_captures",
+                               return_value=(corner_capture(REAL_MODELS),
+                                             REAL_AGENTS)), \
+             mock.patch.object(capture_gate, "read_fresh_window_marker",
+                               return_value=WINDOW_MARKER):
+            code, out, err = self.run_probe()
+
+        self.assertEqual((code, out), (0, "yes\n"))
+        self.assertEqual(err, "")
+
+    def test_a_healthy_capture_answers_no(self):
+        with mock.patch.object(capture_gate, "read_fresh_captures",
+                               return_value=(REAL_MODELS, REAL_AGENTS)), \
+             mock.patch.object(capture_gate, "read_fresh_window_marker",
+                               return_value=None):
+            code, out, err = self.run_probe()
+
+        self.assertEqual((code, out), (0, "no\n"))
+        self.assertEqual(err, "")
+
+    def test_a_two_generation_window_is_not_held(self):
+        # The #217 exemption is a page, not a hold: the two-generation
+        # window's note-page BUILDS, so the probe must answer no and leave
+        # the hour to its ordinary verdicts -- a hold here would swallow
+        # the #217 note-page hour too.
+        with mock.patch.object(capture_gate, "read_fresh_captures",
+                               return_value=(window_capture(REAL_MODELS),
+                                             REAL_AGENTS)), \
+             mock.patch.object(capture_gate, "read_fresh_window_marker",
+                               return_value=WINDOW_MARKER):
+            code, out, err = self.run_probe()
+
+        self.assertEqual((code, out), (0, "no\n"))
+        self.assertEqual(err, "")
+
+    def test_a_converged_corner_capture_is_refused_not_held(self):
+        # THE PM'S RED-PATH PIN: a forced or hub-stale run on a CONVERGED
+        # capture (2 generations) with an emptied axis must still fail red.
+        # The shape is a REFUSED capture -- the 2-generation marker plus
+        # the corner axes -- and the probe relays the refusal: exit 1, the
+        # reason on stderr, no answer on stdout. A probe that answered yes
+        # here would hold a genuinely broken hour green.
+        err = io.StringIO()
+        with mock.patch.object(capture_gate, "read_fresh_captures",
+                               return_value=(corner_capture(REAL_MODELS),
+                                             REAL_AGENTS)), \
+             mock.patch.object(capture_gate, "read_fresh_window_marker",
+                               return_value=CONVERGED_WINDOW_MARKER), \
+             contextlib.redirect_stderr(err):
+            code = capture_gate.held_main()
+
+        self.assertEqual(code, 1)
+        self.assertIn("broken, not held", err.getvalue())
+        self.assertIn("2 generation(s) observed in-run", err.getvalue())
+
+    def test_a_missing_fresh_capture_exits_1(self):
+        # The probe never reads HEAD, so ROOT moved to an empty temp data
+        # dir is hermetic: the missing fresh capture is broken, not held.
+        with tempfile.TemporaryDirectory() as tmp:
+            (pathlib.Path(tmp) / "data").mkdir()
+            with mock.patch.object(capture_gate, "ROOT", pathlib.Path(tmp)):
+                code, out, err = self.run_probe()
+
+        self.assertEqual(code, 1)
+        self.assertEqual(out, "")
+        self.assertIn("broken, not held", err)
+
+    def test_a_named_build_refusal_exits_1_bare_of_traceback(self):
+        # build.py's own refusals are SystemExit -- they carry their named
+        # reason, and no traceback is appended to them (the gate's own
+        # contract, mirrored here).
+        with mock.patch.object(capture_gate, "read_fresh_captures",
+                               return_value=(b"[]", b"[]")), \
+             mock.patch.object(capture_gate, "read_fresh_window_marker",
+                               return_value=None):
+            code, out, err = self.run_probe()
+
+        self.assertEqual(code, 1)
+        self.assertEqual(out, "")
+        self.assertIn("no rows carry", err)
+        self.assertNotIn("Traceback", err)
+
+    def test_an_unexpected_build_crash_exits_1_with_traceback(self):
+        # Anything unexpected -- a raw exception the typed refusal and the
+        # hold do not cover -- exits 1 with the traceback on stderr, the
+        # same diagnosability main()'s broad catch bought (issue #146).
+        err = io.StringIO()
+        with mock.patch.object(capture_gate, "_render_side",
+                               side_effect=RuntimeError("boom")), \
+             mock.patch.object(capture_gate, "read_fresh_captures",
+                               return_value=(REAL_MODELS, REAL_AGENTS)), \
+             mock.patch.object(capture_gate, "read_fresh_window_marker",
+                               return_value=None), \
+             contextlib.redirect_stderr(err):
+            code = capture_gate.held_main()
+
+        self.assertEqual(code, 1)
+        self.assertIn("RuntimeError: boom", err.getvalue())
+        self.assertIn("Traceback (most recent call last)", err.getvalue())
+
+    def test_the_cli_dispatches_fresh_held(self):
+        # The workflow's own invocation, on the real tree: data/ holds a
+        # healthy committed capture, so the answer is no, exit 0 -- and the
+        # no-argument gate keeps its one-word contract (pinned above).
+        proc = subprocess.run(
+            [sys.executable, "scripts/capture_gate.py", "--fresh-held"],
+            cwd=str(build.ROOT), capture_output=True, check=False)
+
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        self.assertEqual(proc.stdout.strip(), b"no")
+
+    def test_the_cli_refuses_unknown_arguments(self):
+        # The gate's stdout is the workflow's verdict: an unparseable
+        # invocation must never fall through to an answer.
+        proc = subprocess.run(
+            [sys.executable, "scripts/capture_gate.py", "--held"],
+            cwd=str(build.ROOT), capture_output=True, check=False)
+
+        self.assertEqual(proc.returncode, 2)
+        self.assertEqual(proc.stdout, b"")
+        self.assertIn(b"--fresh-held", proc.stderr)

@@ -641,6 +641,83 @@ class GateTests(unittest.TestCase):  # pylint: disable=too-many-public-methods
         self.assertIn("grep -oE 'Source commit <code>[0-9a-f]{40}</code>'", run)
 
 
+class HoldProbeTests(unittest.TestCase):
+    """Issue #236: the hold probe's place in the proceed verdict.
+
+    Since #233 an ordinary hour held in a three-generation window (the gate
+    answered false and proceed stayed false), but a FORCED or HUB-STALE run
+    set proceed=true in the same hour and went red at the rebuild. The probe
+    runs before the verdict, so held drops EVERY path. The pins are
+    structural because the step itself cannot run hermetically: the gate and
+    the probe resolve their repository from their own file location, and the
+    step's later half fetches the hub's live page.
+    """
+
+    def setUp(self):
+        self.wf = load()
+        self.step = step(self.wf, "Did anything move?")
+        self.raw = self.step["run"]
+        self.run = flattened(self.raw)
+
+    def held_block(self) -> str:
+        """The held branch, extracted verbatim from the run block."""
+        lines = self.raw.splitlines()
+        start = next(i for i, line in enumerate(lines)
+                     if 'if [ "$held" = yes ]; then' in line)
+        end = next(i for i in range(start, len(lines))
+                   if lines[i].strip() == "fi")
+        return flattened("\n".join(lines[start:end + 1]))
+
+    def test_the_probe_runs_after_the_gate_and_before_the_restore(self):
+        # The probe reads the fresh captures off disk, so it must precede
+        # the restore; and it must precede the verdict whose force and
+        # hub_stale arms it exists to overrule.
+        idx_gate = self.run.index(
+            'changed="$(python3 scripts/capture_gate.py)"')
+        idx_probe = self.run.index(
+            'held="$(python3 scripts/capture_gate.py --fresh-held)"')
+        idx_restore = self.run.index("git checkout -- data/")
+        idx_verdict = self.run.index('if [ "$changed" = true ]')
+        self.assertLess(idx_gate, idx_probe)
+        self.assertLess(idx_probe, idx_restore)
+        self.assertLess(idx_probe, idx_verdict)
+
+    def test_a_held_hour_drops_every_path_and_exits_green(self):
+        # proceed=false INSIDE the held branch: the force arm and the
+        # hub_stale arm below it never get a vote, and the branch leaves
+        # green before either can run.
+        block = self.held_block()
+        idx_proceed = block.index(
+            'echo "proceed=false" >> "$GITHUB_OUTPUT"')
+        self.assertIn("exit 0", block)
+        self.assertLess(idx_proceed, block.index("exit 0", idx_proceed))
+
+    def test_a_held_hour_skips_the_hub_fetch_and_its_republish_lines(self):
+        # The hub_stale fetch and its two summary lines would promise a
+        # republish a held hour must not do; the held branch ends before
+        # either runs.
+        block = self.held_block()
+        self.assertNotIn("docs.nitjsefni.eu", block)
+        self.assertNotIn("hub_stale", block)
+        self.assertNotIn("republishing", block)
+        idx_held = self.run.index('if [ "$held" = yes ]; then')
+        self.assertLess(idx_held,
+                        self.run.index("docs.nitjsefni.eu/d/ai-researcher"))
+
+    def test_the_held_hour_writes_its_own_summary_and_a_clean_tree(self):
+        # The hour's own truthful line names the hold; the workspace ends
+        # clean (data/ restored on the held path too); and the probe line
+        # rides the held path only -- a healthy hour logs nothing about it.
+        block = self.held_block()
+        self.assertIn("### Held", block)
+        self.assertIn("three-generation", block)
+        self.assertIn("last good page stays live", block)
+        self.assertIn("nothing commits or publishes", block)
+        self.assertIn("git checkout -- data/", block)
+        self.assertIn("hold probe:", block)
+        self.assertEqual(self.run.count("hold probe:"), 1)
+
+
 class CaptureStepTests(unittest.TestCase):
     """The Capture step's exit contract, as it stands since issue #200.
 
