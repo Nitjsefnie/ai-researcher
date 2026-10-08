@@ -456,8 +456,12 @@ class GateTests(unittest.TestCase):  # pylint: disable=too-many-public-methods
         self.assertIn('cmp -s - "$hub_page" || hub_stale=true', run)
         self.assertIn("else hub_stale=true", run)
         self.assertIn('[ "$hub_stale" = true ]', run)
-        # The new divergence cause gets its own truthful summary line.
+        # Each divergence cause gets its own truthful summary line (issue
+        # #239): the fetched page differing from HEAD, and the live-page
+        # fetch failing -- a failed fetch compared no page, so the run
+        # must not report a comparison result.
         self.assertIn("differs from HEAD", run)
+        self.assertIn("live-page fetch failed", run)
 
     def test_the_commit_step_carries_an_explicit_publish_verdict(self):
         # Issue 42: the byte-identical early exit commits nothing but must
@@ -671,6 +675,13 @@ class ExecutedHoldProbeTests(unittest.TestCase):
         "out/frontier-models.html": "page\n",
     }
     FRESH = "fresh\n"
+    # The republish hour's two cause lines (issue #239), byte-equal to the
+    # workflow's summary echoes: the cause that set hub_stale is named, so
+    # a failed fetch never reports a comparison result it did not make.
+    HUB_DIVERGED_LINE = ('AA capture unchanged, but the hub serves a page '
+                         'that differs from HEAD — republishing it.')
+    HUB_FETCH_FAILED_LINE = ('AA capture unchanged, but the live-page '
+                             'fetch failed — republishing it.')
 
     def setUp(self):
         if os.name == "nt":
@@ -895,6 +906,27 @@ class ExecutedHoldProbeTests(unittest.TestCase):
                         # assertion and must fail the count instead.
                         self.assertEqual(
                             hour["outputs"].count("proceed="), 1)
+                        # The republish hour names its cause (issue #239):
+                        # a stale page and a failed fetch print different
+                        # summary lines -- a failed fetch compared no page,
+                        # so the run must not report a comparison result --
+                        # and the republish decision above stays hub_stale's
+                        # alone, identical for both causes. Where the
+                        # live-page check never ran (a moved capture, a
+                        # forced dispatch) or found the hub current, neither
+                        # line may appear.
+                        if gate == "false" and not force and hub == "stale":
+                            self.assertIn(self.HUB_DIVERGED_LINE,
+                                          hour["summary"])
+                            self.assertNotIn(self.HUB_FETCH_FAILED_LINE,
+                                             hour["summary"])
+                        elif gate == "false" and not force and hub == "fail":
+                            self.assertIn(self.HUB_FETCH_FAILED_LINE,
+                                          hour["summary"])
+                            self.assertNotIn(self.HUB_DIVERGED_LINE,
+                                             hour["summary"])
+                        else:
+                            self.assertNotIn("republishing", hour["summary"])
 
     def test_an_undefined_probe_token_is_red_never_a_fall_through(self):
         # The `case` guard: the probe's stdout is the step's verdict, and a

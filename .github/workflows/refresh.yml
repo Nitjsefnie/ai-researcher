@@ -364,8 +364,13 @@ jobs:
           # Divergence sets hub_stale, as does a failed fetch:
           # republishing a page that was already current costs one hub
           # version, while a real outage fails red at the write job's
-          # publish step.
+          # publish step. hub_cause records WHICH of the two set it --
+          # the summary names its cause (issue #239), because a failed
+          # fetch compared no page and must not report a comparison
+          # result. The republish decision reads hub_stale alone and is
+          # the same for both.
           hub_stale=false
+          hub_cause='diverged'
           if [ "$changed" = false ] && [ "${{ inputs.force }}" != 'true' ]; then
             hub_page="$(mktemp)"
             if curl -fsS --connect-timeout 10 --max-time 30 \
@@ -374,6 +379,7 @@ jobs:
               git show HEAD:out/frontier-models.html | cmp -s - "$hub_page" || hub_stale=true
             else
               hub_stale=true
+              hub_cause='fetch-failed'
             fi
             rm -f "$hub_page"
           fi
@@ -411,8 +417,13 @@ jobs:
               >> "$GITHUB_STEP_SUMMARY"
           fi
           if [ "$hub_stale" = true ]; then
-            echo 'AA capture unchanged, but the hub serves a page that differs from HEAD — republishing it.' \
-              >> "$GITHUB_STEP_SUMMARY"
+            if [ "$hub_cause" = 'fetch-failed' ]; then
+              echo 'AA capture unchanged, but the live-page fetch failed — republishing it.' \
+                >> "$GITHUB_STEP_SUMMARY"
+            else
+              echo 'AA capture unchanged, but the hub serves a page that differs from HEAD — republishing it.' \
+                >> "$GITHUB_STEP_SUMMARY"
+            fi
           fi
 
       # Both installs gate on `proceed`, not `changed`: a republish run has
