@@ -183,7 +183,7 @@ leaderboard looks against each other (maintainer ruling, 2026-10-06, issue
 #208). Route against route, #200 stands unchanged. A disputed capture is an
 ordinary hour: the run never exits red, the page renders both values red with
 the pair order canonical, and the scheduled commit's body carries the differ's
-Disputes section — The three-generation corner (the looks disagree AND the
+Disputes section — the three-generation corner (the looks disagree AND the
 detail route matches neither fingerprint) is the one state a dispute can
 still produce that builds no page: the detail route fills nothing, the
 parameter count is absent everywhere, and the parameters axis empties beside

@@ -1072,6 +1072,53 @@ class EmptyAxisGuardTests(unittest.TestCase):
 
             self.assertFalse(output.exists(), "hold still wrote the page")
 
+    def test_a_four_generation_window_with_the_corner_axes_still_holds(self):
+        # Kills a `>= 3` -> `== 3` mutant in the hold predicate: the hold
+        # is "three OR MORE generations observed in-run", so the same corner
+        # fixture under a 4-generation marker holds exactly like the 3 --
+        # same axes, same typed exception, same no-page outcome.
+        corner = model_fixture(gdpval=None)
+        del corner["parameters"]
+        with self.capture([corner], [agent_fixture()]) as output:
+            (output.parent / "cost-breakdown-window.txt").write_text(
+                "every cost breakdown dropped as another generation's: "
+                "185 model(s), first apodex-1-1; 4 generation(s) observed "
+                "in-run\n", encoding="utf-8")
+            with self.assertRaises(build.WindowHold) as raised:
+                self.run_build()
+
+            message = str(raised.exception)
+            self.assertIn("4 generation(s) observed in-run", message)
+            self.assertIn("holding the page", message)
+            self.assertFalse(output.exists(), "hold still wrote the page")
+
+    def test_a_non_droppable_axis_emptied_at_three_generations_still_refuses(self):
+        # Kills a widened-subset mutant (the emptied-axes check loosened to
+        # hold every counted marker hour): intelligence is not
+        # window-droppable, so its emptying at a 3-generation marker must
+        # still refuse -- naming the window -- never hold. The hold is only
+        # for the one state that self-heals; a dropped intelligence axis is
+        # a real shape change and stays the go-re-read-AA-by-hand red.
+        corner = model_fixture(intelligence=None, gdpval=None)
+        del corner["parameters"]
+        with self.capture([corner], [agent_fixture()]) as output:
+            (output.parent / "cost-breakdown-window.txt").write_text(
+                "every cost breakdown dropped as another generation's: "
+                "185 model(s), first apodex-1-1; 3 generation(s) observed "
+                "in-run\n", encoding="utf-8")
+            with self.assertRaises(SystemExit) as raised:
+                self.run_build()
+
+            message = str(raised.exception)
+            self.assertIn(
+                "no rows carry a score/cost pair for: "
+                "agentic, intelligence, parameters",
+                message)
+            self.assertIn("3 generation(s) observed in-run", message)
+            self.assertIn("records a cross-generation AA window", message)
+            self.assertNotIn("holding the page", message)
+            self.assertFalse(output.exists(), "refusal still wrote the page")
+
     def test_a_three_generation_hour_with_only_agentic_empty_still_publishes(self):
         # Precedence pin: #217's branch fires before the corner hold at ANY
         # generation count -- a marker hour whose agentic axis is the SINGLE
@@ -1091,6 +1138,65 @@ class EmptyAxisGuardTests(unittest.TestCase):
             self.assertEqual(stats["metricCounts"]["agentic"], 0)
             self.assertIn("Empty during a two-generation window",
                           output.read_text(encoding="utf-8"))
+
+    def run_cli_with_corner(self) -> tuple[subprocess.CompletedProcess,
+                                           pathlib.Path]:
+        """The real command line over a corner capture, driven the way
+        CorruptCaptureTests drives a truncated one: build.py copied into a
+        throwaway tree beside a data/ directory holding the corner-shaped
+        capture, the 3-generation marker and the stamp -- exactly the layout
+        the hourly refresh runs. Nothing outside the temp tree is touched;
+        the copy resolves its own ROOT there."""
+        with tempfile.TemporaryDirectory(
+                prefix=".issue-232-build-", dir=build.ROOT) as tmp:
+            root = pathlib.Path(tmp)
+            (root / "data").mkdir()
+            # The builder is build.py plus the module it imports, so the
+            # temp tree carries both, the way the checkout lays them out.
+            for module in ("build.py", "page_format.py"):
+                (root / module).write_text(
+                    (build.ROOT / module).read_text(encoding="utf-8"),
+                    encoding="utf-8")
+            # The corner shape the gate's corner_capture produces: every
+            # decomposable cost replaced by the bare scalar the merge leaves
+            # and every parameter count gone -- agentic and parameters empty
+            # together, intelligence alive on the scalar total.
+            models = json.loads(
+                (build.ROOT / "data" / "aa-raw-models.json").read_text(
+                    encoding="utf-8"))
+            for record in models:
+                if isinstance(record.get("intelligenceIndexCostPerTask"), dict):
+                    record["intelligenceIndexCostPerTask"] = 0.75
+                record.pop("parameters", None)
+            (root / "data" / "aa-raw-models.json").write_text(
+                json.dumps(models), encoding="utf-8")
+            (root / "data" / "aa-raw-coding-agents.json").write_bytes(
+                (build.ROOT / "data" / "aa-raw-coding-agents.json").read_bytes())
+            (root / "data" / "captured-at.txt").write_text(
+                self.STAMP, encoding="utf-8")
+            (root / "data" / "cost-breakdown-window.txt").write_text(
+                "every cost breakdown dropped as another generation's: "
+                "185 model(s), first apodex-1-1; 3 generation(s) observed "
+                "in-run\n", encoding="utf-8")
+            proc = subprocess.run(
+                [sys.executable, str(root / "build.py")],
+                capture_output=True, text=True, timeout=120, check=False)
+            return proc, root
+
+    def test_the_cli_wrapper_prints_the_hold_report_and_exits_zero(self):
+        # The WindowHold docstring's CLI-wrapper claim, pinned against the
+        # real command line: a manual python3 build.py during a corner
+        # prints the hold report on stdout and exits 0 -- no traceback, and
+        # out/frontier-models.html never appears.
+        proc, root = self.run_cli_with_corner()
+
+        self.assertEqual(proc.returncode, 0)
+        self.assertIn("unchanged / window", proc.stdout)
+        self.assertIn("3 generation(s) observed in-run", proc.stdout)
+        self.assertNotIn("Traceback", proc.stderr)
+        self.assertFalse(
+            (root / "out" / "frontier-models.html").exists(),
+            "the held hour still wrote a page")
 
     def test_a_countless_window_marker_names_the_window_generically(self):
         # A marker written by an older fetch_aa.py carries no generation
