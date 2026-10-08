@@ -655,9 +655,7 @@ class HoldProbeTests(unittest.TestCase):
 
     def setUp(self):
         self.wf = load()
-        self.step = step(self.wf, "Did anything move?")
-        self.raw = self.step["run"]
-        self.run = flattened(self.raw)
+        self.raw = step(self.wf, "Did anything move?")["run"]
 
     def held_block(self) -> str:
         """The held branch, extracted verbatim from the run block."""
@@ -672,12 +670,12 @@ class HoldProbeTests(unittest.TestCase):
         # The probe reads the fresh captures off disk, so it must precede
         # the restore; and it must precede the verdict whose force and
         # hub_stale arms it exists to overrule.
-        idx_gate = self.run.index(
-            'changed="$(python3 scripts/capture_gate.py)"')
-        idx_probe = self.run.index(
+        run = flattened(self.raw)
+        idx_gate = run.index('changed="$(python3 scripts/capture_gate.py)"')
+        idx_probe = run.index(
             'held="$(python3 scripts/capture_gate.py --fresh-held)"')
-        idx_restore = self.run.index("git checkout -- data/")
-        idx_verdict = self.run.index('if [ "$changed" = true ]')
+        idx_restore = run.index("git checkout -- data/")
+        idx_verdict = run.index('if [ "$changed" = true ]')
         self.assertLess(idx_gate, idx_probe)
         self.assertLess(idx_probe, idx_restore)
         self.assertLess(idx_probe, idx_verdict)
@@ -700,9 +698,10 @@ class HoldProbeTests(unittest.TestCase):
         self.assertNotIn("docs.nitjsefni.eu", block)
         self.assertNotIn("hub_stale", block)
         self.assertNotIn("republishing", block)
-        idx_held = self.run.index('if [ "$held" = yes ]; then')
+        run = flattened(self.raw)
+        idx_held = run.index('if [ "$held" = yes ]; then')
         self.assertLess(idx_held,
-                        self.run.index("docs.nitjsefni.eu/d/ai-researcher"))
+                        run.index("docs.nitjsefni.eu/d/ai-researcher"))
 
     def test_the_held_hour_writes_its_own_summary_and_a_clean_tree(self):
         # The hour's own truthful line names the hold, PATH-NEUTRAL: an
@@ -722,7 +721,8 @@ class HoldProbeTests(unittest.TestCase):
         self.assertIn("inputs.force", block)
         self.assertIn("git checkout -- data/", block)
         self.assertIn("hold probe:", block)
-        self.assertEqual(self.run.count("hold probe:"), 1)
+        run = flattened(self.raw)
+        self.assertEqual(run.count("hold probe:"), 1)
 
 
 class CaptureStepTests(unittest.TestCase):
