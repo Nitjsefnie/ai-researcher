@@ -392,8 +392,9 @@ def test_pr_gate_template_satisfies_the_gate_contract():
     # of this file: every `##` section carries a tagged instruction comment,
     # names are unique (upstream keys its rules by casefolded name, so a
     # duplicate would silently shadow), the two content-audited sections sit
-    # under the audited keys, and Footer is required and defined last — the
-    # gate's footer rule accepts it only as the body's final section.
+    # under the audited keys, and Footer is optional (a pull request no AI
+    # model touched drops it) and defined last — the gate's footer rule
+    # accepts it only as the body's final section.
     template = (REPO_ROOT / ".github" / "PULL_REQUEST_TEMPLATE.md").read_text(
         encoding="utf-8")
     headings = list(_TEMPLATE_HEADING.finditer(template))
@@ -412,5 +413,5 @@ def test_pr_gate_template_satisfies_the_gate_contract():
         rules[name.casefold()] = (tag.group("tag").casefold(), index)
     assert "footer" in rules, sorted(rules)
     assert "bugs discovered" in rules, sorted(rules)
-    assert rules["footer"][0] == "required", rules["footer"]
+    assert rules["footer"][0] == "optional", rules["footer"]
     assert rules["footer"][1] == len(rules) - 1, rules["footer"]
