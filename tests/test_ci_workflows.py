@@ -337,17 +337,16 @@ def test_coverage_job_collects_its_measured_subprocesses():
     assert "parallel = True" in rc
 
 
-def test_pr_gate_action_pins_the_reviewed_v2_0_0_sha():
-    # Issue #166: exactly one pr-gate pin, at the reviewed commit the
-    # Overseer pinned — Nitjsefnie-Actions/pr-gate tag v2.0.0 — with the
-    # immutable release tag as the comment, the way the codeql pins above
-    # carry theirs.
+def test_pr_gate_action_is_pinned_by_commit_with_its_release_comment():
+    # Issue #166: exactly one pr-gate pin, by full commit SHA (the pattern
+    # admits nothing else), with the release tag as the comment, the way the
+    # codeql pins above carry theirs. Issue #247: which release is pinned is
+    # the workflow's business, so an upgrade does not edit this test.
     text = PR_GATE_WORKFLOW.read_text(encoding="utf-8")
     pins = _PR_GATE_PIN.findall(text)
     assert len(pins) == 1, f"expected exactly one pr-gate pin: {pins}"
-    sha, comment = pins[0]
-    assert sha == "441f855e54f4f6c98709152f2d2542031dc82f03", sha
-    assert comment == "v2.0.0", comment
+    _sha, comment = pins[0]
+    assert re.fullmatch(r"v\d+\.\d+\.\d+", comment), comment
 
 
 def test_pr_gate_workflow_runs_only_where_it_can_act():
