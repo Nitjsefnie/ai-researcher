@@ -1070,6 +1070,34 @@ class CrossGenerationHoldTests(unittest.TestCase):
         self.assertEqual(
             subject, "Refresh capture: 2 models, nothing the page renders")
 
+    def test_a_mixed_hour_counts_plotted_rows_on_both_full_captures(self):
+        # Hold onset coinciding with a genuine GDPval move: the section
+        # prints, and its "of N -> M plotted" denominators describe what
+        # each CAPTURE drew -- 5 rows old, 4 new. Counting the filtered
+        # sides instead would say 4 -> 4, understating the old capture by
+        # exactly the model the union filter removed; both literals here
+        # are what fails if the full-capture re-read is dropped.
+        alpha, beta, gamma = self.frontier_trio()
+        mover = capture("Mover Model", ident="mover", intelligence=70,
+                        cost=0.9)
+        mover["gdpvalNormalized"] = 0.55  # old capture: dominated
+        holden = capture("Holden Model", ident="holden", intelligence=85,
+                         cost=1.5)
+        old = [alpha, beta, gamma, mover, holden]
+        risen = dict(mover, gdpvalNormalized=0.92)  # new: enters the frontier
+        new = [alpha, beta, gamma, risen, self.held(holden, 1.5)]
+
+        report = self.render(old, new)
+
+        self.assertIn("== GDPval-AA frontier: 1 -> 2 of 5 -> 4 plotted",
+                      report)
+        self.assertIn("  + Mover Model  92.0  $0.90/task", report)
+        self.assertIn("held absent: 1 model(s): Holden Model", report)
+        subject = diff_aa.as_commit_message(report).splitlines()[0]
+        self.assertEqual(
+            subject,
+            "Refresh capture: 5 models, GDPval-AA frontier: Mover Model in")
+
     def test_the_hold_predicate_matches_fetch_aa_drop(self):
         # The held_slugs docstring claims the same predicate as
         # fetch_aa.check_cost_breakdown's `dropped` list; a shared
