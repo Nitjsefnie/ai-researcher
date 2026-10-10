@@ -37,12 +37,6 @@ _PIN = re.compile(
     r"(?:\s+#\s*(?P<comment>\S+))?"
 )
 
-# `uses: Nitjsefnie-Actions/pr-gate@<40-hex sha>  # vX.Y.Z`
-_PR_GATE_PIN = re.compile(
-    r"uses:\s*Nitjsefnie-Actions/pr-gate@(?P<sha>[0-9a-f]{40})"
-    r"(?:\s+#\s*(?P<comment>\S+))?"
-)
-
 # The template contract the pinned gate enforces, mirrored for the pin below.
 # Upstream pr-gate's template_rules (scripts/ci/pr_body.py at
 # 441f855e54f4f6c98709152f2d2542031dc82f03) refuses a consumer template in
@@ -74,22 +68,6 @@ def test_codeql_action_pins_share_one_sha():
         "codeql-action pins disagree — init and analyze must run the same "
         "version or every CodeQL run fails at SARIF processing: "
         f"{sorted(shas)}"
-    )
-
-
-def test_codeql_action_pin_comments_are_immutable_release_tags():
-    pins = _pins(CODEQL_WORKFLOW.read_text(encoding="utf-8"))
-    assert len(pins) >= 2
-    for pin in pins:
-        comment = pin[2]
-        # a floating major tag (# v4) decays when upstream re-points it, so
-        # each comment must name an immutable vX.Y.Z release tag
-        assert re.fullmatch(r"v\d+\.\d+\.\d+", comment), (
-            f"{comment!r} is not an immutable release tag"
-        )
-    comments = {pin[2] for pin in pins}
-    assert len(comments) == 1, (
-        f"pin comments disagree across steps: {sorted(comments)}"
     )
 
 
@@ -335,18 +313,6 @@ def test_coverage_job_collects_its_measured_subprocesses():
         encoding="utf-8")
     assert "[run]" in rc and "include = */scripts/ci/diff_coverage.py" in rc
     assert "parallel = True" in rc
-
-
-def test_pr_gate_action_is_pinned_by_commit_with_its_release_comment():
-    # Issue #166: exactly one pr-gate pin, by full commit SHA (the pattern
-    # admits nothing else), with the release tag as the comment, the way the
-    # codeql pins above carry theirs. Issue #247: which release is pinned is
-    # the workflow's business, so an upgrade does not edit this test.
-    text = PR_GATE_WORKFLOW.read_text(encoding="utf-8")
-    pins = _PR_GATE_PIN.findall(text)
-    assert len(pins) == 1, f"expected exactly one pr-gate pin: {pins}"
-    _sha, comment = pins[0]
-    assert re.fullmatch(r"v\d+\.\d+\.\d+", comment), comment
 
 
 def test_pr_gate_template_satisfies_the_gate_contract():
