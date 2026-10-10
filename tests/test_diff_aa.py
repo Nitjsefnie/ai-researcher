@@ -14,6 +14,7 @@ import unittest
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent / "scripts"))
 
 import diff_aa  # noqa: E402  # pylint: disable=wrong-import-position
+import fetch_aa  # noqa: E402  # pylint: disable=wrong-import-position
 import build  # noqa: E402  # pylint: disable=wrong-import-position,wrong-import-order
 
 # A report in the exact shape diff_aa.report() prints, trimmed to one entry per
@@ -864,6 +865,234 @@ class DisputeSectionTests(unittest.TestCase):
 
         self.assertEqual(
             subject, "Refresh capture: 1 models, nothing the page renders")
+
+
+class CrossGenerationHoldTests(unittest.TestCase):
+    """The cross-generation cost hold (issue #244).
+
+    The merge drops a cost breakdown that belongs to another generation,
+    leaving the leaderboard's bare total. The record then flips shape with
+    its value unchanged and drops off the GDPval-AA frontier -- and the
+    differ reported both as news: two field-change lines spelling one
+    unchanged total, and frontier moves for membership the hold caused on
+    both ends of the comparison.
+    """
+
+    def setUp(self):
+        self.tmp = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, self.tmp)
+
+    def render(self, old, new, tol=0.0):
+        root = pathlib.Path(self.tmp)
+        for name, data in (("old.json", old), ("new.json", new)):
+            (root / name).write_text(json.dumps(data), encoding="utf-8")
+        args = argparse.Namespace(old=str(root / "old.json"),
+                                  new=str(root / "new.json"),
+                                  speed_tol=0.25, tol=tol, derived=False,
+                                  all=False, commit_msg=False)
+        buffer = io.StringIO()
+        with contextlib.redirect_stdout(buffer):
+            diff_aa.print_report(args)
+        return buffer.getvalue()
+
+    @staticmethod
+    def held(model, total):
+        """The same record as the merge leaves it when it drops the detail
+        route's breakdown: the leaderboard's bare measured total."""
+        out = dict(model)
+        out["intelligenceIndexCostPerTask"] = total
+        return out
+
+    @staticmethod
+    def frontier_trio():
+        """Alpha Prime strictly dominates the other two on every chart, so
+        dropping it from one side alone manufactures entry/exit moves."""
+        return [
+            capture("Alpha Prime", intelligence=90, cost=0.5),
+            capture("Beta Standin", ident="beta", intelligence=70, cost=1.0),
+            capture("Gamma Least", ident="gamma", intelligence=60, cost=2.0),
+        ]
+
+    def test_a_shape_switch_with_an_unchanged_total_is_not_a_field_change(self):
+        total = 0.985689
+        old = [capture("Held Model", cost=total)]
+        new = [self.held(old[0], total)]
+
+        report = self.render(old, new)
+
+        # Field changes: none. The issue's two quoted lines both named this
+        # one unchanged total -- "appearing" at the bare path, "disappearing"
+        # from cost.total.
+        self.assertIn("  (none)", report)
+        self.assertNotIn("intelligenceIndexCostPerTask", report)
+        # The hold itself is the section that speaks instead.
+        self.assertIn("held absent: 1 model(s): Held Model", report)
+
+    def test_a_total_that_moves_across_shapes_reports_once_on_the_headline(self):
+        old = [capture("Mover", cost=0.9)]
+        new = [self.held(old[0], 1.0)]
+
+        report = self.render(old, new)
+
+        # A total that really moved is still news, once, on the headline's
+        # own path -- not a bare-path appearance beside a cost.total
+        # disappearance.
+        self.assertIn(
+            "intelligenceIndexCostPerTask.cost.total: 0.9 -> 1", report)
+        self.assertEqual(report.count("intelligenceIndexCostPerTask"), 1)
+
+    def test_hold_driven_frontier_churn_is_not_reported_as_moves(self):
+        # The issue's shape: Alpha Prime on the GDPval-AA frontier, held
+        # absent next hour with score and total unchanged, so "+ Beta, -
+        # Alpha" appears while nothing moved.
+        alpha, beta, gamma = self.frontier_trio()
+        old = [alpha, beta, gamma]
+        new = [self.held(alpha, 0.5), beta, gamma]
+
+        report = self.render(old, new)
+
+        self.assertNotIn("== GDPval-AA frontier", report)
+        # The hold section's own lines must never parse as frontier moves.
+        self.assertEqual(diff_aa.frontier_moves(report.splitlines()), [])
+        self.assertIn("held absent: 1 model(s): Alpha Prime", report)
+        subject = diff_aa.as_commit_message(report).splitlines()[0]
+        self.assertEqual(
+            subject, "Refresh capture: 3 models, 1 GDPval cost held absent")
+
+    def test_returning_models_report_the_hold_ending_not_frontier_moves(self):
+        # The convergence hour, mirror of the hold hour: the model comes
+        # back to the chart, which used to read as "+ Alpha, - Beta".
+        alpha, beta, gamma = self.frontier_trio()
+        old = [self.held(alpha, 0.5), beta, gamma]
+        new = [alpha, beta, gamma]
+
+        report = self.render(old, new)
+
+        self.assertNotIn("== GDPval-AA frontier", report)
+        self.assertEqual(diff_aa.frontier_moves(report.splitlines()), [])
+        self.assertIn(
+            "returned as the routes converged: 1 model(s): Alpha Prime",
+            report)
+        subject = diff_aa.as_commit_message(report).splitlines()[0]
+        self.assertEqual(
+            subject, "Refresh capture: 3 models, 1 GDPval cost restored")
+
+    def test_the_hold_section_names_models_and_the_reason(self):
+        one = capture("First Held", ident="first", intelligence=55, cost=0.6)
+        two = capture("Second Held", ident="second", intelligence=45, cost=1.2)
+        old = [one, two]
+        new = [self.held(one, 0.6), self.held(two, 1.2)]
+
+        report = self.render(old, new)
+
+        self.assertIn("held absent: 2 model(s): First Held, Second Held",
+                      report)
+        self.assertIn("another generation's cost breakdown was dropped", report)
+        self.assertIn("renders absent until the routes converge", report)
+        subject = diff_aa.as_commit_message(report).splitlines()[0]
+        self.assertEqual(
+            subject, "Refresh capture: 2 models, 2 GDPval costs held absent")
+
+    def test_a_held_models_real_move_on_another_chart_still_reports(self):
+        # The hold unplots a model on the GDPval-AA chart ONLY -- its bare
+        # total still plots the intelligence axis -- so suppressing the
+        # hold's churn must not swallow a genuine move elsewhere.
+        alpha, beta, gamma = self.frontier_trio()
+        fell = capture("Alpha Prime", intelligence=40, cost=5.0)
+        fell["intelligenceIndexCostPerTask"] = 5.0
+        old = [alpha, beta, gamma]
+        new = [fell, beta, gamma]
+
+        report = self.render(old, new)
+
+        # Its intelligence index really fell off the frontier: reported.
+        self.assertIn("== efficient frontier (expanded)", report)
+        self.assertIn("  - Alpha Prime", report)
+        self.assertIn("  + Beta Standin", report)
+        # The filter's NEGATIVE limb, discriminating: the hold unplots the
+        # GDPval chart alone, so dropping held models from EVERY chart
+        # (deleting the `metric == "agentic"` guard) must fail here --
+        # that mutant zeroes the parameter section, and no other assertion
+        # in this class sees it (the intelligence frontier is computed
+        # outside print_chart_frontiers).
+        self.assertIn("== parameter-efficiency frontier", report)
+        # The hold's own chart still reports nothing...
+        self.assertNotIn("== GDPval-AA frontier", report)
+        # ... and the hold is named as the reason it is unplotted there.
+        self.assertIn("held absent: 1 model(s): Alpha Prime", report)
+
+    def test_a_removed_held_model_is_neither_restored_nor_held(self):
+        # Presence first: a model gone from the new capture is models-
+        # removed news. Counting it as "restored" would put removed and
+        # restored in one message for one model -- a phantom line of
+        # exactly the class this section exists to replace.
+        stayer = capture("Stayer", ident="stayer")
+        departed = self.held(capture("Departed", ident="departed"), 0.5)
+        old = [departed, stayer]
+        new = [stayer]
+
+        report = self.render(old, new)
+
+        self.assertIn("== models removed: 1", report)
+        self.assertNotIn("== GDPval cost hold", report)
+        self.assertNotIn("restored", report)
+
+    def test_a_partial_convergence_reports_both_hold_lines(self):
+        # One model newly held while another comes back, same hour: both
+        # lines of one section, and the subject carries the hold clause
+        # (the width budget drops the restorable one when both do not fit).
+        alpha, beta, gamma = self.frontier_trio()
+        old = [self.held(alpha, 0.5), beta, gamma]
+        new = [alpha, beta, self.held(gamma, 2.0)]
+
+        report = self.render(old, new)
+
+        self.assertIn("held absent: 1 model(s): Gamma Least", report)
+        self.assertIn(
+            "returned as the routes converged: 1 model(s): Alpha Prime",
+            report)
+        self.assertEqual(diff_aa.frontier_moves(report.splitlines()), [])
+        subject = diff_aa.as_commit_message(report).splitlines()[0]
+        self.assertIn("1 GDPval cost held absent", subject)
+
+    def test_a_converged_quiet_hour_gains_no_hold_section(self):
+        # The quiet path is a real branch, not just an absent string: two
+        # fully converged captures must print no hold section and no hold
+        # clause anywhere in the message.
+        records = [capture("Stable One", ident="stable-one"),
+                   capture("Stable Two", ident="stable-two")]
+
+        report = self.render(records, records)
+
+        self.assertNotIn("== GDPval cost hold", report)
+        self.assertNotIn("held absent", report)
+        subject = diff_aa.as_commit_message(report).splitlines()[0]
+        self.assertEqual(
+            subject, "Refresh capture: 2 models, nothing the page renders")
+
+    def test_the_hold_predicate_matches_fetch_aa_drop(self):
+        # The held_slugs docstring claims the same predicate as
+        # fetch_aa.check_cost_breakdown's `dropped` list; a shared
+        # predicate tested on one side only drifts silently when the other
+        # side widens, so this seam pins both implementations to one input.
+        bare = capture("Bare Held", ident="bare-held", cost=0.5)
+        bare["intelligenceIndexCostPerTask"] = 0.5
+        whole = dict(capture("Whole Model", ident="whole-model", cost=0.9))
+        whole["intelligenceIndexCostPerTask"] = {
+            "cost": {"total": 0.9},
+            "evaluations": [{"slug": "gdpval-aa",
+                             "weightedCostPerTask": 0.09},
+                            {"slug": "scicode",
+                             "weightedCostPerTask": 0.81}],
+        }
+
+        checked, dropped = fetch_aa.check_cost_breakdown([bare, whole])
+
+        self.assertEqual(checked, 1)
+        self.assertEqual(set(dropped), {"bare-held"})
+        self.assertEqual(
+            diff_aa.held_slugs({"bare-held": bare, "whole-model": whole}),
+            set(dropped))
 
 
 class DisplayNameTests(unittest.TestCase):
