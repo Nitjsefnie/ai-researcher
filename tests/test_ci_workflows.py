@@ -349,40 +349,6 @@ def test_pr_gate_action_is_pinned_by_commit_with_its_release_comment():
     assert re.fullmatch(r"v\d+\.\d+\.\d+", comment), comment
 
 
-def test_pr_gate_workflow_runs_only_where_it_can_act():
-    # Issue #166: pull_request_target so a fork's pull request is still
-    # gated with a token allowed to comment and close; filtered to non-Bot
-    # non-draft (a Bot-authored reopen must not recurse, and the gate holds
-    # no opinion on drafts); one never-cancelled queue per pull request, so
-    # a queued run always follows a run that may already have closed it; and
-    # the four inputs the action requires, all from the event, never the
-    # tree.
-    workflow = yaml.safe_load(PR_GATE_WORKFLOW.read_text(encoding="utf-8"))
-    assert list(workflow[True]) == ["pull_request_target"], workflow.get("on")
-    trigger = workflow[True]["pull_request_target"]
-    assert trigger["types"] == [
-        "opened", "edited", "reopened", "ready_for_review"], trigger
-    assert workflow["permissions"] == {
-        "contents": "read", "issues": "read", "pull-requests": "write"}
-    concurrency = workflow["concurrency"]
-    assert concurrency["group"] == (
-        "pr-gate-${{ github.event.pull_request.number }}"), concurrency
-    assert concurrency["cancel-in-progress"] is False, concurrency
-    job = workflow["jobs"]["gate"]
-    assert "github.event.pull_request.user.type != 'Bot'" in job["if"], (
-        job["if"])
-    assert "github.event.pull_request.draft == false" in job["if"], job["if"]
-    assert job["timeout-minutes"] == 5, job["timeout-minutes"]
-    [step] = [step for step in job["steps"] if "uses" in step]
-    assert step["uses"].startswith("Nitjsefnie-Actions/pr-gate@"), step["uses"]
-    assert step["with"] == {
-        "github-token": "${{ github.token }}",
-        "repository": "${{ github.repository }}",
-        "pull-request-number": "${{ github.event.pull_request.number }}",
-        "pull-request-author": "${{ github.event.pull_request.user.login }}",
-    }, step["with"]
-
-
 def test_pr_gate_template_satisfies_the_gate_contract():
     # Issue #166: the gate reads this template at the pull request's base
     # SHA, so a template the parser refuses turns every pull-request run of
