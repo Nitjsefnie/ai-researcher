@@ -98,6 +98,18 @@ model's GDPval cost then renders absent until the routes converge, which is the
 honest outcome: the alternatives are publishing a stale total or failing the
 refresh red for hours.
 
+**Standing rule: when something is inconsistent, both versions are kept.**
+Inconsistency is two versions of the same thing asserted at once where
+precedence does not already settle the case: two generations of one run's
+reads, or a model present in one look or capture and absent from another.
+Both are then held — kept, red, paired. The in-run dispute layer's
+`genVariants` and the cross-run presence layer's `crossRunMerged` marker are
+instances of this rule, not the rule itself; route against route is not one,
+fixed precedence above settling it by publication alone. The rule covers
+coexistence only, so a value succeeding itself over time — one version at a
+time, coexisting with nothing — is ordinary movement rather than
+inconsistency, and the cross-run section below says so.
+
 **When the run's two leaderboard looks disagree, both generations are held —
 the dispute layer.** The precedence above settles the routes against each
 other; it cannot settle a run against itself. AA serves the leaderboard from
@@ -160,9 +172,11 @@ model present in that capture's **firm set** — the records it holds without
 the `crossRunMerged` marker — and absent from this run's fetch, or the
 reverse, is merged and marked disputed: kept, both generations shown, red,
 paired. The layer is presence-only, and the previous corpus participates
-only through the diff slugs: hour-to-hour value movement is ordinary data
-movement, never a dispute, so shared models take no previous-generation slot
-and raise no cross-run value dispute. A record the layer merges from the
+only through the diff slugs: hour-to-hour value movement is a value
+succeeding itself over time as AA re-measures — one current value per hour,
+no two versions coexisting at one point — so it is ordinary data movement,
+never a dispute, and shared models take no previous-generation slot and raise
+no cross-run value dispute. A record the layer merges from the
 previous capture carries `crossRunMerged: true` — this run's own fetch did
 not serve the model, and the marker is what lets the NEXT run read its
 look-back correctly: a marked record is dispute state, not serving
