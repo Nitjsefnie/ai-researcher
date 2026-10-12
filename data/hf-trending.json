@@ -1,0 +1,35 @@
+{
+  "source": "https://huggingface.co/api/models?sort=trendingScore&limit=10",
+  "models": [
+    {
+      "id": "google/embeddinggemma-2"
+    },
+    {
+      "id": "jialinyyzz/humanizer"
+    },
+    {
+      "id": "Cloudflare/clef"
+    },
+    {
+      "id": "abenzerps/Qwen-Image-2.1-Uncensored-GGUF"
+    },
+    {
+      "id": "Qwen/Qwen-Image-2.1-Turbo"
+    },
+    {
+      "id": "Lightricks/LTX-2.5"
+    },
+    {
+      "id": "Aleph-Alpha/Kolibri-1"
+    },
+    {
+      "id": "Venastine-Research/Xing4.0-29B-A4B-GGUF"
+    },
+    {
+      "id": "Qwen/Qwen3.8-27B"
+    },
+    {
+      "id": "canberkkkkkk/ema-lightning"
+    }
+  ]
+}

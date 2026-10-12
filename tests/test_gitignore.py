@@ -49,16 +49,16 @@ HERE = pathlib.Path(__file__).resolve().parent.parent
 GIT_TIMEOUT = 60  # seconds; git check-ignore is local and fast
 
 
-def added_paths():
-    """Every path the refresh's commit step `git add`s, parsed out of
-    .github/workflows/refresh.yml -- never a hand-copied twin."""
+def added_paths(workflow_name="refresh.yml", job="publish",
+                step_name="Commit the capture"):
+    """The named workflow step's git-add paths, derived rather than copied."""
     workflow = yaml.safe_load(
-        (HERE / ".github/workflows/refresh.yml").read_text(encoding="utf-8"))
-    steps = [s for s in workflow["jobs"]["publish"]["steps"]
-             if s.get("name") == "Commit the capture"]
+        (HERE / ".github/workflows" / workflow_name).read_text(encoding="utf-8"))
+    steps = [s for s in workflow["jobs"][job]["steps"]
+             if s.get("name") == step_name]
     assert len(steps) == 1, (
-        "expected exactly one 'Commit the capture' step in the publish "
-        f"job, found {len(steps)}")
+        f"expected exactly one {step_name!r} step in {workflow_name}'s "
+        f"{job} job, found {len(steps)}")
     # Join backslash continuations first, so an add split across lines
     # is read whole. Comment lines are dropped BEFORE the join, not after:
     # prose in the step mentions the adds it makes -- `git add <path>` in
@@ -85,6 +85,21 @@ def added_paths():
 
 class GitignoreTrackableTests(unittest.TestCase):
     """The committed data paths must survive .gitignore's deny-by-default."""
+
+    def test_hf_trending_list_is_git_trackable(self):
+        path = "data/hf-trending.json"
+        verdict = check_ignore(["--no-index", "-q"], path)
+
+        self.assertEqual(
+            verdict.returncode, 1,
+            f"{path} is hidden by .gitignore; it must be a tracked output")
+
+    def test_the_paths_the_trending_workflow_commits_are_git_trackable(self):
+        paths = added_paths("hf-trending.yml", "fetch", "Commit when changed")
+        self.assertEqual(paths, ["data/hf-trending.json"])
+        for path in paths:
+            verdict = check_ignore(["--no-index", "-q"], path)
+            self.assertEqual(verdict.returncode, 1, f"{path} is hidden by .gitignore")
 
     def test_the_paths_the_refresh_commits_are_git_trackable(self):
         for path in added_paths():
@@ -114,15 +129,14 @@ def check_ignore(flags, path):
         timeout=GIT_TIMEOUT)
 
 
-# Synthetic probe paths: no real artifact would ever carry them. Every
-# committed name under data/ is `aa-*` or `captured-at.txt`, and out/
-# ships exactly one file, so a future LEGITIMATE negation -- which names
-# a new committed path exactly (`!/data/aa-new-thing.json`) -- cannot
-# match a synthetic name and cannot turn these probes falsely red. Any
-# edit broad enough to un-deny a probe flips the verdict -- a wholesale
-# `!/data/*` (the issue's own repro) or a class-scoped `!/data/*.json`
-# alike -- and every such edit is exactly the rot this pin exists to
-# catch, because each of them un-denies scratch files along with it.
+# Synthetic probe paths: no real artifact would ever carry them. The data
+# block names the AA captures, the Hugging Face trending list, `captured-at.txt`
+# and the optional cost-window marker; out/ names exactly one page. A future
+# legitimate negation names a concrete path, so it cannot match a synthetic
+# name and turn these probes falsely red. Any edit broad enough to un-deny a
+# probe flips the verdict -- a wholesale `!/data/*` (the issue's own repro) or
+# a class-scoped `!/data/*.json` alike -- and every such edit is exactly the
+# rot this pin exists to catch, because each un-denies scratch files too.
 DENY_PROBE_PATHS = (
     "data/zz-deny-probe-synthetic.json",
     "out/zz-deny-probe-synthetic.html",

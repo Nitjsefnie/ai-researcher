@@ -32,13 +32,20 @@ That is fine in both directions.
 
 ## The constraints that reject the most patches
 
-- **Every number comes from artificialanalysis.ai, and nowhere else.** Not lab
-  blogs, model cards, technical reports, pricing pages, LMSYS, Vellum,
-  swebench.com, livecodebench.com or journalism — not even to cross-check or to
-  fill one gap. A model AA has not measured is **absent**, not interpolated. A
-  patch that adds a second source will be declined no matter how good the
-  source is: two sources with different harnesses produce numbers that cannot
-  be compared on one axis, which is the only thing this page does.
+- **Every number on the frontier page comes from artificialanalysis.ai, and
+  nowhere else.** Not lab blogs, model cards, technical reports, pricing pages,
+  LMSYS, Vellum, swebench.com, livecodebench.com or journalism — not even to
+  cross-check or to fill one gap on the frontier page. A model AA has not
+  measured is **absent from the frontier page**, not interpolated. A patch that
+  adds a second source to the frontier page will be declined no matter how
+  good the source is: two sources with different harnesses produce numbers
+  that cannot be compared on one axis, which is the only thing the frontier
+  page does.
+
+  The Hugging Face trending list is a separate tracked output:
+  `scripts/fetch_hf_trending.py` writes `data/hf-trending.json`, and
+  `.github/workflows/hf-trending.yml` updates it hourly. It never feeds the
+  frontier page.
 
 - **`data/aa-raw-models.json` is a captured artifact — never hand-edit it.**
   `scripts/fetch_aa.py` reassembles it from the leaderboard's Next.js RSC

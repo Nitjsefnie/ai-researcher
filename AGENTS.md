@@ -9,20 +9,26 @@ Primary deliverable: an HTML page published and kept up to date on
 `docs.nitjsefni.eu` via the docs-hub CLI. Slug:
 `ai-researcher/frontier-models`.
 
-## Single source of truth — artificialanalysis.ai
+## Single source of truth for the frontier page — artificialanalysis.ai
 
-**Every number in this repo comes from <https://artificialanalysis.ai/> and
-nowhere else.** This is a standing user decision (2026-07-30), not a default to
-re-litigate.
+**Every number on the frontier page comes from
+<https://artificialanalysis.ai/> and nowhere else.** This is a standing user
+decision (2026-07-30), not a default to re-litigate.
 
-- **Do not** pull numbers from lab blogs, model cards, technical reports,
-  pricing pages, LMSYS, Vellum, swebench.com, livecodebench.com, journalism, or
-  any other third party — not even to "cross-check" or "fill a gap".
-- A model AA has not measured is **absent**, not estimated. Never interpolate a
-  missing cell from another source.
+- **Do not** pull numbers for the frontier page from lab blogs, model cards,
+  technical reports, pricing pages, LMSYS, Vellum, swebench.com,
+  livecodebench.com, journalism, or any other third party — not even to
+  "cross-check" or "fill a gap" on the frontier page.
+- A model AA has not measured is **absent from the frontier page**, not
+  estimated. Never interpolate a missing page cell from another source.
 - The predecessor contract (typed `lab`/`3p` sources, per-cell lab-vs-3p `alt`
   numbers) is **retired**. The corpus built under it was purged in `3375657`;
   it is recoverable from `0bd00c0` but must not be reintroduced.
+
+The Hugging Face trending list is a separate tracked output:
+`scripts/fetch_hf_trending.py` writes `data/hf-trending.json`, and
+`.github/workflows/hf-trending.yml` updates it hourly. It never feeds the
+frontier page.
 
 Because there is exactly one source, per-cell citation is redundant: the page
 states its source once, prominently, and links the leaderboard.
@@ -368,6 +374,12 @@ unclamped and allowed to hang outside the plot rather than be squeezed inside.
 
 ## Update cadence
 
+The independent Hugging Face trending workflow (`.github/workflows/hf-trending.yml`)
+requests hourly runs at `:07` and commits only `data/hf-trending.json` when the list
+changes. The box-side dispatcher `hf-trending-refresh.timer` dispatches it hourly,
+because GitHub drops scheduled runs. It never builds or publishes the frontier
+page.
+
 - **Automated, every hour** — `.github/workflows/refresh.yml` captures the
   leaderboard and the Coding Agent Index, and when the page the fresh capture
   would build differs from the live one — compared by building the page from
@@ -437,4 +449,4 @@ Use whichever model drives the session. One primary-author trailer per commit.
   scheduled is not the same as live.
 - Not a model directory — if AA hasn't measured cost per task for it, it isn't
   on the chart.
-- Not multi-source. See above; this is the whole point.
+- The frontier page is not multi-source. See above; this is the whole point.

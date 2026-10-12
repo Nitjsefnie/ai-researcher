@@ -15,6 +15,7 @@ import importlib.util
 import re
 import sys
 from pathlib import Path
+from unittest import mock
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
@@ -118,6 +119,17 @@ def test_data_only_refuses_a_fifth_path():
             "data/aa-raw-models.json", "data/aa-raw-coding-agents.json",
             "data/captured-at.txt", "out/frontier-models.html",
             intruder]), intruder
+
+
+def test_trending_push_runs_the_full_gate_set():
+    with mock.patch.object(classify, "_verified_base", return_value="a" * 40):
+        docs_only, data_only, reason = classify.classify(
+            {"name": "push", "repository": "o/r", "before": "a" * 40,
+             "sha": "b" * 40},
+            lambda argv: "data/hf-trending.json\n",
+        )
+    assert (docs_only, data_only) == (False, False)
+    assert "outside documentation" in reason
 
 
 def test_data_only_accepts_any_proper_subset():
