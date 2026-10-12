@@ -202,6 +202,7 @@ CORE_PIN = (
     '.github/workflows/secrets.yml',
     '.github/workflows/tests.yml',
     '.github/workflows/types.yml',
+    'data/aa-generation-state.json',
     'data/aa-raw-coding-agents.json',
     'data/aa-raw-models.json',
     'data/captured-at.txt',

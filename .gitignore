@@ -59,6 +59,8 @@
 !/data/aa-raw-models.json
 !/data/aa-raw-coding-agents.json
 !/data/captured-at.txt
+# fetch_aa.py's remembered generations and held AA values.
+!/data/aa-generation-state.json
 # Hugging Face trending list; not AA capture data and not page input.
 !/data/hf-trending.json
 # fetch_aa.py's all-dropped cost-breakdown window marker (issue #217):

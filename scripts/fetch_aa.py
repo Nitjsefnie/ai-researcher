@@ -763,6 +763,131 @@ def cross_generation_merge(corpora: list[list[dict]]) -> list[dict]:
 # and that is what lets a stable retirement settle within one further hour:
 # a look-back that pinned a model disputed forever would be wrong.
 CROSS_RUN_KEY = "crossRunMerged"
+GENERATION_STATE_FILE = "aa-generation-state.json"
+REMEMBERED_GENERATION_LIMIT = 1000
+HELD_SPEED_FIELDS = frozenset({
+    "medianOutputTokensPerSecond", "intelligenceIndexTimePerTask",
+})
+HELD_FIELDS = frozenset(DISPUTE_CAPABLE) | HELD_SPEED_FIELDS | {
+    "slug", "name", "shortName", "modelCreatorName", "parameters",
+    "isOpenWeights", "deprecated", "isReasoning", "intelligenceIndexIsEstimated",
+    "licenseName", "releaseDate", CROSS_RUN_KEY,
+}
+
+
+def _today() -> dt.date:
+    return dt.date.today()
+
+
+def revisit_key(records: list[dict]) -> str:
+    return generation_key(records, set(DISPUTE_CAPABLE))
+
+
+def remember_generation(state, key):
+    if key not in state["remembered"]:
+        state["remembered"].append(key)
+        state["remembered"] = state["remembered"][-REMEMBERED_GENERATION_LIMIT:]
+    state["last"] = key
+
+
+def load_generation_state(prev_records):
+    """Read tracked state, or bootstrap a missing-state checkout from its capture.
+
+    The checked-in seed uses this fallback so quiet refreshes restore a
+    tracked state file instead of leaving an untracked bootstrap behind.
+    """
+    path = OUT.with_name(GENERATION_STATE_FILE)
+    if path.exists():
+        try:
+            return json.loads(path.read_text(encoding="utf-8"))
+        except (ValueError, OSError) as exc:
+            sys.exit(f"{path}: generation state does not read back as JSON ({exc})")
+    state = {"remembered": [], "last": None, "held": None}
+    if prev_records:
+        remember_generation(state, revisit_key(prev_records))
+    return state
+
+
+def held_records(records):
+    out = []
+    for rec in sorted(records, key=lambda r: r.get("slug", "")):
+        saved = {k: rec[k] for k in sorted(HELD_FIELDS) if k in rec}
+        cost = saved.get("intelligenceIndexCostPerTask")
+        if isinstance(cost, dict):
+            saved["intelligenceIndexCostPerTask"] = {
+                "cost": {"total": _cost_total(rec)},
+                "evaluations": [
+                    {k: e[k] for k in ("slug", "weightedCostPerTask") if k in e}
+                    for e in cost.get("evaluations", []) if isinstance(e, dict)],
+            }
+        out.append(saved)
+    return out
+
+
+def render_revisit_hold(held, current):
+    """Freeze held fields; retain every other field from the current capture."""
+    corpora = [held["generations"][key] for key in sorted(held["generations"])]
+    by_slug = [{r["slug"]: r for r in corpus} for corpus in corpora]
+    current_by_slug = {r["slug"]: r for r in current}
+    out = []
+    for slug in sorted(set().union(*by_slug)):
+        carried = [corpus[slug] for corpus in by_slug if slug in corpus]
+        plain = {k: v for k, v in current_by_slug.get(slug, {}).items()
+                 if k not in HELD_FIELDS}
+        plain.update(carried[0])
+        for rec in carried[1:]:
+            for key, value in rec.items():
+                if (key not in HELD_SPEED_FIELDS
+                        and normalize_for_comparison(plain.get(key)) is None
+                        and normalize_for_comparison(value) is not None):
+                    plain[key] = value
+        plain["genVariants"] = [variant_fields(corpus[slug]) if slug in corpus else {}
+                                for corpus in by_slug]
+        out.append(plain)
+    return out, corpora
+
+
+def revisit_merge(models, prev_records, run_corpora, state):
+    """Re-bootstrap a stale no-hold last from the previous capture before
+    applying the revisit rules; append that key only if it is absent.
+    In-run disagreements leave the remembered state unchanged.
+    """
+    held = state["held"]
+    action = "ordinary"
+    render_held = False
+    if len(run_corpora) != 1:
+        render_held = bool(held) and all(
+            revisit_key(c) in held["generations"] for c in run_corpora)
+    else:
+        if not held and prev_records:
+            previous_key = revisit_key(prev_records)
+            if state["last"] != previous_key:
+                remember_generation(state, previous_key)
+        key = revisit_key(models)
+        if held and key in held["generations"]:
+            render_held = True
+        elif key not in state["remembered"]:
+            action = "hold ended" if held else "new"
+            remember_generation(state, key)
+            state["held"] = held = None
+        elif held:
+            held["generations"][key] = held_records(models)
+            action, render_held = "joined", True
+        elif key != state["last"]:
+            held = {"since": _today().isoformat(), "generations": {
+                state["last"]: held_records(prev_records),
+                key: held_records(models),
+            }}
+            state["held"] = held
+            action, render_held = "hold entered", True
+    if held and (_today() - dt.date.fromisoformat(held["since"])).days > 7:
+        print(f"WARNING: cross-run generation hold older than 7 days "
+              f"(held since {held['since']})")
+    if render_held:
+        models, run_corpora = render_revisit_hold(held, models)
+        if action == "ordinary":
+            action = "held"
+    return models, run_corpora, render_held, action
 
 
 class CrossRun(typing.NamedTuple):
@@ -917,9 +1042,10 @@ class Capture(typing.NamedTuple):
     `version` is None when the methodology page named no index version at
     all -- the pin passed on absence (issue #220), and the log says so
     rather than interpolating a version where none was found.
-    `generations` counts the distinct generation fingerprints the run
-    observed across its reads, and `disputed` says the written corpus
-    carries genVariants -- the looks disagreed on a published value.
+    `generations` counts distinct generation fingerprints observed in-run
+    across the leaderboard and detail reads. `disputed` says the written
+    corpus carries genVariants, including cross-run presence and revisit
+    holds; it can be true even when this run's two looks agree.
     """
 
     models: list
@@ -930,11 +1056,13 @@ class Capture(typing.NamedTuple):
     # The cross-run presence layer's summary (issue #211); empty when the
     # look-back was not engaged or found no presence diff.
     cross_run: CrossRun = CrossRun([], [])
+    revisit_action: str | None = None
 
 
 def capture(cached_base: str | None, cached_detail: str | None,
             cached_methodology: str | None,
-            prev_records: list | None = None) -> Capture:
+            prev_records: list | None = None,
+            revisit_state: dict | None = None) -> Capture:
     """Fetch the routes fresh, parse each from its own bytes, and merge.
 
     The methodology page is read FIRST and the version pin runs on it before
@@ -964,6 +1092,13 @@ def capture(cached_base: str | None, cached_detail: str | None,
     from this run's fetch -- or the reverse -- is merged and marked
     disputed on top of whatever the in-run layer held; see
     cross_run_presence_merge.
+
+    Optional `revisit_state` enables cross-run revisit tracking and is
+    mutated on clean-run transitions. Held generations render their stored
+    HELD_FIELDS, including canonical speed fields; other fields follow this
+    run's capture. The presence layer applies
+    on top. In-run disagreements leave the state unchanged. With no state
+    argument, capture uses only the in-run and presence layers above.
     """
     version = check_index_version(
         fetch_html(cached_methodology, METHODOLOGY_URL))
@@ -1044,7 +1179,16 @@ def capture(cached_base: str | None, cached_detail: str | None,
         models, cross_run = cross_run_presence_merge(models, prev_records,
                                                      run_corpora)
         disputed = disputed or bool(cross_run.dropped or cross_run.readded)
-    return Capture(models, host, version, generations, disputed, cross_run)
+    revisit_action = None
+    if revisit_state is not None:
+        models, held_corpora, rendering_hold, revisit_action = revisit_merge(
+            models, prev_records, run_corpora, revisit_state)
+        if rendering_hold:
+            models, cross_run = cross_run_presence_merge(
+                models, prev_records or [], held_corpora)
+            disputed = True
+    return Capture(models, host, version, generations, disputed, cross_run,
+                   revisit_action)
 
 
 def load_previous_capture() -> list | None:
@@ -1088,8 +1232,11 @@ def main() -> None:
 
     prev_records = (load_previous_capture()
                     if args.cross_run_lookback else None)
+    bootstrap = args.cross_run_lookback and not OUT.with_name(GENERATION_STATE_FILE).exists()
+    revisit_state = (load_generation_state(prev_records)
+                     if args.cross_run_lookback else None)
     captured = capture(args.html, args.detail_html, args.methodology_html,
-                       prev_records)
+                       prev_records, revisit_state)
     models = captured.models
     priced, dropped = check_cost_breakdown(models)
     record_cost_window(priced, dropped, generations=captured.generations)
@@ -1099,7 +1246,14 @@ def main() -> None:
     OUT.parent.mkdir(parents=True, exist_ok=True)
     write_atomic(OUT, json.dumps(models, indent=1))
     write_atomic(AGENTS_OUT, json.dumps(agents, indent=1))
+    if revisit_state is not None:
+        write_atomic(OUT.with_name(GENERATION_STATE_FILE),
+                     json.dumps(revisit_state, sort_keys=True, indent=1) + "\n")
     STAMP.write_text(dt.date.today().isoformat() + "\n", encoding="utf-8")
+
+    if captured.revisit_action is not None:
+        prefix = "bootstrap; " if bootstrap else ""
+        print(f"cross-run revisit: {prefix}{captured.revisit_action}")
 
     scored = sum(1 for m in models if isinstance(m.get("intelligenceIndex"), (int, float)))
     if captured.version is not None:

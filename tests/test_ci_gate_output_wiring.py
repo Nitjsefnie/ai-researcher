@@ -47,6 +47,7 @@ CI_GATE = REPO_ROOT / ".github" / "workflows" / "ci-gate.yml"
 # parsed, priced or asserted on here.
 BOT_PATHS = [
     "data/aa-raw-models.json", "data/aa-raw-coding-agents.json",
+    "data/aa-generation-state.json", "data/cost-breakdown-window.txt",
     "data/captured-at.txt", "out/frontier-models.html",
 ]
 DOC_PATHS = ["docs/guide.md", "LICENSE"]
@@ -314,7 +315,7 @@ def test_every_leg_needs_the_classifier():
 
 def test_a_bot_push_runs_only_the_cheap_legs_end_to_end(tmp_path):
     # The refresh bot's own push, with the paths its commit carries (the
-    # fixture's four are a subset of the five-path signature): the cheap
+    # fixture includes all six supported paths): the cheap
     # class is lint and actionlint, every other leg skips — and
     # actionlint is unconditional, so it runs here too.
     run = _run_classifier(tmp_path)

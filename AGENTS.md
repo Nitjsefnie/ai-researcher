@@ -89,9 +89,8 @@ the leaderboard omits, and a conflicting detail value simply loses. There is no
 disagreement state, no heal, no skip, no baseline, and no exit code for a
 disagreement. A field the leaderboard ever drops is a *fill* from the detail
 route, not a disagreement. That is the routes against each other; the two
-leaderboard looks one run takes against each other are the dispute layer
-below (issue #208); the previous run's committed capture against this run's
-fetch is the second — the cross-run presence layer, also below.
+leaderboard looks one run takes against each other are the in-run dispute
+layer; cross-run presence and generation revisits are handled separately below.
 
 One place needs care, because the merge is where two generations could still
 mix: `intelligenceIndexCostPerTask` ships as a **bare number** on the
@@ -107,14 +106,14 @@ refresh red for hours.
 **Standing rule: when something is inconsistent, both versions are kept.**
 Inconsistency is two versions of the same thing asserted at once where
 precedence does not already settle the case: two generations of one run's
-reads, or a model present in one look or capture and absent from another.
+reads, a model present in one look or capture and absent from another, or a
+revisit of a remembered generation after another superseded it.
 Both are then held — kept, red, paired. The in-run dispute layer's
 `genVariants` and the cross-run presence layer's `crossRunMerged` marker are
 instances of this rule, not the rule itself; route against route is not one,
-fixed precedence above settling it by publication alone. The rule covers
-coexistence only, so a value succeeding itself over time — one version at a
-time, coexisting with nothing — is ordinary movement rather than
-inconsistency, and the cross-run section below says so.
+fixed precedence above settling it by publication alone. One-way value
+movement (A → B, A → B → C) is ordinary; a remembered revisit (A → B → A)
+holds both versions under the cross-run generation rule below.
 
 **When the run's two leaderboard looks disagree, both generations are held —
 the dispute layer.** The precedence above settles the routes against each
@@ -141,8 +140,11 @@ values.
 variants are ordered by ascending `generation_key`, so the corpus bytes do
 not depend on which look a run read first, and a record's plain fields are
 the first carrying variant's — the canonical generation's value, gap-filled
-only where it lacks the field (a missing marker is a fill, never a winner);
-an em-dash side marks a generation that does not carry the model at all.
+only where it lacks the field (a missing marker is a fill, never a winner).
+The cross-run generation hold has one exception: a rendered speed missing
+from the canonical carrying generation stays absent, never filled from
+another held generation. An em-dash side marks a generation that does not
+carry the model at all.
 The map list
 is padded to one entry per generation, with the empty map (`{}`) at every
 generation that does not carry the model — `{}` means *not carried*, and a
@@ -167,6 +169,40 @@ and is absent when that breakdown does not sum to its own total — never
 supplied from another generation's parts, which is what makes a disputed axis
 honest.
 
+**The cross-run generation layer** runs under `--cross-run-lookback` and
+remembers the newest 1000 distinct fingerprints in
+`data/aa-generation-state.json`, beside the capture. `revisit_key` fingerprints
+the published merged corpus over `DISPUTE_CAPABLE` only, excluding speed and
+unrendered payload churn. One-way movement (A → B, A → B → C) stays ordinary;
+a remembered revisit (A → B → A) holds both generations with `genVariants`.
+The state stores their AA-published `HELD_FIELDS`, including each side's cost
+breakdown, and renders their union in ascending revisit-key order. Other
+fields follow the current capture, so a hold does not manufacture payload
+removals in the differ; capture bytes may change while built rows stay fixed.
+Both rendered speed fields (`medianOutputTokensPerSecond` and
+`intelligenceIndexTimePerTask`) stay frozen for the length of a hold, including
+canonical absence. Alternating held members leaves the state and held render
+unchanged; a remembered nonmember joins without resetting the hold date.
+Only a fingerprint outside the remembered set ends the hold automatically
+and publishes alone; an evicted fingerprint counts as new. A retired side
+stays held until a new generation arrives or the state is cleared by hand.
+In-run disagreements leave this state unchanged: they render the frozen hold
+only if all their revisit keys are held, otherwise the in-run dispute renders.
+The date is written once at hold-entry and rendered as "held since <date>"
+beside the dispute explanation; no state or no hold renders no such text.
+A hold older than 7 days prints a stdout warning without changing state.
+The repository tracks a bootstrap generated from its committed capture, so
+a quiet refresh's `git checkout -- data/` restores state too and a republish
+does not commit an untracked bootstrap. Later state changes are committed
+with data-moving hours so runs remember the published hold without deriving
+it from git history. A missing state
+bootstraps from the previous capture; a no-hold `last` inconsistent with that
+capture is re-bootstrapped before a clean run's transition. The flag always
+writes state atomically on success; without it state is neither read nor
+written. The gate stages HEAD's state from git and fresh state from disk,
+including the fresh-only `--fresh-held` probe; unchanged held alternation
+answers `false`, while hold entry and a new generation change the page.
+
 **The cross-run presence layer: the previous capture against this run's fetch
 (Overseer ruling, 2026-10-06, evening, on the reopened issue #211).** The
 in-run layer above cannot see a flip that happens between runs: a run whose
@@ -177,19 +213,17 @@ previous committed capture before the fetch overwrites it
 model present in that capture's **firm set** — the records it holds without
 the `crossRunMerged` marker — and absent from this run's fetch, or the
 reverse, is merged and marked disputed: kept, both generations shown, red,
-paired. The layer is presence-only, and the previous corpus participates
-only through the diff slugs: hour-to-hour value movement is a value
-succeeding itself over time as AA re-measures — one current value per hour,
-no two versions coexisting at one point — so it is ordinary data movement,
-never a dispute, and shared models take no previous-generation slot and raise
-no cross-run value dispute. A record the layer merges from the
+paired. This layer is presence-only: the previous corpus participates only
+through the diff slugs, and shared models take no previous-generation slot
+here. One-way value movement is ordinary; remembered revisits are held by
+the generation layer above. A record the presence layer merges from the
 previous capture carries `crossRunMerged: true` — this run's own fetch did
 not serve the model, and the marker is what lets the NEXT run read its
 look-back correctly: a marked record is dispute state, not serving
-evidence, so it neither merges nor disputes again and the model settles out
-the first hour AA still does not serve it. A stable retirement therefore
-settles within one further hour; a look-back that pinned a model disputed
-forever would be wrong. A re-added model — served now, absent from the firm
+evidence, so this layer neither merges nor disputes it again. Outside a
+generation hold, a stable retirement settles within one further hour;
+the hold's frozen union can retain a retired side until its exit rule fires.
+A re-added model — served now, absent from the firm
 set (a brand-new model included, which therefore disputes red for its first
 hour) — takes the empty-map previous slot and carries no marker: it is
 serving evidence the moment the run's own fetch returned it. A
@@ -198,9 +232,8 @@ generation the record is disputed across — the run's own generations plus
 the previous run's, the previous slot positioned by ascending
 `generation_key` over the joint field universe.
 
-This supersedes issue #200's no-dispute-layer rule for one case only — the two
-leaderboard looks against each other (maintainer ruling, 2026-10-06, issue
-#208). Route against route, #200 stands unchanged. A disputed capture is an
+Route precedence does not settle disagreements between looks or captures;
+the layers above keep those versions together. A disputed capture is an
 ordinary hour: the run never exits red, the page renders both values red with
 the pair order canonical, and the scheduled commit's body carries the differ's
 Disputes section — the three-generation corner (the looks disagree AND the
@@ -216,11 +249,11 @@ other emptied axis still refuses — the go-re-read-AA-by-hand signal for a
 real shape change. Without the cross-run look-back, a
 run whose looks agree writes no `genVariants` key anywhere and is
 byte-identical to the single-generation capture; with it, the same holds
-exactly when the two slug sets agree, and a caught flip writes the
-disputed shape the cross-run section above defines. The provenance
-consequence is worth saying plainly: the models capture is a merged,
-dispute-bearing artifact — two routes, and while a window is live two
-generations — so the page's raw-byte provenance digest is a sha256 over
+when the two slug sets agree and no generation hold renders. A caught
+presence flip or generation revisit writes the disputed shape defined above.
+The provenance consequence is worth saying plainly: the models capture is a merged,
+dispute-bearing artifact — two routes and every held generation — so the
+page's raw-byte provenance digest is a sha256 over
 merged, dispute-bearing content, never over AA's raw payload.
 
 A detail page lists every model **except** its own, so the host slug loses its
@@ -425,10 +458,9 @@ is simply resolved: the leaderboard publishes, the detail route fills, and the
 hour is an ordinary one whose only scheduled commit is `Refresh capture: …`.
 There is no window to open, close, record or heal, and no disagreement that can
 turn a run red. Every value still comes only from AA; nothing is estimated or
-interpolated, and nothing from the older generation reaches the page. (The two
-leaderboard LOOKS disagreeing with each other is the one thing precedence
-cannot absorb — that is the dispute layer above, which holds both generations
-red and is just as never-red.)
+interpolated. Route precedence does not settle disagreements between
+leaderboard looks, cross-run presence flips, or remembered generation
+revisits; the layers above keep those versions paired and red on the page.
 
 ## Commit / co-author trailer
 

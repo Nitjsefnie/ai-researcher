@@ -46,10 +46,11 @@ name: refresh
 # threshold even though the differ's report never carries it (its classifier
 # files it as derived and drops it): the page renders it, so gate-side
 # strictness covers it -- intentional, not tool agreement. The cost is
-# stated in the gate: the page's speed columns can lag AA's live
+# stated in the gate: outside a generation hold, speed columns can lag AA's live
 # re-sampling by just under the threshold -- and no further, because each
 # hour compares against the last committed value, so a sustained crawl
-# crosses the threshold cumulatively and commits.
+# crosses the threshold cumulatively and commits. During a generation hold,
+# the model's rendered speeds stay frozen for the length of that hold.
 #
 # There are two captures because the page draws two AA products: the model
 # leaderboard and the Coding Agent Index. The OR survives inside the rendered
@@ -531,7 +532,7 @@ jobs:
           # copy fine -- the write job's `git add` stages only what differs
           # from main.
           for p in data/aa-raw-models.json data/aa-raw-coding-agents.json \
-                   data/captured-at.txt out/frontier-models.html; do
+                   data/aa-generation-state.json data/captured-at.txt out/frontier-models.html; do
             cp --parents "$p" "${PAYLOAD}/tree/"
           done
           # The window marker (issue #227): build.py's empty-axis guard reads
@@ -577,6 +578,7 @@ jobs:
           path: |
             data/aa-raw-models.json
             data/aa-raw-coding-agents.json
+            data/aa-generation-state.json
           if-no-files-found: error
           retention-days: 7
 
@@ -743,7 +745,7 @@ jobs:
           # only other subject is the forced rebuild.
           cp -a "${PAYLOAD}/tree/." ./
           git add data/aa-raw-models.json data/aa-raw-coding-agents.json \
-                  data/captured-at.txt out/frontier-models.html
+                  data/aa-generation-state.json data/captured-at.txt out/frontier-models.html
           # The window marker rides the commit both ways (issue #227): a
           # window hour's payload carries it in, and the first healthy
           # hour's payload leaves it out, which stages its removal with

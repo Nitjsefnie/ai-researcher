@@ -40,6 +40,7 @@ fixture rules forbid.
 import pathlib
 import re
 import subprocess
+import tempfile
 import unittest
 
 import yaml
@@ -85,6 +86,22 @@ def added_paths(workflow_name="refresh.yml", job="publish",
 
 class GitignoreTrackableTests(unittest.TestCase):
     """The committed data paths must survive .gitignore's deny-by-default."""
+
+    def test_generation_state_is_git_trackable(self):
+        with tempfile.TemporaryDirectory(prefix="issue-258-ignore-") as tmp:
+            root = pathlib.Path(tmp)
+            (root / ".gitignore").write_bytes((HERE / ".gitignore").read_bytes())
+            (root / "data").mkdir()
+            (root / "data/aa-generation-state.json").write_text("{}", encoding="utf-8")
+            (root / "data/unshipped.json").write_text("{}", encoding="utf-8")
+            subprocess.run(["git", "init", "-q", str(root)], check=True,
+                           capture_output=True, timeout=GIT_TIMEOUT)
+            for path, code in [("data/aa-generation-state.json", 1),
+                               ("data/unshipped.json", 0)]:
+                verdict = subprocess.run(["git", "check-ignore", "-q", path],
+                                         cwd=root, check=False, capture_output=True,
+                                         timeout=GIT_TIMEOUT)
+                self.assertEqual(verdict.returncode, code)
 
     def test_hf_trending_list_is_git_trackable(self):
         path = "data/hf-trending.json"

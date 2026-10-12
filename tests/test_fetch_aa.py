@@ -2525,5 +2525,361 @@ class CrossRunLookbackFlagTests(unittest.TestCase):
         self.assertTrue(all("genVariants" not in m for m in models))
 
 
+class TestGenerationRevisit(unittest.TestCase):
+    def setUp(self):
+        self.stack = contextlib.ExitStack()
+        self.addCleanup(self.stack.close)
+        self.root = pathlib.Path(self.stack.enter_context(
+            tempfile.TemporaryDirectory(prefix="issue-258-")))
+        self.output = self.root / "aa-raw-models.json"
+        self.state_path = self.root / "aa-generation-state.json"
+        for name, value in {
+                "ROOT": self.root, "OUT": self.output,
+                "AGENTS_OUT": self.root / "agents.json",
+                "STAMP": self.root / "captured-at.txt"}.items():
+            self.stack.enter_context(unittest.mock.patch.object(fetch_aa, name, value))
+        self.stack.enter_context(unittest.mock.patch.object(fetch_aa, "_sleep"))
+
+    def run_hour(self, ii, *, second=None, day=1, enabled=True,
+                 detail_fields=None, extra_rows=(), **extra):
+        base = self.root / "base.html"
+        detail = self.root / "detail.html"
+        methodology = self.root / "methodology.html"
+        agents = self.root / "agents.html"
+        payload = json.loads(look_payload(ii, **extra))
+        payload["models"].extend(extra_rows)
+        base.write_text(flight_html(json.dumps(payload, separators=(",", ":"))),
+                        encoding="utf-8")
+        detail.write_text(flight_html(detail_payload(
+            intelligenceIndex=ii, **(detail_fields or {}))),
+                          encoding="utf-8")
+        methodology.write_text(methodology_html(), encoding="utf-8")
+        agents.write_text(flight_html(agent_payload(
+            [agent_row(f"Agent - Model {i}") for i in range(5)])), encoding="utf-8")
+        argv = ["fetch_aa.py", "--html", str(base), "--detail-html", str(detail),
+                "--methodology-html", str(methodology), "--agents-html", str(agents)]
+        if enabled:
+            argv.append("--cross-run-lookback")
+
+        def between_looks(_seconds):
+            if second is not None:
+                base.write_text(flight_html(look_payload(second, **extra)),
+                                encoding="utf-8")
+        stdout = io.StringIO()
+        with unittest.mock.patch.object(sys, "argv", argv), \
+                unittest.mock.patch.object(fetch_aa, "_today", create=True,
+                                           return_value=datetime.date(2026, 10, day)), \
+                unittest.mock.patch.object(fetch_aa, "_sleep", side_effect=between_looks), \
+                contextlib.redirect_stdout(stdout):
+            fetch_aa.main()
+        return json.loads(self.output.read_text()), stdout.getvalue()
+
+    def state(self):
+        self.assertTrue(self.state_path.exists())
+        return json.loads(self.state_path.read_text())
+
+    def establish_hold(self):
+        self.run_hour(40)
+        self.run_hour(50, day=2)
+        return self.run_hour(40, day=3)
+
+    def test_bootstrap_ordinary_and_one_way_updates_are_byte_identical(self):
+        for ii, action in [(40, "bootstrap"), (40, "ordinary"),
+                           (50, "new"), (60, "new")]:
+            models, log = self.run_hour(ii)
+            state = self.state()
+            self.assertIsNone(state["held"])
+            self.assertEqual(state["last"], fetch_aa.revisit_key(models))
+            self.assertIn(action, log)
+            self.assertEqual(len([line for line in log.splitlines()
+                                  if line.startswith("cross-run revisit:")]), 1)
+            ordinary = self.output.read_bytes()
+            state_bytes = self.state_path.read_bytes()
+            self.run_hour(ii, enabled=False)
+            self.assertEqual(self.output.read_bytes(), ordinary)
+            self.assertEqual(self.state_path.read_bytes(), state_bytes)
+        self.assertEqual(len(self.state()["remembered"]), 3)
+
+    def test_revisit_holds_canonical_values_and_freezes_every_hold_hour(self):
+        models, log = self.establish_hold()
+        self.assertIn("hold entered", log)
+        state = self.state()
+        self.assertEqual(state["held"]["since"], "2026-10-03")
+        held_bytes = self.state_path.read_bytes()
+        fixture = next(m for m in models if m["slug"] == "fixture-model")
+        self.assertEqual({v["ii"] for v in fixture["genVariants"]}, {40, 50})
+        self.assertEqual(fixture["intelligenceIndex"], fixture["genVariants"][0]["ii"])
+        rows = build.build_rows(models)
+        for ii in (50, 50, 40, 40, 50):
+            current, log = self.run_hour(ii, day=4,
+                                         name="Changed identity", parameters=999,
+                                         intelligenceIndexCostPerTask=0.75)
+            self.assertIn("held", log)
+            self.assertEqual(self.state_path.read_bytes(), held_bytes)
+            self.assertEqual(build.build_rows(current), rows)
+        self.assertNotIn("f0", held_bytes.decode())
+        self.assertNotIn("medianTimeToFirstTokenSeconds", held_bytes.decode())
+
+    def test_new_fingerprint_ends_hold_and_publishes_alone(self):
+        self.establish_hold()
+        models, log = self.run_hour(60, day=4)
+        self.assertIn("hold ended", log)
+        self.assertIsNone(self.state()["held"])
+        self.assertEqual(len(self.state()["remembered"]), 3)
+        self.assertTrue(all("genVariants" not in m for m in models))
+        self.assertEqual(self.state()["last"], fetch_aa.revisit_key(models))
+
+    def test_remembered_outside_generation_joins_without_resetting_since(self):
+        self.run_hour(30)
+        self.establish_hold()
+        models, log = self.run_hour(30, day=5)
+        self.assertIn("joined", log)
+        state = self.state()
+        self.assertEqual(state["held"]["since"], "2026-10-03")
+        self.assertEqual(len(state["held"]["generations"]), 3)
+        fixture = next(m for m in models if m["slug"] == "fixture-model")
+        self.assertEqual({v["ii"] for v in fixture["genVariants"]}, {30, 40, 50})
+        frozen = self.state_path.read_bytes()
+        self.run_hour(50, day=6)
+        self.assertEqual(self.state_path.read_bytes(), frozen)
+
+    def test_in_run_disputes_preserve_state_and_render_held_only_for_members(self):
+        held, _ = self.establish_hold()
+        frozen = self.state_path.read_bytes()
+        for first, second in [(40, 50), (50, 40)]:
+            models, _ = self.run_hour(first, second=second)
+            self.assertEqual(build.build_rows(models), build.build_rows(held))
+            self.assertEqual(self.state_path.read_bytes(), frozen)
+        models, _ = self.run_hour(40, second=60)
+        self.assertEqual(self.state_path.read_bytes(), frozen)
+        self.run_hour(40, second=60, enabled=False)
+        self.assertEqual(json.loads(self.output.read_text()), models)
+
+    def test_in_run_dispute_without_hold_does_not_remember_either_look(self):
+        self.run_hour(40)
+        frozen = self.state_path.read_bytes()
+        self.run_hour(50, second=60)
+        self.assertEqual(self.state_path.read_bytes(), frozen)
+
+    def test_stale_last_rebootstraps_from_previous_capture(self):
+        self.run_hour(40)
+        a = self.state()["last"]
+        self.run_hour(50, enabled=False)
+        b = fetch_aa.revisit_key(json.loads(self.output.read_text()))
+        _, log = self.run_hour(40)
+        self.assertIn("hold entered", log)
+        state = self.state()
+        self.assertEqual(state["remembered"], [a, b])
+        self.assertEqual(set(state["held"]["generations"]), {a, b})
+
+    def test_stale_last_already_remembered_does_not_append_it_twice(self):
+        self.run_hour(40)
+        a = self.state()["last"]
+        self.run_hour(50)
+        self.run_hour(40, enabled=False)
+        self.run_hour(40)
+        state = self.state()
+        self.assertIsNone(state["held"])
+        self.assertEqual(state["last"], a)
+        self.assertEqual(len(state["remembered"]), 2)
+
+    def test_warning_boundary_is_stdout_only_and_never_rewrites_since(self):
+        self.establish_hold()
+        frozen = self.state_path.read_bytes()
+        for day, warns in [(9, False), (10, False), (11, True), (9, False)]:
+            stderr = io.StringIO()
+            with contextlib.redirect_stderr(stderr):
+                _, log = self.run_hour(50, day=day)
+            self.assertEqual("WARNING" in log, warns)
+            self.assertEqual(stderr.getvalue(), "")
+            self.assertEqual(self.state_path.read_bytes(), frozen)
+
+    def test_cap_keeps_1000_then_evicts_oldest_and_evicted_revisit_is_new(self):
+        self.run_hour(0)
+        oldest = self.state()["last"]
+        for ii in range(1, 1000):
+            self.run_hour(ii)
+        self.assertEqual(len(self.state()["remembered"]), 1000)
+        self.assertEqual(self.state()["remembered"][0], oldest)
+        self.run_hour(1000)
+        self.assertEqual(len(self.state()["remembered"]), 1000)
+        self.assertNotIn(oldest, self.state()["remembered"])
+        models, _ = self.run_hour(0)
+        self.assertIsNone(self.state()["held"])
+        self.assertEqual(self.state()["remembered"][-1], oldest)
+        self.assertTrue(all("genVariants" not in m for m in models))
+
+    def test_without_flag_neither_reads_nor_creates_state(self):
+        self.run_hour(40, enabled=False)
+        self.assertFalse(self.state_path.exists())
+        self.state_path.write_text("invalid JSON", encoding="utf-8")
+        self.run_hour(50, enabled=False)
+        self.assertEqual(self.state_path.read_text(), "invalid JSON")
+
+    def test_bootstrap_remembers_previous_capture_before_first_update(self):
+        previous, _ = self.run_hour(40, enabled=False)
+        current, _ = self.run_hour(50)
+        self.assertEqual(self.state()["remembered"],
+                         [fetch_aa.revisit_key(previous), fetch_aa.revisit_key(current)])
+        self.run_hour(40)
+        self.assertIsNotNone(self.state()["held"])
+
+    def test_ordinary_repeat_keeps_state_bytes_and_ignores_payload_churn(self):
+        self.run_hour(40)
+        frozen = self.state_path.read_bytes()
+        self.run_hour(40, day=2, medianOutputTokensPerSecond=999,
+                      intelligenceIndexTimePerTask=123, unusedPayload="churn")
+        self.assertEqual(self.state_path.read_bytes(), frozen)
+
+    def test_gdpval_breakdowns_are_frozen_per_generation_and_not_re_filled(self):
+        self.run_hour(40, gdpvalNormalized=0.4)
+        self.run_hour(50, gdpvalNormalized=0.5,
+                      detail_fields={"intelligenceIndexCostPerTask": 0.75})
+        models, _ = self.run_hour(40, gdpvalNormalized=0.4)
+        fixture = next(m for m in models if m["slug"] == "fixture-model")
+        variants = {v["ii"]: v for v in fixture["genVariants"]}
+        self.assertAlmostEqual(variants[40]["gdpvalCost"], 3)
+        self.assertNotIn("gdpvalCost", variants[50])
+        frozen = self.state_path.read_bytes()
+        changed_detail = {"intelligenceIndexCostPerTask": {
+            "cost": {"total": 0.75}, "evaluations": [
+                {"slug": "gdpval-aa", "weightedCostPerTask": 0.15},
+                {"slug": "scicode", "weightedCostPerTask": 0.6}]}}
+        for ii in (50, 40):
+            current, _ = self.run_hour(
+                ii, gdpvalNormalized=ii / 100, detail_fields=changed_detail)
+            self.assertEqual(build.build_rows(current), build.build_rows(models))
+            self.assertEqual(self.state_path.read_bytes(), frozen)
+
+    def test_state_write_failure_preserves_previous_bytes_and_leaves_no_temp(self):
+        self.run_hour(40)
+        frozen = self.state_path.read_bytes()
+        replace = os.replace
+
+        def fail_state(source, dest):
+            if dest == self.state_path:
+                raise OSError("state replace failed")
+            return replace(source, dest)
+        with unittest.mock.patch.object(os, "replace", side_effect=fail_state):
+            with self.assertRaisesRegex(OSError, "state replace failed"):
+                self.run_hour(50)
+        self.assertEqual(self.state_path.read_bytes(), frozen)
+        self.assertEqual(list(self.root.glob("*.tmp")), [])
+
+    def test_held_retirement_has_empty_slot_and_keeps_presence_layer(self):
+        extra = leaderboard_record(slug="extra-model", intelligenceIndex=25)
+        self.run_hour(40)
+        self.run_hour(50, extra_rows=[extra])
+        self.run_hour(50, extra_rows=[extra])
+        models, _ = self.run_hour(40)
+        self.assertTrue(next(m for m in models if m["slug"] == "extra-model")
+                        ["crossRunMerged"])
+        self.run_hour(40)
+        models, _ = self.run_hour(50, extra_rows=[extra])
+        self.assertIsNotNone(self.state()["held"])
+        frozen = self.state_path.read_bytes()
+        for ii, rows in [(40, []), (50, [extra]), (40, [])]:
+            models, _ = self.run_hour(ii, extra_rows=rows)
+            self.assertEqual(self.state_path.read_bytes(), frozen)
+            record = next(m for m in models if m["slug"] == "extra-model")
+            self.assertTrue(any(not v for v in record["genVariants"]))
+
+
+class HeldPayloadTests(unittest.TestCase):
+    def setUp(self):
+        self.harness = TestGenerationRevisit()
+        self.harness.setUp()
+        self.addCleanup(self.harness.doCleanups)
+
+    def test_unheld_fields_follow_current_read_without_moving_rows_or_state(self):
+        self.harness.run_hour(40, critpt=0.2)
+        self.harness.run_hour(50, critpt=0.2)
+        held, _ = self.harness.run_hour(40, critpt=0.2)
+        frozen = self.harness.state_path.read_bytes()
+        rows = build.build_rows(held)
+        for ii, critpt in ((50, 0.3), (40, 0.4)):
+            current, _ = self.harness.run_hour(ii, critpt=critpt, f0="fresh payload")
+            fixture = next(m for m in current if m["slug"] == "fixture-model")
+            self.assertEqual(fixture.get("critpt"), critpt)
+            self.assertEqual(fixture.get("f0"), "fresh payload")
+            self.assertEqual(build.build_rows(current), rows)
+            self.assertEqual(self.harness.state_path.read_bytes(), frozen)
+
+    def test_hold_entry_commit_message_has_no_projection_removals(self):
+        self.harness.run_hour(40, critpt=0.2, hle=0.4)
+        self.harness.run_hour(50, critpt=0.2, hle=0.4)
+        previous = self.harness.root / "previous.json"
+        previous.write_bytes(self.harness.output.read_bytes())
+        self.harness.run_hour(40, critpt=0.2, hle=0.4)
+        agents = str(self.harness.root / "agents.json")
+        result = subprocess.run(
+            [sys.executable, str(build.ROOT / "scripts/diff_aa.py"),
+             str(previous), str(self.harness.output), "--old-agents", agents,
+             "--new-agents", agents, "--commit-msg"],
+            capture_output=True, text=True, check=True)
+        self.assertIn("disputed", result.stdout)
+        self.assertNotIn("-> —", result.stdout)
+        self.assertNotIn("critpt", result.stdout)
+        self.assertNotIn("hle", result.stdout)
+
+
+class TestGenerationRevisitSpeeds(unittest.TestCase):
+    def setUp(self):
+        self.harness = TestGenerationRevisit()
+        self.harness.setUp()
+        self.addCleanup(self.harness.doCleanups)
+
+    def assert_held_speeds(self, first, second):
+        rendered = {"medianOutputTokensPerSecond", "intelligenceIndexTimePerTask"}
+        unused: dict = {key: 777 for key in fetch_aa.NEVER_RED_FIELDS - rendered}
+        self.harness.run_hour(40, **first, **unused)
+        self.harness.run_hour(50, **second, **unused)
+        models, _ = self.harness.run_hour(40, **first, **unused)
+        state_bytes = self.harness.state_path.read_bytes()
+        rows = build.build_rows(models)
+        self.assertEqual(rows[0]["tps"], first.get("medianOutputTokensPerSecond"))
+        self.assertEqual(rows[0]["secs"], first.get("intelligenceIndexTimePerTask"))
+        for ii, speed in [(40, first), (50, second), (40, first), (50, second)]:
+            current, _ = self.harness.run_hour(ii, **speed, **unused)
+            self.assertEqual(build.build_rows(current), rows)
+            self.assertEqual(self.harness.state_path.read_bytes(), state_bytes)
+        for corpus in self.harness.state()["held"]["generations"].values():
+            record = next(m for m in corpus if m["slug"] == "fixture-model")
+            expected = first if record["intelligenceIndex"] == 40 else second
+            self.assertEqual({k: v for k, v in record.items()
+                              if k in fetch_aa.NEVER_RED_FIELDS}, expected)
+        captured = fetch_aa.capture(str(self.harness.root / "base.html"),
+                                    str(self.harness.root / "detail.html"),
+                                    str(self.harness.root / "methodology.html"),
+                                    current, self.harness.state())
+        self.assertEqual(captured.generations, 1)
+        self.assertTrue(captured.disputed)
+
+    def test_held_speeds_above_tolerance_are_frozen_per_generation(self):
+        self.assert_held_speeds(
+            {"medianOutputTokensPerSecond": 150, "intelligenceIndexTimePerTask": 150},
+            {"medianOutputTokensPerSecond": 100, "intelligenceIndexTimePerTask": 100})
+
+    def test_held_speeds_missing_from_canonical_generation_stay_absent(self):
+        self.assert_held_speeds(
+            {}, {"medianOutputTokensPerSecond": 100, "intelligenceIndexTimePerTask": 100})
+
+    def test_held_speeds_missing_from_other_generation_stay_canonical(self):
+        self.assert_held_speeds(
+            {"medianOutputTokensPerSecond": 150, "intelligenceIndexTimePerTask": 150}, {})
+
+    def test_unheld_speed_movement_above_tolerance_still_publishes(self):
+        before, _ = self.harness.run_hour(
+            40, medianOutputTokensPerSecond=150, intelligenceIndexTimePerTask=150)
+        state_bytes = self.harness.state_path.read_bytes()
+        after, _ = self.harness.run_hour(
+            40, medianOutputTokensPerSecond=100, intelligenceIndexTimePerTask=100)
+        self.assertIsNone(self.harness.state()["held"])
+        self.assertEqual(self.harness.state_path.read_bytes(), state_bytes)
+        self.assertNotEqual(before, after)
+        row = build.build_rows(after)[0]
+        self.assertEqual((row["tps"], row["secs"]), (100, 100))
+
+
 if __name__ == "__main__":
     unittest.main()

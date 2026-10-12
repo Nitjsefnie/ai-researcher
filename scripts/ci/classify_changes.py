@@ -18,19 +18,21 @@ list it cannot read, or a list that may be truncated all classify as a
 full change and run every leg. An API failure that under-runs would
 skip gates over code; one that over-runs only wastes minutes.
 
-A second class narrows the refresh bot's data: its hourly push changes
-only the two captures, their capture stamp and the built page —
+A second class narrows the refresh bot's data to six supported paths.
+The fixed `git add` list in refresh.yml names
 `data/aa-raw-models.json`, `data/aa-raw-coding-agents.json`,
-`data/captured-at.txt` and `out/frontier-models.html` — the fixed
-`git add` list in refresh.yml. The refresh job runs the full suite
+`data/aa-generation-state.json`, `data/captured-at.txt` and
+`out/frontier-models.html`. The sixth, `data/cost-breakdown-window.txt`,
+is added when the payload carries it and removed when only HEAD carries it.
+The refresh job runs the full suite
 against the fresh capture BEFORE pushing (refresh.yml's own job), so
 re-running the heavy matrix on the bot's push re-verifies nothing. An
-hour's commit carries only the subset of those four whose bytes moved
+hour's commit carries only the subset of those six whose bytes moved
 (git omits byte-identical files from the diff), so the class matches
-any non-empty SUBSET of the four, never per-file verdicts: a fifth
+any non-empty SUBSET of the six, never per-file verdicts: an outside
 path — any other data/ file, or a source path — is not the bot, has no
 pre-test behind it, and runs the full set. The trade-off is accepted:
-a hand-staged commit confined to those four generated paths also gets
+a hand-staged commit confined to those six generated paths also gets
 the cheap class, although nothing pre-tested it (issue #212).
 
 On a PUSH the changed set is read over the verified base rather than
@@ -60,18 +62,19 @@ import subprocess
 # re-homed as classifier patterns.
 DOC_PATTERNS = ('**/*.md', 'LICENSE', '.gitignore')
 
-# The refresh bot's push signature: the hourly refresh's fixed `git add`
-# list in refresh.yml, staged and pushed as ONE commit. A signature, not
+# The refresh bot's push signature: refresh.yml's fixed `git add` list
+# plus the conditional window-marker add/removal, in ONE commit. A signature, not
 # a filter: the cheap class exists for generated data the refresh job
-# already tested. An hour's commit stages only the subset of these five
+# already tested. An hour's commit stages only the subset of these six
 # whose bytes moved, so any non-empty subset gets it — lint and
 # actionlint still run, and the accepted cost is that a hand-staged
-# commit confined to these five generated paths gets the cheap class
+# commit confined to these six generated paths gets the cheap class
 # without its pre-test. A path outside the signature is untested data
 # and keeps the full matrix.
 BOT_SIGNATURE = frozenset({
     'data/aa-raw-models.json',
     'data/aa-raw-coding-agents.json',
+    'data/aa-generation-state.json',
     'data/captured-at.txt',
     'data/cost-breakdown-window.txt',
     'out/frontier-models.html',

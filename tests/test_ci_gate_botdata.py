@@ -48,9 +48,9 @@ CODE = [
 # ---------------------------------------------------------------------------
 
 
-def test_bot_signature_is_exactly_the_refresh_bots_five_files():
+def test_bot_signature_is_exactly_the_refresh_bots_six_files():
     # The hourly refresh's fixed `git add` list in refresh.yml stages
-    # the two captures, their capture stamp and the built page as ONE
+    # the two captures, generation state, capture stamp and built page as ONE
     # commit, though an hour's diff stages only the subset whose bytes
     # moved. The window marker (issue #227) rides the same commit --
     # in when the hour recorded a window, out on the first healthy
@@ -60,6 +60,7 @@ def test_bot_signature_is_exactly_the_refresh_bots_five_files():
     assert classify.BOT_SIGNATURE == frozenset({
         "data/aa-raw-models.json",
         "data/aa-raw-coding-agents.json",
+        "data/aa-generation-state.json",
         "data/captured-at.txt",
         "data/cost-breakdown-window.txt",
         "out/frontier-models.html",
@@ -76,7 +77,8 @@ def test_bot_signature_names_every_file_the_refresh_workflow_adds():
     raw = (REPO_ROOT / ".github" / "workflows" / "refresh.yml").read_text(
         encoding="utf-8")
     fixed = "git add data/aa-raw-models.json data/aa-raw-coding-agents.json \\\n" \
-            "                  data/captured-at.txt out/frontier-models.html"
+            "                  data/aa-generation-state.json " \
+            "data/captured-at.txt out/frontier-models.html"
     assert fixed in raw
     adds = re.findall(r"^\s*git add(?:[^\n\\]|\\\n)*", raw, re.MULTILINE)
     assert len(adds) == 2, adds
@@ -103,7 +105,7 @@ def test_data_only_accepts_the_signature_and_only_its_subsets():
         "out/frontier-models.html", "data/captured-at.txt",
         "data/aa-raw-models.json", "data/aa-raw-coding-agents.json",
         "data/aa-raw-models.json"])
-    # An hour's commit carries only the subset of the five whose bytes
+    # An hour's commit carries only the subset of the six whose bytes
     # moved (git omits byte-identical files from the diff) — the real
     # refresh push that ran the full matrix by mistake (issue #212,
     # run 37490807791) touched exactly these two.
@@ -111,6 +113,7 @@ def test_data_only_accepts_the_signature_and_only_its_subsets():
         "data/aa-raw-models.json", "out/frontier-models.html"])
     assert classify.data_only(["data/captured-at.txt"])
     assert classify.data_only(["data/cost-breakdown-window.txt"])
+    assert classify.data_only(["data/aa-generation-state.json"])
 
 
 def test_data_only_refuses_a_fifth_path():
@@ -133,14 +136,14 @@ def test_trending_push_runs_the_full_gate_set():
 
 
 def test_data_only_accepts_any_proper_subset():
-    # Any non-empty subset of the five is a shape the bot's push takes:
+    # Any non-empty subset of the six is a shape the bot's push takes:
     # an hour's commit carries only the files whose bytes moved, so a
     # dropped file is an hour with one byte-identical artifact, not a
     # hand-staged change to run the full matrix over. Dropping the window
     # marker (issue #227) is the heal hour's own shape.
     full = ["data/aa-raw-models.json", "data/aa-raw-coding-agents.json",
             "data/captured-at.txt", "out/frontier-models.html",
-            "data/cost-breakdown-window.txt"]
+            "data/cost-breakdown-window.txt", "data/aa-generation-state.json"]
     for dropped in full:
         assert classify.data_only(
             [path for path in full if path != dropped]), dropped

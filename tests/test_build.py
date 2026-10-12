@@ -770,6 +770,50 @@ class CaptureStampTests(unittest.TestCase):
         self.assertIn("\\xff", message)
 
 
+class GenerationHoldRenderTests(unittest.TestCase):
+    """The stored hold date renders once, inside the dispute explanation."""
+
+    def render(self, state):
+        harness = EmptyAxisGuardTests()
+        with harness.capture([disputed_model_fixture()], [agent_fixture()]) as output:
+            if state is not None:
+                (output.parent / "aa-generation-state.json").write_text(
+                    json.dumps(state), encoding="utf-8")
+            harness.run_build()
+            return output.read_text(encoding="utf-8")
+
+    def test_no_state_file_renders_no_held_since_text(self):
+        self.assertNotIn("held since", self.render(None))
+
+    def test_state_without_hold_renders_no_held_since_text(self):
+        self.assertNotIn("held since", self.render(
+            {"remembered": [], "last": None, "held": None}))
+
+    def test_active_hold_renders_exact_stored_date_in_dispute_legend(self):
+        page = self.render({"held": {"since": "2026-10-12", "generations": {}}})
+        legend = re.search(r'<p id="dispute-legend">(.*?)</p>', page, re.S)
+        self.assertIsNotNone(legend)
+        assert legend is not None
+        self.assertIn('<span id="generation-hold">held since 2026-10-12</span>',
+                      legend.group(1))
+        self.assertEqual(page.count("held since"), 1)
+
+    def test_invalid_stored_date_cannot_inject_markup_or_template_markers(self):
+        for since in ("<b>bad</b>", "__DATA__", "2026-02-30"):
+            with self.subTest(since=since), self.assertRaises(ValueError):
+                self.render({"held": {"since": since, "generations": {}}})
+
+    def test_supplied_absent_state_does_not_read_disk(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            data = pathlib.Path(tmp)
+            (data / "aa-generation-state.json").write_text("not JSON", encoding="utf-8")
+            self.assertEqual(build.generation_hold_note(data, None), "")
+
+    def test_supplied_no_hold_state_still_validates_json(self):
+        with self.assertRaises(ValueError):
+            build.generation_hold_note(pathlib.Path("unused"), b'{"held": null,')
+
+
 class CostBreakdownWindowReaderTests(unittest.TestCase):
     """Issue #217: the build layer's one question about the window marker.
 
