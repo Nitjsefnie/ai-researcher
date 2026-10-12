@@ -20,16 +20,16 @@
       "id": "Lightricks/LTX-2.5"
     },
     {
-      "id": "Qwen/Qwen3.8-27B"
-    },
-    {
       "id": "ConwayResearch/Underdog-Saluki-27B-1.0"
     },
     {
-      "id": "canberkkkkkk/ema-lightning"
+      "id": "Qwen/Qwen3.8-27B"
     },
     {
       "id": "LiquidAI/d1-3B"
+    },
+    {
+      "id": "canberkkkkkk/ema-lightning"
     }
   ]
 }
