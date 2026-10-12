@@ -11,10 +11,10 @@
       "id": "abenzerps/Qwen-Image-2.1-Uncensored-Quantized"
     },
     {
-      "id": "Cloudflare/clef"
+      "id": "Qwen/Qwen-Image-2.1-Turbo"
     },
     {
-      "id": "Qwen/Qwen-Image-2.1-Turbo"
+      "id": "Cloudflare/clef"
     },
     {
       "id": "Lightricks/LTX-2.5"
@@ -26,10 +26,10 @@
       "id": "ConwayResearch/Underdog-Saluki-27B-1.0"
     },
     {
-      "id": "LiquidAI/d1-3B"
+      "id": "canberkkkkkk/ema-lightning"
     },
     {
-      "id": "canberkkkkkk/ema-lightning"
+      "id": "LiquidAI/d1-3B"
     }
   ]
 }
