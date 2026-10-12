@@ -154,12 +154,10 @@ def test_required_jobs_name_the_merge_gate_contexts(tmp_path):
         assert name in jobs, f'{path} must define the merge-gate job {name!r}'
 
 
-# The derived set on this repository's HEAD, pinned: a required job naming a
-# new file forces this pin to change in the same commit, says nothing else may
-# move. The pipeline commits exactly the bot paths the refresh workflow's own
-# fixed `git add` names, and every one of them is already in the pin, so
-# nothing else's tracked-ness can move the expectation (issue #200 removed the
-# disagreement window that issue #198's widening existed for).
+# The derived set on this repository's HEAD, pinned: a tracked file named by a
+# gate workflow moves this pin in the same commit. `refresh.yml` names `data/`
+# in checkout commands, and `tests.yml` names `tests/` through its coverage
+# omit glob; `resolve()` expands those directory tokens to tracked files.
 def test_gate_paths_on_this_repository(tmp_path):
     del tmp_path
     done = subprocess.run(
@@ -195,6 +193,7 @@ CORE_PIN = (
     '.github/workflows/codeql.yml',
     '.github/workflows/ci-gate.yml',
     '.github/workflows/coverage-comment.yml',
+    '.github/workflows/hf-trending.yml',
     '.github/workflows/lint.yml',
     '.github/workflows/pr-gate.yml',
     '.github/workflows/ratchet-push.yml',
@@ -206,6 +205,7 @@ CORE_PIN = (
     'data/aa-raw-coding-agents.json',
     'data/aa-raw-models.json',
     'data/captured-at.txt',
+    'data/hf-trending.json',
     'out/frontier-models.html',
     'requirements-dev.txt',
     'requirements-pip-audit.txt',
@@ -246,8 +246,10 @@ CORE_PIN = (
     'tests/test_diff_aa.py',
     'tests/test_diff_coverage.py',
     'tests/test_fetch_aa.py',
+    'tests/test_fetch_hf_trending.py',
     'tests/test_gate_base_freshness.py',
     'tests/test_gitignore.py',
+    'tests/test_hf_trending_workflow.py',
     'tests/test_workflow_ci_gate.py',
     'tests/test_js_coverage.py',
     'tests/test_publish_docs.py',

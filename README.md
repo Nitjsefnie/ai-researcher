@@ -4,10 +4,16 @@ Tracks frontier AI models and publishes one comparison artifact: **capability
 against cost per task**, live at
 [`docs.nitjsefni.eu/d/ai-researcher/frontier-models`](https://docs.nitjsefni.eu/d/ai-researcher/frontier-models).
 
-Every number comes from [artificialanalysis.ai](https://artificialanalysis.ai/)
-and nowhere else. A model AA has not measured is absent from the page, not
+Every number on the frontier page comes from
+[artificialanalysis.ai](https://artificialanalysis.ai/) and nowhere else. A
+model AA has not measured is absent from the page, not
 estimated from a lab blog or a pricing page. That is a standing decision, and
 `AGENTS.md` carries the reasoning; read it before changing what the page shows.
+
+The Hugging Face trending list is a separate tracked output:
+`scripts/fetch_hf_trending.py` writes `data/hf-trending.json`, and
+`.github/workflows/hf-trending.yml` updates it hourly. It never feeds the
+frontier page.
 
 ## What the page plots
 

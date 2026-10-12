@@ -53,12 +53,14 @@
 /.github/workflows/*
 !/.github/workflows/*.yml
 
-# ---- data/ — the captured AA artifact; never hand-edited -------------------
+# ---- data/ — AA captures and separate tracked outputs ---------------------
 !/data/
 /data/*
 !/data/aa-raw-models.json
 !/data/aa-raw-coding-agents.json
 !/data/captured-at.txt
+# Hugging Face trending list; not AA capture data and not page input.
+!/data/hf-trending.json
 # fetch_aa.py's all-dropped cost-breakdown window marker (issue #217):
 # pipeline state the build reads by existence, never page input.
 !/data/cost-breakdown-window.txt
