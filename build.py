@@ -17,6 +17,7 @@ import json
 import os
 import pathlib
 import re
+from types import EllipsisType
 
 # The page's formatting rules live beside the build that renders them into
 # the static table bodies, not inside it: build.py is one line-budgeted HTML
@@ -826,6 +827,23 @@ def read_capture_stamp(stamp_path: pathlib.Path) -> str:
     return value
 
 
+def generation_hold_note(data_dir: pathlib.Path, raw: bytes | None | EllipsisType = ...) -> str:
+    """Read state only when not supplied; None means the source had no file."""
+    if raw is ...:
+        try:
+            raw = (data_dir / "aa-generation-state.json").read_bytes()
+        except FileNotFoundError:
+            return ""
+    if raw is None:
+        return ""
+    state = json.loads(raw.decode("utf-8"))
+    held = state.get("held")
+    if not held:
+        return ""
+    since = dt.date.fromisoformat(held["since"]).isoformat()
+    return f' <span id="generation-hold">held since {since}</span>'
+
+
 def cost_breakdown_window(data_dir: pathlib.Path) -> bool:
     """Whether fetch_aa.py left the all-dropped window marker (issue #217).
 
@@ -1114,7 +1132,7 @@ def render_static_tbodies(rows):
     return rendered[0][1], rendered[1][1]
 
 
-def main():
+def main(*, generation_state: bytes | None | EllipsisType = ...):
     models = read_capture(RAW)
     agents = read_capture(AGENTS_RAW)
     rows = build_rows(models) + build_agent_rows(agents, models)
@@ -1299,8 +1317,11 @@ def main():
     # it -- can never re-splice a rendered tbody. render_static_tbodies has
     # already refused any rendered body that carries a marker.
     frontier_tbody, main_tbody = render_static_tbodies(rows)
+    # Resolve the adjacent state/provenance slots in one pass over the page.
+    footer_note = (generation_hold_note(RAW.parent, generation_state)
+                   + "</p>\n    <p>" + provenance)
     OUT.write_text(TEMPLATE.replace("__AGENTIC_WINDOW_NOTE__", window_note)
-                   .replace("__PROVENANCE__", provenance)
+                   .replace("__GENERATION_HOLD__</p>\n    <p>__PROVENANCE__", footer_note)
                    .replace("__CAPTURED__", captured)
                    .replace("__TBODY_FRONTIER__", frontier_tbody)
                    .replace("__TBODY_MAIN__", main_tbody)
@@ -1746,7 +1767,7 @@ TEMPLATE = r"""<!DOCTYPE html>
       computed from &mdash; and the pair order is canonical, fixed by the
       capture's generation order. Agreeing values render once, unchanged;
       an em-dash side marks a generation that does not carry the model at
-      all (issue #211).</p>
+      all (issue #211).__GENERATION_HOLD__</p>
     <p>__PROVENANCE__</p>
     <p>&copy; 2026 Peter Z (Nitjsefnie) &middot;
       <a href="https://github.com/Nitjsefnie/ai-researcher/blob/main/LICENSE">MIT licence</a></p>

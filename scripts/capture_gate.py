@@ -18,10 +18,11 @@ news: the rendered speed fields are compared with diff_aa.py's own
 value is jitter and is reconciled to it (see reconcile_speed). A
 sub-threshold re-sample of output tokens/sec or time per task compares
 equal, so a quiet month of speed jitter commits nothing. The cost, stated
-plainly: the page's speed columns can lag AA's live re-sampling by just
-under the threshold -- and they cannot lag further, because each hour
-compares against the last committed value, so a sustained crawl crosses
-the threshold cumulatively and commits.
+plainly: outside a generation hold, speed columns can lag AA's live
+re-sampling by just under the threshold -- and they cannot lag further,
+because each hour compares against the last committed value, so a sustained crawl crosses
+the threshold cumulatively and commits. A generation hold instead renders
+the speeds frozen in the capture, for the length of that hold.
 
 Exit codes (the gate, run with no argument):
   0   an answer was reached: stdout carries `true` (moved) or `false`.
@@ -74,6 +75,7 @@ MODELS_NAME = "aa-raw-models.json"
 AGENTS_NAME = "aa-raw-coding-agents.json"
 STAMP_NAME = "captured-at.txt"
 WINDOW_MARKER_NAME = "cost-breakdown-window.txt"
+GENERATION_STATE_NAME = "aa-generation-state.json"
 
 # Both gate builds run stamp-less: an unset AA_SOURCE_COMMIT renders nothing
 # extra (build.py renders only a SHA-shaped value), so the source-commit
@@ -273,24 +275,35 @@ def read_fresh_window_marker() -> bytes | None:
         return None
 
 
+def read_head_generation_state() -> bytes | None:
+    """The state at HEAD, or None for a tree without the state file."""
+    proc = subprocess.run(
+        ["git", "show", f"HEAD:data/{GENERATION_STATE_NAME}"], cwd=str(ROOT),
+        stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, check=False)
+    return proc.stdout if proc.returncode == 0 else None
+
+
+def read_fresh_generation_state() -> bytes | None:
+    """The fresh capture's generation state, or None when absent."""
+    try:
+        return (ROOT / "data" / GENERATION_STATE_NAME).read_bytes()
+    except FileNotFoundError:
+        return None
+
+
 # --- build both sides --------------------------------------------------------
 
 
 def _stage(side_dir: pathlib.Path, captures: tuple[bytes, bytes],
            window_marker: bytes | None) -> None:
-    """One side's temp data dir: the two captures, the synthetic stamp, and
-    that side's own window marker.
+    """Stage the captures, synthetic stamp, and that side's window marker.
 
     The real stamps (tree and HEAD) are never read: the date is build-machine
     metadata, and building both sides from the same synthetic date is what
     keeps a date-only difference from voting.
 
-    The marker, unlike the stamp, is DATA state build.py reads back from
-    RAW.parent (cost_breakdown_window / window_generations) -- the one file
-    beyond the captures and the stamp that build.main() opens there. Staging
-    each side's OWN source's marker is what makes the #217 exemption and the
-    #223 window-naming refusal reachable on the gate path at all: without it
-    a window hour refused with the shape-change wording (issue #227).
+    Generation state goes directly to the builder from the source read;
+    writing and re-reading a temporary copy would add no information.
     """
     side_dir.mkdir(parents=True)
     (side_dir / MODELS_NAME).write_bytes(captures[0])
@@ -302,7 +315,8 @@ def _stage(side_dir: pathlib.Path, captures: tuple[bytes, bytes],
 
 def _render_side(side_dir: pathlib.Path,
                  captures: tuple[bytes, bytes],
-                 window_marker: bytes | None) -> str:
+                 window_marker: bytes | None,
+                 generation_state: bytes | None) -> str:
     """Stage one side and build its page; return the page HTML.
 
     The temp dir lives under build.ROOT because build.main() prints
@@ -319,7 +333,7 @@ def _render_side(side_dir: pathlib.Path,
         build.AGENTS_RAW = side_dir / AGENTS_NAME
         build.OUT = page_path
         with contextlib.redirect_stdout(io.StringIO()):
-            build.main()
+            build.main(generation_state=generation_state)
     finally:
         build.RAW, build.AGENTS_RAW, build.OUT = saved
         if env_saved is not None:
@@ -345,12 +359,14 @@ def build_page_pair(head: tuple[bytes, bytes],
     fresh = reconcile_speed(head, fresh)
     head_marker = read_head_window_marker()
     fresh_marker = read_fresh_window_marker()
+    head_state = read_head_generation_state()
+    fresh_state = read_fresh_generation_state()
     with tempfile.TemporaryDirectory(prefix=".capture-gate-",
                                      dir=build.ROOT) as tmp:
         tmp_root = pathlib.Path(tmp)
-        old_page = _render_side(tmp_root / "old", head, head_marker)
+        old_page = _render_side(tmp_root / "old", head, head_marker, head_state)
         try:
-            new_page = _render_side(tmp_root / "new", fresh, fresh_marker)
+            new_page = _render_side(tmp_root / "new", fresh, fresh_marker, fresh_state)
         except build.WindowHold as exc:
             raise FreshWindowHold(str(exc)) from exc
     return old_page, new_page
@@ -375,15 +391,16 @@ def fresh_held() -> bool:
     keys on exactly the evidence the hold mandates, never on output
     message text and never on which refresh path asked. A page built is
     "not held", whatever else the hour goes on to decide. The fresh reads
-    are the same factored ones the gate uses, so a test stays hermetic on
-    the same two patches.
+    are the same factored ones the gate uses, including generation state
+    for the held-since text.
     """
     fresh = read_fresh_captures()
     marker = read_fresh_window_marker()
+    state = read_fresh_generation_state()
     with tempfile.TemporaryDirectory(prefix=".capture-gate-probe-",
                                      dir=build.ROOT) as tmp:
         try:
-            _render_side(pathlib.Path(tmp) / "fresh", fresh, marker)
+            _render_side(pathlib.Path(tmp) / "fresh", fresh, marker, state)
         except build.WindowHold:
             return True
     return False

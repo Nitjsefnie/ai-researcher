@@ -98,16 +98,14 @@ def mask(page: str) -> str:
     return stamp_mask(mask_digest(page))
 
 
-# The data files the rebuild stages from HEAD, named as build.py and
-# capture_gate.py name them: the two captures plus the stamp file beside
-# them, which build reads from RAW.parent. Staging all three fully
-# determines the build. Any further data/ input in build.py would mix
-# HEAD's staged files with the working tree's -- a required one fails the
-# refresh-shape test's staged dir loudly, an optional one needs its own
-# staging this block did not get.
+# All data inputs the rebuild stages from HEAD: two captures and their
+# stamp, plus generation state and the window marker when committed.
+# build.py reads the optional inputs beside RAW, so omitting one would
+# rebuild a different page from the one the refresh published.
 MODELS_NAME = "aa-raw-models.json"
 AGENTS_NAME = "aa-raw-coding-agents.json"
 STAMP_NAME = "captured-at.txt"
+OPTIONAL_NAMES = ("aa-generation-state.json", "cost-breakdown-window.txt")
 
 
 class HeadCaptureError(Exception):
@@ -138,11 +136,12 @@ def rebuild_page() -> str:
     runs this suite after capture but before the commit, so during a
     refresh the working data/ holds the fresh uncommitted capture, and a
     rebuild that honored it judged HEAD's page against data it was never
-    built from. HEAD's two captures and their captured-at stamp are staged
-    into a temp data/ dir -- build reads the stamp from RAW.parent. build's
+    built from. HEAD's two captures, captured-at stamp, generation state and
+    window marker are staged into a temp data/ dir. build's
     module globals and AA_SOURCE_COMMIT are restored no matter how the
     build ends, so a failed rebuild cannot poison the caller's tree state.
-    A failed `git show` raises -- red, never a silent pass.
+    A failed `git show` for a required input raises; for an optional input
+    it leaves that file absent, matching the capture gate's staging policy.
     """
     with tempfile.TemporaryDirectory(prefix=".committed-page-",
                                      dir=build.ROOT) as tmp:
@@ -150,6 +149,12 @@ def rebuild_page() -> str:
         data_dir.mkdir()
         for name in (MODELS_NAME, AGENTS_NAME, STAMP_NAME):
             (data_dir / name).write_bytes(_git_show(f"data/{name}"))
+        for name in OPTIONAL_NAMES:
+            try:
+                content = _git_show(f"data/{name}")
+            except HeadCaptureError:
+                continue
+            (data_dir / name).write_bytes(content)
         page_path = pathlib.Path(tmp) / "frontier-models.html"
         saved = (build.RAW, build.AGENTS_RAW, build.OUT)
         env_saved = os.environ.pop(STAMP_ENV, None)

@@ -35,6 +35,7 @@ for entry in ("scripts/ci", "scripts"):
 
 import check_committed_page  # noqa: E402  # pylint: disable=wrong-import-position
 import build  # noqa: E402  # pylint: disable=wrong-import-position,wrong-import-order
+import test_capture_gate  # noqa: E402  # pylint: disable=wrong-import-position
 
 COMMIT = "e5e10f1c0ffee4215deadbeefcafe0123456789a"
 
@@ -58,6 +59,61 @@ def committed_at_head() -> str:
         cwd=str(build.ROOT), capture_output=True, check=False)
     assert proc.returncode == 0, proc.stderr
     return proc.stdout.decode("utf-8")
+
+
+class CommittedStateRebuildTests(unittest.TestCase):
+    """Committed optional build inputs must survive a HEAD-only rebuild."""
+
+    def setUp(self):
+        self.harness = test_capture_gate.GenerationStateStagingTests()
+        self.harness.setUp()
+        self.addCleanup(self.harness.doCleanups)
+
+    def render_working_page(self):
+        data = self.harness.repo / "data"
+        output = self.harness.repo / "frontier-models.html"
+        with mock.patch.object(build, "RAW", data / "aa-raw-models.json"), \
+                mock.patch.object(build, "AGENTS_RAW", data / "aa-raw-coding-agents.json"), \
+                mock.patch.object(build, "OUT", output), \
+                mock.patch.dict(os.environ, {"AA_SOURCE_COMMIT": COMMIT}), \
+                contextlib.redirect_stdout(io.StringIO()):
+            build.main()
+        return output.read_text(encoding="utf-8")
+
+    def test_held_page_rebuild_uses_committed_generation_state(self):
+        self.harness.establish_hold()
+        self.harness.commit_hour()
+        committed = self.render_working_page()
+        state = self.harness.repo / "data" / "aa-generation-state.json"
+        state.write_text('{"held": null}', encoding="utf-8")
+        rebuilt = check_committed_page.rebuild_page()
+        self.assertTrue("held since 2026-10-03" in rebuilt)
+        self.assertEqual(check_committed_page.verify(committed, rebuilt), [])
+
+    def test_uncommitted_hold_state_cannot_change_rebuild(self):
+        self.harness.stage_hour(40)
+        self.harness.stage_hour(50, day=2)
+        self.harness.commit_hour()
+        committed = self.render_working_page()
+        self.harness.stage_hour(40, day=3)
+        rebuilt = check_committed_page.rebuild_page()
+        self.assertNotIn("held since", rebuilt)
+        self.assertEqual(check_committed_page.verify(committed, rebuilt), [])
+
+    def test_window_page_rebuild_uses_committed_window_marker(self):
+        self.harness.stage_hour(40)
+        data = self.harness.repo / "data"
+        models = data / "aa-raw-models.json"
+        models.write_bytes(test_capture_gate.window_capture(models.read_bytes()))
+        marker = data / "cost-breakdown-window.txt"
+        marker.write_text("2 generations observed in-run\n", encoding="utf-8")
+        self.harness.git("add", "data/cost-breakdown-window.txt")
+        self.harness.commit_hour()
+        committed = self.render_working_page()
+        marker.unlink()
+        rebuilt = check_committed_page.rebuild_page()
+        self.assertTrue("Empty during a two-generation window" in rebuilt)
+        self.assertEqual(check_committed_page.verify(committed, rebuilt), [])
 
 
 class CheckCommittedPageTests(unittest.TestCase):

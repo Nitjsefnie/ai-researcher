@@ -30,6 +30,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from unittest import mock
 
 import pytest
 import yaml
@@ -287,13 +288,14 @@ class GateTests(unittest.TestCase):  # pylint: disable=too-many-public-methods
         # The artifact is the exact commit payload the old single job staged:
         # the fixed add list and the differ's message when one ran. The
         # disagreement-era files are gone with the disagreement state (issue
-        # #200), so the list is the four payload paths, the window marker
+        # #200), so the list is the five payload paths, the window marker
         # behind its own presence guard (issue #227), and nothing that
         # varies by hour.
         run = flattened(step(self.wf, "Stage the publish payload")["run"])
 
         for piece in ("data/aa-raw-models.json",
                       "data/aa-raw-coding-agents.json",
+                      "data/aa-generation-state.json",
                       "data/captured-at.txt",
                       "out/frontier-models.html",
                       "data/cost-breakdown-window.txt",
@@ -311,6 +313,14 @@ class GateTests(unittest.TestCase):  # pylint: disable=too-many-public-methods
                      "data/aa-last-agreeing-capture.json",
                      "$RETIRE"):
             self.assertNotIn(gone, run)
+
+    def test_failed_hour_artifact_includes_generation_state(self):
+        artifact = step(self.wf, "Upload the capture on failure")
+        self.assertEqual(set(artifact["with"]["path"].splitlines()), {
+            "data/aa-raw-models.json", "data/aa-raw-coding-agents.json",
+            "data/aa-generation-state.json"})
+        self.assertIn("failure()", artifact["if"])
+        self.assertIn("steps.fetch.outputs.captured == 'true'", artifact["if"])
 
     def test_the_write_job_stages_the_window_marker_both_ways(self):
         # Issue #227: the gate's HEAD-side rebuild reads the window marker
@@ -1132,6 +1142,7 @@ class ExecutedCommitMessageTests(_SeededOrigin, unittest.TestCase):
     MOVED_FILES = {
         "data/aa-raw-models.json": '{"models": [1]}\n',
         "data/aa-raw-coding-agents.json": "[1]\n",
+        "data/aa-generation-state.json": '{"held": null}\n',
         "data/captured-at.txt": "2026-10-04T11\n",
         "out/frontier-models.html": "<p>moved</p>\n",
     }
@@ -1179,6 +1190,7 @@ class ExecutedCommitMessageTests(_SeededOrigin, unittest.TestCase):
         self.assertIn("Captured by .github/workflows/refresh.yml.", message)
         self.assertNotIn("Rebuild the page: forced run", message)
         self.assertIn("M\tdata/aa-raw-models.json", names)
+        self.assertIn("A\tdata/aa-generation-state.json", names)
         self.assertIn("M\tout/frontier-models.html", names)
         # The hour's data commit is the only commit it makes.
         self.assertEqual(log.count("\n"), 2, log)
@@ -1198,6 +1210,23 @@ class ExecutedCommitMessageTests(_SeededOrigin, unittest.TestCase):
         self.assertNotIn("Refresh capture", message)
         self.assertIn("M\tout/frontier-models.html", names)
         self.assertEqual(log.count("\n"), 2, log)
+
+    def test_unchanged_republish_with_tracked_state_commits_nothing(self):
+        state_path = "data/aa-generation-state.json"
+        self.assertTrue((ROOT / state_path).exists())
+        files = {**self.BASE_FILES, state_path: (ROOT / state_path).read_text()}
+        with tempfile.TemporaryDirectory(prefix=".republish-state-") as raw, \
+                mock.patch.object(self, "BASE_FILES", files), \
+                mock.patch.object(self, "MOVED_FILES", files):
+            tmp = pathlib.Path(raw)
+            message, names, log = self._run_hour(tmp, differ_msg=None)
+            outputs = (tmp / "output.txt").read_text()
+            self.assertIn("publish=true\n", outputs)
+            self.assertIn("commits=false\n", outputs)
+            self.assertNotIn("commits=true\n", outputs)
+            self.assertEqual(names, "")
+            self.assertEqual(log.count("\n"), 1)
+            self.assertNotIn("Rebuild the page", message)
 
 
 class ExecutedGenerationTieTests(_SeededOrigin, unittest.TestCase):

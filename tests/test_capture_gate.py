@@ -12,6 +12,7 @@ builder cannot parse fails red.
 import contextlib
 import io
 import json
+import os
 import pathlib
 import subprocess
 import sys
@@ -24,6 +25,7 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent / "scripts
 import capture_gate  # noqa: E402  # pylint: disable=wrong-import-position
 import diff_aa  # noqa: E402  # pylint: disable=wrong-import-position
 import build  # noqa: E402  # pylint: disable=wrong-import-position,wrong-import-order
+import test_fetch_aa  # noqa: E402  # pylint: disable=wrong-import-position
 
 # The real captures work as fixtures and are fast (a full build measures
 # ~0.1 s); the suite already builds from them twice. The FRESH side of the
@@ -351,6 +353,195 @@ class CaptureGateTests(unittest.TestCase):
 
         self.assertEqual(proc.returncode, 0, proc.stderr)
         self.assertIn(proc.stdout.strip(), (b"true", b"false"))
+
+
+class GenerationStateStagingTests(unittest.TestCase):
+    """Run cached AA hours through the real gate and a committed HEAD."""
+
+    def setUp(self):
+        self.harness = test_fetch_aa.TestGenerationRevisit()
+        self.harness.setUp()
+        self.addCleanup(self.harness.doCleanups)
+        self.repo = self.harness.root / "repo"
+        (self.repo / "data").mkdir(parents=True)
+        self.git("init", "-q")
+        self.git("config", "user.name", "github-actions[bot]")
+        self.git("config", "user.email",
+                 "41898282+github-actions[bot]@users.noreply.github.com")
+        self.harness.stack.enter_context(mock.patch.object(capture_gate, "ROOT", self.repo))
+        self.harness.stack.enter_context(mock.patch.object(build, "ROOT", self.repo))
+
+    def git(self, *args):
+        return subprocess.run(["git", *args], cwd=self.repo, check=True,
+                              capture_output=True, text=True).stdout
+
+    def stage_hour(self, ii, *, speed=150, day=1, gdp_cost=0.3):
+        extra: dict = {} if speed is None else {
+            "medianOutputTokensPerSecond": speed,
+            "intelligenceIndexTimePerTask": speed}
+        detail = {"parameters": 1000000000, "intelligenceIndexCostPerTask": {
+            "cost": {"total": 0.75}, "evaluations": [
+                {"slug": "gdpval-aa", "weightedCostPerTask": gdp_cost},
+                {"slug": "scicode", "weightedCostPerTask": 0.75 - gdp_cost}]}}
+        self.harness.run_hour(ii, day=day, gdpvalNormalized=0.4,
+                              detail_fields=detail, **extra)
+        for source, dest in (
+                ("aa-raw-models.json", "aa-raw-models.json"),
+                ("agents.json", "aa-raw-coding-agents.json"),
+                ("captured-at.txt", "captured-at.txt"),
+                ("aa-generation-state.json", "aa-generation-state.json")):
+            (self.repo / "data" / dest).write_bytes(
+                (self.harness.root / source).read_bytes())
+
+    def commit_hour(self):
+        self.git("add", "data/aa-raw-models.json", "data/aa-raw-coding-agents.json",
+                 "data/captured-at.txt", "data/aa-generation-state.json")
+        self.git("commit", "-qm", "Record fixture capture")
+
+    def test_fixture_commits_without_ambient_git_identity(self):
+        env = {key: value for key, value in os.environ.items()
+               if not key.startswith(("GIT_AUTHOR_", "GIT_COMMITTER_"))}
+        env.update({"GIT_CONFIG_GLOBAL": os.devnull, "GIT_CONFIG_NOSYSTEM": "1",
+                    "GIT_CONFIG_COUNT": "1", "GIT_CONFIG_KEY_0": "user.useConfigOnly",
+                    "GIT_CONFIG_VALUE_0": "true"})
+        with mock.patch.dict(os.environ, env, clear=True):
+            self.stage_hour(40)
+            self.commit_hour()
+            self.assertEqual(json.loads(self.git("show", "HEAD:data/aa-raw-models.json")),
+                             json.loads(self.harness.output.read_bytes()))
+
+    def establish_hold(self, first_speed=150, second_speed=100):
+        self.stage_hour(40, speed=first_speed)
+        self.stage_hour(50, speed=second_speed, day=2, gdp_cost=0.15)
+        self.commit_hour()
+        self.stage_hour(40, speed=first_speed, day=3)
+
+    def test_hold_entry_and_unseen_c_publish_but_a_and_b_hours_are_quiet(self):
+        self.establish_hold()
+        self.assertEqual(run_gate(), (0, "true\n"))
+        row = build.build_rows(json.loads(self.harness.output.read_bytes()))[0]
+        self.assertEqual((row["tps"], row["secs"]), (100, 100))
+        self.assertEqual([v["ii"] for v in row["gv"]], [50, 40])
+        self.assertAlmostEqual(row["gv"][0]["gdpvalCost"], 1.5)
+        self.assertAlmostEqual(row["gv"][1]["gdpvalCost"], 3)
+        self.commit_hour()
+        for ii, speed, cost in ((40, 150, 0.6), (50, 100, 0.45)):
+            with self.subTest(ii=ii):
+                self.stage_hour(ii, speed=speed, day=4, gdp_cost=cost)
+                self.assertEqual(run_gate(), (0, "false\n"))
+        self.stage_hour(60, day=5)
+        self.assertEqual(run_gate(), (0, "true\n"))
+
+    def assert_missing_speed_quiet(self, first, second):
+        self.establish_hold(first, second)
+        row = build.build_rows(json.loads(self.harness.output.read_bytes()))[0]
+        self.assertEqual((row["tps"], row["secs"]), (second, second))
+        self.commit_hour()
+        for ii, speed in ((40, first), (50, second)):
+            self.stage_hour(ii, speed=speed, day=4)
+            self.assertEqual(run_gate(), (0, "false\n"))
+
+    def test_missing_canonical_held_speeds_remain_quiet_through_gate(self):
+        self.assert_missing_speed_quiet(150, None)
+
+    def test_missing_other_held_speeds_remain_quiet_through_gate(self):
+        self.assert_missing_speed_quiet(None, 100)
+
+    def test_each_gate_side_renders_its_own_state_from_git_or_disk(self):
+        self.establish_hold()
+        self.commit_hour()
+        state = self.repo / "data" / "aa-generation-state.json"
+        held = json.loads(state.read_text(encoding="utf-8"))
+        held["held"]["since"] = "2026-10-04"
+        state.write_text(json.dumps(held), encoding="utf-8")
+        old, new = capture_gate.build_page_pair(
+            capture_gate.read_head_captures(), capture_gate.read_fresh_captures())
+        self.assertTrue("held since 2026-10-03" in old)
+        self.assertNotIn("held since 2026-10-04", old)
+        self.assertTrue("held since 2026-10-04" in new)
+        self.assertNotIn("held since 2026-10-03", new)
+        self.assertEqual(run_gate(), (0, "true\n"))
+
+    def test_fresh_held_probe_stages_the_fresh_generation_state(self):
+        self.establish_hold()
+        pages = []
+        real_main = build.main
+
+        def record_page(**kwargs):
+            real_main(**kwargs)
+            pages.append(build.OUT.read_text(encoding="utf-8"))
+
+        with mock.patch.object(build, "main", side_effect=record_page):
+            code, out, err = FreshHoldProbeTests.run_probe()
+        self.assertEqual((code, out, err), (0, "no\n", ""))
+        self.assertEqual(len(pages), 1)
+        self.assertTrue("held since 2026-10-03" in pages[0])
+
+
+class GenerationBootstrapTests(unittest.TestCase):
+    def test_checked_in_seed_is_a_real_capture_bootstrap(self):
+        fetcher = test_fetch_aa.fetch_aa
+        root = pathlib.Path(__file__).resolve().parents[1]
+        state_path = "data/aa-generation-state.json"
+        self.assertTrue((root / state_path).exists(), "the bootstrap must be tracked from merge")
+
+        def read(path):
+            return subprocess.check_output(["git", "show", f"HEAD:{path}"], cwd=root)
+
+        models = json.loads(read("data/aa-raw-models.json"))
+        with tempfile.TemporaryDirectory() as tmp, mock.patch.object(
+                fetcher, "OUT", pathlib.Path(tmp) / "aa-raw-models.json"):
+            expected = fetcher.load_generation_state(models)
+        raw = read(state_path).decode()
+        state = json.loads(raw)
+        self.assertEqual(raw, json.dumps(state, sort_keys=True, indent=1) + "\n")
+        self.assertIn(state["last"], state["remembered"])
+        if state["held"] is not None:
+            # Later refreshes legitimately commit holds; the seed pin must not block them.
+            for key, records in state["held"]["generations"].items():
+                self.assertIn(key, state["remembered"])
+                self.assertEqual(fetcher.revisit_key(records), key)
+        elif state["remembered"] == expected["remembered"]:
+            self.assertEqual(state, expected)
+        else:
+            # A later capture can outlive its last key; the real clean-run path repairs it.
+            fetcher.revisit_merge(models, models, [models], state)
+            self.assertIsNone(state["held"])
+            self.assertEqual(state["last"], expected["last"])
+
+
+class StateReadTests(unittest.TestCase):
+    def test_state_is_read_once_per_side_on_both_capture_shapes(self):
+        reads = []
+        read_bytes = pathlib.Path.read_bytes
+        read_text = pathlib.Path.read_text
+
+        def record_read(path, reader, *args, **kwargs):
+            if path.name == "aa-generation-state.json":
+                reads.append(path)
+            return reader(path, *args, **kwargs)
+
+        for changed in (False, True):
+            with self.subTest(changed=changed):
+                harness = GenerationStateStagingTests()
+                harness.setUp()
+                try:
+                    harness.establish_hold()
+                    harness.commit_hour()
+                    if changed:
+                        harness.stage_hour(60)
+                    reads.clear()
+                    with mock.patch.object(pathlib.Path, "read_bytes", autospec=True,
+                                           side_effect=lambda p: record_read(p, read_bytes)), \
+                            mock.patch.object(pathlib.Path, "read_text", autospec=True,
+                                              side_effect=lambda p, **kw: record_read(
+                                                  p, read_text, **kw)), \
+                            mock.patch.object(build, "main", wraps=build.main) as render:
+                        self.assertEqual(run_gate(), (0, "true\n" if changed else "false\n"))
+                    self.assertEqual(render.call_count, 2)
+                    self.assertEqual(reads, [harness.repo / "data/aa-generation-state.json"])
+                finally:
+                    harness.doCleanups()
 
 
 class ReconcileSpeedTests(unittest.TestCase):
