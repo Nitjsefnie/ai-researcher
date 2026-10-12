@@ -675,7 +675,7 @@ def _build_bytes(raw_path, agents_path):
                 # module (test_browser.py calls the same name clean);
                 # the member exists and the suite exercises it.
                 # pylint: disable-next=no-member
-                build.main()
+                build.main(generation_state=None)
             page_bytes = output.read_bytes()
         finally:
             if saved_stamp is not None:
