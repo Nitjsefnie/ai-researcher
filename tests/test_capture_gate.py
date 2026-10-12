@@ -27,12 +27,12 @@ import diff_aa  # noqa: E402  # pylint: disable=wrong-import-position
 import build  # noqa: E402  # pylint: disable=wrong-import-position,wrong-import-order
 import test_fetch_aa  # noqa: E402  # pylint: disable=wrong-import-position
 
-# The real captures work as fixtures and are fast (a full build measures
-# ~0.1 s); the suite already builds from them twice. The FRESH side of the
-# gate reads data/ directly, so tests stay hermetic by monkeypatching both
-# factored reads -- nothing here writes to the working tree.
-REAL_MODELS = (build.ROOT / "data" / "aa-raw-models.json").read_bytes()
-REAL_AGENTS = (build.ROOT / "data" / "aa-raw-coding-agents.json").read_bytes()
+# Both gate sides use the committed miniature captures. The shared harness
+# pins every capture, marker and state reader; tests override the inputs
+# relevant to their scenario inside that harness.
+FIXTURE_DIR = pathlib.Path(__file__).resolve().parent / "fixtures" / "pipeline"
+FIXTURE_MODELS = (FIXTURE_DIR / "aa-raw-models.json").read_bytes()
+FIXTURE_AGENTS = (FIXTURE_DIR / "aa-raw-coding-agents.json").read_bytes()
 
 
 def run_gate() -> tuple[int, str]:
@@ -43,16 +43,26 @@ def run_gate() -> tuple[int, str]:
     return code, out.getvalue()
 
 
+@contextlib.contextmanager
 def head_serving(*captures: bytes):
-    """A capture_gate.read_head_captures patched to hand back these bytes."""
-    return mock.patch.object(capture_gate, "read_head_captures",
-                             return_value=tuple(captures))
+    """Serve HEAD's fixture bytes with a healthy, isolated fresh baseline."""
+    with contextlib.ExitStack() as stack:
+        for reader, value in (
+                ("read_head_captures", tuple(captures)),
+                ("read_fresh_captures", (FIXTURE_MODELS, FIXTURE_AGENTS)),
+                ("read_head_window_marker", None),
+                ("read_fresh_window_marker", None),
+                ("read_head_generation_state", None),
+                ("read_fresh_generation_state", None)):
+            stack.enter_context(mock.patch.object(capture_gate, reader,
+                                                  return_value=value))
+        yield
 
 
 def churn(models: bytes) -> bytes:
-    """The same capture, different bytes: every object's keys reordered, so
+    """The same capture, different formatting and sorted object keys, so
     nothing parsed changes and nothing rendered can change."""
-    return json.dumps(json.loads(models), indent=1, sort_keys=True).encode()
+    return json.dumps(json.loads(models), indent=2, sort_keys=True).encode()
 
 
 def disputed_capture(models: bytes) -> bytes:
@@ -146,13 +156,13 @@ class CaptureGateTests(unittest.TestCase):
         self.assertEqual((build.RAW, build.AGENTS_RAW, build.OUT), self._saved)
 
     def test_identical_captures_are_not_a_change(self):
-        with head_serving(REAL_MODELS, REAL_AGENTS):
+        with head_serving(FIXTURE_MODELS, FIXTURE_AGENTS):
             code, out = run_gate()
 
         self.assertEqual((code, out), (0, "false\n"))
 
     def test_a_rendered_change_is_a_change(self):
-        with head_serving(rendered_field_changed(REAL_MODELS), REAL_AGENTS):
+        with head_serving(rendered_field_changed(FIXTURE_MODELS), FIXTURE_AGENTS):
             code, out = run_gate()
 
         self.assertEqual((code, out), (0, "true\n"))
@@ -163,11 +173,11 @@ class CaptureGateTests(unittest.TestCase):
         # --speed-tol or the repo keeps producing commits whose own subject
         # says "nothing the page renders". 100 -> 110 tokens/sec sits inside
         # one ladder rung; the page compares equal.
-        head = with_tps(REAL_MODELS, 100.0)
-        fresh = with_tps(REAL_MODELS, 110.0)
-        with head_serving(head, REAL_AGENTS), \
+        head = with_tps(FIXTURE_MODELS, 100.0)
+        fresh = with_tps(FIXTURE_MODELS, 110.0)
+        with head_serving(head, FIXTURE_AGENTS), \
              mock.patch.object(capture_gate, "read_fresh_captures",
-                               return_value=(fresh, REAL_AGENTS)):
+                               return_value=(fresh, FIXTURE_AGENTS)):
             code, out = run_gate()
 
         self.assertEqual((code, out), (0, "false\n"))
@@ -175,11 +185,11 @@ class CaptureGateTests(unittest.TestCase):
     def test_a_threshold_speed_move_is_a_change(self):
         # 100 -> 150 tokens/sec is a 50% relative move: past the differ's
         # threshold, a different rendered cell, news.
-        head = with_tps(REAL_MODELS, 100.0)
-        fresh = with_tps(REAL_MODELS, 150.0)
-        with head_serving(head, REAL_AGENTS), \
+        head = with_tps(FIXTURE_MODELS, 100.0)
+        fresh = with_tps(FIXTURE_MODELS, 150.0)
+        with head_serving(head, FIXTURE_AGENTS), \
              mock.patch.object(capture_gate, "read_fresh_captures",
-                               return_value=(fresh, REAL_AGENTS)):
+                               return_value=(fresh, FIXTURE_AGENTS)):
             code, out = run_gate()
 
         self.assertEqual((code, out), (0, "true\n"))
@@ -188,15 +198,15 @@ class CaptureGateTests(unittest.TestCase):
         # A structural presence change commits even on a speed field:
         # nothing is reconciled when the cell exists on one side only, so
         # the fresh page renders an em-dash where HEAD renders a number.
-        head = with_tps(REAL_MODELS, 100.0)
-        parsed = json.loads(with_tps(REAL_MODELS, 110.0))
+        head = with_tps(FIXTURE_MODELS, 100.0)
+        parsed = json.loads(with_tps(FIXTURE_MODELS, 110.0))
         for m in parsed:
             if m.get("medianOutputTokensPerSecond") == 110.0:
                 del m["medianOutputTokensPerSecond"]
         fresh = json.dumps(parsed, indent=1).encode()
-        with head_serving(head, REAL_AGENTS), \
+        with head_serving(head, FIXTURE_AGENTS), \
              mock.patch.object(capture_gate, "read_fresh_captures",
-                               return_value=(fresh, REAL_AGENTS)):
+                               return_value=(fresh, FIXTURE_AGENTS)):
             code, out = run_gate()
 
         self.assertEqual((code, out), (0, "true\n"))
@@ -205,7 +215,7 @@ class CaptureGateTests(unittest.TestCase):
         # The gate this script replaces compared raw bytes and voted true on
         # exactly this fixture -- 23 of 30 refresh commits. Reordering keys
         # changes nothing the page parses, renders or (after masking) prints.
-        with head_serving(churn(REAL_MODELS), churn(REAL_AGENTS)):
+        with head_serving(churn(FIXTURE_MODELS), churn(FIXTURE_AGENTS)):
             code, out = run_gate()
 
         self.assertEqual((code, out), (0, "false\n"))
@@ -216,10 +226,10 @@ class CaptureGateTests(unittest.TestCase):
         # the capture's key layout into the embedded dispute maps votes
         # true on exactly this fixture -- the vote that turned refresh run
         # 37682958494's hour red.
-        disputed = disputed_capture(REAL_MODELS)
-        with head_serving(churn(disputed), churn(REAL_AGENTS)), \
+        disputed = disputed_capture(FIXTURE_MODELS)
+        with head_serving(churn(disputed), churn(FIXTURE_AGENTS)), \
              mock.patch.object(capture_gate, "read_fresh_captures",
-                               return_value=(disputed, REAL_AGENTS)):
+                               return_value=(disputed, FIXTURE_AGENTS)):
             code, out = run_gate()
 
         self.assertEqual((code, out), (0, "false\n"))
@@ -228,10 +238,10 @@ class CaptureGateTests(unittest.TestCase):
         # On raw-only churn the two built pages genuinely differ -- in the
         # 64-hex digest inside `Capture <code>...</code>` and nowhere else --
         # and the mask removes exactly that, anchored on the prose.
-        with head_serving(churn(REAL_MODELS), churn(REAL_AGENTS)):
+        with head_serving(churn(FIXTURE_MODELS), churn(FIXTURE_AGENTS)):
             old_page, new_page = capture_gate.build_page_pair(
-                (churn(REAL_MODELS), churn(REAL_AGENTS)),
-                (REAL_MODELS, REAL_AGENTS))
+                (churn(FIXTURE_MODELS), churn(FIXTURE_AGENTS)),
+                (FIXTURE_MODELS, FIXTURE_AGENTS))
 
         self.assertNotEqual(old_page, new_page)
         self.assertEqual(capture_gate.mask_digest(old_page),
@@ -245,11 +255,11 @@ class CaptureGateTests(unittest.TestCase):
         # masked difference, and any OTHER rendered change still votes true
         # (test_a_rendered_change_is_a_change, run over the disputed shape
         # below).
-        disputed = disputed_capture(REAL_MODELS)
-        with head_serving(churn(disputed), churn(REAL_AGENTS)):
+        disputed = disputed_capture(FIXTURE_MODELS)
+        with head_serving(churn(disputed), churn(FIXTURE_AGENTS)):
             old_page, new_page = capture_gate.build_page_pair(
-                (churn(disputed), churn(REAL_AGENTS)),
-                (disputed, REAL_AGENTS))
+                (churn(disputed), churn(FIXTURE_AGENTS)),
+                (disputed, FIXTURE_AGENTS))
 
         self.assertNotEqual(old_page, new_page)
         self.assertEqual(capture_gate.mask_digest(old_page),
@@ -263,10 +273,10 @@ class CaptureGateTests(unittest.TestCase):
         # through build.metric_record exactly as the quiet control mutates
         # its field -- must still vote true when the capture carries
         # genVariants, so the dispute handling can never swallow news.
-        disputed = disputed_capture(REAL_MODELS)
-        with head_serving(rendered_field_changed(disputed), REAL_AGENTS), \
+        disputed = disputed_capture(FIXTURE_MODELS)
+        with head_serving(rendered_field_changed(disputed), FIXTURE_AGENTS), \
              mock.patch.object(capture_gate, "read_fresh_captures",
-                               return_value=(disputed, REAL_AGENTS)):
+                               return_value=(disputed, FIXTURE_AGENTS)):
             code, out = run_gate()
 
         self.assertEqual((code, out), (0, "true\n"))
@@ -302,18 +312,18 @@ class CaptureGateTests(unittest.TestCase):
         # it compares are stamped 2000-01-01 and the real dates cannot vote.
         # (The synthetic date is also NOT today's, so a gate that ever leaked
         # the real stamp in would fail this test on the page contents.)
-        real_stamp = (build.ROOT / "data" / "captured-at.txt").read_text()
-        self.assertNotEqual(real_stamp, capture_gate.SYNTHETIC_STAMP)
+        fixture_stamp = (FIXTURE_DIR / "captured-at.txt").read_text()
+        self.assertNotEqual(fixture_stamp, capture_gate.SYNTHETIC_STAMP)
 
-        with head_serving(REAL_MODELS, REAL_AGENTS):
+        with head_serving(FIXTURE_MODELS, FIXTURE_AGENTS):
             old_page, new_page = capture_gate.build_page_pair(
-                (REAL_MODELS, REAL_AGENTS), (REAL_MODELS, REAL_AGENTS))
+                (FIXTURE_MODELS, FIXTURE_AGENTS), (FIXTURE_MODELS, FIXTURE_AGENTS))
 
         for page in (old_page, new_page):
             self.assertIn("2000-01-01", page)
         self.assertEqual(capture_gate.mask_digest(old_page),
                          capture_gate.mask_digest(new_page))
-        with head_serving(REAL_MODELS, REAL_AGENTS):
+        with head_serving(FIXTURE_MODELS, FIXTURE_AGENTS):
             code, out = run_gate()
         self.assertEqual((code, out), (0, "false\n"))
 
@@ -325,7 +335,8 @@ class CaptureGateTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             (pathlib.Path(tmp) / "data").mkdir()
             with mock.patch.object(capture_gate, "ROOT", pathlib.Path(tmp)), \
-                 head_serving(REAL_MODELS, REAL_AGENTS):
+                 mock.patch.object(capture_gate, "read_head_captures",
+                                   return_value=(FIXTURE_MODELS, FIXTURE_AGENTS)):
                 code, out = run_gate()
 
         self.assertNotEqual(code, 0)
@@ -336,7 +347,7 @@ class CaptureGateTests(unittest.TestCase):
         # the run red -- exit nonzero, no true/false on stdout -- because a
         # broken capture is a re-read-the-leaderboard signal, never a quiet
         # "nothing moved".
-        with head_serving(b"{not json", REAL_AGENTS):
+        with head_serving(b"{not json", FIXTURE_AGENTS):
             code, out = run_gate()
 
         self.assertNotEqual(code, 0)
@@ -353,6 +364,24 @@ class CaptureGateTests(unittest.TestCase):
 
         self.assertEqual(proc.returncode, 0, proc.stderr)
         self.assertIn(proc.stdout.strip(), (b"true", b"false"))
+
+
+class FixtureIsolationTests(unittest.TestCase):
+    def test_fixture_gate_ignores_ambient_generation_holds(self):
+        held = b'{"held": {"since": "2026-10-12", "generations": {}}}'
+        other = b'{"held": {"since": "2026-10-11", "generations": {}}}'
+        for head, fresh in ((None, held), (held, None), (held, other)):
+            with self.subTest(head=head, fresh=fresh), \
+                    mock.patch.object(capture_gate, "read_head_generation_state",
+                                      return_value=head), \
+                    mock.patch.object(capture_gate, "read_fresh_generation_state",
+                                      return_value=fresh), \
+                    head_serving(FIXTURE_MODELS, FIXTURE_AGENTS):
+                self.assertEqual(run_gate(), (0, "false\n"))
+                pages = capture_gate.build_page_pair(
+                    (FIXTURE_MODELS, FIXTURE_AGENTS), (FIXTURE_MODELS, FIXTURE_AGENTS))
+                for page in pages:
+                    self.assertNotIn('id="generation-hold"', page)
 
 
 class GenerationStateStagingTests(unittest.TestCase):
@@ -633,11 +662,11 @@ class OscillationTests(unittest.TestCase):
         # measured. Both are sub-threshold relative to their own committed
         # value -- no accumulation, no commit, either hour.
         for head_value, fresh_value in ((100.0, 99.0), (99.0, 101.0)):
-            head = with_tps(REAL_MODELS, head_value)
-            fresh = with_tps(REAL_MODELS, fresh_value)
-            with head_serving(head, REAL_AGENTS), \
+            head = with_tps(FIXTURE_MODELS, head_value)
+            fresh = with_tps(FIXTURE_MODELS, fresh_value)
+            with head_serving(head, FIXTURE_AGENTS), \
                  mock.patch.object(capture_gate, "read_fresh_captures",
-                                   return_value=(fresh, REAL_AGENTS)):
+                                   return_value=(fresh, FIXTURE_AGENTS)):
                 code, out = run_gate()
 
             self.assertEqual((code, out), (0, "false\n"),
@@ -648,11 +677,11 @@ class OscillationTests(unittest.TestCase):
         # +25.7% relative to the last COMMITTED value. Each hourly step was
         # sub-threshold, and the drift accumulated into news anyway --
         # exactly what the per-cell comparison guarantees.
-        head = with_tps(REAL_MODELS, 101.0)
-        fresh = with_tps(REAL_MODELS, 101.0 * 1.27)
-        with head_serving(head, REAL_AGENTS), \
+        head = with_tps(FIXTURE_MODELS, 101.0)
+        fresh = with_tps(FIXTURE_MODELS, 101.0 * 1.27)
+        with head_serving(head, FIXTURE_AGENTS), \
              mock.patch.object(capture_gate, "read_fresh_captures",
-                               return_value=(fresh, REAL_AGENTS)):
+                               return_value=(fresh, FIXTURE_AGENTS)):
             code, out = run_gate()
 
         self.assertEqual((code, out), (0, "true\n"))
@@ -707,10 +736,10 @@ class ZeroScoreCaptureGateTests(unittest.TestCase):
     log alone instead of a bare "float division by zero"."""
 
     def test_a_zero_score_capture_builds_and_answers_false(self):
-        models = zero_score_capture(REAL_MODELS)
-        with head_serving(models, REAL_AGENTS), \
+        models = zero_score_capture(FIXTURE_MODELS)
+        with head_serving(models, FIXTURE_AGENTS), \
              mock.patch.object(capture_gate, "read_fresh_captures",
-                               return_value=(models, REAL_AGENTS)):
+                               return_value=(models, FIXTURE_AGENTS)):
             code, out = run_gate()
 
         self.assertEqual((code, out), (0, "false\n"))
@@ -720,9 +749,9 @@ class ZeroScoreCaptureGateTests(unittest.TestCase):
         # zero" that named neither site nor field. An unexpected exception
         # now carries the traceback on stderr.
         err = io.StringIO()
-        with head_serving(b"{not json", REAL_AGENTS), \
+        with head_serving(b"{not json", FIXTURE_AGENTS), \
              mock.patch.object(capture_gate, "read_fresh_captures",
-                               return_value=(b"{not json", REAL_AGENTS)), \
+                               return_value=(b"{not json", FIXTURE_AGENTS)), \
              contextlib.redirect_stderr(err):
             code = capture_gate.main()
 
@@ -800,12 +829,12 @@ class WindowMarkerStagingTests(unittest.TestCase):
         # live and nothing commits.
         err = io.StringIO()
         out = io.StringIO()
-        with head_serving(REAL_MODELS, REAL_AGENTS), \
+        with head_serving(FIXTURE_MODELS, FIXTURE_AGENTS), \
              mock.patch.object(capture_gate, "read_head_window_marker",
                                return_value=None), \
              mock.patch.object(capture_gate, "read_fresh_captures",
-                               return_value=(corner_capture(REAL_MODELS),
-                                             REAL_AGENTS)), \
+                               return_value=(corner_capture(FIXTURE_MODELS),
+                                             FIXTURE_AGENTS)), \
              mock.patch.object(capture_gate, "read_fresh_window_marker",
                                return_value=WINDOW_MARKER), \
              contextlib.redirect_stderr(err), \
@@ -825,12 +854,12 @@ class WindowMarkerStagingTests(unittest.TestCase):
         # refusal as broken-red exactly as before -- the paired mutation
         # check to the build-side test above.
         err = io.StringIO()
-        with head_serving(REAL_MODELS, REAL_AGENTS), \
+        with head_serving(FIXTURE_MODELS, FIXTURE_AGENTS), \
              mock.patch.object(capture_gate, "read_head_window_marker",
                                return_value=None), \
              mock.patch.object(capture_gate, "read_fresh_captures",
-                               return_value=(corner_capture(REAL_MODELS),
-                                             REAL_AGENTS)), \
+                               return_value=(corner_capture(FIXTURE_MODELS),
+                                             FIXTURE_AGENTS)), \
              mock.patch.object(capture_gate, "read_fresh_window_marker",
                                return_value=CONVERGED_WINDOW_MARKER), \
              contextlib.redirect_stderr(err):
@@ -846,11 +875,11 @@ class WindowMarkerStagingTests(unittest.TestCase):
         # never carries a corner marker under this design, so that state is
         # unexpected and must never read as "unchanged".
         err = io.StringIO()
-        with head_serving(corner_capture(REAL_MODELS), REAL_AGENTS), \
+        with head_serving(corner_capture(FIXTURE_MODELS), FIXTURE_AGENTS), \
              mock.patch.object(capture_gate, "read_head_window_marker",
                                return_value=WINDOW_MARKER), \
              mock.patch.object(capture_gate, "read_fresh_captures",
-                               return_value=(REAL_MODELS, REAL_AGENTS)), \
+                               return_value=(FIXTURE_MODELS, FIXTURE_AGENTS)), \
              mock.patch.object(capture_gate, "read_fresh_window_marker",
                                return_value=None), \
              contextlib.redirect_stderr(err):
@@ -863,12 +892,12 @@ class WindowMarkerStagingTests(unittest.TestCase):
         # recorded is a shape change to build.py, and the gate relays that
         # wording verbatim. The marker's presence is the whole difference.
         err = io.StringIO()
-        with head_serving(REAL_MODELS, REAL_AGENTS), \
+        with head_serving(FIXTURE_MODELS, FIXTURE_AGENTS), \
              mock.patch.object(capture_gate, "read_head_window_marker",
                                return_value=None), \
              mock.patch.object(capture_gate, "read_fresh_captures",
-                               return_value=(corner_capture(REAL_MODELS),
-                                             REAL_AGENTS)), \
+                               return_value=(corner_capture(FIXTURE_MODELS),
+                                             FIXTURE_AGENTS)), \
              mock.patch.object(capture_gate, "read_fresh_window_marker",
                                return_value=None), \
              contextlib.redirect_stderr(err):
@@ -882,12 +911,12 @@ class WindowMarkerStagingTests(unittest.TestCase):
         # drop: marker staged, fresh in the two-generation shape -- agentic
         # empty, everything else alive -- and the gate answers true (the
         # window hour's note-page differs from HEAD's healthy page).
-        with head_serving(REAL_MODELS, REAL_AGENTS), \
+        with head_serving(FIXTURE_MODELS, FIXTURE_AGENTS), \
              mock.patch.object(capture_gate, "read_head_window_marker",
                                return_value=None), \
              mock.patch.object(capture_gate, "read_fresh_captures",
-                               return_value=(window_capture(REAL_MODELS),
-                                             REAL_AGENTS)), \
+                               return_value=(window_capture(FIXTURE_MODELS),
+                                             FIXTURE_AGENTS)), \
              mock.patch.object(capture_gate, "read_fresh_window_marker",
                                return_value=WINDOW_MARKER):
             code, out = run_gate()
@@ -898,14 +927,14 @@ class WindowMarkerStagingTests(unittest.TestCase):
         # The exemption's page half: the note renders on the fresh side's
         # page and on no other -- through the gate's own build, not a
         # build.py call.
-        with head_serving(REAL_MODELS, REAL_AGENTS), \
+        with head_serving(FIXTURE_MODELS, FIXTURE_AGENTS), \
              mock.patch.object(capture_gate, "read_head_window_marker",
                                return_value=None), \
              mock.patch.object(capture_gate, "read_fresh_window_marker",
                                return_value=WINDOW_MARKER):
             old_page, new_page = capture_gate.build_page_pair(
-                (REAL_MODELS, REAL_AGENTS),
-                (window_capture(REAL_MODELS), REAL_AGENTS))
+                (FIXTURE_MODELS, FIXTURE_AGENTS),
+                (window_capture(FIXTURE_MODELS), FIXTURE_AGENTS))
 
         self.assertNotIn("Empty during a two-generation window", old_page)
         self.assertIn("Empty during a two-generation window", new_page)
@@ -915,13 +944,13 @@ class WindowMarkerStagingTests(unittest.TestCase):
         # NEXT hour's old side rebuilds the published note-page instead of
         # refusing -- and the hour answers on the data's own movement (here:
         # a rendered move past tolerance, so true).
-        head = window_capture(REAL_MODELS)
+        head = window_capture(FIXTURE_MODELS)
         fresh = rendered_field_changed(head)
-        with head_serving(head, REAL_AGENTS), \
+        with head_serving(head, FIXTURE_AGENTS), \
              mock.patch.object(capture_gate, "read_head_window_marker",
                                return_value=WINDOW_MARKER), \
              mock.patch.object(capture_gate, "read_fresh_captures",
-                               return_value=(fresh, REAL_AGENTS)), \
+                               return_value=(fresh, FIXTURE_AGENTS)), \
              mock.patch.object(capture_gate, "read_fresh_window_marker",
                                return_value=WINDOW_MARKER):
             code, out = run_gate()
@@ -932,12 +961,12 @@ class WindowMarkerStagingTests(unittest.TestCase):
         # The same state with no movement: two window captures, both sides
         # carrying their own marker, build equal note-pages and the gate
         # answers false -- a quiet window hour commits nothing.
-        head = window_capture(REAL_MODELS)
-        with head_serving(head, REAL_AGENTS), \
+        head = window_capture(FIXTURE_MODELS)
+        with head_serving(head, FIXTURE_AGENTS), \
              mock.patch.object(capture_gate, "read_head_window_marker",
                                return_value=WINDOW_MARKER), \
              mock.patch.object(capture_gate, "read_fresh_captures",
-                               return_value=(head, REAL_AGENTS)), \
+                               return_value=(head, FIXTURE_AGENTS)), \
              mock.patch.object(capture_gate, "read_fresh_window_marker",
                                return_value=WINDOW_MARKER):
             code, out = run_gate()
@@ -950,12 +979,12 @@ class WindowMarkerStagingTests(unittest.TestCase):
         # differs, so the hour commits -- and its payload leaves the marker
         # out, which is what the workflow's `git rm` branch removes (pinned
         # in test_refresh_workflow.py).
-        head = window_capture(REAL_MODELS)
-        with head_serving(head, REAL_AGENTS), \
+        head = window_capture(FIXTURE_MODELS)
+        with head_serving(head, FIXTURE_AGENTS), \
              mock.patch.object(capture_gate, "read_head_window_marker",
                                return_value=WINDOW_MARKER), \
              mock.patch.object(capture_gate, "read_fresh_captures",
-                               return_value=(REAL_MODELS, REAL_AGENTS)), \
+                               return_value=(FIXTURE_MODELS, FIXTURE_AGENTS)), \
              mock.patch.object(capture_gate, "read_fresh_window_marker",
                                return_value=None):
             code, out = run_gate()
@@ -968,11 +997,11 @@ class WindowMarkerStagingTests(unittest.TestCase):
         # capture whose note-page the old side cannot rebuild -- this exact
         # red is the symptom to expect, not a gate bug to chase.
         err = io.StringIO()
-        with head_serving(window_capture(REAL_MODELS), REAL_AGENTS), \
+        with head_serving(window_capture(FIXTURE_MODELS), FIXTURE_AGENTS), \
              mock.patch.object(capture_gate, "read_head_window_marker",
                                return_value=None), \
              mock.patch.object(capture_gate, "read_fresh_captures",
-                               return_value=(REAL_MODELS, REAL_AGENTS)), \
+                               return_value=(FIXTURE_MODELS, FIXTURE_AGENTS)), \
              mock.patch.object(capture_gate, "read_fresh_window_marker",
                                return_value=None), \
              contextlib.redirect_stderr(err):
@@ -1026,6 +1055,8 @@ class FreshHoldProbeTests(unittest.TestCase):
         # them back: the suite runs other tests against the real data/ and
         # the real out/.
         self._saved = (build.RAW, build.AGENTS_RAW, build.OUT)
+        self.enterContext(mock.patch.object(capture_gate, "read_fresh_generation_state",
+                                            return_value=None))
 
     def tearDown(self):
         self.assertEqual((build.RAW, build.AGENTS_RAW, build.OUT), self._saved)
@@ -1045,8 +1076,8 @@ class FreshHoldProbeTests(unittest.TestCase):
         # pin as "unchanged" through main(), here pinned as the probe's
         # whole question.
         with mock.patch.object(capture_gate, "read_fresh_captures",
-                               return_value=(corner_capture(REAL_MODELS),
-                                             REAL_AGENTS)), \
+                               return_value=(corner_capture(FIXTURE_MODELS),
+                                             FIXTURE_AGENTS)), \
              mock.patch.object(capture_gate, "read_fresh_window_marker",
                                return_value=WINDOW_MARKER):
             code, out, err = self.run_probe()
@@ -1056,7 +1087,7 @@ class FreshHoldProbeTests(unittest.TestCase):
 
     def test_a_healthy_capture_answers_no(self):
         with mock.patch.object(capture_gate, "read_fresh_captures",
-                               return_value=(REAL_MODELS, REAL_AGENTS)), \
+                               return_value=(FIXTURE_MODELS, FIXTURE_AGENTS)), \
              mock.patch.object(capture_gate, "read_fresh_window_marker",
                                return_value=None):
             code, out, err = self.run_probe()
@@ -1070,8 +1101,8 @@ class FreshHoldProbeTests(unittest.TestCase):
         # the hour to its ordinary verdicts -- a hold here would swallow
         # the #217 note-page hour too.
         with mock.patch.object(capture_gate, "read_fresh_captures",
-                               return_value=(window_capture(REAL_MODELS),
-                                             REAL_AGENTS)), \
+                               return_value=(window_capture(FIXTURE_MODELS),
+                                             FIXTURE_AGENTS)), \
              mock.patch.object(capture_gate, "read_fresh_window_marker",
                                return_value=WINDOW_MARKER):
             code, out, err = self.run_probe()
@@ -1091,8 +1122,8 @@ class FreshHoldProbeTests(unittest.TestCase):
         # gate-failure case), not here.
         err = io.StringIO()
         with mock.patch.object(capture_gate, "read_fresh_captures",
-                               return_value=(corner_capture(REAL_MODELS),
-                                             REAL_AGENTS)), \
+                               return_value=(corner_capture(FIXTURE_MODELS),
+                                             FIXTURE_AGENTS)), \
              mock.patch.object(capture_gate, "read_fresh_window_marker",
                                return_value=CONVERGED_WINDOW_MARKER), \
              contextlib.redirect_stderr(err):
@@ -1137,7 +1168,7 @@ class FreshHoldProbeTests(unittest.TestCase):
         with mock.patch.object(capture_gate, "_render_side",
                                side_effect=RuntimeError("boom")), \
              mock.patch.object(capture_gate, "read_fresh_captures",
-                               return_value=(REAL_MODELS, REAL_AGENTS)), \
+                               return_value=(FIXTURE_MODELS, FIXTURE_AGENTS)), \
              mock.patch.object(capture_gate, "read_fresh_window_marker",
                                return_value=None), \
              contextlib.redirect_stderr(err):

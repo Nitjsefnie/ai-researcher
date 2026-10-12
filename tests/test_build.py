@@ -15,6 +15,9 @@ import build
 import page_format
 
 
+PIPELINE_FIXTURES = pathlib.Path(__file__).resolve().parent / "fixtures" / "pipeline"
+
+
 def _build_in_temp_dir() -> str:
     """Run build.main() with OUT redirected into a temp dir and return the
     page text, leaving the real out/frontier-models.html untouched (#114).
@@ -1339,7 +1342,7 @@ class WindowHoldTests(unittest.TestCase):
             # and every parameter count gone -- agentic and parameters empty
             # together, intelligence alive on the scalar total.
             models = json.loads(
-                (build.ROOT / "data" / "aa-raw-models.json").read_text(
+                (PIPELINE_FIXTURES / "aa-raw-models.json").read_text(
                     encoding="utf-8"))
             for record in models:
                 if isinstance(record.get("intelligenceIndexCostPerTask"), dict):
@@ -1348,7 +1351,7 @@ class WindowHoldTests(unittest.TestCase):
             (root / "data" / "aa-raw-models.json").write_text(
                 json.dumps(models), encoding="utf-8")
             (root / "data" / "aa-raw-coding-agents.json").write_bytes(
-                (build.ROOT / "data" / "aa-raw-coding-agents.json").read_bytes())
+                (PIPELINE_FIXTURES / "aa-raw-coding-agents.json").read_bytes())
             (root / "data" / "captured-at.txt").write_text(
                 self.STAMP, encoding="utf-8")
             (root / "data" / "cost-breakdown-window.txt").write_text(
@@ -2023,7 +2026,7 @@ class CorruptCaptureTests(unittest.TestCase):
                     (build.ROOT / module).read_text(encoding="utf-8"),
                     encoding="utf-8")
             for name in self.CAPTURES:
-                raw = (build.ROOT / "data" / name).read_bytes()
+                raw = (PIPELINE_FIXTURES / name).read_bytes()
                 if name == truncate:
                     raw = raw[: len(raw) // 2]  # valid capture JSON, cut mid-file
                 (root / "data" / name).write_bytes(raw)
@@ -2116,12 +2119,12 @@ class FrontierZeroScoreTests(unittest.TestCase):
         self.assertIn('<td class="n">$0.0400</td>', tbody)
 
     def test_zero_score_capture_builds_through_main(self):
-        # The real capture with one model turned into the enumerated crash
+        # The fixture capture with one model turned into the zero-score
         # shape: gdpvalNormalized zeroed and its gdpval eval cost set to the
         # positive minimum halved, so it holds the axis's minimum cost and
         # lands on the agentic frontier with a zero score.
         models = json.loads(
-            (build.ROOT / "data" / "aa-raw-models.json").read_bytes())
+            (PIPELINE_FIXTURES / "aa-raw-models.json").read_bytes())
         floor = None
         target = None
         for m in models:
@@ -2154,12 +2157,12 @@ class FrontierZeroScoreTests(unittest.TestCase):
             raw.write_bytes(
                 json.dumps(models, indent=1).encode("utf-8"))
             agents_raw.write_bytes(
-                (build.ROOT / "data" / "aa-raw-coding-agents.json").read_bytes())
+                (PIPELINE_FIXTURES / "aa-raw-coding-agents.json").read_bytes())
             saved = (build.RAW, build.AGENTS_RAW, build.OUT)
             build.RAW, build.AGENTS_RAW, build.OUT = raw, agents_raw, page_path
             try:
                 with contextlib.redirect_stdout(io.StringIO()):
-                    build.main()
+                    build.main(generation_state=None)
             finally:
                 build.RAW, build.AGENTS_RAW, build.OUT = saved
             page = page_path.read_text(encoding="utf-8")
@@ -2269,13 +2272,13 @@ class RetiredMismatchSummaryTests(unittest.TestCase):
             build.retired_frontier_axes(rows, agent), ["coding"])
 
     def test_the_printed_line_names_the_undominated_retired_model(self):
-        # Through main() on a mutated real capture: retiring an undominated
+        # Through main() on a mutated fixture: retiring an undominated
         # frontier model must put its name and frontiers on the printed
-        # line. The target is chosen dynamically so the pin survives
-        # capture churn; the mutation cannot move the frontier (the retired
+        # line. The target is chosen from the fixture's frontier;
+        # the mutation cannot move the frontier (the retired
         # flag is not a frontier input), so the mismatch is deterministic.
-        models = build.read_capture(build.RAW)
-        agents = build.read_capture(build.AGENTS_RAW)
+        models = build.read_capture(PIPELINE_FIXTURES / "aa-raw-models.json")
+        agents = build.read_capture(PIPELINE_FIXTURES / "aa-raw-coding-agents.json")
         rows = build.build_rows(models) + build.build_agent_rows(agents, models)
         intelligence_rows = [r for r in rows if r["metrics"]["intelligence"]]
         target = next(
@@ -2295,13 +2298,13 @@ class RetiredMismatchSummaryTests(unittest.TestCase):
             page_path = pathlib.Path(tmp) / "frontier-models.html"
             raw.write_bytes(json.dumps(models, indent=1).encode("utf-8"))
             agents_raw.write_bytes(
-                (build.ROOT / "data" / "aa-raw-coding-agents.json").read_bytes())
+                (PIPELINE_FIXTURES / "aa-raw-coding-agents.json").read_bytes())
             saved = (build.RAW, build.AGENTS_RAW, build.OUT)
             build.RAW, build.AGENTS_RAW, build.OUT = raw, agents_raw, page_path
             buf = io.StringIO()
             try:
                 with contextlib.redirect_stdout(buf):
-                    build.main()
+                    build.main(generation_state=None)
             finally:
                 build.RAW, build.AGENTS_RAW, build.OUT = saved
         line = next(
