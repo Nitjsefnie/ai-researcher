@@ -11,7 +11,7 @@
       "id": "Cloudflare/clef"
     },
     {
-      "id": "abenzerps/Qwen-Image-2.1-Uncensored-GGUF"
+      "id": "abenzerps/Qwen-Image-2.1-Uncensored-Quantized"
     },
     {
       "id": "Qwen/Qwen-Image-2.1-Turbo"
@@ -26,10 +26,10 @@
       "id": "Qwen/Qwen3.8-27B"
     },
     {
-      "id": "Venastine-Research/Xing4.0-29B-A4B-GGUF"
+      "id": "ConwayResearch/Underdog-Saluki-27B-1.0"
     },
     {
-      "id": "canberkkkkkk/ema-lightning"
+      "id": "Venastine-Research/Xing4.0-29B-A4B-GGUF"
     }
   ]
 }
