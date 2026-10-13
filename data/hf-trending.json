@@ -17,13 +17,13 @@
       "id": "Lightricks/LTX-2.5"
     },
     {
-      "id": "Cloudflare/clef"
-    },
-    {
       "id": "openbmb/MiniCPM-V-4.7-35B-A3B"
     },
     {
       "id": "ConwayResearch/Underdog-Saluki-27B-1.0"
+    },
+    {
+      "id": "Cloudflare/clef"
     },
     {
       "id": "LiquidAI/d1-3B"
