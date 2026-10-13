@@ -6234,7 +6234,7 @@
   "omniscience": 40.86666666666667,
   "omniscienceAccuracy": 0.6081666666666666,
   "omniscienceNonHallucination": 0.49085495533815393,
-  "gdpvalNormalized": 0.51916,
+  "gdpvalNormalized": 0.5193300000000001,
   "analystAgent": null,
   "terminalbenchHard": null,
   "terminalBench21": null,
@@ -6355,7 +6355,7 @@
   },
   "omniscienceHallucinationRate": 0.5091450446618461,
   "gdpPdfAllPass": 0.318,
-  "gdpval": 1538.32,
+  "gdpval": 1538.66,
   "itBenchSre": null,
   "frontierCode": null,
   "terminalBenchScience": null,
@@ -6395,14 +6395,14 @@
   "intelligenceIndexEvaluations": [
    {
     "slug": "aa-briefcase",
-    "score": 1503.34,
+    "score": 1503.98,
     "outputTokensPerTask": 43512.52747252747,
     "costPerTask": 1.0385626211756458,
     "timePerTask": 725.7504461169847
    },
    {
     "slug": "gdpval-aa",
-    "score": 1538.32,
+    "score": 1538.66,
     "outputTokensPerTask": 25610.15,
     "costPerTask": 0.558465178851431,
     "timePerTask": 427.15463493491416
@@ -6466,20 +6466,20 @@
   ],
   "briefcaseBreakdown": {
    "overall": {
-    "elo": 1503.34,
-    "lower95ci": 1493.44,
-    "upper95ci": 1515.06
+    "elo": 1503.98,
+    "lower95ci": 1494.24,
+    "upper95ci": 1515.67
    },
    "rubricPassRate": 0.5161616161616162,
    "analyticalQuality": {
-    "elo": 1697.62,
-    "lower95ci": 1679.09,
-    "upper95ci": 1717.97
+    "elo": 1699.41,
+    "lower95ci": 1679.8,
+    "upper95ci": 1719.95
    },
    "presentation": {
-    "elo": 1426.79,
-    "lower95ci": 1408.13,
-    "upper95ci": 1446.99
+    "elo": 1426.92,
+    "lower95ci": 1407.5,
+    "upper95ci": 1446.41
    }
   },
   "briefcaseTotalCost": 94.50919852698377,
@@ -21048,8 +21048,8 @@
   "omniscience": 8.383333333333333,
   "omniscienceAccuracy": 0.3485,
   "omniscienceNonHallucination": 0.5937579943719622,
-  "gdpvalNormalized": 0.5923849999999999,
-  "analystAgent": null,
+  "gdpvalNormalized": 0.59104,
+  "analystAgent": 0.375,
   "terminalbenchHard": null,
   "terminalBench21": null,
   "terminalBench40": 0.348484848484849,
@@ -21166,7 +21166,7 @@
   "omniscienceHallucinationRate": 0.40624200562803786,
   "mlcrOverall": 0.183333333333333,
   "gdpPdfAllPass": 0.192,
-  "gdpval": 1684.77,
+  "gdpval": 1682.08,
   "itBenchSre": null,
   "frontierCode": 0.454153333333333,
   "terminalBenchScience": 0.0571428571428571,
@@ -21206,14 +21206,14 @@
   "intelligenceIndexEvaluations": [
    {
     "slug": "aa-briefcase",
-    "score": 1515.94,
+    "score": 1516.62,
     "outputTokensPerTask": 163891.81318681317,
     "costPerTask": 0.3801825468509968,
     "timePerTask": 3366.1863020281426
    },
    {
     "slug": "gdpval-aa",
-    "score": 1684.77,
+    "score": 1682.08,
     "outputTokensPerTask": 87938.75,
     "costPerTask": 0.16121702931689816,
     "timePerTask": 1806.1806133663247
@@ -21284,20 +21284,20 @@
   },
   "briefcaseBreakdown": {
    "overall": {
-    "elo": 1515.94,
-    "lower95ci": 1506.29,
-    "upper95ci": 1526.14
+    "elo": 1516.62,
+    "lower95ci": 1506.82,
+    "upper95ci": 1526.91
    },
    "rubricPassRate": 0.5474747474747474,
    "analyticalQuality": {
-    "elo": 1801.58,
-    "lower95ci": 1783.81,
-    "upper95ci": 1822.64
+    "elo": 1801.03,
+    "lower95ci": 1783.53,
+    "upper95ci": 1820.9
    },
    "presentation": {
-    "elo": 1296.29,
-    "lower95ci": 1280.03,
-    "upper95ci": 1314.61
+    "elo": 1296.86,
+    "lower95ci": 1277.96,
+    "upper95ci": 1314.44
    }
   },
   "briefcaseTotalCost": 34.596611763440706,
@@ -27864,7 +27864,7 @@
   "omniscience": 43.4,
   "omniscienceAccuracy": 0.626,
   "omniscienceNonHallucination": 0.4866310160427807,
-  "gdpvalNormalized": 0.53695,
+  "gdpvalNormalized": 0.53583,
   "analystAgent": 0.5125,
   "terminalbenchHard": null,
   "terminalBench21": 0.883895131086142,
@@ -27988,7 +27988,7 @@
   "mlcrOverall": 0.35,
   "harveyLab": 0.0861111111111111,
   "gdpPdfAllPass": 0.31,
-  "gdpval": 1573.9,
+  "gdpval": 1571.66,
   "itBenchSre": 0.485875706214689,
   "frontierCode": 0.469827666666667,
   "terminalBenchScience": 0.633333333333333,
@@ -28028,14 +28028,14 @@
   "intelligenceIndexEvaluations": [
    {
     "slug": "aa-briefcase",
-    "score": 1570.1,
+    "score": 1571.12,
     "outputTokensPerTask": 68691.47252747252,
     "costPerTask": 9.50208391505787,
     "timePerTask": 1047.804497459646
    },
    {
     "slug": "gdpval-aa",
-    "score": 1573.9,
+    "score": 1571.66,
     "outputTokensPerTask": 39974.68636363636,
     "costPerTask": 4.529484400556546,
     "timePerTask": 609.7650059780735
@@ -28099,20 +28099,20 @@
   ],
   "briefcaseBreakdown": {
    "overall": {
-    "elo": 1570.1,
-    "lower95ci": 1561.8,
-    "upper95ci": 1579.35
+    "elo": 1571.12,
+    "lower95ci": 1562.64,
+    "upper95ci": 1580.76
    },
    "rubricPassRate": 0.5202020202020202,
    "analyticalQuality": {
-    "elo": 1759.67,
-    "lower95ci": 1743.95,
-    "upper95ci": 1776.45
+    "elo": 1761.75,
+    "lower95ci": 1745.25,
+    "upper95ci": 1781.01
    },
    "presentation": {
-    "elo": 1549.94,
-    "lower95ci": 1534.26,
-    "upper95ci": 1565.99
+    "elo": 1550.31,
+    "lower95ci": 1534.03,
+    "upper95ci": 1567.29
    }
   },
   "briefcaseTotalCost": 864.6896362702661,
@@ -54155,7 +54155,7 @@
   "omniscienceHallucinationRate": 0.869632239594803,
   "mlcrOverall": 0.0333333333333333,
   "gdpPdfAllPass": 0.026,
-  "gdpval": 489.89,
+  "gdpval": 489.57,
   "itBenchSre": 0.0112994350282486,
   "frontierCode": null,
   "terminalBenchScience": null,
@@ -54203,7 +54203,7 @@
    },
    {
     "slug": "gdpval-aa",
-    "score": 489.89,
+    "score": 489.57,
     "outputTokensPerTask": 24750.18181818182,
     "costPerTask": 0.5448675286363636,
     "timePerTask": 145.0157039704414
@@ -81586,7 +81586,7 @@
   "omniscienceAccuracy": 0.43583333333333335,
   "omniscienceNonHallucination": 0.670605612998523,
   "gdpvalNormalized": 0.590495,
-  "analystAgent": null,
+  "analystAgent": 0.375,
   "terminalbenchHard": null,
   "terminalBench21": 0.842696629213483,
   "terminalBench40": 0.333333333333333,
@@ -95291,7 +95291,7 @@
   "omniscience": 41.53333333333333,
   "omniscienceAccuracy": 0.621,
   "omniscienceNonHallucination": 0.4573438874230431,
-  "gdpvalNormalized": 0.545985,
+  "gdpvalNormalized": 0.54653,
   "analystAgent": 0.5,
   "terminalbenchHard": null,
   "terminalBench21": null,
@@ -95415,7 +95415,7 @@
   "mlcrOverall": 0.338888888888889,
   "harveyLab": 0.06944444444444443,
   "gdpPdfAllPass": 0.31,
-  "gdpval": 1591.97,
+  "gdpval": 1593.06,
   "itBenchSre": null,
   "frontierCode": 0.491209333333333,
   "terminalBenchScience": 0.580952380952381,
@@ -95455,14 +95455,14 @@
   "intelligenceIndexEvaluations": [
    {
     "slug": "aa-briefcase",
-    "score": 1557.24,
+    "score": 1561.01,
     "outputTokensPerTask": 114993.58241758242,
     "costPerTask": 2.3126027773097606,
     "timePerTask": 1762.0573153168668
    },
    {
     "slug": "gdpval-aa",
-    "score": 1591.97,
+    "score": 1593.06,
     "outputTokensPerTask": 45846.736363636366,
     "costPerTask": 0.8935140711105688,
     "timePerTask": 702.5137881137737
@@ -95526,20 +95526,20 @@
   ],
   "briefcaseBreakdown": {
    "overall": {
-    "elo": 1557.24,
-    "lower95ci": 1548.29,
-    "upper95ci": 1568.04
+    "elo": 1561.01,
+    "lower95ci": 1550.96,
+    "upper95ci": 1570.98
    },
    "rubricPassRate": 0.5565656565656566,
    "analyticalQuality": {
-    "elo": 1775.61,
-    "lower95ci": 1758.68,
-    "upper95ci": 1792.39
+    "elo": 1780.31,
+    "lower95ci": 1763.61,
+    "upper95ci": 1798.08
    },
    "presentation": {
-    "elo": 1446.17,
-    "lower95ci": 1428.29,
-    "upper95ci": 1467.01
+    "elo": 1450.83,
+    "lower95ci": 1430.93,
+    "upper95ci": 1469.93
    }
   },
   "briefcaseTotalCost": 210.4468527351882,
@@ -106920,7 +106920,7 @@
   "omniscience": -8.4,
   "omniscienceAccuracy": 0.33916666666666667,
   "omniscienceNonHallucination": 0.3596469104665826,
-  "gdpvalNormalized": 0.41117999999999993,
+  "gdpvalNormalized": 0.41108500000000003,
   "analystAgent": null,
   "terminalbenchHard": null,
   "terminalBench21": null,
@@ -107041,7 +107041,7 @@
   },
   "omniscienceHallucinationRate": 0.6403530895334174,
   "gdpPdfAllPass": 0.088,
-  "gdpval": 1322.36,
+  "gdpval": 1322.17,
   "itBenchSre": null,
   "frontierCode": null,
   "terminalBenchScience": null,
@@ -107081,14 +107081,14 @@
   "intelligenceIndexEvaluations": [
    {
     "slug": "aa-briefcase",
-    "score": 1186.45,
+    "score": 1187.14,
     "outputTokensPerTask": 33551.53846153846,
     "costPerTask": 0.7256031951789672,
     "timePerTask": 455.55887384879895
    },
    {
     "slug": "gdpval-aa",
-    "score": 1322.36,
+    "score": 1322.17,
     "outputTokensPerTask": 22444.00909090909,
     "costPerTask": 0.38483972661293636,
     "timePerTask": 304.742136275736
@@ -107159,20 +107159,20 @@
   },
   "briefcaseBreakdown": {
    "overall": {
-    "elo": 1186.45,
-    "lower95ci": 1177.24,
-    "upper95ci": 1196.16
+    "elo": 1187.14,
+    "lower95ci": 1177.71,
+    "upper95ci": 1197.45
    },
    "rubricPassRate": 0.37731958762886597,
    "analyticalQuality": {
-    "elo": 1315.08,
-    "lower95ci": 1297.01,
-    "upper95ci": 1334.91
+    "elo": 1316.02,
+    "lower95ci": 1297.18,
+    "upper95ci": 1333.92
    },
    "presentation": {
-    "elo": 1064.07,
-    "lower95ci": 1047.05,
-    "upper95ci": 1080.49
+    "elo": 1064.1,
+    "lower95ci": 1046.95,
+    "upper95ci": 1081.5
    }
   },
   "briefcaseTotalCost": 66.02989076128601,
@@ -122251,6 +122251,7 @@
    "economics": 60.7259560742972
   },
   "omniscienceHallucinationRate": 0.23011447020839448,
+  "harveyLab": 0.13055555555555556,
   "gdpPdfAllPass": 0.326,
   "gdpval": 1857.09,
   "itBenchSre": null,
@@ -128661,7 +128662,7 @@
   "omniscience": -2.6,
   "omniscienceAccuracy": 0.15516666666666667,
   "omniscienceNonHallucination": 0.7855592819096469,
-  "gdpvalNormalized": 0.34065999999999996,
+  "gdpvalNormalized": 0.3405599999999999,
   "analystAgent": null,
   "terminalbenchHard": null,
   "terminalBench21": 0.692883895131086,
@@ -128782,7 +128783,7 @@
   },
   "omniscienceHallucinationRate": 0.21444071809035312,
   "gdpPdfAllPass": 0.054,
-  "gdpval": 1181.32,
+  "gdpval": 1181.12,
   "itBenchSre": null,
   "frontierCode": null,
   "terminalBenchScience": null,
@@ -128822,14 +128823,14 @@
   "intelligenceIndexEvaluations": [
    {
     "slug": "aa-briefcase",
-    "score": 1122.77,
+    "score": 1123.11,
     "outputTokensPerTask": 59475.53846153846,
     "costPerTask": 3.76217765934066,
     "timePerTask": 350.4630019182557
    },
    {
     "slug": "gdpval-aa",
-    "score": 1181.32,
+    "score": 1181.12,
     "outputTokensPerTask": 101074.99545454545,
     "costPerTask": 1.3902969027272727,
     "timePerTask": 595.5901744173592
@@ -128893,20 +128894,20 @@
   ],
   "briefcaseBreakdown": {
    "overall": {
-    "elo": 1122.77,
-    "lower95ci": 1114.11,
-    "upper95ci": 1130.89
+    "elo": 1123.11,
+    "lower95ci": 1114.12,
+    "upper95ci": 1131.4
    },
    "rubricPassRate": 0.3434343434343434,
    "analyticalQuality": {
-    "elo": 1067.47,
-    "lower95ci": 1050.99,
-    "upper95ci": 1082.93
+    "elo": 1067.51,
+    "lower95ci": 1051.11,
+    "upper95ci": 1084.63
    },
    "presentation": {
-    "elo": 1187.39,
-    "lower95ci": 1171.75,
-    "upper95ci": 1202.77
+    "elo": 1188.31,
+    "lower95ci": 1172.7,
+    "upper95ci": 1203.66
    }
   },
   "briefcaseTotalCost": 342.35816700000004,
@@ -131186,6 +131187,7 @@
    "economics": 57.6944582754093
   },
   "omniscienceHallucinationRate": 0.2651386530843237,
+  "harveyLab": 0.1,
   "gdpPdfAllPass": 0.306,
   "gdpval": 1770.34,
   "itBenchSre": null,
