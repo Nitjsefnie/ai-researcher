@@ -83,7 +83,6 @@ class MessageTests(unittest.TestCase):
             "OUT  org/b (was rank 2)\n"
             "MOVE org/a rank 1 -> 2\n")
 
-
     def test_no_line_names_an_issue_reference(self):
         # GitHub links every "#N" in a commit message to issue or PR N.
         text = fetch_hf_trending.message(
