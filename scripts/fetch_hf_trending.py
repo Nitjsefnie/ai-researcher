@@ -46,10 +46,11 @@ def message(old: list[dict[str, str]], new: list[dict[str, str]]) -> str:
         subject = f"Trending: {len(moved)} rank change(s)"
     else:
         subject = "Trending: order updated"
-    body = [f"NEW  #{after[model['id']]} {model['id']}" for model in entered]
-    body += [f"OUT  {model['id']} (was #{before[model['id']]})" for model in left]
-    body += [f"MOVE {model['id']} #{before[model['id']]} -> "
-             f"#{after[model['id']]}" for model in moved]
+    # Ranks never carry "#": GitHub links "#N" in a commit message to issue N.
+    body = [f"NEW  rank {after[model['id']]} {model['id']}" for model in entered]
+    body += [f"OUT  {model['id']} (was rank {before[model['id']]})" for model in left]
+    body += [f"MOVE {model['id']} rank {before[model['id']]} -> "
+             f"{after[model['id']]}" for model in moved]
     return subject + ("\n\n" + "\n".join(body) if body else "") + "\n"
 
 
