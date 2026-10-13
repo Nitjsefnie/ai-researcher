@@ -16,7 +16,7 @@ import _workflowrun  # noqa: E402  # pylint: disable=wrong-import-position
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 WORKFLOW = ROOT / '.github/workflows/hf-trending.yml'
 DATA = 'data/hf-trending.json'
-MESSAGE = 'Trending: 1 new in the top 10: org/new\n\nNEW  #1 org/new\n'
+MESSAGE = 'Trending: 1 new in the top 10: org/new\n\nNEW  rank 1 org/new\n'
 
 
 def load():

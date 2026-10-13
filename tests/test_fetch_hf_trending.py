@@ -49,8 +49,8 @@ class MessageTests(unittest.TestCase):
         self.assertEqual(
             fetch_hf_trending.message([], ids("org/a", "org/b")),
             "Trending: 2 new in the top 10: org/a, org/b\n\n"
-            "NEW  #1 org/a\n"
-            "NEW  #2 org/b\n")
+            "NEW  rank 1 org/a\n"
+            "NEW  rank 2 org/b\n")
 
     def test_rank_changes_use_the_new_order_and_exact_arrow_spacing(self):
         self.assertEqual(
@@ -58,8 +58,8 @@ class MessageTests(unittest.TestCase):
                 ids("org/a", "org/b", "org/c"),
                 ids("org/b", "org/a", "org/c")),
             "Trending: 2 rank change(s)\n\n"
-            "MOVE org/b #2 -> #1\n"
-            "MOVE org/a #1 -> #2\n")
+            "MOVE org/b rank 2 -> 1\n"
+            "MOVE org/a rank 1 -> 2\n")
 
     def test_no_changes_keep_the_upstream_order_updated_message(self):
         self.assertEqual(
@@ -71,7 +71,7 @@ class MessageTests(unittest.TestCase):
         self.assertEqual(
             fetch_hf_trending.message(ids("org/a", "org/b"), ids("org/a")),
             "Trending: order updated\n\n"
-            "OUT  org/b (was #2)\n")
+            "OUT  org/b (was rank 2)\n")
 
     def test_new_departed_and_moved_lines_are_combined_in_upstream_order(self):
         self.assertEqual(
@@ -79,9 +79,16 @@ class MessageTests(unittest.TestCase):
                 ids("org/a", "org/b", "org/c"),
                 ids("org/d", "org/a", "org/c")),
             "Trending: 1 new in the top 10: org/d\n\n"
-            "NEW  #1 org/d\n"
-            "OUT  org/b (was #2)\n"
-            "MOVE org/a #1 -> #2\n")
+            "NEW  rank 1 org/d\n"
+            "OUT  org/b (was rank 2)\n"
+            "MOVE org/a rank 1 -> 2\n")
+
+
+    def test_no_line_names_an_issue_reference(self):
+        # GitHub links every "#N" in a commit message to issue or PR N.
+        text = fetch_hf_trending.message(
+            ids("org/a", "org/b", "org/c"), ids("org/d", "org/a", "org/c"))
+        self.assertNotRegex(text, r"#[0-9]")
 
 
 class FetchTests(unittest.TestCase):
@@ -194,8 +201,8 @@ class MainTests(unittest.TestCase):
             output = io.StringIO()
             expected = (
                 "Trending: 2 rank change(s)\n\n"
-                "MOVE org/model-1 #2 -> #1\n"
-                "MOVE org/model-0 #1 -> #2\n")
+                "MOVE org/model-1 rank 2 -> 1\n"
+                "MOVE org/model-0 rank 1 -> 2\n")
 
             with unittest.mock.patch.object(fetch_hf_trending, "DATA", capture), \
                     unittest.mock.patch.object(urllib.request, "urlopen",
