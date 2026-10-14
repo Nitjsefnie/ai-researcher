@@ -125046,7 +125046,7 @@
   "omniscienceHallucinationRate": 0.9081610909865757,
   "mlcrOverall": 0.0111111111111111,
   "gdpPdfAllPass": 0.04,
-  "gdpval": 608.15,
+  "gdpval": 608.65,
   "itBenchSre": 0.0564971751412429,
   "frontierCode": null,
   "terminalBenchScience": null,
@@ -125094,7 +125094,7 @@
    },
    {
     "slug": "gdpval-aa",
-    "score": 608.15,
+    "score": 608.65,
     "outputTokensPerTask": 31411.090909090908,
     "costPerTask": 0.10493220409090907,
     "timePerTask": 131.18556882260341
@@ -128816,7 +128816,7 @@
   "omniscience": -2.6,
   "omniscienceAccuracy": 0.15516666666666667,
   "omniscienceNonHallucination": 0.7855592819096469,
-  "gdpvalNormalized": 0.3405599999999999,
+  "gdpvalNormalized": 0.34080999999999995,
   "analystAgent": null,
   "terminalbenchHard": null,
   "terminalBench21": 0.692883895131086,
@@ -128937,7 +128937,7 @@
   },
   "omniscienceHallucinationRate": 0.21444071809035312,
   "gdpPdfAllPass": 0.054,
-  "gdpval": 1181.12,
+  "gdpval": 1181.62,
   "itBenchSre": null,
   "frontierCode": null,
   "terminalBenchScience": null,
@@ -128977,14 +128977,14 @@
   "intelligenceIndexEvaluations": [
    {
     "slug": "aa-briefcase",
-    "score": 1123.11,
+    "score": 1122.88,
     "outputTokensPerTask": 59475.53846153846,
     "costPerTask": 3.76217765934066,
     "timePerTask": 338.29242648942426
    },
    {
     "slug": "gdpval-aa",
-    "score": 1181.12,
+    "score": 1181.62,
     "outputTokensPerTask": 101074.99545454545,
     "costPerTask": 1.3902969027272727,
     "timePerTask": 574.9070349625757
@@ -129048,20 +129048,20 @@
   ],
   "briefcaseBreakdown": {
    "overall": {
-    "elo": 1123.11,
-    "lower95ci": 1114.12,
-    "upper95ci": 1131.4
+    "elo": 1122.88,
+    "lower95ci": 1113.67,
+    "upper95ci": 1131.72
    },
    "rubricPassRate": 0.3434343434343434,
    "analyticalQuality": {
-    "elo": 1067.51,
-    "lower95ci": 1051.11,
-    "upper95ci": 1084.63
+    "elo": 1067.46,
+    "lower95ci": 1052,
+    "upper95ci": 1083.67
    },
    "presentation": {
-    "elo": 1188.31,
-    "lower95ci": 1172.7,
-    "upper95ci": 1203.66
+    "elo": 1187.9,
+    "lower95ci": 1170.99,
+    "upper95ci": 1203.62
    }
   },
   "briefcaseTotalCost": 342.35816700000004,
