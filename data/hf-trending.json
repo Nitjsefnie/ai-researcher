@@ -14,9 +14,6 @@
       "id": "openbmb/MiniCPM-V-4.7-35B-A3B"
     },
     {
-      "id": "autotrust/JEV-35B"
-    },
-    {
       "id": "abenzerps/Qwen-Image-2.1-Uncensored-Quantized"
     },
     {
@@ -30,6 +27,9 @@
     },
     {
       "id": "ConwayResearch/Underdog-Saluki-27B-1.0"
+    },
+    {
+      "id": "LiquidAI/LFM2.5-24B-A2B"
     }
   ]
 }
