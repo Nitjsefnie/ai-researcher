@@ -23,13 +23,13 @@
       "id": "Lightricks/LTX-2.5"
     },
     {
-      "id": "AtomicChat/Qwen-Image-2.1-Turbo-Uncensored-GGUF"
-    },
-    {
       "id": "LiquidAI/LFM2.5-24B-A2B"
     },
     {
       "id": "meta-models/Muse-Spark-Open-816B-A42B"
+    },
+    {
+      "id": "AtomicChat/Qwen-Image-2.1-Turbo-Uncensored-GGUF"
     }
   ]
 }
