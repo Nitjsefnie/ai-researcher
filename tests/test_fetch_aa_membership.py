@@ -290,7 +290,7 @@ def test_three_generation_window_uses_leaderboard_provenance(
     data = tmp_path / "data"
     data.mkdir()
     base, detail, methodology, agents = (tmp_path / name for name in
-                                        ("base.html", "detail.html", "method.html", "agents.html"))
+                                         ("base.html", "detail.html", "method.html", "agents.html"))
     retired = detail_record("retired")
     if rescued not in ("parameters", "both"):
         retired.pop("parameters")
@@ -303,7 +303,7 @@ def test_three_generation_window_uses_leaderboard_provenance(
     base.write_text(page(leaderboard(51), "initialModels"), encoding="utf-8")
     detail.write_text(page(detail_rows, "models"), encoding="utf-8")
     methodology.write_text(f"Artificial Analysis Intelligence Index v{fetch_aa.INDEX_VERSION}",
-                            encoding="utf-8")
+                           encoding="utf-8")
     agents_payload = json.dumps({"rows": [
         {"id": str(i), "displayLabel": f"Agent {i}", "hostModelSlug": "current",
          "indexScore": 0.5, "mean": {"costUsd": 1}} for i in range(5)]})
@@ -312,9 +312,9 @@ def test_three_generation_window_uses_leaderboard_provenance(
     output = tmp_path / "page.html"
     raw, raw_agents = data / "aa-raw-models.json", data / "aa-raw-coding-agents.json"
     for module, paths in ((fetch_aa, {"ROOT": tmp_path, "OUT": raw,
-                                     "AGENTS_OUT": raw_agents, "STAMP": data / "captured-at.txt"}),
-                           (build, {"ROOT": tmp_path, "RAW": raw,
-                                    "AGENTS_RAW": raw_agents, "OUT": output})):
+                                      "AGENTS_OUT": raw_agents, "STAMP": data / "captured-at.txt"}),
+                          (build, {"ROOT": tmp_path, "RAW": raw,
+                                   "AGENTS_RAW": raw_agents, "OUT": output})):
         for key, value in paths.items():
             monkeypatch.setattr(module, key, value)
     monkeypatch.setattr(sys, "argv", ["fetch_aa.py", "--html", str(base),
