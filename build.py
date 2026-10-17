@@ -850,7 +850,7 @@ def cost_breakdown_window(data_dir: pathlib.Path) -> bool:
     """Whether fetch_aa.py left the all-dropped window marker (issue #217).
 
     fetch_aa.py writes data/cost-breakdown-window.txt when the merge
-    dropped EVERY model's cost breakdown -- a two-generation AA window, not a
+    dropped the leaderboard models' cost breakdowns -- an AA window, not a
     schema change. EXISTENCE is the whole signal: the file's one-line content
     is a git-history note for a human, and the page renders build.py's own
     fixed wording, so no marker text is ever interpolated into the page. (The
@@ -885,8 +885,10 @@ class WindowHold(Exception):
     """A window hour that holds the page instead of building one.
 
     Issue #232: when the window marker records three or more generations
-    observed in-run, the merge has dropped every cost breakdown and every
-    detail-route fill, and no honest page exists to build. main() raises
+    observed in-run and parameters remain empty after detail-only rows join,
+    the page holds. If only agentic is empty it publishes with a note; if
+    neither is empty it publishes fully. Other empty axes still refuse.
+    For a hold, main() raises
     instead of writing: the capture gate catches it on the fresh side and
     reports the hour unchanged, so the last good page stays live and
     nothing commits or publishes. Never caught inside build.py's own main()
@@ -942,8 +944,8 @@ TEMPLATE_MARKERS = ("__DATA__", "__PROVENANCE__", "__CAPTURED__", "__TBODY_")
 # payload. A literal here -- never marker-file content -- because the marker
 # file is pipeline state for a human, and page copy is build.py's own.
 AGENTIC_WINDOW_NOTE = (
-    '<div class="empty-state">Empty during a two-generation window &mdash; '
-    "AA's leaderboard and detail routes disagree on every cost breakdown; "
+    '<div class="empty-state">Empty during a capture window &mdash; '
+    "AA's leaderboard models lack matching cost breakdowns; "
     "GDPval costs return when they converge.</div>"
 )
 
@@ -1198,7 +1200,7 @@ def main(*, generation_state: bytes | None | EllipsisType = ...):
         ),
     }
     # Issue #217: fetch_aa.py leaves data/cost-breakdown-window.txt when the
-    # merge dropped EVERY model's cost breakdown -- a two-generation AA
+    # merge dropped the leaderboard models' cost breakdowns -- an AA
     # window, whose one legitimately-empty axis is agentic (GDPval). The flag
     # rides the payload only when the page is actually IN that state --
     # marker present AND the agentic count zero -- so a stale marker beside a
@@ -1234,8 +1236,8 @@ def main(*, generation_state: bytes | None | EllipsisType = ...):
     rendered = {**stats["metricCounts"], "parameters": stats["parameterCount"]}
     empty = [axis for axis, n in rendered.items() if not n]
     if empty and window and set(empty) == {"agentic"}:
-        print("cost-breakdown window: every model's GDPval cost was dropped as "
-              "another generation's -- publishing with the agentic axis empty "
+        print("cost-breakdown window: leaderboard GDPval costs are unavailable "
+              "-- publishing with the agentic axis empty "
               "and a note on the page instead of refusing; the axis returns "
               "when AA's routes converge")
     elif (empty and window and set(empty) <= {"agentic", "parameters"}
@@ -1245,8 +1247,8 @@ def main(*, generation_state: bytes | None | EllipsisType = ...):
             + ", ".join(sorted(empty))
             + f" -- the capture records "
             f"{window_generations(RAW.parent)} generation(s) observed in-run, "
-            "not a shape change: the merge dropped every cost breakdown and "
-            "every detail-route fill as another generation's, and no honest "
+            "not a shape change: leaderboard detail fills are unavailable "
+            "for these axes, and no honest "
             "page exists to build -- holding the page: the last good page "
             "stays live, nothing commits or publishes this hour, and the "
             "axes return when AA's routes converge")
@@ -1258,9 +1260,8 @@ def main(*, generation_state: bytes | None | EllipsisType = ...):
         raise SystemExit(
             "no rows carry a score/cost pair for: " + ", ".join(sorted(empty))
             + " -- the capture records a cross-generation AA window, not a "
-            "shape change: " + count_phrase + ", and the merge dropped every "
-            "cost breakdown and every detail-route fill as another "
-            "generation's, emptying these axes -- re-read the AA leaderboard "
+            "shape change: " + count_phrase + ", and leaderboard detail fills "
+            "are unavailable for these axes -- re-read the AA leaderboard "
             "by hand; the page recovers when AA's routes converge"
         )
     elif empty:

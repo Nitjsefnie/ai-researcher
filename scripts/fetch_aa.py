@@ -385,9 +385,9 @@ def check_cost_breakdown(models: list[dict]) -> tuple[int, list[str]]:
     the GDPval axis reads absent for that model until the routes converge
     (issue #200). When the merge dropped EVERY breakdown, the hour is a
     cross-generation window the merge is holding honest through, not a schema
-    change: it is reported and returned as (0, dropped) -- main() records the
-    state to the window marker, and the refresh publishes through the hour
-    rather than refusing one the page recovers from on its own (issue #217).
+    change: it is reported and returned as (0, dropped). These are whole-union
+    validation counts; main() separately counts leaderboard members for the
+    window marker, so detail-only prices cannot erase the window (issue #266).
     """
     checked = 0
     dropped: list[str] = []
@@ -441,9 +441,9 @@ def check_cost_breakdown(models: list[dict]) -> tuple[int, list[str]]:
     return checked, dropped
 
 
-# The sidecar marker for the all-dropped window (issue #217): check_cost_
-# breakdown's (0, dropped) return lands here as pipeline state the build
-# layer reads. Beside the capture, like the stamp it complements.
+# The sidecar marker for the leaderboard's all-dropped window (issue #217).
+# main validates the whole union but scopes these counts to leaderboard
+# models, so detail-only prices cannot erase route provenance (issue #266).
 COST_WINDOW_MARKER = ROOT / "data" / "cost-breakdown-window.txt"
 
 
@@ -452,7 +452,9 @@ def record_cost_window(priced: int, dropped: list[str],
                        generations: int | None = None) -> None:
     """Record -- or clear -- the all-dropped window marker beside the capture.
 
-    A window hour (priced == 0 with a non-empty `dropped`, issue #217) writes
+    `priced` and `dropped` describe leaderboard models after validating the
+    whole union (issue #266); detail-only records do not establish or clear
+    this evidence. A window hour (priced == 0 with non-empty `dropped`) writes
     the file with ONE human-readable line -- count and first dropped slug,
     plus the in-run generation count when the caller supplies one (issue
     #223: the build layer's refusal reads it, so a window hour that empties
@@ -470,7 +472,7 @@ def record_cost_window(priced: int, dropped: list[str],
         count = (f"; {generations} generation(s) observed in-run"
                  if generations is not None else "")
         path.write_text(
-            f"every cost breakdown dropped as another generation's: "
+            f"every leaderboard cost breakdown dropped as another generation's: "
             f"{len(dropped)} model(s), first {dropped[0]}{count}\n",
             encoding="utf-8")
         return
@@ -1054,6 +1056,8 @@ class Capture(typing.NamedTuple):
     across the leaderboard and detail reads. `disputed` says the written
     corpus carries genVariants, including cross-run presence and revisit
     holds; it can be true even when this run's two looks agree.
+    `leaderboard_slugs` is the union of the looks' membership, used only to
+    scope window evidence; it is not written into the captured AA records.
     """
 
     models: list
@@ -1065,6 +1069,8 @@ class Capture(typing.NamedTuple):
     # look-back was not engaged or found no presence diff.
     cross_run: CrossRun = CrossRun([], [])
     revisit_action: str | None = None
+    # Window evidence belongs to leaderboard models, not detail-only prices.
+    leaderboard_slugs: frozenset[str] = frozenset()
 
 
 def capture(cached_base: str | None, cached_detail: str | None,
@@ -1217,7 +1223,7 @@ def capture(cached_base: str | None, cached_detail: str | None,
                 models, prev_records or [], held_corpora)
             disputed = True
     return Capture(models, host, version, generations, disputed, cross_run,
-                   revisit_action)
+                   revisit_action, frozenset(s for s in listed if isinstance(s, str)))
 
 
 def load_previous_capture() -> list | None:
@@ -1268,7 +1274,15 @@ def main() -> None:
                        prev_records, revisit_state)
     models = captured.models
     priced, dropped = check_cost_breakdown(models)
-    record_cost_window(priced, dropped, generations=captured.generations)
+    # All records were validated above. Only leaderboard records establish
+    # the route window: a detail-only breakdown cannot clear that provenance
+    # merely by existing, whether or not it renders an axis (issue #266).
+    window_models = [m for m in models if m.get("slug") in captured.leaderboard_slugs]
+    window_priced = sum(isinstance(m.get("intelligenceIndexCostPerTask"), dict)
+                        for m in window_models)
+    window_dropped = [label(m) for m in window_models
+                      if _number(m.get("intelligenceIndexCostPerTask")) is not None]
+    record_cost_window(window_priced, window_dropped, generations=captured.generations)
     agents_text = fetch_html(args.agents_html, AGENTS_URL)
     agents = coding_agent_rows(flight_payload(agents_text))
 

@@ -992,7 +992,7 @@ class EmptyAxisGuardTests(unittest.TestCase):
             stats = self.payload_of(output)["stats"]
             self.assertTrue(stats["costBreakdownWindow"])
             self.assertEqual(stats["metricCounts"]["agentic"], 0)
-            self.assertIn("Empty during a two-generation window",
+            self.assertIn("Empty during a capture window",
                           output.read_text(encoding="utf-8"))
 
     def test_a_production_window_row_is_the_dropped_cost_not_the_score(self):
@@ -1015,7 +1015,7 @@ class EmptyAxisGuardTests(unittest.TestCase):
             self.assertTrue(stats["costBreakdownWindow"])
             self.assertEqual(stats["metricCounts"]["agentic"], 0)
             self.assertEqual(stats["metricCounts"]["intelligence"], 1)
-            self.assertIn("Empty during a two-generation window",
+            self.assertIn("Empty during a capture window",
                           output.read_text(encoding="utf-8"))
 
     def test_a_window_marker_covers_the_agentic_axis_only(self):
@@ -1089,7 +1089,7 @@ class EmptyAxisGuardTests(unittest.TestCase):
 
             stats = self.payload_of(output)["stats"]
             self.assertNotIn("costBreakdownWindow", stats)
-            self.assertNotIn("Empty during a two-generation window",
+            self.assertNotIn("Empty during a capture window",
                              output.read_text(encoding="utf-8"))
 
     def test_a_fully_measured_capture_builds_and_names_all_four_axes_nonzero(self):
@@ -1106,7 +1106,7 @@ class EmptyAxisGuardTests(unittest.TestCase):
             self.assertEqual(
                 stats["metricCounts"], {"coding": 1, "intelligence": 1, "agentic": 1})
             self.assertEqual(stats["parameterCount"], 1)
-            self.assertNotIn("Empty during a two-generation window",
+            self.assertNotIn("Empty during a capture window",
                              output.read_text(encoding="utf-8"))
 
 
@@ -1290,7 +1290,7 @@ class WindowHoldTests(unittest.TestCase):
             stats = self.payload_of(output)["stats"]
             self.assertTrue(stats["costBreakdownWindow"])
             self.assertEqual(stats["metricCounts"]["agentic"], 0)
-            self.assertIn("Empty during a two-generation window",
+            self.assertIn("Empty during a capture window",
                           output.read_text(encoding="utf-8"))
 
     def test_a_counted_marker_with_a_fully_measured_capture_still_builds(self):
@@ -1316,7 +1316,7 @@ class WindowHoldTests(unittest.TestCase):
                 {"coding": 1, "intelligence": 1, "agentic": 1})
             self.assertEqual(stats["parameterCount"], 1)
             self.assertNotIn("costBreakdownWindow", stats)
-            self.assertNotIn("Empty during a two-generation window",
+            self.assertNotIn("Empty during a capture window",
                              output.read_text(encoding="utf-8"))
 
     def run_cli_with_corner(self) -> tuple[subprocess.CompletedProcess,

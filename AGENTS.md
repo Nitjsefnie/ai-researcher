@@ -249,13 +249,14 @@ the layers above keep those versions together. A disputed capture is an
 ordinary hour: the run never exits red, the page renders both values red with
 the pair order canonical, and the scheduled commit's body carries the differ's
 Disputes section — the three-generation corner (the looks disagree AND the
-detail route matches neither fingerprint) can build no page when detail-only
-models also supply no pairs: shared models get no detail fills, and parameters
-and agentic empty together. That corner holds the page rather than exiting red:
-the window marker records ≥ 3 generations observed in-run, the emptied axes are
-only the window-droppable ones (agentic, parameters), so `build.py` raises
-instead of writing, the gate reports the hour unchanged, the last good page
-stays live, and nothing commits or publishes until the routes converge. Any
+detail route matches neither fingerprint) gives shared models no detail fills.
+Window evidence counts leaderboard models after validating the whole union;
+detail-only breakdowns cannot clear it, even on models that render no rows.
+At ≥ 3 observed generations, empty parameters (alone or with agentic) HOLD
+the page: the gate reports unchanged and the last good page stays live.
+If detail-only rows rescue parameters, only agentic stays empty and the page
+publishes with the window note; rescuing both axes publishes a full page.
+Unplottable extras rescue neither axis and preserve the original HOLD. Any
 other emptied axis still refuses — the go-re-read-AA-by-hand signal for a
 real shape change. Without the cross-run look-back, a
 run whose looks agree writes no `genVariants` key anywhere and is
@@ -344,13 +345,13 @@ the refresh red.
 
 `build.py` additionally refuses to write a page where a rendered axis has no
 rows, so an emptied chart is a build failure rather than a published blank.
-Two exemptions. An all-dropped two-generation window hour (marked by
+Two exemptions. A leaderboard all-dropped window hour (marked by
 `data/cost-breakdown-window.txt`, written by `fetch_aa.py`) publishes with
 the agentic axis empty and a named on-page note. A three-generation window
-hour — the marker records ≥ 3 generations observed in-run — empties agentic
-and parameters together and builds no page at all: the build holds, the hour
-reports unchanged, the last good page stays live, and nothing commits or
-publishes until the routes converge. Every other empty axis remains a
+hour — the marker records ≥ 3 generations observed in-run — holds when
+parameters remain empty after detail-only rows join, with or without agentic.
+An agentic-only gap publishes with a note; no gap publishes a full page.
+Every other empty axis remains a
 refusal.
 
 Never hand-edit either capture; both are captured artifacts.

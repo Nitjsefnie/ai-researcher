@@ -936,8 +936,8 @@ class WindowMarkerStagingTests(unittest.TestCase):
                 (FIXTURE_MODELS, FIXTURE_AGENTS),
                 (window_capture(FIXTURE_MODELS), FIXTURE_AGENTS))
 
-        self.assertNotIn("Empty during a two-generation window", old_page)
-        self.assertIn("Empty during a two-generation window", new_page)
+        self.assertNotIn("Empty during a capture window", old_page)
+        self.assertIn("Empty during a capture window", new_page)
 
     def test_a_committed_window_hour_rebuilds_from_heads_marker(self):
         # A window hour's commit carries the capture AND its marker, so the

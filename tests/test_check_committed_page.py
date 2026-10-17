@@ -112,7 +112,7 @@ class CommittedStateRebuildTests(unittest.TestCase):
         committed = self.render_working_page()
         marker.unlink()
         rebuilt = check_committed_page.rebuild_page()
-        self.assertTrue("Empty during a two-generation window" in rebuilt)
+        self.assertTrue("Empty during a capture window" in rebuilt)
         self.assertEqual(check_committed_page.verify(committed, rebuilt), [])
 
 

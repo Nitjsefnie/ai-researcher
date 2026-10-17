@@ -273,7 +273,7 @@ class CostBreakdownTests(unittest.TestCase):
             fetch_aa.record_cost_window(
                 0, ["dropped-0", "dropped-1"], marker, generations=3)
             note = marker.read_text(encoding="utf-8")
-            self.assertIn("every cost breakdown dropped", note)
+            self.assertIn("every leaderboard cost breakdown dropped", note)
             self.assertIn("dropped-0", note)
             self.assertIn("; 3 generation(s) observed in-run", note)
             self.assertEqual(len(note.splitlines()), 1)
