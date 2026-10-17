@@ -1,17 +1,17 @@
 #!/usr/bin/env python3
-"""Extract the Artificial Analysis model dataset from the public leaderboard page.
+"""Extract Artificial Analysis models from the leaderboard and detail routes.
 
-artificialanalysis.ai is a Next.js app; the leaderboard's full model array ships
-inside the RSC flight payload embedded in the HTML rather than via a public JSON
-API. This pulls the page, reassembles the flight chunks, and picks out the rich
-model array (the one carrying intelligenceIndex, not the lightweight filter list).
+artificialanalysis.ai is a Next.js app; scored records ship inside the embedded
+RSC flight payload rather than via a public JSON API. Select the richest models
+or initialModels array, not the lightweight model index (issue #266).
 
 Writes two captures, both from artificialanalysis.ai and nothing else:
 
   data/aa-raw-models.json         the model leaderboard WIDENED with a model
                                   detail page -- the leaderboard publishes
                                   every value it carries, and the detail route
-                                  fills only what it omits
+                                  fills omitted fields and adds detail-only
+                                  models, whose values can lag a generation
   data/aa-raw-coding-agents.json  the Coding Agent Index -- agent+model rows
                                   carrying indexScore and mean.costUsd on the
                                   SAME record, so no reweighting is needed
@@ -53,8 +53,9 @@ URL = "https://artificialanalysis.ai/leaderboards/models"
 # detail corpus is MEASURED to lag the leaderboard, and the per-route generation
 # timestamps do not identify the stale one -- a detail page regenerated later
 # still embeds the older corpus (issue #200). So the leaderboard is the
-# authority: it publishes every value it carries, and the detail route fills
-# only what it omits. See merge_captures in build.py.
+# authority for models it lists: it publishes every value it carries, and the
+# detail route fills omitted fields. capture also keeps detail-only models
+# (issue #266); their values can lag. See merge_captures in build.py.
 MODEL_DETAIL_URL = "https://artificialanalysis.ai/models/{slug}"
 # The Coding Agent Index. This is a DIFFERENT AA product from the leaderboard's
 # `codingIndex` field: it scores agent+model+harness combinations (Claude Code -
@@ -276,10 +277,12 @@ def balanced_array(text: str, start: int) -> str | None:
 
 
 def richest_models_array(payload: str) -> list[dict]:
-    """Several "models":[...] arrays exist; take the one with the most fields."""
+    """Take the richest records from models or initialModels (issue #266)."""
     best: list[dict] = []
-    best_keys = 0
-    for m in re.finditer(r'"models":\[', payload):
+    best_fields: set[str] = set()
+    names: set[str] = set()
+    for m in re.finditer(r'"(models|initialModels)"\s*:\s*\[', payload):
+        names.add(m.group(1))
         raw = balanced_array(payload, m.end() - 1)
         if not raw:
             continue
@@ -287,11 +290,16 @@ def richest_models_array(payload: str) -> list[dict]:
             arr = json.loads(raw)
         except json.JSONDecodeError:
             continue
-        keys = max((len(x) for x in arr if isinstance(x, dict)), default=0)
-        if keys > best_keys:
-            best, best_keys = arr, keys
-    if best_keys < 20:
-        sys.exit(f"richest models array had only {best_keys} fields -- schema changed")
+        richest = max((x for x in arr if isinstance(x, dict)), key=len, default={})
+        if len(richest) > len(best_fields):
+            best, best_fields = arr, set(richest)
+    if len(best_fields) < 20:
+        sys.exit(
+            f"no full scored model records found in arrays: {', '.join(sorted(names)) or 'none'}; "
+            f"richest record had {len(best_fields)} fields "
+            f"({', '.join(sorted(best_fields)) or 'none'}); expected scored records "
+            "with at least 20 fields, including intelligenceIndex, "
+            "intelligenceIndexCostPerTask and contextWindowTokens")
     # RSC splices marker strings ("$L1c") in among the records; they are
     # references to other payload nodes, not models, and every consumer
     # downstream treats an entry as a mapping.
@@ -1074,7 +1082,7 @@ def capture(cached_base: str | None, cached_detail: str | None,
     paired with a host picked from a different read. The merge is
     merge_captures', and its rule is the whole contract: the leaderboard's
     value wins wherever both routes carry a field, and the detail route fills
-    only what the leaderboard omits (issue #200).
+    only what the leaderboard omits on shared models (issue #200).
 
     Issue #208 adds the second, spaced leaderboard look. The DISPUTE DECISION
     compares THE LOOKS on their shared slugs over the leaderboard universe:
@@ -1086,6 +1094,11 @@ def capture(cached_base: str | None, cached_detail: str | None,
     it never raises a dispute by itself (a stale detail corpus is the known,
     precedence-handled state of issue #200) and it fills the generation it
     belongs to.
+
+    Issue #266 adds detail-only records after the in-run comparison, before
+    either cross-run layer. Their single-source values can lag a generation;
+    they have no in-run variants and cannot change the leaderboard dispute.
+    creator.name fills an absent modelCreatorName only on these records.
 
     Issue #211 adds the cross-run look-back: when `prev_records` is passed,
     a model present in the previous committed capture's firm set and absent
@@ -1173,6 +1186,22 @@ def capture(cached_base: str | None, cached_detail: str | None,
         disputed = any("genVariants" in m for m in models)
         generations = 2 + (0 if matches1 or matches2 else 1)
         run_corpora = corpora
+
+    # Issue #266: membership is the union of both routes. Append detail-only
+    # records AFTER comparing the leaderboard looks, so their presence cannot
+    # change the in-run dispute or its canonical order. They are serving
+    # evidence for the cross-run layers, which must see the union too.
+    listed = slugs[0] | slugs[1]
+    detail_only = sorted(
+        (dict(rec) for rec in detail if isinstance(rec.get("slug"), str)
+         and rec["slug"] not in listed), key=lambda rec: rec["slug"])
+    for rec in detail_only:
+        creator = rec.get("creator")
+        if ("modelCreatorName" not in rec and isinstance(creator, dict)
+                and isinstance(creator.get("name"), str)):
+            rec["modelCreatorName"] = creator["name"]
+    models = models + detail_only
+    run_corpora = [corpus + detail_only for corpus in run_corpora]
 
     cross_run = CrossRun([], [])
     if prev_records:

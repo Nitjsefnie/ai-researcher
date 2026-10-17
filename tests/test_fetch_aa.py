@@ -81,13 +81,14 @@ class RichestModelsArrayTests(unittest.TestCase):
         self.assertEqual(len(got[0]), 30)
         self.assertEqual(got[0]["f0"], "rich0")
 
-    def test_a_thin_array_exits_as_a_schema_change(self):
+    def test_a_thin_array_refuses_naming_the_observed_and_expected_fields(self):
         payload = f'{{"models":{json.dumps([model(5, "thin")])}}}'
 
         with self.assertRaises(SystemExit) as caught:
             fetch_aa.richest_models_array(payload)
 
-        self.assertIn("schema changed", str(caught.exception))
+        self.assertIn("5 fields", str(caught.exception))
+        self.assertIn("intelligenceIndex", str(caught.exception))
 
     def test_an_identical_duplicate_record_is_collapsed(self):
         # AA has emitted one model twice in the same array, byte-identical.
@@ -749,8 +750,8 @@ def methodology_html(version: str | None = fetch_aa.INDEX_VERSION) -> str:
 class CaptureGapFillWiringTests(unittest.TestCase):
     """Issue #200: capture() reads both routes and merges them under one rule.
 
-    The detail route is a GAP FILL: it supplies the fields the leaderboard
-    does not ship and loses every field the leaderboard does carry. The merge
+    On shared models the detail route is a GAP FILL: it supplies the fields
+    the leaderboard does not ship and loses every field it does carry. The merge
     rule lives in build.merge_captures (pinned there), but only the capture
     function is what CALLS it with a detail host computed from THIS
     leaderboard's own rows -- a call site no unit test observes, which is
@@ -1876,8 +1877,8 @@ class MultiLookCaptureTests(unittest.TestCase):
         self.assertEqual(captured.models,
                          build.merge_captures(look1, [detail_record()]))
 
-    def test_a_detail_generation_matching_neither_look_fills_nothing(self):
-        # D a third generation: it widens no corpus that hour -- both
+    def test_a_detail_generation_matching_neither_look_fills_no_shared_model(self):
+        # D a third generation: it widens no shared model that hour -- both
         # variants render their own generation's values with the GDPval
         # cost absent (no breakdown is that generation's own), the summary
         # counts three observed generations, and the hour self-heals once

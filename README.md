@@ -25,9 +25,9 @@ pair is a score and a cost AA measured on the same run:
 | chart | y | AA source | one row is |
 |---|---|---|---|
 | Coding agents | Coding Agent Index v1.4 | `/agents/coding-agents` | an agent + a model |
-| Intelligence | Intelligence Index v4.3 | `/leaderboards/models` | a model |
-| GDPval-AA | GDPval-AA v2 | `/leaderboards/models` | a model |
-| Parameter efficiency | Intelligence Index vs parameters | `/leaderboards/models` | a model |
+| Intelligence | Intelligence Index v4.3 | leaderboard + model detail | a model |
+| GDPval-AA | GDPval-AA v2 | leaderboard + model detail | a model |
+| Parameter efficiency | Intelligence Index vs parameters | leaderboard + model detail | a model |
 
 The coding chart measures an agent *with* a model, because that is what AA
 benchmarks there: Claude Code on Opus 5 (xhigh) is a different row from Codex

@@ -69,16 +69,17 @@ the single-source rule above. This is why the coding axis moved to a different
 AA product rather than being dropped.
 
 **The model capture is TWO ROUTES stitched together — and the leaderboard
-wins.** AA trimmed the leaderboard payload once, and it still omits
-`licenseName`, `releaseDate`, the parameter count and the per-evaluation cost
+wins shared values.** Its scored records now ship in `initialModels` beside a
+three-field `models` index; detail pages still carry rich `models` arrays.
+The leaderboard omits `licenseName`, `releaseDate`, parameters and the cost
 breakdown. Those ship on any model detail page (`/models/<slug>`), which embeds
 the whole corpus for its comparison widgets. `fetch_aa.py` fetches both and
 gap-fills, one level deep — the split runs *through* the cost object, whose
 `evaluations` the leaderboard drops, so a key-level merge would let a surviving
 stub shadow the complete breakdown.
 
-**The two routes are not the same generation, and only one of them is
-published.** AA serves each route from its own Vercel cache, so a capture can
+**The two routes are not the same generation; shared models follow the
+leaderboard.** AA serves each route from its own Vercel cache, so a capture can
 straddle an update. The detail route's embedded corpus is measured to be the
 stale one, and the per-route generation timestamps do NOT identify it — a detail
 page regenerated later still embeds the older corpus, so comparing dates picks
@@ -91,6 +92,17 @@ disagreement. A field the leaderboard ever drops is a *fill* from the detail
 route, not a disagreement. That is the routes against each other; the two
 leaderboard looks one run takes against each other are the in-run dispute
 layer; cross-run presence and generation revisits are handled separately below.
+
+Membership is the leaderboard ∪ detail corpus (issue #266, 2026-10-17).
+Shared models retain the precedence and cost guards below. Detail-only models
+use their detail record alone: leaderboard-only speed stays absent;
+`creator.name`, when a string on a mapping, fills an absent `modelCreatorName`.
+Their values can lag a generation (issue #200); retired values rarely change.
+Vendor-retired models stay visible and tagged, preserving the independent
+`MISMATCH` verdict that leaderboard-only membership would silently end.
+The cross-run presence layer then sees genuinely new AA models instead of
+about 430 retirements going red. Detail-only records join after the in-run
+comparison, so their presence cannot alter its dispute or canonical order.
 
 One place needs care, because the merge is where two generations could still
 mix: `intelligenceIndexCostPerTask` ships as a **bare number** on the
@@ -132,7 +144,7 @@ precedence-handled state above. One fingerprint **on the same slug set** →
 the merge above, byte for byte. Two fingerprints, or one fingerprint on
 different slug sets — a model present in one look and absent from the other,
 which the Overseer ruled an inconsistency between the generations (2026-10-06,
-issue #211) — and the capture holds both, every record carrying `genVariants`:
+issue #211) — and the capture holds both; leaderboard records carry `genVariants`:
 one flat map per generation whose fields are that generation's own published
 values.
 
@@ -237,11 +249,10 @@ the layers above keep those versions together. A disputed capture is an
 ordinary hour: the run never exits red, the page renders both values red with
 the pair order canonical, and the scheduled commit's body carries the differ's
 Disputes section — the three-generation corner (the looks disagree AND the
-detail route matches neither fingerprint) is the one state a dispute can
-still produce that builds no page: the detail route fills nothing, the
-parameter count is absent everywhere, and the parameters axis empties beside
-the agentic one. That corner holds the page rather than exiting red — the
-window marker records ≥ 3 generations observed in-run, the emptied axes are
+detail route matches neither fingerprint) can build no page when detail-only
+models also supply no pairs: shared models get no detail fills, and parameters
+and agentic empty together. That corner holds the page rather than exiting red:
+the window marker records ≥ 3 generations observed in-run, the emptied axes are
 only the window-droppable ones (agentic, parameters), so `build.py` raises
 instead of writing, the gate reports the hour unchanged, the last good page
 stays live, and nothing commits or publishes until the routes converge. Any
@@ -278,7 +289,7 @@ frontier point. `coding_agent_rows` finds every object carrying an
 `model` rows have the intelligence, agentic and parameter axes, `agent` rows
 have coding, and neither has the other's columns. Weights status belongs to a
 model, so an agent row inherits it by matching `hostModelSlug` against the
-leaderboard's `slug`; runs on models AA has no row for (unreleased codenames)
+captured model's `slug`; runs on models AA has no row for (unreleased codenames)
 are **unknown**, drawn hollow — never defaulted to proprietary, which would
 assert something AA never said.
 

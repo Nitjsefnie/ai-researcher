@@ -277,12 +277,15 @@ independently cached and can serve two generations of the same data, and the
 refresh used to react to that with a skip, a heal, or a **disputed page** whose
 cells showed both routes' values. It no longer reacts at all, because there is
 nothing to react to: the leaderboard route is the fresh one and is published,
-the detail route fills only fields the leaderboard omits, and a disagreement is
-resolved by that fixed precedence rather than by a state. So the only scheduled
+the detail route fills fields a shared leaderboard record omits. A disagreement
+is resolved by fixed precedence rather than by a state. So the only scheduled
 commit is `Refresh capture: N models, …`, there is no disagreement that turns a
 run red, and the published document only moves forward. The two rules that
 matter when you touch the capture are in AGENTS.md — the leaderboard-wins
 precedence and the breakdown-drop guard at the cost shape split.
+Membership is the union of both routes (issue #266): detail-only retired models
+remain visible, with their detail lab and no leaderboard-only speed; their
+values can lag a generation.
 
 **Actions are hash-pinned**, with the version in a trailing comment. Do not
 "tidy" one back to `@v4`: a tag is a moving pointer, and these jobs hold a
