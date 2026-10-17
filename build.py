@@ -57,7 +57,7 @@ METRIC_ORDER = ("coding", "intelligence", "agentic")
 #   coding        the Coding Agent Index (data/aa-raw-coding-agents.json), whose
 #                 rows carry indexScore and mean.costUsd on ONE record. Its unit
 #                 is an agent+model+harness combination, not a bare model.
-#   intelligence  the model leaderboard's intelligenceIndex against its own
+#   intelligence  the model corpus's intelligenceIndex against its own
 #                 measured intelligenceIndexCostPerTask.cost.total.
 #   agentic       GDPval-AA v2 -- gdpvalNormalized against the cost AA measured
 #                 running it, recovered from the weighted breakdown below.
@@ -405,7 +405,7 @@ def build_agent_rows(agents, models):
     # Weights status is a property of the MODEL a run used, and the agent
     # capture does not carry it. `hostModelSlug` is provider-prefixed
     # ("anthropic_claude-sonnet-4-6"), so match on the slug with and without
-    # that prefix. Fourteen of the runs use models the leaderboard has no row
+    # that prefix. Some runs use models the captured corpus has no row
     # for at all -- unreleased codenames like "spiffy-blimp350" -- and those
     # stay None rather than being defaulted to proprietary, which would be a
     # claim AA never made.
@@ -637,15 +637,14 @@ def retired_summary(rows, retired_front):
     return f"MISMATCH -- still undominated: {named}"
 
 
-# The capture's one generation: the leaderboard's copy (Overseer ruling,
-# delegated by the maintainer, 2026-10-05, issue #200). The two routes are
+# Shared models publish the leaderboard's copy (issue #200). The two routes are
 # independently cached Vercel pages and AA's data lands on them at different
 # times, so a capture can straddle an update -- but the detail route is
 # MEASURED to be the stale one (its corpus keeps the previous generation's
 # display names and scores), and the per-route generation timestamps do NOT
 # identify which route is stale: a detail page regenerated later still embeds
-# the older corpus. So the leaderboard is published, always, and the detail
-# route is a gap-fill and nothing more.
+# the older corpus. Shared models use leaderboard values and detail fills;
+# capture() also retains detail-only models with that lag caveat (issue #266).
 # The one field whose two halves must agree or the breakdown goes: the cost
 # object, whose .evaluations decompose .cost.total. AA writes the breakdown as
 # the index weights already applied, so the parts sum to the total exactly.
@@ -693,13 +692,16 @@ def breakdown_matches_total(value) -> bool:
 def merge_captures(base: list, detail: list) -> list:
     """Leaderboard records widened with the detail route's extra fields.
 
-    The leaderboard is the authority on WHICH models exist and on every field
-    it ships; the detail route fills only what the leaderboard does not carry
+    For models the leaderboard lists, it is the authority on every field it
+    ships; the detail route fills only what the leaderboard does not carry
     (parameters, licence, release date, the per-evaluation cost breakdown).
     A value the leaderboard HAS is never replaced by the detail route's,
     silently and always: two generations mixed into one capture is exactly
     what made the page oscillate, so a conflicting detail value is not a
     disagreement to resolve -- it simply loses.
+
+    This helper widens only base records. capture() adds detail-only models
+    after the in-run comparison and before the cross-run layers (issue #266).
     """
     def fill(into, extra):
         """`into` wins; `extra` supplies only what is absent.
@@ -1592,7 +1594,7 @@ TEMPLATE = r"""<!DOCTYPE html>
     <button class="chip" id="fProp" aria-pressed="true"><span class="dot prop"></span>Proprietary</button>
     <button class="chip" id="fOpen" aria-pressed="true"><span class="dot open"></span>Open-weights</button>
     <button class="chip" id="fUnk" aria-pressed="true"
-      title="Coding-agent runs on a model AA's leaderboard does not carry, so its weights status is unpublished"><span class="dot unk"></span>Weights unpublished</button>
+      title="Coding-agent runs on a model AA's captured corpus does not carry, so its weights status is unpublished"><span class="dot unk"></span>Weights unpublished</button>
     <button class="chip" id="fSup" aria-pressed="false"
             title="Drop every model that some other model beats on both axes at once">Hide superseded</button>
     <button class="chip" id="fEff" aria-pressed="false"
@@ -1752,9 +1754,9 @@ TEMPLATE = r"""<!DOCTYPE html>
   <div class="foot">
     <p>Sourced entirely from Artificial Analysis. Intelligence Index v4.3 comprises
       <span id="evals"></span>. The Coding Agent Index carries its own measured cost per task, and the
-      Intelligence Index cost is AA's own total, and the model rows are the leaderboard's own records,
-      widened only where the leaderboard omits a field the page needs by a value from a model detail
-      page; where both carry a field, the leaderboard's value is the one published. GDPval-AA's cost is AA's figure for that evaluation with
+      Intelligence Index cost is AA's own total. Model rows combine the leaderboard and detail corpus;
+      shared models use leaderboard values, with detail fills. Detail-only models can lag a generation
+      and lack leaderboard-only speed measurements. GDPval-AA's cost is AA's figure for that evaluation with
       its 10% index weight divided back out &mdash; AA reports each component's task cost pre-weighted, and
       the components sum exactly to the published total. No score, token price or task measurement is
       estimated, and nothing is filled in from another source. Rebuild with
@@ -1962,7 +1964,7 @@ const DATA = __DATA__;
   // colour follows the entity, never its rank or row order
   const colourOf = r => r.open ? "var(--series-open)" : "var(--series-prop)";
   // Weights status belongs to a MODEL. A coding-agent row inherits it from the
-  // model that run used, and some of those models are not on AA's leaderboard
+  // model that run used, and some of those models are absent from AA's corpus
   // at all (unreleased codenames), so the honest value is "unknown" rather than
   // "proprietary". Unknown draws HOLLOW -- same hue, no fill -- because the
   // palette has no room for a third categorical colour on an all-pairs form.

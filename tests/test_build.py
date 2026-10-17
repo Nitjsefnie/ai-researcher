@@ -1380,7 +1380,7 @@ class WindowHoldTests(unittest.TestCase):
 
 
 class MergeCapturesTests(unittest.TestCase):
-    """Issue #200: the capture is ONE generation, taken from the leaderboard.
+    """Issue #200: shared models publish the leaderboard's generation.
 
     AA's two routes are independently cached pages and its data lands on them
     at different times, so one capture can straddle an update -- which is what

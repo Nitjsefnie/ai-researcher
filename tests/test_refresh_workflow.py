@@ -18,7 +18,7 @@ or whole-run-block equality that any reflow would break.
 
 There is NO route-disagreement state (issue #200): AA's two routes are
 independently cached, the leaderboard is the authority and the detail route
-is a gap-fill only, so the workflow has one capture exit colour and one
+fills shared-model gaps and adds detail-only models, so the workflow has one capture exit colour and one
 commit message for a moved capture. The pins below cover the recovery and the
 re-raise the Capture step keeps, not a dispute branch.
 """
@@ -1011,8 +1011,8 @@ class CaptureStepTests(unittest.TestCase):
     re-read AA by hand -- so the step's trap exists to park the capture's
     stderr and re-emit it on the red path. There is no exit-3 branch, no
     window stamp, no baseline record and nothing to retire: the leaderboard
-    route publishes every value it carries and the detail route fills only
-    what it omits.
+    route publishes every value it carries; the detail route fills omitted
+    fields on shared models and supplies detail-only records (issue #266).
     """
 
     def setUp(self):
