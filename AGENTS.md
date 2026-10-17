@@ -252,7 +252,7 @@ Disputes section — the three-generation corner (the looks disagree AND the
 detail route matches neither fingerprint) gives shared models no detail fills.
 Window evidence counts leaderboard models after validating the whole union;
 detail-only breakdowns cannot clear it, even on models that render no rows.
-At ≥ 3 observed generations, empty parameters (alone or with agentic) HOLD
+With that window marker at ≥ 3 observed generations, empty parameters HOLD
 the page: the gate reports unchanged and the last good page stays live.
 If detail-only rows rescue parameters, only agentic stays empty and the page
 publishes with the window note; rescuing both axes publishes a full page.
