@@ -252,7 +252,7 @@
     <button class="chip" id="fProp" aria-pressed="true"><span class="dot prop"></span>Proprietary</button>
     <button class="chip" id="fOpen" aria-pressed="true"><span class="dot open"></span>Open-weights</button>
     <button class="chip" id="fUnk" aria-pressed="true"
-      title="Coding-agent runs on a model AA's leaderboard does not carry, so its weights status is unpublished"><span class="dot unk"></span>Weights unpublished</button>
+      title="Coding-agent runs on a model AA's captured corpus does not carry, so its weights status is unpublished"><span class="dot unk"></span>Weights unpublished</button>
     <button class="chip" id="fSup" aria-pressed="false"
             title="Drop every model that some other model beats on both axes at once">Hide superseded</button>
     <button class="chip" id="fEff" aria-pressed="false"
@@ -412,9 +412,9 @@
   <div class="foot">
     <p>Sourced entirely from Artificial Analysis. Intelligence Index v4.3 comprises
       <span id="evals"></span>. The Coding Agent Index carries its own measured cost per task, and the
-      Intelligence Index cost is AA's own total, and the model rows are the leaderboard's own records,
-      widened only where the leaderboard omits a field the page needs by a value from a model detail
-      page; where both carry a field, the leaderboard's value is the one published. GDPval-AA's cost is AA's figure for that evaluation with
+      Intelligence Index cost is AA's own total. Model rows combine the leaderboard and detail corpus;
+      shared models use leaderboard values, with detail fills. Detail-only models can lag a generation
+      and lack leaderboard-only speed measurements. GDPval-AA's cost is AA's figure for that evaluation with
       its 10% index weight divided back out &mdash; AA reports each component's task cost pre-weighted, and
       the components sum exactly to the published total. No score, token price or task measurement is
       estimated, and nothing is filled in from another source. Rebuild with
@@ -428,7 +428,7 @@
       capture's generation order. Agreeing values render once, unchanged;
       an em-dash side marks a generation that does not carry the model at
       all (issue #211).</p>
-    <p>Capture <code>70e8b643b1c2d8cab38de0321e90bbb417de836f73a9d69c28f2d88614edbe57</code> &mdash; sha256 over data/aa-raw-models.json -- the merged, dispute-bearing capture of AA's leaderboard looks and model detail route, holding every generation a dispute caught -- then data/aa-raw-coding-agents.json, whole files concatenated in that order. Source commit <code>97ed37dfc4ef3350e6825e36372e7f6679116159</code>.</p>
+    <p>Capture <code>70e8b643b1c2d8cab38de0321e90bbb417de836f73a9d69c28f2d88614edbe57</code> &mdash; sha256 over data/aa-raw-models.json -- the merged, dispute-bearing capture of AA's leaderboard looks and model detail route, holding every generation a dispute caught -- then data/aa-raw-coding-agents.json, whole files concatenated in that order. Source commit <code>a3a600f3201bd90612d977b218e857ccb760b0cd</code>.</p>
     <p>&copy; 2026 Peter Z (Nitjsefnie) &middot;
       <a href="https://github.com/Nitjsefnie/ai-researcher/blob/main/LICENSE">MIT licence</a></p>
   </div>
@@ -622,7 +622,7 @@ const DATA = {"rows":[{"name":"Claude Opus 5.5 (Max, Default Fallback)","base":"
   // colour follows the entity, never its rank or row order
   const colourOf = r => r.open ? "var(--series-open)" : "var(--series-prop)";
   // Weights status belongs to a MODEL. A coding-agent row inherits it from the
-  // model that run used, and some of those models are not on AA's leaderboard
+  // model that run used, and some of those models are absent from AA's corpus
   // at all (unreleased codenames), so the honest value is "unknown" rather than
   // "proprietary". Unknown draws HOLLOW -- same hue, no fill -- because the
   // palette has no room for a third categorical colour on an all-pairs form.
