@@ -14,6 +14,9 @@
       "id": "fishaudio/drama-3"
     },
     {
+      "id": "deepseek-ai/DeepSeek-V4.1-Flash-1017"
+    },
+    {
       "id": "black-forest-labs/flux-3-image-klein-comfy"
     },
     {
@@ -24,9 +27,6 @@
     },
     {
       "id": "abenzerps/Qwen-Image-2.1-Uncensored-Quantized"
-    },
-    {
-      "id": "Qwen/Qwen-Image-2.1-Turbo"
     },
     {
       "id": "LiquidAI/LFM2.5-24B-A2B"
