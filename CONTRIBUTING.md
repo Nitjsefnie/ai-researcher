@@ -287,6 +287,13 @@ Membership is the union of both routes (issue #266): detail-only retired models
 remain visible, with their detail lab and no leaderboard-only speed; their
 values can lag a generation.
 
+The window marker counts leaderboard models after validating the whole union,
+so a detail-only breakdown cannot erase a route window (issue #266). In the
+three-generation corner, empty parameters (alone or with agentic) hold the
+last good page. Detail-only rows that rescue parameters leave an agentic-only
+gap, which publishes with a window note; rescuing both axes publishes fully.
+Unplottable extras leave the original hold intact. Other empty axes still refuse.
+
 **Actions are hash-pinned**, with the version in a trailing comment. Do not
 "tidy" one back to `@v4`: a tag is a moving pointer, and these jobs hold a
 repository token. Dependabot keeps the hashes current.

@@ -35,6 +35,23 @@ def test_no_scored_array_names_the_observed_arrays_and_fields():
     assert "schema changed" not in message
 
 
+@pytest.mark.parametrize("payload,names", [
+    ('{"other":[]}', "none"),
+    ('{"models":[],"initialModels":[]}', "initialModels, models"),
+    ('{"models":[invalid],"initialModels":[{"slug":}]}', "initialModels, models"),
+    ('{"models":[{"slug":"a"}', "models"),
+])
+def test_refusal_reports_empty_or_unreadable_candidates(payload, names):
+    with pytest.raises(SystemExit) as caught:
+        fetch_aa.richest_models_array(payload)
+    message = str(caught.value)
+    assert f"no full scored model records found in arrays: {names};" in message
+    assert "richest record had 0 fields (none); expected scored records" in message
+    assert "intelligenceIndexCostPerTask" in message
+    assert "contextWindowTokens" in message
+    assert "schema changed" not in message
+
+
 def detail_record(slug="current", ii=51):
     """Small synthetic scored record with the detail route's published shape."""
     return {
@@ -56,6 +73,8 @@ def detail_record(slug="current", ii=51):
         "medianEndToEndResponseTimeSeconds": 1,
         "quartile25OutputTokensPerSecond": 90,
         "quartile75OutputTokensPerSecond": 110,
+        # Shared identity must agree too for the matching-generation cases.
+        **({"modelCreatorName": "Leaderboard Lab"} if slug == "current" else {}),
     }
 
 
@@ -92,10 +111,12 @@ def capture_pages(tmp_path, monkeypatch, first, second, detail, prev=None, state
     return fetch_aa.capture(str(base), str(detail_path), str(methodology), prev, state)
 
 
-@pytest.mark.parametrize("first_ii,second_ii,detail_ii", [
-    (51, 51, 51), (51, 51, 53), (51, 52, 51), (51, 52, 52), (51, 52, 53)])
-def test_union_preserves_leaderboard_bytes_and_dispute_decision(
-        tmp_path, monkeypatch, first_ii, second_ii, detail_ii):
+@pytest.mark.parametrize("first_ii,second_ii,detail_ii,generations,filled", [
+    (51, 51, 51, 1, [51]), (51, 51, 53, 2, [51]),
+    (51, 52, 51, 2, [51]), (51, 52, 52, 2, [52]), (51, 52, 53, 3, [])])
+def test_detail_only_additions_preserve_existing_records_and_in_run_decision(
+        tmp_path, monkeypatch, first_ii, second_ii, detail_ii, generations, filled):
+    """Invariance to adding detail-only records, not an old-merge reference."""
     first, second = leaderboard(first_ii), leaderboard(second_ii)
     shared_detail = [detail_record(ii=detail_ii)]
     baseline = capture_pages(tmp_path, monkeypatch, first, second, shared_detail)
@@ -106,6 +127,18 @@ def test_union_preserves_leaderboard_bytes_and_dispute_decision(
     assert {r["slug"] for r in captured.models} == {"host", "current", "retired", "older"}
     existing = [r for r in captured.models if r["slug"] in {"host", "current"}]
     assert json.dumps(existing) == json.dumps(baseline.models)
+    assert captured.generations == generations
+    current = next(r for r in existing if r["slug"] == "current")
+    assert current.get("parameters") == (27 if filled else None)
+    if first_ii == second_ii:
+        assert "genVariants" not in current
+        assert current["intelligenceIndexCostPerTask"]["cost"]["total"] == 0.75
+    else:
+        assert sorted(v["ii"] for v in current["genVariants"]) == [51, 52]
+        assert sorted(v["ii"] for v in current["genVariants"]
+                      if "gdpvalCost" in v) == filled
+        assert all(v["gdpvalCost"] == pytest.approx(3.0) for v in current["genVariants"]
+                   if "gdpvalCost" in v)
     assert captured.disputed == baseline.disputed
     assert captured.generations == baseline.generations
     reversed_capture = capture_pages(tmp_path, monkeypatch, second, first,
@@ -245,3 +278,64 @@ def test_build_renders_detail_only_retirement_lab_speed_and_mismatch(
     raw.write_text(json.dumps(captured.models), encoding="utf-8")
     with pytest.raises(SystemExit, match="no rows carry a score/cost pair for: parameters"):
         build.main(generation_state=None)
+
+
+@pytest.mark.parametrize("rescued,outcome", [
+    ("no-extra", "hold"), ("neither", "hold"), ("agentic", "hold"),
+    ("parameters", "publish"), ("both", "publish"),
+])
+def test_three_generation_window_uses_leaderboard_provenance(
+        tmp_path, monkeypatch, capsys, rescued, outcome):
+    """Real capture CLI through build: extras cannot erase a route window."""
+    data = tmp_path / "data"
+    data.mkdir()
+    base, detail, methodology, agents = (tmp_path / name for name in
+                                        ("base.html", "detail.html", "method.html", "agents.html"))
+    retired = detail_record("retired")
+    if rescued not in ("parameters", "both"):
+        retired.pop("parameters")
+        retired.pop("intelligenceIndex")
+    if rescued not in ("agentic", "both"):
+        retired.pop("gdpvalNormalized")
+    detail_rows = [detail_record(ii=53)]
+    if rescued != "no-extra":
+        detail_rows.append(retired)
+    base.write_text(page(leaderboard(51), "initialModels"), encoding="utf-8")
+    detail.write_text(page(detail_rows, "models"), encoding="utf-8")
+    methodology.write_text(f"Artificial Analysis Intelligence Index v{fetch_aa.INDEX_VERSION}",
+                            encoding="utf-8")
+    agents_payload = json.dumps({"rows": [
+        {"id": str(i), "displayLabel": f"Agent {i}", "hostModelSlug": "current",
+         "indexScore": 0.5, "mean": {"costUsd": 1}} for i in range(5)]})
+    agents.write_text(f"<script>self.__next_f.push([1,{json.dumps(agents_payload)}])</script>",
+                      encoding="utf-8")
+    output = tmp_path / "page.html"
+    raw, raw_agents = data / "aa-raw-models.json", data / "aa-raw-coding-agents.json"
+    for module, paths in ((fetch_aa, {"ROOT": tmp_path, "OUT": raw,
+                                     "AGENTS_OUT": raw_agents, "STAMP": data / "captured-at.txt"}),
+                           (build, {"ROOT": tmp_path, "RAW": raw,
+                                    "AGENTS_RAW": raw_agents, "OUT": output})):
+        for key, value in paths.items():
+            monkeypatch.setattr(module, key, value)
+    monkeypatch.setattr(sys, "argv", ["fetch_aa.py", "--html", str(base),
+                                      "--detail-html", str(detail), "--agents-html", str(agents),
+                                      "--methodology-html", str(methodology)])
+    monkeypatch.setattr(fetch_aa, "_sleep", lambda _seconds:
+                        base.write_text(page(leaderboard(52), "initialModels"), encoding="utf-8"))
+    # Redirect only marker IO while exercising the real recording decision.
+    record_window = fetch_aa.record_cost_window
+    monkeypatch.setattr(fetch_aa, "record_cost_window", lambda priced, dropped, **kwargs:
+                        record_window(priced, dropped, data / "cost-breakdown-window.txt", **kwargs))
+    fetch_aa.main()
+    assert "3 generation(s) observed in-run" in capsys.readouterr().out
+    if outcome == "hold":
+        with pytest.raises(build.WindowHold, match="3 generation\\(s\\) observed in-run"):
+            build.main(generation_state=None)
+        assert not output.exists()
+    else:
+        build.main(generation_state=None)
+        html = output.read_text(encoding="utf-8")
+        note = "Empty during a capture window"
+        assert (note in html) == (rescued == "parameters")
+    assert (data / "cost-breakdown-window.txt").exists()
+    assert "changed shape" not in capsys.readouterr().out
