@@ -2,10 +2,10 @@
   "source": "https://huggingface.co/api/models?sort=trendingScore&limit=10",
   "models": [
     {
-      "id": "google/embeddinggemma-2"
+      "id": "deepseek-ai/DeepSeek-V4.1-Flash-1017"
     },
     {
-      "id": "deepseek-ai/DeepSeek-V4.1-Flash-1017"
+      "id": "google/embeddinggemma-2"
     },
     {
       "id": "jialinyyzz/humanizer"
