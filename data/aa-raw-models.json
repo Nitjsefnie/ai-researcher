@@ -58688,7 +58688,7 @@
  {
   "slug": "deepseek-v4-1-flash-1017",
   "name": "DeepSeek V4.1 Flash 1017 (Max)",
-  "shortName": "DeepSeek V4.1 Flash (max)",
+  "shortName": "DeepSeek V4.1 Flash 1017 (max)",
   "deprecated": false,
   "isReasoning": true,
   "isOpenWeights": true,
@@ -59027,19 +59027,7 @@
   "outputModalityText": true,
   "outputModalityImage": false,
   "outputModalitySpeech": false,
-  "outputModalityVideo": false,
-  "genVariants": [
-   {
-    "ii": 45.0965048681912,
-    "cost": 0.2620484273114172,
-    "gdpval": 0.622885,
-    "gdpvalCost": 0.35413323565282917,
-    "ctx": 1000000,
-    "pin": 0.3,
-    "pout": 1.2
-   },
-   {}
-  ]
+  "outputModalityVideo": false
  },
  {
   "slug": "nvidia-nemotron-nano-9b-v2-reasoning",
