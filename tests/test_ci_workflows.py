@@ -142,11 +142,9 @@ def test_instruction_budgets_gate_runs_only_in_the_coverage_job():
 
 
 def test_page_job_runs_the_committed_page_check():
-    # Issue #105: the committed-page check's only CI surface is this job, so
-    # a rename or removal must fail here the way an unwired chromium
-    # install fails above. The job runs on pull requests, so it must stay
-    # read-only and credential-free: the checkout persists no token and the
-    # job asks for nothing beyond contents: read.
+    # Issue #105: the page job invokes the committed-page check through
+    # its script and requests only contents: read. Check the invocation
+    # and the job's declared permissions at this CI surface.
     workflow = yaml.safe_load(TESTS_WORKFLOW.read_text(encoding="utf-8"))
     job = workflow["jobs"]["page"]
     [check] = [s for s in job["steps"]
