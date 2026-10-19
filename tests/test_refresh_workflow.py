@@ -88,6 +88,87 @@ class GateTests(unittest.TestCase):  # pylint: disable=too-many-public-methods
     def setUp(self):
         self.wf = load()
 
+    def test_needs_dependencies_resolve_to_defined_jobs(self):
+        jobs = self.wf["jobs"]
+        for name, job in jobs.items():
+            dependencies = job.get("needs", [])
+            if isinstance(dependencies, str):
+                dependencies = [dependencies]
+            with self.subTest(job=name):
+                self.assertLessEqual(set(dependencies), set(jobs))
+
+    def test_needs_graph_can_schedule_every_job(self):
+        jobs = self.wf["jobs"]
+        pending = {}
+        for name, job in jobs.items():
+            dependencies = job.get("needs", [])
+            pending[name] = set([dependencies] if isinstance(dependencies, str)
+                                else dependencies)
+        scheduled = set()
+        while pending:
+            ready = {name for name, dependencies in pending.items()
+                     if dependencies <= scheduled}
+            if not ready:
+                break
+            scheduled.update(ready)
+            for name in ready:
+                del pending[name]
+        self.assertEqual(scheduled, set(jobs))
+
+    def test_needs_context_references_are_declared_dependencies(self):
+        for name, job in self.wf["jobs"].items():
+            dependencies = job.get("needs", [])
+            if isinstance(dependencies, str):
+                dependencies = [dependencies]
+            referenced = set(re.findall(r"\bneeds\.([\w-]+)\.", json.dumps(job)))
+            with self.subTest(job=name):
+                self.assertLessEqual(referenced, set(dependencies))
+
+    def test_step_context_references_resolve_within_the_job(self):
+        for name, job in self.wf["jobs"].items():
+            defined = {entry["id"] for entry in job.get("steps", [])
+                       if "id" in entry}
+            referenced = set(re.findall(r"\bsteps\.([\w-]+)\.", json.dumps(job)))
+            with self.subTest(job=name):
+                self.assertLessEqual(referenced, defined)
+
+    def test_artifact_upload_names_are_unique(self):
+        produced = [entry["with"]["name"]
+                    for job in self.wf["jobs"].values()
+                    for entry in job.get("steps", [])
+                    if entry.get("uses", "").split("@", 1)[0]
+                    == "actions/upload-artifact"]
+        self.assertEqual(len(produced), len(set(produced)), produced)
+
+    def test_download_artifacts_have_upstream_producers(self):
+        jobs = self.wf["jobs"]
+        uploads = {}
+        for name, job in jobs.items():
+            uploads[name] = {
+                entry["with"]["name"] for entry in job.get("steps", [])
+                if entry.get("uses", "").split("@", 1)[0] == "actions/upload-artifact"}
+        for name, job in jobs.items():
+            downloads = [entry for entry in job.get("steps", [])
+                         if entry.get("uses", "").split("@", 1)[0]
+                         == "actions/download-artifact"]
+            if not downloads:
+                continue
+            ancestors = set()
+            pending = [name]
+            while pending:
+                dependencies = jobs[pending.pop()].get("needs", [])
+                if isinstance(dependencies, str):
+                    dependencies = [dependencies]
+                for dependency in dependencies:
+                    if dependency not in ancestors:
+                        ancestors.add(dependency)
+                        pending.append(dependency)
+            available = {artifact for ancestor in ancestors
+                         for artifact in uploads[ancestor]}
+            for download in downloads:
+                with self.subTest(job=name, step=download.get("name")):
+                    self.assertIn(download["with"]["name"], available)
+
     def test_workflow_permissions_floor_and_job_read_scope(self):
         # Issue #52 fold, narrowed by #143: the workflow-level floor is
         # contents: read, so a job added later without its own permissions
