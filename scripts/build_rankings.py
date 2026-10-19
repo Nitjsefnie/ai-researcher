@@ -82,7 +82,7 @@ button { font: inherit; color: var(--text-primary); background: var(--surface-1)
 section { margin: 3rem 0; }
 .chart-scroll, .table-scroll { overflow-x: auto; }
 .chart { background: var(--surface-1); position: relative; }
-svg { display: block; max-width: none; }
+svg { display: block; width: 100%; max-width: 100%; height: auto; }
 svg text { fill: var(--text-secondary); font-size: 12px; }
 .end-label { fill: var(--text-primary); font-size: 13px; }
 .grid { stroke: var(--grid); stroke-width: 1; }
@@ -216,7 +216,7 @@ def chart_svg(history: list[Snapshot], models: list[str], identifier: str) -> st
     def y(rank: int) -> float:
         return 35 + (rank - 1) * plot_height / 9
 
-    parts = [f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" '
+    parts = [f'<svg xmlns="http://www.w3.org/2000/svg" '
              f'viewBox="0 0 {width} {height}" aria-labelledby="{identifier}-title" '
              f'aria-describedby="{identifier}-description">',
              f'<title id="{identifier}-title">Top 10 rank history</title>',

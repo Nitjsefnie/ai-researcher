@@ -199,14 +199,14 @@ class RankingsTests(unittest.TestCase):
         self.addCleanup(_cleanup_rankings_fixture, self.directory)
         self.repo = pathlib.Path(self.directory) / "repo"
         self.repo.mkdir()
-        self.git("init", "-q", "-b", "main")
-        self.git("config", "user.name", "fixture")
-        self.git("config", "user.email", "fixture@example.com")
-        self.git("config", "commit.gpgsign", "false")
+        self._git("init", "-q", "-b", "main")
+        self._git("config", "user.name", "fixture")
+        self._git("config", "user.email", "fixture@example.com")
+        self._git("config", "commit.gpgsign", "false")
         self.first = self.commit(HF, ["org/a", "org/b"], "id")
         self.or_first = self.commit(OR, ["lab/x", "lab/y"], "slug")
 
-    def git(self, *args):
+    def _git(self, *args):
         return subprocess.run(
             ["git", "-C", str(self.repo), *args], check=True,
             capture_output=True, text=True, encoding="utf-8", timeout=60).stdout
@@ -216,9 +216,9 @@ class RankingsTests(unittest.TestCase):
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_text(json.dumps({"source": "fixture", "models": [
             {key: model} for model in models]}), encoding="utf-8")
-        self.git("add", path)
-        self.git("commit", "-qm", "Update list")
-        return self.git("rev-parse", "HEAD").strip()
+        self._git("add", path)
+        self._git("commit", "-qm", "Update list")
+        return self._git("rev-parse", "HEAD").strip()
 
     def _document(self, *arguments):
         output = pathlib.Path(self.directory) / "nested" / "rankings.html"
@@ -230,8 +230,8 @@ class RankingsTests(unittest.TestCase):
         second = self.commit(HF, ["org/b", "org/a"], "id")
         self.commit(OR, ["lab/y", "lab/x"], "slug")
         (self.repo / "README.md").write_text("unrelated", encoding="utf-8")
-        self.git("add", "README.md")
-        self.git("commit", "-qm", "Documentation")
+        self._git("add", "README.md")
+        self._git("commit", "-qm", "Documentation")
         third = self.commit(HF, ["org/c", "org/b"], "id")
         history = build_rankings.read_history(self.repo, HF, "id", 2)
         self.assertEqual([snapshot.commit for snapshot in history], [second, third])
@@ -285,7 +285,7 @@ class RankingsTests(unittest.TestCase):
         document = self._document()
         page = Page(document)
         for point in page.points:
-            timestamp = self.git("show", "-s", "--format=%cI", point["data-commit"]).strip()
+            timestamp = self._git("show", "-s", "--format=%cI", point["data-commit"]).strip()
             self.assertEqual(point["data-timestamp"], timestamp)
             self.assertIn(timestamp, " ".join(page.text))
         self.assertEqual(document.count('class="timestamp-tick"'), 3)
@@ -385,6 +385,97 @@ class RankingsTests(unittest.TestCase):
             finally:
                 browser.close()
 
+    def test_charts_fit_their_containers_at_common_widths(self):
+        for index in range(1, 10):
+            hf_models = [f"org/hf-{(index + rank) % 11}" for rank in range(10)]
+            latest_hf = self.commit(HF, hf_models, "id")
+        for index in range(1, 5):
+            router_models = [f"lab/or-{(index + rank) % 6}" for rank in range(10)]
+            latest_or = self.commit(OR, router_models, "slug")
+
+        document = self._document("--limit", "10")
+        chromium = os.environ.get("CHROMIUM_PATH") or "/usr/bin/chromium"
+        executable = chromium if pathlib.Path(chromium).exists() else None
+        with sync_playwright() as playwright:
+            try:
+                browser = playwright.chromium.launch(headless=True, executable_path=executable)
+            except PlaywrightError as error:
+                if "Executable doesn't exist at " in str(error):
+                    self.skipTest("Chromium executable is not installed")
+                raise
+            try:
+                page = browser.new_page(viewport={"width": 390, "height": 900},
+                                        color_scheme="dark")
+                page.set_content(document)
+                latest_commits = [latest_hf, latest_or]
+                for width in (390, 768, 1280):
+                    page.set_viewport_size({"width": width, "height": 900})
+                    page.locator(".chart-scroll").evaluate_all(
+                        "containers => containers.forEach(container => container.scrollLeft = 0)")
+                    charts = page.locator(".chart-scroll").evaluate_all("""(containers, commits) =>
+                      containers.map((container, index) => {
+                        const svg = container.querySelector('svg');
+                        const bounds = svg.getBoundingClientRect();
+                        const containerBounds = container.getBoundingClientRect();
+                        const newestPoints = Array.from(svg.querySelectorAll('.point'))
+                          .filter(point => point.dataset.commit === commits[index]);
+                        const newestBounds = newestPoints.map(point =>
+                          point.getBoundingClientRect());
+                        return {
+                          svgWidth: bounds.width,
+                          containerWidth: containerBounds.width,
+                          svgRight: bounds.right,
+                          containerRight: containerBounds.right,
+                          scrollWidth: container.scrollWidth,
+                          clientWidth: container.clientWidth,
+                          newestVisible: newestBounds.length > 0 && newestBounds.every(point =>
+                            point.left >= containerBounds.left - 0.5 &&
+                            point.right <= containerBounds.right + 0.5)
+                        };
+                      })""", latest_commits)
+                    widths = [chart["svgWidth"] for chart in charts]
+                    self.assertLessEqual(
+                        max(widths) - min(widths), 0.5,
+                        f"chart SVG widths differ at {width}px: {widths}")
+                    for index, chart in enumerate(charts):
+                        message = f"chart {index} at {width}px: {chart}"
+                        self.assertLessEqual(
+                            chart["svgWidth"], chart["containerWidth"] + 0.5,
+                            f"SVG exceeds its container; {message}")
+                        self.assertLessEqual(
+                            chart["scrollWidth"], chart["clientWidth"] + 1,
+                            f"chart scrolls horizontally; {message}")
+                        self.assertLessEqual(
+                            chart["svgRight"], chart["containerRight"] + 0.5,
+                            f"SVG right edge is clipped; {message}")
+                        self.assertTrue(
+                            chart["newestVisible"],
+                            f"newest commit points are clipped; {message}")
+
+                latest_point = page.locator(
+                    f"#hugging-face .point[data-commit='{latest_hf}']").first
+                expected_timestamp = latest_point.get_attribute("data-timestamp")
+                latest_point.hover()
+                self.assertIn(expected_timestamp, page.locator(
+                    "#hugging-face .tooltip").inner_text())
+
+                page.locator("#theme").click()
+                self.assertEqual(page.locator("html").get_attribute("data-theme"), "light")
+                light_surface = page.locator("#hugging-face .chart").evaluate(
+                    "node => getComputedStyle(node).backgroundColor")
+                page.locator("#theme").click()
+                self.assertEqual(page.locator("html").get_attribute("data-theme"), "dark")
+                dark_surface = page.locator("#hugging-face .chart").evaluate(
+                    "node => getComputedStyle(node).backgroundColor")
+                self.assertNotEqual(light_surface, dark_surface)
+                self.assertLessEqual(page.locator(".chart-scroll").evaluate_all("""containers => {
+                  const widths = containers.map(container =>
+                    container.querySelector('svg').getBoundingClientRect().width);
+                  return Math.max(...widths) - Math.min(...widths);
+                }"""), 0.5)
+            finally:
+                browser.close()
+
     def test_many_departed_models_keep_endpoint_labels_within_the_chart(self):
         for index in range(10):
             self.commit(HF, [f"org/model-{index}-{rank}" for rank in range(10)], "id")
@@ -396,7 +487,8 @@ class RankingsTests(unittest.TestCase):
                   if element.attrib.get("class") == "end-label"]
         self.assertEqual(len(labels), 100)
         coordinates = sorted(float(label.attrib["y"]) for label in labels)
+        viewbox_height = float(svg.attrib["viewBox"].split()[3])
         self.assertGreaterEqual(coordinates[0], 16)
-        self.assertLessEqual(coordinates[-1], float(svg.attrib["height"]) - 16)
+        self.assertLessEqual(coordinates[-1], viewbox_height - 16)
         self.assertTrue(all(right - left >= 22
                             for left, right in zip(coordinates, coordinates[1:])))
