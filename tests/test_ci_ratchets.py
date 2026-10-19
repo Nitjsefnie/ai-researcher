@@ -1212,12 +1212,14 @@ def test_end_to_end_push_undeclared_raise_refuses_with_the_route_hint(
     assert "Budget-Raise: <document> <key> <from> -> <to>" in out
 
 
+@pytest.mark.parametrize("subject", ["feat: add a chart",
+                                     "feat(charts): add a chart"])
 def test_end_to_end_pull_request_declared_raise_is_clean(tmp_path, capsys,
-                                                         monkeypatch):
+                                                         monkeypatch, subject):
     """Issue #133 part 3: the PR route opens the same rules the push
     route applies. The window is the merge commit's own commits
     (HEAD^1..HEAD^2), so a pure raise commit carrying perfectly formed
-    declaration lines passes on a pull request: --allow-declared-raises
+    declaration lines passes with a feat sibling: --allow-declared-raises
     --route pr is the invocation the workflow's PR branch makes."""
     repo = _seed_repo(tmp_path, _document(), budgets=_budgets_document())
     was = _budgets_document()["bytes"]["code_bytes"]
@@ -1227,6 +1229,7 @@ def test_end_to_end_pull_request_declared_raise_is_clean(tmp_path, capsys,
         repo, raised,
         _push_message(_declaration(".github/perf-budgets.json",
                                    "bytes.code_bytes", was, 79700)))
+    _git(repo, "commit", "-q", "--allow-empty", "-m", subject)
     head = _git(repo, "rev-parse", "pr").stdout.strip()
     guard = _guard()
     monkeypatch.chdir(repo)
@@ -1235,6 +1238,49 @@ def test_end_to_end_pull_request_declared_raise_is_clean(tmp_path, capsys,
     out = capsys.readouterr().out
     assert out.count("not relaxed") == 3
     assert "cannot ride a pull request" not in out
+
+
+@pytest.mark.parametrize("subject", [
+    "fix: repair a chart", "feature: add a chart", "feat!: add a chart",
+    "feat(charts)add a chart", "feat(charts):add a chart", "feat(): add a chart",
+    "fix: mention feat: in the subject\n\nfeat: only in the body",
+])
+def test_end_to_end_pull_request_declared_raise_without_feat_refuses(
+        tmp_path, capsys, monkeypatch, subject):
+    """A pure, exact declaration needs a feat subject in this PR's window."""
+    repo = _seed_repo(tmp_path, _document(), budgets=_budgets_document())
+    # A feature on the base is outside the window and cannot qualify it.
+    _git(repo, "commit", "-q", "--allow-empty", "-m", "feat: earlier work")
+    raised = _budgets_document()
+    raised["bytes"]["code_bytes"] = 79700
+    _commit_budgets_on_branch(
+        repo, raised,
+        _push_message(_declaration(".github/perf-budgets.json",
+                                   "bytes.code_bytes", 71627, 79700)))
+    _git(repo, "commit", "-q", "--allow-empty", "-m", subject)
+    head = _git(repo, "rev-parse", "HEAD").stdout.strip()
+    guard = _guard()
+    monkeypatch.chdir(repo)
+    assert guard.main(["main", head, "--allow-declared-raises",
+                       "--route", "pr"]) == 1
+    out = capsys.readouterr().out
+    assert "feat:" in out
+    assert "feat(<scope>):" in out
+    assert "CONTRIBUTING.md" in out
+
+
+def test_end_to_end_pull_request_without_declarations_needs_no_feat(
+        tmp_path, capsys, monkeypatch):
+    """Ordinary fix PRs stay clean when no declaration lines exist."""
+    repo = _seed_repo(tmp_path, _document(), budgets=_budgets_document())
+    tightened = _budgets_document()
+    tightened["bytes"]["code_bytes"] = 71000
+    head = _commit_budgets_on_branch(repo, tightened, "fix: trim page code")
+    guard = _guard()
+    monkeypatch.chdir(repo)
+    assert guard.main(["main", head, "--allow-declared-raises",
+                       "--route", "pr"]) == 0
+    assert capsys.readouterr().out.count("not relaxed") == 3
 
 
 def test_end_to_end_pull_request_route_survives_a_moved_base(
@@ -1256,6 +1302,7 @@ def test_end_to_end_pull_request_route_survives_a_moved_base(
         repo, raised,
         _push_message(_declaration(".github/perf-budgets.json",
                                    "bytes.code_bytes", was, 79700)))
+    _git(repo, "commit", "-q", "--allow-empty", "-m", "feat: add a chart")
     head = _git(repo, "rev-parse", "pr").stdout.strip()
     (repo / "UNRELATED.md").write_text("main moved on", encoding="utf-8")
     _git(repo, "checkout", "-q", "main")
