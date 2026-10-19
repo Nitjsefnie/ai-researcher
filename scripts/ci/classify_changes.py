@@ -18,22 +18,34 @@ list it cannot read, or a list that may be truncated all classify as a
 full change and run every leg. An API failure that under-runs would
 skip gates over code; one that over-runs only wastes minutes.
 
-A second class narrows the refresh bot's data to six supported paths.
-The fixed `git add` list in refresh.yml names
-`data/aa-raw-models.json`, `data/aa-raw-coding-agents.json`,
-`data/aa-generation-state.json`, `data/captured-at.txt` and
-`out/frontier-models.html`. The sixth, `data/cost-breakdown-window.txt`,
-is added when the payload carries it and removed when only HEAD carries it.
-The refresh job runs the full suite
-against the fresh capture BEFORE pushing (refresh.yml's own job), so
-re-running the heavy matrix on the bot's push re-verifies nothing. An
-hour's commit carries only the subset of those six whose bytes moved
-(git omits byte-identical files from the diff), so the class matches
-any non-empty SUBSET of the six, never per-file verdicts: an outside
-path — any other data/ file, or a source path — is not the bot, has no
-pre-test behind it, and runs the full set. The trade-off is accepted:
-a hand-staged commit confined to those six generated paths also gets
-the cheap class, although nothing pre-tested it (issue #212).
+A second class narrows refresh.yml's generated artifacts to nine supported
+paths. The AA publish job commits data/aa-raw-models.json,
+data/aa-raw-coding-agents.json, data/aa-generation-state.json,
+data/captured-at.txt and out/frontier-models.html, plus the conditional
+add/removal of data/cost-breakdown-window.txt. The refresh job runs the full
+suite against the fresh capture before handing it to publish, so the heavy
+matrix would only repeat that verification on the AA commit.
+
+The independent hf-fetch and or-fetch producers commit data/hf-trending.json
+and data/openrouter-trending.json. They do NOT run the suite before pushing:
+this classification rests on generated data with no code, not a pre-test.
+Tracker pushes land before rankings-push, so a full gate on a tracker
+commit would rebuild the newer list history against the not-yet-updated
+page and fail. Data-only classification skips the heavy legs, page-rankings
+included, and rankings-push catches the page up within the same hour
+(issue #277). The ninth path,
+out/trending-rankings.html, joins out/frontier-models.html as a bot-generated
+page committed by the run that built it. Its dedicated tests/page-rankings
+check re-verifies it on full gate runs (outside both narrowing classes).
+
+The class matches any non-empty SUBSET of these nine paths: each producer
+commits only its changed artifacts, and git omits byte-identical paths.
+Lint and actionlint still run. An outside path keeps the full gate set;
+scripts/build_rankings.py, alone or mixed with generated data, is outside
+the signature, so a stale committed page after a code change still fails its
+dedicated check. The accepted trade-off remains: a hand-staged commit
+confined to the generated paths also gets the cheap class without a pre-test
+(issue #212).
 
 On a PUSH the changed set is read over the verified base rather than
 the push's own `before`: the newest ci-gate run on main whose
@@ -62,15 +74,11 @@ import subprocess
 # re-homed as classifier patterns.
 DOC_PATTERNS = ('**/*.md', 'LICENSE', '.gitignore')
 
-# The refresh bot's push signature: refresh.yml's fixed `git add` list
-# plus the conditional window-marker add/removal, in ONE commit. A signature, not
-# a filter: the cheap class exists for generated data the refresh job
-# already tested. An hour's commit stages only the subset of these six
-# whose bytes moved, so any non-empty subset gets it — lint and
-# actionlint still run, and the accepted cost is that a hand-staged
-# commit confined to these six generated paths gets the cheap class
-# without its pre-test. A path outside the signature is untested data
-# and keeps the full matrix.
+# Generated artifacts from the AA refresh, both trackers, and rankings builder.
+# Any non-empty subset of these nine paths gets the cheap class; lint and
+# actionlint still run. Only the AA producer pre-tests with the full suite.
+# The trackers' list-to-page lag is intentional, and a source path beside any
+# generated artifact keeps the full gate set. Hand-staged subsets also narrow.
 BOT_SIGNATURE = frozenset({
     'data/aa-raw-models.json',
     'data/aa-raw-coding-agents.json',
@@ -78,6 +86,9 @@ BOT_SIGNATURE = frozenset({
     'data/captured-at.txt',
     'data/cost-breakdown-window.txt',
     'out/frontier-models.html',
+    'data/hf-trending.json',
+    'data/openrouter-trending.json',
+    'out/trending-rankings.html',
 })
 
 # The workflow whose runs decide the verified base on a push, and the

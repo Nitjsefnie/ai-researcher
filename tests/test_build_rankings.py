@@ -1,6 +1,7 @@
 """Exercise ranking history and the standalone page against real git commits."""
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from html.parser import HTMLParser
 import errno
 import json
@@ -275,19 +276,34 @@ class RankingsTests(unittest.TestCase):
         self.assertEqual(self._document().encode("utf-8"),
                          self._document().encode("utf-8"))
 
+        # An explicit commit must reproduce those bytes without moving HEAD.
+        before = self._git("rev-parse", "HEAD").strip()
+        original = self._document()
+        self.commit(HF, ["org/b", "org/new"], "id")
+        self.commit(OR, ["lab/y", "lab/new"], "slug")
+        current = self._git("rev-parse", "HEAD").strip()
+        self.assertEqual(self._document("--commit", before), original)
+        self.assertNotEqual(self._document(), original)
+        self.assertEqual(self._git("rev-parse", "HEAD").strip(), current)
+
     def test_page_has_no_external_subresources(self):
         document = self._document()
         self.assertNotRegex(document, r'(?i)(?:src|href)\s*=\s*[\"\x27]?https?://')
         self.assertNotRegex(document, r'(?i)(?:@import\s+|url\(\s*)[\"\x27]?https?://')
 
-    def test_every_point_has_its_full_commit_timestamp_and_visible_tick(self):
-        self.commit(HF, ["org/b", "org/a"], "id")
+    def test_every_point_has_its_utc_commit_timestamp_and_visible_tick(self):
+        with mock.patch.dict(os.environ, {"TZ": "JST-9"}):
+            latest = self.commit(HF, ["org/b", "org/a"], "id")
+        raw = self._git("show", "-s", "--format=%cI", latest).strip()
+        self.assertTrue(raw.endswith("+09:00"), raw)
         document = self._document()
         page = Page(document)
         for point in page.points:
-            timestamp = self._git("show", "-s", "--format=%cI", point["data-commit"]).strip()
+            seconds = int(self._git("show", "-s", "--format=%ct", point["data-commit"]))
+            timestamp = datetime.fromtimestamp(seconds, timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
             self.assertEqual(point["data-timestamp"], timestamp)
             self.assertIn(timestamp, " ".join(page.text))
+        self.assertNotIn(raw, document)
         self.assertEqual(document.count('class="timestamp-tick"'), 3)
 
     def test_each_table_exposes_model_rank_history_and_timestamps(self):
@@ -408,8 +424,14 @@ class RankingsTests(unittest.TestCase):
                                         color_scheme="dark")
                 page.set_content(document)
                 latest_commits = [latest_hf, latest_or]
-                for width in (390, 768, 1280):
+                for width in (390, 768, 1280, 2560):
                     page.set_viewport_size({"width": width, "height": 900})
+                    if width == 2560:
+                        main_width = page.locator("main").evaluate(
+                            "node => node.getBoundingClientRect().width")
+                        self.assertGreater(
+                            main_width, 2000,
+                            f"main should use the wide viewport at {width}px; got {main_width}px")
                     page.locator(".chart-scroll").evaluate_all(
                         "containers => containers.forEach(container => container.scrollLeft = 0)")
                     charts = page.locator(".chart-scroll").evaluate_all("""(containers, commits) =>
