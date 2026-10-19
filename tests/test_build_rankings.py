@@ -456,6 +456,8 @@ class RankingsTests(unittest.TestCase):
                     f"#hugging-face .point[data-commit='{latest_hf}']").first
                 expected_timestamp = latest_point.get_attribute("data-timestamp")
                 latest_point.hover()
+                self.assertEqual(page.locator(
+                    "#hugging-face .point.selected").get_attribute("data-commit"), latest_hf)
                 self.assertIn(expected_timestamp, page.locator(
                     "#hugging-face .tooltip").inner_text())
 
