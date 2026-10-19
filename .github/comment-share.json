@@ -208,8 +208,8 @@
     18694
   ],
   "tests/test_ci_workflows.py": [
-    6002,
-    14269
+    5896,
+    14243
   ],
   "tests/test_diff_aa.py": [
     13196,
@@ -240,8 +240,8 @@
     10113
   ],
   "tests/test_refresh_workflow.py": [
-    25197,
-    100094
+    25105,
+    100227
   ],
   "tests/test_workflow_ci_gate.py": [
     3391,
