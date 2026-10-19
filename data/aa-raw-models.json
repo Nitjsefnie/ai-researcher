@@ -52866,19 +52866,7 @@
   "outputModalityText": true,
   "outputModalityImage": false,
   "outputModalitySpeech": false,
-  "outputModalityVideo": false,
-  "genVariants": [
-   {},
-   {
-    "ii": 42.3811052132362,
-    "cost": 0.2201135746720313,
-    "gdpval": 0.478845,
-    "gdpvalCost": 0.3411067158769286,
-    "ctx": 1000000,
-    "pin": 0.15,
-    "pout": 0.6
-   }
-  ]
+  "outputModalityVideo": false
  },
  {
   "slug": "deepseek-v4-pro-non-reasoning",
