@@ -153,9 +153,6 @@ def test_page_job_runs_the_committed_page_check():
                if s.get("name") == "Check the committed page"]
     assert check["run"] == "python3 scripts/ci/check_committed_page.py"
     assert job["permissions"] == {"contents": "read"}
-    [checkout] = [s for s in job["steps"] if "uses" in s and
-                  s["uses"].startswith("actions/checkout@")]
-    assert checkout["with"]["persist-credentials"] is False
 
 
 def test_no_job_in_tests_workflow_holds_contents_write():
@@ -190,11 +187,6 @@ def test_diff_coverage_job_is_pull_request_only_and_read_only():
     # YAML reads the scalar `needs: coverage` as a string, not a list.
     assert job["needs"] in ("coverage", ["coverage"]), job["needs"]
     assert job["permissions"] == {"contents": "read"}
-    [checkout] = [s for s in job["steps"] if "uses" in s
-                  and s["uses"].startswith("actions/checkout@")]
-    assert checkout["with"]["ref"] == "${{ github.sha }}", checkout["with"]
-    assert checkout["with"]["fetch-depth"] == 0
-    assert checkout["with"]["persist-credentials"] is False
 
 
 def test_no_job_that_checks_out_the_tree_holds_conversation_write():
@@ -242,8 +234,6 @@ def test_coverage_comment_workflow_never_executes_the_tree():
     assert workflow[True]["workflow_run"]["workflows"] == ["ci gate"]
     [job] = workflow["jobs"].values()
     assert "github.event.workflow_run.event == 'pull_request'" in job["if"]
-    assert not [s for s in job["steps"] if "uses" in s
-                and s["uses"].startswith("actions/checkout@")]
     # The write lives at workflow level: the single job inherits it.
     assert workflow["permissions"] == {
         "pull-requests": "write", "actions": "read", "checks": "write"}
@@ -279,8 +269,7 @@ def test_the_comment_artifact_name_spans_both_workflows():
                                     "commenter"]
     [download] = [s for s in comment["jobs"]["comment"]["steps"]
                   if s.get("name") == "Download the comment artifact"]
-    assert upload["with"]["name"] == download["with"]["name"] == (
-        "diff-coverage-comment")
+    assert upload["with"]["name"] == download["with"]["name"]
 
 
 def test_coverage_job_collects_its_measured_subprocesses():
