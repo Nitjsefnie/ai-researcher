@@ -33,7 +33,7 @@ WORKFLOWS = sorted((REPO_ROOT / ".github" / "workflows").glob("*.yml"))
 
 # `uses: github/codeql-action/<step>@<40-hex sha>  # vX.Y.Z`
 _PIN = re.compile(
-    r"uses:\s*github/codeql-action/(?P<step>\S+)@(?P<sha>[0-9a-f]{40})"
+    r"uses:\s*(?P<action>[^\s@]+)@(?P<revision>\S+)"
     r"(?:\s+#\s*(?P<comment>\S+))?"
 )
 
@@ -53,8 +53,23 @@ _TEMPLATE_TAG = re.compile(
     r"<!--\s*(?P<tag>required|conditional|optional)\b", re.IGNORECASE)
 
 
-def _pins(workflow: str):
-    return _PIN.findall(workflow)
+def _pins(workflow: str, prefix: str = "github/codeql-action/"):
+    return [(action.removeprefix(prefix), revision, comment)
+            for action, revision, comment in _PIN.findall(workflow)
+            if action.startswith(prefix)]
+
+
+def test_action_revisions_agree_across_workflows():
+    references: dict[str, list[tuple[str, str]]] = {}
+    for path in WORKFLOWS:
+        workflow = path.read_text(encoding="utf-8")
+        for action, revision, _ in _pins(workflow, prefix=""):
+            references.setdefault(action, []).append((path.name, revision))
+    for action, occurrences in references.items():
+        first_path, expected = occurrences[0]
+        for path, actual in occurrences[1:]:
+            assert actual == expected, (
+                f"{action}: {path} uses {actual}, but {first_path} uses {expected}")
 
 
 def test_codeql_action_pins_share_one_sha():
