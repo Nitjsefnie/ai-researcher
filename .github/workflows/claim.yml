@@ -1,6 +1,6 @@
 name: claim
 on:
-  issue_comment:
+  issue_comment:  # zizmor: ignore[dangerous-triggers]
     types: [created]
 concurrency:
   group: claim-${{ github.event.issue.number }}
@@ -19,7 +19,7 @@ jobs:
       issues: write
       pull-requests: write
     steps:
-      - uses: Nitjsefnie-Actions/claim@cd8ffd8227e94cdf60ed2580016187353b055cf4 # v2.0.4
+      - uses: Nitjsefnie-Actions/claim@4c781a9b0ce62ff263a65226f6005d412cea6ae1 # v2.0.5
         with:
           max-claims: 'read=2, triage=4, write=6, maintain=10, admin=-1'
           expire: '7'
