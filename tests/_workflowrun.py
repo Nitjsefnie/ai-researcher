@@ -137,18 +137,13 @@ def emit(document):
         return
     expression = args[args.index("--jq") + 1]
     done = subprocess.run(
-        ["jq", expression], input=document,
+        ["jq", "-r", expression], input=document,
         capture_output=True, text=True)
     out = done.stdout
     sys.stderr.write(done.stderr)
     if done.returncode:
         raise SystemExit(done.returncode)
-    # gh prints a top-level string result UNQUOTED — every workflow here
-    # compares `--jq '.head.sha'` output with a bare SHA.
-    stripped = out.strip()
-    if (stripped.count(chr(10)) == 0
-            and stripped.startswith('"') and stripped.endswith('"')):
-        out = json.loads(stripped) + chr(10)
+    # gh prints every string result unquoted, including a stream of names.
     sys.stdout.write(out)
 
 def refuse(reason):

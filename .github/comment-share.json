@@ -1,0 +1,250 @@
+{
+  ".github/dependabot.yml": [
+    1696,
+    2181
+  ],
+  ".github/workflows/actionlint.yml": [
+    5707,
+    7482
+  ],
+  ".github/workflows/audit.yml": [
+    4193,
+    6000
+  ],
+  ".github/workflows/ci-gate.yml": [
+    5529,
+    7538
+  ],
+  ".github/workflows/codeql.yml": [
+    3304,
+    4169
+  ],
+  ".github/workflows/coverage-comment.yml": [
+    4547,
+    13754
+  ],
+  ".github/workflows/lint.yml": [
+    1102,
+    1770
+  ],
+  ".github/workflows/pr-gate.yml": [
+    615,
+    1271
+  ],
+  ".github/workflows/ratchet-push.yml": [
+    4623,
+    10811
+  ],
+  ".github/workflows/refresh.yml": [
+    33889,
+    66676
+  ],
+  ".github/workflows/scorecard.yml": [
+    593,
+    1587
+  ],
+  ".github/workflows/secrets.yml": [
+    2521,
+    3828
+  ],
+  ".github/workflows/tests.yml": [
+    17256,
+    23918
+  ],
+  ".github/workflows/types.yml": [
+    1021,
+    1568
+  ],
+  "build.py": [
+    25878,
+    113753
+  ],
+  "page_format.py": [
+    1954,
+    3021
+  ],
+  "scripts/capture_gate.py": [
+    9962,
+    16790
+  ],
+  "scripts/ci/aggregate_gate.py": [
+    3297,
+    6426
+  ],
+  "scripts/ci/check_committed_page.py": [
+    4527,
+    8337
+  ],
+  "scripts/ci/check_committed_rankings_page.py": [
+    1185,
+    3385
+  ],
+  "scripts/ci/check_ratchets.py": [
+    9043,
+    21616
+  ],
+  "scripts/ci/classify_changes.py": [
+    6658,
+    11337
+  ],
+  "scripts/ci/commit_scopes.py": [
+    6375,
+    12040
+  ],
+  "scripts/ci/diff_coverage.py": [
+    4731,
+    11949
+  ],
+  "scripts/ci/gate_base_freshness.py": [
+    13615,
+    24115
+  ],
+  "scripts/ci/install_chromium.py": [
+    7626,
+    19211
+  ],
+  "scripts/ci/instruction_budgets.py": [
+    6288,
+    13368
+  ],
+  "scripts/ci/js_coverage.py": [
+    2496,
+    8151
+  ],
+  "scripts/ci/perf_budgets.py": [
+    10031,
+    22198
+  ],
+  "scripts/ci/ratchet.py": [
+    555,
+    2856
+  ],
+  "scripts/ci/thresholds.py": [
+    2045,
+    8670
+  ],
+  "scripts/diff_aa.py": [
+    16747,
+    32453
+  ],
+  "scripts/fetch_aa.py": [
+    24082,
+    47542
+  ],
+  "scripts/fetch_hf_trending.py": [
+    661,
+    2705
+  ],
+  "scripts/fetch_openrouter_trending.py": [
+    690,
+    2808
+  ],
+  "scripts/publish_docs.py": [
+    1904,
+    4523
+  ],
+  "tests/_workflowrun.py": [
+    1399,
+    7198
+  ],
+  "tests/test_browser.py": [
+    31755,
+    96575
+  ],
+  "tests/test_build.py": [
+    31881,
+    96995
+  ],
+  "tests/test_capture_gate.py": [
+    13320,
+    43796
+  ],
+  "tests/test_check_committed_page.py": [
+    3940,
+    13676
+  ],
+  "tests/test_checkout_clean.py": [
+    4544,
+    7118
+  ],
+  "tests/test_ci_classify_verified_base.py": [
+    3628,
+    10868
+  ],
+  "tests/test_ci_context_separation.py": [
+    3048,
+    4862
+  ],
+  "tests/test_ci_gate_botdata.py": [
+    2560,
+    10511
+  ],
+  "tests/test_ci_gate_modules.py": [
+    3955,
+    16676
+  ],
+  "tests/test_ci_gate_output_wiring.py": [
+    7310,
+    14508
+  ],
+  "tests/test_ci_install_chromium.py": [
+    3858,
+    22391
+  ],
+  "tests/test_ci_instruction_budgets.py": [
+    5646,
+    20299
+  ],
+  "tests/test_ci_perf_budgets.py": [
+    5068,
+    21949
+  ],
+  "tests/test_ci_ratchets.py": [
+    10743,
+    56097
+  ],
+  "tests/test_ci_thresholds.py": [
+    3332,
+    18694
+  ],
+  "tests/test_ci_workflows.py": [
+    6002,
+    14269
+  ],
+  "tests/test_diff_aa.py": [
+    13196,
+    50317
+  ],
+  "tests/test_diff_coverage.py": [
+    3811,
+    23237
+  ],
+  "tests/test_fetch_aa.py": [
+    28402,
+    104015
+  ],
+  "tests/test_gate_base_freshness.py": [
+    5049,
+    28988
+  ],
+  "tests/test_gitignore.py": [
+    3628,
+    7163
+  ],
+  "tests/test_js_coverage.py": [
+    1840,
+    11040
+  ],
+  "tests/test_publish_docs.py": [
+    2178,
+    10113
+  ],
+  "tests/test_refresh_workflow.py": [
+    25197,
+    100094
+  ],
+  "tests/test_workflow_ci_gate.py": [
+    3391,
+    7843
+  ]
+}
