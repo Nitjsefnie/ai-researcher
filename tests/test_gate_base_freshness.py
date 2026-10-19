@@ -192,6 +192,7 @@ CORE_PIN = (
     '.github/workflows/claim.yml',
     '.github/workflows/codeql.yml',
     '.github/workflows/ci-gate.yml',
+    '.github/workflows/comment-share.yml',
     '.github/workflows/coverage-comment.yml',
     '.github/workflows/lint.yml',
     '.github/workflows/pr-gate.yml',

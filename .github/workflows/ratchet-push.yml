@@ -1,31 +1,37 @@
 name: ratchet push
 
-# The data-only push half of the coverage ratchet, split out of tests.yml
-# (issues #134 and #133 part 2b). A workflow_call callee cannot read an
+# The data-only push half of the coverage and comment-share ratchets
+# (issues #134, #133 and #281). A workflow_call callee cannot read an
 # environment's secret — the main-push deploy key would resolve EMPTY
 # inside the tests leg, exactly as claudit's #479 recorded for the same
 # split — and the job token's push is rejected by the planned
 # require-ci-aggregate ruleset, whose only bypass is the deploy key. So
 # the push lives HERE, a top-level workflow where `environment: main-push`
-# resolves, keyed on the ci-gate run's completion.
+# resolves, keyed on the ci-gate or comment-share run's completion.
 #
 # tests.yml is a workflow_call callee and produces no run of its own on a
 # main push — the run that carries the ratchet-data artifact is ci-gate's
 # (a callee's artifacts surface on the caller's run) — so that run is the
-# trigger. The keyless half stays in tests.yml: the coverage leg measures,
-# and stages the artifacts there; this workflow lists the triggering run's
-# artifacts, downloads the ratchet data, validates it as data, and pushes
-# the raise when there is one to push.
+# trigger for coverage. The keyless comment-share workflow stages tightened
+# records on main pushes. The triggering workflow's exact name selects
+# ratchet-data/ci-thresholds.json or comment-share-data/comment-share.json;
+# the names are disjoint so one producer cannot feed the other consumer.
+# This workflow lists that run's artifacts, downloads only its selected
+# data, validates it inline, and lands only the selected document.
 #
-# THE SUITE GATES THE PUSH: only a run whose pytest and coverage legs were
+# COVERAGE IS SUITE-GATED: only a run whose pytest and coverage legs were
 # green stages the ratchet data, and only a FULLY green gate run
-# (conclusion: success) publishes it. The artifact is treated as data and
+# (conclusion: success) publishes it. Comment-share instead requires its own
+# successful measurement run. An unchanged record stages no artifact and
+# completes as a green no-op here. The artifact is treated as data and
 # nothing else: the job runs no repository code — no checkout, no pip, no
-# script from the tree — and the staged thresholds document is
-# schema-checked inline (exact key set, numeric values) before anything is
-# pushed; the next push's "Ratchet documents" guard refuses any document
+# script from the tree. Both artifacts have exactly two files: base.txt
+# plus their selected document. Thresholds retain their exact-key numeric
+# schema; comment records are an object of pairs of finite non-negative
+# integers (an empty object is valid). Validation precedes the key step.
+# The next push's "Ratchet documents" guard refuses any thresholds document
 # that lowered a value, so a forged artifact cannot silently relax the
-# ratchet either way.
+# coverage ratchet.
 #
 # THE TRIGGER'S HAZARD — event data or code from another branch's run
 # reaching a privileged job — is gated shut: the job admits only a push
@@ -37,15 +43,15 @@ name: ratchet push
 # real ci-gate aggregate verdict on main's tip.
 #
 # Main standing still is checked before anything is built: the staged
-# base — the commit the raise was measured against — must still be
-# main's tip, or the raise is dropped green; the next main push measures
-# and raises instead. A push rejected after the check distinguishes main
+# base — the commit the data was measured against — must still be
+# main's tip, or the update is dropped green; the next main push measures
+# again. A push rejected after the check distinguishes main
 # having moved (dropped green) from main having stood still (a real
 # error).
 
 on:
   workflow_run:  # zizmor: ignore[dangerous-triggers]
-    workflows: [ci gate]
+    workflows: [ci gate, comment share]
     types: [completed]
 
 permissions: {}
@@ -60,7 +66,7 @@ concurrency:
 jobs:
   push:
     # Main pushes only: a PR run stages no main data, and a failed or
-    # cancelled gate run's data is not the tested state worth publishing.
+    # cancelled producer run's data is not the measured state worth publishing.
     # The head-repository gate is belt to the event gate's suspenders: a
     # fork's run carries event pull_request, never push, so it can never
     # pass — and the explicit repository equality keeps a same-named
@@ -84,13 +90,27 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
           RUN_ID: ${{ github.event.workflow_run.id }}
+          WORKFLOW_NAME: ${{ github.event.workflow_run.name }}
         run: |
           set -o pipefail
+          case "$WORKFLOW_NAME" in
+            'comment share')
+              artifact=comment-share-data
+              document=comment-share.json
+              ;;
+            'ci gate')
+              artifact=ratchet-data
+              document=ci-thresholds.json
+              ;;
+            *) echo 'unexpected triggering workflow' >&2; exit 1 ;;
+          esac
+          echo "artifact=$artifact" >> "$GITHUB_OUTPUT"
+          echo "document=$document" >> "$GITHUB_OUTPUT"
           names="$(gh api -H 'Cache-Control: no-cache' --paginate \
             "repos/$REPO/actions/runs/$RUN_ID/artifacts" \
             --jq '.artifacts[] | select(.expired != true) | .name' \
             | sort -u)"
-          if printf '%s\n' "$names" | grep -qx 'ratchet-data'; then
+          if printf '%s\n' "$names" | grep -qx "$artifact"; then
             echo "staged=true" >> "$GITHUB_OUTPUT"
           else
             echo "staged=false" >> "$GITHUB_OUTPUT"
@@ -103,7 +123,7 @@ jobs:
         if: steps.list.outputs.staged == 'true'
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
-          name: ratchet-data
+          name: ${{ steps.list.outputs.artifact }}
           path: ${{ runner.temp }}/ratchet-data
           run-id: ${{ github.event.workflow_run.id }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
@@ -112,23 +132,29 @@ jobs:
         # The artifact is DATA and nothing else: no file from it is
         # executed, sourced or interpreted as anything but bytes. The
         # validation is the push's own gate — the exact two-file shape the
-        # coverage leg stages, a base of exactly one 40-hex commit, and
-        # the thresholds document's exact key set (top level, per
-        # language, and leaf) with four finite numeric leaves and
-        # schema_version exactly 1. A forged or reshaped artifact dies
+        # selected producer stages, a base of exactly one 40-hex commit,
+        # and the selected schema. A forged or reshaped artifact dies
         # here, before the key is ever put to work.
         if: steps.list.outputs.staged == 'true'
+        env:
+          DOCUMENT: ${{ steps.list.outputs.document }}
         run: |
           set -euo pipefail
           data="${RUNNER_TEMP}/ratchet-data"
-          files="$(ls -A "${data}")"
-          echo "staged: ${files}"
-          # The exact two-file shape the coverage leg stages.
-          [ "$(printf '%s\n' "${files}" | sort | tr '\n' ' ' | xargs)" \
-            = "base.txt ci-thresholds.json" ] || {
+          case "$DOCUMENT" in
+            ci-thresholds.json|comment-share.json) ;;
+            *) echo 'unexpected ratchet document' >&2; exit 1 ;;
+          esac
+          # The exact two-file shape the selected producer stages.
+          shopt -s nullglob dotglob
+          files=("${data}"/*)
+          printf 'staged: %s\n' "${files[@]}"
+          if [ "${#files[@]}" -ne 2 ] ||
+            [ ! -f "${data}/base.txt" ] ||
+            [ ! -f "${data}/$DOCUMENT" ]; then
             echo "the ratchet artifact carries unexpected files" >&2
             exit 1
-          }
+          fi
           # The base is exactly one 40-hex commit: the whole file content,
           # not one line of it, must be the commit.
           base="$(cat "${data}/base.txt")"
@@ -140,29 +166,52 @@ jobs:
             echo "base.txt is not a 40-hex commit" >&2
             exit 1
           }
-          # The thresholds document's exact key set at every level, four
-          # finite numeric leaves, and schema_version exactly 1.
-          jq -e '
-            (keys | sort) == ["coverage", "schema_version"]
-            and .schema_version == 1
-            and (.coverage | keys | sort) == ["javascript", "python"]
-            and (.coverage.python | keys | sort) == ["floor", "measured"]
-            and (.coverage.javascript | keys | sort) == ["floor", "measured"]
-            and ([.coverage[][] | type] | sort)
-              == ["number", "number", "number", "number"]
-            and ([.coverage[][]] |
-                 all(type == "number" and . == . and . != infinite))
-          ' "${data}/ci-thresholds.json" > /dev/null || {
-            echo "ci-thresholds.json does not match the ratchet schema" >&2
-            exit 1
-          }
+          if [ "$DOCUMENT" = comment-share.json ]; then
+            # jq accepts non-finite numeric spellings: type alone cannot
+            # establish an exact finite integer (issue #281).
+            jq -es '
+              length == 1 and (.[0] | type == "object" and all(.[];
+                type == "array" and length == 2 and all(.[];
+                  type == "number" and isfinite and . >= 0 and floor == .)))
+            ' "${data}/comment-share.json" > /dev/null || {
+              echo "comment-share.json does not match the records schema" >&2
+              exit 1
+            }
+          else
+            # The thresholds document's exact key set at every level, four
+            # finite numeric leaves, and schema_version exactly 1.
+            jq -e '
+              (keys | sort) == ["coverage", "schema_version"]
+              and .schema_version == 1
+              and (.coverage | keys | sort) == ["javascript", "python"]
+              and (.coverage.python | keys | sort) == ["floor", "measured"]
+              and (.coverage.javascript | keys | sort) == ["floor", "measured"]
+              and ([.coverage[][] | type] | sort)
+                == ["number", "number", "number", "number"]
+              and ([.coverage[][]] |
+                   all(type == "number" and . == . and . != infinite))
+            ' "${data}/ci-thresholds.json" > /dev/null || {
+              echo "ci-thresholds.json does not match the ratchet schema" >&2
+              exit 1
+            }
+          fi
 
       - name: Push the ratchet commit
         if: steps.list.outputs.staged == 'true'
         env:
           MASTER_PUSH_DEPLOY_KEY: ${{ secrets.MASTER_PUSH_DEPLOY_KEY }}
           REPO: ${{ github.repository }}
+          DOCUMENT: ${{ steps.list.outputs.document }}
         run: |
+          case "$DOCUMENT" in
+            comment-share.json)
+              message='Ratchet comment-share: tighten the records (automated)'
+              ;;
+            ci-thresholds.json)
+              message='Ratchet ci-thresholds: raise the coverage floor (automated)'
+              ;;
+            *) echo 'unexpected ratchet document' >&2; exit 1 ;;
+          esac
           # Fail closed when the environment is missing its secret: with
           # no key there is nothing to authenticate the push with, and
           # the fallback must never be a token.
@@ -190,28 +239,40 @@ jobs:
           base="$(cat "${RUNNER_TEMP}/ratchet-data/base.txt")"
           fetched="$(git ls-remote "${remote}" refs/heads/main | cut -f1)"
           if [ "${fetched}" != "${base}" ]; then
-            echo "::notice::Main moved while this run measured; the next push raises instead"
+            echo "::notice::Main moved while this run measured; the next push measures again"
             {
               echo "### Dropped: main moved while this run measured"
               echo
               echo "The measured base ${base} is no longer main's tip (${fetched});"
-              echo "this run's raise is dropped and the next main push raises instead."
+              echo "this run's update is dropped and the next main push measures again."
             } >> "$GITHUB_STEP_SUMMARY"
             exit 0
           fi
           git init -q "${RUNNER_TEMP}/ratchet-repo"
           git -C "${RUNNER_TEMP}/ratchet-repo" remote add origin "${remote}"
           git -C "${RUNNER_TEMP}/ratchet-repo" fetch --quiet origin main
-          git -C "${RUNNER_TEMP}/ratchet-repo" checkout -q -B push FETCH_HEAD
-          cp "${RUNNER_TEMP}/ratchet-data/ci-thresholds.json" \
-            "${RUNNER_TEMP}/ratchet-repo/.github/ci-thresholds.json"
+          # Main can advance between ls-remote and fetch (issue #281).
+          # Bind the commit to the measured base; later movement rejects.
+          fetched="$(git -C "${RUNNER_TEMP}/ratchet-repo" rev-parse FETCH_HEAD)"
+          if [ "${fetched}" != "${base}" ]; then
+            echo "::notice::Main moved while this run measured; the next push measures again"
+            {
+              echo "### Dropped: main moved while this run measured"
+              echo
+              echo "The measured base ${base} is no longer main's tip (${fetched});"
+              echo "this run's update is dropped and the next main push measures again."
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          git -C "${RUNNER_TEMP}/ratchet-repo" checkout -q -B push "${base}"
+          cp "${RUNNER_TEMP}/ratchet-data/$DOCUMENT" \
+            "${RUNNER_TEMP}/ratchet-repo/.github/$DOCUMENT"
           git -C "${RUNNER_TEMP}/ratchet-repo" config user.name \
             'github-actions[bot]'
           git -C "${RUNNER_TEMP}/ratchet-repo" config user.email \
             '41898282+github-actions[bot]@users.noreply.github.com'
-          git -C "${RUNNER_TEMP}/ratchet-repo" add .github/ci-thresholds.json
-          git -C "${RUNNER_TEMP}/ratchet-repo" commit -q -m \
-            'Ratchet ci-thresholds: raise the coverage floor (automated)'
+          git -C "${RUNNER_TEMP}/ratchet-repo" add -f ".github/$DOCUMENT"
+          git -C "${RUNNER_TEMP}/ratchet-repo" commit -q -m "$message"
           if git -C "${RUNNER_TEMP}/ratchet-repo" push origin HEAD:main; then
             exit 0
           fi
@@ -227,5 +288,5 @@ jobs:
             echo "the ratchet push was rejected while main stood still" >&2
             exit 1
           fi
-          echo 'Main moved while this run measured; the next push raises instead.' \
+          echo 'Main moved while this run measured; the next push measures again.' \
             >> "$GITHUB_STEP_SUMMARY"
