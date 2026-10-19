@@ -42,10 +42,12 @@ That is fine in both directions.
   that cannot be compared on one axis, which is the only thing the frontier
   page does.
 
-  The Hugging Face trending list is a separate tracked output:
-  `scripts/fetch_hf_trending.py` writes `data/hf-trending.json`, and
-  `.github/workflows/hf-trending.yml` updates it hourly. It never feeds the
-  frontier page.
+  The Hugging Face trending and OpenRouter weekly top-10 lists are separate
+  tracked outputs: `scripts/fetch_hf_trending.py` writes `data/hf-trending.json`,
+  and `scripts/fetch_openrouter_trending.py` writes `data/openrouter-trending.json`.
+  The joined `.github/workflows/refresh.yml` updates both hourly and publishes
+  [rankings over time](https://docs.nitjsefni.eu/d/ai-researcher/trending-rankings)
+  from their git history. Neither tracker feeds the frontier page.
 
 - **`data/aa-raw-models.json` is a captured artifact — never hand-edit it.**
   `scripts/fetch_aa.py` reassembles it from the leaderboard's Next.js RSC
@@ -249,28 +251,28 @@ ones. `claim` watches issue comments: `/claim` assigns the commenter to an
 unassigned open issue, and `/unclaim` and `/release` remove the commenter's own
 assignment — self-service issue claiming for contributors without write access.
 
-`refresh` is the capture → commit → publish of the page, and it fires two
-ways, which are not equivalent. The commit lands on main through the
-`push` job's write deploy key (the `main-push` environment, restricted to
-main) rather than the workflow token, so the bot commit starts workflow
-runs and gets a real `ci gate` aggregate verdict on main's tip (issue
-#133). The workflow's own `schedule` trigger asks
-for hourly (`11 * * * *`), but GitHub delivers scheduled runs best-effort:
-measured over the 37 days ending 2026-09-28, it averaged five runs a day.
-The hourly cadence is actually carried by an out-of-repository scheduler on
-the maintainer's side, which calls the workflow's `workflow_dispatch` API
-once an hour (24 runs a day since it started on 2026-09-25; dispatching
-needs write access, so a contributor cannot reproduce this trigger — you
-can only read its runs). **If that external dispatcher stops, nothing in
-this repository changes and nothing alerts: the cadence silently degrades
-to the schedule trigger's few runs a day.** `workflow_dispatch` is also
-the only path a build-only change has to the live page: run the workflow
-with `force: true` to rebuild and republish even when the fresh capture
-would render the identical page — the page the code produces has moved
-while the data has not, and only a forced run publishes that (the workflow
-header explains the rendered no-change gate — the page is built from both
-captures with provenance normalized out — and the stale-page case in
-full).
+The joined `.github/workflows/refresh.yml` captures, commits and publishes the
+frontier page and refreshes both trending trackers. Its `schedule` requests
+hourly runs (`11 * * * *`); GitHub delivers schedules best-effort. Each data
+producer commits only its own changed files, and a failure in the AA capture
+or either tracker leaves the other producers independent. The push jobs
+serialize deliveries through their write deploy key (the `main-push`
+environment, restricted to main), so bot commits start workflow runs and get
+a real `ci gate` aggregate verdict (issue #133).
+
+After either tracker delivers a commit, `rankings` checks out landed `main`
+with full history and runs `python3 scripts/build_rankings.py`. The builder
+reads up to ten changing commits per list, with no network input. Its HTML
+stays untracked; `rankings-hub` publishes the same-run artifact to the
+[rankings page](https://docs.nitjsefni.eu/d/ai-researcher/trending-rankings),
+skipping an upload when the live bytes already match. The upload job executes
+no repository code and holds the docs-hub key only in its inline upload step.
+
+For a build-only frontier change, `workflow_dispatch` with `force: true`
+rebuilds and republishes even when the fresh capture would render the identical
+page. The workflow also repairs a stale live frontier page on an unchanged
+capture; its header explains both the rendered no-change gate and the
+republish check.
 
 One hourly-flow case reads differently since #200: AA's two routes are
 independently cached and can serve two generations of the same data, and the

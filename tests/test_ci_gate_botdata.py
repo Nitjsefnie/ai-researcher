@@ -17,6 +17,8 @@ import sys
 from pathlib import Path
 from unittest import mock
 
+import yaml
+
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
 
@@ -67,19 +69,21 @@ def test_bot_signature_is_exactly_the_refresh_bots_six_files():
     })
 
 
-def test_bot_signature_names_every_file_the_refresh_workflow_adds():
-    # Lockstep with refresh.yml: its `git add` list is the signature's
+def test_bot_signature_names_every_file_the_aa_committer_adds():
+    # Lockstep with refresh.yml: the AA committer's add list is the signature's
     # source of truth, and since issue #200 the fixed list is the ONLY
     # unconditional `git add` -- issue #227 put the window marker's add
     # and its `git rm` behind conditionals, so the signature covers every
-    # path an hour's commit can stage. The pin compares the sets, not one
+    # path an AA commit can stage. The pin compares the sets, not one
     # spelling.
-    raw = (REPO_ROOT / ".github" / "workflows" / "refresh.yml").read_text(
-        encoding="utf-8")
+    workflow = yaml.safe_load(
+        (REPO_ROOT / ".github/workflows/refresh.yml").read_text(encoding="utf-8"))
+    raw = "\n".join(step.get("run", "") for step in
+                    workflow["jobs"]["publish"]["steps"])
     fixed = "git add data/aa-raw-models.json data/aa-raw-coding-agents.json \\\n" \
-            "                  data/aa-generation-state.json " \
+            "        data/aa-generation-state.json " \
             "data/captured-at.txt out/frontier-models.html"
-    assert fixed in raw
+    assert " ".join(fixed.split()) in " ".join(raw.split())
     adds = re.findall(r"^\s*git add(?:[^\n\\]|\\\n)*", raw, re.MULTILINE)
     assert len(adds) == 2, adds
     staged = {path for add in adds for path in add.replace("\\\n", " ").split()
@@ -125,14 +129,24 @@ def test_data_only_refuses_a_fifth_path():
 
 
 def test_trending_push_runs_the_full_gate_set():
-    with mock.patch.object(classify, "_verified_base", return_value="a" * 40):
-        docs_only, data_only, reason = classify.classify(
-            {"name": "push", "repository": "o/r", "before": "a" * 40,
-             "sha": "b" * 40},
-            lambda argv: "data/hf-trending.json\n",
-        )
-    assert (docs_only, data_only) == (False, False)
-    assert "outside documentation" in reason
+    workflow = yaml.safe_load(
+        (REPO_ROOT / ".github/workflows/refresh.yml").read_text(encoding="utf-8"))
+    for tracker, filename in [('hf', 'hf'), ('or', 'openrouter')]:
+        steps = workflow['jobs'][f'{tracker}-fetch']['steps']
+        run = next(step['run'] for step in steps if step.get('id') == 'commit')
+        adds = re.findall(r'^\s*git add (.+)$', run, re.MULTILINE)
+        assert adds == [f'data/{filename}-trending.json']
+        assert not set(adds) & classify.BOT_SIGNATURE
+        with mock.patch.object(classify, "_verified_base", return_value="a" * 40):
+            docs_only, data_only, reason = classify.classify(
+                {"name": "push", "repository": "o/r", "before": "a" * 40,
+                 "sha": "b" * 40},
+                lambda argv, staged=tuple(adds): "\n".join(staged),
+            )
+        assert (docs_only, data_only) == (False, False)
+        assert "outside documentation" in reason
+        # Combining an untested tracker with pre-tested AA data cannot narrow.
+        assert not classify.data_only(adds + list(classify.BOT_SIGNATURE))
 
 
 def test_data_only_accepts_any_proper_subset():

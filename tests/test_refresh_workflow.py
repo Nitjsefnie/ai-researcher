@@ -5,7 +5,7 @@ its write side is three jobs in a fixed order: `refresh` (capture, rendered
 gate, rebuild, suite) runs on a read-only token and leaves the commit
 payload as an artifact of its own run; `publish` -- a keyless committer --
 downloads that artifact and replays the hour's commits into a git bundle
-while running no repository code; `push` -- the only job that loads the
+while running no repository code; `push` -- the AA job that loads the
 deploy key, in the main-push environment -- delivers the bundle to main;
 `hub` -- read-only since issue #206 -- uploads the verified page when the
 live page's embedded source-commit stamp shows the hub behind.
@@ -22,6 +22,7 @@ fills shared-model gaps and adds detail-only models, so the workflow has one cap
 commit message for a moved capture. The pins below cover the recovery and the
 re-raise the Capture step keeps, not a dispute branch.
 """
+import json
 import os
 import pathlib
 import re
@@ -1538,3 +1539,786 @@ def test_the_marker_conditional_behaves_on_the_four_hours(tmp_path):
     repo = scratch("quiet", tracked=False)
     run_block(repo)
     assert status(repo) == ""
+
+
+class HFTrackerStructureTests(unittest.TestCase):
+    """The key is accessible only to the push job, which executes no tree code."""
+
+    tracker = 'hf'
+    fetcher = 'hf'
+
+    def tracker_step(self, job, name):
+        return step_in(load(), f'{self.tracker}-{job}', name)
+
+    def test_workflow_exists(self):
+        self.assertTrue(WORKFLOW.is_file())
+        self.assertFalse((ROOT / '.github/workflows/hf-trending.yml').exists())
+
+    def test_triggers_concurrency_and_main_only(self):
+        workflow = load()
+        workflow['jobs'] = {name: workflow['jobs'][f'{self.tracker}-{name}']
+                            for name in ('fetch', 'push')}
+        self.assertEqual(workflow['concurrency'], {
+            'group': 'refresh', 'cancel-in-progress': False})
+        self.assertEqual(workflow['jobs']['fetch']['if'],
+                         "github.ref == 'refs/heads/main'")
+        self.assertNotIn('needs', workflow['jobs']['fetch'])
+
+    def test_permissions_and_secret_scope(self):
+        workflow = load()
+        workflow['jobs'] = {name: workflow['jobs'][f'{self.tracker}-{name}']
+                            for name in ('fetch', 'push')}
+        self.assertEqual(set(workflow['jobs']), {'fetch', 'push'})
+        self.assertEqual(workflow['permissions'], {'contents': 'read'})
+        self.assertNotIn('secrets.', str(workflow['jobs']['fetch']))
+        for name, job in workflow['jobs'].items():
+            with self.subTest(job=name):
+                self.assertEqual(job['permissions'], {'contents': 'read'})
+                self.assertEqual(job['timeout-minutes'],
+                                 10 if name == 'fetch' else 15)
+                self.assertEqual(job.get('environment'),
+                                 'main-push' if name == 'push' else None)
+                for entry in job['steps']:
+                    if name == 'fetch':
+                        self.assertNotIn('secrets.', str(entry))
+        push = workflow['jobs']['push']
+        preceding = 'push' if self.tracker == 'hf' else 'hf-push'
+        dependencies = [f'{self.tracker}-fetch', preceding]
+        if self.tracker == 'hf':
+            dependencies.append('hub')
+        self.assertEqual(push['needs'], dependencies)
+        self.assertEqual(push['if'],
+                         f"!cancelled() && needs.{self.tracker}-fetch.outputs.commits == 'true' && "
+                         f"needs.{preceding}.result != 'cancelled'")
+        self.assertNotIn('needs.hub.result', push['if'])
+        self.assertEqual(push['outputs'], {
+            'landed': '${{ steps.push.outputs.landed }}'})
+        self.assertEqual(workflow['jobs']['fetch']['outputs'], {
+            'commits': '${{ steps.commit.outputs.commits }}'})
+        key_steps = [entry for entry in push['steps']
+                     if 'secrets.' in str(entry)]
+        self.assertEqual(key_steps, [self.tracker_step('push', 'Push the trending commit')])
+        self.assertEqual(key_steps[0]['env']['MASTER_PUSH_DEPLOY_KEY'],
+                         '${{ secrets.MASTER_PUSH_DEPLOY_KEY }}')
+        self.assertEqual(key_steps[0]['if'],
+                         "steps.replay.outputs.commits == 'true'")
+        self.assertNotIn('env', workflow)
+        self.assertNotIn('env', push)
+
+    def test_only_fetch_checks_out_and_no_frontier_code_runs(self):
+        workflow = load()
+        workflow['jobs'] = {name: workflow['jobs'][f'{self.tracker}-{name}']
+                            for name in ('fetch', 'push')}
+        checkout = [entry for entry in workflow['jobs']['fetch']['steps']
+                    if entry.get('uses', '').startswith('actions/checkout@')]
+        self.assertEqual(len(checkout), 1)
+        self.assertEqual(checkout[0]['with']['persist-credentials'], False)
+        self.assertEqual(checkout[0]['with']['fetch-depth'], 0)
+        for name, job in workflow['jobs'].items():
+            for entry in job['steps']:
+                run = entry.get('run', '')
+                self.assertNotRegex(run, r'build\.py|capture_gate\.py|fetch_aa\.py|publish_docs\.py|diff_aa\.py')
+                if name == 'push':
+                    self.assertFalse(entry.get('uses', '').startswith('actions/checkout@'))
+                    self.assertNotRegex(run, r'\bpython3?\b|\bpip\b')
+                    self.assertNotIn('github.token', str(entry))
+
+    def test_artifact_is_this_runs_bundle_and_upload_is_success_gated(self):
+        upload = self.tracker_step('fetch', 'Upload the push bundle')
+        download = self.tracker_step('push', 'Download the push bundle')
+        self.assertEqual(upload['if'], "success() && steps.commit.outputs.commits == 'true'")
+        self.assertEqual(upload['with']['if-no-files-found'], 'error')
+        self.assertEqual(upload['with']['name'], f'{self.tracker}-push-data')
+        self.assertEqual(upload['with']['name'], download['with']['name'])
+        self.assertEqual(upload['with']['path'], download['with']['path'])
+        self.assertNotIn('run-id', download['with'])
+        self.assertNotIn('github-token', download['with'])
+        self.assertEqual([entry.get('name') for entry in load()['jobs'][f'{self.tracker}-push']['steps']],
+                         ['Download the push bundle', 'Replay onto fresh main',
+                          'Push the trending commit'])
+
+    def test_capture_message_and_exact_add_list(self):
+        self.assertEqual(self.tracker_step('fetch', 'Fetch the top 10')['run'],
+                         f'python3 scripts/fetch_{self.fetcher}_trending.py --message "$RUNNER_TEMP/message"')
+        run = self.tracker_step('fetch', 'Commit when changed')['run']
+        adds = re.findall(r'^\s*git add (.+)$', run, re.MULTILINE)
+        self.assertEqual(adds, [f'data/{self.fetcher}-trending.json'])
+        self.assertIn('git commit -q -F "$RUNNER_TEMP/message"', run)
+        self.assertNotIn('git push', run)
+
+    def test_key_lifecycle_matches_refresh_and_has_no_force_push(self):
+        run = self.tracker_step('push', 'Push the trending commit')['run']
+        self.assertIn('trap \'kill "$SSH_AGENT_PID" 2>/dev/null || true\' EXIT', run)
+        self.assertIn('ssh-add <(printf \'%s\\n\' "$MASTER_PUSH_DEPLOY_KEY")', run)
+        self.assertIn('StrictHostKeyChecking=yes', run)
+        self.assertNotIn('--force', run)
+        self.assertNotIn('--depth', run)
+
+    def test_deploy_key_delivery_stays_in_lockstep_with_refresh(self):
+        refresh_path = ROOT / '.github/workflows/refresh.yml'
+        refresh = _workflowrun.step_by_name(
+            refresh_path, 'push', 'Push the tested tree to main')['run'].splitlines()
+        trending = self.tracker_step('push', 'Push the trending commit')['run'].splitlines()
+        files = f'refresh.yml: push and {self.tracker}-push'
+        success_output = ['else', '  echo "landed=true" >> "$GITHUB_OUTPUT"']
+        self.assertEqual(trending[-3:-1], success_output)
+        trending[-3:-1] = []
+        # Apart from the pinned output, only truthful diagnostics differ.
+        differences = (
+            # Trending's pre-push concession promises a fresh list, not a suite.
+            ('  echo "::notice::main moved under the run (tested base $base, current tip $fetched); the next hourly run re-fetches, re-tests and lands it"',
+             '  echo "::notice::main moved under the run (tested base $base, current tip $fetched); the next hourly run fetches and lands the trending list"', 1),
+            # Trending's post-rejection concession likewise promises no suite.
+            ('  echo "::notice::main moved before the push landed; the next hourly run re-fetches, re-tests and lands it"',
+             '  echo "::notice::main moved before the push landed; the next hourly run fetches and lands the trending list"', 1),
+            # Both summary branches describe fetching the list without a suite.
+            ('    echo "The next hourly run re-fetches on the new tip, re-runs the suite"',
+             '    echo "The next hourly run fetches the trending list on the new tip"', 2),
+            # Both summary branches omit refresh's capture-job-specific wording.
+            ('    echo "in the capture job, and lands the data there."',
+             '    echo "and lands the data there."', 2),
+        )
+        canonical = {}
+        for refresh_line, trending_line, count in differences:
+            self.assertEqual(refresh.count(refresh_line), count, files)
+            self.assertEqual(trending.count(trending_line), count, files)
+            canonical[trending_line] = refresh_line
+        # Whole-line canonicalization retains every line and its position: a
+        # one-sided edit, insertion, deletion or reorder fails the comparison.
+        self.assertEqual(refresh, [canonical.get(line, line) for line in trending],
+                         f'Deploy-key delivery diverged between {files}')
+
+
+class ORTrackerStructureTests(HFTrackerStructureTests):
+    tracker = 'or'
+    fetcher = 'openrouter'
+
+
+class RankingsStructureTests(unittest.TestCase):
+    """Build landed history without keys; publish only this run's artifact."""
+
+    def setUp(self):
+        self.wf = load()
+
+    def test_rankings_waits_for_deliveries_and_requires_a_landed_tracker(self):
+        job = self.wf['jobs']['rankings']
+        self.assertEqual(job['needs'], ['push', 'hf-push', 'or-push'])
+        self.assertEqual(job['if'],
+                         "!cancelled() && (needs.hf-push.outputs.landed == 'true' || "
+                         "needs.or-push.outputs.landed == 'true')")
+        self.assertEqual(self.wf['concurrency'], {
+            'group': 'refresh', 'cancel-in-progress': False})
+
+    def test_rankings_hub_has_an_explicit_failure_isolated_condition(self):
+        self.assertEqual(self.wf['jobs']['rankings-hub'].get('if'),
+                         "!cancelled() && needs.rankings.result == 'success'")
+
+    def test_rankings_reads_full_landed_main_and_builds_with_defaults(self):
+        job = self.wf['jobs']['rankings']
+        checkouts = [s for s in job['steps']
+                     if s.get('uses', '').startswith('actions/checkout@')]
+        self.assertEqual(len(checkouts), 1)
+        self.assertEqual(checkouts[0]['with']['ref'], 'main')
+        self.assertEqual(checkouts[0]['with']['fetch-depth'], 0)
+        self.assertIs(checkouts[0]['with']['persist-credentials'], False)
+        self.assertNotIn('github.sha', str(job))
+        build_step = step_in(self.wf, 'rankings', 'Build the rankings page')
+        self.assertEqual(build_step['run'], 'python3 scripts/build_rankings.py')
+        self.assertLess(job['steps'].index(checkouts[0]),
+                        job['steps'].index(build_step))
+
+    def test_rankings_artifact_is_required_and_consumed_in_the_same_run(self):
+        upload = step_in(self.wf, 'rankings', 'Upload the rankings page')
+        download = step_in(self.wf, 'rankings-hub', 'Download the rankings page')
+        self.assertEqual(upload['with']['name'], 'rankings-page')
+        self.assertEqual(upload['with']['path'], 'out/trending-rankings.html')
+        self.assertEqual(upload['with']['if-no-files-found'], 'error')
+        self.assertEqual(download['with'], {
+            'name': 'rankings-page', 'path': '${{ runner.temp }}/rankings-page'})
+        self.assertEqual(self.wf['jobs']['rankings-hub']['needs'], ['rankings'])
+        names = [s.get('name') for s in self.wf['jobs']['rankings']['steps']]
+        self.assertLess(names.index('Build the rankings page'),
+                        names.index('Upload the rankings page'))
+
+    def test_rankings_credentials_stay_in_the_code_free_upload_job(self):
+        self.assertNotIn('env', self.wf)
+        for name in ('rankings', 'rankings-hub'):
+            job = self.wf['jobs'][name]
+            self.assertEqual(job['permissions'], {'contents': 'read'})
+            self.assertGreater(job['timeout-minutes'], 0)
+            self.assertNotIn('environment', job)
+            self.assertNotIn('env', job)
+        self.assertNotIn('secrets.', str(self.wf['jobs']['rankings']))
+        upload = step_in(self.wf, 'rankings-hub', 'Publish to docs-hub')
+        self.assertEqual(upload['env'], {
+            'DOCS_HUB_API_KEY': '${{ secrets.DOCS_HUB_API_KEY }}'})
+        key_jobs = {name for name, job in self.wf['jobs'].items()
+                    if 'secrets.DOCS_HUB_API_KEY' in str(job)}
+        self.assertEqual(key_jobs, {'hub', 'rankings-hub'})
+        steps = self.wf['jobs']['rankings-hub']['steps']
+        self.assertEqual([s for s in steps if 'secrets.' in str(s)], [upload])
+        for entry in steps:
+            if 'uses' in entry:
+                self.assertTrue(entry['uses'].startswith('actions/download-artifact@'))
+            self.assertNotRegex(commands(entry.get('run', '')),
+                                r'\bpython3?\b|\bpip[0-9]?\b|\bgit\b')
+
+    def test_rankings_upload_mirrors_the_hub_wire_format(self):
+        run = commands(step_in(self.wf, 'rankings-hub', 'Publish to docs-hub')['run'])
+        for piece in ("-F 'slug=ai-researcher/trending-rankings'",
+                      "-F 'title=Trending rankings — Hugging Face & OpenRouter top 10 over time'",
+                      "-F 'tags=trending,rankings,ai'",
+                      "-F 'project=ai-researcher'", "-F 'from=ai-researcher'",
+                      "-F 'file=@out/trending-rankings.html;type=text/html'",
+                      '-H "x-docs-key: ${DOCS_HUB_API_KEY}"',
+                      'https://docs.nitjsefni.eu/api/publish',
+                      '[ "${code}" -lt 200 ] || [ "${code}" -ge 300 ]',
+                      "jq -e '(.error // null) != null'"):
+            self.assertIn(piece, run)
+        self.assertNotIn('DOCS_HUB_URL', run)
+        self.assertNotIn('push-data', run)
+        self.assertNotIn('github.sha', run)
+
+
+@pytest.mark.parametrize('upstream,rankings,cancelled,expected', [
+    ('skipped', 'success', False, True),
+    ('failure', 'success', False, True),
+    ('success', 'success', False, True),
+    ('success', 'skipped', False, False),
+    ('success', 'failure', False, False),
+    ('success', 'cancelled', False, False),
+    ('skipped', 'success', True, False),
+    ('failure', 'success', True, False),
+    ('success', 'success', True, False),
+])
+def test_rankings_hub_condition_covers_ancestor_outcomes(upstream, rankings, cancelled, expected):
+    """Evaluate the pinned terms; shell execution cannot model job admission."""
+    condition = load()['jobs']['rankings-hub'].get('if', 'success()')
+    terms = {
+        'success()': not cancelled and upstream == 'success' and rankings == 'success',
+        '!cancelled()': not cancelled,
+        "needs.rankings.result == 'success'": rankings == 'success',
+    }
+    assert all(terms[term] for term in condition.split(' && ')) is expected
+
+
+RANKINGS_CURL = '''import json
+import os
+from pathlib import Path
+import sys
+
+args = sys.argv[1:]
+url = next(arg for arg in args if arg.startswith('https://'))
+output = Path(args[args.index('-o') + 1])
+with Path(os.environ['HUB_CALLS']).open('a', encoding='utf-8') as calls:
+    calls.write(json.dumps(args) + chr(10))
+if url == 'https://docs.nitjsefni.eu/d/ai-researcher/trending-rankings':
+    if os.environ['LIVE_PAGE'] == 'fail':
+        raise SystemExit(22)
+    page = (Path(os.environ['RANKINGS_PAGE']).read_bytes()
+            if os.environ['LIVE_PAGE'] == 'same' else b'previous page')
+    output.write_bytes(page)
+elif url == 'https://docs.nitjsefni.eu/api/publish':
+    if os.environ['UPLOAD_CODE'] == 'transport':
+        raise SystemExit(7)
+    output.write_text(os.environ['UPLOAD_BODY'], encoding='utf-8')
+    print(os.environ['UPLOAD_CODE'], end='')
+else:
+    raise SystemExit('unexpected curl endpoint: ' + url)
+'''
+
+
+@pytest.mark.skipif(os.name == 'nt', reason='workflow shell runs on Ubuntu')
+@pytest.mark.parametrize('live,code,body,expected,uploads', [
+    ('same', '200', '{}', 0, 0),
+    ('stale', '200', '{}', 0, 1),
+    ('fail', '201', '{}', 0, 1),
+    ('stale', '199', '{}', 1, 1),
+    ('stale', '300', '{}', 1, 1),
+    ('stale', '403', '{"error":"refused"}', 1, 1),
+    ('stale', '200', '{"error":"refused"}', 1, 1),
+    ('stale', '200', '{"error":false}', 0, 1),
+    ('stale', '200', '{"error":null}', 0, 1),
+    ('stale', 'transport', '{}', 7, 1),
+])
+def test_rankings_hub_upload_verdicts(tmp_path, live, code, body, expected, uploads):
+    """Execute the YAML upload: identical bytes skip; refusals stay red."""
+    runner = tmp_path / 'runner'
+    page = runner / 'rankings-page/trending-rankings.html'
+    page.parent.mkdir(parents=True)
+    page.write_bytes(b'<html>rankings</html>\n')
+    stub = tmp_path / 'bin'
+    stub.mkdir()
+    (stub / 'curl_payload.py').write_text(RANKINGS_CURL, encoding='utf-8')
+    (stub / 'curl').write_text(
+        '#!/bin/sh\nexec "$TEST_PYTHON" "$(dirname "$0")/curl_payload.py" "$@"\n',
+        encoding='utf-8')
+    (stub / 'curl').chmod(0o755)
+    calls = tmp_path / 'calls'
+    env = {**os.environ, 'PATH': str(stub) + os.pathsep + os.environ['PATH'],
+           'TEST_PYTHON': sys.executable, 'RUNNER_TEMP': str(runner),
+           'GITHUB_STEP_SUMMARY': str(tmp_path / 'summary'),
+           'DOCS_HUB_API_KEY': 'fixture', 'LIVE_PAGE': live,
+           'UPLOAD_CODE': code, 'UPLOAD_BODY': body,
+           'HUB_CALLS': str(calls), 'RANKINGS_PAGE': str(page)}
+    entry = dict(step_in(load(), 'rankings-hub', 'Publish to docs-hub'))
+    entry['run'] = entry['run'].replace(
+        '/tmp/publish-response.json', '"${RUNNER_TEMP}/publish-response.json"')
+    done = _workflowrun.run_step(tmp_path, entry, env)
+    assert done.returncode == expected, done.stdout + done.stderr
+    requests = [json.loads(line) for line in calls.read_text(encoding='utf-8').splitlines()]
+    assert len(requests) == 1 + uploads
+    assert requests[0][-3:] == [
+        'https://docs.nitjsefni.eu/d/ai-researcher/trending-rankings',
+        '-o', requests[0][-1]]
+    assert '-H' not in requests[0]
+    if not uploads:
+        assert 'Nothing uploaded' in done.stdout
+        assert not (runner / 'page').exists()
+        return
+    request = requests[1]
+    assert request[-1] == 'https://docs.nitjsefni.eu/api/publish'
+    assert request[request.index('-H') + 1] == 'x-docs-key: fixture'
+    assert [request[i + 1] for i, arg in enumerate(request) if arg == '-F'] == [
+        'slug=ai-researcher/trending-rankings',
+        'title=Trending rankings — Hugging Face & OpenRouter top 10 over time',
+        'tags=trending,rankings,ai', 'project=ai-researcher', 'from=ai-researcher',
+        'file=@out/trending-rankings.html;type=text/html']
+    assert (runner / 'page/out/trending-rankings.html').read_bytes() == page.read_bytes()
+    if expected == 1:
+        assert f'publish failed: HTTP {code}' in done.stderr
+        assert body in done.stderr
+
+
+@unittest.skipIf(os.name == 'nt', 'workflow shell runs on Ubuntu')
+class HFTrackerExecutedStepsTests(unittest.TestCase):
+    """Run the actual YAML scripts against local git repos and a stubbed fetch."""
+
+    tracker = 'hf'
+    fetcher = 'hf'
+    data = 'data/hf-trending.json'
+    message = 'Trending: 1 new in the top 10: org/new\n\nNEW  rank 1 org/new\n'
+
+    def tracker_step(self, job, name):
+        return step_in(load(), f'{self.tracker}-{job}', name)
+
+    def setUp(self):
+        self.root = pathlib.Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, self.root)
+        self.repo = self.root / 'repo'
+        self.repo.mkdir()
+        self.git(self.repo, 'init', '-q', '-b', 'main')
+        self.configure(self.repo)
+        (self.repo / 'data').mkdir()
+        (self.repo / self.data).write_text('old\n', encoding='utf-8')
+        (self.repo / 'README.md').write_text('base\n', encoding='utf-8')
+        self.git(self.repo, 'add', self.data, 'README.md')
+        self.git(self.repo, 'commit', '-qm', 'base')
+        self.base = self.git(self.repo, 'rev-parse', 'HEAD').strip()
+        self.origin = self.root / 'origin.git'
+        self.git(self.root, 'clone', '-q', '--bare', str(self.repo), str(self.origin))
+        self.git(self.repo, 'remote', 'add', 'origin', str(self.origin))
+        self.runner = self.root / 'runner'
+        self.runner.mkdir()
+        (self.runner / 'message').write_text(self.message, encoding='utf-8')
+        home = self.root / 'home'
+        home.mkdir()
+        (self.root / 'output').touch()
+        (self.root / 'summary').touch()
+        self.env = {**os.environ, 'RUNNER_TEMP': str(self.runner),
+                    'GITHUB_OUTPUT': str(self.root / 'output'),
+                    'GITHUB_STEP_SUMMARY': str(self.root / 'summary'),
+                    'GITHUB_REPOSITORY': 'fixture/trending',
+                    'REPO': 'fixture/trending',
+                    'MASTER_PUSH_DEPLOY_KEY': '',
+                    'HOME': str(home), 'PUSH_REMOTE': str(self.origin)}
+
+    @staticmethod
+    def git(repo, *args):
+        return subprocess.run(['git', '-C', str(repo), *args], check=True,
+                              capture_output=True, text=True, timeout=60).stdout
+
+    def configure(self, repo):
+        self.git(repo, 'config', 'user.name', 'fixture')
+        self.git(repo, 'config', 'user.email', 'fixture@example.com')
+        self.git(repo, 'config', 'commit.gpgsign', 'false')
+
+    def run_step(self, job, name, expected=0):
+        result = _workflowrun.run_step(self.repo, self.tracker_step(job, name), self.env)
+        self.assertEqual(result.returncode, expected, result.stdout + result.stderr)
+        summary = pathlib.Path(self.env['GITHUB_STEP_SUMMARY']).read_text(encoding='utf-8')
+        if name == 'Push the trending commit' and (expected or 'Dropped:' in summary):
+            self.assertNotIn('landed=true', pathlib.Path(
+                self.env['GITHUB_OUTPUT']).read_text(encoding='utf-8'))
+        return result
+
+    def stage_change(self):
+        (self.repo / self.data).write_text('new\n', encoding='utf-8')
+        self.run_step('fetch', 'Commit when changed')
+
+    def replay(self):
+        # Redirect the production anonymous HTTPS fetch to the local bare remote.
+        self.git(self.repo, 'config', '--file', str(self.root / 'gitconfig'),
+                 f'url.{self.origin}.insteadOf', 'https://github.com/fixture/trending')
+        self.env['GIT_CONFIG_GLOBAL'] = str(self.root / 'gitconfig')
+        self.run_step('push', 'Replay onto fresh main')
+
+    def advance_main(self, path='README.md', content='moved\n'):
+        other = self.root / 'other'
+        self.git(self.root, 'clone', '-q', str(self.origin), str(other))
+        self.configure(other)
+        (other / path).write_text(content, encoding='utf-8')
+        self.git(other, 'add', path)
+        self.git(other, 'commit', '-qm', 'main moved')
+        self.git(other, 'push', '-q', 'origin', 'main')
+        return self.git(other, 'rev-parse', 'HEAD').strip()
+
+    def load_ephemeral_key(self):
+        key = self.root / 'key'
+        subprocess.run(['ssh-keygen', '-q', '-t', 'ed25519', '-N', '',
+                        '-f', str(key)], check=True, capture_output=True, timeout=60)
+        self.env['MASTER_PUSH_DEPLOY_KEY'] = key.read_text(encoding='utf-8')
+
+    def test_unchanged_capture_creates_no_commit_or_bundle(self):
+        self.run_step('fetch', 'Commit when changed')
+        self.assertEqual(self.git(self.repo, 'rev-parse', 'HEAD').strip(), self.base)
+        self.assertEqual(pathlib.Path(self.env['GITHUB_OUTPUT']).read_text(encoding='utf-8'),
+                         'commits=false\n')
+        self.assertFalse((self.runner / 'push-data').exists())
+
+    def test_changed_capture_commits_only_data_with_exact_message(self):
+        (self.repo / 'README.md').write_text('do not commit\n', encoding='utf-8')
+        self.stage_change()
+        self.assertEqual(self.git(self.repo, 'diff-tree', '--no-commit-id',
+                                  '--name-only', '-r', 'HEAD').splitlines(), [self.data])
+        self.assertEqual(self.git(self.repo, 'log', '-1', '--format=%B').rstrip(),
+                         self.message.rstrip())
+        self.assertEqual(self.git(self.repo, 'log', '-1', '--format=%an').strip(),
+                         'github-actions[bot]')
+        self.assertNotIn('Co-Authored-By:', self.git(self.repo, 'log', '-1', '--format=%B'))
+        self.assertEqual(self.git(self.origin, 'rev-parse', 'main').strip(), self.base)
+        self.assertTrue((self.runner / 'push-data/push.bundle').exists())
+        self.assertEqual((self.runner / 'push-data/base.txt').read_text(encoding='utf-8').strip(),
+                         self.base)
+
+    @unittest.skipUnless(sys.platform == 'linux',
+                         'requires Linux ssh-agent/ssh-add behaviour matching ubuntu-latest')
+    def test_replay_preserves_fresh_main_and_message_then_pushes(self):
+        self.stage_change()
+        fresh = self.advance_main()
+        self.replay()
+        push_repo = self.runner / 'scratch'
+        self.assertEqual(self.git(push_repo, 'rev-parse', 'HEAD^').strip(), fresh)
+        self.assertEqual(self.git(push_repo, 'show', 'HEAD:README.md'), 'moved\n')
+        self.assertEqual(self.git(push_repo, 'show', f'HEAD:{self.data}'), 'new\n')
+        self.assertEqual(self.git(push_repo, 'log', '-1', '--format=%B').rstrip(), self.message.rstrip())
+        self.load_ephemeral_key()
+        self.run_step('push', 'Push the trending commit')
+        self.assertIn('landed=true\n', pathlib.Path(
+            self.env['GITHUB_OUTPUT']).read_text(encoding='utf-8'))
+        landed = self.git(self.origin, 'rev-parse', 'main').strip()
+        self.assertEqual(landed, (self.runner / 'push-data/tip.txt').read_text(encoding='utf-8').strip())
+
+    def test_replay_preserves_the_other_trackers_landed_commit(self):
+        self.stage_change()
+        other_data = ('data/openrouter-trending.json' if self.tracker == 'hf'
+                      else 'data/hf-trending.json')
+        fresh = self.advance_main(other_data, 'other list\n')
+        self.replay()
+        scratch = self.runner / 'scratch'
+        self.assertEqual(self.git(scratch, 'rev-parse', 'HEAD^').strip(), fresh)
+        self.assertEqual(self.git(scratch, 'show', f'HEAD:{other_data}'),
+                         'other list\n')
+        self.assertEqual(self.git(scratch, 'diff-tree', '--no-commit-id',
+                                  '--name-only', '-r', 'HEAD').splitlines(),
+                         [self.data])
+
+    def test_replay_noops_when_main_already_has_capture(self):
+        self.stage_change()
+        fresh = self.advance_main(self.data, 'new\n')
+        self.replay()
+        self.assertTrue(pathlib.Path(self.env['GITHUB_OUTPUT']).read_text(encoding='utf-8').endswith('commits=false\n'))
+        self.assertEqual(self.git(self.origin, 'rev-parse', 'main').strip(), fresh)
+        self.assertNotIn('landed=true', pathlib.Path(
+            self.env['GITHUB_OUTPUT']).read_text(encoding='utf-8'))
+
+    def test_push_missing_key_fails_before_delivery(self):
+        result = self.run_step('push', 'Push the trending commit', 1)
+        self.assertIn('MASTER_PUSH_DEPLOY_KEY is empty', result.stderr)
+        self.assertEqual(self.git(self.origin, 'rev-parse', 'main').strip(), self.base)
+
+    @unittest.skipUnless(sys.platform == 'linux',
+                         'requires Linux ssh-agent/ssh-add behaviour matching ubuntu-latest')
+    def test_main_move_after_replay_concedes_without_force(self):
+        self.stage_change()
+        self.replay()
+        fresh = self.advance_main()
+        self.load_ephemeral_key()
+        self.run_step('push', 'Push the trending commit')
+        self.assertEqual(self.git(self.origin, 'rev-parse', 'main').strip(), fresh)
+        self.assertIn('main moved under the run', pathlib.Path(self.env['GITHUB_STEP_SUMMARY']).read_text(encoding='utf-8'))
+
+    @unittest.skipUnless(sys.platform == 'linux',
+                         'requires Linux ssh-agent/ssh-add behaviour matching ubuntu-latest')
+    def test_rejected_push_with_main_still_at_base_fails(self):
+        self.stage_change()
+        self.replay()
+        hook = self.origin / 'hooks/pre-receive'
+        hook.write_text('#!/bin/sh\nexit 1\n', encoding='utf-8')
+        hook.chmod(0o755)
+        self.load_ephemeral_key()
+        result = self.run_step('push', 'Push the trending commit', 1)
+        self.assertIn('the push was rejected while main stood still', result.stderr)
+
+    @unittest.skipUnless(sys.platform == 'linux',
+                         'requires Linux ssh-agent/ssh-add behaviour matching ubuntu-latest')
+    def test_main_moving_during_push_concedes_after_rejection(self):
+        self.stage_change()
+        self.replay()
+        writer = self.root / 'racer'
+        self.git(self.root, 'clone', '-q', str(self.origin), str(writer))
+        self.configure(writer)
+        (writer / 'README.md').write_text('race\n', encoding='utf-8')
+        self.git(writer, 'add', 'README.md')
+        self.git(writer, 'commit', '-qm', 'raced')
+        raced = self.git(writer, 'rev-parse', 'HEAD').strip()
+        bin_dir = self.root / 'bin'
+        bin_dir.mkdir()
+        wrapper = bin_dir / 'git'
+        wrapper.write_text(
+            '#!/bin/sh\ncase "$*" in\n'
+            '  *" push origin "*) "$REAL_GIT" -C "$RACE_REPO" push -q origin main ;;\n'
+            'esac\nexec "$REAL_GIT" "$@"\n', encoding='utf-8')
+        wrapper.chmod(0o755)
+        real_git = shutil.which('git')
+        assert real_git is not None, 'git is required to execute the workflow'
+        self.env.update({'REAL_GIT': real_git, 'RACE_REPO': str(writer),
+                         'PATH': str(bin_dir) + os.pathsep + os.environ['PATH']})
+        self.load_ephemeral_key()
+        self.run_step('push', 'Push the trending commit')
+        self.assertEqual(self.git(self.origin, 'rev-parse', 'main').strip(), raced)
+        self.assertIn('main moved before the push landed', pathlib.Path(self.env['GITHUB_STEP_SUMMARY']).read_text(encoding='utf-8'))
+
+    def test_fetch_script_is_invoked_with_message_and_failure_propagates(self):
+        scripts = self.repo / 'scripts'
+        scripts.mkdir()
+        script = f'scripts/fetch_{self.fetcher}_trending.py'
+        target = self.repo / script
+        shutil.copyfile(ROOT / script, target)
+        # A sitecustomize stub answers the fetcher's network boundary only.
+        stub = self.root / 'stub'
+        stub.mkdir()
+        models = ('[{"id": f"org/{n}"} for n in range(int(os.environ["COUNT"]))]'
+                  if self.tracker == 'hf' else
+                  '{"data": {"models": [{"slug": f"org/{n}"} '
+                  'for n in range(int(os.environ["COUNT"]))]}}')
+        (stub / 'sitecustomize.py').write_text(
+            'import io, json, os, urllib.request\n'
+            'urllib.request.urlopen = lambda *a, **k: io.BytesIO(json.dumps('
+            + models +
+            ').encode())\n', encoding='utf-8')
+        (self.repo / self.data).write_text('{"models": []}\n', encoding='utf-8')
+        self.env.update({'PYTHONPATH': str(stub), 'COUNT': '10'})
+        self.run_step('fetch', 'Fetch the top 10')
+        self.assertTrue((self.runner / 'message').read_text(encoding='utf-8').startswith(
+            'Trending: 10 new in the top 10:' if self.tracker == 'hf' else
+            'Top 10: 10 new:'))
+        saved = (self.repo / self.data).read_bytes()
+        self.env['COUNT'] = '9'
+        result = self.run_step('fetch', 'Fetch the top 10', 1)
+        self.assertIn('expected 10 models, got 9', result.stderr)
+        self.assertEqual((self.repo / self.data).read_bytes(), saved)
+
+
+class ORTrackerExecutedStepsTests(HFTrackerExecutedStepsTests):
+    tracker = 'or'
+    fetcher = 'openrouter'
+    data = 'data/openrouter-trending.json'
+    message = 'Top 10: 1 new: org/new\n\nNEW  rank 1 org/new\n'
+
+
+HUB_UPLOAD_CURL = '''import os
+from pathlib import Path
+import sys
+
+args = sys.argv[1:]
+url = next((arg for arg in args if arg.startswith('https://')), '')
+output = Path(args[args.index('-o') + 1])
+if url == 'https://docs.nitjsefni.eu/d/ai-researcher/frontier-models':
+    output.write_text('previous page', encoding='utf-8')
+elif url == 'https://docs.nitjsefni.eu/api/publish':
+    fields = [args[index + 1] for index, value in enumerate(args) if value == '-F']
+    assert 'slug=ai-researcher/frontier-models' in fields, fields
+    upload = next(field for field in fields if field.startswith('file=@'))
+    page = Path(upload[len('file=@'):].split(';', 1)[0]).read_bytes()
+    Path(os.environ['HUB_PUBLISHED']).write_bytes(page)
+    output.write_text('{}', encoding='utf-8')
+    print('200', end='')
+else:
+    raise SystemExit('unexpected curl endpoint: ' + url)
+with Path(os.environ['HUB_CALLS']).open('a', encoding='utf-8') as calls:
+    calls.write(url + chr(10))
+'''
+
+
+@unittest.skipUnless(sys.platform == 'linux',
+                     'requires Linux ssh-agent/ssh-add behaviour matching ubuntu-latest')
+class ExecutedHubTrackerOrderingTests(unittest.TestCase):
+    """Run allowed job interleavings against one local origin and a fake hub."""
+
+    def setUp(self):
+        self.root = pathlib.Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, self.root)
+        self.workflow = load()
+        self.source = self.root / 'source'
+        self.source.mkdir()
+        self._git(self.source, 'init', '-q', '-b', 'main')
+        self._configure(self.source)
+        files = {'data/hf-trending.json': '{"models": []}\n',
+                 'data/openrouter-trending.json': '{"models": []}\n',
+                 'out/frontier-models.html': 'previous page\n',
+                 'README.md': 'base\n'}
+        for name, content in files.items():
+            target = self.source / name
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_text(content, encoding='utf-8')
+        self._git(self.source, 'add', '--', *files)
+        self._git(self.source, 'commit', '-qm', 'base')
+        self.base = self._git(self.source, 'rev-parse', 'HEAD').strip()
+        self.origin = self.root / 'origin.git'
+        self._git(self.root, 'clone', '-q', '--bare', str(self.source), str(self.origin))
+        self.config = self.root / 'gitconfig'
+        self._git(self.source, 'config', '--file', str(self.config),
+                  f'url.{self.origin.as_uri()}.insteadOf', 'https://github.com/fixture/trending')
+        key = self.root / 'key'
+        subprocess.run(['ssh-keygen', '-q', '-t', 'ed25519', '-N', '', '-f', str(key)],
+                       check=True, capture_output=True, timeout=60)
+        self.key = key.read_text(encoding='utf-8')
+        self.published = self.root / 'published.html'
+        self.calls = self.root / 'curl-calls'
+        stub = self.root / 'bin'
+        stub.mkdir()
+        (stub / 'curl_payload.py').write_text(HUB_UPLOAD_CURL, encoding='utf-8')
+        (stub / 'curl').write_text(
+            '#!/bin/sh\nexec "$(command -v python || command -v python3)" '
+            '"$(dirname "$0")/curl_payload.py" "$@"\n', encoding='utf-8')
+        (stub / 'curl').chmod(0o755)
+        self.contexts = {}
+        self._context('aa', self.source, stub)
+        for tracker, key_name in (('hf', 'id'), ('or', 'slug')):
+            repo = self.root / tracker
+            self._git(self.root, 'clone', '-q', str(self.origin), str(repo))
+            self._configure(repo)
+            self._context(tracker, repo, stub)
+            name = 'hf' if tracker == 'hf' else 'openrouter'
+            (repo / f'data/{name}-trending.json').write_text(
+                json.dumps({'models': [{key_name: 'org/new'}]}), encoding='utf-8')
+            runner = pathlib.Path(self.contexts[tracker][1]['RUNNER_TEMP'])
+            (runner / 'message').write_text('Update list\n', encoding='utf-8')
+            self._run(f'{tracker}-fetch', 'Commit when changed', tracker)
+        self.page = b'<html>new AA page</html>\n'
+        (self.source / 'out/frontier-models.html').write_bytes(self.page)
+        self._git(self.source, 'add', '--', 'out/frontier-models.html')
+        self._git(self.source, 'commit', '-qm', 'AA page')
+        self.aa_tip = self._git(self.source, 'rev-parse', 'HEAD').strip()
+        self._git(self.source, 'branch', 'push')
+        runner = pathlib.Path(self.contexts['aa'][1]['RUNNER_TEMP'])
+        bundle = runner / 'push-data'
+        bundle.mkdir()
+        self._git(self.source, 'bundle', 'create', str(bundle / 'push.bundle'),
+                  f'{self.base}..push')
+        (bundle / 'base.txt').write_text(self.base + '\n', encoding='utf-8')
+        (bundle / 'tip.txt').write_text(self.aa_tip + '\n', encoding='utf-8')
+        payload = runner / 'publish-payload/tree/out'
+        payload.mkdir(parents=True)
+        (payload / 'frontier-models.html').write_bytes(self.page)
+
+    @staticmethod
+    def _git(repo, *args):
+        return subprocess.run(['git', '-C', str(repo), *args], check=True,
+                              capture_output=True, text=True, timeout=60).stdout
+
+    def _configure(self, repo):
+        self._git(repo, 'config', 'user.name', 'fixture')
+        self._git(repo, 'config', 'user.email', 'fixture@example.com')
+        self._git(repo, 'config', 'commit.gpgsign', 'false')
+
+    def _context(self, name, repo, stub):
+        runner = self.root / f'{name}-runner'
+        runner.mkdir()
+        home = self.root / f'{name}-home'
+        home.mkdir()
+        (runner / 'output').touch()
+        (runner / 'summary').touch()
+        env = {**os.environ, 'RUNNER_TEMP': str(runner), 'HOME': str(home),
+               'GITHUB_OUTPUT': str(runner / 'output'),
+               'GITHUB_STEP_SUMMARY': str(runner / 'summary'),
+               'GITHUB_REPOSITORY': 'fixture/trending', 'REPO': 'fixture/trending',
+               'GIT_CONFIG_GLOBAL': str(self.config), 'PUSH_REMOTE': self.origin.as_uri(),
+               'MASTER_PUSH_DEPLOY_KEY': self.key, 'DOCS_HUB_API_KEY': 'fixture',
+               'HUB_PUBLISHED': str(self.published), 'HUB_CALLS': str(self.calls),
+               'PATH': str(stub) + os.pathsep + os.environ['PATH']}
+        self.contexts[name] = repo, env
+
+    def _run(self, job, name, context):
+        repo, env = self.contexts[context]
+        entry = dict(step_in(self.workflow, job, name))
+        if job == 'hub':
+            # Relocate only the response scratch file; the tip comparison and
+            # upload logic run unchanged without touching a shared /tmp file.
+            entry['run'] = entry['run'].replace(
+                '/tmp/publish-response.json', '"${RUNNER_TEMP}/publish-response.json"')
+        result = _workflowrun.run_step(repo, entry, env)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        return result
+
+    def test_hub_publishes_before_same_run_tracker_commits_land(self):
+        self._run('push', 'Push the tested tree to main', 'aa')
+        self.assertEqual(self._git(self.origin, 'rev-parse', 'main').strip(), self.aa_tip)
+        completed = {'publish', 'push', 'hf-fetch', 'or-fetch'}
+        pending = ['hf-push', 'or-push', 'hub']
+        order = []
+        for _ in range(len(pending)):
+            job = next((name for name in pending
+                        if set(self.workflow['jobs'][name]['needs']) <= completed), None)
+            assert job is not None, f'no ready job: {pending}'
+            if job == 'hub':
+                result = self._run(job, 'Publish to docs-hub', 'aa')
+                self.assertTrue(self.published.exists(), result.stdout)
+            else:
+                tracker = job.split('-')[0]
+                self._run(job, 'Replay onto fresh main', tracker)
+                self._run(job, 'Push the trending commit', tracker)
+                output = pathlib.Path(self.contexts[tracker][1]['GITHUB_OUTPUT'])
+                self.assertIn('landed=true\n', output.read_text(encoding='utf-8'))
+            completed.add(job)
+            pending.remove(job)
+            order.append(job)
+        self.assertEqual(order, ['hub', 'hf-push', 'or-push'])
+        self.assertEqual(self.published.read_bytes(), self.page)
+        self.assertEqual(self.calls.read_text(encoding='utf-8').splitlines(), [
+            'https://docs.nitjsefni.eu/d/ai-researcher/frontier-models',
+            'https://docs.nitjsefni.eu/api/publish'])
+        tips = [self.aa_tip]
+        for tracker in ('hf', 'or'):
+            runner = pathlib.Path(self.contexts[tracker][1]['RUNNER_TEMP'])
+            tip = (runner / 'push-data/tip.txt').read_text(encoding='utf-8').strip()
+            self.assertEqual(self._git(self.origin, 'rev-parse', tip + '^').strip(), tips[-1])
+            tips.append(tip)
+        self.assertEqual(self._git(self.origin, 'rev-parse', 'main').strip(), tips[-1])
+
+    def test_hub_still_concedes_to_a_third_party_main_move(self):
+        self._run('push', 'Push the tested tree to main', 'aa')
+        other = self.root / 'third-party'
+        self._git(self.root, 'clone', '-q', str(self.origin), str(other))
+        self._configure(other)
+        (other / 'README.md').write_text('third-party change\n', encoding='utf-8')
+        self._git(other, 'add', '--', 'README.md')
+        self._git(other, 'commit', '-qm', 'third-party change')
+        self._git(other, 'push', '-q', 'origin', 'main')
+        moved = self._git(other, 'rev-parse', 'HEAD').strip()
+        result = self._run('hub', 'Publish to docs-hub', 'aa')
+        self.assertIn('Nothing published by this run.', result.stdout)
+        self.assertFalse(self.published.exists())
+        self.assertFalse(self.calls.exists())
+        self.assertEqual(self._git(self.origin, 'rev-parse', 'main').strip(), moved)

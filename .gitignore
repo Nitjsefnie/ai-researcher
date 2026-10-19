@@ -63,6 +63,8 @@
 !/data/aa-generation-state.json
 # Hugging Face trending list; not AA capture data and not page input.
 !/data/hf-trending.json
+# OpenRouter weekly top-10 list; not AA capture data and not page input.
+!/data/openrouter-trending.json
 # fetch_aa.py's all-dropped cost-breakdown window marker (issue #217):
 # pipeline state the build reads by existence, never page input.
 !/data/cost-breakdown-window.txt
