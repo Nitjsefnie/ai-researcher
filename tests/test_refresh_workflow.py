@@ -99,13 +99,11 @@ class GateTests(unittest.TestCase):  # pylint: disable=too-many-public-methods
                          {"contents": "read"})
 
     def test_no_job_holds_contents_write(self):
-        # Issues #143 and #133, narrowed by #206: the published-ref move was
-        # the workflow's last contents:write holder and the live page's
-        # embedded stamp replaced it, so EVERY job now declares read and no
-        # write permission exists anywhere in the workflow. The push job --
-        # the deploy key's only reader -- is read-only: the push
-        # authenticates with the key, never the job token. No write-side
-        # job checks the tree out.
+        # Issues #143 and #133, narrowed by #206: the workflow floor and
+        # every job declare contents: read. The publish, push and hub jobs
+        # remain present; push depends on publish and runs in main-push.
+        # Check the publish job's explicit read permission alongside the
+        # catalogue-wide declarations and the push job's delivery wiring.
         workflow = self.wf
         self.assertEqual(workflow.get("permissions"), {"contents": "read"})
         jobs = workflow["jobs"]
@@ -143,8 +141,8 @@ class GateTests(unittest.TestCase):  # pylint: disable=too-many-public-methods
                          "${{ steps.capture.outputs.proceed }}")
 
     def test_the_payload_travels_as_this_runs_own_artifact(self):
-        # Same-run artifact only: the upload is error-gated on the name, the
-        # download consumes that name, and the download precedes the commit.
+        # The upload and download agree on the artifact name, and the
+        # download precedes the commit in the publish job.
         up = step(self.wf, "Upload the publish payload")
         down = pub_step(self.wf, "Download the publish payload")
 
@@ -307,7 +305,7 @@ class GateTests(unittest.TestCase):  # pylint: disable=too-many-public-methods
                      "$RETIRE"):
             self.assertNotIn(gone, run)
 
-    def test_failed_hour_artifact_includes_generation_state(self):
+    def test_capture_artifact_upload_requires_failure_and_successful_capture(self):
         artifact = step(self.wf, "Upload the capture on failure")
         self.assertIn("failure()", artifact["if"])
         self.assertIn("steps.fetch.outputs.captured == 'true'", artifact["if"])
@@ -1593,7 +1591,7 @@ class HFTrackerStructureTests(unittest.TestCase):
         self.assertNotIn('env', workflow)
         self.assertNotIn('env', push)
 
-    def test_only_fetch_checks_out_and_no_frontier_code_runs(self):
+    def test_tracker_excludes_frontier_scripts_and_push_excludes_python_and_github_token(self):
         workflow = load()
         workflow['jobs'] = {name: workflow['jobs'][f'{self.tracker}-{name}']
                             for name in ('fetch', 'push')}
@@ -1742,13 +1740,13 @@ class RankingsStructureTests(unittest.TestCase):
         self.assertNotIn('--depth', run)
         self.assertNotIn('git push', run)
 
-    def test_rankings_reads_full_landed_main_and_builds_with_defaults(self):
+    def test_rankings_builds_with_defaults_without_dispatch_sha(self):
         job = self.wf['jobs']['rankings']
         self.assertNotIn('github.sha', str(job))
         build_step = step_in(self.wf, 'rankings', 'Build the rankings page')
         self.assertEqual(build_step['run'], 'python3 scripts/build_rankings.py')
 
-    def test_rankings_artifact_is_required_and_consumed_in_the_same_run(self):
+    def test_rankings_hub_waits_for_delivery_and_page_build_precedes_upload(self):
         self.assertEqual(self.wf['jobs']['rankings-hub']['needs'],
                          ['rankings', 'rankings-push'])
         names = [s.get('name') for s in self.wf['jobs']['rankings']['steps']]
