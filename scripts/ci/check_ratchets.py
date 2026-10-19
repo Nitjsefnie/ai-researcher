@@ -59,7 +59,10 @@ exactly the push's own commits because the base is an ancestor of the
 head (enforced: without the ancestor relationship the route stays shut,
 ``declarations apply only on a fast-forward push of main``); on a pull
 request the base is the merge commit's first parent, so base..head is
-exactly the pull request's own commits by construction. On both routes
+exactly the pull request's own commits by construction. On the PR route,
+declaration lines additionally require at least one commit in base..head
+whose subject starts with ``feat: `` or ``feat(<scope>): `` (issue #271).
+On both routes
 the lines count only from commits touching nothing outside the two
 budget documents: the route is its own act, and a raise cannot ride
 feature work onto main. Every raised budget leaf needs a declaration
@@ -445,18 +448,32 @@ def _commit_paths(cwd, base, head):
     return paths_by_commit
 
 
-def _collect_declarations(cwd, base, head):
+def _collect_declarations(cwd, base, head, require_feat=False):
     """The parsed declarations by document, plus the findings for the
     lines that can never be consumed: a line on a commit that touches
     anything outside the two budget documents (the route is its own
     act — this is what keeps a raise from riding feature work onto main
     through a squash merge), a malformed line, or one naming a document
-    outside the declarable two.
+    outside the declarable two. On the PR route, declaration lines also
+    require a feat subject in the same window.
     """
     paths_by_commit = _commit_paths(cwd, base, head)
     raw = []
     findings = []
-    for sha, lines in _commits_with_declaration_lines(cwd, base, head):
+    commits = _commits_with_declaration_lines(cwd, base, head)
+    if require_feat and commits:
+        subjects = _git(cwd, ['log', '--format=%s', f'{base}..{head}'])
+        if subjects.returncode != 0:
+            raise ValueError(
+                f'cannot walk {base}..{head} for feat subjects: '
+                f'{subjects.stderr.strip()}')
+        if not any(re.match(r'^feat(?:\([^()]+\))?: ', subject)
+                   for subject in subjects.stdout.splitlines()):
+            findings.append(
+                'Budget-Raise: declarations on a pull request require at '
+                'least one feat: or feat(<scope>): commit subject in '
+                'base..head (colon followed by a space; CONTRIBUTING.md)')
+    for sha, lines in commits:
         outside = sorted(path for path in paths_by_commit.get(sha, [])
                          if path not in DECLARABLE_DOCUMENTS)
         if outside:
@@ -601,7 +618,7 @@ def check_ratchets(cwd, base_rev, head_rev, allow_declared_raises=False,
         route == 'pr' or _is_ancestor(cwd, base, head))
     if route_open:
         by_document, declaration_findings = _collect_declarations(
-            cwd, base, head)
+            cwd, base, head, require_feat=route == 'pr')
         findings.extend(declaration_findings)
     for document, direction_of, cross_checks in DOCUMENTS:
         kind = entry_kind(cwd, head, document)
