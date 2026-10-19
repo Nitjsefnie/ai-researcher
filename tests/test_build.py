@@ -292,6 +292,40 @@ class AgentRowTests(unittest.TestCase):
 
 
 class GeneratedArtifactTests(unittest.TestCase):
+    def test_dispute_capable_charts_explain_the_mark_in_their_own_legends(self):
+        html = _build_in_temp_dir()
+
+        for metric in ("intelligence", "agentic"):
+            with self.subTest(metric=metric):
+                section = re.search(
+                    rf'<section id="{metric}">(.*?)</section>', html, re.S)
+                assert section is not None
+                legend = re.search(
+                    r'<div class="legend">(.*?)</div>', section.group(1), re.S)
+                assert legend is not None
+                self.assertRegex(
+                    legend.group(1),
+                    r'<span class="item">\s*<span class="dswatch" '
+                    r'aria-hidden="true"></span>\s*Disputed value</span>',
+                )
+
+    def test_charts_without_dispute_marks_keep_their_existing_legends(self):
+        html = _build_in_temp_dir()
+
+        for metric, frontier in (
+                ("coding", "Efficient frontier"),
+                ("parameters", "Parameter-efficiency frontier")):
+            with self.subTest(metric=metric):
+                section = re.search(
+                    rf'<section id="{metric}">(.*?)</section>', html, re.S)
+                assert section is not None
+                legend = re.search(
+                    r'<div class="legend">(.*?)</div>', section.group(1), re.S)
+                assert legend is not None
+                self.assertIn(frontier, legend.group(1))
+                self.assertIn("Proprietary", legend.group(1))
+                self.assertNotIn("dswatch", legend.group(1))
+
     def test_contains_parameter_chart_in_requested_order_and_accessible_columns(self):
         html = _build_in_temp_dir()
         parser = ArtifactParser()

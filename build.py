@@ -1659,6 +1659,7 @@ TEMPLATE = r"""<!DOCTYPE html>
         <span class="item"><span class="swatch" style="background:var(--series-open)"></span>Open-weights</span>
         <span class="item"><span class="swatch" style="background:var(--muted)"></span>Superseded</span>
         <span class="item"><span class="line"></span>Efficient frontier</span>
+        <span class="item"><span class="dswatch" aria-hidden="true"></span>Disputed value</span>
       </div>
     </div>
   </section>
@@ -1681,6 +1682,7 @@ TEMPLATE = r"""<!DOCTYPE html>
         <span class="item"><span class="swatch" style="background:var(--series-open)"></span>Open-weights</span>
         <span class="item"><span class="swatch" style="background:var(--muted)"></span>Superseded</span>
         <span class="item"><span class="line"></span>Efficient frontier</span>
+        <span class="item"><span class="dswatch" aria-hidden="true"></span>Disputed value</span>
       </div>
     </div>
   </section>
