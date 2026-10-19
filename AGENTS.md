@@ -25,10 +25,12 @@ decision (2026-07-30), not a default to re-litigate.
   numbers) is **retired**. The corpus built under it was purged in `3375657`;
   it is recoverable from `0bd00c0` but must not be reintroduced.
 
-The Hugging Face trending list is a separate tracked output:
-`scripts/fetch_hf_trending.py` writes `data/hf-trending.json`, and
-`.github/workflows/hf-trending.yml` updates it hourly. It never feeds the
-frontier page.
+The Hugging Face trending and OpenRouter weekly top-10 lists are separate
+tracked outputs: `scripts/fetch_hf_trending.py` writes `data/hf-trending.json`,
+and `scripts/fetch_openrouter_trending.py` writes `data/openrouter-trending.json`.
+The joined `.github/workflows/refresh.yml` updates both hourly and publishes
+[trending rankings over time](https://docs.nitjsefni.eu/d/ai-researcher/trending-rankings)
+from their git history. Neither tracker feeds the frontier page.
 
 Because there is exactly one source, per-cell citation is redundant: the page
 states its source once, prominently, and links the leaderboard.
@@ -419,11 +421,14 @@ unclamped and allowed to hang outside the plot rather than be squeezed inside.
 
 ## Update cadence
 
-The independent Hugging Face trending workflow (`.github/workflows/hf-trending.yml`)
-requests hourly runs at `:07` and commits only `data/hf-trending.json` when the list
-changes. The box-side dispatcher `hf-trending-refresh.timer` dispatches it hourly,
-because GitHub drops scheduled runs. It never builds or publishes the frontier
-page.
+The joined `.github/workflows/refresh.yml` refreshes the AA frontier page,
+the Hugging Face trending list and the OpenRouter weekly top 10. Each producer
+commits only its own changed data; a failure in one leaves the others independent.
+After either tracker lands a commit, `rankings` builds from full git history at
+landed `main`, and `rankings-hub` publishes the
+[rankings page](https://docs.nitjsefni.eu/d/ai-researcher/trending-rankings).
+An identical live rankings page skips the upload. Neither tracker feeds the
+frontier page. The standalone `openrouter-top` tracker is retired.
 
 - **Automated, every hour** — `.github/workflows/refresh.yml` captures the
   leaderboard and the Coding Agent Index, and when the page the fresh capture
@@ -433,11 +438,10 @@ page.
   last committed values at `diff_aa.py`'s news threshold (`--speed-tol`),
   since AA's payload also churns in fields the page never renders — it
   rebuilds, runs the suite, commits both with `diff_aa.py`'s
-  summary in the message body, and publishes to docs-hub. The hourly cadence
-  is carried by an out-of-repository dispatcher on the maintainer's side,
-  which calls the workflow's `workflow_dispatch` API hourly — GitHub's own
-  schedule trigger delivers only a few runs a day (measured rates in
-  CONTRIBUTING.md). A capture that would render the identical page is silent
+  summary in the message body, and publishes to docs-hub. The joined workflow
+  requests hourly runs at `:11`; GitHub delivers schedules best-effort. It also
+  refreshes both trackers and publishes their rankings after a tracker commit
+  lands. A capture that would render the identical frontier page is silent
   — no commit, no version, no notification — as long as the live page is
   current; when a publish failed or was missed, the next run's live-page
   check -- the served page compared byte-for-byte against the page main

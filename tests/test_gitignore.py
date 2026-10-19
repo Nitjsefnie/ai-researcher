@@ -112,11 +112,15 @@ class GitignoreTrackableTests(unittest.TestCase):
             f"{path} is hidden by .gitignore; it must be a tracked output")
 
     def test_the_paths_the_trending_workflow_commits_are_git_trackable(self):
-        paths = added_paths("hf-trending.yml", "fetch", "Commit when changed")
-        self.assertEqual(paths, ["data/hf-trending.json"])
-        for path in paths:
-            verdict = check_ignore(["--no-index", "-q"], path)
-            self.assertEqual(verdict.returncode, 1, f"{path} is hidden by .gitignore")
+        for tracker, filename in [('hf', 'hf'), ('or', 'openrouter')]:
+            with self.subTest(tracker=tracker):
+                paths = added_paths("refresh.yml", f"{tracker}-fetch",
+                                    "Commit when changed")
+                self.assertEqual(paths, [f"data/{filename}-trending.json"])
+                for path in paths:
+                    verdict = check_ignore(["--no-index", "-q"], path)
+                    self.assertEqual(verdict.returncode, 1,
+                                     f"{path} is hidden by .gitignore")
 
     def test_the_paths_the_refresh_commits_are_git_trackable(self):
         for path in added_paths():
@@ -147,7 +151,7 @@ def check_ignore(flags, path):
 
 
 # Synthetic probe paths: no real artifact would ever carry them. The data
-# block names the AA captures, the Hugging Face trending list, `captured-at.txt`
+# block names the AA captures, both trending lists, `captured-at.txt`
 # and the optional cost-window marker; out/ names exactly one page. A future
 # legitimate negation names a concrete path, so it cannot match a synthetic
 # name and turn these probes falsely red. Any edit broad enough to un-deny a

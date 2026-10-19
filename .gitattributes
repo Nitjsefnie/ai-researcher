@@ -3,5 +3,7 @@
 # measured mini-tree, so no eol translation may touch them on checkout --
 # without this, a Windows autocrlf checkout turns the LF fixture into CRLF
 # on disk and the byte pin fails. Other text files keep the default
-# handling (blobs are LF in-repo either way).
+# handling unless specified below (blobs are LF in-repo either way).
 tests/fixtures/pipeline/* -text
+# Keep the tracker's byte-stable seed in its writer's LF format on checkout.
+data/openrouter-trending.json text eol=lf
