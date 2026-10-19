@@ -4,7 +4,7 @@ name: tests
 # tests/test_browser.py, drives the built HTML in a real headless Chromium
 # through playwright.
 #
-# FOUR JOBS, split on purpose. `suites` is a 3-OS x 3-Python matrix running the
+# FIVE JOBS, split on purpose. `suites` is a 3-OS x 3-Python matrix running the
 # non-browser suite on every cell — that is what buys portability coverage of
 # the tooling itself. `coverage` is the dedicated Linux job: the full suite
 # (browser included) under the coverage ratchet, and it holds a read-only
@@ -25,7 +25,8 @@ name: tests
 # (issue #105): the source-commit stamp is set only on the refresh path, so a
 # page a PR commits by hand could go out stamp-less and the #94 republish run
 # would publish it — that job refuses a committed page lacking the stamp or
-# differing from its own stamp-less rebuild.
+# differing from its own stamp-less rebuild. `page-rankings` refuses a
+# committed rankings page that differs from its rebuild of HEAD's history.
 #
 # A FOURTH job rides along on pull requests only. `diff-coverage` reports the
 # coverage of the change's OWN added lines — informational, never a gate
@@ -602,3 +603,27 @@ jobs:
           # nothing to key a cache off.
       - name: Check the committed page
         run: python3 scripts/ci/check_committed_page.py
+
+  # The rankings page compares every byte against a rebuild of HEAD's history.
+  page-rankings:
+    runs-on: ubuntu-latest
+
+    timeout-minutes: 20
+
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          # Rebuild walks data/hf-trending.json and data/openrouter-trending.json
+          # history; a depth-1 checkout omits the earlier ranking snapshots.
+          fetch-depth: 0
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.13"
+          # Pure stdlib, like the frontier check: nothing to install or cache.
+      - name: Check the committed rankings page
+        run: python3 scripts/ci/check_committed_rankings_page.py

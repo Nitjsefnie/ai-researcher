@@ -1700,18 +1700,74 @@ class RankingsStructureTests(unittest.TestCase):
     def setUp(self):
         self.wf = load()
 
-    def test_rankings_waits_for_deliveries_and_requires_a_landed_tracker(self):
+    def test_rankings_waits_for_deliveries_and_runs_every_hour_on_main(self):
         job = self.wf['jobs']['rankings']
         self.assertEqual(job['needs'], ['push', 'hf-push', 'or-push'])
         self.assertEqual(job['if'],
-                         "!cancelled() && (needs.hf-push.outputs.landed == 'true' || "
-                         "needs.or-push.outputs.landed == 'true')")
+                         "!cancelled() && github.ref == 'refs/heads/main'")
         self.assertEqual(self.wf['concurrency'], {
             'group': 'refresh', 'cancel-in-progress': False})
 
     def test_rankings_hub_has_an_explicit_failure_isolated_condition(self):
         self.assertEqual(self.wf['jobs']['rankings-hub'].get('if'),
-                         "!cancelled() && needs.rankings.result == 'success'")
+                         "!cancelled() && needs.rankings.result == 'success' && "
+                         "(needs.rankings-push.result == 'success' || "
+                         "needs.rankings-push.result == 'skipped')")
+
+    def test_rankings_stages_push_data_on_every_successful_build(self):
+        job = self.wf['jobs']['rankings']
+        self.assertEqual(job['outputs'], {'commits': '${{ steps.commit.outputs.commits }}'})
+        commit = step_in(self.wf, 'rankings', 'Commit when changed')
+        self.assertEqual(commit['id'], 'commit')
+        self.assertIn('git diff --quiet -- out/trending-rankings.html', commit['run'])
+        self.assertEqual(re.findall(r'^\s*git add (.+)$', commit['run'], re.MULTILINE),
+                         ['out/trending-rankings.html'])
+        upload = step_in(self.wf, 'rankings', 'Upload the push bundle')
+        self.assertNotIn('if', upload)
+        self.assertEqual(upload['with'], {
+            'name': 'rankings-push-data', 'path': '${{ runner.temp }}/push-data',
+            'if-no-files-found': 'error', 'retention-days': 1})
+        names = [entry.get('name') for entry in job['steps']]
+        self.assertLess(names.index('Build the rankings page'), names.index('Commit when changed'))
+        self.assertLess(names.index('Commit when changed'), names.index('Upload the push bundle'))
+
+    def test_rankings_push_mirrors_tracker_delivery_with_only_page_adjustments(self):
+        push = self.wf['jobs']['rankings-push']
+        tracker = self.wf['jobs']['hf-push']
+        self.assertEqual(push['needs'], ['rankings'])
+        self.assertEqual(push['if'],
+                         "!cancelled() && needs.rankings.result == 'success' && "
+                         "needs.rankings.outputs.commits == 'true'")
+        for key in ('environment', 'permissions', 'timeout-minutes', 'outputs'):
+            self.assertEqual(push[key], tracker[key])
+        expected_steps = json.loads(json.dumps(tracker['steps']))
+        expected_steps[0]['with']['name'] = 'rankings-push-data'
+        expected_steps[1]['run'] = expected_steps[1]['run'].replace(
+            'data/hf-trending.json', 'out/trending-rankings.html').replace(
+                'Fresh main already carries the trending list',
+                'Fresh main already carries the rankings page')
+        expected_steps[2]['run'] = expected_steps[2]['run'].replace(
+            'the trending list', 'the rankings page')
+        self.assertEqual(push['steps'], expected_steps)
+        for entry in push['steps']:
+            self.assertFalse(entry.get('uses', '').startswith(('actions/checkout@', './')))
+            self.assertNotRegex(commands(entry.get('run', '')),
+                                r'\bpython3?\b|\bpip\b|\bnpm\b|\bbash\b|\bsh\b')
+            self.assertNotIn('github.token', str(entry))
+
+    def test_rankings_hub_compares_main_page_bytes_before_comparing_live_bytes(self):
+        job = self.wf['jobs']['rankings-hub']
+        self.assertNotIn('rankings-push-data', str(job))
+        self.assertNotIn('tip.txt', str(job))
+        self.assertEqual(job['steps'][0]['with'], {
+            'name': 'rankings-page', 'path': '${{ runner.temp }}/rankings-page'})
+        run = commands(step_in(self.wf, 'rankings-hub', 'Publish to docs-hub')['run'])
+        self.assertIn('if ! git -C "${scratch}" fetch --quiet origin main', run)
+        self.assertIn('show FETCH_HEAD:out/trending-rankings.html', run)
+        self.assertIn('cmp -s "$main_page"', run)
+        self.assertLess(run.index('cmp -s "$main_page"'), run.index('if curl'))
+        self.assertNotIn('--depth', run)
+        self.assertNotIn('git push', run)
 
     def test_rankings_reads_full_landed_main_and_builds_with_defaults(self):
         job = self.wf['jobs']['rankings']
@@ -1735,7 +1791,8 @@ class RankingsStructureTests(unittest.TestCase):
         self.assertEqual(upload['with']['if-no-files-found'], 'error')
         self.assertEqual(download['with'], {
             'name': 'rankings-page', 'path': '${{ runner.temp }}/rankings-page'})
-        self.assertEqual(self.wf['jobs']['rankings-hub']['needs'], ['rankings'])
+        self.assertEqual(self.wf['jobs']['rankings-hub']['needs'],
+                         ['rankings', 'rankings-push'])
         names = [s.get('name') for s in self.wf['jobs']['rankings']['steps']]
         self.assertLess(names.index('Build the rankings page'),
                         names.index('Upload the rankings page'))
@@ -1761,7 +1818,7 @@ class RankingsStructureTests(unittest.TestCase):
             if 'uses' in entry:
                 self.assertTrue(entry['uses'].startswith('actions/download-artifact@'))
             self.assertNotRegex(commands(entry.get('run', '')),
-                                r'\bpython3?\b|\bpip[0-9]?\b|\bgit\b')
+                                r'\bpython3?\b|\bpip[0-9]?\b')
 
     def test_rankings_upload_mirrors_the_hub_wire_format(self):
         run = commands(step_in(self.wf, 'rankings-hub', 'Publish to docs-hub')['run'])
@@ -1776,30 +1833,28 @@ class RankingsStructureTests(unittest.TestCase):
                       "jq -e '(.error // null) != null'"):
             self.assertIn(piece, run)
         self.assertNotIn('DOCS_HUB_URL', run)
-        self.assertNotIn('push-data', run)
         self.assertNotIn('github.sha', run)
 
 
-@pytest.mark.parametrize('upstream,rankings,cancelled,expected', [
-    ('skipped', 'success', False, True),
-    ('failure', 'success', False, True),
-    ('success', 'success', False, True),
-    ('success', 'skipped', False, False),
-    ('success', 'failure', False, False),
-    ('success', 'cancelled', False, False),
-    ('skipped', 'success', True, False),
-    ('failure', 'success', True, False),
-    ('success', 'success', True, False),
-])
-def test_rankings_hub_condition_covers_ancestor_outcomes(upstream, rankings, cancelled, expected):
-    """Evaluate the pinned terms; shell execution cannot model job admission."""
+@pytest.mark.parametrize('upstream', ['success', 'failure', 'skipped'])
+@pytest.mark.parametrize('rankings', ['success', 'failure', 'skipped', 'cancelled'])
+@pytest.mark.parametrize('pushed', ['success', 'failure', 'skipped', 'cancelled'])
+@pytest.mark.parametrize('cancelled', [False, True])
+def test_rankings_hub_condition_covers_ancestor_outcomes(upstream, rankings, pushed, cancelled):
+    """Ancestor failures cannot block publication; a failed page push must."""
     condition = load()['jobs']['rankings-hub'].get('if', 'success()')
     terms = {
         'success()': not cancelled and upstream == 'success' and rankings == 'success',
         '!cancelled()': not cancelled,
         "needs.rankings.result == 'success'": rankings == 'success',
+        "needs.rankings-push.result == 'success'": pushed == 'success',
+        "needs.rankings-push.result == 'skipped'": pushed == 'skipped',
     }
-    assert all(terms[term] for term in condition.split(' && ')) is expected
+    for term, value in terms.items():
+        condition = condition.replace(term, str(value))
+    actual = eval(condition.replace('&&', 'and').replace('||', 'or'),  # pylint: disable=eval-used
+                  {'__builtins__': {}}, {})
+    assert actual is (not cancelled and rankings == 'success' and pushed in ('success', 'skipped'))
 
 
 RANKINGS_CURL = '''import json
@@ -1829,26 +1884,71 @@ else:
 
 
 @pytest.mark.skipif(os.name == 'nt', reason='workflow shell runs on Ubuntu')
-@pytest.mark.parametrize('live,code,body,expected,uploads', [
-    ('same', '200', '{}', 0, 0),
-    ('stale', '200', '{}', 0, 1),
-    ('fail', '201', '{}', 0, 1),
-    ('stale', '199', '{}', 1, 1),
-    ('stale', '300', '{}', 1, 1),
-    ('stale', '403', '{"error":"refused"}', 1, 1),
-    ('stale', '200', '{"error":"refused"}', 1, 1),
-    ('stale', '200', '{"error":false}', 0, 1),
-    ('stale', '200', '{"error":null}', 0, 1),
-    ('stale', 'transport', '{}', 7, 1),
+@pytest.mark.parametrize('main,live,code,body,expected,uploads', [
+    ('moved', 'stale', '200', '{}', 0, 0),
+    ('moved-same', 'stale', '200', '{}', 0, 1),
+    ('fetch-fail', 'stale', '200', '{}', 0, 0),
+    ('empty-head', 'stale', '200', '{}', 0, 0),
+    ('unreadable-head', 'stale', '200', '{}', 0, 0),
+    ('landed', 'same', '200', '{}', 0, 0),
+    ('landed', 'stale', '200', '{}', 0, 1),
+    ('landed', 'fail', '201', '{}', 0, 1),
+    ('landed', 'stale', '199', '{}', 1, 1),
+    ('landed', 'stale', '300', '{}', 1, 1),
+    ('landed', 'stale', '403', '{"error":"refused"}', 1, 1),
+    ('landed', 'stale', '200', '{"error":"refused"}', 1, 1),
+    ('landed', 'stale', '200', '{"error":false}', 0, 1),
+    ('landed', 'stale', '200', '{"error":null}', 0, 1),
+    ('landed', 'stale', 'transport', '{}', 7, 1),
 ])
-def test_rankings_hub_upload_verdicts(tmp_path, live, code, body, expected, uploads):
-    """Execute the YAML upload: identical bytes skip; refusals stay red."""
+def test_rankings_hub_upload_verdicts(tmp_path, main, live, code, body, expected, uploads):
+    """Publish verified main bytes, skip duplicates, and surface hub refusals."""
+    repo = tmp_path / 'origin'
+    repo.mkdir()
+    git = HFTrackerExecutedStepsTests.git
+    git(repo, 'init', '-q', '-b', 'main')
+    git(repo, 'config', 'user.name', 'fixture')
+    git(repo, 'config', 'user.email', 'fixture@example.com')
+    git(repo, 'config', 'commit.gpgsign', 'false')
+    committed = repo / 'out/trending-rankings.html'
+    committed.parent.mkdir()
+    committed.write_bytes(b'previous page')
+    git(repo, 'add', 'out/trending-rankings.html')
+    git(repo, 'commit', '-q', '-m', 'base')
+    base = git(repo, 'rev-parse', 'HEAD').strip()
+    committed.write_bytes(b'<html>rankings</html>\n')
+    git(repo, 'add', 'out/trending-rankings.html')
+    git(repo, 'commit', '-q', '-m', 'page landed with a new SHA')
+    assert git(repo, 'rev-parse', 'HEAD').strip() != base
+    if main == 'moved':
+        committed.write_bytes(b'newer page')
+        git(repo, 'add', 'out/trending-rankings.html')
+        git(repo, 'commit', '-q', '-m', 'main moved with a newer page')
+    elif main == 'moved-same':
+        git(repo, 'commit', '-q', '--allow-empty', '-m', 'main moved with the same page')
+    config = tmp_path / 'gitconfig'
+    remote = repo / 'unavailable.git' if main == 'fetch-fail' else repo
+    git(repo, 'config', '--file', str(config),
+        f'url.{remote.as_posix()}.insteadOf', 'https://github.com/fixture/rankings')
     runner = tmp_path / 'runner'
     page = runner / 'rankings-page/trending-rankings.html'
     page.parent.mkdir(parents=True)
     page.write_bytes(b'<html>rankings</html>\n')
     stub = tmp_path / 'bin'
     stub.mkdir()
+    if main in ('empty-head', 'unreadable-head'):
+        # Keep the real successful fetch, then make its FETCH_HEAD unusable.
+        # The tie must affirmatively read the committed page before any HTTP.
+        (stub / 'git').write_text(
+            '#!/bin/sh\n"$REAL_GIT" "$@" || exit $?\n'
+            'case "$*" in\n'
+            '  *" fetch --quiet origin main")\n'
+            '    "$TEST_PYTHON" -c \'from pathlib import Path; import os, sys; '
+            'p = Path(sys.argv[1]) / ".git/FETCH_HEAD"; '
+            'p.write_text("") if os.environ["HEAD_STATE"] == "empty-head" '
+            'else (p.unlink(), p.mkdir())\' "$2" ;;\n'
+            'esac\n', encoding='utf-8')
+        (stub / 'git').chmod(0o755)
     (stub / 'curl_payload.py').write_text(RANKINGS_CURL, encoding='utf-8')
     (stub / 'curl').write_text(
         '#!/bin/sh\nexec "$TEST_PYTHON" "$(dirname "$0")/curl_payload.py" "$@"\n',
@@ -1860,12 +1960,25 @@ def test_rankings_hub_upload_verdicts(tmp_path, live, code, body, expected, uplo
            'GITHUB_STEP_SUMMARY': str(tmp_path / 'summary'),
            'DOCS_HUB_API_KEY': 'fixture', 'LIVE_PAGE': live,
            'UPLOAD_CODE': code, 'UPLOAD_BODY': body,
-           'HUB_CALLS': str(calls), 'RANKINGS_PAGE': str(page)}
+           'HUB_CALLS': str(calls), 'RANKINGS_PAGE': str(page),
+           'GITHUB_REPOSITORY': 'fixture/rankings', 'GIT_CONFIG_GLOBAL': str(config),
+           'REAL_GIT': shutil.which('git') or 'git', 'HEAD_STATE': main}
     entry = dict(step_in(load(), 'rankings-hub', 'Publish to docs-hub'))
     entry['run'] = entry['run'].replace(
         '/tmp/publish-response.json', '"${RUNNER_TEMP}/publish-response.json"')
     done = _workflowrun.run_step(tmp_path, entry, env)
     assert done.returncode == expected, done.stdout + done.stderr
+    if main in ('moved', 'fetch-fail', 'empty-head', 'unreadable-head'):
+        assert 'Nothing published by this run.' in done.stdout
+        summary = (tmp_path / 'summary').read_text(encoding='utf-8')
+        if main == 'moved':
+            assert "Lost the race: main's tip moved past this run's rankings page" in summary
+        else:
+            assert ("could not verify main's committed page — publishing nothing this run; "
+                    "the next hourly run self-heals") in summary
+        assert not calls.exists()
+        assert not (runner / 'page').exists()
+        return
     requests = [json.loads(line) for line in calls.read_text(encoding='utf-8').splitlines()]
     assert len(requests) == 1 + uploads
     assert requests[0][-3:] == [
@@ -1909,7 +2022,7 @@ class HFTrackerExecutedStepsTests(unittest.TestCase):
         self.repo.mkdir()
         self.git(self.repo, 'init', '-q', '-b', 'main')
         self.configure(self.repo)
-        (self.repo / 'data').mkdir()
+        (self.repo / self.data).parent.mkdir()
         (self.repo / self.data).write_text('old\n', encoding='utf-8')
         (self.repo / 'README.md').write_text('base\n', encoding='utf-8')
         self.git(self.repo, 'add', self.data, 'README.md')
@@ -2135,6 +2248,114 @@ class ORTrackerExecutedStepsTests(HFTrackerExecutedStepsTests):
     fetcher = 'openrouter'
     data = 'data/openrouter-trending.json'
     message = 'Top 10: 1 new: org/new\n\nNEW  rank 1 org/new\n'
+
+
+@unittest.skipIf(os.name == 'nt', 'workflow shell runs on Ubuntu')
+class RankingsExecutedStepsTests(unittest.TestCase):
+    """Execute the page committer and the same delivery safeguards as the lists."""
+
+    repo: pathlib.Path
+    runner: pathlib.Path
+    root: pathlib.Path
+    origin: pathlib.Path
+    base: str
+    env: dict[str, str]
+    data = 'out/trending-rankings.html'
+    message = (
+        'Rebuild the rankings page\n\n'
+        "The page is rebuilt from the two trending lists' history and differs from the committed copy.\n\n"
+        'Captured by .github/workflows/refresh.yml.\n')
+    setUp = HFTrackerExecutedStepsTests.setUp
+    git = staticmethod(HFTrackerExecutedStepsTests.git)
+    configure = HFTrackerExecutedStepsTests.configure
+    run_step = HFTrackerExecutedStepsTests.run_step
+    stage_change = HFTrackerExecutedStepsTests.stage_change
+    replay = HFTrackerExecutedStepsTests.replay
+    advance_main = HFTrackerExecutedStepsTests.advance_main
+    load_ephemeral_key = HFTrackerExecutedStepsTests.load_ephemeral_key
+    test_changed_page_commits_only_page_with_exact_message = (
+        HFTrackerExecutedStepsTests.test_changed_capture_commits_only_data_with_exact_message)
+    test_replay_preserves_fresh_main_and_message_then_pushes = (
+        HFTrackerExecutedStepsTests.test_replay_preserves_fresh_main_and_message_then_pushes)
+    test_replay_noops_when_main_already_has_page = (
+        HFTrackerExecutedStepsTests.test_replay_noops_when_main_already_has_capture)
+    test_push_missing_key_fails_before_delivery = (
+        HFTrackerExecutedStepsTests.test_push_missing_key_fails_before_delivery)
+    test_main_move_after_replay_concedes_without_force = (
+        HFTrackerExecutedStepsTests.test_main_move_after_replay_concedes_without_force)
+    test_rejected_push_with_main_still_at_base_fails = (
+        HFTrackerExecutedStepsTests.test_rejected_push_with_main_still_at_base_fails)
+    test_main_moving_during_push_concedes_after_rejection = (
+        HFTrackerExecutedStepsTests.test_main_moving_during_push_concedes_after_rejection)
+
+    def tracker_step(self, job, name):
+        return step_in(load(), 'rankings' if job == 'fetch' else 'rankings-push', name)
+
+    def test_unchanged_page_stages_base_and_tip_without_commit_or_bundle(self):
+        self.run_step('fetch', 'Commit when changed')
+        self.assertEqual(self.git(self.repo, 'rev-parse', 'HEAD').strip(), self.base)
+        self.assertEqual(pathlib.Path(self.env['GITHUB_OUTPUT']).read_text(encoding='utf-8'),
+                         'commits=false\n')
+        data = self.runner / 'push-data'
+        self.assertEqual(sorted(path.name for path in data.iterdir()), ['base.txt', 'tip.txt'])
+        for name in ('base.txt', 'tip.txt'):
+            self.assertEqual((data / name).read_text(encoding='utf-8').strip(), self.base)
+
+    @unittest.skipUnless(sys.platform == 'linux',
+                         'requires Linux ssh-agent/ssh-add behaviour matching ubuntu-latest')
+    def test_conceded_delivery_and_failed_hub_fetch_publish_nothing(self):
+        self.stage_change()
+        self.replay()
+        fresh = self.advance_main()
+        self.load_ephemeral_key()
+        self.run_step('push', 'Push the trending commit')
+        output = pathlib.Path(self.env['GITHUB_OUTPUT']).read_text(encoding='utf-8')
+        self.assertNotIn('landed=true', output)
+        self.assertEqual(self.git(self.origin, 'rev-parse', 'main').strip(), fresh)
+        self.assertEqual(self.git(self.origin, 'show', f'main:{self.data}'), 'old\n')
+        # A successful conceded push admits the hub under its actual job gate.
+        condition = load()['jobs']['rankings-hub']['if']
+        for term, value in {
+                '!cancelled()': 'True',
+                "needs.rankings.result == 'success'": 'True',
+                "needs.rankings-push.result == 'success'": 'True',
+                "needs.rankings-push.result == 'skipped'": 'False'}.items():
+            condition = condition.replace(term, value)
+        self.assertTrue(eval(condition.replace('&&', 'and').replace('||', 'or'),  # pylint: disable=eval-used
+                             {'__builtins__': {}}, {}))
+        page = self.runner / 'rankings-page/trending-rankings.html'
+        page.parent.mkdir()
+        page.write_bytes((self.repo / self.data).read_bytes())
+        self.assertEqual(page.read_bytes(), b'new\n')
+        # Redirect only the hub's main fetch to an unavailable local remote.
+        self.git(self.repo, 'config', '--file', str(self.root / 'gitconfig'),
+                 f'url.{self.root / "unavailable.git"}.insteadOf',
+                 'https://github.com/fixture/unavailable')
+        stub = self.root / 'bin'
+        stub.mkdir()
+        (stub / 'curl_payload.py').write_text(RANKINGS_CURL, encoding='utf-8')
+        (stub / 'curl').write_text(
+            '#!/bin/sh\nexec "$TEST_PYTHON" "$(dirname "$0")/curl_payload.py" "$@"\n',
+            encoding='utf-8')
+        (stub / 'curl').chmod(0o755)
+        calls = self.root / 'hub-calls'
+        self.env.update({
+            'PATH': str(stub) + os.pathsep + os.environ['PATH'],
+            'TEST_PYTHON': sys.executable, 'GITHUB_REPOSITORY': 'fixture/unavailable',
+            'DOCS_HUB_API_KEY': 'fixture', 'LIVE_PAGE': 'stale',
+            'UPLOAD_CODE': '200', 'UPLOAD_BODY': '{}',
+            'HUB_CALLS': str(calls), 'RANKINGS_PAGE': str(page)})
+        entry = dict(step_in(load(), 'rankings-hub', 'Publish to docs-hub'))
+        entry['run'] = entry['run'].replace(
+            '/tmp/publish-response.json', '"${RUNNER_TEMP}/publish-response.json"')
+        done = _workflowrun.run_step(self.repo, entry, self.env)
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+        self.assertIn('Nothing published by this run.', done.stdout)
+        self.assertIn("could not verify main's committed page — publishing nothing this run; "
+                      "the next hourly run self-heals", pathlib.Path(
+                          self.env['GITHUB_STEP_SUMMARY']).read_text(encoding='utf-8'))
+        self.assertFalse(calls.exists(), 'neither live-page fetch nor upload may run')
+        self.assertFalse((self.runner / 'page').exists())
 
 
 HUB_UPLOAD_CURL = '''import os

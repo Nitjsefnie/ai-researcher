@@ -73,6 +73,8 @@
 !/out/
 /out/*
 !/out/frontier-models.html
+!/out/trending-rankings.html
+# Built rankings page from the tracked trending-list history.
 
 # ---- scripts/ — fetch and diff tooling -------------------------------------
 !/scripts/

@@ -41,7 +41,7 @@ DOCS = ["README.md", "docs/guide.md", "LICENSE", ".gitignore"]
 CODE = [
     "build.py", "scripts/fetch_aa.py", ".github/workflows/tests.yml",
     ".github/ci-thresholds.json", "scripts/ci/classify_changes.py",
-    "scripts/capture_gate.py",
+    "scripts/capture_gate.py", "scripts/build_rankings.py",
 ]
 
 
@@ -50,15 +50,9 @@ CODE = [
 # ---------------------------------------------------------------------------
 
 
-def test_bot_signature_is_exactly_the_refresh_bots_six_files():
-    # The hourly refresh's fixed `git add` list in refresh.yml stages
-    # the two captures, generation state, capture stamp and built page as ONE
-    # commit, though an hour's diff stages only the subset whose bytes
-    # moved. The window marker (issue #227) rides the same commit --
-    # in when the hour recorded a window, out on the first healthy
-    # hour -- and the refresh job runs the full suite against the fresh
-    # capture BEFORE pushing, so the signature's paths are exactly the
-    # ones that pre-test covers.
+def test_bot_signature_is_exactly_the_refresh_bots_nine_files():
+    # AA, the two trackers and the rankings builder commit generated artifacts.
+    # Only the AA producer runs the suite before handing its data to delivery.
     assert classify.BOT_SIGNATURE == frozenset({
         "data/aa-raw-models.json",
         "data/aa-raw-coding-agents.json",
@@ -66,16 +60,14 @@ def test_bot_signature_is_exactly_the_refresh_bots_six_files():
         "data/captured-at.txt",
         "data/cost-breakdown-window.txt",
         "out/frontier-models.html",
+        "data/hf-trending.json",
+        "data/openrouter-trending.json",
+        "out/trending-rankings.html",
     })
 
 
-def test_bot_signature_names_every_file_the_aa_committer_adds():
-    # Lockstep with refresh.yml: the AA committer's add list is the signature's
-    # source of truth, and since issue #200 the fixed list is the ONLY
-    # unconditional `git add` -- issue #227 put the window marker's add
-    # and its `git rm` behind conditionals, so the signature covers every
-    # path an AA commit can stage. The pin compares the sets, not one
-    # spelling.
+def test_bot_signature_names_every_file_the_refresh_committers_add():
+    # Keep the exact AA staging set, then join the other producers' own paths.
     workflow = yaml.safe_load(
         (REPO_ROOT / ".github/workflows/refresh.yml").read_text(encoding="utf-8"))
     raw = "\n".join(step.get("run", "") for step in
@@ -88,7 +80,21 @@ def test_bot_signature_names_every_file_the_aa_committer_adds():
     assert len(adds) == 2, adds
     staged = {path for add in adds for path in add.replace("\\\n", " ").split()
               if path.startswith(("data/", "out/"))}
-    assert staged == set(classify.BOT_SIGNATURE)
+    assert staged == {
+        "data/aa-raw-models.json", "data/aa-raw-coding-agents.json",
+        "data/aa-generation-state.json", "data/captured-at.txt",
+        "data/cost-breakdown-window.txt", "out/frontier-models.html",
+    }
+    all_staged = set(staged)
+    for job, path in (("hf-fetch", "data/hf-trending.json"),
+                      ("or-fetch", "data/openrouter-trending.json"),
+                      ("rankings", "out/trending-rankings.html")):
+        commit = next(step for step in workflow["jobs"][job]["steps"]
+                      if step.get("id") == "commit")
+        producer_adds = re.findall(r"^\s*git add (.+)$", commit["run"], re.MULTILINE)
+        assert producer_adds == [path]
+        all_staged.update(producer_adds)
+    assert all_staged == set(classify.BOT_SIGNATURE)
     # And the marker's removal stays conditional: never an unconditional
     # `git rm` of a data path.
     rms = re.findall(r"^\s*git rm(?:[^\n\\]|\\\n)*", raw, re.MULTILINE)
@@ -109,7 +115,7 @@ def test_data_only_accepts_the_signature_and_only_its_subsets():
         "out/frontier-models.html", "data/captured-at.txt",
         "data/aa-raw-models.json", "data/aa-raw-coding-agents.json",
         "data/aa-raw-models.json"])
-    # An hour's commit carries only the subset of the six whose bytes
+    # An AA commit carries only the subset of its six paths whose bytes
     # moved (git omits byte-identical files from the diff) — the real
     # refresh push that ran the full matrix by mistake (issue #212,
     # run 37490807791) touched exactly these two.
@@ -128,36 +134,53 @@ def test_data_only_refuses_a_fifth_path():
             intruder]), intruder
 
 
-def test_trending_push_runs_the_full_gate_set():
+def test_generated_trending_pushes_get_the_data_only_class():
     workflow = yaml.safe_load(
         (REPO_ROOT / ".github/workflows/refresh.yml").read_text(encoding="utf-8"))
-    for tracker, filename in [('hf', 'hf'), ('or', 'openrouter')]:
-        steps = workflow['jobs'][f'{tracker}-fetch']['steps']
+    for job, path in (("hf-fetch", "data/hf-trending.json"),
+                      ("or-fetch", "data/openrouter-trending.json"),
+                      ("rankings", "out/trending-rankings.html")):
+        steps = workflow['jobs'][job]['steps']
         run = next(step['run'] for step in steps if step.get('id') == 'commit')
         adds = re.findall(r'^\s*git add (.+)$', run, re.MULTILINE)
-        assert adds == [f'data/{filename}-trending.json']
-        assert not set(adds) & classify.BOT_SIGNATURE
+        assert adds == [path]
+        assert set(adds) <= classify.BOT_SIGNATURE
         with mock.patch.object(classify, "_verified_base", return_value="a" * 40):
             docs_only, data_only, reason = classify.classify(
                 {"name": "push", "repository": "o/r", "before": "a" * 40,
                  "sha": "b" * 40},
                 lambda argv, staged=tuple(adds): "\n".join(staged),
             )
-        assert (docs_only, data_only) == (False, False)
+        assert (docs_only, data_only) == (False, True), path
+        assert "data-only" in reason
+        assert classify.data_only(adds + list(classify.BOT_SIGNATURE))
+
+
+def test_rankings_builder_alone_or_beside_generated_artifacts_runs_everything():
+    builder = "scripts/build_rankings.py"
+    for paths in ([builder], ["data/hf-trending.json", builder],
+                  ["data/openrouter-trending.json", builder],
+                  ["out/trending-rankings.html", builder],
+                  [*classify.BOT_SIGNATURE, builder]):
+        docs_only, data_only, reason = classify.classify(
+            {"name": "pull_request", "repository": "o/r", "pull_request": "17"},
+            lambda argv, changed=paths: "\n".join(changed),
+        )
+        assert (docs_only, data_only) == (False, False), paths
         assert "outside documentation" in reason
-        # Combining an untested tracker with pre-tested AA data cannot narrow.
-        assert not classify.data_only(adds + list(classify.BOT_SIGNATURE))
 
 
 def test_data_only_accepts_any_proper_subset():
-    # Any non-empty subset of the six is a shape the bot's push takes:
+    # Any non-empty subset of the nine is a shape the bot's pushes take:
     # an hour's commit carries only the files whose bytes moved, so a
     # dropped file is an hour with one byte-identical artifact, not a
     # hand-staged change to run the full matrix over. Dropping the window
     # marker (issue #227) is the heal hour's own shape.
     full = ["data/aa-raw-models.json", "data/aa-raw-coding-agents.json",
             "data/captured-at.txt", "out/frontier-models.html",
-            "data/cost-breakdown-window.txt", "data/aa-generation-state.json"]
+            "data/cost-breakdown-window.txt", "data/aa-generation-state.json",
+            "data/hf-trending.json", "data/openrouter-trending.json",
+            "out/trending-rankings.html"]
     for dropped in full:
         assert classify.data_only(
             [path for path in full if path != dropped]), dropped
