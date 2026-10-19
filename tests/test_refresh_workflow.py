@@ -143,14 +143,6 @@ class GateTests(unittest.TestCase):  # pylint: disable=too-many-public-methods
     def test_the_payload_travels_as_this_runs_own_artifact(self):
         # The upload and download agree on the artifact name, and the
         # download precedes the commit in the publish job.
-        # Issue #283: the producer and consumer define the transport's
-        # shared identifier, so each supplies the other's expected value.
-        # A rename applied to both remains valid; a one-sided edit would
-        # leave the committer waiting for a differently named payload.
-        # The ordering check addresses a separate dependency: the commit
-        # needs its downloaded files before it starts. Neither assertion
-        # establishes the payload's contents or upload failure policy;
-        # those properties cannot be inferred from matching identifiers.
         up = step(self.wf, "Upload the publish payload")
         down = pub_step(self.wf, "Download the publish payload")
 
@@ -1612,16 +1604,6 @@ class HFTrackerStructureTests(unittest.TestCase):
                     self.assertNotIn('github.token', str(entry))
 
     def test_artifact_is_this_runs_bundle_and_upload_is_success_gated(self):
-        # The two jobs exchange a bundle through an agreed artifact name
-        # and staging path. Deriving those expectations from their YAML
-        # catches a producer/consumer mismatch without freezing either
-        # setting in Python. A coordinated transport change can preserve
-        # that agreement without changing the data the tracker commits.
-        # The success condition remains an independent boundary: a failed
-        # fetch must not hand a bundle to delivery merely because its
-        # artifact configuration agrees with the download configuration.
-        # These structural checks complement the executed commit/replay
-        # cases, which exercise the bundle and its effects on git history.
         upload = self.tracker_step('fetch', 'Upload the push bundle')
         download = self.tracker_step('push', 'Download the push bundle')
         self.assertEqual(upload['if'], "success() && steps.commit.outputs.commits == 'true'")

@@ -58,13 +58,6 @@ def _pins(workflow: str):
 
 
 def test_codeql_action_pins_share_one_sha():
-    # Issue #283: the workflow supplies both revisions under comparison.
-    # A coordinated upgrade can therefore pass without editing this test,
-    # while changing only one side still exposes the incompatible pair.
-    # Hardcoding a known-good revision would instead reject the upgrade
-    # and make the test an additional dependency manifest to maintain.
-    # Agreement is the runtime requirement; choosing a release belongs
-    # to the workflow and its dependency-update process.
     pins = _pins(CODEQL_WORKFLOW.read_text(encoding="utf-8"))
     steps = {pin[0] for pin in pins}
     # the oracle must be live: a refactor that renames the steps or the
@@ -185,12 +178,6 @@ def test_diff_coverage_job_is_pull_request_only_and_read_only():
     # credentials — the rendered comment travels as an artifact to the
     # trusted workflow_run poster, so this job never needs conversation
     # write.
-    # Pull-request code can influence the tools this job executes, so
-    # separating measurement from comment delivery limits its token scope.
-    # The successful-coverage dependency also keeps a failed measurement
-    # from becoming a patch report. These event, dependency and permission
-    # checks remain meaningful when an action revision or input changes;
-    # they do not certify the checkout configuration or artifact contents.
     workflow = yaml.safe_load(TESTS_WORKFLOW.read_text(encoding="utf-8"))
     job = workflow["jobs"]["diff-coverage"]
     assert "pull_request" in job["if"], job["if"]
@@ -271,12 +258,6 @@ def test_the_comment_artifact_name_spans_both_workflows():
     # One artifact carries the rendered comment from the producer to the
     # poster; the two sides name it independently, so the shared literal is
     # pinned across the pair rather than per file.
-    # The name is a rendezvous between independently configured jobs: a
-    # one-sided rename disconnects the commenter from its producer even
-    # if both actions run successfully. Comparing the two declarations
-    # catches that wiring error while allowing a coordinated rename.
-    # This guarantees agreement, not that an artifact was uploaded or
-    # contains a valid report; those require execution and content checks.
     tests = yaml.safe_load(TESTS_WORKFLOW.read_text(encoding="utf-8"))
     comment = yaml.safe_load(
         (REPO_ROOT / ".github" / "workflows" / "coverage-comment.yml")
