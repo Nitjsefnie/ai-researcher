@@ -194,7 +194,7 @@ class ReadonlyCleanupTests(unittest.TestCase):
                     target.chmod(target.stat().st_mode | stat.S_IWRITE)
 
 
-class RankingsTests(unittest.TestCase):
+class RankingsFixture(unittest.TestCase):
     def setUp(self):
         self.directory = tempfile.mkdtemp()
         self.addCleanup(_cleanup_rankings_fixture, self.directory)
@@ -227,6 +227,8 @@ class RankingsTests(unittest.TestCase):
                              *arguments])
         return output.read_text(encoding="utf-8")
 
+
+class RankingsTests(RankingsFixture):
     def test_history_limits_each_list_to_its_own_changing_commits(self):
         second = self.commit(HF, ["org/b", "org/a"], "id")
         self.commit(OR, ["lab/y", "lab/x"], "slug")
@@ -516,3 +518,119 @@ class RankingsTests(unittest.TestCase):
         self.assertLessEqual(coordinates[-1], viewbox_height - 16)
         self.assertTrue(all(right - left >= 22
                             for left, right in zip(coordinates, coordinates[1:])))
+
+
+class FreshRankingsTests(RankingsFixture):
+    def _fresh_file(self, models, key):
+        target = pathlib.Path(self.directory) / f"fresh-{key}.json"
+        target.write_text(json.dumps({"source": "fixture", "models": [
+            {key: model} for model in models]}), encoding="utf-8")
+        return str(target)
+
+    def test_fresh_columns_render_the_label_and_each_lists_fetch_timestamp(self):
+        hf = self._fresh_file(["org/new", "org/a"], "id")
+        router = self._fresh_file(["lab/y", "lab/new"], "slug")
+        document = self._document(
+            "--fresh-hf", hf, "--fresh-hf-timestamp", "2026-10-20T09:41:00Z",
+            "--fresh-or", router, "--fresh-or-timestamp", "2026-10-20T09:42:00Z",
+            "--fresh-label", "run 123")
+        sections = re.findall(r'<section\b.*?</section>', document, re.S)
+        for section, timestamp, expected in (
+                (sections[0], "2026-10-20T09:41:00Z", {"org/new": "1", "org/a": "2"}),
+                (sections[1], "2026-10-20T09:42:00Z", {"lab/y": "1", "lab/new": "2"})):
+            with self.subTest(timestamp=timestamp):
+                points = [point for point in Page(section).points
+                          if point["data-commit"] == "run 123"]
+                self.assertEqual({point["data-model"]: point["data-rank"]
+                                  for point in points}, expected)
+                self.assertEqual({point["data-timestamp"] for point in points}, {timestamp})
+                for point in points:
+                    self.assertEqual(point["aria-label"],
+                                     f'Rank {point["data-rank"]} · '
+                                     f'{point["data-model"]} · {timestamp}')
+                self.assertEqual(section.count('class="timestamp-tick"'), 2)
+                self.assertIn(f"<title>{timestamp}</title>", section)
+                self.assertIn(timestamp[11:19], section)
+                self.assertIn("2 changing commits · ", section)
+                self.assertIn(f" → {timestamp}</p>", section)
+                rows = re.findall(r'<tr><td>.*?</tr>', section, re.S)
+                for model, rank in expected.items():
+                    row = next(row for row in rows if f"<td>{model}</td>" in row)
+                    self.assertIn(f'{timestamp}</time> · Rank {rank}</li>', row)
+
+    def test_one_sided_fresh_keeps_the_other_lists_full_history(self):
+        self.commit(HF, ["org/b", "org/a"], "id")
+        self.commit(OR, ["lab/y", "lab/x"], "slug")
+        original = re.findall(r'<section\b.*?</section>', self._document("--limit", "2"), re.S)
+        hf = self._fresh_file(["org/new"], "id")
+        document = self._document(
+            "--limit", "2", "--fresh-hf", hf,
+            "--fresh-hf-timestamp", "2026-10-20T09:41:00Z", "--fresh-label", "run 123")
+        sections = re.findall(r'<section\b.*?</section>', document, re.S)
+        self.assertEqual(sections[1], original[1])
+        self.assertNotEqual(sections[0], original[0])
+        self.assertNotIn(self.first, sections[0])
+        self.assertIn('data-commit="run 123"', sections[0])
+
+    def test_fresh_column_replaces_the_oldest_of_ten_history_columns(self):
+        commits = [self.first]
+        for index in range(9):
+            commits.append(self.commit(HF, [f"org/model-{index}"], "id"))
+        hf = self._fresh_file(["org/fresh"], "id")
+        document = self._document(
+            "--fresh-hf", hf, "--fresh-hf-timestamp", "2026-10-20T09:41:00Z",
+            "--fresh-label", "run 123")
+        section = re.findall(r'<section\b.*?</section>', document, re.S)[0]
+        points = Page(section).points
+        self.assertEqual(list(dict.fromkeys(point["data-commit"] for point in points)),
+                         [*commits[1:], "run 123"])
+        self.assertEqual(len({point["cx"] for point in points}), 10)
+        self.assertEqual(section.count('class="timestamp-tick"'), 10)
+        self.assertIn("10 changing commits · ", section)
+        self.assertNotIn("org/a", section)
+
+    def test_limit_one_with_fresh_input_keeps_only_the_fresh_column(self):
+        for option, key, model, other in (
+                ("hf", "id", "org/fresh", self.or_first),
+                ("or", "slug", "lab/fresh", self.first)):
+            with self.subTest(option=option):
+                fresh = self._fresh_file([model], key)
+                document = self._document(
+                    "--limit", "1", f"--fresh-{option}", fresh,
+                    f"--fresh-{option}-timestamp", "2026-10-20T09:41:00Z",
+                    "--fresh-label", "run 123")
+                self.assertEqual({point["data-commit"] for point in Page(document).points},
+                                 {"run 123", other})
+                self.assertEqual(document.count('class="timestamp-tick"'), 2)
+
+    def test_fresh_arguments_require_a_file_timestamp_pair_and_label(self):
+        hf = self._fresh_file(["org/fresh"], "id")
+        router = self._fresh_file(["lab/fresh"], "slug")
+        for arguments, message in (
+                (["--fresh-hf", hf], "--fresh-label"),
+                (["--fresh-or", router], "--fresh-label"),
+                (["--fresh-hf", hf, "--fresh-label", "run 123"], "--fresh-hf-timestamp"),
+                (["--fresh-or", router, "--fresh-label", "run 123"], "--fresh-or-timestamp"),
+                (["--fresh-hf-timestamp", "2026-10-20T09:41:00Z"], "--fresh-hf"),
+                (["--fresh-or-timestamp", "2026-10-20T09:42:00Z"], "--fresh-or"),
+                (["--fresh-label", "run 123"], "--fresh-label"),
+                (["--fresh-hf", hf, "--fresh-hf-timestamp", "2026-10-20T09:41:00Z",
+                  "--fresh-label", "run 123", "--fresh-or", router], "--fresh-or-timestamp")):
+            with self.subTest(arguments=arguments):
+                result = subprocess.run(
+                    [sys.executable, str(ROOT / "scripts/build_rankings.py"), *arguments],
+                    cwd=self.repo, check=False, capture_output=True, text=True, timeout=60)
+                self.assertEqual(result.returncode, 2, result.stderr)
+                self.assertIn(message, result.stderr)
+                self.assertNotIn("unrecognized arguments", result.stderr)
+                self.assertFalse((self.repo / "out/trending-rankings.html").exists())
+
+    def test_fresh_inputs_build_byte_identical_html(self):
+        hf = self._fresh_file(["org/new", "org/a"], "id")
+        router = self._fresh_file(["lab/y", "lab/new"], "slug")
+        arguments = (
+            "--fresh-hf", hf, "--fresh-hf-timestamp", "2026-10-20T09:41:00Z",
+            "--fresh-or", router, "--fresh-or-timestamp", "2026-10-20T09:42:00Z",
+            "--fresh-label", "run 123")
+        self.assertEqual(self._document(*arguments).encode("utf-8"),
+                         self._document(*arguments).encode("utf-8"))

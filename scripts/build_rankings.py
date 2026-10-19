@@ -3,8 +3,9 @@
 
     build_rankings.py [--limit 10] [--repo .] [--commit HEAD] [--out out/trending-rankings.html]
 
-Each list has its own window of changing commits. No network or working-tree
-capture is read, and every displayed date belongs to a captured commit.
+Each list has its own window of changing commits. An explicit --fresh-hf or
+--fresh-or file replaces its list's oldest column with a labelled snapshot
+at the supplied fetch timestamp. Without fresh inputs, only git history is read.
 """
 from __future__ import annotations
 
@@ -19,7 +20,7 @@ import subprocess
 
 @dataclass(frozen=True)
 class Snapshot:
-    """A list's ranks and UTC committer timestamp at one changing commit."""
+    """A list's ranks and UTC timestamp identified by a commit or fresh label."""
 
     commit: str
     timestamp: str
@@ -331,17 +332,45 @@ def section_html(identifier: str, title: str, source: str, history: list[Snapsho
 
 
 def main(argv: list[str] | None = None) -> None:
-    """Write the deterministic page, using independent history windows."""
+    """Write independent history windows, reserving one column per fresh input."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--limit", type=int, default=10)
     parser.add_argument("--repo", type=pathlib.Path, default=pathlib.Path("."))
     parser.add_argument("--commit", default="HEAD")
     parser.add_argument("--out", type=pathlib.Path, default=pathlib.Path("out/trending-rankings.html"))
+    parser.add_argument("--fresh-hf", type=pathlib.Path)
+    parser.add_argument("--fresh-hf-timestamp")
+    parser.add_argument("--fresh-or", type=pathlib.Path)
+    parser.add_argument("--fresh-or-timestamp")
+    parser.add_argument("--fresh-label")
     args = parser.parse_args(argv)
     if not 1 <= args.limit <= 10:
         parser.error("--limit must be between 1 and 10")
-    hf = read_history(args.repo, "data/hf-trending.json", "id", args.limit, args.commit)
-    router = read_history(args.repo, "data/openrouter-trending.json", "slug", args.limit, args.commit)
+    has_fresh = args.fresh_hf is not None or args.fresh_or is not None
+    if has_fresh and args.fresh_label is None:
+        parser.error("--fresh-label is required with a fresh file")
+    if args.fresh_label is not None and not has_fresh:
+        parser.error("--fresh-label requires --fresh-hf or --fresh-or")
+    for source in ("hf", "or"):
+        fresh = getattr(args, f"fresh_{source}")
+        timestamp = getattr(args, f"fresh_{source}_timestamp")
+        if fresh is not None and timestamp is None:
+            parser.error(f"--fresh-{source}-timestamp is required with --fresh-{source}")
+        if timestamp is not None and fresh is None:
+            parser.error(f"--fresh-{source}-timestamp requires --fresh-{source}")
+    histories = []
+    for path, key, fresh, timestamp in (
+            ("data/hf-trending.json", "id", args.fresh_hf, args.fresh_hf_timestamp),
+            ("data/openrouter-trending.json", "slug", args.fresh_or, args.fresh_or_timestamp)):
+        history_limit = args.limit - int(fresh is not None)
+        history = (read_history(args.repo, path, key, history_limit, args.commit)
+                   if history_limit else [])
+        if fresh is not None:
+            assert args.fresh_label is not None
+            capture = json.loads(fresh.read_text(encoding="utf-8"))
+            ranks = {model[key]: rank for rank, model in enumerate(capture["models"], 1)}
+            history.append(Snapshot(args.fresh_label, timestamp, ranks))
+        histories.append(history)
     style = (f".viz-root {{{LIGHT}}}\n"
              f'@media (prefers-color-scheme: dark) {{\n'
              f':root:where(:not([data-theme="light"])) .viz-root {{{DARK}}}\n}}\n'
@@ -359,8 +388,10 @@ def main(argv: list[str] | None = None) -> None:
                 '<button id="theme" type="button">Toggle light / dark theme</button>'
                 '<nav aria-label="Contents"><a href="#hugging-face">Hugging Face</a>'
                 '<a href="#openrouter">OpenRouter</a></nav>'
-                + section_html("hugging-face", "Hugging Face · trending top 10", "Hugging Face", hf)
-                + section_html("openrouter", "OpenRouter · weekly top 10 by tokens", "OpenRouter", router)
+                + section_html("hugging-face", "Hugging Face · trending top 10", "Hugging Face",
+                               histories[0])
+                + section_html("openrouter", "OpenRouter · weekly top 10 by tokens", "OpenRouter",
+                               histories[1])
                 + f'</main></div><script>{JS}</script></body></html>\n')
     args.out.parent.mkdir(parents=True, exist_ok=True)
     args.out.write_text(document, encoding="utf-8", newline="\n")
