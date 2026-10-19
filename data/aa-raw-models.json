@@ -46568,7 +46568,7 @@
   "omniscience": -9.983333333333333,
   "omniscienceAccuracy": 0.15583333333333332,
   "omniscienceNonHallucination": 0.6971372161895361,
-  "gdpvalNormalized": 0.45994000000000007,
+  "gdpvalNormalized": 0.45846000000000003,
   "analystAgent": null,
   "terminalbenchHard": null,
   "terminalBench21": 0.797752808988764,
@@ -46691,7 +46691,7 @@
   "omniscienceHallucinationRate": 0.30286278381046394,
   "mlcrOverall": 0.216666666666667,
   "gdpPdfAllPass": 0.164,
-  "gdpval": 1419.88,
+  "gdpval": 1416.92,
   "itBenchSre": null,
   "frontierCode": 0.342324,
   "terminalBenchScience": 0.00476190476190476,
@@ -46732,14 +46732,14 @@
   "intelligenceIndexEvaluations": [
    {
     "slug": "aa-briefcase",
-    "score": 1395.27,
+    "score": 1394.92,
     "outputTokensPerTask": 142232.02197802198,
     "costPerTask": 2.82922071556044,
     "timePerTask": 2626.630366731079
    },
    {
     "slug": "gdpval-aa",
-    "score": 1419.88,
+    "score": 1416.92,
     "outputTokensPerTask": 100519.12272727273,
     "costPerTask": 1.096572516109091,
     "timePerTask": 1856.308983875802
@@ -46810,98 +46810,98 @@
   },
   "briefcaseBreakdown": {
    "overall": {
-    "elo": 1395.27,
-    "lower95ci": 1388.09,
-    "upper95ci": 1402.99
+    "elo": 1394.92,
+    "lower95ci": 1387.8,
+    "upper95ci": 1402.51
    },
    "rubricPassRate": 0.4780388151174668,
    "analyticalQuality": {
-    "elo": 1565.53,
-    "lower95ci": 1552.45,
-    "upper95ci": 1579.63
+    "elo": 1564.45,
+    "lower95ci": 1550.53,
+    "upper95ci": 1579.15
    },
    "presentation": {
-    "elo": 1286.73,
-    "lower95ci": 1273.02,
-    "upper95ci": 1301.02
+    "elo": 1286.91,
+    "lower95ci": 1273.32,
+    "upper95ci": 1300.83
    }
   },
   "briefcaseTotalCost": 257.45908511600004,
   "personalityBench": {
    "scores": {
-    "lexically_varied": 509.56,
-    "eloquent": 980.94,
-    "literate": 604.28,
-    "natural_sounding": 663.7,
-    "metaphorical": 1190.78,
-    "structured": 591.87,
-    "scannable": 1213.65,
-    "summarizes_bottom_line": 1095.76,
-    "answer_first": 969.81,
-    "information_dense": 1030.41,
-    "evidence_based": 706.76,
-    "resource_specific": 1466.27,
-    "provides_actionable_guidance": 1411.14,
-    "pragmatic": 639.63,
-    "truthful": 177.46,
-    "admits_uncertainty": 762.98,
-    "disclaims_with_assumptions": 808.87,
-    "flags_nuances": 932.16,
-    "sycophantic": 1108.46,
-    "friendly": 908.38,
-    "humorous": 794.03,
-    "sincere": 492.71,
-    "emotionally_intelligent": 809.56,
-    "direct": 640.58,
-    "confident": 1025.35,
-    "opinionated": 1006.83,
-    "constructively_pushes_back": 1075.02,
-    "creative": 831.72,
-    "open_ended": 709.55,
-    "slop": 1809.57
+    "lexically_varied": 510.07,
+    "eloquent": 983.12,
+    "literate": 604.6,
+    "natural_sounding": 663.67,
+    "metaphorical": 1189.41,
+    "structured": 587.7,
+    "scannable": 1209.54,
+    "summarizes_bottom_line": 1094.98,
+    "answer_first": 963.98,
+    "information_dense": 1031.32,
+    "evidence_based": 710.5,
+    "resource_specific": 1467.5,
+    "provides_actionable_guidance": 1412.3,
+    "pragmatic": 650.3,
+    "truthful": 177.14,
+    "admits_uncertainty": 760.47,
+    "disclaims_with_assumptions": 810.85,
+    "flags_nuances": 931.74,
+    "sycophantic": 1109.5,
+    "friendly": 906.19,
+    "humorous": 791.38,
+    "sincere": 481.12,
+    "emotionally_intelligent": 815.47,
+    "direct": 636.33,
+    "confident": 1024.78,
+    "opinionated": 1005.88,
+    "constructively_pushes_back": 1076.78,
+    "creative": 833.53,
+    "open_ended": 712.64,
+    "slop": 1812.16
    },
    "indexScores": {
-    "expressiveness": 15.558823529411764,
-    "organization": 59.23529411764706,
-    "informativeness": 33.029411764705884,
-    "transparency": 33.029411764705884,
-    "warmth": 18.47058823529412,
-    "conviction": 35.94117647058824,
-    "imagination": 30.11764705882353,
-    "slop": 82.52941176470588
+    "expressiveness": 15.142857142857142,
+    "organization": 57.57142857142857,
+    "informativeness": 32.114285714285714,
+    "transparency": 32.114285714285714,
+    "warmth": 17.97142857142857,
+    "conviction": 34.94285714285714,
+    "imagination": 29.285714285714285,
+    "slop": 83.02857142857144
    },
    "indexIntervals": {
     "expressiveness": {
-     "lower": 14.923747406356595,
-     "upper": 18.726020932007145
+     "lower": 14.489856705292315,
+     "upper": 18.189541697856114
     },
     "organization": {
-     "lower": 49.61647028659102,
-     "upper": 75.0101922418243
+     "lower": 47.59011397996638,
+     "upper": 73.71728230579753
     },
     "informativeness": {
-     "lower": 27.01897118317479,
-     "upper": 36.92738494733346
+     "lower": 26.25548726217319,
+     "upper": 35.982704455652986
     },
     "transparency": {
-     "lower": 30.697777077240843,
-     "upper": 38.694520245020804
+     "lower": 29.832338146326265,
+     "upper": 37.733649636172935
     },
     "warmth": {
-     "lower": 17.029259054852226,
-     "upper": 20.921321081271792
+     "lower": 16.60971586178244,
+     "upper": 20.23883050880034
     },
     "conviction": {
-     "lower": 30.0868813020238,
-     "upper": 43.122407493586884
+     "lower": 28.926634935023984,
+     "upper": 43.918196721655654
     },
     "imagination": {
-     "lower": 19.063640551182022,
-     "upper": 35.958884551924854
+     "lower": 18.622361103232393,
+     "upper": 35.32183234748398
     },
     "slop": {
-     "lower": 72.2098671726755,
-     "upper": 85.01984742328719
+     "lower": 73.1931506849315,
+     "upper": 86.98927754168028
     }
    }
   },
@@ -61657,7 +61657,7 @@
    "type": "firstParty",
    "providerName": "DeepSeek"
   },
-  "hostModelCount": 5,
+  "hostModelCount": 6,
   "creator": {
    "id": "58b835bf-4c87-4f87-a846-df4b692c6e7d",
    "slug": "deepseek",
@@ -80877,8 +80877,8 @@
   "price1mBlended0To100To1": 0.10297029702970298,
   "intelligenceIndexEvaluations": [],
   "openness": {
-   "opennessIndex": 11.11111111111111,
-   "modelAvailability": 2,
+   "opennessIndex": 5.555555555555555,
+   "modelAvailability": 1,
    "transparencyMethodology": 0,
    "transparencyPostTrainingData": 0,
    "transparencyPreTrainingData": 0
@@ -81203,8 +81203,8 @@
   "price1mBlended0To100To1": null,
   "intelligenceIndexEvaluations": [],
   "openness": {
-   "opennessIndex": 11.11111111111111,
-   "modelAvailability": 2,
+   "opennessIndex": 5.555555555555555,
+   "modelAvailability": 1,
    "transparencyMethodology": 0,
    "transparencyPostTrainingData": 0,
    "transparencyPreTrainingData": 0
