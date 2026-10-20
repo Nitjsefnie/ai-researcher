@@ -3,16 +3,13 @@
 
     python3 scripts/ci/check_committed_rankings_page.py
 
-The page supplies each list's newest SVG column label and timestamp; landed
-JSON supplies its ranks, checked independently against that column. Earlier
-columns come from the preceding path-changing commit. This reconstructs both
-run-labelled and SHA-labelled pages, with independent windows for each list.
-The rebuild always anchors at HEAD. On a pull-request merge ref, path-limited
-history simplification follows the parent each tracker file came from, checking
-the merged result: untouched rankings use main's newer state, while page or
-tracker edits are checked against the lineage they joined. Every byte
-participates in the comparison; each tracker must also have at least one
-committed snapshot.
+The page supplies each list's newest column label and timestamp; landed JSON
+supplies its ranks. Earlier columns use preceding path-changing commits,
+with separate windows for run- or SHA-labelled lists.
+Rebuilds anchor at HEAD. On pull-request merge refs, git's path-limited history
+simplification checks the merged result: untouched pages and trackers use
+main's newer state; page or tracker edits use their joined lineage.
+Every byte is compared; each tracker needs a committed snapshot.
 
 Exit 0 when both histories are non-empty and the page is present and
 identical; 1 with one line per violated invariant otherwise -- an empty
