@@ -521,6 +521,13 @@ class RankingsTests(RankingsFixture):
 
 
 class FreshRankingsTests(RankingsFixture):
+    def test_quoted_snapshot_label_survives_render_parse_round_trip(self):
+        label = 'run "quoted" & <snapshot>'
+        snapshot = build_rankings.Snapshot(label, "2026-10-20T09:41:00Z", {"org/model": 1})
+        document = build_rankings.section_html(
+            "hugging-face", "Hugging Face", "Hugging Face", [snapshot])
+        self.assertEqual([point["data-commit"] for point in Page(document).points], [label])
+
     def _fresh_file(self, models, key):
         target = pathlib.Path(self.directory) / f"fresh-{key}.json"
         target.write_text(json.dumps({"source": "fixture", "models": [
