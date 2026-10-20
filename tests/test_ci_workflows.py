@@ -59,11 +59,49 @@ def _pins(workflow: str, prefix: str = "github/codeql-action/"):
             if action.startswith(prefix)]
 
 
+def _uses_references(workflow_text: str) -> list[tuple[str, str]]:
+    references: list[tuple[str, str]] = []
+
+    def walk(value):
+        if isinstance(value, dict):
+            for key, child in value.items():
+                if key == "uses" and isinstance(child, str):
+                    action, _, revision = child.partition("@")
+                    if action and revision:
+                        references.append((action, revision))
+                walk(child)
+        elif isinstance(value, list):
+            for child in value:
+                walk(child)
+
+    walk(yaml.safe_load(workflow_text) or {})
+    return references
+
+
 def test_action_revisions_agree_across_workflows():
+    def composed_references(node):
+        pairs = set()
+        if isinstance(node, yaml.MappingNode):
+            for key, value in node.value or []:
+                if (isinstance(key, yaml.ScalarNode) and key.value == "uses"
+                        and isinstance(value, yaml.ScalarNode)
+                        and value.tag == "tag:yaml.org,2002:str"):
+                    action, _, revision = value.value.partition("@")
+                    if action and revision:
+                        pairs.add((action, revision))
+                pairs.update(composed_references(value))
+        elif isinstance(node, yaml.SequenceNode):
+            for value in node.value or []:
+                pairs.update(composed_references(value))
+        return pairs
+
     references: dict[str, list[tuple[str, str]]] = {}
     for path in WORKFLOWS:
         workflow = path.read_text(encoding="utf-8")
-        for action, revision, _ in _pins(workflow, prefix=""):
+        pairs = _uses_references(workflow)
+        assert set(pairs) == composed_references(yaml.compose(workflow)), (
+            f"{path.name}: parsed uses references disagree with the YAML tree")
+        for action, revision in pairs:
             references.setdefault(action, []).append((path.name, revision))
     for action, occurrences in references.items():
         first_path, expected = occurrences[0]
