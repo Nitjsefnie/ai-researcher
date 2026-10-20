@@ -75,12 +75,8 @@ import subprocess
 # re-homed as classifier patterns.
 DOC_PATTERNS = ('**/*.md', 'LICENSE', '.gitignore')
 
-# Generated artifacts from the AA refresh, both trackers, and rankings builder.
-# Any non-empty subset of these nine paths gets the cheap class; lint and
-# actionlint still run. Only the AA producer pre-tests with the full suite.
-# One joined bot commit carries every changed source. If rankings fails, its
-# page can lag until the next hourly build. A source path beside generated
-# artifacts keeps the full gate set. Hand-staged subsets also narrow.
+# Generated artifacts from the AA refresh, both trackers, and the rankings
+# builder; the docstring owns the narrowing rationale and its trade-offs.
 BOT_SIGNATURE = frozenset({
     'data/aa-raw-models.json',
     'data/aa-raw-coding-agents.json',
