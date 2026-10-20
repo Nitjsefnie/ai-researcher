@@ -230,7 +230,7 @@ class CheckCommittedRankingsPageTests(unittest.TestCase):  # pylint: disable=too
         self.assertEqual(code, 1)
         self.assertIn("data/hf-trending.json newest column is missing or unparseable", error)
 
-    def test_pr_merge_checks_branch_history_in_both_directions(self):
+    def test_pr_merge_checks_the_merged_result(self):
         git = self.harness._git  # pylint: disable=protected-access
         branch = git("rev-parse", "HEAD").strip()
         original = self.page.read_bytes()
@@ -247,13 +247,73 @@ class CheckCommittedRankingsPageTests(unittest.TestCase):  # pylint: disable=too
         merged = merged_page.read_bytes()
         self.assertNotEqual(original, merged, "walking merged HEAD must change the snapshot window")
         self.assertTrue(check_committed_rankings_page.verify(original, merged))
-        for label, page, expected in (("branch", original, 0), ("merged", merged, 1)):
+        for label, page, expected in (("branch", original, 1), ("merged", merged, 0)):
             with self.subTest(history=label):
                 self.page.write_bytes(page)
                 code, _, error = self.run_check()
                 self.assertEqual(code, expected, error)
                 if expected:
                     self.assertIn("differs from a rebuild", error)
+
+    def merge_into_refreshed_main(self, branch):
+        """Merge the branch after main lands both rank reorders and their page."""
+        git = self.harness._git  # pylint: disable=protected-access
+        git("checkout", "-q", "main")
+        self.build_fresh_page()
+        main_page = self.page.read_bytes()
+        code, _, error = self.run_check()
+        self.assertEqual(code, 0, error)
+        updated_main = git("rev-parse", "HEAD").strip()
+        git("merge", "--no-ff", "-X", "theirs", "-qm", "Merge branch into refreshed main", branch)
+        parents = git("rev-list", "--parents", "-n", "1", "HEAD").split()
+        self.assertEqual(parents[1:], [updated_main, branch])
+        return main_page
+
+    def test_pr_merge_with_untouched_rankings_passes_after_main_refresh(self):
+        git = self.harness._git  # pylint: disable=protected-access
+        git("checkout", "-q", "-b", "unrelated-change")
+        (self.repo / "README.md").write_text("Unrelated change\n", encoding="utf-8")
+        git("add", "README.md")
+        git("commit", "-qm", "Update unrelated documentation")
+        branch = git("rev-parse", "HEAD").strip()
+        main_page = self.merge_into_refreshed_main(branch)
+        self.assertEqual(self.page.read_bytes(), main_page)
+        code, output, error = self.run_check()
+        self.assertEqual(code, 0, error)
+        self.assertEqual(error, "")
+        self.assertIn("-- ok", output)
+
+    def test_pr_merge_with_only_tracker_edit_refuses_main_page(self):
+        git = self.harness._git  # pylint: disable=protected-access
+        self.harness.commit(test_build_rankings.HF, ["org/a", "org/b", "org/c"], "id")
+        build_rankings.main(["--repo", str(self.repo), "--out", str(self.page)])
+        git("add", "out/trending-rankings.html")
+        git("commit", "-qm", "Commit rankings for three models")
+        git("checkout", "-q", "-b", "tracker-change")
+        branch = self.harness.commit(test_build_rankings.HF, ["org/b", "org/c", "org/a"], "id")
+        branch_tracker = (self.repo / test_build_rankings.HF).read_bytes()
+        main_page = self.merge_into_refreshed_main(branch)
+        self.assertEqual(self.page.read_bytes(), main_page)
+        self.assertEqual((self.repo / test_build_rankings.HF).read_bytes(), branch_tracker)
+        code, _, error = self.run_check()
+        self.assertEqual(code, 1, error)
+        self.assertIn("data/hf-trending.json newest column ranks differ from landed JSON", error)
+        self.assertNotIn("data/openrouter-trending.json newest column ranks differ", error)
+
+    def test_pr_merge_with_only_page_edit_refuses_changed_page(self):
+        git = self.harness._git  # pylint: disable=protected-access
+        git("checkout", "-q", "-b", "page-change")
+        self.page.write_bytes(self.page.read_bytes().replace(
+            b"<h1>Trending rankings</h1>", b"<h1>Stale rankings</h1>", 1))
+        git("add", "out/trending-rankings.html")
+        git("commit", "-qm", "Change rankings heading")
+        branch = git("rev-parse", "HEAD").strip()
+        main_page = self.merge_into_refreshed_main(branch)
+        self.assertNotEqual(self.page.read_bytes(), main_page)
+        self.assertIn(b"<h1>Stale rankings</h1>", self.page.read_bytes())
+        code, _, error = self.run_check()
+        self.assertEqual(code, 1, error)
+        self.assertIn("differs from a rebuild", error)
 
     def test_failed_rebuild_is_red(self):
         self.harness.commit(test_build_rankings.HF, [None], "id")
