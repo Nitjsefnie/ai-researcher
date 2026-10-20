@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import os
 import subprocess
 import sys
 from decimal import Decimal
@@ -229,7 +230,7 @@ def test_guard_deleted_document_is_a_finding():
     guard = _guard()
     findings = guard.coverage_relaxations({"schema_version": 1}, None)
     assert findings == [
-        '.github/ci-thresholds.json: (document): merge base "present", '
+        '.github/ci-thresholds.json: (document): reference "present", '
         'head absent — the document was deleted'
     ]
 
@@ -399,9 +400,7 @@ def _commit_here(repo, document, message):
 def _commit_on_branch(repo, document, message):
     """Commit on a `pr` branch forked from main, as a pull request does.
 
-    Both revisions must have history behind them: with the change on main
-    itself, the merge base of main and the tip IS the tip, and the check
-    would compare the document with itself.
+    Main stays at the fork so either route compares with the parent.
     """
     _git(repo, "checkout", "-q", "-b", "pr")
     return _commit_here(repo, document, message)
@@ -434,8 +433,8 @@ def test_end_to_end_relaxed_head_fails_with_findings(tmp_path, capsys,
 
 
 def test_end_to_end_main_advancing_after_the_fork_is_not_a_relaxation(
-        tmp_path, monkeypatch):
-    """The merge base, not main's tip, is the reference.
+        tmp_path, monkeypatch, capsys):
+    """On the PR route the merge base, not main's tip, is the reference.
 
     Main records a higher measured after the branch forked — a raise the
     stale branch must not be penalised for missing. Comparing against
@@ -449,12 +448,13 @@ def test_end_to_end_main_advancing_after_the_fork_is_not_a_relaxation(
     tip = _commit_here(repo, _document(measured="94.2", floor="92.7"),
                        "raise on main after the branch forked")
     guard = _guard()
-    fork, findings = guard.check_ratchets(repo, "main", "pr")
+    fork, findings = guard.check_ratchets(repo, "main", "pr", route="pr")
     assert findings == []
     assert fork == _git(repo, "rev-parse", "pr").stdout.strip()
     assert fork != tip
     monkeypatch.chdir(repo)
-    assert guard.main(["main", "pr"]) == 0
+    assert guard.main(["--route", "pr", "main", "pr"]) == 0
+    assert capsys.readouterr().out.count(f"against merge base {fork} — ok") == 3
 
 
 def test_end_to_end_branch_lowering_while_main_advanced_is_flagged(tmp_path):
@@ -468,7 +468,7 @@ def test_end_to_end_branch_lowering_while_main_advanced_is_flagged(tmp_path):
     head = _commit_here(repo, _document(measured="90.0", floor="88.5"),
                         "lower the calibration on the branch")
     guard = _guard()
-    _fork, findings = guard.check_ratchets(repo, "main", head)
+    _fork, findings = guard.check_ratchets(repo, "main", head, route="pr")
     assert len(findings) == 2
     assert all("lowered" in line for line in findings)
 
@@ -507,7 +507,7 @@ def test_end_to_end_symlink_head_entry_is_a_finding(tmp_path, monkeypatch):
     guard = _guard()
     _fork, findings = guard.check_ratchets(repo, "main", "pr")
     assert findings == [
-        '.github/ci-thresholds.json: (document): merge base "100644 blob", '
+        '.github/ci-thresholds.json: (document): reference "100644 blob", '
         'head "120000 blob" — not a regular file'
     ]
     monkeypatch.chdir(repo)
@@ -688,7 +688,7 @@ def test_budgets_guard_deleted_document_is_a_finding():
     guard = _guard()
     findings = guard.budgets_relaxations(_budgets_document(), None)
     assert findings == [
-        '.github/perf-budgets.json: (document): merge base "present", '
+        '.github/perf-budgets.json: (document): reference "present", '
         'head absent — the document was deleted'
     ]
 
@@ -1094,14 +1094,14 @@ def test_guard_changed_leaf_without_a_direction_is_a_finding():
     assert "changed, and has no tightening direction" in findings[0]
 
 
-def test_guard_merge_base_non_number_is_a_finding():
+def test_guard_reference_non_number_is_a_finding():
     guard = _guard()
     base, head = _budgets_document(), _budgets_document()
     base["bytes"]["code_bytes"] = "corrupt"
     head["bytes"]["code_bytes"] = 5
     findings = guard.budgets_relaxations(base, head)
     assert len(findings) == 1
-    assert "merge-base value is not a finite number" in findings[0]
+    assert "reference value is not a finite number" in findings[0]
 
 
 def test_guard_git_failure_outside_a_repository_is_refused(tmp_path):
@@ -1111,8 +1111,7 @@ def test_guard_git_failure_outside_a_repository_is_refused(tmp_path):
 
 
 def test_end_to_end_unrelated_histories_are_refused(tmp_path):
-    """Orphan histories share no merge base: the guard refuses rather
-    than guessing a comparison."""
+    """The PR route refuses orphan histories with no merge base."""
     repo = _seed_repo(tmp_path, _document(), budgets=_budgets_document())
     _git(repo, "checkout", "-q", "--orphan", "isolated")
     (repo / ".github" / "ci-thresholds.json").write_text(
@@ -1122,7 +1121,22 @@ def test_end_to_end_unrelated_histories_are_refused(tmp_path):
     head = _git(repo, "rev-parse", "HEAD").stdout.strip()
     guard = _guard()
     with pytest.raises(ValueError, match="no merge base"):
-        guard.check_ratchets(repo, "main", head)
+        guard.check_ratchets(repo, "main", head, route="pr")
+
+
+def test_end_to_end_push_with_unrelated_identical_documents_is_clean(
+        tmp_path, monkeypatch):
+    repo = _seed_repo(tmp_path, _document(), budgets=_budgets_document())
+    _git(repo, "checkout", "-q", "--orphan", "rewritten")
+    _git(repo, "commit", "-qm", "Rewrite the root with the same tree")
+    head = _git(repo, "rev-parse", "HEAD").stdout.strip()
+    before = _git(repo, "rev-parse", "main").stdout.strip()
+    guard = _guard()
+    reference, findings = guard.check_ratchets(repo, before, head)
+    assert reference == before
+    assert findings == []
+    monkeypatch.chdir(repo)
+    assert guard.main(["--allow-declared-raises", before, head]) == 0
 
 
 def test_entry_kind_refuses_an_unreadable_object(tmp_path):
@@ -1168,6 +1182,101 @@ def _commit_budgets_here(repo, document, message, allow_empty=False):
     else:
         _git(repo, "commit", "-qm", message)
     return _git(repo, "rev-parse", "HEAD").stdout.strip()
+
+
+def _workflow_push_check(repo, before, head):
+    return subprocess.run(  # pylint: disable=subprocess-run-check
+        [sys.executable, str(REPO_ROOT / "scripts/ci/check_ratchets.py"),
+         "--allow-declared-raises", before, head], cwd=repo,
+        capture_output=True, encoding="utf-8",
+        env={**os.environ, "PYTHONIOENCODING": "utf-8"})
+
+
+def _rewrite_commits(repo, fork, commits):
+    parent = fork
+    for commit in commits:
+        tree = _git(repo, "rev-parse", f"{commit}^{{tree}}").stdout.strip()
+        parent = _git(repo, "commit-tree", tree, "-p", parent,
+                      "-m", "Rewrite the same tree").stdout.strip()
+    return parent
+
+
+def _rewritten_budget_push(tmp_path):
+    repo = _seed_repo(tmp_path, _document(), budgets=_budgets_document(),
+                      instruction_budgets=_instruction_budgets_document())
+    fork = _git(repo, "rev-parse", "HEAD").stdout.strip()
+    raised = _budgets_document()
+    raised["bytes"]["code_bytes"] = 79700
+    raise_tip = _commit_budgets_here(repo, raised, _push_message(_declaration(
+        ".github/perf-budgets.json", "bytes.code_bytes", 71627, 79700)))
+    landed = _workflow_push_check(repo, fork, raise_tip)
+    assert landed.returncode == 0, landed.stdout + landed.stderr
+    (repo / "page.html").write_text("Rebuilt page\n", encoding="utf-8")
+    _git(repo, "add", "page.html")
+    _git(repo, "commit", "-qm", "Rebuild the page")
+    before = _git(repo, "rev-parse", "HEAD").stdout.strip()
+    return repo, before, _rewrite_commits(repo, fork, (raise_tip, before))
+
+
+def _assert_non_fast_forward(repo, before, head):
+    ancestry = subprocess.run(  # pylint: disable=subprocess-run-check
+        ["git", "merge-base", "--is-ancestor", before, head], cwd=repo,
+        capture_output=True, encoding="utf-8")
+    assert ancestry.returncode == 1, ancestry.stderr
+
+
+def test_end_to_end_rewritten_push_with_identical_ratchets_is_clean(tmp_path):
+    repo, before, head = _rewritten_budget_push(tmp_path)
+    _assert_non_fast_forward(repo, before, head)
+    for document in (".github/ci-thresholds.json", ".github/perf-budgets.json",
+                     ".github/instruction-budgets.json"):
+        blobs = [subprocess.run(
+            ["git", "show", f"{rev}:{document}"], cwd=repo, check=True,
+            capture_output=True).stdout for rev in (before, head)]
+        assert blobs[0] == blobs[1]
+    result = _workflow_push_check(repo, before, head)
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert result.stdout.count(f"against base revision {before} — ok") == 3
+
+
+def test_end_to_end_rewritten_push_cannot_declare_an_additional_raise(tmp_path):
+    repo, before, rewritten = _rewritten_budget_push(tmp_path)
+    _git(repo, "checkout", "-q", "-b", "rewritten", rewritten)
+    raised = _budgets_document()
+    raised["bytes"]["code_bytes"] = 80000
+    head = _commit_budgets_here(repo, raised, _push_message(_declaration(
+        ".github/perf-budgets.json", "bytes.code_bytes", 79700, 80000)))
+    _assert_non_fast_forward(repo, before, head)
+    result = _workflow_push_check(repo, before, head)
+    assert result.returncode == 1, result.stdout + result.stderr
+    assert (".github/perf-budgets.json: bytes.code_bytes: reference 79700, "
+            "head 80000 — raised; it may only fall") in result.stdout
+    assert ("Budget-Raise declarations apply only on a fast-forward push "
+            "of main — this comparison is not one") in result.stdout
+    assert f"against base revision {before};" in result.stdout
+
+
+def test_end_to_end_rewritten_push_dropping_coverage_raise_is_flagged(tmp_path):
+    repo = _seed_repo(tmp_path, _document(), budgets=_budgets_document())
+    fork = _git(repo, "rev-parse", "HEAD").stdout.strip()
+    _commit_here(repo, _document(measured="94.2", floor="92.7"),
+                 "Raise coverage on main")
+    _git(repo, "commit", "-q", "--allow-empty", "-m", "Further work")
+    before = _git(repo, "rev-parse", "HEAD").stdout.strip()
+    head = _rewrite_commits(repo, fork, (fork, fork))
+    _assert_non_fast_forward(repo, before, head)
+    result = _workflow_push_check(repo, before, head)
+    assert result.returncode == 1, result.stdout + result.stderr
+    assert (".github/ci-thresholds.json: coverage.python.measured: "
+            "reference 94.2, head 92.6 — lowered; it may only rise"
+            in result.stdout)
+    assert (".github/ci-thresholds.json: coverage.python.floor: "
+            "reference 92.7, head 91.1 — lowered; it may only rise"
+            in result.stdout)
+    assert f"against base revision {before};" in result.stdout
+    reference, findings = _guard().check_ratchets(repo, before, head)
+    assert reference == before
+    assert len(findings) == 2
 
 
 def test_end_to_end_push_declared_raise_is_clean(tmp_path, capsys,
@@ -1286,14 +1395,9 @@ def test_end_to_end_pull_request_without_declarations_needs_no_feat(
 def test_end_to_end_pull_request_route_survives_a_moved_base(
         tmp_path, capsys, monkeypatch):
     """The route clause's discriminating input: main advanced past the
-    fork point, so `main` is NOT an ancestor of the PR head and the push
-    route's ancestor gate would shut the route. The pr route exists for
-    exactly this shape — an ordinary raise PR on this repository, where
-    main moves hourly — and must still land the pure declared raise.
-
-    This test is the clause's only entry: deleting `route == 'pr'` from
-    the guard turns this pass into a refusal and nothing else in the
-    suite notices (the round-1 review's surviving-mutant probe)."""
+    fork point, so `main` is NOT an ancestor of the PR head. Requiring
+    ancestry on the PR declaration route would refuse this pure declared
+    raise after main advances; the PR route must still accept it."""
     repo = _seed_repo(tmp_path, _document(), budgets=_budgets_document())
     was = _budgets_document()["bytes"]["code_bytes"]
     raised = _budgets_document()
