@@ -5,19 +5,19 @@
   ],
   ".github/workflows/actionlint.yml": [
     5707,
-    7482
+    7557
   ],
   ".github/workflows/audit.yml": [
     4193,
-    6000
+    6075
   ],
   ".github/workflows/ci-gate.yml": [
-    5529,
-    7538
+    5237,
+    7246
   ],
   ".github/workflows/codeql.yml": [
     3304,
-    4169
+    4244
   ],
   ".github/workflows/coverage-comment.yml": [
     4547,
@@ -25,7 +25,7 @@
   ],
   ".github/workflows/lint.yml": [
     1102,
-    1770
+    1845
   ],
   ".github/workflows/pr-gate.yml": [
     615,
@@ -48,12 +48,12 @@
     3828
   ],
   ".github/workflows/tests.yml": [
-    17256,
-    23918
+    17195,
+    23932
   ],
   ".github/workflows/types.yml": [
     1021,
-    1568
+    1643
   ],
   "build.py": [
     25878,
@@ -245,6 +245,6 @@
   ],
   "tests/test_workflow_ci_gate.py": [
     3391,
-    7843
+    8501
   ]
 }
