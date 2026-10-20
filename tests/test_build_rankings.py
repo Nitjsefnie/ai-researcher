@@ -688,6 +688,28 @@ class IdentityRankingsTests(RankingsFixture):
         self.assertEqual([section.count('class="timestamp-tick"') for section in sections],
                          [10, 3])
 
+    def test_stale_identity_uses_history_while_the_matching_list_keeps_its_identity(self):
+        page = self._land_fresh()
+        original = re.findall(r'<section\b.*?</section>', page.read_text(), re.S)
+        landed = self.commit(HF, ["new/model"], "id")
+        timestamp = datetime.fromisoformat(self._git("show", "-s", "--format=%cI", landed)
+                                           .strip()).astimezone(timezone.utc).isoformat()
+        timestamp = timestamp.replace("+00:00", "Z")
+        self.commit(HF, ["later/model"], "id")
+        pure = re.findall(r'<section\b.*?</section>',
+                          self._document("--commit", landed), re.S)
+        rebuilt = self._document("--identity-page", str(page), "--commit", landed)
+        sections = re.findall(r'<section\b.*?</section>', rebuilt, re.S)
+        self.assertEqual(sections[0], pure[0])
+        self.assertEqual(sections[1], original[1])
+        points = Page(sections[0]).points
+        right = max(float(point["cx"]) for point in points)
+        newest = [point for point in points if float(point["cx"]) == right]
+        self.assertEqual({point["data-commit"] for point in newest}, {landed})
+        self.assertEqual({point["data-timestamp"] for point in newest}, {timestamp})
+        self.assertEqual({point["data-model"]: point["data-rank"] for point in newest},
+                         {"new/model": "1"})
+
     def test_fresh_input_changes_only_its_section_beside_identity_reconstruction(self):
         page = self._land_fresh()
         original = re.findall(r'<section\b.*?</section>', page.read_text(), re.S)
