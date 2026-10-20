@@ -690,7 +690,7 @@ class IdentityRankingsTests(RankingsFixture):
 
     def test_stale_identity_uses_history_while_the_matching_list_keeps_its_identity(self):
         page = self._land_fresh()
-        original = re.findall(r'<section\b.*?</section>', page.read_text(), re.S)
+        original = re.findall(r'<section\b.*?</section>', page.read_text(encoding="utf-8"), re.S)
         landed = self.commit(HF, ["new/model"], "id")
         timestamp = datetime.fromisoformat(self._git("show", "-s", "--format=%cI", landed)
                                            .strip()).astimezone(timezone.utc).isoformat()
@@ -712,7 +712,7 @@ class IdentityRankingsTests(RankingsFixture):
 
     def test_fresh_input_changes_only_its_section_beside_identity_reconstruction(self):
         page = self._land_fresh()
-        original = re.findall(r'<section\b.*?</section>', page.read_text(), re.S)
+        original = re.findall(r'<section\b.*?</section>', page.read_text(encoding="utf-8"), re.S)
         for flag, path, key, identifier in (("hf", HF, "id", 0), ("or", OR, "slug", 1)):
             with self.subTest(flag=flag):
                 fresh = pathlib.Path(self.directory) / "new.json"
