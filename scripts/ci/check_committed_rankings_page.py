@@ -1,17 +1,15 @@
 #!/usr/bin/env python3
-"""Refuse deficient tracker histories, a missing page or a differing rebuild.
+"""Refuse deficient histories, stale newest ranks or a differing page rebuild.
 
     python3 scripts/ci/check_committed_rankings_page.py
 
-The rankings page is rebuilt from HEAD on ordinary commits. A pull-request
-checkout is a merge ref whose second parent is the tested branch tip: merge
-commits rebuild from HEAD^2 so newer main tracker commits cannot change the
-snapshot window the branch's page was built from. The rebuild goes into a
-temp directory and is compared byte-for-byte with out/trending-rankings.html.
-This refuses a stale committed page when the builder or captured history
-changes. No provenance is masked: every byte participates in the check.
-Each tracker must have at least one committed snapshot in the selected
-history; identical bytes cannot make an empty tracker history valid.
+The page supplies each list's newest SVG column label and timestamp; landed
+JSON supplies its ranks, checked independently against that column. Earlier
+columns come from the preceding path-changing commit. This reconstructs both
+run-labelled and SHA-labelled pages, with independent windows for each list.
+A pull-request merge checkout selects HEAD^2 so newer main tracker commits
+cannot change the branch's snapshot window. Every byte participates in the
+comparison; each tracker must also have at least one committed snapshot.
 
 Exit 0 when both histories are non-empty and the page is present and
 identical; 1 with one line per violated invariant otherwise -- an empty
@@ -22,6 +20,10 @@ A build failure is red, never a silent pass.
 from __future__ import annotations
 
 import pathlib
+from html.parser import HTMLParser
+import json
+import math
+import re
 import sys
 import tempfile
 
@@ -34,6 +36,123 @@ import build_rankings  # noqa: E402  # pylint: disable=wrong-import-position
 PAGE = "out/trending-rankings.html"
 CONTEXT = 80
 _CHECK = "committed-rankings-page check"
+LIMIT = 10
+TRACKERS = (("data/hf-trending.json", "id", "hugging-face", "hf"),
+            ("data/openrouter-trending.json", "slug", "openrouter", "or"))
+
+
+class _Columns(HTMLParser):
+    """Group SVG points by numeric x position within each tracker section."""
+
+    def __init__(self, document: bytes):
+        super().__init__()
+        self.section = ""
+        self.in_svg = False
+        self.groups: dict[str, dict[float, build_rankings.Snapshot]] = {}
+        self.invalid: set[str] = set()
+        self.feed(document.decode("utf-8", errors="replace"))
+
+    def handle_starttag(self, tag, attrs):
+        attributes = dict(attrs)
+        if tag == "section":
+            self.section = attributes.get("id", "")
+        if tag == "svg":
+            self.in_svg = True
+        if (not self.section or not self.in_svg or tag != "circle"
+                or "point" not in (attributes.get("class") or "").split()):
+            return
+        try:
+            commit, timestamp, model = (attributes[key] for key in
+                                        ("data-commit", "data-timestamp", "data-model"))
+            rank = int(attributes["data-rank"] or "")
+            position = float(attributes["cx"] or "")
+            if not commit or not timestamp or not model or rank < 1 or not math.isfinite(position):
+                raise ValueError("incomplete point")
+            groups = self.groups.setdefault(self.section, {})
+            column = groups.setdefault(position, build_rankings.Snapshot(commit, timestamp, {}))
+            if column.commit != commit or column.timestamp != timestamp or model in column.ranks:
+                raise ValueError("inconsistent column")
+            column.ranks[model] = rank
+        except (KeyError, TypeError, ValueError):
+            self.invalid.add(self.section)
+
+    def handle_endtag(self, tag):
+        if tag == "svg":
+            self.in_svg = False
+        if tag == "section":
+            self.section = ""
+
+    def newest(self, section: str) -> build_rankings.Snapshot | None:
+        """Return the rightmost column, or refuse malformed point data."""
+        groups = self.groups.get(section, {})
+        if not groups or section in self.invalid:
+            return None
+        return groups[max(groups)]
+
+
+def _section(document: bytes, identifier: str) -> bytes:
+    """Extract one complete section from the builder's generated document."""
+    match = re.search(rb'<section id="' + identifier.encode("ascii") + rb'">.*?</section>',
+                      document, re.DOTALL)
+    if match is None:
+        raise ValueError(f"rebuilt section {identifier} is missing")
+    return match.group()
+
+
+def _read_output(output: pathlib.Path, violations: list[str]) -> bytes | None:
+    try:
+        return output.read_bytes()
+    except OSError as exc:
+        violations.append(f"{_CHECK}: {PAGE} rebuild output is missing or "
+                          f"unreadable: {' '.join(str(exc).splitlines())}")
+        return None
+
+
+def _rebuild(checkout: pathlib.Path, ref: str, committed: bytes | None,
+             directory: pathlib.Path, violations: list[str]) -> bytes | None:
+    """Rebuild each list at its own anchor, then join the generated sections."""
+    columns = _Columns(committed or b"")
+    requests = []
+    for path, key, section, flag in TRACKERS:
+        history = build_rankings.git(checkout, "log", "-n", str(LIMIT + 1), "--format=%H",
+                                     ref, "--", path).splitlines()
+        if not history:
+            violations.append(f"{_CHECK}: {path} history is empty")
+            continue
+        column = columns.newest(section)
+        if column is None:
+            if committed is not None:
+                violations.append(f"{_CHECK}: {path} newest column is missing or unparseable")
+            continue
+        capture = build_rankings.git(checkout, "show", f"{ref}:{path}")
+        ranks = {model[key]: rank for rank, model in enumerate(json.loads(capture)["models"], 1)}
+        if ranks != column.ranks:
+            violations.append(f"{_CHECK}: {path} newest column ranks differ from landed JSON")
+        fresh = directory / f"{flag}.json"
+        fresh.write_text(capture, encoding="utf-8")
+        # The builder reserves one column for fresh data. A lone root snapshot
+        # has no preceding history, so use a one-column window at that commit.
+        anchor = history[1] if len(history) > 1 else history[0]
+        requests.append((section, ["--commit", anchor, "--limit",
+                                  str(LIMIT if len(history) > 1 else 1),
+                                  f"--fresh-{flag}", str(fresh),
+                                  f"--fresh-{flag}-timestamp", column.timestamp,
+                                  "--fresh-label", column.commit]))
+    output = directory / "trending-rankings.html"
+    common = ["--repo", str(checkout)]
+    if len(requests) != len(TRACKERS):
+        build_rankings.main([*common, "--out", str(output), "--commit", ref])
+        return _read_output(output, violations)
+    rebuilt = None
+    for section, arguments in requests:
+        output = directory / f"{section}.html"
+        build_rankings.main([*common, "--out", str(output), *arguments])
+        document = _read_output(output, violations)
+        if document is None:
+            return None
+        rebuilt = (document if rebuilt is None else
+                   rebuilt.replace(_section(rebuilt, section), _section(document, section), 1))
+    return rebuilt
 
 
 def _snippet(content: bytes, at: int) -> str:
@@ -65,27 +184,14 @@ def main(repo: pathlib.Path | None = None) -> int:
                           f"unreadable: {' '.join(str(exc).splitlines())}")
 
     with tempfile.TemporaryDirectory(prefix=".committed-rankings-page-") as tmp:
-        output = pathlib.Path(tmp) / "trending-rankings.html"
         try:
             head = build_rankings.git(checkout, "rev-list", "--parents", "-n", "1", "HEAD").split()
             history_commit = "HEAD^2" if len(head) > 2 else "HEAD"
-            for path in ("data/hf-trending.json", "data/openrouter-trending.json"):
-                history = build_rankings.git(checkout, "log", "-n", "1", "--format=%H",
-                                             history_commit, "--", path)
-                if not history.strip():
-                    violations.append(f"{_CHECK}: {path} history is empty")
-            build_rankings.main(["--repo", str(checkout), "--commit", history_commit,
-                                 "--out", str(output)])
+            rebuilt = _rebuild(checkout, history_commit, committed, pathlib.Path(tmp), violations)
         except (SystemExit, Exception) as exc:  # pylint: disable=broad-exception-caught
             violations.append(f"{_CHECK}: {PAGE} rebuild failed "
                               f"({' '.join(str(exc).splitlines())}) "
                               "-- red, never a silent pass")
-        else:
-            try:
-                rebuilt = output.read_bytes()
-            except OSError as exc:
-                violations.append(f"{_CHECK}: {PAGE} rebuild output is missing or "
-                                  f"unreadable: {' '.join(str(exc).splitlines())}")
 
     if committed is not None and rebuilt is not None:
         violations.extend(verify(committed, rebuilt))
