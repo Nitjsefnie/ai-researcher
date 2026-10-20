@@ -21,7 +21,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: types-${{ github.ref }}
+  group: types-${{ github.event.pull_request.number || (github.event_name == 'push' && github.sha) || github.ref }}
   cancel-in-progress: true
 
 jobs:

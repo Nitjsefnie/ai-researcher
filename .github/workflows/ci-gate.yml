@@ -31,19 +31,14 @@ name: ci gate
 # coverage-comment.yml are outside the aggregate.
 #
 # SUPERSESSION AND CANCELLATION. The concurrency group is one per pull
-# request, or per commit SHA on a push: a newer push starts its own run
-# instead of cancelling the older one, so the ordinary two-push
-# supersession cancel cannot leave a stale aggregate behind — the
-# aggregate carries `if: always()`, so a run-level cancel would still
-# fold and record a red aggregate on the superseded commit. A residual
-# lives one level down: the legs keep their own per-ref groups, which
-# hold at most one PENDING run, so a third concurrent main push can
-# cancel a merely-queued short leg, and that middle run's aggregate
-# folds red — the window is that leg's own duration, it fails closed,
-# and the next push re-verifies it. With the group itself no longer
-# cancelling on a push, a run-level cancel is always DELIBERATE: it
-# leaves that run's aggregate cancelled — folded as a failure by
-# aggregate_gate.py, so a required-check ruleset reads it never-green.
+# request, or per pushed SHA. Each leg's callee mirrors that keying:
+# one group per pull request, per pushed SHA on push, or per ref for
+# standalone schedule/dispatch runs. A later push's legs run in their
+# own per-SHA groups and never cancel an earlier push's legs, at any
+# stage. Pull-request supersession still cancels the older run. A
+# run-level cancel remains DELIBERATE: the aggregate carries
+# `if: always()` and aggregate_gate.py folds a cancelled result as a
+# failure, so a required-check ruleset reads it never-green.
 
 on:
   pull_request:
