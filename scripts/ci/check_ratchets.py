@@ -5,22 +5,23 @@
         [--allow-declared-raises]
 
 Both sides of each document are read as data with ``git show
-<rev>:<path>`` at the merge base of the two revisions and at the head —
-never from the working tree, and no head code is executed. The merge
-base, not the base tip, is the reference: the automated raise lands on
-main after a branch forks, and the branch did not loosen anything by
-missing that raise.
+<rev>:<path>`` at the reference revision and at the head — never from the
+working tree, and no head code is executed. On the push route the base
+revision (BEFORE, the previous main tip) is the reference, including on a
+non-fast-forward push. On the pull-request route the merge base is the
+reference: an automated raise landing on main after a branch forks is
+not something the branch loosened by missing.
 
 Exit 0 when nothing is relaxed, 1 with one line per relaxation, 2 on a
 usage error, an unknown revision, a shallow clone — refused up front,
 because a shallow history can make ``git merge-base`` fail or return a
 wrong base without erroring, and the fix is to fetch full history
-(``git fetch --unshallow``) — a merge base that cannot be computed
+(``git fetch --unshallow``) — a PR merge base that cannot be computed
 (unrelated histories), or a document that is not valid JSON. A document
-absent at the merge base cannot be relaxed; the sibling checks (thresholds
+absent at the reference cannot be relaxed; the sibling checks (thresholds
 ``--check``, the coverage gates, the perf budgets gate) judge its
 content. A non-regular entry at the head is a finding (exit 1) — it is
-the branch's own change; a non-regular entry at the merge base is a git
+the head's own change; a non-regular entry at the reference is a git
 error (exit 2).
 
 Three documents are guarded, each with its own direction rules:
@@ -51,17 +52,12 @@ raise commit's message carries one declaration line per raised leaf,
 
     Budget-Raise: <document> <key> <from> -> <to>
 
-with the exact values the diff carries. The workflow invokes the guard
-with --allow-declared-raises on both shapes: the push branch passes
---route push (the default), the pull-request branch --route pr. The
-lines are collected from the window base..head — on a push that is
-exactly the push's own commits because the base is an ancestor of the
-head (enforced: without the ancestor relationship the route stays shut,
-``declarations apply only on a fast-forward push of main``); on a pull
-request the base is the merge commit's first parent, so base..head is
-exactly the pull request's own commits by construction. On the PR route,
-declaration lines additionally require at least one commit in base..head
-whose subject starts with ``feat: `` or ``feat(<scope>): `` (issue #271).
+with the exact values the diff carries. The workflow enables
+--allow-declared-raises on both routes: --route push (default) and
+--route pr. Declarations come from base..head: pushes require ancestry;
+PRs use the merge commit's parents (base HEAD^1, head HEAD^2). PR
+declarations additionally require a commit in that window whose subject
+starts with ``feat: `` or ``feat(<scope>): `` (issue #271).
 On both routes
 the lines count only from commits touching nothing outside the two
 budget documents: the route is its own act, and a raise cannot ride
@@ -195,7 +191,7 @@ def leaves(value, parts=None, out=None):
 
 
 def _finding(document, key, base, head, why):
-    return (f'{document}: {key}: merge base {_show(base)}, '
+    return (f'{document}: {key}: reference {_show(base)}, '
             f'head {_show(head)} — {why}')
 
 
@@ -234,7 +230,7 @@ def _implied_floor_findings(before, after, document):
 
 def _relaxations(base, head, document, direction_of, cross_checks,
                  declarations=None):
-    """Findings for a head document that relaxes the merge base's.
+    """Findings for a head document that relaxes the reference's.
 
     ``document`` names the checked path in the finding lines;
     ``direction_of`` answers a leaf's dotted path with the one direction
@@ -276,7 +272,7 @@ def _relaxations(base, head, document, direction_of, cross_checks,
         elif not _is_number(was):
             findings.append(_finding(
                 document, key, was, now,
-                'merge-base value is not a finite number'))
+                'reference value is not a finite number'))
         elif direction == 'up' and now < was:
             findings.append(_finding(
                 document, key, was, now, 'lowered; it may only rise'))
@@ -405,10 +401,9 @@ def _parse_declarations(lines):
 def _commits_with_declaration_lines(cwd, base, head):
     """(sha, raw declaration lines) for each window commit carrying any.
 
-    The caller opens the window: this runs only when the route is
-    allowed and base is an ancestor of head, so base..head is exactly
-    the push's own commits. The whole message is scanned; only exact
-    'Budget-Raise: '-prefixed lines count.
+    The caller selects base..head: a fast-forward push's commits, or a
+    PR's commits (base HEAD^1, head HEAD^2), even after main diverges.
+    Scan whole messages for exact 'Budget-Raise: '-prefixed lines.
     """
     result = _git(cwd, ['log', '--format=%x00%H%n%B', f'{base}..{head}'])
     if result.returncode != 0:
@@ -604,16 +599,15 @@ def read_document(cwd, commit, path):
 
 def check_ratchets(cwd, base_rev, head_rev, allow_declared_raises=False,
                    route='push'):
+    """Return (reference SHA, findings), using base on push, fork on PR."""
     require_full_history(cwd)
     base = resolve_commit(cwd, base_rev)
     head = resolve_commit(cwd, head_rev)
-    fork = merge_base(cwd, base, head)
+    reference = base if route == 'push' else merge_base(cwd, base, head)
     findings = []
     by_document = None
-    # The push route rides a fast-forward (base an ancestor of head), so
-    # base..head is exactly the push's own commits. The PR route needs no
-    # ancestor check: its base is the merge commit's first parent, and
-    # base..head is the pull request's own commits by construction.
+    # Push declarations require ancestry; base..head is the push's commits.
+    # PR declarations use HEAD^1..HEAD^2 without requiring ancestry.
     route_open = allow_declared_raises and (
         route == 'pr' or _is_ancestor(cwd, base, head))
     if route_open:
@@ -627,7 +621,7 @@ def check_ratchets(cwd, base_rev, head_rev, allow_declared_raises=False,
                 document, '(document)', REGULAR_FILE, kind,
                 'not a regular file'))
         else:
-            base_document = read_document(cwd, fork, document)
+            base_document = read_document(cwd, reference, document)
             head_document = read_document(cwd, head, document)
             declarations = None
             if by_document is not None and document in by_document:
@@ -635,7 +629,7 @@ def check_ratchets(cwd, base_rev, head_rev, allow_declared_raises=False,
             findings.extend(_relaxations(
                 base_document, head_document, document, direction_of,
                 cross_checks, declarations))
-    return fork, findings
+    return reference, findings
 
 
 def main(argv=None):
@@ -648,28 +642,29 @@ def main(argv=None):
              'base..head names it exactly')
     parser.add_argument(
         '--route', choices=('push', 'pr'), default='push',
-        help='which shape the comparison is: push requires base to be an '
-             'ancestor of head (a fast-forward push of main); pr reads '
-             'the window as the merge commit\'s own commits (base is '
-             'HEAD^1, head HEAD^2)')
+        help='push compares against the base revision (BEFORE); only its '
+             'declaration route requires a fast-forward. pr compares '
+             'against the merge base and reads declarations from the '
+             'merge commit\'s own commits (base HEAD^1, head HEAD^2)')
     args = parser.parse_args(argv)
     try:
-        fork, findings = check_ratchets(
+        reference, findings = check_ratchets(
             Path.cwd(), args.base_rev, args.head_rev,
             allow_declared_raises=args.allow_declared_raises,
             route=args.route)
     except ValueError as error:
         print(f'ratchet check: {error}', file=sys.stderr)
         return 2
+    reference_label = 'base revision' if args.route == 'push' else 'merge base'
     if not findings:
         for document, _direction_of, _cross_checks in DOCUMENTS:
-            print(f'ratchet check: {document} not relaxed against merge '
-                  f'base {fork} — ok')
+            print(f'ratchet check: {document} not relaxed against '
+                  f'{reference_label} {reference} — ok')
         return 0
     for line in findings:
         print(line)
-    print(f'ratchet check: {len(findings)} relaxation(s) against merge '
-          f'base {fork}; the ratchet document may only tighten')
+    print(f'ratchet check: {len(findings)} relaxation(s) against '
+          f'{reference_label} {reference}; the ratchet document may only tighten')
     saw_raise = any('raised; it may only fall' in line for line in findings)
     route_open = (args.allow_declared_raises
                   and (args.route == 'pr'
