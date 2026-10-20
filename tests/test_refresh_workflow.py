@@ -1,14 +1,11 @@
 """Structural pins on .github/workflows/refresh.yml.
 
-The workflow publishes the live page hourly, and since issues #143 and #133
-its write side is three jobs in a fixed order: `refresh` (capture, rendered
-gate, rebuild, suite) runs on a read-only token and leaves the commit
-payload as an artifact of its own run; `publish` -- a keyless committer --
-downloads that artifact and replays the hour's commits into a git bundle
-while running no repository code; `push` -- the AA job that loads the
-deploy key, in the main-push environment -- delivers the bundle to main;
-`hub` -- read-only since issue #206 -- uploads the verified page when the
-live page's embedded source-commit stamp shows the hub behind.
+The hourly producers stage separate artifacts; the keyless publish job
+joins their successful changes into one commit (issue #285). The push job
+alone loads the deploy key in main-push and delivers that bundle (issues
+#143 and #133). Both hub jobs follow the landing and verify their page
+against main before uploading; identical live bytes skip the upload
+(issue #206).
 Its safety lives in the gating BETWEEN steps and BETWEEN jobs: what runs only
 after the suite passed, what only when the commit actually landed, what
 republishes a stale live page. Those contracts are invisible to the Python
@@ -87,6 +84,45 @@ class GateTests(unittest.TestCase):  # pylint: disable=too-many-public-methods
     # workflow's step/job contracts, and splitting it would hide that.
     def setUp(self):
         self.wf = load()
+
+    def test_joined_sources_have_independent_participation_gates(self):
+        job = self.wf['jobs']['publish']
+        sources = (
+            ('refresh', 'proceed', 'publish'),
+            ('hf-fetch', 'changed', 'Hugging Face'),
+            ('or-fetch', 'changed', 'OpenRouter'),
+            ('rankings', 'changed', 'rankings page'),
+        )
+        self.assertEqual(job['needs'], [source[0] for source in sources])
+        for source, output, label in sources:
+            term = (f"needs.{source}.result == 'success' && "
+                    f"needs.{source}.outputs.{output} == 'true'")
+            self.assertIn(term, flattened(job['if']))
+            name = (f'Download the {label} payload' if source != 'rankings'
+                    else 'Download the rankings page')
+            self.assertEqual(pub_step(self.wf, name)['if'], term)
+        self.assertIn('!cancelled()', job['if'])
+        self.assertEqual(job['if'].count('||'), 3)
+
+    def test_one_push_environment_and_bounded_keyless_producers(self):
+        jobs = self.wf['jobs']
+        self.assertEqual([name for name, job in jobs.items()
+                          if job.get('environment') == 'main-push'], ['push'])
+        for name, job in jobs.items():
+            self.assertGreater(job['timeout-minutes'], 0, name)
+        for name in ('hf-fetch', 'or-fetch', 'rankings'):
+            self.assertNotIn('environment', jobs[name])
+            self.assertNotIn('secrets.', json.dumps(jobs[name]))
+
+    def test_hubs_declare_producer_context_and_guard_only_downloads(self):
+        jobs = self.wf['jobs']
+        self.assertEqual(jobs['hub']['needs'], ['publish', 'push', 'refresh'])
+        self.assertEqual(jobs['rankings-hub']['needs'], ['publish', 'push', 'rankings'])
+        self.assertEqual(jobs['hub']['if'], jobs['rankings-hub']['if'])
+        self.assertNotIn('needs.refresh.', jobs['hub']['if'])
+        self.assertNotIn('needs.rankings.', jobs['rankings-hub']['if'])
+        self.assertEqual(hub_step(self.wf, 'Download the publish payload')['if'],
+                         pub_step(self.wf, 'Download the publish payload')['if'])
 
     def test_needs_dependencies_resolve_to_defined_jobs(self):
         jobs = self.wf["jobs"]
@@ -204,10 +240,8 @@ class GateTests(unittest.TestCase):  # pylint: disable=too-many-public-methods
             "the committer is keyless and read-only: it pushes nothing")
 
     def test_the_publish_job_is_gated_on_the_refresh_jobs_success_and_proceed(self):
-        # A red capture or a red suite leaves needs.refresh.result != success
-        # and the writer never starts; a quiet hour leaves proceed unset and
-        # the writer never starts either. Nothing reaches main or the hub
-        # that the refresh job did not verify.
+        # AA contributes only after its capture and suite succeed and its
+        # gate says proceed. Other successful sources participate separately.
         cond = self.wf["jobs"]["publish"]["if"]
 
         self.assertIn("needs.refresh.result == 'success'", cond)
@@ -230,7 +264,7 @@ class GateTests(unittest.TestCase):  # pylint: disable=too-many-public-methods
         self.assertEqual(up["with"]["name"], down["with"]["name"])
         names = [s.get("name") for s in self.wf["jobs"]["publish"]["steps"]]
         self.assertLess(names.index("Download the publish payload"),
-                        names.index("Commit the capture"))
+                        names.index("Commit the refresh"))
 
     def test_the_upload_is_gated_on_success_and_proceed(self):
         # An explicit step `if` REPLACES the implicit success() gate, so the
@@ -402,7 +436,7 @@ class GateTests(unittest.TestCase):  # pylint: disable=too-many-public-methods
         # reviewer-reproduced defect this condition fixes). The removal is
         # the elif's `git rm`. Neither branch fires in a normal hour.
         run = flattened(step_in(self.wf, "publish",
-                                "Commit the capture")["run"])
+                                "Commit the refresh")["run"])
 
         self.assertIn(
             'if [ -f "${PAYLOAD}/tree/data/cost-breakdown-window.txt" ]; then',
@@ -547,46 +581,18 @@ class GateTests(unittest.TestCase):  # pylint: disable=too-many-public-methods
         # still publish; issue 46 adds a concede path that must publish
         # nothing. Both are the commit step's own verdict, so the step holds
         # the id the publish gate reads and sets the output on every path.
-        s = pub_step(self.wf, "Commit the capture")
+        s = pub_step(self.wf, "Commit the refresh")
 
         self.assertEqual(s["id"], "commit")
         self.assertIn('echo "publish=true"', flattened(s["run"]))
         self.assertIn('echo "commits=true"', flattened(s["run"]))
         self.assertIn('echo "commits=false"', flattened(s["run"]))
 
-    def test_every_message_branch_writes_the_file_the_commit_reads(self):
-        # Review C1/I3 on PR #151: the differ branch appended its trailer to
-        # the payload copy while `git commit -F` read the RUNNER_TEMP file --
-        # nothing wrote it on an ordinary moved-capture hour, and the
-        # workflow's primary publishing path died at the commit, exit 128,
-        # with every structural pin green. The pin follows the dataflow: both
-        # branches leave the commit's file written, no branch mutates the
-        # payload copy, and the commit reads exactly that path.
-        run = flattened(pub_step(self.wf, "Commit the capture")["run"])
-        msg = '"${RUNNER_TEMP}/commit-msg.txt"'
-
-        # The differ branch routes the payload message into it before the
-        # trailer append...
-        idx_differ = run.index('if [ -f "${PAYLOAD}/commit-msg.txt" ]; then')
-        idx_cat = run.index(
-            'cat "${PAYLOAD}/commit-msg.txt" > "${RUNNER_TEMP}/commit-msg.txt"',
-            idx_differ)
-        idx_append = run.index("> " + msg, idx_cat)
-        self.assertLess(idx_cat, idx_append)
-        # ...and the forced branch writes it outright.
-        idx_forced = run.index("Rebuild the page: forced run")
-        self.assertLess(idx_forced, run.index(f"> {msg}", idx_forced))
-        # No branch mutates the payload copy, and the commit consumes the
-        # one file every branch wrote.
-        self.assertNotIn('>> "${PAYLOAD}/commit-msg.txt"', run)
-        self.assertLess(run.index(f"> {msg}"),
-                        run.index("git commit -F " + msg))
-
     def test_the_commit_step_performs_no_push(self):
         # Issue #133: the commit step is the keyless committer -- it stages
         # the verified commits as a bundle and pushes nothing. Every main
         # push in the workflow lives in the push job, behind the deploy key.
-        run = flattened(pub_step(self.wf, "Commit the capture")["run"])
+        run = flattened(pub_step(self.wf, "Commit the refresh")["run"])
 
         self.assertNotIn("git push", run)
         self.assertNotIn("HEAD:main", run)
@@ -1189,17 +1195,10 @@ class _SeededOrigin:
 
 
 class ExecutedCommitMessageTests(_SeededOrigin, unittest.TestCase):
-    """The commit step's message selection, EXECUTED, not pinned as text.
+    """Execute the joined committer against a local origin and read its result.
 
-    The review corpus's ci/run-workflow-step-scripts-dont-read-them, fourth
-    sighting on this file: the --diff-filter=A narrowing shipped green over
-    every text pin in this module -- only running the step caught it (review
-    on PR #192). Since #200 the selection has exactly two shapes, one per
-    payload: the differ's own rendering (the hour whose data moved) and the
-    forced rebuild's own subject (the hour the data did not). Both are run
-    here over a local origin -- the https remote rewritten to it by
-    GIT_CONFIG_GLOBAL -- so each scenario's commit is read back, not read
-    about.
+    Each source contributes its subject in fixed order. AA's mode separates
+    moved captures, forced rebuilds and republish-only hours (issue #285).
     """
 
     BASE_FILES = {
@@ -1219,7 +1218,7 @@ class ExecutedCommitMessageTests(_SeededOrigin, unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.step = _workflowrun.step_by_name(
-            WORKFLOW, "publish", "Commit the capture")
+            WORKFLOW, "publish", "Commit the refresh")
 
     def _stage_payload(self, tmp: pathlib.Path, differ_msg):
         payload = tmp / "publish-payload"
@@ -1228,6 +1227,8 @@ class ExecutedCommitMessageTests(_SeededOrigin, unittest.TestCase):
             path = payload / "tree" / rel
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_text(text, encoding="utf-8")
+        (payload / "aa-mode.txt").write_text(
+            "moved\n" if differ_msg else "rebuild\n", encoding="utf-8")
         if differ_msg:
             (payload / "commit-msg.txt").write_text(differ_msg,
                                                     encoding="utf-8")
@@ -1254,8 +1255,9 @@ class ExecutedCommitMessageTests(_SeededOrigin, unittest.TestCase):
             message, names, log = self._run_hour(
                 pathlib.Path(raw),
                 differ_msg="Refresh capture: 690 models\n\nspeed rows\n")
-        self.assertIn("Refresh capture: 690 models", message)
-        self.assertIn("speed rows", message)
+        self.assertEqual(message.strip(), "Refresh capture: 690 models\n\n"
+                         "Captured by .github/workflows/refresh.yml.")
+        self.assertNotIn("speed rows", message)
         self.assertIn("Captured by .github/workflows/refresh.yml.", message)
         self.assertNotIn("Rebuild the page: forced run", message)
         self.assertIn("M\tdata/aa-raw-models.json", names)
@@ -1265,17 +1267,13 @@ class ExecutedCommitMessageTests(_SeededOrigin, unittest.TestCase):
         self.assertEqual(log.count("\n"), 2, log)
 
     def test_a_forced_run_without_a_differ_message_writes_its_own_subject(self):
-        # The republish/force shape: no commit-msg.txt in the payload, so
-        # the step writes the forced rebuild's subject itself -- the one
-        # subject the hour gets when the data did not move.
+        # The explicit rebuild mode supplies the forced subject even when
+        # the unchanged capture produced no differ message.
         with tempfile.TemporaryDirectory(prefix=".commit-msg-") as raw:
             message, names, log = self._run_hour(
                 pathlib.Path(raw), differ_msg=None)
         self.assertIn(
             "Rebuild the page: forced run, AA capture unchanged", message)
-        self.assertIn(
-            "The build moved, the data did not. Republished so the live "
-            "page matches main.", message)
         self.assertNotIn("Refresh capture", message)
         self.assertIn("M\tout/frontier-models.html", names)
         self.assertEqual(log.count("\n"), 2, log)
@@ -1288,7 +1286,12 @@ class ExecutedCommitMessageTests(_SeededOrigin, unittest.TestCase):
                 mock.patch.object(self, "BASE_FILES", files), \
                 mock.patch.object(self, "MOVED_FILES", files):
             tmp = pathlib.Path(raw)
-            message, names, log = self._run_hour(tmp, differ_msg=None)
+            original = self._stage_payload
+            def republish_payload(where, differ_msg):
+                original(where, differ_msg)
+                (where / "publish-payload/aa-mode.txt").write_text("none\n", encoding="utf-8")
+            with mock.patch.object(self, "_stage_payload", republish_payload):
+                message, names, log = self._run_hour(tmp, differ_msg=None)
             outputs = (tmp / "output.txt").read_text()
             self.assertIn("publish=true\n", outputs)
             self.assertIn("commits=false\n", outputs)
@@ -1296,6 +1299,78 @@ class ExecutedCommitMessageTests(_SeededOrigin, unittest.TestCase):
             self.assertEqual(names, "")
             self.assertEqual(log.count("\n"), 1)
             self.assertNotIn("Rebuild the page", message)
+
+    def test_joined_sources_commit_once_in_fixed_order(self):
+        for sources in (('hf',), ('hf', 'or'), ('aa', 'hf'),
+                        ('aa', 'hf', 'or', 'rankings'), ('or', 'rankings')):
+            with self.subTest(sources=sources), tempfile.TemporaryDirectory() as raw:
+                tmp = pathlib.Path(raw)
+                base_files = {**self.BASE_FILES,
+                              'data/hf-trending.json': 'old hf\n',
+                              'data/openrouter-trending.json': 'old or\n',
+                              'out/trending-rankings.html': 'old page\n'}
+                config, base, _, _, _ = self._seed_origin(tmp, base_files)
+                lines = []
+                changed_paths = []
+                if 'aa' in sources:
+                    self._stage_payload(tmp, 'Refresh capture: new models\n\nDisputes\n')
+                    lines.append('Refresh capture: new models')
+                    changed_paths.extend(self.MOVED_FILES)
+                for tracker, filename, line in (
+                        ('hf', 'hf', 'Trending: fresh HF'),
+                        ('or', 'openrouter', 'Top 10: fresh OR')):
+                    if tracker in sources:
+                        payload = tmp / f'{tracker}-payload'
+                        (payload / 'data').mkdir(parents=True)
+                        path = f'data/{filename}-trending.json'
+                        (payload / path).write_text('fresh list\n', encoding='utf-8')
+                        (payload / 'message.txt').write_text(line + '\n\nfull report\n',
+                                                            encoding='utf-8')
+                        # An artifact cannot widen the fixed add list.
+                        (payload / 'unrelated.txt').write_text('ignore me', encoding='utf-8')
+                        lines.append(line)
+                        changed_paths.append(path)
+                if 'rankings' in sources:
+                    payload = tmp / 'rankings-page'
+                    payload.mkdir()
+                    (payload / 'trending-rankings.html').write_text('fresh page\n',
+                                                                  encoding='utf-8')
+                    lines.append("Rebuild the rankings page from this run's snapshots.")
+                    changed_paths.append('out/trending-rankings.html')
+                result = _workflowrun.run_step(tmp, self.step, self._env(tmp, config, base))
+                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                scratch = tmp / 'scratch'
+                message = self._git('log', '-1', '--format=%B', cwd=scratch).stdout.strip()
+                expected = lines[0] + '\n\n'
+                if len(lines) > 1:
+                    expected += '\n'.join(lines[1:]) + '\n\n'
+                expected += 'Captured by .github/workflows/refresh.yml.'
+                self.assertEqual(message, expected)
+                self.assertEqual(self._git('rev-list', '--count', base + '..HEAD',
+                                           cwd=scratch).stdout.strip(), '1')
+                actual = self._git('diff-tree', '--no-commit-id', '--name-only', '-r',
+                                   'HEAD', cwd=scratch).stdout.splitlines()
+                self.assertEqual(actual, sorted(changed_paths))
+                self.assertEqual(self._git('log', '-1', '--format=%an', cwd=scratch)
+                                 .stdout.strip(), 'github-actions[bot]')
+                self.assertNotIn('Co-Authored-By:', message)
+
+    def test_republish_payload_contributes_no_aa_line_beside_hf(self):
+        with tempfile.TemporaryDirectory() as raw:
+            tmp = pathlib.Path(raw)
+            files = {**self.MOVED_FILES, 'data/hf-trending.json': 'old\n'}
+            config, base, _, _, _ = self._seed_origin(tmp, files)
+            self._stage_payload(tmp, 'Stale differ subject\n')
+            (tmp / 'publish-payload/aa-mode.txt').write_text('none\n', encoding='utf-8')
+            payload = tmp / 'hf-payload'
+            (payload / 'data').mkdir(parents=True)
+            (payload / 'data/hf-trending.json').write_text('new\n', encoding='utf-8')
+            (payload / 'message.txt').write_text('Trending: new HF\n', encoding='utf-8')
+            result = _workflowrun.run_step(tmp, self.step, self._env(tmp, config, base))
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertEqual(self._git('log', '-1', '--format=%B', cwd=tmp / 'scratch')
+                             .stdout.strip(), 'Trending: new HF\n\n'
+                             'Captured by .github/workflows/refresh.yml.')
 
 
 class ExecutedGenerationTieTests(_SeededOrigin, unittest.TestCase):
@@ -1315,7 +1390,7 @@ class ExecutedGenerationTieTests(_SeededOrigin, unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.step = _workflowrun.step_by_name(
-            WORKFLOW, "publish", "Commit the capture")
+            WORKFLOW, "publish", "Commit the refresh")
         cls.base_files = {
             "data/aa-raw-models.json": '{"models": []}\n',
             "data/aa-raw-coding-agents.json": "[]\n",
@@ -1463,7 +1538,7 @@ class DeployKeyPushTests(unittest.TestCase):
         # holds a credential at all. The deploy key lives only in the push
         # job; the docs-hub key and the job token live only in the hub.
         capture = step(self.wf, "Capture the leaderboard")
-        commit = pub_step(self.wf, "Commit the capture")
+        commit = pub_step(self.wf, "Commit the refresh")
         push_step = step_in(self.wf, "push", "Push the tested tree to main")
         hub = hub_step(self.wf, "Publish to docs-hub")
 
@@ -1505,7 +1580,7 @@ class DeployKeyPushTests(unittest.TestCase):
 
 
 def _commit_capture_step():
-    return step_in(load(), "publish", "Commit the capture")
+    return step_in(load(), "publish", "Commit the refresh")
 
 
 def _marker_conditional() -> str:
@@ -1517,6 +1592,66 @@ def _marker_conditional() -> str:
     end = next(i for i in range(start, len(lines))
                if lines[i].strip() == "fi")
     return "\n".join(lines[start:end + 1])
+
+
+@pytest.mark.parametrize('states,expected', [
+    (('failure', 'true', 'success', 'true', 'failure', '', 'failure', ''), True),
+    (('success', 'true', 'failure', '', 'failure', '', 'failure', ''), True),
+    (('success', 'false', 'success', 'false', 'success', 'false', 'success', 'false'), False),
+    (('failure', '', 'failure', '', 'success', 'true', 'failure', ''), True),
+    (('failure', '', 'failure', '', 'failure', '', 'success', 'true'), True),
+    (('failure', 'true', 'failure', 'true', 'failure', 'true', 'failure', 'true'), False),
+    (('skipped', '', 'skipped', '', 'skipped', '', 'skipped', ''), False),
+])
+@pytest.mark.parametrize('cancelled', [False, True])
+def test_publish_condition_isolates_failures_and_quiet_hours(states, expected, cancelled):
+    """Only a successful source with its participation output can open the join."""
+    condition = load()['jobs']['publish']['if']
+    condition = condition.replace('!cancelled()', str(not cancelled))
+    for offset, (source, output) in enumerate((('refresh', 'proceed'), ('hf-fetch', 'changed'),
+                                              ('or-fetch', 'changed'), ('rankings', 'changed'))):
+        result, changed = states[offset * 2:offset * 2 + 2]
+        condition = condition.replace(f"needs.{source}.result == 'success'",
+                                      str(result == 'success'))
+        condition = condition.replace(f"needs.{source}.outputs.{output} == 'true'",
+                                      str(changed == 'true'))
+    actual = eval(condition.replace('&&', 'and').replace('||', 'or'),  # pylint: disable=eval-used
+                  {'__builtins__': {}}, {})
+    assert actual is (expected and not cancelled)
+
+
+@pytest.mark.skipif(os.name == 'nt', reason='workflow shell runs on Ubuntu')
+@pytest.mark.parametrize('changed,force,mode,page', [
+    ('true', 'false', 'moved', 'fresh page'),
+    ('true', 'true', 'moved', 'fresh page'),
+    ('false', 'true', 'rebuild', 'fresh page'),
+    ('false', 'false', 'none', 'base page'),
+])
+def test_aa_payload_mode_and_republish_bytes(tmp_path, changed, force, mode, page):
+    """Mode travels with the payload and republish hours restore the committed page."""
+    git = HFTrackerExecutedStepsTests.git
+    git(tmp_path, 'init', '-q')
+    git(tmp_path, 'config', 'user.name', 'fixture')
+    git(tmp_path, 'config', 'user.email', 'fixture@example.com')
+    files = {**ExecutedCommitMessageTests.MOVED_FILES, 'out/frontier-models.html': 'base page'}
+    for name, text in files.items():
+        target = tmp_path / name
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(text, encoding='utf-8')
+    git(tmp_path, 'add', '--', *files)
+    git(tmp_path, 'commit', '-qm', 'base')
+    (tmp_path / 'out/frontier-models.html').write_text('fresh page', encoding='utf-8')
+    (tmp_path / 'commit-msg.txt').write_text('Refresh capture: fresh AA\n\nreport\n',
+                                            encoding='utf-8')
+    env = {**os.environ, 'RUNNER_TEMP': str(tmp_path), 'CHANGED': changed, 'FORCE': force}
+    result = _workflowrun.run_step(tmp_path, step(load(), 'Stage the publish payload'), env)
+    assert result.returncode == 0, result.stdout + result.stderr
+    payload = tmp_path / 'publish-payload'
+    assert (payload / 'aa-mode.txt').read_text() == mode + '\n'
+    assert (payload / 'tree/out/frontier-models.html').read_text() == page
+    assert (payload / 'commit-msg.txt').read_bytes() == (tmp_path / 'commit-msg.txt').read_bytes()
+    assert sorted(str(path.relative_to(payload / 'tree')) for path in
+                  (payload / 'tree').rglob('*') if path.is_file()) == sorted(files)
 
 
 def test_the_marker_conditional_behaves_on_the_four_hours(tmp_path):
@@ -1609,7 +1744,7 @@ def test_the_marker_conditional_behaves_on_the_four_hours(tmp_path):
 
 
 class HFTrackerStructureTests(unittest.TestCase):
-    """The key is accessible only to the push job, which executes no tree code."""
+    """Trackers stage isolated snapshots without a commit or credential."""
 
     tracker = 'hf'
     fetcher = 'hf'
@@ -1617,133 +1752,40 @@ class HFTrackerStructureTests(unittest.TestCase):
     def tracker_step(self, job, name):
         return step_in(load(), f'{self.tracker}-{job}', name)
 
-    def test_workflow_exists(self):
-        self.assertTrue(WORKFLOW.is_file())
-        self.assertFalse((ROOT / '.github/workflows/hf-trending.yml').exists())
-
     def test_triggers_concurrency_and_main_only(self):
         workflow = load()
-        workflow['jobs'] = {name: workflow['jobs'][f'{self.tracker}-{name}']
-                            for name in ('fetch', 'push')}
+        job = workflow['jobs'][f'{self.tracker}-fetch']
         self.assertEqual(workflow['concurrency'], {
             'group': 'refresh', 'cancel-in-progress': False})
-        self.assertEqual(workflow['jobs']['fetch']['if'],
-                         "github.ref == 'refs/heads/main'")
-        self.assertNotIn('needs', workflow['jobs']['fetch'])
+        self.assertEqual(job['if'], "github.ref == 'refs/heads/main'")
+        self.assertNotIn('needs', job)
 
     def test_permissions_and_secret_scope(self):
-        workflow = load()
-        workflow['jobs'] = {name: workflow['jobs'][f'{self.tracker}-{name}']
-                            for name in ('fetch', 'push')}
-        self.assertEqual(set(workflow['jobs']), {'fetch', 'push'})
-        self.assertEqual(workflow['permissions'], {'contents': 'read'})
-        self.assertNotIn('secrets.', str(workflow['jobs']['fetch']))
-        for name, job in workflow['jobs'].items():
-            with self.subTest(job=name):
-                self.assertEqual(job['permissions'], {'contents': 'read'})
-                self.assertEqual(job['timeout-minutes'],
-                                 10 if name == 'fetch' else 15)
-                self.assertEqual(job.get('environment'),
-                                 'main-push' if name == 'push' else None)
-                for entry in job['steps']:
-                    if name == 'fetch':
-                        self.assertNotIn('secrets.', str(entry))
-        push = workflow['jobs']['push']
-        preceding = 'push' if self.tracker == 'hf' else 'hf-push'
-        dependencies = [f'{self.tracker}-fetch', preceding]
-        if self.tracker == 'hf':
-            dependencies.append('hub')
-        self.assertEqual(push['needs'], dependencies)
-        self.assertEqual(push['if'],
-                         f"!cancelled() && needs.{self.tracker}-fetch.outputs.commits == 'true' && "
-                         f"needs.{preceding}.result != 'cancelled'")
-        self.assertNotIn('needs.hub.result', push['if'])
-        self.assertEqual(push['outputs'], {
-            'landed': '${{ steps.push.outputs.landed }}'})
-        self.assertEqual(workflow['jobs']['fetch']['outputs'], {
-            'commits': '${{ steps.commit.outputs.commits }}'})
-        key_steps = [entry for entry in push['steps']
-                     if 'secrets.' in str(entry)]
-        self.assertEqual(key_steps, [self.tracker_step('push', 'Push the trending commit')])
-        self.assertEqual(key_steps[0]['env']['MASTER_PUSH_DEPLOY_KEY'],
-                         '${{ secrets.MASTER_PUSH_DEPLOY_KEY }}')
-        self.assertEqual(key_steps[0]['if'],
-                         "steps.replay.outputs.commits == 'true'")
-        self.assertNotIn('env', workflow)
-        self.assertNotIn('env', push)
+        job = load()['jobs'][f'{self.tracker}-fetch']
+        self.assertEqual(job['permissions'], {'contents': 'read'})
+        self.assertEqual(job['timeout-minutes'], 10)
+        self.assertNotIn('environment', job)
+        self.assertNotIn('secrets.', str(job))
+        self.assertEqual(job['outputs'], {
+            'changed': '${{ steps.stage.outputs.changed }}'})
 
-    def test_tracker_excludes_frontier_scripts_and_push_excludes_python_and_github_token(self):
-        workflow = load()
-        workflow['jobs'] = {name: workflow['jobs'][f'{self.tracker}-{name}']
-                            for name in ('fetch', 'push')}
-        for name, job in workflow['jobs'].items():
-            for entry in job['steps']:
-                run = entry.get('run', '')
-                self.assertNotRegex(run, r'build\.py|capture_gate\.py|fetch_aa\.py|publish_docs\.py|diff_aa\.py')
-                if name == 'push':
-                    self.assertNotRegex(run, r'\bpython3?\b|\bpip\b')
-                    self.assertNotIn('github.token', str(entry))
-
-    def test_artifact_is_this_runs_bundle_and_upload_is_success_gated(self):
-        upload = self.tracker_step('fetch', 'Upload the push bundle')
-        download = self.tracker_step('push', 'Download the push bundle')
-        self.assertEqual(upload['if'], "success() && steps.commit.outputs.commits == 'true'")
-        self.assertEqual(upload['with']['name'], download['with']['name'])
-        self.assertEqual(upload['with']['path'], download['with']['path'])
-        self.assertEqual([entry.get('name') for entry in load()['jobs'][f'{self.tracker}-push']['steps']],
-                         ['Download the push bundle', 'Replay onto fresh main',
-                          'Push the trending commit'])
-
-    def test_capture_message_and_exact_add_list(self):
+    def test_capture_and_payload_are_keyless_and_never_commit(self):
         self.assertEqual(self.tracker_step('fetch', 'Fetch the top 10')['run'],
                          f'python3 scripts/fetch_{self.fetcher}_trending.py --message "$RUNNER_TEMP/message"')
-        run = self.tracker_step('fetch', 'Commit when changed')['run']
-        adds = re.findall(r'^\s*git add (.+)$', run, re.MULTILINE)
-        self.assertEqual(adds, [f'data/{self.fetcher}-trending.json'])
-        self.assertIn('git commit -q -F "$RUNNER_TEMP/message"', run)
-        self.assertNotIn('git push', run)
+        for entry in load()['jobs'][f'{self.tracker}-fetch']['steps']:
+            run = commands(entry.get('run', ''))
+            self.assertNotRegex(run, r'git (commit|bundle|push|branch)')
+            self.assertNotRegex(run, r'build\.py|capture_gate\.py|fetch_aa\.py|publish_docs\.py|diff_aa\.py')
 
-    def test_key_lifecycle_matches_refresh_and_has_no_force_push(self):
-        run = self.tracker_step('push', 'Push the trending commit')['run']
-        self.assertIn('trap \'kill "$SSH_AGENT_PID" 2>/dev/null || true\' EXIT', run)
-        self.assertIn('ssh-add <(printf \'%s\\n\' "$MASTER_PUSH_DEPLOY_KEY")', run)
-        self.assertIn('StrictHostKeyChecking=yes', run)
-        self.assertNotIn('--force', run)
-        self.assertNotIn('--depth', run)
-
-    def test_deploy_key_delivery_stays_in_lockstep_with_refresh(self):
-        refresh_path = ROOT / '.github/workflows/refresh.yml'
-        refresh = _workflowrun.step_by_name(
-            refresh_path, 'push', 'Push the tested tree to main')['run'].splitlines()
-        trending = self.tracker_step('push', 'Push the trending commit')['run'].splitlines()
-        files = f'refresh.yml: push and {self.tracker}-push'
-        success_output = ['else', '  echo "landed=true" >> "$GITHUB_OUTPUT"']
-        self.assertEqual(trending[-3:-1], success_output)
-        trending[-3:-1] = []
-        # Apart from the pinned output, only truthful diagnostics differ.
-        differences = (
-            # Trending's pre-push concession promises a fresh list, not a suite.
-            ('  echo "::notice::main moved under the run (tested base $base, current tip $fetched); the next hourly run re-fetches, re-tests and lands it"',
-             '  echo "::notice::main moved under the run (tested base $base, current tip $fetched); the next hourly run fetches and lands the trending list"', 1),
-            # Trending's post-rejection concession likewise promises no suite.
-            ('  echo "::notice::main moved before the push landed; the next hourly run re-fetches, re-tests and lands it"',
-             '  echo "::notice::main moved before the push landed; the next hourly run fetches and lands the trending list"', 1),
-            # Both summary branches describe fetching the list without a suite.
-            ('    echo "The next hourly run re-fetches on the new tip, re-runs the suite"',
-             '    echo "The next hourly run fetches the trending list on the new tip"', 2),
-            # Both summary branches omit refresh's capture-job-specific wording.
-            ('    echo "in the capture job, and lands the data there."',
-             '    echo "and lands the data there."', 2),
-        )
-        canonical = {}
-        for refresh_line, trending_line, count in differences:
-            self.assertEqual(refresh.count(refresh_line), count, files)
-            self.assertEqual(trending.count(trending_line), count, files)
-            canonical[trending_line] = refresh_line
-        # Whole-line canonicalization retains every line and its position: a
-        # one-sided edit, insertion, deletion or reorder fails the comparison.
-        self.assertEqual(refresh, [canonical.get(line, line) for line in trending],
-                         f'Deploy-key delivery diverged between {files}')
+    def test_payload_upload_and_download_agree(self):
+        wf = load()
+        upload = self.tracker_step('fetch', 'Upload the payload')
+        name = 'Hugging Face' if self.tracker == 'hf' else 'OpenRouter'
+        for job in ('rankings', 'publish'):
+            download = step_in(wf, job, f'Download the {name} payload')
+            self.assertEqual(upload['with']['name'], download['with']['name'])
+            self.assertEqual(upload['with']['path'], download['with']['path'])
+        self.assertEqual(upload['if'], "success() && steps.stage.outputs.changed == 'true'")
 
 
 class ORTrackerStructureTests(HFTrackerStructureTests):
@@ -1752,62 +1794,37 @@ class ORTrackerStructureTests(HFTrackerStructureTests):
 
 
 class RankingsStructureTests(unittest.TestCase):
-    """Build landed history without keys; publish only this run's artifact."""
+    """Build history plus fresh snapshots; publish only verified landed bytes."""
 
     def setUp(self):
         self.wf = load()
 
-    def test_rankings_waits_for_deliveries_and_runs_every_hour_on_main(self):
+    def test_rankings_waits_for_fetches_and_runs_every_hour_on_main(self):
         job = self.wf['jobs']['rankings']
-        self.assertEqual(job['needs'], ['push', 'hf-push', 'or-push'])
-        self.assertEqual(job['if'],
-                         "!cancelled() && github.ref == 'refs/heads/main'")
-        self.assertEqual(self.wf['concurrency'], {
-            'group': 'refresh', 'cancel-in-progress': False})
+        self.assertEqual(job['needs'], ['hf-fetch', 'or-fetch'])
+        self.assertEqual(job['if'], "!cancelled() && github.ref == 'refs/heads/main'")
+        self.assertEqual(job['outputs'], {'changed': '${{ steps.commit.outputs.changed }}'})
+        for tracker, name in (('hf', 'Hugging Face'), ('or', 'OpenRouter')):
+            download = step_in(self.wf, 'rankings', f'Download the {name} payload')
+            self.assertEqual(download['if'],
+                             f"needs.{tracker}-fetch.result == 'success' && "
+                             f"needs.{tracker}-fetch.outputs.changed == 'true'")
 
     def test_rankings_hub_has_an_explicit_failure_isolated_condition(self):
-        self.assertEqual(self.wf['jobs']['rankings-hub'].get('if'),
-                         "!cancelled() && needs.rankings.result == 'success' && "
-                         "(needs.rankings-push.result == 'success' || "
-                         "needs.rankings-push.result == 'skipped')")
+        self.assertEqual(self.wf['jobs']['rankings-hub']['if'],
+                         self.wf['jobs']['hub']['if'])
 
-    def test_rankings_stages_push_data_on_every_successful_build(self):
-        job = self.wf['jobs']['rankings']
-        self.assertEqual(job['outputs'], {'commits': '${{ steps.commit.outputs.commits }}'})
-        commit = step_in(self.wf, 'rankings', 'Commit when changed')
-        self.assertEqual(commit['id'], 'commit')
-        self.assertIn('git diff --quiet -- out/trending-rankings.html', commit['run'])
-        self.assertEqual(re.findall(r'^\s*git add (.+)$', commit['run'], re.MULTILINE),
-                         ['out/trending-rankings.html'])
-        upload = step_in(self.wf, 'rankings', 'Upload the push bundle')
-        self.assertNotIn('if', upload)
-        names = [entry.get('name') for entry in job['steps']]
-        self.assertLess(names.index('Build the rankings page'), names.index('Commit when changed'))
-        self.assertLess(names.index('Commit when changed'), names.index('Upload the push bundle'))
-
-    def test_rankings_push_mirrors_tracker_delivery_with_only_page_adjustments(self):
-        push = self.wf['jobs']['rankings-push']
-        tracker = self.wf['jobs']['hf-push']
-        self.assertEqual(push['needs'], ['rankings'])
-        self.assertEqual(push['if'],
-                         "!cancelled() && needs.rankings.result == 'success' && "
-                         "needs.rankings.outputs.commits == 'true'")
-        for key in ('environment', 'permissions', 'timeout-minutes', 'outputs'):
-            self.assertEqual(push[key], tracker[key])
-        expected_steps = json.loads(json.dumps(tracker['steps']))
-        expected_steps[0]['with']['name'] = step_in(
-            self.wf, 'rankings', 'Upload the push bundle')['with']['name']
-        expected_steps[1]['run'] = expected_steps[1]['run'].replace(
-            'data/hf-trending.json', 'out/trending-rankings.html').replace(
-                'Fresh main already carries the trending list',
-                'Fresh main already carries the rankings page')
-        expected_steps[2]['run'] = expected_steps[2]['run'].replace(
-            'the trending list', 'the rankings page')
-        self.assertEqual(push['steps'], expected_steps)
-        for entry in push['steps']:
-            self.assertNotRegex(commands(entry.get('run', '')),
-                                r'\bpython3?\b|\bpip\b|\bnpm\b|\bbash\b|\bsh\b')
-            self.assertNotIn('github.token', str(entry))
+    def test_rankings_stages_only_the_changed_verdict(self):
+        stage = step_in(self.wf, 'rankings', 'Stage the page state')
+        self.assertEqual(stage['id'], 'commit')
+        self.assertIn('git diff --quiet -- out/trending-rankings.html', stage['run'])
+        self.assertNotRegex(commands(stage['run']), r'git (add|commit|bundle|branch)')
+        self.assertNotIn('push-data', stage['run'])
+        upload = step_in(self.wf, 'rankings', 'Upload the rankings page')
+        self.assertEqual(upload['if'], 'success()')
+        names = [entry.get('name') for entry in self.wf['jobs']['rankings']['steps']]
+        self.assertLess(names.index('Build the rankings page'), names.index('Stage the page state'))
+        self.assertLess(names.index('Stage the page state'), names.index('Upload the rankings page'))
 
     def test_rankings_hub_compares_main_page_bytes_before_comparing_live_bytes(self):
         job = self.wf['jobs']['rankings-hub']
@@ -1821,18 +1838,10 @@ class RankingsStructureTests(unittest.TestCase):
         self.assertNotIn('--depth', run)
         self.assertNotIn('git push', run)
 
-    def test_rankings_builds_with_defaults_without_dispatch_sha(self):
-        job = self.wf['jobs']['rankings']
-        self.assertNotIn('github.sha', str(job))
-        build_step = step_in(self.wf, 'rankings', 'Build the rankings page')
-        self.assertEqual(build_step['run'], 'python3 scripts/build_rankings.py')
-
-    def test_rankings_hub_waits_for_delivery_and_page_build_precedes_upload(self):
-        self.assertEqual(self.wf['jobs']['rankings-hub']['needs'],
-                         ['rankings', 'rankings-push'])
-        names = [s.get('name') for s in self.wf['jobs']['rankings']['steps']]
-        self.assertLess(names.index('Build the rankings page'),
-                        names.index('Upload the rankings page'))
+    def test_rankings_hub_waits_for_joined_delivery(self):
+        self.assertTrue({'publish', 'push'} <= set(self.wf['jobs']['rankings-hub']['needs']))
+        download = step_in(self.wf, 'rankings-hub', 'Download the rankings page')
+        self.assertEqual(download['if'], "needs.rankings.result == 'success'")
 
     def test_rankings_credentials_stay_in_the_code_free_upload_job(self):
         self.assertNotIn('env', self.wf)
@@ -1871,25 +1880,27 @@ class RankingsStructureTests(unittest.TestCase):
         self.assertNotIn('github.sha', run)
 
 
-@pytest.mark.parametrize('upstream', ['success', 'failure', 'skipped'])
-@pytest.mark.parametrize('rankings', ['success', 'failure', 'skipped', 'cancelled'])
+@pytest.mark.parametrize('published', ['success', 'failure', 'skipped'])
+@pytest.mark.parametrize('verdict', ['true', 'false', ''])
 @pytest.mark.parametrize('pushed', ['success', 'failure', 'skipped', 'cancelled'])
 @pytest.mark.parametrize('cancelled', [False, True])
-def test_rankings_hub_condition_covers_ancestor_outcomes(upstream, rankings, pushed, cancelled):
-    """Ancestor failures cannot block publication; a failed page push must."""
+def test_rankings_hub_condition_covers_ancestor_outcomes(published, verdict, pushed, cancelled):
+    """A successful joined commit admits publication even after a conceded push."""
     condition = load()['jobs']['rankings-hub'].get('if', 'success()')
     terms = {
-        'success()': not cancelled and upstream == 'success' and rankings == 'success',
+        'success()': not cancelled and published == 'success' and pushed == 'success',
         '!cancelled()': not cancelled,
-        "needs.rankings.result == 'success'": rankings == 'success',
-        "needs.rankings-push.result == 'success'": pushed == 'success',
-        "needs.rankings-push.result == 'skipped'": pushed == 'skipped',
+        "needs.publish.result == 'success'": published == 'success',
+        "needs.publish.outputs.publish == 'true'": verdict == 'true',
+        "needs.push.result == 'success'": pushed == 'success',
+        "needs.push.result == 'skipped'": pushed == 'skipped',
     }
     for term, value in terms.items():
         condition = condition.replace(term, str(value))
     actual = eval(condition.replace('&&', 'and').replace('||', 'or'),  # pylint: disable=eval-used
                   {'__builtins__': {}}, {})
-    assert actual is (not cancelled and rankings == 'success' and pushed in ('success', 'skipped'))
+    assert actual is (not cancelled and published == 'success' and verdict == 'true'
+                      and pushed in ('success', 'skipped'))
 
 
 RANKINGS_CURL = '''import json
@@ -1916,6 +1927,75 @@ elif url == 'https://docs.nitjsefni.eu/api/publish':
 else:
     raise SystemExit('unexpected curl endpoint: ' + url)
 '''
+
+
+@pytest.mark.skipif(os.name == 'nt', reason='workflow shell runs on Ubuntu')
+@pytest.mark.parametrize('fresh', [(), ('hf',), ('or',), ('hf', 'or')])
+def test_rankings_build_passes_fresh_snapshots_and_stages_only_verdict(tmp_path, fresh):
+    """The real build block passes each snapshot's own timestamp and one run label."""
+    git = HFTrackerExecutedStepsTests.git
+    git(tmp_path, 'init', '-q')
+    git(tmp_path, 'config', 'user.name', 'fixture')
+    git(tmp_path, 'config', 'user.email', 'fixture@example.com')
+    page = tmp_path / 'out/trending-rankings.html'
+    page.parent.mkdir()
+    page.write_text('base page', encoding='utf-8')
+    git(tmp_path, 'add', 'out/trending-rankings.html')
+    git(tmp_path, 'commit', '-qm', 'base')
+    base = git(tmp_path, 'rev-parse', 'HEAD')
+    runner = tmp_path / 'runner'
+    runner.mkdir()
+    args = []
+    for tracker, filename, timestamp in (
+            ('hf', 'hf', '2026-10-20T09:41:00Z'),
+            ('or', 'openrouter', '2026-10-20T09:42:00Z')):
+        if tracker in fresh:
+            payload = runner / f'{tracker}-payload'
+            (payload / 'data').mkdir(parents=True)
+            data = payload / f'data/{filename}-trending.json'
+            data.write_text('{"models": []}', encoding='utf-8')
+            (payload / 'fetched-at.txt').write_text(timestamp + '\n', encoding='utf-8')
+            args.extend([f'--fresh-{tracker}', str(data),
+                         f'--fresh-{tracker}-timestamp', timestamp])
+    if fresh:
+        args.extend(['--fresh-label', 'run 12345'])
+    scripts = tmp_path / 'scripts'
+    scripts.mkdir()
+    (scripts / 'build_rankings.py').write_text(
+        'import json, sys\nfrom pathlib import Path\n'
+        'Path("args.json").write_text(json.dumps(sys.argv[1:]))\n'
+        'Path("out/trending-rankings.html").write_text("built page")\n', encoding='utf-8')
+    env = {**os.environ, 'RUNNER_TEMP': str(runner), 'GITHUB_RUN_ID': '12345',
+           'GITHUB_OUTPUT': str(tmp_path / 'outputs')}
+    build_step = step_in(load(), 'rankings', 'Build the rankings page')
+    done = _workflowrun.run_step(tmp_path, build_step, env)
+    assert done.returncode == 0, done.stdout + done.stderr
+    assert json.loads((tmp_path / 'args.json').read_text()) == args
+    assert page.read_text() == 'built page'
+    stage = step_in(load(), 'rankings', 'Stage the page state')
+    for changed in (True, False):
+        if not changed:
+            page.write_text('base page', encoding='utf-8')
+        (tmp_path / 'outputs').write_text('', encoding='utf-8')
+        done = _workflowrun.run_step(tmp_path, stage, env)
+        assert done.returncode == 0, done.stdout + done.stderr
+        assert (tmp_path / 'outputs').read_text() == f'changed={str(changed).lower()}\n'
+        assert git(tmp_path, 'rev-parse', 'HEAD') == base
+        assert git(tmp_path, 'diff', '--cached', '--name-only') == ''
+        assert not (runner / 'push-data').exists()
+
+
+@pytest.mark.skipif(os.name == 'nt', reason='workflow shell runs on Ubuntu')
+@pytest.mark.parametrize('job', ['hub', 'rankings-hub'])
+def test_hubs_without_artifact_are_green(tmp_path, job):
+    """An absent source payload exits before a tie check or any publication."""
+    entry = step_in(load(), job, 'Publish to docs-hub')
+    env = {**os.environ, 'RUNNER_TEMP': str(tmp_path),
+           'GITHUB_STEP_SUMMARY': str(tmp_path / 'summary')}
+    done = _workflowrun.run_step(tmp_path, entry, env)
+    assert done.returncode == 0, done.stdout + done.stderr
+    assert 'Nothing published by this run.' in done.stdout
+    assert not (tmp_path / 'ref-scratch').exists()
 
 
 @pytest.mark.skipif(os.name == 'nt', reason='workflow shell runs on Ubuntu')
@@ -2100,152 +2180,30 @@ class HFTrackerExecutedStepsTests(unittest.TestCase):
                 self.env['GITHUB_OUTPUT']).read_text(encoding='utf-8'))
         return result
 
-    def stage_change(self):
-        (self.repo / self.data).write_text('new\n', encoding='utf-8')
-        self.run_step('fetch', 'Commit when changed')
-
-    def replay(self):
-        # Redirect the production anonymous HTTPS fetch to the local bare remote.
-        self.git(self.repo, 'config', '--file', str(self.root / 'gitconfig'),
-                 f'url.{self.origin}.insteadOf', 'https://github.com/fixture/trending')
-        self.env['GIT_CONFIG_GLOBAL'] = str(self.root / 'gitconfig')
-        self.run_step('push', 'Replay onto fresh main')
-
-    def advance_main(self, path='README.md', content='moved\n'):
-        other = self.root / 'other'
-        self.git(self.root, 'clone', '-q', str(self.origin), str(other))
-        self.configure(other)
-        (other / path).write_text(content, encoding='utf-8')
-        self.git(other, 'add', path)
-        self.git(other, 'commit', '-qm', 'main moved')
-        self.git(other, 'push', '-q', 'origin', 'main')
-        return self.git(other, 'rev-parse', 'HEAD').strip()
-
-    def load_ephemeral_key(self):
-        key = self.root / 'key'
-        subprocess.run(['ssh-keygen', '-q', '-t', 'ed25519', '-N', '',
-                        '-f', str(key)], check=True, capture_output=True, timeout=60)
-        self.env['MASTER_PUSH_DEPLOY_KEY'] = key.read_text(encoding='utf-8')
-
-    def test_unchanged_capture_creates_no_commit_or_bundle(self):
-        self.run_step('fetch', 'Commit when changed')
+    def test_unchanged_capture_stages_nothing(self):
+        self.run_step('fetch', 'Stage the payload')
         self.assertEqual(self.git(self.repo, 'rev-parse', 'HEAD').strip(), self.base)
         self.assertEqual(pathlib.Path(self.env['GITHUB_OUTPUT']).read_text(encoding='utf-8'),
-                         'commits=false\n')
+                         'changed=false\n')
+        self.assertFalse((self.runner / f'{self.tracker}-payload').exists())
+
+    def test_changed_capture_stages_fresh_bytes_message_and_time(self):
+        (self.repo / 'README.md').write_text('do not stage\n', encoding='utf-8')
+        (self.repo / self.data).write_text('new\n', encoding='utf-8')
+        self.run_step('fetch', 'Stage the payload')
+        payload = self.runner / f'{self.tracker}-payload'
+        self.assertEqual((payload / self.data).read_text(encoding='utf-8'), 'new\n')
+        self.assertEqual((payload / 'message.txt').read_text(encoding='utf-8'), self.message)
+        self.assertRegex((payload / 'fetched-at.txt').read_text(encoding='utf-8'),
+                         r'^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ\n$')
+        self.assertEqual(sorted(str(path.relative_to(payload)) for path in payload.rglob('*')
+                                if path.is_file()),
+                         [self.data, 'fetched-at.txt', 'message.txt'])
+        self.assertEqual(self.git(self.repo, 'rev-parse', 'HEAD').strip(), self.base)
+        self.assertEqual(self.git(self.repo, 'diff', '--cached', '--name-only'), '')
+        self.assertEqual(pathlib.Path(self.env['GITHUB_OUTPUT']).read_text(encoding='utf-8'),
+                         'changed=true\n')
         self.assertFalse((self.runner / 'push-data').exists())
-
-    def test_changed_capture_commits_only_data_with_exact_message(self):
-        (self.repo / 'README.md').write_text('do not commit\n', encoding='utf-8')
-        self.stage_change()
-        self.assertEqual(self.git(self.repo, 'diff-tree', '--no-commit-id',
-                                  '--name-only', '-r', 'HEAD').splitlines(), [self.data])
-        self.assertEqual(self.git(self.repo, 'log', '-1', '--format=%B').rstrip(),
-                         self.message.rstrip())
-        self.assertEqual(self.git(self.repo, 'log', '-1', '--format=%an').strip(),
-                         'github-actions[bot]')
-        self.assertNotIn('Co-Authored-By:', self.git(self.repo, 'log', '-1', '--format=%B'))
-        self.assertEqual(self.git(self.origin, 'rev-parse', 'main').strip(), self.base)
-        self.assertTrue((self.runner / 'push-data/push.bundle').exists())
-        self.assertEqual((self.runner / 'push-data/base.txt').read_text(encoding='utf-8').strip(),
-                         self.base)
-
-    @unittest.skipUnless(sys.platform == 'linux',
-                         'requires Linux ssh-agent/ssh-add behaviour matching ubuntu-latest')
-    def test_replay_preserves_fresh_main_and_message_then_pushes(self):
-        self.stage_change()
-        fresh = self.advance_main()
-        self.replay()
-        push_repo = self.runner / 'scratch'
-        self.assertEqual(self.git(push_repo, 'rev-parse', 'HEAD^').strip(), fresh)
-        self.assertEqual(self.git(push_repo, 'show', 'HEAD:README.md'), 'moved\n')
-        self.assertEqual(self.git(push_repo, 'show', f'HEAD:{self.data}'), 'new\n')
-        self.assertEqual(self.git(push_repo, 'log', '-1', '--format=%B').rstrip(), self.message.rstrip())
-        self.load_ephemeral_key()
-        self.run_step('push', 'Push the trending commit')
-        self.assertIn('landed=true\n', pathlib.Path(
-            self.env['GITHUB_OUTPUT']).read_text(encoding='utf-8'))
-        landed = self.git(self.origin, 'rev-parse', 'main').strip()
-        self.assertEqual(landed, (self.runner / 'push-data/tip.txt').read_text(encoding='utf-8').strip())
-
-    def test_replay_preserves_the_other_trackers_landed_commit(self):
-        self.stage_change()
-        other_data = ('data/openrouter-trending.json' if self.tracker == 'hf'
-                      else 'data/hf-trending.json')
-        fresh = self.advance_main(other_data, 'other list\n')
-        self.replay()
-        scratch = self.runner / 'scratch'
-        self.assertEqual(self.git(scratch, 'rev-parse', 'HEAD^').strip(), fresh)
-        self.assertEqual(self.git(scratch, 'show', f'HEAD:{other_data}'),
-                         'other list\n')
-        self.assertEqual(self.git(scratch, 'diff-tree', '--no-commit-id',
-                                  '--name-only', '-r', 'HEAD').splitlines(),
-                         [self.data])
-
-    def test_replay_noops_when_main_already_has_capture(self):
-        self.stage_change()
-        fresh = self.advance_main(self.data, 'new\n')
-        self.replay()
-        self.assertTrue(pathlib.Path(self.env['GITHUB_OUTPUT']).read_text(encoding='utf-8').endswith('commits=false\n'))
-        self.assertEqual(self.git(self.origin, 'rev-parse', 'main').strip(), fresh)
-        self.assertNotIn('landed=true', pathlib.Path(
-            self.env['GITHUB_OUTPUT']).read_text(encoding='utf-8'))
-
-    def test_push_missing_key_fails_before_delivery(self):
-        result = self.run_step('push', 'Push the trending commit', 1)
-        self.assertIn('MASTER_PUSH_DEPLOY_KEY is empty', result.stderr)
-        self.assertEqual(self.git(self.origin, 'rev-parse', 'main').strip(), self.base)
-
-    @unittest.skipUnless(sys.platform == 'linux',
-                         'requires Linux ssh-agent/ssh-add behaviour matching ubuntu-latest')
-    def test_main_move_after_replay_concedes_without_force(self):
-        self.stage_change()
-        self.replay()
-        fresh = self.advance_main()
-        self.load_ephemeral_key()
-        self.run_step('push', 'Push the trending commit')
-        self.assertEqual(self.git(self.origin, 'rev-parse', 'main').strip(), fresh)
-        self.assertIn('main moved under the run', pathlib.Path(self.env['GITHUB_STEP_SUMMARY']).read_text(encoding='utf-8'))
-
-    @unittest.skipUnless(sys.platform == 'linux',
-                         'requires Linux ssh-agent/ssh-add behaviour matching ubuntu-latest')
-    def test_rejected_push_with_main_still_at_base_fails(self):
-        self.stage_change()
-        self.replay()
-        hook = self.origin / 'hooks/pre-receive'
-        hook.write_text('#!/bin/sh\nexit 1\n', encoding='utf-8')
-        hook.chmod(0o755)
-        self.load_ephemeral_key()
-        result = self.run_step('push', 'Push the trending commit', 1)
-        self.assertIn('the push was rejected while main stood still', result.stderr)
-
-    @unittest.skipUnless(sys.platform == 'linux',
-                         'requires Linux ssh-agent/ssh-add behaviour matching ubuntu-latest')
-    def test_main_moving_during_push_concedes_after_rejection(self):
-        self.stage_change()
-        self.replay()
-        writer = self.root / 'racer'
-        self.git(self.root, 'clone', '-q', str(self.origin), str(writer))
-        self.configure(writer)
-        (writer / 'README.md').write_text('race\n', encoding='utf-8')
-        self.git(writer, 'add', 'README.md')
-        self.git(writer, 'commit', '-qm', 'raced')
-        raced = self.git(writer, 'rev-parse', 'HEAD').strip()
-        bin_dir = self.root / 'bin'
-        bin_dir.mkdir()
-        wrapper = bin_dir / 'git'
-        wrapper.write_text(
-            '#!/bin/sh\ncase "$*" in\n'
-            '  *" push origin "*) "$REAL_GIT" -C "$RACE_REPO" push -q origin main ;;\n'
-            'esac\nexec "$REAL_GIT" "$@"\n', encoding='utf-8')
-        wrapper.chmod(0o755)
-        real_git = shutil.which('git')
-        assert real_git is not None, 'git is required to execute the workflow'
-        self.env.update({'REAL_GIT': real_git, 'RACE_REPO': str(writer),
-                         'PATH': str(bin_dir) + os.pathsep + os.environ['PATH']})
-        self.load_ephemeral_key()
-        self.run_step('push', 'Push the trending commit')
-        self.assertEqual(self.git(self.origin, 'rev-parse', 'main').strip(), raced)
-        self.assertIn('main moved before the push landed', pathlib.Path(self.env['GITHUB_STEP_SUMMARY']).read_text(encoding='utf-8'))
 
     def test_fetch_script_is_invoked_with_message_and_failure_propagates(self):
         scripts = self.repo / 'scripts'
@@ -2286,8 +2244,8 @@ class ORTrackerExecutedStepsTests(HFTrackerExecutedStepsTests):
 
 
 @unittest.skipIf(os.name == 'nt', 'workflow shell runs on Ubuntu')
-class RankingsExecutedStepsTests(unittest.TestCase):
-    """Execute the page committer and the same delivery safeguards as the lists."""
+class JoinedPushExecutedTests(unittest.TestCase):
+    """Deliver the single joined bundle with the existing race safeguards."""
 
     repo: pathlib.Path
     runner: pathlib.Path
@@ -2295,102 +2253,118 @@ class RankingsExecutedStepsTests(unittest.TestCase):
     origin: pathlib.Path
     base: str
     env: dict[str, str]
-    data = 'out/trending-rankings.html'
-    message = (
-        'Rebuild the rankings page\n\n'
-        "The page is rebuilt from the two trending lists' history and differs from the committed copy.\n\n"
-        'Captured by .github/workflows/refresh.yml.\n')
+    data = 'data/hf-trending.json'
+    message = 'Trending: fresh list\n'
     setUp = HFTrackerExecutedStepsTests.setUp
     git = staticmethod(HFTrackerExecutedStepsTests.git)
     configure = HFTrackerExecutedStepsTests.configure
-    run_step = HFTrackerExecutedStepsTests.run_step
-    stage_change = HFTrackerExecutedStepsTests.stage_change
-    replay = HFTrackerExecutedStepsTests.replay
-    advance_main = HFTrackerExecutedStepsTests.advance_main
-    load_ephemeral_key = HFTrackerExecutedStepsTests.load_ephemeral_key
-    test_changed_page_commits_only_page_with_exact_message = (
-        HFTrackerExecutedStepsTests.test_changed_capture_commits_only_data_with_exact_message)
-    test_replay_preserves_fresh_main_and_message_then_pushes = (
-        HFTrackerExecutedStepsTests.test_replay_preserves_fresh_main_and_message_then_pushes)
-    test_replay_noops_when_main_already_has_page = (
-        HFTrackerExecutedStepsTests.test_replay_noops_when_main_already_has_capture)
-    test_push_missing_key_fails_before_delivery = (
-        HFTrackerExecutedStepsTests.test_push_missing_key_fails_before_delivery)
-    test_main_move_after_replay_concedes_without_force = (
-        HFTrackerExecutedStepsTests.test_main_move_after_replay_concedes_without_force)
-    test_rejected_push_with_main_still_at_base_fails = (
-        HFTrackerExecutedStepsTests.test_rejected_push_with_main_still_at_base_fails)
-    test_main_moving_during_push_concedes_after_rejection = (
-        HFTrackerExecutedStepsTests.test_main_moving_during_push_concedes_after_rejection)
 
     def tracker_step(self, job, name):
-        return step_in(load(), 'rankings' if job == 'fetch' else 'rankings-push', name)
+        return step_in(load(), job, name)
 
-    def test_unchanged_page_stages_base_and_tip_without_commit_or_bundle(self):
-        self.run_step('fetch', 'Commit when changed')
-        self.assertEqual(self.git(self.repo, 'rev-parse', 'HEAD').strip(), self.base)
-        self.assertEqual(pathlib.Path(self.env['GITHUB_OUTPUT']).read_text(encoding='utf-8'),
-                         'commits=false\n')
-        data = self.runner / 'push-data'
-        self.assertEqual(sorted(path.name for path in data.iterdir()), ['base.txt', 'tip.txt'])
-        for name in ('base.txt', 'tip.txt'):
-            self.assertEqual((data / name).read_text(encoding='utf-8').strip(), self.base)
+    def run_step(self, job, name, expected=0):
+        result = _workflowrun.run_step(self.repo, self.tracker_step(job, name), self.env)
+        self.assertEqual(result.returncode, expected, result.stdout + result.stderr)
+        return result
+
+    def stage_change(self):
+        payload = self.runner / 'hf-payload/data'
+        payload.mkdir(parents=True)
+        (payload / 'hf-trending.json').write_text('new\n', encoding='utf-8')
+        (payload.parent / 'message.txt').write_text(self.message, encoding='utf-8')
+
+    def replay(self):
+        self.git(self.repo, 'config', '--file', str(self.root / 'gitconfig'),
+                 f'url.{self.origin.as_uri()}.insteadOf', 'https://github.com/fixture/trending')
+        self.env['GIT_CONFIG_GLOBAL'] = str(self.root / 'gitconfig')
+        self.env['GITHUB_SHA'] = self.base
+        self.run_step('publish', 'Commit the refresh')
+
+    def advance_main(self, path='README.md', content='moved\n'):
+        other = self.root / 'other'
+        self.git(self.root, 'clone', '-q', str(self.origin), str(other))
+        self.configure(other)
+        (other / path).write_text(content, encoding='utf-8')
+        self.git(other, 'add', path)
+        self.git(other, 'commit', '-qm', 'main moved')
+        self.git(other, 'push', '-q', 'origin', 'main')
+        return self.git(other, 'rev-parse', 'HEAD').strip()
+
+    def load_ephemeral_key(self):
+        key = self.root / 'key'
+        subprocess.run(['ssh-keygen', '-q', '-t', 'ed25519', '-N', '',
+                        '-f', str(key)], check=True, capture_output=True, timeout=60)
+        self.env['MASTER_PUSH_DEPLOY_KEY'] = key.read_text(encoding='utf-8')
+
+    def test_push_missing_key_fails_before_delivery(self):
+        result = self.run_step('push', 'Push the tested tree to main', 1)
+        self.assertIn('MASTER_PUSH_DEPLOY_KEY is empty', result.stderr)
+        self.assertEqual(self.git(self.origin, 'rev-parse', 'main').strip(), self.base)
 
     @unittest.skipUnless(sys.platform == 'linux',
                          'requires Linux ssh-agent/ssh-add behaviour matching ubuntu-latest')
-    def test_conceded_delivery_and_failed_hub_fetch_publish_nothing(self):
+    def test_main_move_after_replay_concedes_without_force(self):
         self.stage_change()
         self.replay()
         fresh = self.advance_main()
         self.load_ephemeral_key()
-        self.run_step('push', 'Push the trending commit')
-        output = pathlib.Path(self.env['GITHUB_OUTPUT']).read_text(encoding='utf-8')
-        self.assertNotIn('landed=true', output)
+        self.run_step('push', 'Push the tested tree to main')
         self.assertEqual(self.git(self.origin, 'rev-parse', 'main').strip(), fresh)
-        self.assertEqual(self.git(self.origin, 'show', f'main:{self.data}'), 'old\n')
-        # A successful conceded push admits the hub under its actual job gate.
-        condition = load()['jobs']['rankings-hub']['if']
-        for term, value in {
-                '!cancelled()': 'True',
-                "needs.rankings.result == 'success'": 'True',
-                "needs.rankings-push.result == 'success'": 'True',
-                "needs.rankings-push.result == 'skipped'": 'False'}.items():
-            condition = condition.replace(term, value)
-        self.assertTrue(eval(condition.replace('&&', 'and').replace('||', 'or'),  # pylint: disable=eval-used
-                             {'__builtins__': {}}, {}))
-        page = self.runner / 'rankings-page/trending-rankings.html'
-        page.parent.mkdir()
-        page.write_bytes((self.repo / self.data).read_bytes())
-        self.assertEqual(page.read_bytes(), b'new\n')
-        # Redirect only the hub's main fetch to an unavailable local remote.
-        self.git(self.repo, 'config', '--file', str(self.root / 'gitconfig'),
-                 f'url.{self.root / "unavailable.git"}.insteadOf',
-                 'https://github.com/fixture/unavailable')
-        stub = self.root / 'bin'
-        stub.mkdir()
-        (stub / 'curl_payload.py').write_text(RANKINGS_CURL, encoding='utf-8')
-        (stub / 'curl').write_text(
-            '#!/bin/sh\nexec "$TEST_PYTHON" "$(dirname "$0")/curl_payload.py" "$@"\n',
-            encoding='utf-8')
-        (stub / 'curl').chmod(0o755)
-        calls = self.root / 'hub-calls'
-        self.env.update({
-            'PATH': str(stub) + os.pathsep + os.environ['PATH'],
-            'TEST_PYTHON': sys.executable, 'GITHUB_REPOSITORY': 'fixture/unavailable',
-            'DOCS_HUB_API_KEY': 'fixture', 'LIVE_PAGE': 'stale',
-            'UPLOAD_CODE': '200', 'UPLOAD_BODY': '{}',
-            'HUB_CALLS': str(calls), 'RANKINGS_PAGE': str(page)})
-        entry = dict(step_in(load(), 'rankings-hub', 'Publish to docs-hub'))
-        entry['run'] = entry['run'].replace(
-            '/tmp/publish-response.json', '"${RUNNER_TEMP}/publish-response.json"')
-        done = _workflowrun.run_step(self.repo, entry, self.env)
-        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
-        self.assertIn('Nothing published by this run.', done.stdout)
-        self.assertIn("could not verify main's committed page — publishing nothing this run; "
-                      "the next hourly run self-heals", pathlib.Path(
-                          self.env['GITHUB_STEP_SUMMARY']).read_text(encoding='utf-8'))
-        self.assertFalse(calls.exists(), 'neither live-page fetch nor upload may run')
-        self.assertFalse((self.runner / 'page').exists())
+        self.assertIn('main moved under the run', pathlib.Path(self.env['GITHUB_STEP_SUMMARY']).read_text(encoding='utf-8'))
+
+    @unittest.skipUnless(sys.platform == 'linux',
+                         'requires Linux ssh-agent/ssh-add behaviour matching ubuntu-latest')
+    def test_rejected_push_with_main_still_at_base_fails(self):
+        self.stage_change()
+        self.replay()
+        hook = self.origin / 'hooks/pre-receive'
+        hook.write_text('#!/bin/sh\nexit 1\n', encoding='utf-8')
+        hook.chmod(0o755)
+        self.load_ephemeral_key()
+        result = self.run_step('push', 'Push the tested tree to main', 1)
+        self.assertIn('the push was rejected while main stood still', result.stderr)
+
+    @unittest.skipUnless(sys.platform == 'linux',
+                         'requires Linux ssh-agent/ssh-add behaviour matching ubuntu-latest')
+    def test_main_moving_during_push_concedes_after_rejection(self):
+        self.stage_change()
+        self.replay()
+        writer = self.root / 'racer'
+        self.git(self.root, 'clone', '-q', str(self.origin), str(writer))
+        self.configure(writer)
+        (writer / 'README.md').write_text('race\n', encoding='utf-8')
+        self.git(writer, 'add', 'README.md')
+        self.git(writer, 'commit', '-qm', 'raced')
+        raced = self.git(writer, 'rev-parse', 'HEAD').strip()
+        bin_dir = self.root / 'bin'
+        bin_dir.mkdir()
+        wrapper = bin_dir / 'git'
+        wrapper.write_text(
+            '#!/bin/sh\ncase "$*" in\n'
+            '  *" push origin "*) "$REAL_GIT" -C "$RACE_REPO" push -q origin main ;;\n'
+            'esac\nexec "$REAL_GIT" "$@"\n', encoding='utf-8')
+        wrapper.chmod(0o755)
+        real_git = shutil.which('git')
+        assert real_git is not None, 'git is required to execute the workflow'
+        self.env.update({'REAL_GIT': real_git, 'RACE_REPO': str(writer),
+                         'PATH': str(bin_dir) + os.pathsep + os.environ['PATH']})
+        self.load_ephemeral_key()
+        self.run_step('push', 'Push the tested tree to main')
+        self.assertEqual(self.git(self.origin, 'rev-parse', 'main').strip(), raced)
+        self.assertIn('main moved before the push landed', pathlib.Path(self.env['GITHUB_STEP_SUMMARY']).read_text(encoding='utf-8'))
+
+
+    @unittest.skipUnless(sys.platform == 'linux', 'requires Linux ssh-agent/ssh-add')
+    def test_joined_bundle_lands_once(self):
+        self.stage_change()
+        self.replay()
+        self.load_ephemeral_key()
+        self.run_step('push', 'Push the tested tree to main')
+        self.assertEqual(self.git(self.origin, 'rev-list', '--count',
+                                  self.base + '..main').strip(), '1')
+        self.assertEqual(self.git(self.origin, 'show', f'main:{self.data}'), 'new\n')
+        self.assertEqual(self.git(self.origin, 'rev-parse', 'main').strip(),
+                         (self.runner / 'push-data/tip.txt').read_text().strip())
 
 
 HUB_UPLOAD_CURL = '''import os
@@ -2460,34 +2434,27 @@ class ExecutedHubTrackerOrderingTests(unittest.TestCase):
             '"$(dirname "$0")/curl_payload.py" "$@"\n', encoding='utf-8')
         (stub / 'curl').chmod(0o755)
         self.contexts = {}
-        self._context('aa', self.source, stub)
-        for tracker, key_name in (('hf', 'id'), ('or', 'slug')):
-            repo = self.root / tracker
-            self._git(self.root, 'clone', '-q', str(self.origin), str(repo))
-            self._configure(repo)
-            self._context(tracker, repo, stub)
-            name = 'hf' if tracker == 'hf' else 'openrouter'
-            (repo / f'data/{name}-trending.json').write_text(
-                json.dumps({'models': [{key_name: 'org/new'}]}), encoding='utf-8')
-            runner = pathlib.Path(self.contexts[tracker][1]['RUNNER_TEMP'])
-            (runner / 'message').write_text('Update list\n', encoding='utf-8')
-            self._run(f'{tracker}-fetch', 'Commit when changed', tracker)
+        self._context('joined', self.source, stub)
+        runner = pathlib.Path(self.contexts['joined'][1]['RUNNER_TEMP'])
+        self.contexts['joined'][1]['GITHUB_SHA'] = self.base
         self.page = b'<html>new AA page</html>\n'
-        (self.source / 'out/frontier-models.html').write_bytes(self.page)
-        self._git(self.source, 'add', '--', 'out/frontier-models.html')
-        self._git(self.source, 'commit', '-qm', 'AA page')
-        self.aa_tip = self._git(self.source, 'rev-parse', 'HEAD').strip()
-        self._git(self.source, 'branch', 'push')
-        runner = pathlib.Path(self.contexts['aa'][1]['RUNNER_TEMP'])
-        bundle = runner / 'push-data'
-        bundle.mkdir()
-        self._git(self.source, 'bundle', 'create', str(bundle / 'push.bundle'),
-                  f'{self.base}..push')
-        (bundle / 'base.txt').write_text(self.base + '\n', encoding='utf-8')
-        (bundle / 'tip.txt').write_text(self.aa_tip + '\n', encoding='utf-8')
-        payload = runner / 'publish-payload/tree/out'
-        payload.mkdir(parents=True)
-        (payload / 'frontier-models.html').write_bytes(self.page)
+        payload = runner / 'publish-payload'
+        files = {**ExecutedCommitMessageTests.MOVED_FILES,
+                 'out/frontier-models.html': self.page.decode()}
+        for name, content in files.items():
+            target = payload / 'tree' / name
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_text(content, encoding='utf-8')
+        (payload / 'aa-mode.txt').write_text('moved\n', encoding='utf-8')
+        (payload / 'commit-msg.txt').write_text('Refresh capture: fresh AA\n', encoding='utf-8')
+        for tracker, name, key_name in (('hf', 'hf', 'id'), ('or', 'openrouter', 'slug')):
+            payload = runner / f'{tracker}-payload'
+            (payload / 'data').mkdir(parents=True)
+            (payload / f'data/{name}-trending.json').write_text(
+                json.dumps({'models': [{key_name: 'org/new'}]}), encoding='utf-8')
+            (payload / 'message.txt').write_text(f'Update {tracker} list\n', encoding='utf-8')
+        self._run('publish', 'Commit the refresh', 'joined')
+        self.joined_tip = (runner / 'push-data/tip.txt').read_text().strip()
 
     @staticmethod
     def _git(repo, *args):
@@ -2528,43 +2495,23 @@ class ExecutedHubTrackerOrderingTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         return result
 
-    def test_hub_publishes_before_same_run_tracker_commits_land(self):
-        self._run('push', 'Push the tested tree to main', 'aa')
-        self.assertEqual(self._git(self.origin, 'rev-parse', 'main').strip(), self.aa_tip)
-        completed = {'publish', 'push', 'hf-fetch', 'or-fetch'}
-        pending = ['hf-push', 'or-push', 'hub']
-        order = []
-        for _ in range(len(pending)):
-            job = next((name for name in pending
-                        if set(self.workflow['jobs'][name]['needs']) <= completed), None)
-            assert job is not None, f'no ready job: {pending}'
-            if job == 'hub':
-                result = self._run(job, 'Publish to docs-hub', 'aa')
-                self.assertTrue(self.published.exists(), result.stdout)
-            else:
-                tracker = job.split('-')[0]
-                self._run(job, 'Replay onto fresh main', tracker)
-                self._run(job, 'Push the trending commit', tracker)
-                output = pathlib.Path(self.contexts[tracker][1]['GITHUB_OUTPUT'])
-                self.assertIn('landed=true\n', output.read_text(encoding='utf-8'))
-            completed.add(job)
-            pending.remove(job)
-            order.append(job)
-        self.assertEqual(order, ['hub', 'hf-push', 'or-push'])
+    def test_hub_ties_to_the_single_joined_landing(self):
+        self.assertEqual(self.workflow['jobs']['hub']['needs'], ['publish', 'push', 'refresh'])
+        self._run('push', 'Push the tested tree to main', 'joined')
+        self.assertEqual(self._git(self.origin, 'rev-parse', 'main').strip(), self.joined_tip)
+        self.assertEqual(self._git(self.origin, 'rev-parse', 'main^').strip(), self.base)
+        self._run('hub', 'Publish to docs-hub', 'joined')
         self.assertEqual(self.published.read_bytes(), self.page)
         self.assertEqual(self.calls.read_text(encoding='utf-8').splitlines(), [
             'https://docs.nitjsefni.eu/d/ai-researcher/frontier-models',
             'https://docs.nitjsefni.eu/api/publish'])
-        tips = [self.aa_tip]
-        for tracker in ('hf', 'or'):
-            runner = pathlib.Path(self.contexts[tracker][1]['RUNNER_TEMP'])
-            tip = (runner / 'push-data/tip.txt').read_text(encoding='utf-8').strip()
-            self.assertEqual(self._git(self.origin, 'rev-parse', tip + '^').strip(), tips[-1])
-            tips.append(tip)
-        self.assertEqual(self._git(self.origin, 'rev-parse', 'main').strip(), tips[-1])
+        for path in ('data/hf-trending.json', 'data/openrouter-trending.json'):
+            self.assertIn('org/new', self._git(self.origin, 'show', 'main:' + path))
+        self.assertEqual(self._git(self.origin, 'rev-list', '--count',
+                                   self.base + '..main').strip(), '1')
 
     def test_hub_still_concedes_to_a_third_party_main_move(self):
-        self._run('push', 'Push the tested tree to main', 'aa')
+        self._run('push', 'Push the tested tree to main', 'joined')
         other = self.root / 'third-party'
         self._git(self.root, 'clone', '-q', str(self.origin), str(other))
         self._configure(other)
@@ -2573,7 +2520,7 @@ class ExecutedHubTrackerOrderingTests(unittest.TestCase):
         self._git(other, 'commit', '-qm', 'third-party change')
         self._git(other, 'push', '-q', 'origin', 'main')
         moved = self._git(other, 'rev-parse', 'HEAD').strip()
-        result = self._run('hub', 'Publish to docs-hub', 'aa')
+        result = self._run('hub', 'Publish to docs-hub', 'joined')
         self.assertIn('Nothing published by this run.', result.stdout)
         self.assertFalse(self.published.exists())
         self.assertFalse(self.calls.exists())

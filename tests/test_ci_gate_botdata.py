@@ -77,24 +77,14 @@ def test_bot_signature_names_every_file_the_refresh_committers_add():
             "data/captured-at.txt out/frontier-models.html"
     assert " ".join(fixed.split()) in " ".join(raw.split())
     adds = re.findall(r"^\s*git add(?:[^\n\\]|\\\n)*", raw, re.MULTILINE)
-    assert len(adds) == 2, adds
+    assert len(adds) == 5, adds
     staged = {path for add in adds for path in add.replace("\\\n", " ").split()
               if path.startswith(("data/", "out/"))}
-    assert staged == {
-        "data/aa-raw-models.json", "data/aa-raw-coding-agents.json",
-        "data/aa-generation-state.json", "data/captured-at.txt",
-        "data/cost-breakdown-window.txt", "out/frontier-models.html",
-    }
-    all_staged = set(staged)
-    for job, path in (("hf-fetch", "data/hf-trending.json"),
-                      ("or-fetch", "data/openrouter-trending.json"),
-                      ("rankings", "out/trending-rankings.html")):
-        commit = next(step for step in workflow["jobs"][job]["steps"]
-                      if step.get("id") == "commit")
-        producer_adds = re.findall(r"^\s*git add (.+)$", commit["run"], re.MULTILINE)
-        assert producer_adds == [path]
-        all_staged.update(producer_adds)
-    assert all_staged == set(classify.BOT_SIGNATURE)
+    assert staged == set(classify.BOT_SIGNATURE)
+    committers = {name for name, job in workflow['jobs'].items()
+                  if any(re.search(r'^\s*git commit\b', step.get('run', ''), re.MULTILINE)
+                         for step in job['steps'])}
+    assert committers == {'publish'}
     # And the marker's removal stays conditional: never an unconditional
     # `git rm` of a data path.
     rms = re.findall(r"^\s*git rm(?:[^\n\\]|\\\n)*", raw, re.MULTILINE)
@@ -135,25 +125,18 @@ def test_data_only_refuses_a_fifth_path():
 
 
 def test_generated_trending_pushes_get_the_data_only_class():
-    workflow = yaml.safe_load(
-        (REPO_ROOT / ".github/workflows/refresh.yml").read_text(encoding="utf-8"))
-    for job, path in (("hf-fetch", "data/hf-trending.json"),
-                      ("or-fetch", "data/openrouter-trending.json"),
-                      ("rankings", "out/trending-rankings.html")):
-        steps = workflow['jobs'][job]['steps']
-        run = next(step['run'] for step in steps if step.get('id') == 'commit')
-        adds = re.findall(r'^\s*git add (.+)$', run, re.MULTILINE)
-        assert adds == [path]
-        assert set(adds) <= classify.BOT_SIGNATURE
+    for paths in (['data/hf-trending.json'], ['data/openrouter-trending.json'],
+                  ['out/trending-rankings.html'],
+                  ['data/hf-trending.json', 'data/openrouter-trending.json',
+                   'out/trending-rankings.html'], sorted(classify.BOT_SIGNATURE)):
         with mock.patch.object(classify, "_verified_base", return_value="a" * 40):
             docs_only, data_only, reason = classify.classify(
                 {"name": "push", "repository": "o/r", "before": "a" * 40,
                  "sha": "b" * 40},
-                lambda argv, staged=tuple(adds): "\n".join(staged),
+                lambda argv, staged=tuple(paths): "\n".join(staged),
             )
-        assert (docs_only, data_only) == (False, True), path
+        assert (docs_only, data_only) == (False, True), paths
         assert "data-only" in reason
-        assert classify.data_only(adds + list(classify.BOT_SIGNATURE))
 
 
 def test_rankings_builder_alone_or_beside_generated_artifacts_runs_everything():

@@ -51,7 +51,7 @@ GIT_TIMEOUT = 60  # seconds; git check-ignore is local and fast
 
 
 def added_paths(workflow_name="refresh.yml", job="publish",
-                step_name="Commit the capture"):
+                step_name="Commit the refresh"):
     """The named workflow step's git-add paths, derived rather than copied."""
     workflow = yaml.safe_load(
         (HERE / ".github/workflows" / workflow_name).read_text(encoding="utf-8"))
@@ -112,15 +112,14 @@ class GitignoreTrackableTests(unittest.TestCase):
             f"{path} is hidden by .gitignore; it must be a tracked output")
 
     def test_the_paths_the_trending_workflow_commits_are_git_trackable(self):
-        for tracker, filename in [('hf', 'hf'), ('or', 'openrouter')]:
-            with self.subTest(tracker=tracker):
-                paths = added_paths("refresh.yml", f"{tracker}-fetch",
-                                    "Commit when changed")
-                self.assertEqual(paths, [f"data/{filename}-trending.json"])
-                for path in paths:
-                    verdict = check_ignore(["--no-index", "-q"], path)
-                    self.assertEqual(verdict.returncode, 1,
-                                     f"{path} is hidden by .gitignore")
+        paths = added_paths()
+        for path in ('data/hf-trending.json', 'data/openrouter-trending.json',
+                     'out/trending-rankings.html'):
+            with self.subTest(path=path):
+                self.assertIn(path, paths)
+                verdict = check_ignore(["--no-index", "-q"], path)
+                self.assertEqual(verdict.returncode, 1,
+                                 f"{path} is hidden by .gitignore")
 
     def test_the_paths_the_refresh_commits_are_git_trackable(self):
         for path in added_paths():
