@@ -19,6 +19,7 @@ fills shared-model gaps and adds detail-only models, so the workflow has one cap
 commit message for a moved capture. The pins below cover the recovery and the
 re-raise the Capture step keeps, not a dispute branch.
 """
+from datetime import datetime, timezone
 import json
 import os
 import pathlib
@@ -2011,9 +2012,10 @@ def test_rankings_build_passes_fresh_snapshots_and_stages_only_verdict(tmp_path,
 
 
 @pytest.mark.skipif(os.name == 'nt', reason='workflow shell runs on Ubuntu')
-@pytest.mark.parametrize('next_fresh', [None, 'hf', 'or'])
-def test_rankings_fresh_landing_is_stable_on_quiet_and_mixed_hours(tmp_path, next_fresh):
-    """The real builder retains landed fetch identities in every inactive section."""
+@pytest.mark.parametrize('next_fresh,page_less', [
+    (None, False), ('hf', False), ('or', False), ('hf', True), ('or', True)])
+def test_rankings_fresh_landing_is_stable_on_quiet_and_mixed_hours(tmp_path, next_fresh, page_less):
+    """Quiet identities stay fixed and tracker-only landings heal through history."""
     git = HFTrackerExecutedStepsTests.git
     git(tmp_path, 'init', '-q')
     git(tmp_path, 'config', 'user.name', 'fixture')
@@ -2059,11 +2061,16 @@ def test_rankings_fresh_landing_is_stable_on_quiet_and_mixed_hours(tmp_path, nex
     git(tmp_path, 'commit', '-qm', 'Land snapshots with fetch identities')
     if next_fresh is not None:
         tracker, filename, key = next(item for item in trackers if item[0] == next_fresh)
-        payload = runner / f'{tracker}-payload'
-        (payload / 'data').mkdir(parents=True)
-        (payload / f'data/{filename}-trending.json').write_text(
-            json.dumps({'models': [{key: 'newest/model'}]}), encoding='utf-8')
-        (payload / 'fetched-at.txt').write_text('2026-10-20T10:41:00Z', encoding='utf-8')
+        capture = json.dumps({'models': [{key: 'newest/model'}]})
+        if page_less:
+            (tmp_path / f'data/{filename}-trending.json').write_text(capture, encoding='utf-8')
+            git(tmp_path, 'add', f'data/{filename}-trending.json')
+            git(tmp_path, 'commit', '-qm', 'Land the tracker without its page')
+        else:
+            payload = runner / f'{tracker}-payload'
+            (payload / 'data').mkdir(parents=True)
+            (payload / f'data/{filename}-trending.json').write_text(capture, encoding='utf-8')
+            (payload / 'fetched-at.txt').write_text('2026-10-20T10:41:00Z', encoding='utf-8')
     env['GITHUB_RUN_ID'] = '67890'
     done = _workflowrun.run_step(tmp_path, build, env)
     assert done.returncode == 0, done.stdout + done.stderr
@@ -2080,6 +2087,24 @@ def test_rankings_fresh_landing_is_stable_on_quiet_and_mixed_hours(tmp_path, nex
         active = 0 if next_fresh == 'hf' else 1
         assert after[active] != before[active]
         assert after[1 - active] == before[1 - active]
+        if page_less:
+            landed = git(tmp_path, 'rev-parse', 'HEAD').strip()
+            timestamp = datetime.fromisoformat(git(tmp_path, 'show', '-s', '--format=%cI',
+                                                   landed).strip())
+            timestamp = timestamp.astimezone(timezone.utc).isoformat().replace('+00:00', 'Z')
+            assert f'data-commit="{landed}"'.encode() in after[active]
+            assert f'data-timestamp="{timestamp}"'.encode() in after[active]
+            assert b'data-commit="run 12345"' not in after[active]
+            assert b'data-model="newest/model" data-rank="1"' in after[active]
+            healed = page.read_bytes()
+            git(tmp_path, 'add', 'out/trending-rankings.html')
+            git(tmp_path, 'commit', '-qm', 'Land the healed rankings page')
+            (tmp_path / 'outputs').write_text('', encoding='utf-8')
+            for entry in (build, stage):
+                done = _workflowrun.run_step(tmp_path, entry, env)
+                assert done.returncode == 0, done.stdout + done.stderr
+            assert page.read_bytes() == healed
+            assert (tmp_path / 'outputs').read_text() == 'changed=false\n'
 
 
 @pytest.mark.skipif(os.name == 'nt', reason='workflow shell runs on Ubuntu')

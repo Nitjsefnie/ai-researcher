@@ -105,17 +105,19 @@ def read_history(repo: pathlib.Path, path: str, key: str, limit: int,
 
 def identity_history(repo: pathlib.Path, path: str, key: str, section: str,
                      limit: int, commit: str, columns: SnapshotColumns) -> list[Snapshot]:
-    """Reconstruct a landed section using its newest identity and tracked ranks."""
+    """Reuse matching page identities; rebuild stale sections from git history."""
     column = columns.newest(section)
     if column is None:
         raise ValueError(f"identity page: {section} newest column is missing or unparseable")
+    capture = json.loads(git(repo, "show", f"{commit}:{path}"))
+    ranks = {model[key]: rank for rank, model in enumerate(capture["models"], 1)}
+    if column.ranks != ranks:
+        return read_history(repo, path, key, limit, commit)
     changes = git(repo, "log", "-n", "2", "--format=%H", commit, "--", path).splitlines()
     if not changes:
         raise ValueError(f"identity page: {path} history is empty")
     history = (read_history(repo, path, key, limit - 1, changes[1])
                if limit > 1 and len(changes) > 1 else [])
-    capture = json.loads(git(repo, "show", f"{commit}:{path}"))
-    ranks = {model[key]: rank for rank, model in enumerate(capture["models"], 1)}
     return [*history, Snapshot(column.commit, column.timestamp, ranks)]
 
 
