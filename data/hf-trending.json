@@ -11,9 +11,6 @@
       "id": "fishaudio/drama-3"
     },
     {
-      "id": "openbmb/MiniCPM-V-4.7-35B-A3B"
-    },
-    {
       "id": "google/embeddinggemma-2"
     },
     {
@@ -27,6 +24,9 @@
     },
     {
       "id": "black-forest-labs/flux-3-image-klein"
+    },
+    {
+      "id": "OpenMOSS-Team/MOSS-Image-SFT"
     },
     {
       "id": "Lightricks/LTX-2.5"
