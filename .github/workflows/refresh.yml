@@ -1216,15 +1216,18 @@ jobs:
     name: Publish the rankings to docs-hub
     needs: [publish, push, rankings]
     if: >-
-      !cancelled() && needs.publish.result == 'success' &&
-      needs.publish.outputs.publish == 'true' &&
+      !cancelled() && needs.rankings.result == 'success' &&
+      (needs.publish.result == 'skipped' || needs.publish.result == 'success') &&
       (needs.push.result == 'skipped' || needs.push.result == 'success')
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
       contents: read
-    # Publish the artifact only after verifying main carries its bytes.
-    # No repository code executes beside the upload key.
+    # A successful build can recover a failed upload during an unchanged hour,
+    # when the committer and push both skip. Failed commit or delivery jobs
+    # suppress publication. Main's committed page must match the artifact
+    # before HTTP; identical live bytes skip the upload. No repository code
+    # executes beside the upload key.
     steps:
       - name: Download the rankings page
         if: needs.rankings.result == 'success'
