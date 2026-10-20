@@ -264,7 +264,8 @@ def chart_svg(history: list[Snapshot], models: list[str], identifier: str) -> st
             parts.append(f'<circle class="point" style="{style}" r="4" tabindex="0" '
                          f'cx="{x(index):.1f}" cy="{y(rank):.1f}" '
                          f'data-model="{escape(model)}" data-rank="{rank}" '
-                         f'data-commit="{snapshot.commit}" data-timestamp="{escape(snapshot.timestamp)}" '
+                         f'data-commit="{escape(snapshot.commit)}" '
+                         f'data-timestamp="{escape(snapshot.timestamp)}" '
                          f'data-dashed="{str(model_index >= 8).lower()}" '
                          f'aria-label="{description}"><title>{description}</title></circle>')
         endpoints.append((y(last_rank), last_index, model))
