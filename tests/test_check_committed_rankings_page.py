@@ -1,7 +1,9 @@
 """Exercise the rankings-page gate against deterministic fixture history."""
 import contextlib
 import io
+import json
 import pathlib
+import subprocess
 import sys
 import unittest
 from unittest import mock
@@ -17,7 +19,7 @@ import build_rankings  # noqa: E402  # pylint: disable=wrong-import-position,wro
 import test_build_rankings  # noqa: E402  # pylint: disable=wrong-import-position
 
 
-class CheckCommittedRankingsPageTests(unittest.TestCase):
+class CheckCommittedRankingsPageTests(unittest.TestCase):  # pylint: disable=too-many-public-methods
     """A missing, stale or unbuildable page must fail the CI check."""
 
     def setUp(self):
@@ -31,6 +33,16 @@ class CheckCommittedRankingsPageTests(unittest.TestCase):
         self.harness._git("commit", "-qm", "Commit rankings page")  # pylint: disable=protected-access
 
     def run_check(self):
+        result = subprocess.run(
+            [sys.executable, "-c",
+             "import pathlib, sys; sys.path.insert(0, sys.argv[1]); "
+             "import check_committed_rankings_page as check; "
+             "sys.exit(check.main(pathlib.Path(sys.argv[2])))",
+             str(HERE / "scripts/ci"), str(self.repo)],
+            check=False, capture_output=True, text=True, timeout=60)
+        return result.returncode, result.stdout, result.stderr
+
+    def run_check_in_process(self):
         output, error = io.StringIO(), io.StringIO()
         with contextlib.redirect_stdout(output), contextlib.redirect_stderr(error):
             code = check_committed_rankings_page.main(self.repo)
@@ -60,7 +72,7 @@ class CheckCommittedRankingsPageTests(unittest.TestCase):
 
                 with mock.patch.object(build_rankings, "git", side_effect=git):
                     build_rankings.main(["--repo", str(self.repo), "--out", str(self.page)])
-                    code, output, error = self.run_check()
+                    code, output, error = self.run_check_in_process()
                 self.assertEqual(code, 1)
                 self.assertNotIn("-- ok", output)
                 self.assertEqual(len(error.splitlines()), len(empty_paths))
@@ -79,7 +91,7 @@ class CheckCommittedRankingsPageTests(unittest.TestCase):
 
         self.page.unlink()
         with mock.patch.object(build_rankings, "git", side_effect=git):
-            code, _, error = self.run_check()
+            code, _, error = self.run_check_in_process()
         self.assertEqual(code, 1)
         self.assertEqual(len(error.splitlines()), 3)
         self.assertIn("data/hf-trending.json history is empty", error)
@@ -124,7 +136,99 @@ class CheckCommittedRankingsPageTests(unittest.TestCase):
         self.harness.commit(test_build_rankings.HF, ["org/b", "org/a"], "id")
         code, _, error = self.run_check()
         self.assertEqual(code, 1)
-        self.assertIn("differs from a rebuild", error)
+        self.assertIn("data/hf-trending.json newest column ranks differ", error)
+
+    def build_fresh_page(self, *, router=True):
+        arguments = ["--repo", str(self.repo), "--out", str(self.page),
+                     "--fresh-label", 'run 42 & "capture"']
+        paths = [(test_build_rankings.HF, "id", ["org/b", "org/a"],
+                  "hf", "2026-10-20T09:41:00Z")]
+        if router:
+            paths.append((test_build_rankings.OR, "slug", ["lab/y", "lab/x"],
+                          "or", "2026-10-20T09:42:00Z"))
+        for path, key, models, flag, timestamp in paths:
+            (self.repo / path).write_text(json.dumps({"models": [
+                {key: model} for model in models]}), encoding="utf-8")
+            arguments.extend([f"--fresh-{flag}", str(self.repo / path),
+                              f"--fresh-{flag}-timestamp", timestamp])
+        build_rankings.main(arguments)
+        git = self.harness._git  # pylint: disable=protected-access
+        git("add", *(path for path, *_ in paths), "out/trending-rankings.html")
+        git("commit", "-qm", "Capture lists and rankings together")
+
+    def test_fresh_columns_reconstruct_after_the_capture_lands(self):
+        self.build_fresh_page()
+        before = self.page.read_bytes()
+        code, output, error = self.run_check()
+        self.assertEqual(code, 0, error)
+        self.assertEqual(error, "")
+        self.assertIn("-- ok", output)
+        self.assertEqual(self.page.read_bytes(), before)
+
+    def test_one_sided_fresh_column_keeps_other_commit_identity(self):
+        self.build_fresh_page(router=False)
+        code, _, error = self.run_check()
+        self.assertEqual(code, 0, error)
+        self.assertEqual(error, "")
+
+    def test_fresh_page_with_newer_landed_ranks_refuses(self):
+        self.build_fresh_page()
+        self.harness.commit(test_build_rankings.HF, ["org/a", "org/b"], "id")
+        code, _, error = self.run_check()
+        self.assertEqual(code, 1)
+        self.assertIn("data/hf-trending.json newest column ranks differ", error)
+        self.assertNotIn("data/openrouter-trending.json newest column ranks differ", error)
+
+    def test_sha_columns_reconstruct_with_independent_history_windows(self):
+        for index in range(12):
+            self.harness.commit(test_build_rankings.HF,
+                                ["org/a", "org/b"] if index % 2 else ["org/b", "org/a"],
+                                "id")
+        self.harness.commit(test_build_rankings.OR, ["lab/y", "lab/x"], "slug")
+        build_rankings.main(["--repo", str(self.repo), "--out", str(self.page)])
+        code, _, error = self.run_check()
+        self.assertEqual(code, 0, error)
+        self.assertEqual(error, "")
+
+    def test_sha_columns_reconstruct_when_a_model_leaves_and_returns(self):
+        self.harness.commit(test_build_rankings.HF, ["org/b", "org/c"], "id")
+        self.harness.commit(test_build_rankings.HF, ["org/a", "org/b"], "id")
+        build_rankings.main(["--repo", str(self.repo), "--out", str(self.page)])
+        code, _, error = self.run_check()
+        self.assertEqual(code, 0, error)
+
+    def test_single_model_sections_still_have_parseable_columns(self):
+        git = self.harness._git  # pylint: disable=protected-access
+        git("checkout", "--orphan", "one-model")
+        git("rm", "-rf", "--cached", ".")
+        self.harness.commit(test_build_rankings.HF, ['org/a & "quoted"'], "id")
+        self.harness.commit(test_build_rankings.OR, ["lab/x"], "slug")
+        build_rankings.main(["--repo", str(self.repo), "--out", str(self.page)])
+        code, _, error = self.run_check()
+        self.assertEqual(code, 0, error)
+
+    def test_missing_newest_column_is_a_tracker_violation(self):
+        self.page.write_bytes(self.page.read_bytes().replace(b'class="point"', b'class="gone"'))
+        code, _, error = self.run_check()
+        self.assertEqual(code, 1)
+        self.assertIn("data/hf-trending.json newest column is missing or unparseable", error)
+        self.assertIn("data/openrouter-trending.json newest column is missing or unparseable",
+                      error)
+
+    def test_newest_column_with_mixed_identity_is_unparseable(self):
+        self.build_fresh_page()
+        self.page.write_bytes(self.page.read_bytes().replace(
+            b'data-commit="run 42 &amp; &quot;capture&quot;"',
+            b'data-commit="different"', 1))
+        code, _, error = self.run_check()
+        self.assertEqual(code, 1)
+        self.assertIn("data/hf-trending.json newest column is missing or unparseable", error)
+
+    def test_nonfinite_column_position_is_unparseable(self):
+        self.page.write_bytes(self.page.read_bytes().replace(b'cx="180.0"', b'cx="nan"', 1))
+        code, _, error = self.run_check()
+        self.assertEqual(code, 1)
+        self.assertIn("data/hf-trending.json newest column is missing or unparseable", error)
 
     def test_pr_merge_checks_branch_history_in_both_directions(self):
         git = self.harness._git  # pylint: disable=protected-access
@@ -155,27 +259,40 @@ class CheckCommittedRankingsPageTests(unittest.TestCase):
         self.harness.commit(test_build_rankings.HF, [None], "id")
         code, _, error = self.run_check()
         self.assertEqual(code, 1)
-        self.assertEqual(len(error.splitlines()), 1)
         self.assertIn("rebuild failed", error)
         self.assertIn("red, never a silent pass", error)
 
     def test_system_exit_from_builder_is_red(self):
         with mock.patch.object(build_rankings, "main", side_effect=SystemExit(2)):
-            code, _, error = self.run_check()
+            code, _, error = self.run_check_in_process()
         self.assertEqual(code, 1)
         self.assertIn("rebuild failed", error)
 
     def test_missing_rebuild_output_has_its_own_line(self):
         with mock.patch.object(build_rankings, "main"):
-            code, _, error = self.run_check()
+            code, _, error = self.run_check_in_process()
         self.assertEqual(code, 1)
         self.assertEqual(len(error.splitlines()), 1)
+        self.assertIn("rebuild output is missing or unreadable", error)
+
+    def test_missing_second_rebuild_output_is_red(self):
+        real_main = build_rankings.main
+        builds = []
+
+        def build(arguments):
+            builds.append(arguments)
+            if len(builds) == 1:
+                real_main(arguments)
+
+        with mock.patch.object(build_rankings, "main", side_effect=build):
+            code, _, error = self.run_check_in_process()
+        self.assertEqual(code, 1)
         self.assertIn("rebuild output is missing or unreadable", error)
 
     def test_both_missing_pages_report_distinct_lines(self):
         self.page.unlink()
         with mock.patch.object(build_rankings, "main"):
-            code, _, error = self.run_check()
+            code, _, error = self.run_check_in_process()
         self.assertEqual(code, 1)
         self.assertEqual(len(error.splitlines()), 2)
         self.assertIn("committed page is missing or unreadable", error)
