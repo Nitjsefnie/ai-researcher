@@ -1652,7 +1652,8 @@ def test_push_condition_requires_successful_publish_and_a_bundle(published, comm
         not cancelled and published in ('success', 'skipped'))
 
 
-@pytest.mark.skipif(os.name == 'nt', reason='workflow shell runs on Ubuntu')
+@pytest.mark.skipif(sys.platform != 'linux',
+                    reason='the staging block uses GNU cp --parents; the production job runs on ubuntu')
 @pytest.mark.parametrize('changed,force,mode,page', [
     ('true', 'false', 'moved', 'fresh page'),
     ('true', 'true', 'moved', 'fresh page'),
@@ -2221,8 +2222,10 @@ def test_rankings_fresh_landing_is_stable_on_quiet_and_mixed_hours(tmp_path, nex
 def test_hubs_without_artifact_are_green(tmp_path, job):
     """An absent source payload exits before a tie check or any publication."""
     entry = step_in(load(), job, 'Publish to docs-hub')
+    # The step must exit on the missing artifact before any use of the key.
     env = {**os.environ, 'RUNNER_TEMP': str(tmp_path),
-           'GITHUB_STEP_SUMMARY': str(tmp_path / 'summary')}
+           'GITHUB_STEP_SUMMARY': str(tmp_path / 'summary'),
+           'DOCS_HUB_API_KEY': 'fixture'}
     done = _workflowrun.run_step(tmp_path, entry, env)
     assert done.returncode == 0, done.stdout + done.stderr
     assert 'Nothing published by this run.' in done.stdout
