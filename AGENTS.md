@@ -422,30 +422,38 @@ unclamped and allowed to hang outside the plot rather than be squeezed inside.
 ## Update cadence
 
 The joined `.github/workflows/refresh.yml` refreshes the AA frontier page,
-the Hugging Face trending list and the OpenRouter weekly top 10. Each producer
-commits only its own changed data; a failure in one leaves the others independent.
-After either tracker lands a commit, `rankings` builds from full git history at
-landed `main`, and `rankings-hub` publishes the
+the Hugging Face trending list and the OpenRouter weekly top 10. `rankings`
+builds from full git history plus this run's changed tracker snapshots, and
+`out/trending-rankings.html` joins the same commit as the changed data.
+For each changed list, the newest column identifies its snapshot by the run
+and its fetch time: a commit cannot contain its own SHA and committer time.
+After the commit lands, `rankings-hub` publishes the
 [rankings page](https://docs.nitjsefni.eu/d/ai-researcher/trending-rankings).
 An identical live rankings page skips the upload. Neither tracker feeds the
 frontier page. The standalone `openrouter-top` tracker is retired.
 
 - **Automated, every hour** — `.github/workflows/refresh.yml` captures the
-  leaderboard and the Coding Agent Index, and when the page the fresh capture
-  would build differs from the live one — compared by building the page from
-  both captures with provenance (source stamp, capture date, raw-byte digest)
-  normalized out and sub-threshold speed re-samples reconciled against the
-  last committed values at `diff_aa.py`'s news threshold (`--speed-tol`),
+  leaderboard and the Coding Agent Index and fetches both trackers. When the
+  page the fresh AA capture would build differs from the live one — compared
+  by building the page from both captures with provenance (source stamp,
+  capture date, raw-byte digest) normalized out and sub-threshold speed
+  re-samples reconciled against the last committed values at `diff_aa.py`'s
+  news threshold (`--speed-tol`),
   since AA's payload also churns in fields the page never renders — it
-  rebuilds, runs the suite, commits both with `diff_aa.py`'s
-  summary in the message body, and publishes to docs-hub. The joined workflow
-  requests hourly runs at `:11`; GitHub delivers schedules best-effort. It also
-  refreshes both trackers and publishes their rankings after a tracker commit
-  lands. A capture that would render the identical frontier page is silent
-  — no commit, no version, no notification — as long as the live page is
-  current; when a publish failed or was missed, the next run's live-page
-  check -- the served page compared byte-for-byte against the page main
-  carries, the embedded source-commit stamp among those bytes --
+  rebuilds and runs the suite. The run pushes at most one bot commit carrying
+  every changed source: the AA capture with its rebuilt
+  `out/frontier-models.html`, the two trending lists, and
+  `out/trending-rankings.html`. The message gives one line per changed source,
+  using `diff_aa.py`'s summary for AA. A failed source fetch, or a red AA gate
+  or suite, leaves that source out while the sources that succeeded still
+  commit. A run in which nothing changed pushes nothing; each page is
+  published to docs-hub after the commit lands. The joined workflow requests
+  hourly runs at `:11`; GitHub delivers schedules best-effort. A capture that
+  would render the identical frontier page adds no AA change, version or
+  notification as long as the live page is current; when a publish failed or
+  was missed, the next run's live-page check -- the served page compared
+  byte-for-byte against the page main carries, the embedded source-commit
+  stamp among those bytes --
   republishes instead. The stamp file therefore moves when the DATA
   moves, not every calendar day.
 - **On-demand refresh** when asked ("update the table", "did GPT-6 land yet").
