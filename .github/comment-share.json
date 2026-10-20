@@ -80,8 +80,8 @@
     5308
   ],
   "scripts/ci/check_ratchets.py": [
-    9043,
-    21616
+    8755,
+    21494
   ],
   "scripts/ci/classify_changes.py": [
     6548,
@@ -200,8 +200,8 @@
     21949
   ],
   "tests/test_ci_ratchets.py": [
-    10743,
-    56097
+    10483,
+    60320
   ],
   "tests/test_ci_thresholds.py": [
     3332,
