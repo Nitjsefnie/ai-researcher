@@ -76528,22 +76528,22 @@
   "price1mBlended0To100To1": 0.3089108910891089,
   "intelligenceIndexTimePerTask": 272.8101629213881,
   "intelligenceIndexCost": {
-   "total": 677.3733464311972,
-   "input": 373.63707923119716,
+   "total": 755.0506555191507,
+   "input": 451.3143883191507,
    "nonCacheInput": 5.8523109,
-   "cacheRead": 49.04342705038374,
-   "cacheWrite": 318.7413412808134,
+   "cacheRead": 47.45817584450713,
+   "cacheWrite": 398.0039015746435,
    "output": 303.7362672,
    "reasoning": 263.358132,
    "answer": 40.378135199999996
   },
   "intelligenceIndexCostPerTask": {
    "cost": {
-    "total": 0.485662249576018,
-    "input": 0.37937345138239115,
+    "total": 0.5710707873977727,
+    "input": 0.46478198920414576,
     "nonCacheInput": 0.003871747133582461,
-    "cacheRead": 0.0539247232341467,
-    "cacheWrite": 0.3215769810146621,
+    "cacheRead": 0.05218169185002926,
+    "cacheWrite": 0.40872855022053406,
     "output": 0.10628879819362691,
     "reasoning": 0.07520347462481308,
     "answer": 0.0310853235688138
@@ -76551,19 +76551,19 @@
    "evaluations": [
     {
      "slug": "aa-briefcase",
-     "weightedCostPerTask": 0.1565156380367765
+     "weightedCostPerTask": 0.18427661349045904
     },
     {
      "slug": "gdpval-aa",
-     "weightedCostPerTask": 0.049602102788351914
+     "weightedCostPerTask": 0.05718362080535969
     },
     {
      "slug": "automationbench-aa",
-     "weightedCostPerTask": 0.010968272991303984
+     "weightedCostPerTask": 0.011858715438173642
     },
     {
      "slug": "terminalbench-4-0",
-     "weightedCostPerTask": 0.24252360709410728
+     "weightedCostPerTask": 0.29169920899830193
     },
     {
      "slug": "scicode",
@@ -76607,28 +76607,28 @@
     "slug": "aa-briefcase",
     "score": 1419.38,
     "outputTokensPerTask": 170690.02197802198,
-    "costPerTask": 1.0434375869118435,
+    "costPerTask": 1.2285107566030604,
     "timePerTask": 525.7295989372276
    },
    {
     "slug": "gdpval-aa",
     "score": 1600,
     "outputTokensPerTask": 116107.87272727273,
-    "costPerTask": 0.4960210278835191,
+    "costPerTask": 0.5718362080535969,
     "timePerTask": 357.6151942274835
    },
    {
     "slug": "automationbench-aa",
     "score": 0.6889097769674057,
     "outputTokensPerTask": 87008.58751902588,
-    "costPerTask": 0.21936545982607963,
+    "costPerTask": 0.23717430876347279,
     "timePerTask": 267.9886573941739
    },
    {
     "slug": "terminalbench-4-0",
     "score": 0.267676767676768,
     "outputTokensPerTask": 285252.1060606061,
-    "costPerTask": 2.425236070941073,
+    "costPerTask": 2.9169920899830193,
     "timePerTask": 878.5837249148136
    },
    {
@@ -76699,7 +76699,7 @@
     "upper95ci": 1349.09
    }
   },
-  "briefcaseTotalCost": 94.95282040897776,
+  "briefcaseTotalCost": 111.79447885087849,
   "personalityBench": {
    "scores": {
     "lexicallyVaried": 1026.44,
@@ -76859,7 +76859,7 @@
   "performanceDataSource": {
    "type": "median"
   },
-  "hostModelCount": 26,
+  "hostModelCount": 25,
   "creator": {
    "id": "58b835bf-4c87-4f87-a846-df4b692c6e7d",
    "slug": "deepseek",
@@ -76947,7 +76947,7 @@
   "cacheHitPrice": 0.007,
   "cacheHitDiscountPercent": 0.98,
   "cacheWritePrice": null,
-  "pricePer1k1mpImages": 0.1836,
+  "pricePer1k1mpImages": 0.1683,
   "price1mBlended0To3To1": 0.5249999999999999,
   "price1mBlended7To2To1": 0.1849,
   "price1mBlended0To1To1": 0.75,
@@ -76955,22 +76955,22 @@
   "price1mBlended0To100To1": 0.3089108910891089,
   "intelligenceIndexTimePerTask": 77.60804250752258,
   "intelligenceIndexCost": {
-   "total": 216.378922466945,
-   "input": 162.971111666945,
+   "total": 238.91460512604993,
+   "input": 185.50679432604994,
    "nonCacheInput": 6.112259099999999,
-   "cacheRead": 38.071574494987665,
-   "cacheWrite": 118.78727807195735,
+   "cacheRead": 37.53317934613533,
+   "cacheWrite": 141.8613558799146,
    "output": 53.4078108,
    "reasoning": 0,
    "answer": 53.4078108
   },
   "intelligenceIndexCostPerTask": {
    "cost": {
-    "total": 0.22122822673888506,
-    "input": 0.18078944440697187,
+    "total": 0.2488243348377231,
+    "input": 0.2083855525058099,
     "nonCacheInput": 0.004176689544296747,
-    "cacheRead": 0.04662061057343499,
-    "cacheWrite": 0.12999214428924016,
+    "cacheRead": 0.04596131788847982,
+    "cacheWrite": 0.15824754507303335,
     "output": 0.040438782331913205,
     "reasoning": 0,
     "answer": 0.040438782331913205
@@ -76978,19 +76978,19 @@
    "evaluations": [
     {
      "slug": "aa-briefcase",
-     "weightedCostPerTask": 0.02896228629789439
+     "weightedCostPerTask": 0.03197247148044812
     },
     {
      "slug": "gdpval-aa",
-     "weightedCostPerTask": 0.015585347679789889
+     "weightedCostPerTask": 0.016997030659361607
     },
     {
      "slug": "automationbench-aa",
-     "weightedCostPerTask": 0.002916053476763367
+     "weightedCostPerTask": 0.0031010536959194253
     },
     {
      "slug": "terminalbench-4-0",
-     "weightedCostPerTask": 0.16771181954446568
+     "weightedCostPerTask": 0.1907010592620222
     },
     {
      "slug": "scicode",
@@ -77034,28 +77034,28 @@
     "slug": "aa-briefcase",
     "score": 1117.62,
     "outputTokensPerTask": 35128.43956043956,
-    "costPerTask": 0.19308190865262928,
+    "costPerTask": 0.21314980986965418,
     "timePerTask": 80.90004515723655
    },
    {
     "slug": "gdpval-aa",
     "score": 1341.23,
     "outputTokensPerTask": 42247.82272727273,
-    "costPerTask": 0.15585347679789888,
+    "costPerTask": 0.16997030659361606,
     "timePerTask": 97.29583235687913
    },
    {
     "slug": "automationbench-aa",
     "score": 0.4780780681445035,
     "outputTokensPerTask": 14803.056316590562,
-    "costPerTask": 0.05832106953526734,
+    "costPerTask": 0.06202107391838849,
     "timePerTask": 34.09112216376249
    },
    {
     "slug": "terminalbench-4-0",
     "score": 0.0555555555555556,
     "outputTokensPerTask": 219014.25757575757,
-    "costPerTask": 1.6771181954446568,
+    "costPerTask": 1.907010592620222,
     "timePerTask": 504.38515202113115
    },
    {
@@ -77126,7 +77126,7 @@
     "upper95ci": 1247.01
    }
   },
-  "briefcaseTotalCost": 17.570453687389264,
+  "briefcaseTotalCost": 19.39663269813853,
   "timescaleData": {
    "medianOutputSpeed": 442.1713013215,
    "medianTimeToFirstChunk": 0.815512986499996
@@ -77185,7 +77185,7 @@
   "performanceDataSource": {
    "type": "median"
   },
-  "hostModelCount": 12,
+  "hostModelCount": 11,
   "creator": {
    "id": "58b835bf-4c87-4f87-a846-df4b692c6e7d",
    "slug": "deepseek",
