@@ -24343,7 +24343,7 @@
   "omniscience": -0.4,
   "omniscienceAccuracy": 0.22583333333333333,
   "omniscienceNonHallucination": 0.7031216361679224,
-  "gdpvalNormalized": 0.256625,
+  "gdpvalNormalized": 0.2553,
   "analystAgent": 0.0625,
   "terminalbenchHard": 0.363636363636364,
   "terminalBench21": 0.539325842696629,
@@ -24461,10 +24461,10 @@
   "omniscienceHallucinationRate": 0.2968783638320775,
   "mlcrOverall": 0.111111111111111,
   "gdpPdfAllPass": 0.05,
-  "gdpval": 1013.25,
+  "gdpval": 1010.6,
   "itBenchSre": null,
   "frontierCode": 0.105152333333333,
-  "terminalBenchScience": null,
+  "terminalBenchScience": 0,
   "hleDiamond": null,
   "livecodebench": null,
   "aime25": null,
@@ -24502,14 +24502,14 @@
   "intelligenceIndexEvaluations": [
    {
     "slug": "aa-briefcase",
-    "score": 876.28,
+    "score": 876.35,
     "outputTokensPerTask": 47525.45054945055,
     "costPerTask": 1.282229230372431,
     "timePerTask": 282.8966920753457
    },
    {
     "slug": "gdpval-aa",
-    "score": 1013.25,
+    "score": 1010.6,
     "outputTokensPerTask": 27244.104545454546,
     "costPerTask": 0.4085503966954266,
     "timePerTask": 162.17136219349499
@@ -24580,99 +24580,99 @@
   },
   "briefcaseBreakdown": {
    "overall": {
-    "elo": 876.28,
-    "lower95ci": 868.97,
-    "upper95ci": 883.59
+    "elo": 876.35,
+    "lower95ci": 868.83,
+    "upper95ci": 883.45
    },
    "rubricPassRate": 0.2202020202020202,
    "analyticalQuality": {
-    "elo": 831.75,
-    "lower95ci": 818.81,
-    "upper95ci": 845.37
+    "elo": 831.25,
+    "lower95ci": 818.26,
+    "upper95ci": 844.57
    },
    "presentation": {
-    "elo": 877.23,
-    "lower95ci": 862.58,
-    "upper95ci": 890.42
+    "elo": 877.29,
+    "lower95ci": 863.34,
+    "upper95ci": 891.74
    }
   },
   "briefcaseTotalCost": 116.68285996389122,
   "aa3dElo": 568.9111,
   "personalityBench": {
    "scores": {
-    "lexicallyVaried": 567.76,
-    "eloquent": 208.86,
-    "literate": 605.75,
-    "naturalSounding": -68.74,
-    "metaphorical": 1033.35,
-    "structured": 753.09,
-    "scannable": 1336.38,
-    "summarizesBottomLine": 987.02,
-    "answerFirst": 378.45,
-    "informationDense": 1476.46,
-    "evidenceBased": 1106.76,
-    "resourceSpecific": 2001.47,
-    "providesActionableGuidance": 1658,
-    "pragmatic": 264.59,
-    "truthful": -79.82,
-    "admitsUncertainty": 390.2,
-    "disclaimsWithAssumptions": 554.41,
-    "flagsNuances": 707.67,
-    "sycophantic": 1247.2,
-    "friendly": 520.65,
-    "humorous": 492.32,
-    "sincere": -342.86,
-    "emotionallyIntelligent": -3.23,
-    "direct": 563.05,
-    "confident": 944.11,
-    "opinionated": 888.11,
-    "constructivelyPushesBack": 808.2,
-    "creative": 606.61,
-    "openEnded": 389.35,
-    "slop": 2007.21
+    "lexicallyVaried": 568.23,
+    "eloquent": 208.84,
+    "literate": 611.39,
+    "naturalSounding": -69.54,
+    "metaphorical": 1038.12,
+    "structured": 751.13,
+    "scannable": 1339.84,
+    "summarizesBottomLine": 986.17,
+    "answerFirst": 375.77,
+    "informationDense": 1477,
+    "evidenceBased": 1104.95,
+    "resourceSpecific": 2000.25,
+    "providesActionableGuidance": 1659.54,
+    "pragmatic": 272.88,
+    "truthful": -81.98,
+    "admitsUncertainty": 387.6,
+    "disclaimsWithAssumptions": 553.42,
+    "flagsNuances": 707.87,
+    "sycophantic": 1245.75,
+    "friendly": 523.58,
+    "humorous": 489.91,
+    "sincere": -348.26,
+    "emotionallyIntelligent": 0.07,
+    "direct": 560.7,
+    "confident": 943.17,
+    "opinionated": 894.03,
+    "constructivelyPushesBack": 809.31,
+    "creative": 606.81,
+    "openEnded": 391.1,
+    "slop": 2011.02
    },
    "indexScores": {
-    "expressiveness": 9.73529411764706,
-    "organization": 9.73529411764706,
-    "informativeness": 82.52941176470588,
-    "transparency": 9.73529411764706,
+    "expressiveness": 9.485714285714286,
+    "organization": 9.485714285714286,
+    "informativeness": 68.88571428571429,
+    "transparency": 9.485714285714286,
     "warmth": 1,
-    "conviction": 15.558823529411764,
-    "imagination": 6.823529411764706,
-    "slop": 91.26470588235294
+    "conviction": 15.142857142857142,
+    "imagination": 6.657142857142857,
+    "slop": 91.5142857142857
    },
    "indexIntervals": {
     "expressiveness": {
-     "lower": 6.5800634298146345,
-     "upper": 10.738618051144849
+     "lower": 6.446083808356575,
+     "upper": 10.470666429599707
     },
     "organization": {
-     "lower": 8.625901574000821,
-     "upper": 16.44215403005085
+     "lower": 8.350260703243201,
+     "upper": 15.761159494737381
     },
     "informativeness": {
-     "lower": 68.21634836493381,
-     "upper": 85.89154447224153
+     "lower": 66.06085723708169,
+     "upper": 86.9782756571906
     },
     "transparency": {
-     "lower": 7.17557071322498,
-     "upper": 15.796237808958018
+     "lower": 7.01346618935547,
+     "upper": 15.416918069076422
     },
     "warmth": {
      "lower": 1,
-     "upper": 4.092237155407544
+     "upper": 4.04802016425616
     },
     "conviction": {
-     "lower": 11.274971727157682,
-     "upper": 17.451709040153588
+     "lower": 11.005923745102608,
+     "upper": 16.894346961733802
     },
     "imagination": {
-     "lower": 5.283151438311892,
-     "upper": 9.899204840849546
+     "lower": 5.027357854830094,
+     "upper": 9.573550217338314
     },
     "slop": {
-     "lower": 90.16119895817025,
-     "upper": 93.6143414271786
+     "lower": 90.526801669714,
+     "upper": 94.11663270832797
     }
    }
   },
