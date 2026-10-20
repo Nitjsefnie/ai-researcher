@@ -83,10 +83,10 @@ def _rebuild(checkout: pathlib.Path, ref: str, committed: bytes | None,
         # has no preceding history, so use a one-column window at that commit.
         anchor = history[1] if len(history) > 1 else history[0]
         requests.append((section, ["--commit", anchor, "--limit",
-                                  str(LIMIT if len(history) > 1 else 1),
-                                  f"--fresh-{flag}", str(fresh),
-                                  f"--fresh-{flag}-timestamp", column.timestamp,
-                                  "--fresh-label", column.commit]))
+                                   str(LIMIT if len(history) > 1 else 1),
+                                   f"--fresh-{flag}", str(fresh),
+                                   f"--fresh-{flag}-timestamp", column.timestamp,
+                                   "--fresh-label", column.commit]))
     output = directory / "trending-rankings.html"
     common = ["--repo", str(checkout)]
     if len(requests) != len(TRACKERS):
