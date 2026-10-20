@@ -119,9 +119,12 @@ class GateTests(unittest.TestCase):  # pylint: disable=too-many-public-methods
         jobs = self.wf['jobs']
         self.assertEqual(jobs['hub']['needs'], ['publish', 'push', 'refresh'])
         self.assertEqual(jobs['rankings-hub']['needs'], ['publish', 'push', 'rankings'])
-        self.assertEqual(jobs['hub']['if'], jobs['rankings-hub']['if'])
+        self.assertEqual(jobs['hub']['if'],
+                         "!cancelled() && needs.publish.result == 'success' && "
+                         "needs.publish.outputs.publish == 'true' && "
+                         "(needs.push.result == 'skipped' || needs.push.result == 'success')")
         self.assertNotIn('needs.refresh.', jobs['hub']['if'])
-        self.assertNotIn('needs.rankings.', jobs['rankings-hub']['if'])
+        self.assertNotIn('needs.publish.outputs.', jobs['rankings-hub']['if'])
         self.assertEqual(hub_step(self.wf, 'Download the publish payload')['if'],
                          pub_step(self.wf, 'Download the publish payload')['if'])
 
@@ -1643,6 +1646,9 @@ def test_push_condition_requires_successful_publish_and_a_bundle(published, comm
         condition = condition.replace(term, str(value))
     actual = eval(condition.replace('&&', 'and'), {'__builtins__': {}}, {})  # pylint: disable=eval-used
     assert actual is (not cancelled and published == 'success' and commits == 'true')
+    assert _rankings_hub_runs(published, 'success' if actual else 'skipped',
+                              'success', cancelled) is (
+        not cancelled and published in ('success', 'skipped'))
 
 
 @pytest.mark.skipif(os.name == 'nt', reason='workflow shell runs on Ubuntu')
@@ -1837,7 +1843,9 @@ class RankingsStructureTests(unittest.TestCase):
 
     def test_rankings_hub_has_an_explicit_failure_isolated_condition(self):
         self.assertEqual(self.wf['jobs']['rankings-hub']['if'],
-                         self.wf['jobs']['hub']['if'])
+                         "!cancelled() && needs.rankings.result == 'success' && "
+                         "(needs.publish.result == 'skipped' || needs.publish.result == 'success') && "
+                         "(needs.push.result == 'skipped' || needs.push.result == 'success')")
 
     def test_rankings_stages_only_the_changed_verdict(self):
         stage = step_in(self.wf, 'rankings', 'Stage the page state')
@@ -1905,27 +1913,36 @@ class RankingsStructureTests(unittest.TestCase):
         self.assertNotIn('github.sha', run)
 
 
-@pytest.mark.parametrize('published', ['success', 'failure', 'skipped'])
-@pytest.mark.parametrize('verdict', ['true', 'false', ''])
-@pytest.mark.parametrize('pushed', ['success', 'failure', 'skipped', 'cancelled'])
-@pytest.mark.parametrize('cancelled', [False, True])
-def test_rankings_hub_condition_covers_ancestor_outcomes(published, verdict, pushed, cancelled):
-    """A successful joined commit admits publication even after a conceded push."""
+def _rankings_hub_runs(published, pushed, rankings, cancelled=False, verdict=''):
+    """Evaluate the real hub condition against upstream results and outputs."""
     condition = load()['jobs']['rankings-hub'].get('if', 'success()')
     terms = {
-        'success()': not cancelled and published == 'success' and pushed == 'success',
+        'success()': not cancelled and all(result == 'success'
+                                           for result in (published, pushed, rankings)),
         '!cancelled()': not cancelled,
-        "needs.publish.result == 'success'": published == 'success',
-        "needs.publish.outputs.publish == 'true'": verdict == 'true',
-        "needs.push.result == 'success'": pushed == 'success',
-        "needs.push.result == 'skipped'": pushed == 'skipped',
+        'needs.rankings.result': rankings,
+        'needs.publish.result': published,
+        'needs.publish.outputs.publish': verdict,
+        'needs.push.result': pushed,
     }
     for term, value in terms.items():
-        condition = condition.replace(term, str(value))
-    actual = eval(condition.replace('&&', 'and').replace('||', 'or'),  # pylint: disable=eval-used
-                  {'__builtins__': {}}, {})
-    assert actual is (not cancelled and published == 'success' and verdict == 'true'
-                      and pushed in ('success', 'skipped'))
+        condition = condition.replace(term, repr(value))
+    return eval(condition.replace('&&', 'and').replace('||', 'or'),  # pylint: disable=eval-used
+                {'__builtins__': {}}, {})
+
+
+@pytest.mark.parametrize('published,verdict', [
+    ('success', 'true'), ('success', 'false'), ('success', ''),
+    ('skipped', ''), ('failure', 'true'), ('cancelled', 'true')])
+@pytest.mark.parametrize('rankings', ['success', 'failure', 'skipped', 'cancelled'])
+@pytest.mark.parametrize('pushed', ['success', 'failure', 'skipped', 'cancelled'])
+@pytest.mark.parametrize('cancelled', [False, True])
+def test_rankings_hub_condition_covers_ancestor_outcomes(published, verdict, rankings,
+                                                        pushed, cancelled):
+    """Quiet recovery is admitted; failed jobs and cancellation remain suppressive."""
+    actual = _rankings_hub_runs(published, pushed, rankings, cancelled, verdict)
+    assert actual is (not cancelled and rankings == 'success'
+                      and published in ('success', 'skipped') and pushed in ('success', 'skipped'))
 
 
 RANKINGS_CURL = '''import json
@@ -1952,6 +1969,97 @@ elif url == 'https://docs.nitjsefni.eu/api/publish':
 else:
     raise SystemExit('unexpected curl endpoint: ' + url)
 '''
+
+
+@pytest.mark.skipif(os.name == 'nt', reason='workflow shell runs on Ubuntu')
+def test_rankings_quiet_hour_recovers_a_failed_upload(tmp_path):
+    """An HTTP failure after landing heals next hour without another commit."""
+    # Reuse the shared fixture's private seeding and git helpers.
+    # pylint: disable=protected-access
+    harness = _SeededOrigin()
+    config, base, origin, repo, seed_env = harness._seed_origin(tmp_path, {
+        'data/hf-trending.json': '{"models": [{"id": "old/hf"}]}',
+        'data/openrouter-trending.json': '{"models": [{"slug": "old/or"}]}',
+    })
+    (repo / 'scripts').mkdir()
+    shutil.copyfile(ROOT / 'scripts/build_rankings.py', repo / 'scripts/build_rankings.py')
+    landing = tmp_path / 'landing'
+    landing.mkdir()
+    env = {**os.environ, **harness._env(landing, config, base), 'GITHUB_RUN_ID': '12345'}
+    for tracker, filename, key in (('hf', 'hf', 'id'), ('or', 'openrouter', 'slug')):
+        payload = landing / f'{tracker}-payload'
+        (payload / 'data').mkdir(parents=True)
+        data = payload / f'data/{filename}-trending.json'
+        data.write_text(json.dumps({'models': [{key: 'fresh/model'}]}), encoding='utf-8')
+        (payload / 'fetched-at.txt').write_text('2026-10-20T09:41:00Z', encoding='utf-8')
+    build = step_in(load(), 'rankings', 'Build the rankings page')
+    done = _workflowrun.run_step(repo, build, env)
+    assert done.returncode == 0, done.stdout + done.stderr
+    page = repo / 'out/trending-rankings.html'
+    original = page.read_bytes()
+    assert b'data-commit="run 12345"' in original
+    for tracker, filename in (('hf', 'hf'), ('or', 'openrouter')):
+        shutil.copyfile(landing / f'{tracker}-payload/data/{filename}-trending.json',
+                        repo / f'data/{filename}-trending.json')
+    harness._git('add', 'data/hf-trending.json', 'data/openrouter-trending.json',
+                 'out/trending-rankings.html', cwd=repo, env=seed_env)
+    harness._git('commit', '-qm', 'Land snapshots and rankings', cwd=repo, env=seed_env)
+    harness._git('push', '-q', str(origin), 'HEAD:main', cwd=repo, env=seed_env)
+    landed = harness._git('rev-parse', 'HEAD', cwd=repo).stdout.strip()
+    stub = tmp_path / 'bin'
+    stub.mkdir()
+    (stub / 'curl_payload.py').write_text(RANKINGS_CURL, encoding='utf-8')
+    (stub / 'curl').write_text(
+        '#!/bin/sh\nexec "$TEST_PYTHON" "$(dirname "$0")/curl_payload.py" "$@"\n',
+        encoding='utf-8')
+    (stub / 'curl').chmod(0o755)
+    env.update({'PATH': str(stub) + os.pathsep + os.environ['PATH'],
+                'TEST_PYTHON': sys.executable, 'DOCS_HUB_API_KEY': 'fixture',
+                'LIVE_PAGE': 'stale', 'UPLOAD_CODE': '503', 'UPLOAD_BODY': '{}',
+                'HUB_CALLS': str(tmp_path / 'calls')})
+    hub = dict(step_in(load(), 'rankings-hub', 'Publish to docs-hub'))
+    hub['run'] = hub['run'].replace(
+        '/tmp/publish-response.json', '"${RUNNER_TEMP}/publish-response.json"')
+    artifact = landing / 'rankings-page/trending-rankings.html'
+    artifact.parent.mkdir()
+    artifact.write_bytes(original)
+    env['RANKINGS_PAGE'] = str(artifact)
+    assert _rankings_hub_runs('success', 'success', 'success', verdict='true')
+    done = _workflowrun.run_step(repo, hub, env)
+    assert done.returncode == 1, done.stdout + done.stderr
+    assert 'publish failed: HTTP 503' in done.stderr
+    quiet = tmp_path / 'quiet'
+    quiet.mkdir()
+    env.update(harness._env(quiet, config, landed))
+    env.update({'PATH': str(stub) + os.pathsep + os.environ['PATH'],
+                'GITHUB_RUN_ID': '67890', 'UPLOAD_CODE': '200'})
+    for entry in (build, step_in(load(), 'rankings', 'Stage the page state')):
+        done = _workflowrun.run_step(repo, entry, env)
+        assert done.returncode == 0, done.stdout + done.stderr
+    assert page.read_bytes() == original
+    assert (quiet / 'output.txt').read_text() == 'changed=false\n'
+    publish = load()['jobs']['publish']['if'].replace('!cancelled()', 'True')
+    for source, output in (('refresh', 'proceed'), ('hf-fetch', 'changed'),
+                           ('or-fetch', 'changed'), ('rankings', 'changed')):
+        publish = publish.replace(f'needs.{source}.result', repr('success'))
+        publish = publish.replace(f'needs.{source}.outputs.{output}', repr('false'))
+    assert not eval(publish.replace('&&', 'and').replace('||', 'or'),  # pylint: disable=eval-used
+                    {'__builtins__': {}}, {})
+    assert _rankings_hub_runs('skipped', 'skipped', 'success')
+    artifact = quiet / 'rankings-page/trending-rankings.html'
+    artifact.parent.mkdir()
+    artifact.write_bytes(page.read_bytes())
+    env['RANKINGS_PAGE'] = str(artifact)
+    done = _workflowrun.run_step(repo, hub, env)
+    assert done.returncode == 0, done.stdout + done.stderr
+    verified = harness._git('show', 'FETCH_HEAD:out/trending-rankings.html',
+                             cwd=quiet / 'ref-scratch').stdout.encode()
+    assert verified == original == (quiet / 'page/out/trending-rankings.html').read_bytes()
+    calls = [json.loads(line) for line in (tmp_path / 'calls').read_text().splitlines()]
+    assert [call[-1] for call in calls if call[-1].endswith('/api/publish')] == [
+        'https://docs.nitjsefni.eu/api/publish', 'https://docs.nitjsefni.eu/api/publish']
+    assert harness._git('rev-parse', 'HEAD', cwd=repo).stdout.strip() == landed
+    assert harness._git('rev-parse', 'main', cwd=origin).stdout.strip() == landed
 
 
 @pytest.mark.skipif(os.name == 'nt', reason='workflow shell runs on Ubuntu')
