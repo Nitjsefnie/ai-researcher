@@ -100,10 +100,12 @@ def test_caller_and_every_callee_key_push_concurrency_by_sha():
     for path, workflow in workflows.items():
         group = workflow["concurrency"]["group"]
         assert isinstance(group, str), path.name
-        assert re.search(
+        push_sha = re.search(
             r"\(\s*github\.event_name\s*==\s*'push'\s*&&\s*github\.sha\s*\)",
-            group), (path.name, group)
-        assert not re.search(r"\$\{\{\s*github\.ref\s*\}\}", group), (
+            group)
+        assert push_sha, (path.name, group)
+        ref_position = group.find("github.ref")
+        assert ref_position == -1 or ref_position > push_sha.end(), (
             path.name, group)
 
 
