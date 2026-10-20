@@ -1,27 +1,17 @@
 name: refresh
 
-# The automated capture: fetch AA's leaderboard every hour, and when the page
-# built from the new capture would differ from the one it replaces, commit the
-# new capture and publish the rebuilt page to docs-hub.
+# The hourly refresh stages one payload per successful, changed source: AA,
+# Hugging Face, OpenRouter and the rankings page. The keyless `publish` job
+# joins those payloads into at most one commit, with one message line per
+# source. Failed sources stay red and contribute nothing; survivors still
+# land. A quiet run has no commit or push (issues #143 and #133).
 #
-# THE AA WRITE SIDE IS THREE JOBS IN A FIXED ORDER (issues #143 and #133):
-# `refresh` captures, gates, rebuilds, installs third-party dependencies,
-# downloads Chromium and runs the full suite -- so it holds NOTHING but a
-# read-only token, and the hour's commit payload (the fresh captures, the
-# built page, the differ's message) leaves it as an artifact of this same
-# run. `publish` is a keyless committer: it downloads the artifact and replays
-# the hour's single data commit against main in a scratch repo with git plumbing
-# alone -- no checkout, no pip, no browser, no script from the tree, and no
-# push; it stages the commits for the push job as a git bundle. `push` is
-# the AA job that loads the deploy key (the main-push environment,
-# reachable from main alone): it delivers the bundle to main, so the bot
-# commit starts workflow runs and gets a real ci-gate aggregate verdict --
-# the reason the push moved off the GITHUB_TOKEN for issue #133. `hub` then
-# publishes to docs-hub, skipping the upload when the live page already
-# carries this run's bytes. A red capture or a red suite fails the refresh
-# job, and a failed
-# need never starts the write half: NO commit and NO publish, and the
-# hourly cadence stays green-behaved.
+# The producers run repository code with read-only tokens. `publish` uses
+# git plumbing in a scratch tree, without executing repository code or
+# holding a key. One `push` job loads the deploy key in main-push and
+# delivers the joined bundle. Deploy-key delivery starts CI on the landed
+# commit (issue #133). Both hub publications follow that landing, verify
+# their artifacts against main, and skip identical live pages (issue #206).
 #
 # WHAT COUNTS AS "MOVED" IS THE RENDERED PAGE, NOT THE RAW CAPTURE BYTES
 # (issue #94). The gate (scripts/capture_gate.py) builds the page twice --
@@ -142,23 +132,20 @@ name: refresh
 # identify it (a detail page regenerated later still embeds the older corpus).
 # So there is nothing to dispute, nothing to retry and nothing to heal: the
 # leaderboard publishes every value it carries, the detail route fills only
-# what it omits, and the only scheduled commit is "Refresh capture: ...".
+# what it omits. A moved AA capture contributes its "Refresh capture: ..."
+# subject to the joined scheduled commit.
 # A field the leaderboard drops is a FILL from the detail route, not a
 # disagreement, and fetch_aa.py never exits 3.
 
 #
-# Both trending trackers run independently of AA and each other. Every hourly
-# run on main rebuilds the rankings page from landed main's full history,
-# commits and pushes it when it differs from the committed copy, and publishes
-# it. The workflow concurrency group serializes whole runs; within each run,
-# push -> hub -> hf-push -> or-push -> rankings -> rankings-push serializes
-# the page commit behind the AA and tracker pushes. Each replay carries only
-# its own path over fresh main; disjoint paths prevent content conflicts.
-# A same-run tracker commit must never be visible to the frontier hub's page-tip
-# comparison. The rankings hub ties its artifact to main's committed page bytes,
-# so replayed SHAs cannot delay publication. A tracker or page failure leaves
-# the other producers independent. A mid-run merge or failed push self-heals
-# next hour. No tracker feeds the frontier page.
+# Both trending trackers stage their own changed snapshots independently of
+# AA and each other. Rankings builds from the run's base history plus those
+# fresh snapshots before anything lands. Each successful, changed source
+# participates independently in the joined commit; a fetch or build failure
+# leaves its payload out while the other sources can land. One deploy-key
+# push delivers the bundle, then the frontier hub ties to its tip and the
+# rankings hub verifies main's page bytes before publication. A mid-run merge
+# or failed push self-heals next hour. No tracker feeds the frontier page.
 
 on:
   schedule:
@@ -428,7 +415,7 @@ jobs:
           # hour, and "AA capture unchanged" would mislabel it.
           if [ "$changed" = false ] && [ "${{ inputs.force }}" != 'true' ] \
              && [ "$CAPTURED" != "false" ] && [ "$hub_stale" = false ]; then
-            echo 'AA capture unchanged and the live page is current — nothing committed, nothing published.' \
+            echo 'AA capture unchanged and the live page is current.' \
               >> "$GITHUB_STEP_SUMMARY"
           fi
           if [ "$hub_stale" = true ]; then
@@ -534,6 +521,13 @@ jobs:
         run: |
           PAYLOAD="${RUNNER_TEMP}/publish-payload"
           mkdir -p "${PAYLOAD}/tree"
+          if [ "$CHANGED" = "true" ]; then
+            echo moved > "${PAYLOAD}/aa-mode.txt"
+          elif [ "$FORCE" = "true" ]; then
+            echo rebuild > "${PAYLOAD}/aa-mode.txt"
+          else
+            echo none > "${PAYLOAD}/aa-mode.txt"
+          fi
           # Issue #94's stamp-churn guard, moved from the old commit step: on
           # a republish run the rebuilt page is stamped with THIS run's sha --
           # the only thing that differs from HEAD's page -- so restore HEAD's
@@ -596,35 +590,12 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
-  # --- The write half: commit, push, publish --------------------------------
-  # Issues #143 and #133: the write side is three jobs in a fixed order —
-  # commit, push, publish.
-  #
-  # `publish` (the keyless committer) downloads the payload, replays the
-  # hour's commit — the data commit, and only that one — against main in a
-  # scratch repo with git plumbing alone, and stages the
-  # result for the push job as a git bundle. It runs no repository code: no
-  # checkout, no pip, no browser, no script from the tree, and it pushes
-  # nothing: the fetches are anonymous.
-  #
-  # `push` is the AA job that loads the deploy key. It declares the
-  # main-push environment — the environment's deployment-branch policy
-  # admits only main — and runs no repository code either: the pinned
-  # download action runs before the key is loaded, and the push step is git
-  # plumbing against its own scratch. The push authenticates with the
-  # deploy key, never the job token: unlike a GITHUB_TOKEN push, a
-  # deploy-key push to main starts workflow runs, so ci-gate gives the bot
-  # commit a real aggregate verdict on main's tip — the reason the push
-  # moved off the token for issue #133.
-  #
-  # `hub` publishes the verified page to docs-hub after the push job had
-  # its turn, skipping the upload when the hub already serves the page --
-  # the stamp inside the page HTML is the publish record (issue #206).
-  # A red capture or a red suite fails the refresh job, and a failed need
-  # never starts the write half — NO commit and NO publish, and the hourly
-  # cadence stays green-behaved. A pull request never reaches any of it:
-  # this workflow has no pull_request trigger, and each job needs a
-  # successful refresh run that said proceed.
+  # --- One joined commit, one push, two publications -----------------------
+  # Issues #143 and #133: producers leave artifacts; the keyless committer
+  # joins only successful sources with changes. One deploy-key delivery
+  # starts CI on main, then each hub verifies its own publishable bytes
+  # (issue #206). Failed producers stay red without blocking survivors.
+  # No repository code executes in the committer, push or hub jobs.
   #
   # THE PUSH CAN STILL RACE. The concurrency group serializes runs, but two
   # of them can still pass each other between their checks and their pushes
@@ -638,27 +609,27 @@ jobs:
   # workflow mid-run, so the payload it replays is not this generation's
   # shape (issue #202).
   publish:
-    name: Commit and stage the capture
+    name: Commit and stage the joined refresh
     runs-on: ubuntu-latest
 
     # Per-job ceiling, like every other job's: a hung push or upload fails
     # in 15 minutes instead of holding GitHub's 6-hour default.
     timeout-minutes: 15
 
-    needs: refresh
+    needs: [refresh, hf-fetch, or-fetch, rankings]
 
-    # The committer runs only behind a successful, proceeding refresh job: a
-    # red capture or a red suite must still produce NO commit and NO publish,
-    # and a quiet hour means the committer has nothing to do.
+    # Each source's success and change verdict admits only its own payload.
     if: >-
-      needs.refresh.result == 'success' &&
-      needs.refresh.outputs.proceed == 'true'
+      !cancelled() && ((needs.refresh.result == 'success' && needs.refresh.outputs.proceed == 'true') ||
+      (needs.hf-fetch.result == 'success' && needs.hf-fetch.outputs.changed == 'true') ||
+      (needs.or-fetch.result == 'success' && needs.or-fetch.outputs.changed == 'true') ||
+      (needs.rankings.result == 'success' && needs.rankings.outputs.changed == 'true'))
 
     permissions:
       # Read-only: every fetch here is anonymous, and since issue #206 no
       # job in this workflow holds a write permission at all. Everything
-      # this job commits or stages is the artifact of its own run's
-      # refresh job, which the suite verified.
+      # this job commits or stages comes from successful producers in its
+      # own run; the AA producer also verified its payload with the suite.
       contents: read
 
     outputs:
@@ -673,12 +644,34 @@ jobs:
 
     steps:
       - name: Download the publish payload
+        if: needs.refresh.result == 'success' && needs.refresh.outputs.proceed == 'true'
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: publish-payload
           path: ${{ runner.temp }}/publish-payload
 
-      - name: Commit the capture
+      - name: Download the Hugging Face payload
+        if: needs.hf-fetch.result == 'success' && needs.hf-fetch.outputs.changed == 'true'
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: hf-payload
+          path: ${{ runner.temp }}/hf-payload
+
+      - name: Download the OpenRouter payload
+        if: needs.or-fetch.result == 'success' && needs.or-fetch.outputs.changed == 'true'
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: or-payload
+          path: ${{ runner.temp }}/or-payload
+
+      - name: Download the rankings page
+        if: needs.rankings.result == 'success' && needs.rankings.outputs.changed == 'true'
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: rankings-page
+          path: ${{ runner.temp }}/rankings-page
+
+      - name: Commit the refresh
         id: commit
         run: |
           PAYLOAD="${RUNNER_TEMP}/publish-payload"
@@ -747,44 +740,71 @@ jobs:
           git -C "${scratch}" config user.email \
             '41898282+github-actions[bot]@users.noreply.github.com'
           cd "${scratch}"
-          # The hour's data commit, staged over main's tip in the scratch. The
-          # staging step restored HEAD's page on a republish hour, so the tree
-          # copy stages only what differs from main; the fixed add list is the
-          # old commit step's, widened to the payload's own staging shape.
-          #
-          # The message is diff_aa.py's own rendering, subject line included —
-          # not truncated here. A long one means a lot genuinely moved, and
-          # that is the day you want the detail. A run with an unchanged
-          # capture never ran the differ, so it writes its own subject. The
-          # only other subject is the forced rebuild.
-          cp -a "${PAYLOAD}/tree/." ./
-          git add data/aa-raw-models.json data/aa-raw-coding-agents.json \
-                  data/aa-generation-state.json data/captured-at.txt out/frontier-models.html
-          # The window marker rides the commit both ways (issue #227): a
-          # window hour's payload carries it in, and the first healthy
-          # hour's payload leaves it out, which stages its removal with
-          # `git rm`. The add keys on the PAYLOAD, never on the worktree
-          # file: the checkout at main's tip materializes a tracked marker
-          # into the tree and `cp -a` never deletes, so a worktree probe
-          # would fire the add branch on exactly the heal hour this elif
-          # exists for and the marker would never leave main. Neither
-          # branch fires in a normal hour: absent from both payload and
-          # main.
-          if [ -f "${PAYLOAD}/tree/data/cost-breakdown-window.txt" ]; then
-            git add data/cost-breakdown-window.txt
-          elif git cat-file -e HEAD:data/cost-breakdown-window.txt 2>/dev/null; then
-            git rm -q data/cost-breakdown-window.txt
+          # Every payload contributes only its fixed paths. AA's marker
+          # guard handles both the opening and closing window hours.
+          if [ -d "${PAYLOAD}/tree" ]; then
+            cp -a "${PAYLOAD}/tree/." ./
+            git add data/aa-raw-models.json data/aa-raw-coding-agents.json \
+                    data/aa-generation-state.json data/captured-at.txt out/frontier-models.html
+            # The window marker rides the commit both ways (issue #227): a
+            # window hour's payload carries it in, and the first healthy
+            # hour's payload leaves it out, which stages its removal with
+            # `git rm`. The add keys on the PAYLOAD, never on the worktree
+            # file: the checkout at main's tip materializes a tracked marker
+            # into the tree and `cp -a` never deletes, so a worktree probe
+            # would fire the add branch on exactly the heal hour this elif
+            # exists for and the marker would never leave main. Neither
+            # branch fires in a normal hour: absent from both payload and
+            # main.
+            if [ -f "${PAYLOAD}/tree/data/cost-breakdown-window.txt" ]; then
+              git add data/cost-breakdown-window.txt
+            elif git cat-file -e HEAD:data/cost-breakdown-window.txt 2>/dev/null; then
+              git rm -q data/cost-breakdown-window.txt
+            fi
           fi
-          if [ -f "${PAYLOAD}/commit-msg.txt" ]; then
-            cat "${PAYLOAD}/commit-msg.txt" > "${RUNNER_TEMP}/commit-msg.txt"
-            printf '\n%s\n' 'Captured by .github/workflows/refresh.yml.' \
-              >> "${RUNNER_TEMP}/commit-msg.txt"
-          else
-            printf '%s\n\n%s\n' \
-              'Rebuild the page: forced run, AA capture unchanged' \
-              'The build moved, the data did not. Republished so the live page matches main.' \
-              > "${RUNNER_TEMP}/commit-msg.txt"
+          if [ -f "${RUNNER_TEMP}/hf-payload/data/hf-trending.json" ]; then
+            mkdir -p data
+            cp "${RUNNER_TEMP}/hf-payload/data/hf-trending.json" data/
+            git add data/hf-trending.json
           fi
+          if [ -f "${RUNNER_TEMP}/or-payload/data/openrouter-trending.json" ]; then
+            mkdir -p data
+            cp "${RUNNER_TEMP}/or-payload/data/openrouter-trending.json" data/
+            git add data/openrouter-trending.json
+          fi
+          if [ -f "${RUNNER_TEMP}/rankings-page/trending-rankings.html" ]; then
+            mkdir -p out
+            cp "${RUNNER_TEMP}/rankings-page/trending-rankings.html" out/
+            git add out/trending-rankings.html
+          fi
+          # Only source subjects enter the joined message, in fixed order.
+          # The full differ report stays in the run summary.
+          lines=()
+          if [ -f "${PAYLOAD}/aa-mode.txt" ]; then
+            case "$(cat "${PAYLOAD}/aa-mode.txt")" in
+              moved) lines+=("$(sed -n '1p' "${PAYLOAD}/commit-msg.txt")") ;;
+              rebuild) lines+=('Rebuild the page: forced run, AA capture unchanged') ;;
+            esac
+          fi
+          if [ -f "${RUNNER_TEMP}/hf-payload/message.txt" ]; then
+            lines+=("$(sed -n '1p' "${RUNNER_TEMP}/hf-payload/message.txt")")
+          fi
+          if [ -f "${RUNNER_TEMP}/or-payload/message.txt" ]; then
+            lines+=("$(sed -n '1p' "${RUNNER_TEMP}/or-payload/message.txt")")
+          fi
+          if [ -f "${RUNNER_TEMP}/rankings-page/trending-rankings.html" ]; then
+            lines+=("Rebuild the rankings page from this run's snapshots.")
+          fi
+          {
+            if [ "${#lines[@]}" -gt 0 ]; then
+              printf '%s\n\n' "${lines[0]}"
+              if [ "${#lines[@]}" -gt 1 ]; then
+                printf '%s\n' "${lines[@]:1}"
+                echo
+              fi
+            fi
+            echo 'Captured by .github/workflows/refresh.yml.'
+          } > "${RUNNER_TEMP}/commit-msg.txt"
           # A quiet run stages nothing (the gate restored data/ in the
           # refresh job and the staging step's guard restored the page), and
           # a forced run can produce a page identical to HEAD's; committing
@@ -925,7 +945,7 @@ jobs:
     # Per-job ceiling, like every other job's.
     timeout-minutes: 15
 
-    needs: [publish, push]
+    needs: [publish, push, refresh]
 
     # The hub job runs whenever the run reached a publishable state - a
     # quiet or republish hour too, where the push job skipped (nothing to
@@ -945,6 +965,7 @@ jobs:
 
     steps:
       - name: Download the publish payload
+        if: needs.refresh.result == 'success' && needs.refresh.outputs.proceed == 'true'
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: publish-payload
@@ -961,6 +982,10 @@ jobs:
         env:
           DOCS_HUB_API_KEY: ${{ secrets.DOCS_HUB_API_KEY }}
         run: |
+          if [ ! -f "${RUNNER_TEMP}/publish-payload/tree/out/frontier-models.html" ]; then
+            echo "No frontier artifact from this run. Nothing published by this run."
+            exit 0
+          fi
           # The scratch is read-only plumbing: init, one anonymous fetch
           # (the repo is public), rev-parse, compare. No credential sits in
           # it, and nothing in this step writes to GitHub at all: the only
@@ -1072,14 +1097,14 @@ jobs:
           # left in this workflow that writes to GitHub.
 
   hf-fetch:
-    name: Fetch and commit the Hugging Face top 10
+    name: Fetch and stage the Hugging Face top 10
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
       contents: read
     outputs:
-      commits: ${{ steps.commit.outputs.commits }}
+      changed: ${{ steps.stage.outputs.changed }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -1089,164 +1114,34 @@ jobs:
       - name: Fetch the top 10
         run: python3 scripts/fetch_hf_trending.py --message "$RUNNER_TEMP/message"
 
-      - name: Commit when changed
-        id: commit
+      - name: Stage the payload
+        id: stage
         run: |
-          if git diff --quiet -- data/hf-trending.json; then
-            echo "hf-trending.json unchanged"
-            echo "commits=false" >> "$GITHUB_OUTPUT"
-            exit 0
+          changed=false
+          if ! git diff --quiet -- data/hf-trending.json; then
+            changed=true
           fi
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          base="$(git rev-parse HEAD)"
-          git add data/hf-trending.json
-          git commit -q -F "$RUNNER_TEMP/message"
-          # No co-author trailer: no model authored this scheduled commit.
-          git branch push HEAD
-          mkdir -p "${RUNNER_TEMP}/push-data"
-          git bundle create "${RUNNER_TEMP}/push-data/push.bundle" "$base..push"
-          printf '%s\n' "$base" > "${RUNNER_TEMP}/push-data/base.txt"
-          git rev-parse HEAD > "${RUNNER_TEMP}/push-data/tip.txt"
-          echo "commits=true" >> "$GITHUB_OUTPUT"
+          if [ "$changed" = "true" ]; then
+            payload="${RUNNER_TEMP}/hf-payload"
+            mkdir -p "${payload}/data"
+            cp data/hf-trending.json "${payload}/data/"
+            cp "$RUNNER_TEMP/message" "${payload}/message.txt"
+            date -u +%Y-%m-%dT%H:%M:%SZ > "${payload}/fetched-at.txt"
+          fi
+          echo "changed=$changed" >> "$GITHUB_OUTPUT"
 
-      - name: Upload the push bundle
-        if: success() && steps.commit.outputs.commits == 'true'
+      - name: Upload the payload
+        if: success() && steps.stage.outputs.changed == 'true'
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: hf-push-data
-          path: ${{ runner.temp }}/push-data
+          name: hf-payload
+          path: ${{ runner.temp }}/hf-payload
           if-no-files-found: error
           retention-days: 1
 
-  hf-push:
-    name: Replay and push the Hugging Face trending commit
-    needs: [hf-fetch, push, hub]
-    if: >-
-      !cancelled() && needs.hf-fetch.outputs.commits == 'true' && needs.push.result != 'cancelled'
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    # Push jobs alone reach the key. The environment admits main alone.
-    environment: main-push
-    permissions:
-      contents: read
-    outputs:
-      landed: ${{ steps.push.outputs.landed }}
-    steps:
-      - name: Download the push bundle
-        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
-        with:
-          name: hf-push-data
-          path: ${{ runner.temp }}/push-data
-
-      - name: Replay onto fresh main
-        id: replay
-        # Anonymous fetch and git alone, before the key is loaded. No action
-        # checks out the tree and no repository script executes in this job.
-        run: |
-          remote="https://github.com/${GITHUB_REPOSITORY}"
-          scratch="${RUNNER_TEMP}/scratch"
-          git init -q "$scratch"
-          git -C "$scratch" remote add origin "$remote"
-          git -C "$scratch" fetch --quiet origin main
-          base="$(git -C "$scratch" rev-parse FETCH_HEAD)"
-          git -C "$scratch" fetch --quiet "${RUNNER_TEMP}/push-data/push.bundle" \
-            'refs/heads/push:refs/heads/capture'
-          git -C "$scratch" checkout -q -B push "$base"
-          git -C "$scratch" config user.name 'github-actions[bot]'
-          git -C "$scratch" config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          cd "$scratch"
-          git restore --source=capture --staged --worktree -- data/hf-trending.json
-          if git diff --cached --quiet; then
-            echo "Fresh main already carries the trending list — nothing committed." \
-              >> "$GITHUB_STEP_SUMMARY"
-            echo "commits=false" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-          # Reuse the fetcher's entire message and bot author, without executing
-          # tree code. Only the one data file is replayed over fresh main.
-          git commit -q -C capture
-          git bundle create "${RUNNER_TEMP}/push-data/replayed.bundle" "$base..push"
-          mv "${RUNNER_TEMP}/push-data/replayed.bundle" "${RUNNER_TEMP}/push-data/push.bundle"
-          printf '%s\n' "$base" > "${RUNNER_TEMP}/push-data/base.txt"
-          git rev-parse HEAD > "${RUNNER_TEMP}/push-data/tip.txt"
-          echo "commits=true" >> "$GITHUB_OUTPUT"
-
-      # Delivery matches the AA push job, apart from truthful tracker wording
-      # and its success-only landed output. The tests hold these in lockstep:
-      # a local action or script would put repository code beside the deploy key.
-      - name: Push the trending commit
-        id: push
-        if: steps.replay.outputs.commits == 'true'
-        env:
-          MASTER_PUSH_DEPLOY_KEY: ${{ secrets.MASTER_PUSH_DEPLOY_KEY }}
-          REPO: ${{ github.repository }}
-        run: |
-          set -o pipefail
-          # Fail closed when the environment is missing its secret: with no
-          # key there is nothing to authenticate the push with, and the
-          # fallback must never be a token.
-          if [ -z "${MASTER_PUSH_DEPLOY_KEY:-}" ]; then
-            echo "MASTER_PUSH_DEPLOY_KEY is empty: the main-push environment is missing its secret" >&2
-            exit 1
-          fi
-          eval "$(ssh-agent -s)" >/dev/null
-          # The agent is stopped when this step ends, whatever its outcome:
-          # the key never outlives the step that loaded it.
-          trap 'kill "$SSH_AGENT_PID" 2>/dev/null || true' EXIT
-          ssh-add <(printf '%s\n' "$MASTER_PUSH_DEPLOY_KEY") >/dev/null
-          mkdir -p ~/.ssh
-          # GitHub SSH host keys, published by GitHub's Meta endpoint:
-          # https://docs.github.com/en/rest/meta/meta#get-github-meta-information
-          printf '%s\n' \
-            'github.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl' \
-            'github.com ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQCj7ndNxQowgcQnjshcLrqPEiiphnt+VTTvDP6mHBL9j1aNUkY4Ue1gvwnGLVlOhGeYrnZaMgRK6+PKCUXaDbC7qtbW8gIkhL7aGCsOr/C56SJMy/BCZfxd1nWzAOxSDPgVsmerOBYfNqltV9/hWCqBywINIR+5dIg6JTJ72pcEpEjcYgXkE2YEFXV1JHnsKgbLWNlhScqb2UmyRkQyytRLtL+38TGxkxCflmO+5Z8CSSNY7GidjMIZ7Q4zMjA2n1nGrlTDkzwDCsw+wqFPGQA179cnfGWOWRVruj16z6XyvxvjJwbz0wQZ75XK5tKSb7FNyeIEs4TT4jk+S4dhPeAUC5y+bDYirYgM4GC7uEnztnZyaVWQ7B381AK4Qdrwt51ZqExKbQpTUNn+EjqoTwvqNj4kqx5QUCI0ThS/YkOxJCXmPUWZbhjpCg56i+2aB6CmK2JGhn57K5mj0MNdBXA4/WnwH6XoPWJzK5Nyu2zB3nAZp+S5hpQs+p1vN1/wsjk=' \
-            >> ~/.ssh/known_hosts
-          export GIT_SSH_COMMAND='ssh -o StrictHostKeyChecking=yes'
-          remote="${PUSH_REMOTE:-git@github.com:${REPO}.git}"
-          base="$(cat "${RUNNER_TEMP}/push-data/base.txt")"
-          fetched="$(git ls-remote "$remote" refs/heads/main | cut -f1)"
-          if [ "$fetched" != "$base" ]; then
-            echo "::notice::main moved under the run (tested base $base, current tip $fetched); the next hourly run fetches and lands the trending list"
-            {
-              echo "### Dropped: main moved under the run"
-              echo
-              echo "The tested base $base is no longer main's tip ($fetched)."
-              echo "The next hourly run fetches the trending list on the new tip"
-              echo "and lands the data there."
-            } >> "$GITHUB_STEP_SUMMARY"
-            exit 0
-          fi
-          git init -q "${RUNNER_TEMP}/push-repo"
-          git -C "${RUNNER_TEMP}/push-repo" remote add origin "$remote"
-          git -C "${RUNNER_TEMP}/push-repo" fetch --quiet origin main
-          git -C "${RUNNER_TEMP}/push-repo" fetch --quiet \
-            "${RUNNER_TEMP}/push-data/push.bundle" \
-            'refs/heads/push:refs/heads/push'
-          if ! git -C "${RUNNER_TEMP}/push-repo" push origin \
-            "$(cat "${RUNNER_TEMP}/push-data/tip.txt"):refs/heads/main"; then
-            git -C "${RUNNER_TEMP}/push-repo" fetch --quiet origin main
-            # base.txt, not tip^: tip^ would only be the tested base while
-            # the bundle carries exactly the one hour's commit, and the
-            # recorded base is what this comparison asserts.
-            if [ "$(cat "${RUNNER_TEMP}/push-data/base.txt")" = \
-                 "$(git -C "${RUNNER_TEMP}/push-repo" rev-parse FETCH_HEAD)" ]; then
-              echo "the push was rejected while main stood still" >&2
-              exit 1
-            fi
-            echo "::notice::main moved before the push landed; the next hourly run fetches and lands the trending list"
-            {
-              echo "### Dropped: main moved before the push landed"
-              echo "The next hourly run fetches the trending list on the new tip"
-              echo "and lands the data there."
-            } >> "$GITHUB_STEP_SUMMARY"
-          else
-            echo "landed=true" >> "$GITHUB_OUTPUT"
-          fi
-
   rankings:
     name: Build the trending rankings
-    needs: [push, hf-push, or-push]
+    needs: [hf-fetch, or-fetch]
     if: >-
       !cancelled() && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
@@ -1254,202 +1149,78 @@ jobs:
     permissions:
       contents: read
     outputs:
-      commits: ${{ steps.commit.outputs.commits }}
+      changed: ${{ steps.commit.outputs.changed }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          # Read landed main after all pushes, including this run's lists.
           # Ten changing commits per list can span the entire history.
-          ref: main
           fetch-depth: 0
           persist-credentials: false
 
-      - name: Build the rankings page
-        run: python3 scripts/build_rankings.py
+      - name: Download the Hugging Face payload
+        if: needs.hf-fetch.result == 'success' && needs.hf-fetch.outputs.changed == 'true'
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: hf-payload
+          path: ${{ runner.temp }}/hf-payload
 
-      - name: Commit when changed
+      - name: Download the OpenRouter payload
+        if: needs.or-fetch.result == 'success' && needs.or-fetch.outputs.changed == 'true'
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: or-payload
+          path: ${{ runner.temp }}/or-payload
+
+      - name: Build the rankings page
+        run: |
+          args=()
+          if [ -f "${RUNNER_TEMP}/hf-payload/data/hf-trending.json" ]; then
+            args+=(--fresh-hf "${RUNNER_TEMP}/hf-payload/data/hf-trending.json"
+                   --fresh-hf-timestamp "$(cat "${RUNNER_TEMP}/hf-payload/fetched-at.txt")")
+          fi
+          if [ -f "${RUNNER_TEMP}/or-payload/data/openrouter-trending.json" ]; then
+            args+=(--fresh-or "${RUNNER_TEMP}/or-payload/data/openrouter-trending.json"
+                   --fresh-or-timestamp "$(cat "${RUNNER_TEMP}/or-payload/fetched-at.txt")")
+          fi
+          if [ "${#args[@]}" -gt 0 ]; then
+            args+=(--fresh-label "run ${GITHUB_RUN_ID}")
+          fi
+          python3 scripts/build_rankings.py "${args[@]}"
+
+      - name: Stage the page state
         id: commit
         run: |
-          # Every successful build stages its base and tip, including no-commit hours.
-          mkdir -p "${RUNNER_TEMP}/push-data"
-          git rev-parse HEAD > "${RUNNER_TEMP}/push-data/base.txt"
-          git rev-parse HEAD > "${RUNNER_TEMP}/push-data/tip.txt"
-          if git diff --quiet -- out/trending-rankings.html; then
-            echo "trending-rankings.html unchanged"
-            echo "commits=false" >> "$GITHUB_OUTPUT"
-            exit 0
+          changed=false
+          if ! git diff --quiet -- out/trending-rankings.html; then
+            changed=true
           fi
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          base="$(git rev-parse HEAD)"
-          git add out/trending-rankings.html
-          git commit -q -m 'Rebuild the rankings page' \
-            -m "The page is rebuilt from the two trending lists' history and differs from the committed copy." \
-            -m 'Captured by .github/workflows/refresh.yml.'
-          # No co-author trailer: no model authored this scheduled commit.
-          git branch push HEAD
-          git bundle create "${RUNNER_TEMP}/push-data/push.bundle" "$base..push"
-          printf '%s\n' "$base" > "${RUNNER_TEMP}/push-data/base.txt"
-          git rev-parse HEAD > "${RUNNER_TEMP}/push-data/tip.txt"
-          echo "commits=true" >> "$GITHUB_OUTPUT"
-
-      - name: Upload the push bundle
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: rankings-push-data
-          path: ${{ runner.temp }}/push-data
-          if-no-files-found: error
-          retention-days: 1
+          echo "changed=$changed" >> "$GITHUB_OUTPUT"
 
       - name: Upload the rankings page
+        if: success()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: rankings-page
           path: out/trending-rankings.html
           if-no-files-found: error
-
-  rankings-push:
-    name: Replay and push the rankings page
-    needs: [rankings]
-    if: >-
-      !cancelled() && needs.rankings.result == 'success' && needs.rankings.outputs.commits == 'true'
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    # Push jobs alone reach the key. The environment admits main alone.
-    environment: main-push
-    permissions:
-      contents: read
-    outputs:
-      landed: ${{ steps.push.outputs.landed }}
-    steps:
-      - name: Download the push bundle
-        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
-        with:
-          name: rankings-push-data
-          path: ${{ runner.temp }}/push-data
-
-      - name: Replay onto fresh main
-        id: replay
-        # Anonymous fetch and git alone, before the key is loaded. No action
-        # checks out the tree and no repository script executes in this job.
-        run: |
-          remote="https://github.com/${GITHUB_REPOSITORY}"
-          scratch="${RUNNER_TEMP}/scratch"
-          git init -q "$scratch"
-          git -C "$scratch" remote add origin "$remote"
-          git -C "$scratch" fetch --quiet origin main
-          base="$(git -C "$scratch" rev-parse FETCH_HEAD)"
-          git -C "$scratch" fetch --quiet "${RUNNER_TEMP}/push-data/push.bundle" \
-            'refs/heads/push:refs/heads/capture'
-          git -C "$scratch" checkout -q -B push "$base"
-          git -C "$scratch" config user.name 'github-actions[bot]'
-          git -C "$scratch" config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          cd "$scratch"
-          git restore --source=capture --staged --worktree -- out/trending-rankings.html
-          if git diff --cached --quiet; then
-            echo "Fresh main already carries the rankings page — nothing committed." \
-              >> "$GITHUB_STEP_SUMMARY"
-            echo "commits=false" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-          # Reuse the fetcher's entire message and bot author, without executing
-          # tree code. Only the one data file is replayed over fresh main.
-          git commit -q -C capture
-          git bundle create "${RUNNER_TEMP}/push-data/replayed.bundle" "$base..push"
-          mv "${RUNNER_TEMP}/push-data/replayed.bundle" "${RUNNER_TEMP}/push-data/push.bundle"
-          printf '%s\n' "$base" > "${RUNNER_TEMP}/push-data/base.txt"
-          git rev-parse HEAD > "${RUNNER_TEMP}/push-data/tip.txt"
-          echo "commits=true" >> "$GITHUB_OUTPUT"
-
-      # Delivery matches the AA push job, apart from truthful tracker wording
-      # and its success-only landed output. The tests hold these in lockstep:
-      # a local action or script would put repository code beside the deploy key.
-      - name: Push the trending commit
-        id: push
-        if: steps.replay.outputs.commits == 'true'
-        env:
-          MASTER_PUSH_DEPLOY_KEY: ${{ secrets.MASTER_PUSH_DEPLOY_KEY }}
-          REPO: ${{ github.repository }}
-        run: |
-          set -o pipefail
-          # Fail closed when the environment is missing its secret: with no
-          # key there is nothing to authenticate the push with, and the
-          # fallback must never be a token.
-          if [ -z "${MASTER_PUSH_DEPLOY_KEY:-}" ]; then
-            echo "MASTER_PUSH_DEPLOY_KEY is empty: the main-push environment is missing its secret" >&2
-            exit 1
-          fi
-          eval "$(ssh-agent -s)" >/dev/null
-          # The agent is stopped when this step ends, whatever its outcome:
-          # the key never outlives the step that loaded it.
-          trap 'kill "$SSH_AGENT_PID" 2>/dev/null || true' EXIT
-          ssh-add <(printf '%s\n' "$MASTER_PUSH_DEPLOY_KEY") >/dev/null
-          mkdir -p ~/.ssh
-          # GitHub SSH host keys, published by GitHub's Meta endpoint:
-          # https://docs.github.com/en/rest/meta/meta#get-github-meta-information
-          printf '%s\n' \
-            'github.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl' \
-            'github.com ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQCj7ndNxQowgcQnjshcLrqPEiiphnt+VTTvDP6mHBL9j1aNUkY4Ue1gvwnGLVlOhGeYrnZaMgRK6+PKCUXaDbC7qtbW8gIkhL7aGCsOr/C56SJMy/BCZfxd1nWzAOxSDPgVsmerOBYfNqltV9/hWCqBywINIR+5dIg6JTJ72pcEpEjcYgXkE2YEFXV1JHnsKgbLWNlhScqb2UmyRkQyytRLtL+38TGxkxCflmO+5Z8CSSNY7GidjMIZ7Q4zMjA2n1nGrlTDkzwDCsw+wqFPGQA179cnfGWOWRVruj16z6XyvxvjJwbz0wQZ75XK5tKSb7FNyeIEs4TT4jk+S4dhPeAUC5y+bDYirYgM4GC7uEnztnZyaVWQ7B381AK4Qdrwt51ZqExKbQpTUNn+EjqoTwvqNj4kqx5QUCI0ThS/YkOxJCXmPUWZbhjpCg56i+2aB6CmK2JGhn57K5mj0MNdBXA4/WnwH6XoPWJzK5Nyu2zB3nAZp+S5hpQs+p1vN1/wsjk=' \
-            >> ~/.ssh/known_hosts
-          export GIT_SSH_COMMAND='ssh -o StrictHostKeyChecking=yes'
-          remote="${PUSH_REMOTE:-git@github.com:${REPO}.git}"
-          base="$(cat "${RUNNER_TEMP}/push-data/base.txt")"
-          fetched="$(git ls-remote "$remote" refs/heads/main | cut -f1)"
-          if [ "$fetched" != "$base" ]; then
-            echo "::notice::main moved under the run (tested base $base, current tip $fetched); the next hourly run fetches and lands the rankings page"
-            {
-              echo "### Dropped: main moved under the run"
-              echo
-              echo "The tested base $base is no longer main's tip ($fetched)."
-              echo "The next hourly run fetches the rankings page on the new tip"
-              echo "and lands the data there."
-            } >> "$GITHUB_STEP_SUMMARY"
-            exit 0
-          fi
-          git init -q "${RUNNER_TEMP}/push-repo"
-          git -C "${RUNNER_TEMP}/push-repo" remote add origin "$remote"
-          git -C "${RUNNER_TEMP}/push-repo" fetch --quiet origin main
-          git -C "${RUNNER_TEMP}/push-repo" fetch --quiet \
-            "${RUNNER_TEMP}/push-data/push.bundle" \
-            'refs/heads/push:refs/heads/push'
-          if ! git -C "${RUNNER_TEMP}/push-repo" push origin \
-            "$(cat "${RUNNER_TEMP}/push-data/tip.txt"):refs/heads/main"; then
-            git -C "${RUNNER_TEMP}/push-repo" fetch --quiet origin main
-            # base.txt, not tip^: tip^ would only be the tested base while
-            # the bundle carries exactly the one hour's commit, and the
-            # recorded base is what this comparison asserts.
-            if [ "$(cat "${RUNNER_TEMP}/push-data/base.txt")" = \
-                 "$(git -C "${RUNNER_TEMP}/push-repo" rev-parse FETCH_HEAD)" ]; then
-              echo "the push was rejected while main stood still" >&2
-              exit 1
-            fi
-            echo "::notice::main moved before the push landed; the next hourly run fetches and lands the rankings page"
-            {
-              echo "### Dropped: main moved before the push landed"
-              echo "The next hourly run fetches the rankings page on the new tip"
-              echo "and lands the data there."
-            } >> "$GITHUB_STEP_SUMMARY"
-          else
-            echo "landed=true" >> "$GITHUB_OUTPUT"
-          fi
+          retention-days: 1
 
   rankings-hub:
     name: Publish the rankings to docs-hub
-    needs: [rankings, rankings-push]
+    needs: [publish, push, rankings]
     if: >-
-      !cancelled() && needs.rankings.result == 'success' &&
-      (needs.rankings-push.result == 'success' || needs.rankings-push.result == 'skipped')
+      !cancelled() && needs.publish.result == 'success' &&
+      needs.publish.outputs.publish == 'true' &&
+      (needs.push.result == 'skipped' || needs.push.result == 'success')
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
       contents: read
-    # Every hourly run publishes after its changed page is committed and pushed.
-    # The page-byte tie concedes when main carries a different page; next hour
-    # rebuilds from landed main and self-heals. Disjoint replay paths keep the
-    # page commit independent of the AA and tracker commits ordered before it.
-    # The job reads its artifact and main's committed page and runs no repository code beside the key.
+    # Publish the artifact only after verifying main carries its bytes.
+    # No repository code executes beside the upload key.
     steps:
       - name: Download the rankings page
+        if: needs.rankings.result == 'success'
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: rankings-page
@@ -1460,6 +1231,10 @@ jobs:
         env:
           DOCS_HUB_API_KEY: ${{ secrets.DOCS_HUB_API_KEY }}
         run: |
+          if [ ! -f "${RUNNER_TEMP}/rankings-page/trending-rankings.html" ]; then
+            echo "No rankings artifact from this run. Nothing published by this run."
+            exit 0
+          fi
           scratch="${RUNNER_TEMP}/ref-scratch"
           git init -q "${scratch}"
           git -C "${scratch}" remote add origin "https://github.com/${GITHUB_REPOSITORY}"
@@ -1528,14 +1303,14 @@ jobs:
           cat /tmp/publish-response.json
 
   or-fetch:
-    name: Fetch and commit the OpenRouter top 10
+    name: Fetch and stage the OpenRouter top 10
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
       contents: read
     outputs:
-      commits: ${{ steps.commit.outputs.commits }}
+      changed: ${{ steps.stage.outputs.changed }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -1545,157 +1320,27 @@ jobs:
       - name: Fetch the top 10
         run: python3 scripts/fetch_openrouter_trending.py --message "$RUNNER_TEMP/message"
 
-      - name: Commit when changed
-        id: commit
+      - name: Stage the payload
+        id: stage
         run: |
-          if git diff --quiet -- data/openrouter-trending.json; then
-            echo "openrouter-trending.json unchanged"
-            echo "commits=false" >> "$GITHUB_OUTPUT"
-            exit 0
+          changed=false
+          if ! git diff --quiet -- data/openrouter-trending.json; then
+            changed=true
           fi
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          base="$(git rev-parse HEAD)"
-          git add data/openrouter-trending.json
-          git commit -q -F "$RUNNER_TEMP/message"
-          # No co-author trailer: no model authored this scheduled commit.
-          git branch push HEAD
-          mkdir -p "${RUNNER_TEMP}/push-data"
-          git bundle create "${RUNNER_TEMP}/push-data/push.bundle" "$base..push"
-          printf '%s\n' "$base" > "${RUNNER_TEMP}/push-data/base.txt"
-          git rev-parse HEAD > "${RUNNER_TEMP}/push-data/tip.txt"
-          echo "commits=true" >> "$GITHUB_OUTPUT"
+          if [ "$changed" = "true" ]; then
+            payload="${RUNNER_TEMP}/or-payload"
+            mkdir -p "${payload}/data"
+            cp data/openrouter-trending.json "${payload}/data/"
+            cp "$RUNNER_TEMP/message" "${payload}/message.txt"
+            date -u +%Y-%m-%dT%H:%M:%SZ > "${payload}/fetched-at.txt"
+          fi
+          echo "changed=$changed" >> "$GITHUB_OUTPUT"
 
-      - name: Upload the push bundle
-        if: success() && steps.commit.outputs.commits == 'true'
+      - name: Upload the payload
+        if: success() && steps.stage.outputs.changed == 'true'
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: or-push-data
-          path: ${{ runner.temp }}/push-data
+          name: or-payload
+          path: ${{ runner.temp }}/or-payload
           if-no-files-found: error
           retention-days: 1
-
-  or-push:
-    name: Replay and push the OpenRouter trending commit
-    needs: [or-fetch, hf-push]
-    if: >-
-      !cancelled() && needs.or-fetch.outputs.commits == 'true' && needs.hf-push.result != 'cancelled'
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    # Push jobs alone reach the key. The environment admits main alone.
-    environment: main-push
-    permissions:
-      contents: read
-    outputs:
-      landed: ${{ steps.push.outputs.landed }}
-    steps:
-      - name: Download the push bundle
-        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
-        with:
-          name: or-push-data
-          path: ${{ runner.temp }}/push-data
-
-      - name: Replay onto fresh main
-        id: replay
-        # Anonymous fetch and git alone, before the key is loaded. No action
-        # checks out the tree and no repository script executes in this job.
-        run: |
-          remote="https://github.com/${GITHUB_REPOSITORY}"
-          scratch="${RUNNER_TEMP}/scratch"
-          git init -q "$scratch"
-          git -C "$scratch" remote add origin "$remote"
-          git -C "$scratch" fetch --quiet origin main
-          base="$(git -C "$scratch" rev-parse FETCH_HEAD)"
-          git -C "$scratch" fetch --quiet "${RUNNER_TEMP}/push-data/push.bundle" \
-            'refs/heads/push:refs/heads/capture'
-          git -C "$scratch" checkout -q -B push "$base"
-          git -C "$scratch" config user.name 'github-actions[bot]'
-          git -C "$scratch" config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          cd "$scratch"
-          git restore --source=capture --staged --worktree -- data/openrouter-trending.json
-          if git diff --cached --quiet; then
-            echo "Fresh main already carries the trending list — nothing committed." \
-              >> "$GITHUB_STEP_SUMMARY"
-            echo "commits=false" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-          # Reuse the fetcher's entire message and bot author, without executing
-          # tree code. Only the one data file is replayed over fresh main.
-          git commit -q -C capture
-          git bundle create "${RUNNER_TEMP}/push-data/replayed.bundle" "$base..push"
-          mv "${RUNNER_TEMP}/push-data/replayed.bundle" "${RUNNER_TEMP}/push-data/push.bundle"
-          printf '%s\n' "$base" > "${RUNNER_TEMP}/push-data/base.txt"
-          git rev-parse HEAD > "${RUNNER_TEMP}/push-data/tip.txt"
-          echo "commits=true" >> "$GITHUB_OUTPUT"
-
-      # Delivery matches the AA push job, apart from truthful tracker wording
-      # and its success-only landed output. The tests hold these in lockstep:
-      # a local action or script would put repository code beside the deploy key.
-      - name: Push the trending commit
-        id: push
-        if: steps.replay.outputs.commits == 'true'
-        env:
-          MASTER_PUSH_DEPLOY_KEY: ${{ secrets.MASTER_PUSH_DEPLOY_KEY }}
-          REPO: ${{ github.repository }}
-        run: |
-          set -o pipefail
-          # Fail closed when the environment is missing its secret: with no
-          # key there is nothing to authenticate the push with, and the
-          # fallback must never be a token.
-          if [ -z "${MASTER_PUSH_DEPLOY_KEY:-}" ]; then
-            echo "MASTER_PUSH_DEPLOY_KEY is empty: the main-push environment is missing its secret" >&2
-            exit 1
-          fi
-          eval "$(ssh-agent -s)" >/dev/null
-          # The agent is stopped when this step ends, whatever its outcome:
-          # the key never outlives the step that loaded it.
-          trap 'kill "$SSH_AGENT_PID" 2>/dev/null || true' EXIT
-          ssh-add <(printf '%s\n' "$MASTER_PUSH_DEPLOY_KEY") >/dev/null
-          mkdir -p ~/.ssh
-          # GitHub SSH host keys, published by GitHub's Meta endpoint:
-          # https://docs.github.com/en/rest/meta/meta#get-github-meta-information
-          printf '%s\n' \
-            'github.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl' \
-            'github.com ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQCj7ndNxQowgcQnjshcLrqPEiiphnt+VTTvDP6mHBL9j1aNUkY4Ue1gvwnGLVlOhGeYrnZaMgRK6+PKCUXaDbC7qtbW8gIkhL7aGCsOr/C56SJMy/BCZfxd1nWzAOxSDPgVsmerOBYfNqltV9/hWCqBywINIR+5dIg6JTJ72pcEpEjcYgXkE2YEFXV1JHnsKgbLWNlhScqb2UmyRkQyytRLtL+38TGxkxCflmO+5Z8CSSNY7GidjMIZ7Q4zMjA2n1nGrlTDkzwDCsw+wqFPGQA179cnfGWOWRVruj16z6XyvxvjJwbz0wQZ75XK5tKSb7FNyeIEs4TT4jk+S4dhPeAUC5y+bDYirYgM4GC7uEnztnZyaVWQ7B381AK4Qdrwt51ZqExKbQpTUNn+EjqoTwvqNj4kqx5QUCI0ThS/YkOxJCXmPUWZbhjpCg56i+2aB6CmK2JGhn57K5mj0MNdBXA4/WnwH6XoPWJzK5Nyu2zB3nAZp+S5hpQs+p1vN1/wsjk=' \
-            >> ~/.ssh/known_hosts
-          export GIT_SSH_COMMAND='ssh -o StrictHostKeyChecking=yes'
-          remote="${PUSH_REMOTE:-git@github.com:${REPO}.git}"
-          base="$(cat "${RUNNER_TEMP}/push-data/base.txt")"
-          fetched="$(git ls-remote "$remote" refs/heads/main | cut -f1)"
-          if [ "$fetched" != "$base" ]; then
-            echo "::notice::main moved under the run (tested base $base, current tip $fetched); the next hourly run fetches and lands the trending list"
-            {
-              echo "### Dropped: main moved under the run"
-              echo
-              echo "The tested base $base is no longer main's tip ($fetched)."
-              echo "The next hourly run fetches the trending list on the new tip"
-              echo "and lands the data there."
-            } >> "$GITHUB_STEP_SUMMARY"
-            exit 0
-          fi
-          git init -q "${RUNNER_TEMP}/push-repo"
-          git -C "${RUNNER_TEMP}/push-repo" remote add origin "$remote"
-          git -C "${RUNNER_TEMP}/push-repo" fetch --quiet origin main
-          git -C "${RUNNER_TEMP}/push-repo" fetch --quiet \
-            "${RUNNER_TEMP}/push-data/push.bundle" \
-            'refs/heads/push:refs/heads/push'
-          if ! git -C "${RUNNER_TEMP}/push-repo" push origin \
-            "$(cat "${RUNNER_TEMP}/push-data/tip.txt"):refs/heads/main"; then
-            git -C "${RUNNER_TEMP}/push-repo" fetch --quiet origin main
-            # base.txt, not tip^: tip^ would only be the tested base while
-            # the bundle carries exactly the one hour's commit, and the
-            # recorded base is what this comparison asserts.
-            if [ "$(cat "${RUNNER_TEMP}/push-data/base.txt")" = \
-                 "$(git -C "${RUNNER_TEMP}/push-repo" rev-parse FETCH_HEAD)" ]; then
-              echo "the push was rejected while main stood still" >&2
-              exit 1
-            fi
-            echo "::notice::main moved before the push landed; the next hourly run fetches and lands the trending list"
-            {
-              echo "### Dropped: main moved before the push landed"
-              echo "The next hourly run fetches the trending list on the new tip"
-              echo "and lands the data there."
-            } >> "$GITHUB_STEP_SUMMARY"
-          else
-            echo "landed=true" >> "$GITHUB_OUTPUT"
-          fi
