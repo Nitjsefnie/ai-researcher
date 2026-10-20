@@ -72,9 +72,8 @@ permissions:
   contents: read
 
 concurrency:
-  # A push that supersedes an in-flight run for the same ref cancels it —
-  # nothing is learned from CI for a commit that is already history.
-  group: tests-${{ github.ref }}
+  # One group per PR, per push SHA, or per ref for standalone runs.
+  group: tests-${{ github.event.pull_request.number || (github.event_name == 'push' && github.sha) || github.ref }}
   cancel-in-progress: true
 
 jobs:

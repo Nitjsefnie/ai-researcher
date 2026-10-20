@@ -52,7 +52,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: codeql-${{ github.ref }}
+  group: codeql-${{ github.event.pull_request.number || (github.event_name == 'push' && github.sha) || github.ref }}
   cancel-in-progress: true
 
 jobs:

@@ -29,6 +29,7 @@ here:
 from __future__ import annotations
 
 import importlib.util
+import re
 import sys
 from pathlib import Path
 
@@ -85,6 +86,25 @@ def test_every_reusable_call_points_at_an_existing_callable_workflow():
         assert target.exists(), (job_id, uses)
         assert "workflow_call" in (_load(target).get("on") or {}), (
             job_id, uses)
+
+
+def test_caller_and_every_callee_key_push_concurrency_by_sha():
+    doc = _ci_gate()
+    workflows = {CI_GATE: doc}
+    for job in doc["jobs"].values():
+        uses = (job or {}).get("uses") or ""
+        if uses.startswith("./.github/workflows/"):
+            target = WORKFLOWS / uses.removeprefix("./.github/workflows/")
+            workflows[target] = _load(target)
+    assert len(workflows) > 1
+    for path, workflow in workflows.items():
+        group = workflow["concurrency"]["group"]
+        assert isinstance(group, str), path.name
+        assert re.search(
+            r"\(\s*github\.event_name\s*==\s*'push'\s*&&\s*github\.sha\s*\)",
+            group), (path.name, group)
+        assert not re.search(r"\$\{\{\s*github\.ref\s*\}\}", group), (
+            path.name, group)
 
 
 def test_aggregate_always_runs_and_needs_every_leg():
