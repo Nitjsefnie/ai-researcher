@@ -54585,7 +54585,7 @@
   "omniscience": 42.35,
   "omniscienceAccuracy": 0.499,
   "omniscienceNonHallucination": 0.8493013972055888,
-  "gdpvalNormalized": 0.561995,
+  "gdpvalNormalized": 0.5615549999999999,
   "analystAgent": 0.4875,
   "terminalbenchHard": null,
   "terminalBench21": null,
@@ -54705,8 +54705,9 @@
    "economics": 60.4193601521471
   },
   "omniscienceHallucinationRate": 0.1506986027944112,
+  "harveyLab": 0.03888888888888888,
   "gdpPdfAllPass": 0.218,
-  "gdpval": 1623.99,
+  "gdpval": 1623.11,
   "itBenchSre": null,
   "frontierCode": 0.434532,
   "terminalBenchScience": 0.528571428571429,
@@ -54746,14 +54747,14 @@
   "intelligenceIndexEvaluations": [
    {
     "slug": "aa-briefcase",
-    "score": 1486.44,
+    "score": 1485.76,
     "outputTokensPerTask": 142374.13186813187,
     "costPerTask": 5.8277493804482905,
     "timePerTask": 1669.7446235505392
    },
    {
     "slug": "gdpval-aa",
-    "score": 1623.99,
+    "score": 1623.11,
     "outputTokensPerTask": 74570.9909090909,
     "costPerTask": 1.8192251097173668,
     "timePerTask": 874.558527658782
@@ -54817,99 +54818,99 @@
   ],
   "briefcaseBreakdown": {
    "overall": {
-    "elo": 1486.44,
-    "lower95ci": 1476.51,
-    "upper95ci": 1497.11
+    "elo": 1485.76,
+    "lower95ci": 1475.63,
+    "upper95ci": 1495.84
    },
    "rubricPassRate": 0.6463414634146342,
    "analyticalQuality": {
-    "elo": 1560.52,
-    "lower95ci": 1541.14,
-    "upper95ci": 1582.16
+    "elo": 1559.81,
+    "lower95ci": 1541.01,
+    "upper95ci": 1579.69
    },
    "presentation": {
-    "elo": 1304.24,
-    "lower95ci": 1287.68,
-    "upper95ci": 1322.03
+    "elo": 1303.33,
+    "lower95ci": 1285.86,
+    "upper95ci": 1321.56
    }
   },
   "briefcaseTotalCost": 530.3251936207944,
   "aa3dElo": 1153.9782,
   "personalityBench": {
    "scores": {
-    "lexicallyVaried": 1219.61,
-    "eloquent": 1223.62,
-    "literate": 834.71,
-    "naturalSounding": 845.91,
-    "metaphorical": 1920.91,
-    "structured": 958.27,
-    "scannable": 1227.21,
-    "summarizesBottomLine": 937.38,
-    "answerFirst": 743.41,
-    "informationDense": 1221.33,
-    "evidenceBased": 1064.59,
-    "resourceSpecific": 1725.21,
-    "providesActionableGuidance": 1514.23,
-    "pragmatic": 1261.42,
-    "truthful": 420.66,
-    "admitsUncertainty": 247.17,
-    "disclaimsWithAssumptions": 744.59,
-    "flagsNuances": 771.17,
-    "sycophantic": 1233.95,
-    "friendly": 1059.19,
-    "humorous": 1574.44,
-    "sincere": 405.97,
-    "emotionallyIntelligent": 973.69,
-    "direct": 415.89,
-    "confident": 1451.64,
-    "opinionated": 1158.52,
-    "constructivelyPushesBack": 1080.65,
-    "creative": 1448.15,
-    "openEnded": 409.41,
-    "slop": 1709.4
+    "lexicallyVaried": 1217.39,
+    "eloquent": 1222.78,
+    "literate": 833.65,
+    "naturalSounding": 845.51,
+    "metaphorical": 1915.47,
+    "structured": 957.8,
+    "scannable": 1224.74,
+    "summarizesBottomLine": 937.67,
+    "answerFirst": 737.89,
+    "informationDense": 1221.87,
+    "evidenceBased": 1066.96,
+    "resourceSpecific": 1723.47,
+    "providesActionableGuidance": 1518.98,
+    "pragmatic": 1258.63,
+    "truthful": 420.18,
+    "admitsUncertainty": 247.11,
+    "disclaimsWithAssumptions": 745.59,
+    "flagsNuances": 771.41,
+    "sycophantic": 1235.7,
+    "friendly": 1058.7,
+    "humorous": 1573.04,
+    "sincere": 398.36,
+    "emotionallyIntelligent": 974.69,
+    "direct": 421.92,
+    "confident": 1450.84,
+    "opinionated": 1161.15,
+    "constructivelyPushesBack": 1081.6,
+    "creative": 1450.77,
+    "openEnded": 407.56,
+    "slop": 1714.17
    },
    "indexScores": {
-    "expressiveness": 79.61764705882352,
-    "organization": 53.411764705882355,
-    "informativeness": 76.70588235294117,
-    "transparency": 18.47058823529412,
-    "warmth": 70.88235294117648,
-    "conviction": 65.05882352941177,
-    "imagination": 38.85294117647059,
-    "slop": 62.14705882352941
+    "expressiveness": 80.2,
+    "organization": 51.91428571428571,
+    "informativeness": 77.37142857142858,
+    "transparency": 17.97142857142857,
+    "warmth": 71.71428571428572,
+    "conviction": 66.05714285714285,
+    "imagination": 37.77142857142857,
+    "slop": 66.05714285714285
    },
    "indexIntervals": {
     "expressiveness": {
-     "lower": 69.41374031742185,
-     "upper": 84.87658455597798
+     "lower": 70.56326439398559,
+     "upper": 85.19530604226345
     },
     "organization": {
-     "lower": 35.48774395453493,
-     "upper": 64.16951107256824
+     "lower": 31.888802342886894,
+     "upper": 62.3522871864101
     },
     "informativeness": {
-     "lower": 68.83770723853387,
-     "upper": 85.55595477243772
+     "lower": 67.0111596570368,
+     "upper": 86.46077033267423
     },
     "transparency": {
-     "lower": 17.20585103847249,
-     "upper": 20.85221224549098
+     "lower": 16.804125508603093,
+     "upper": 20.240243822226034
     },
     "warmth": {
-     "lower": 64.25266016012938,
-     "upper": 77.37220415569783
+     "lower": 64.34869098015088,
+     "upper": 78.03481437695733
     },
     "conviction": {
-     "lower": 50.66232317138508,
-     "upper": 67.33224058076716
+     "lower": 52.2302610490535,
+     "upper": 68.28755043484216
     },
     "imagination": {
-     "lower": 35.018582635680616,
-     "upper": 47.690784232908584
+     "lower": 33.324007596217314,
+     "upper": 42.777344429359815
     },
     "slop": {
-     "lower": 60.307839858351365,
-     "upper": 64.45367424579514
+     "lower": 64.15761904761905,
+     "upper": 68.65775478661324
     }
    }
   },
@@ -55320,7 +55321,7 @@
   "gdpPdfAllPass": 0.208,
   "gdpval": 1457.69,
   "itBenchSre": null,
-  "frontierCode": null,
+  "frontierCode": 0.385759,
   "terminalBenchScience": null,
   "hleDiamond": null,
   "livecodebench": null,
@@ -61522,7 +61523,7 @@
   "gdpPdfAllPass": 0.172,
   "gdpval": 1745.77,
   "itBenchSre": null,
-  "frontierCode": null,
+  "frontierCode": 0.436605666666667,
   "terminalBenchScience": null,
   "hleDiamond": null,
   "livecodebench": null,

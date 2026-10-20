@@ -25,6 +25,7 @@
    }
   ],
   "hasTieredPricing": false,
+  "isRouter": false,
   "variantOf": null,
   "isUnavailable": false,
   "indexComponentCount": 3,
@@ -217,6 +218,7 @@
    }
   ],
   "hasTieredPricing": false,
+  "isRouter": false,
   "variantOf": null,
   "isUnavailable": false,
   "indexComponentCount": 3,
@@ -409,6 +411,7 @@
    }
   ],
   "hasTieredPricing": false,
+  "isRouter": false,
   "variantOf": null,
   "isUnavailable": false,
   "indexComponentCount": 3,
@@ -2044,6 +2047,7 @@
    }
   ],
   "hasTieredPricing": false,
+  "isRouter": false,
   "variantOf": null,
   "isUnavailable": false,
   "indexComponentCount": 3,
@@ -2236,6 +2240,7 @@
    }
   ],
   "hasTieredPricing": false,
+  "isRouter": false,
   "variantOf": null,
   "isUnavailable": false,
   "indexComponentCount": 3,
@@ -2556,6 +2561,7 @@
    }
   ],
   "hasTieredPricing": false,
+  "isRouter": false,
   "variantOf": null,
   "isUnavailable": false,
   "indexComponentCount": 3,
@@ -2848,6 +2854,7 @@
    }
   ],
   "hasTieredPricing": false,
+  "isRouter": false,
   "variantOf": null,
   "isUnavailable": false,
   "indexComponentCount": 3,
@@ -4159,6 +4166,7 @@
    }
   ],
   "hasTieredPricing": false,
+  "isRouter": false,
   "variantOf": null,
   "isUnavailable": false,
   "indexComponentCount": 3,
@@ -6083,6 +6091,7 @@
    }
   ],
   "hasTieredPricing": false,
+  "isRouter": false,
   "variantOf": null,
   "isUnavailable": false,
   "indexComponentCount": 3,
@@ -6418,6 +6427,7 @@
    }
   ],
   "hasTieredPricing": false,
+  "isRouter": false,
   "variantOf": null,
   "isUnavailable": false,
   "indexComponentCount": 3,
@@ -6610,6 +6620,7 @@
    }
   ],
   "hasTieredPricing": false,
+  "isRouter": false,
   "variantOf": null,
   "isUnavailable": false,
   "indexComponentCount": 3,
@@ -7669,6 +7680,7 @@
    }
   ],
   "hasTieredPricing": false,
+  "isRouter": false,
   "variantOf": null,
   "isUnavailable": false,
   "indexComponentCount": 3,
@@ -7861,6 +7873,7 @@
    }
   ],
   "hasTieredPricing": false,
+  "isRouter": false,
   "variantOf": null,
   "isUnavailable": false,
   "indexComponentCount": 3,
@@ -8992,6 +9005,7 @@
    }
   ],
   "hasTieredPricing": false,
+  "isRouter": false,
   "variantOf": null,
   "isUnavailable": false,
   "indexComponentCount": 3,
@@ -9184,6 +9198,7 @@
    }
   ],
   "hasTieredPricing": false,
+  "isRouter": false,
   "variantOf": null,
   "isUnavailable": false,
   "indexComponentCount": 3,
@@ -9376,6 +9391,7 @@
    }
   ],
   "hasTieredPricing": false,
+  "isRouter": false,
   "variantOf": null,
   "isUnavailable": false,
   "indexComponentCount": 3,
@@ -9574,6 +9590,7 @@
    }
   ],
   "hasTieredPricing": false,
+  "isRouter": true,
   "variantOf": null,
   "isUnavailable": false,
   "indexComponentCount": 3,
@@ -10705,6 +10722,7 @@
    }
   ],
   "hasTieredPricing": true,
+  "isRouter": false,
   "variantOf": null,
   "isUnavailable": false,
   "indexComponentCount": 3,
@@ -11007,6 +11025,7 @@
    }
   ],
   "hasTieredPricing": false,
+  "isRouter": false,
   "variantOf": null,
   "isUnavailable": false,
   "indexComponentCount": 3,
@@ -11199,6 +11218,7 @@
    }
   ],
   "hasTieredPricing": false,
+  "isRouter": false,
   "variantOf": null,
   "isUnavailable": false,
   "indexComponentCount": 3,
@@ -11391,6 +11411,7 @@
    }
   ],
   "hasTieredPricing": true,
+  "isRouter": false,
   "variantOf": null,
   "isUnavailable": false,
   "indexComponentCount": 3,
@@ -11627,6 +11648,7 @@
    }
   ],
   "hasTieredPricing": false,
+  "isRouter": true,
   "variantOf": null,
   "isUnavailable": false,
   "indexComponentCount": 3,
@@ -11825,6 +11847,7 @@
    }
   ],
   "hasTieredPricing": false,
+  "isRouter": true,
   "variantOf": null,
   "isUnavailable": false,
   "indexComponentCount": 3,
@@ -13477,6 +13500,7 @@
    }
   ],
   "hasTieredPricing": false,
+  "isRouter": false,
   "variantOf": null,
   "isUnavailable": false,
   "indexComponentCount": 3,
@@ -13685,6 +13709,7 @@
    }
   ],
   "hasTieredPricing": false,
+  "isRouter": false,
   "variantOf": null,
   "isUnavailable": false,
   "indexComponentCount": 3,
@@ -13949,6 +13974,7 @@
    }
   ],
   "hasTieredPricing": true,
+  "isRouter": false,
   "variantOf": null,
   "isUnavailable": false,
   "indexComponentCount": 3,
@@ -14265,6 +14291,7 @@
    }
   ],
   "hasTieredPricing": false,
+  "isRouter": false,
   "variantOf": null,
   "isUnavailable": false,
   "indexComponentCount": 3,
@@ -14567,6 +14594,7 @@
    }
   ],
   "hasTieredPricing": false,
+  "isRouter": false,
   "variantOf": null,
   "isUnavailable": false,
   "indexComponentCount": 3,
@@ -14759,6 +14787,7 @@
    }
   ],
   "hasTieredPricing": false,
+  "isRouter": false,
   "variantOf": null,
   "isUnavailable": false,
   "indexComponentCount": 3,
@@ -15422,6 +15451,7 @@
    }
   ],
   "hasTieredPricing": false,
+  "isRouter": false,
   "variantOf": null,
   "isUnavailable": false,
   "indexComponentCount": 3,
@@ -16157,6 +16187,7 @@
    }
   ],
   "hasTieredPricing": false,
+  "isRouter": false,
   "variantOf": null,
   "isUnavailable": false,
   "indexComponentCount": 3,
@@ -16349,6 +16380,7 @@
    }
   ],
   "hasTieredPricing": true,
+  "isRouter": false,
   "variantOf": null,
   "isUnavailable": false,
   "indexComponentCount": 3,
@@ -16651,6 +16683,7 @@
    }
   ],
   "hasTieredPricing": true,
+  "isRouter": false,
   "variantOf": null,
   "isUnavailable": false,
   "indexComponentCount": 3,
@@ -16917,6 +16950,7 @@
    }
   ],
   "hasTieredPricing": false,
+  "isRouter": false,
   "variantOf": null,
   "isUnavailable": false,
   "indexComponentCount": 3,
@@ -17153,6 +17187,7 @@
    }
   ],
   "hasTieredPricing": false,
+  "isRouter": false,
   "variantOf": null,
   "isUnavailable": false,
   "indexComponentCount": 3,
@@ -17345,6 +17380,7 @@
    }
   ],
   "hasTieredPricing": false,
+  "isRouter": false,
   "variantOf": null,
   "isUnavailable": false,
   "indexComponentCount": 3,
@@ -17537,6 +17573,7 @@
    }
   ],
   "hasTieredPricing": false,
+  "isRouter": false,
   "variantOf": null,
   "isUnavailable": false,
   "indexComponentCount": 3,
@@ -17759,6 +17796,7 @@
    }
   ],
   "hasTieredPricing": false,
+  "isRouter": false,
   "variantOf": null,
   "isUnavailable": false,
   "indexComponentCount": 3,
@@ -17951,6 +17989,7 @@
    }
   ],
   "hasTieredPricing": false,
+  "isRouter": false,
   "variantOf": null,
   "isUnavailable": false,
   "indexComponentCount": 3,
@@ -18143,6 +18182,7 @@
    }
   ],
   "hasTieredPricing": false,
+  "isRouter": false,
   "variantOf": null,
   "isUnavailable": false,
   "indexComponentCount": 3,
