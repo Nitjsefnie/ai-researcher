@@ -257,17 +257,23 @@ assignment — self-service issue claiming for contributors without write access
 
 The joined `.github/workflows/refresh.yml` captures, commits and publishes the
 frontier page and refreshes both trending trackers. Its `schedule` requests
-hourly runs (`11 * * * *`); GitHub delivers schedules best-effort. Each data
-producer commits only its own changed files, and a failure in the AA capture
-or either tracker leaves the other producers independent. The push jobs
-serialize deliveries through their write deploy key (the `main-push`
+hourly runs (`11 * * * *`); GitHub delivers schedules best-effort. Each run
+captures AA and fetches both trackers, then pushes at most one bot commit
+carrying every changed source: the AA capture with its rebuilt
+`out/frontier-models.html`, the two trending lists, and
+`out/trending-rankings.html`. The message gives one line per changed source.
+A failed source fetch, or a red AA gate or suite, leaves that source out while
+the sources that succeeded still commit. A run in which nothing changed
+pushes nothing. The single push job uses its write deploy key (the `main-push`
 environment, restricted to main), so bot commits start workflow runs and get
 a real `ci gate` aggregate verdict (issue #133).
 
-After either tracker delivers a commit, `rankings` checks out landed `main`
-with full history and runs `python3 scripts/build_rankings.py`. The builder
-reads up to ten changing commits per list, with no network input. Its HTML
-stays untracked; `rankings-hub` publishes the same-run artifact to the
+Before the commit, `rankings` runs `python3 scripts/build_rankings.py` with full
+git history and this run's changed tracker snapshots, with no network input.
+The builder keeps up to ten columns per list; each changed list's newest
+column uses the run and its fetch time, since a commit cannot contain its own
+SHA and committer time. Each page is published to docs-hub after the commit lands;
+`rankings-hub` publishes the same-run artifact to the
 [rankings page](https://docs.nitjsefni.eu/d/ai-researcher/trending-rankings),
 skipping an upload when the live bytes already match. The upload job executes
 no repository code and holds the docs-hub key only in its inline upload step.
