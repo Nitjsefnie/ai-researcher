@@ -76,16 +76,16 @@
     8337
   ],
   "scripts/ci/check_committed_rankings_page.py": [
-    1185,
-    3385
+    1326,
+    5308
   ],
   "scripts/ci/check_ratchets.py": [
     9043,
     21616
   ],
   "scripts/ci/classify_changes.py": [
-    6658,
-    11337
+    6548,
+    11227
   ],
   "scripts/ci/commit_scopes.py": [
     6375,
@@ -240,8 +240,8 @@
     10113
   ],
   "tests/test_refresh_workflow.py": [
-    25105,
-    100227
+    24104,
+    108476
   ],
   "tests/test_workflow_ci_gate.py": [
     3391,
