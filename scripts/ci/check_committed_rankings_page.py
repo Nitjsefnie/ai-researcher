@@ -20,9 +20,7 @@ A build failure is red, never a silent pass.
 from __future__ import annotations
 
 import pathlib
-from html.parser import HTMLParser
 import json
-import math
 import re
 import sys
 import tempfile
@@ -39,55 +37,6 @@ _CHECK = "committed-rankings-page check"
 LIMIT = 10
 TRACKERS = (("data/hf-trending.json", "id", "hugging-face", "hf"),
             ("data/openrouter-trending.json", "slug", "openrouter", "or"))
-
-
-class _Columns(HTMLParser):
-    """Group SVG points by numeric x position within each tracker section."""
-
-    def __init__(self, document: bytes):
-        super().__init__()
-        self.section = ""
-        self.in_svg = False
-        self.groups: dict[str, dict[float, build_rankings.Snapshot]] = {}
-        self.invalid: set[str] = set()
-        self.feed(document.decode("utf-8", errors="replace"))
-
-    def handle_starttag(self, tag, attrs):
-        attributes = dict(attrs)
-        if tag == "section":
-            self.section = attributes.get("id", "")
-        if tag == "svg":
-            self.in_svg = True
-        if (not self.section or not self.in_svg or tag != "circle"
-                or "point" not in (attributes.get("class") or "").split()):
-            return
-        try:
-            commit, timestamp, model = (attributes[key] for key in
-                                        ("data-commit", "data-timestamp", "data-model"))
-            rank = int(attributes["data-rank"] or "")
-            position = float(attributes["cx"] or "")
-            if not commit or not timestamp or not model or rank < 1 or not math.isfinite(position):
-                raise ValueError("incomplete point")
-            groups = self.groups.setdefault(self.section, {})
-            column = groups.setdefault(position, build_rankings.Snapshot(commit, timestamp, {}))
-            if column.commit != commit or column.timestamp != timestamp or model in column.ranks:
-                raise ValueError("inconsistent column")
-            column.ranks[model] = rank
-        except (KeyError, TypeError, ValueError):
-            self.invalid.add(self.section)
-
-    def handle_endtag(self, tag):
-        if tag == "svg":
-            self.in_svg = False
-        if tag == "section":
-            self.section = ""
-
-    def newest(self, section: str) -> build_rankings.Snapshot | None:
-        """Return the rightmost column, or refuse malformed point data."""
-        groups = self.groups.get(section, {})
-        if not groups or section in self.invalid:
-            return None
-        return groups[max(groups)]
 
 
 def _section(document: bytes, identifier: str) -> bytes:
@@ -111,7 +60,7 @@ def _read_output(output: pathlib.Path, violations: list[str]) -> bytes | None:
 def _rebuild(checkout: pathlib.Path, ref: str, committed: bytes | None,
              directory: pathlib.Path, violations: list[str]) -> bytes | None:
     """Rebuild each list at its own anchor, then join the generated sections."""
-    columns = _Columns(committed or b"")
+    columns = build_rankings.SnapshotColumns(committed or b"")
     requests = []
     for path, key, section, flag in TRACKERS:
         history = build_rankings.git(checkout, "log", "-n", str(LIMIT + 1), "--format=%H",
