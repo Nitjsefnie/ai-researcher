@@ -1291,6 +1291,7 @@ class ExecutedCommitMessageTests(_SeededOrigin, unittest.TestCase):
                 mock.patch.object(self, "MOVED_FILES", files):
             tmp = pathlib.Path(raw)
             original = self._stage_payload
+
             def republish_payload(where, differ_msg):
                 original(where, differ_msg)
                 (where / "publish-payload/aa-mode.txt").write_text("none\n", encoding="utf-8")
@@ -1329,7 +1330,7 @@ class ExecutedCommitMessageTests(_SeededOrigin, unittest.TestCase):
                         path = f'data/{filename}-trending.json'
                         (payload / path).write_text('fresh list\n', encoding='utf-8')
                         (payload / 'message.txt').write_text(line + '\n\nfull report\n',
-                                                            encoding='utf-8')
+                                                             encoding='utf-8')
                         # An artifact cannot widen the fixed add list.
                         (payload / 'unrelated.txt').write_text('ignore me', encoding='utf-8')
                         lines.append(line)
@@ -1338,7 +1339,7 @@ class ExecutedCommitMessageTests(_SeededOrigin, unittest.TestCase):
                     payload = tmp / 'rankings-page'
                     payload.mkdir()
                     (payload / 'trending-rankings.html').write_text('fresh page\n',
-                                                                  encoding='utf-8')
+                                                                    encoding='utf-8')
                     lines.append("Rebuild the rankings page from this run's snapshots.")
                     changed_paths.append('out/trending-rankings.html')
                 result = _workflowrun.run_step(tmp, self.step, self._env(tmp, config, base))
@@ -1673,7 +1674,7 @@ def test_aa_payload_mode_and_republish_bytes(tmp_path, changed, force, mode, pag
     git(tmp_path, 'commit', '-qm', 'base')
     (tmp_path / 'out/frontier-models.html').write_text('fresh page', encoding='utf-8')
     (tmp_path / 'commit-msg.txt').write_text('Refresh capture: fresh AA\n\nreport\n',
-                                            encoding='utf-8')
+                                             encoding='utf-8')
     env = {**os.environ, 'RUNNER_TEMP': str(tmp_path), 'CHANGED': changed, 'FORCE': force}
     result = _workflowrun.run_step(tmp_path, step(load(), 'Stage the publish payload'), env)
     assert result.returncode == 0, result.stdout + result.stderr
@@ -1938,7 +1939,7 @@ def _rankings_hub_runs(published, pushed, rankings, cancelled=False, verdict='')
 @pytest.mark.parametrize('pushed', ['success', 'failure', 'skipped', 'cancelled'])
 @pytest.mark.parametrize('cancelled', [False, True])
 def test_rankings_hub_condition_covers_ancestor_outcomes(published, verdict, rankings,
-                                                        pushed, cancelled):
+                                                         pushed, cancelled):
     """Quiet recovery is admitted; failed jobs and cancellation remain suppressive."""
     actual = _rankings_hub_runs(published, pushed, rankings, cancelled, verdict)
     assert actual is (not cancelled and rankings == 'success'
@@ -2053,7 +2054,7 @@ def test_rankings_quiet_hour_recovers_a_failed_upload(tmp_path):
     done = _workflowrun.run_step(repo, hub, env)
     assert done.returncode == 0, done.stdout + done.stderr
     verified = harness._git('show', 'FETCH_HEAD:out/trending-rankings.html',
-                             cwd=quiet / 'ref-scratch').stdout.encode()
+                            cwd=quiet / 'ref-scratch').stdout.encode()
     assert verified == original == (quiet / 'page/out/trending-rankings.html').read_bytes()
     calls = [json.loads(line) for line in (tmp_path / 'calls').read_text().splitlines()]
     assert [call[-1] for call in calls if call[-1].endswith('/api/publish')] == [
@@ -2582,7 +2583,6 @@ class JoinedPushExecutedTests(unittest.TestCase):
         self.run_step('push', 'Push the tested tree to main')
         self.assertEqual(self.git(self.origin, 'rev-parse', 'main').strip(), raced)
         self.assertIn('main moved before the push landed', pathlib.Path(self.env['GITHUB_STEP_SUMMARY']).read_text(encoding='utf-8'))
-
 
     @unittest.skipUnless(sys.platform == 'linux', 'requires Linux ssh-agent/ssh-add')
     def test_joined_bundle_lands_once(self):
