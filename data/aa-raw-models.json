@@ -61887,7 +61887,7 @@
    "type": "firstParty",
    "providerName": "DeepSeek"
   },
-  "hostModelCount": 10,
+  "hostModelCount": 12,
   "creator": {
    "id": "58b835bf-4c87-4f87-a846-df4b692c6e7d",
    "slug": "deepseek",
