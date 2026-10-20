@@ -641,3 +641,122 @@ class FreshRankingsTests(RankingsFixture):
             "--fresh-label", "run 123")
         self.assertEqual(self._document(*arguments).encode("utf-8"),
                          self._document(*arguments).encode("utf-8"))
+
+
+class IdentityRankingsTests(RankingsFixture):
+    """Committed column identities remain fixed across quiet rebuilds."""
+
+    def _land_fresh(self):
+        page = self.repo / "out/trending-rankings.html"
+        arguments = ["--repo", str(self.repo), "--out", str(page),
+                     "--fresh-label", 'run 12345 & "capture"']
+        for path, key, flag, models, timestamp in (
+                (HF, "id", "hf", ["org/b", "org/new"], "2026-10-20T09:41:00Z"),
+                (OR, "slug", "or", ["lab/y", "lab/new"], "2026-10-20T09:42:00Z")):
+            fresh = self.repo / path
+            fresh.write_text(json.dumps({"models": [{key: model} for model in models]}),
+                             encoding="utf-8")
+            arguments.extend([f"--fresh-{flag}", str(fresh), f"--fresh-{flag}-timestamp",
+                              timestamp])
+        build_rankings.main(arguments)
+        self._git("add", HF, OR, "out/trending-rankings.html")
+        self._git("commit", "-qm", "Land snapshots and page")
+        return page
+
+    def test_sha_identity_is_a_fixed_point_with_a_single_snapshot(self):
+        original = self._document()
+        identity = pathlib.Path(self.directory) / "identity.html"
+        identity.write_text(original, encoding="utf-8")
+        for limit in (1, 10):
+            with self.subTest(limit=limit):
+                self.assertEqual(self._document("--identity-page", str(identity),
+                                                "--limit", str(limit)), original)
+
+    def test_fresh_landing_preserves_identity_and_full_independent_windows(self):
+        for index in range(12):
+            self.commit(HF, [f"org/old-{index}"], "id")
+        self.commit(OR, ["lab/old"], "slug")
+        page = self._land_fresh()
+        original = page.read_text(encoding="utf-8")
+        # Identity supplies labels, while ranks come from the selected git ref.
+        selected = self._git("rev-parse", "HEAD").strip()
+        self.commit(HF, ["org/later"], "id")
+        (self.repo / OR).write_text("uncommitted invalid JSON", encoding="utf-8")
+        rebuilt = self._document("--identity-page", str(page), "--commit", selected)
+        self.assertEqual(rebuilt, original)
+        sections = re.findall(r'<section\b.*?</section>', rebuilt, re.S)
+        self.assertEqual([section.count('class="timestamp-tick"') for section in sections],
+                         [10, 3])
+
+    def test_fresh_input_changes_only_its_section_beside_identity_reconstruction(self):
+        page = self._land_fresh()
+        original = re.findall(r'<section\b.*?</section>', page.read_text(), re.S)
+        for flag, path, key, identifier in (("hf", HF, "id", 0), ("or", OR, "slug", 1)):
+            with self.subTest(flag=flag):
+                fresh = pathlib.Path(self.directory) / "new.json"
+                fresh.write_text(json.dumps({"models": [{key: "new/model"}]}), encoding="utf-8")
+                rebuilt = self._document(
+                    "--identity-page", str(page), f"--fresh-{flag}", str(fresh),
+                    f"--fresh-{flag}-timestamp", "2026-10-20T10:41:00Z",
+                    "--fresh-label", "run 54321")
+                sections = re.findall(r'<section\b.*?</section>', rebuilt, re.S)
+                self.assertNotEqual(sections[identifier], original[identifier], path)
+                self.assertEqual(sections[1 - identifier], original[1 - identifier], path)
+
+    def test_fresh_list_ignores_its_missing_or_unparseable_identity_section(self):
+        original = self._document()
+        sections = re.findall(r'<section\b.*?</section>', original, re.S)
+        identity = pathlib.Path(self.directory) / "identity.html"
+        for flag, path, index in (("hf", HF, 0), ("or", OR, 1)):
+            arguments = [f"--fresh-{flag}", str(self.repo / path),
+                         f"--fresh-{flag}-timestamp", "2026-10-20T09:41:00Z",
+                         "--fresh-label", "run 12345"]
+            expected = self._document(*arguments)
+            for section in ("", sections[index].replace('class="point"', 'class="gone"')):
+                with self.subTest(flag=flag, missing=not section):
+                    identity.write_text(original.replace(sections[index], section),
+                                        encoding="utf-8")
+                    self.assertEqual(self._document(*arguments, "--identity-page", str(identity)),
+                                     expected)
+            identity.write_text(original.replace(sections[1 - index], ""), encoding="utf-8")
+            with self.subTest(flag=flag, missing_inactive=True):
+                with self.assertRaises(SystemExit) as caught:
+                    self._document(*arguments, "--identity-page", str(identity))
+                self.assertEqual(caught.exception.code, 2)
+
+    def test_both_fresh_lists_never_consult_the_identity_page(self):
+        arguments = ["--fresh-hf", str(self.repo / HF),
+                     "--fresh-hf-timestamp", "2026-10-20T09:41:00Z",
+                     "--fresh-or", str(self.repo / OR),
+                     "--fresh-or-timestamp", "2026-10-20T09:42:00Z",
+                     "--fresh-label", "run 12345"]
+        expected = self._document(*arguments)
+        invalid = pathlib.Path(self.directory) / "invalid.html"
+        invalid.write_text("no parseable columns", encoding="utf-8")
+        for identity in (invalid, pathlib.Path(self.directory) / "missing.html",
+                         pathlib.Path(self.directory)):
+            with self.subTest(identity=identity.name):
+                self.assertEqual(self._document(*arguments, "--identity-page", str(identity)),
+                                 expected)
+
+    def test_unparseable_or_unreadable_identity_errors_without_writing_output(self):
+        original = self._document()
+        identity = pathlib.Path(self.directory) / "identity.html"
+        for case, document in (
+                ("empty", b""),
+                ("no-points", original.replace('class="point"', 'class="gone"').encode()),
+                ("nonfinite", original.replace('cx="180.0"', 'cx="nan"', 1).encode()),
+                ("missing", None)):
+            with self.subTest(case=case):
+                if document is None:
+                    identity.unlink()
+                else:
+                    identity.write_bytes(document)
+                result = subprocess.run(
+                    [sys.executable, str(ROOT / "scripts/build_rankings.py"),
+                     "--identity-page", str(identity)], cwd=self.repo, check=False,
+                    capture_output=True, text=True, timeout=60)
+                self.assertEqual(result.returncode, 2, result.stderr)
+                self.assertIn("identity", result.stderr)
+                self.assertNotIn("unrecognized arguments", result.stderr)
+                self.assertFalse((self.repo / "out/trending-rankings.html").exists())

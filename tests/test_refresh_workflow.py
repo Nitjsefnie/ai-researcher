@@ -1618,6 +1618,30 @@ def test_publish_condition_isolates_failures_and_quiet_hours(states, expected, c
     actual = eval(condition.replace('&&', 'and').replace('||', 'or'),  # pylint: disable=eval-used
                   {'__builtins__': {}}, {})
     assert actual is (expected and not cancelled)
+    push = load()['jobs']['push']['if']
+    assert '!cancelled()' in push
+    push = push.replace('!cancelled()', str(not cancelled))
+    push = push.replace("needs.publish.result == 'success'", str(actual))
+    push = push.replace("needs.publish.outputs.commits == 'true'", str(actual))
+    eligible = eval(push.replace('&&', 'and'), {'__builtins__': {}}, {})  # pylint: disable=eval-used
+    assert eligible is (expected and not cancelled)
+
+
+@pytest.mark.parametrize('published', ['success', 'failure', 'skipped', 'cancelled'])
+@pytest.mark.parametrize('commits', ['true', 'false', ''])
+@pytest.mark.parametrize('cancelled', [False, True])
+def test_push_condition_requires_successful_publish_and_a_bundle(published, commits, cancelled):
+    """A rescued publish can deliver survivors; cancellation and no bundle cannot."""
+    condition = load()['jobs']['push']['if']
+    assert condition == ("!cancelled() && needs.publish.result == 'success' && "
+                         "needs.publish.outputs.commits == 'true'")
+    for term, value in {
+            '!cancelled()': not cancelled,
+            "needs.publish.result == 'success'": published == 'success',
+            "needs.publish.outputs.commits == 'true'": commits == 'true'}.items():
+        condition = condition.replace(term, str(value))
+    actual = eval(condition.replace('&&', 'and'), {'__builtins__': {}}, {})  # pylint: disable=eval-used
+    assert actual is (not cancelled and published == 'success' and commits == 'true')
 
 
 @pytest.mark.skipif(os.name == 'nt', reason='workflow shell runs on Ubuntu')
@@ -1945,7 +1969,7 @@ def test_rankings_build_passes_fresh_snapshots_and_stages_only_verdict(tmp_path,
     base = git(tmp_path, 'rev-parse', 'HEAD')
     runner = tmp_path / 'runner'
     runner.mkdir()
-    args = []
+    args = ['--identity-page', str(runner / 'committed-page.html')]
     for tracker, filename, timestamp in (
             ('hf', 'hf', '2026-10-20T09:41:00Z'),
             ('or', 'openrouter', '2026-10-20T09:42:00Z')):
@@ -1971,6 +1995,7 @@ def test_rankings_build_passes_fresh_snapshots_and_stages_only_verdict(tmp_path,
     done = _workflowrun.run_step(tmp_path, build_step, env)
     assert done.returncode == 0, done.stdout + done.stderr
     assert json.loads((tmp_path / 'args.json').read_text()) == args
+    assert (runner / 'committed-page.html').read_text() == 'base page'
     assert page.read_text() == 'built page'
     stage = step_in(load(), 'rankings', 'Stage the page state')
     for changed in (True, False):
@@ -1983,6 +2008,78 @@ def test_rankings_build_passes_fresh_snapshots_and_stages_only_verdict(tmp_path,
         assert git(tmp_path, 'rev-parse', 'HEAD') == base
         assert git(tmp_path, 'diff', '--cached', '--name-only') == ''
         assert not (runner / 'push-data').exists()
+
+
+@pytest.mark.skipif(os.name == 'nt', reason='workflow shell runs on Ubuntu')
+@pytest.mark.parametrize('next_fresh', [None, 'hf', 'or'])
+def test_rankings_fresh_landing_is_stable_on_quiet_and_mixed_hours(tmp_path, next_fresh):
+    """The real builder retains landed fetch identities in every inactive section."""
+    git = HFTrackerExecutedStepsTests.git
+    git(tmp_path, 'init', '-q')
+    git(tmp_path, 'config', 'user.name', 'fixture')
+    git(tmp_path, 'config', 'user.email', 'fixture@example.com')
+    trackers = [('hf', 'hf', 'id'), ('or', 'openrouter', 'slug')]
+    (tmp_path / 'data').mkdir()
+    for _, filename, key in trackers:
+        (tmp_path / f'data/{filename}-trending.json').write_text(
+            json.dumps({'models': [{key: 'old/a'}, {key: 'old/b'}]}), encoding='utf-8')
+    git(tmp_path, 'add', 'data/hf-trending.json', 'data/openrouter-trending.json')
+    git(tmp_path, 'commit', '-qm', 'Seed snapshots')
+    (tmp_path / 'scripts').mkdir()
+    shutil.copyfile(ROOT / 'scripts/build_rankings.py', tmp_path / 'scripts/build_rankings.py')
+    runner = tmp_path / 'runner'
+    runner.mkdir()
+    env = {**os.environ, 'RUNNER_TEMP': str(runner), 'GITHUB_RUN_ID': '12345',
+           'GITHUB_OUTPUT': str(tmp_path / 'outputs')}
+    build = step_in(load(), 'rankings', 'Build the rankings page')
+    stage = step_in(load(), 'rankings', 'Stage the page state')
+    # Bootstrap a page without an identity source, then land fresh JSON + HTML.
+    done = _workflowrun.run_step(tmp_path, build, env)
+    assert done.returncode == 0, done.stdout + done.stderr
+    page = tmp_path / 'out/trending-rankings.html'
+    git(tmp_path, 'add', 'out/trending-rankings.html')
+    git(tmp_path, 'commit', '-qm', 'Seed page')
+    for tracker, filename, key in trackers:
+        payload = runner / f'{tracker}-payload'
+        (payload / 'data').mkdir(parents=True)
+        data = payload / f'data/{filename}-trending.json'
+        data.write_text(json.dumps({'models': [{key: 'fresh/a'}, {key: 'old/a'}]}),
+                        encoding='utf-8')
+        (payload / 'fetched-at.txt').write_text('2026-10-20T09:41:00Z', encoding='utf-8')
+    done = _workflowrun.run_step(tmp_path, build, env)
+    assert done.returncode == 0, done.stdout + done.stderr
+    original = page.read_bytes()
+    assert b'data-commit="run 12345"' in original
+    for tracker, filename, _ in trackers:
+        shutil.copyfile(runner / f'{tracker}-payload/data/{filename}-trending.json',
+                        tmp_path / f'data/{filename}-trending.json')
+        shutil.rmtree(runner / f'{tracker}-payload')
+    git(tmp_path, 'add', 'data/hf-trending.json', 'data/openrouter-trending.json',
+        'out/trending-rankings.html')
+    git(tmp_path, 'commit', '-qm', 'Land snapshots with fetch identities')
+    if next_fresh is not None:
+        tracker, filename, key = next(item for item in trackers if item[0] == next_fresh)
+        payload = runner / f'{tracker}-payload'
+        (payload / 'data').mkdir(parents=True)
+        (payload / f'data/{filename}-trending.json').write_text(
+            json.dumps({'models': [{key: 'newest/model'}]}), encoding='utf-8')
+        (payload / 'fetched-at.txt').write_text('2026-10-20T10:41:00Z', encoding='utf-8')
+    env['GITHUB_RUN_ID'] = '67890'
+    done = _workflowrun.run_step(tmp_path, build, env)
+    assert done.returncode == 0, done.stdout + done.stderr
+    done = _workflowrun.run_step(tmp_path, stage, env)
+    assert done.returncode == 0, done.stdout + done.stderr
+    assert (tmp_path / 'outputs').read_text() == f'changed={str(next_fresh is not None).lower()}\n'
+    if next_fresh is None:
+        assert page.read_bytes() == original
+        assert b'data-commit="run 12345"' in page.read_bytes()
+        assert b'data-timestamp="2026-10-20T09:41:00Z"' in page.read_bytes()
+    else:
+        before = re.findall(rb'<section\b.*?</section>', original, re.S)
+        after = re.findall(rb'<section\b.*?</section>', page.read_bytes(), re.S)
+        active = 0 if next_fresh == 'hf' else 1
+        assert after[active] != before[active]
+        assert after[1 - active] == before[1 - active]
 
 
 @pytest.mark.skipif(os.name == 'nt', reason='workflow shell runs on Ubuntu')

@@ -5,7 +5,9 @@
 
 Each list has its own window of changing commits. An explicit --fresh-hf or
 --fresh-or file replaces its list's oldest column with a labelled snapshot
-at the supplied fetch timestamp. Without fresh inputs, only git history is read.
+at the supplied fetch timestamp. --identity-page preserves landed labels and
+fetch timestamps for lists without fresh inputs. With neither flag, only git
+history is read.
 """
 from __future__ import annotations
 
@@ -13,7 +15,9 @@ import argparse
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from html import escape
+from html.parser import HTMLParser
 import json
+import math
 import pathlib
 import subprocess
 
@@ -25,6 +29,55 @@ class Snapshot:
     commit: str
     timestamp: str
     ranks: dict[str, int]
+
+
+class SnapshotColumns(HTMLParser):
+    """Group SVG points by numeric x position within each tracker section."""
+
+    def __init__(self, document: bytes):
+        super().__init__()
+        self.section = ""
+        self.in_svg = False
+        self.groups: dict[str, dict[float, Snapshot]] = {}
+        self.invalid: set[str] = set()
+        self.feed(document.decode("utf-8", errors="replace"))
+
+    def handle_starttag(self, tag, attrs):
+        attributes = dict(attrs)
+        if tag == "section":
+            self.section = attributes.get("id", "")
+        if tag == "svg":
+            self.in_svg = True
+        if (not self.section or not self.in_svg or tag != "circle"
+                or "point" not in (attributes.get("class") or "").split()):
+            return
+        try:
+            commit, timestamp, model = (attributes[key] for key in
+                                        ("data-commit", "data-timestamp", "data-model"))
+            rank = int(attributes["data-rank"] or "")
+            position = float(attributes["cx"] or "")
+            if not commit or not timestamp or not model or rank < 1 or not math.isfinite(position):
+                raise ValueError("incomplete point")
+            groups = self.groups.setdefault(self.section, {})
+            column = groups.setdefault(position, Snapshot(commit, timestamp, {}))
+            if column.commit != commit or column.timestamp != timestamp or model in column.ranks:
+                raise ValueError("inconsistent column")
+            column.ranks[model] = rank
+        except (KeyError, TypeError, ValueError):
+            self.invalid.add(self.section)
+
+    def handle_endtag(self, tag):
+        if tag == "svg":
+            self.in_svg = False
+        if tag == "section":
+            self.section = ""
+
+    def newest(self, section: str) -> Snapshot | None:
+        """Return the rightmost column, or refuse malformed point data."""
+        groups = self.groups.get(section, {})
+        if not groups or section in self.invalid:
+            return None
+        return groups[max(groups)]
 
 
 def git(repo: pathlib.Path, *args: str) -> str:
@@ -48,6 +101,22 @@ def read_history(repo: pathlib.Path, path: str, key: str, limit: int,
         ranks = {model[key]: rank for rank, model in enumerate(capture["models"], 1)}
         history.append(Snapshot(commit, timestamp, ranks))
     return history
+
+
+def identity_history(repo: pathlib.Path, path: str, key: str, section: str,
+                     limit: int, commit: str, columns: SnapshotColumns) -> list[Snapshot]:
+    """Reconstruct a landed section using its newest identity and tracked ranks."""
+    column = columns.newest(section)
+    if column is None:
+        raise ValueError(f"identity page: {section} newest column is missing or unparseable")
+    changes = git(repo, "log", "-n", "2", "--format=%H", commit, "--", path).splitlines()
+    if not changes:
+        raise ValueError(f"identity page: {path} history is empty")
+    history = (read_history(repo, path, key, limit - 1, changes[1])
+               if limit > 1 and len(changes) > 1 else [])
+    capture = json.loads(git(repo, "show", f"{commit}:{path}"))
+    ranks = {model[key]: rank for rank, model in enumerate(capture["models"], 1)}
+    return [*history, Snapshot(column.commit, column.timestamp, ranks)]
 
 
 LIGHT = """
@@ -333,7 +402,7 @@ def section_html(identifier: str, title: str, source: str, history: list[Snapsho
 
 
 def main(argv: list[str] | None = None) -> None:
-    """Write independent history windows, reserving one column per fresh input."""
+    """Write each list from fresh input, a preserved identity, or git history."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--limit", type=int, default=10)
     parser.add_argument("--repo", type=pathlib.Path, default=pathlib.Path("."))
@@ -344,6 +413,7 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument("--fresh-or", type=pathlib.Path)
     parser.add_argument("--fresh-or-timestamp")
     parser.add_argument("--fresh-label")
+    parser.add_argument("--identity-page", type=pathlib.Path)
     args = parser.parse_args(argv)
     if not 1 <= args.limit <= 10:
         parser.error("--limit must be between 1 and 10")
@@ -359,10 +429,24 @@ def main(argv: list[str] | None = None) -> None:
             parser.error(f"--fresh-{source}-timestamp is required with --fresh-{source}")
         if timestamp is not None and fresh is None:
             parser.error(f"--fresh-{source}-timestamp requires --fresh-{source}")
+    columns = None
+    if args.identity_page is not None and (args.fresh_hf is None or args.fresh_or is None):
+        try:
+            columns = SnapshotColumns(args.identity_page.read_bytes())
+        except OSError as exc:
+            parser.error(f"identity page is unreadable: {exc}")
     histories = []
-    for path, key, fresh, timestamp in (
-            ("data/hf-trending.json", "id", args.fresh_hf, args.fresh_hf_timestamp),
-            ("data/openrouter-trending.json", "slug", args.fresh_or, args.fresh_or_timestamp)):
+    for path, key, section, fresh, timestamp in (
+            ("data/hf-trending.json", "id", "hugging-face", args.fresh_hf, args.fresh_hf_timestamp),
+            ("data/openrouter-trending.json", "slug", "openrouter",
+             args.fresh_or, args.fresh_or_timestamp)):
+        if fresh is None and columns is not None:
+            try:
+                histories.append(identity_history(args.repo, path, key, section,
+                                                  args.limit, args.commit, columns))
+            except ValueError as exc:
+                parser.error(str(exc))
+            continue
         history_limit = args.limit - int(fresh is not None)
         history = (read_history(args.repo, path, key, history_limit, args.commit)
                    if history_limit else [])

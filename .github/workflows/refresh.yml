@@ -850,7 +850,7 @@ jobs:
 
     # The push runs only when the committer staged a bundle: a quiet or
     # republish hour has nothing to land.
-    if: needs.publish.outputs.commits == 'true'
+    if: "!cancelled() && needs.publish.result == 'success' && needs.publish.outputs.commits == 'true'"
 
     # Only push jobs enter main-push: the main-push
     # environment's deployment-branch policy admits main alone, so the
@@ -1174,15 +1174,22 @@ jobs:
       - name: Build the rankings page
         run: |
           args=()
+          has_fresh=false
+          if [ -f out/trending-rankings.html ]; then
+            cp out/trending-rankings.html "${RUNNER_TEMP}/committed-page.html"
+            args+=(--identity-page "${RUNNER_TEMP}/committed-page.html")
+          fi
           if [ -f "${RUNNER_TEMP}/hf-payload/data/hf-trending.json" ]; then
             args+=(--fresh-hf "${RUNNER_TEMP}/hf-payload/data/hf-trending.json"
                    --fresh-hf-timestamp "$(cat "${RUNNER_TEMP}/hf-payload/fetched-at.txt")")
+            has_fresh=true
           fi
           if [ -f "${RUNNER_TEMP}/or-payload/data/openrouter-trending.json" ]; then
             args+=(--fresh-or "${RUNNER_TEMP}/or-payload/data/openrouter-trending.json"
                    --fresh-or-timestamp "$(cat "${RUNNER_TEMP}/or-payload/fetched-at.txt")")
+            has_fresh=true
           fi
-          if [ "${#args[@]}" -gt 0 ]; then
+          if [ "$has_fresh" = true ]; then
             args+=(--fresh-label "run ${GITHUB_RUN_ID}")
           fi
           python3 scripts/build_rankings.py "${args[@]}"
