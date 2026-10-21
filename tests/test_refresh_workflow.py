@@ -1235,7 +1235,7 @@ class ExecutedCommitMessageTests(_SeededOrigin, unittest.TestCase):
             "moved\n" if differ_msg else "rebuild\n", encoding="utf-8")
         if differ_msg:
             (payload / "commit-msg.txt").write_text(differ_msg,
-                                                    encoding="utf-8")
+                                                    encoding="utf-8", newline="\n")
 
     def _run_hour(self, tmp: pathlib.Path, differ_msg):
         """Stage one hour's payload and run the real commit step."""
@@ -1333,7 +1333,7 @@ class ExecutedCommitMessageTests(_SeededOrigin, unittest.TestCase):
                         path = f'data/{filename}-trending.json'
                         (payload / path).write_text('fresh list\n', encoding='utf-8')
                         (payload / 'message.txt').write_text(line + '\n\nfull report\n',
-                                                             encoding='utf-8')
+                                                             encoding='utf-8', newline='\n')
                         # An artifact cannot widen the fixed add list.
                         (payload / 'unrelated.txt').write_text('ignore me', encoding='utf-8')
                         blocks.append(line + '\n\nfull report')
@@ -1375,7 +1375,8 @@ class ExecutedCommitMessageTests(_SeededOrigin, unittest.TestCase):
                     (payload / f'data/{filename}-trending.json').write_text(
                         'fresh list\n', encoding='utf-8')
                     (payload / 'message.txt').write_text(
-                        subject + '\n\nMOVE model rank 2 -> 1' + ending, encoding='utf-8')
+                        subject + '\n\nMOVE model rank 2 -> 1' + ending,
+                        encoding='utf-8', newline='\n')
                 result = _workflowrun.run_step(tmp, self.step, self._env(tmp, config, base))
                 self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
                 expected = ('Refresh capture: new models\n\nDisputes\n\n'
@@ -1388,10 +1389,18 @@ class ExecutedCommitMessageTests(_SeededOrigin, unittest.TestCase):
                                  .stdout.strip(), expected.strip())
 
     def test_leading_tracker_subject_is_capped_without_losing_its_block(self):
+        # Exercise Windows' implicit CRLF translation on every test platform.
+        def windows_message_write(path, data, **kwargs):
+            if path.name == 'message.txt' and kwargs.get('newline') is None:
+                kwargs['newline'] = '\r\n'
+            with path.open('w', **kwargs) as handle:
+                return handle.write(data)
+
         for tracker, filename in (('hf', 'hf'), ('or', 'openrouter')):
             for length in (72, 73, 336):
                 with self.subTest(tracker=tracker, length=length), \
-                        tempfile.TemporaryDirectory() as raw:
+                        tempfile.TemporaryDirectory() as raw, \
+                        mock.patch.object(pathlib.Path, 'write_text', windows_message_write):
                     tmp = pathlib.Path(raw)
                     config, base, _, _, _ = self._seed_origin(tmp, self.BASE_FILES)
                     subject = 'Trending: ' + 'm' * (length - len('Trending: '))
@@ -1400,7 +1409,7 @@ class ExecutedCommitMessageTests(_SeededOrigin, unittest.TestCase):
                     (payload / 'data').mkdir(parents=True)
                     (payload / f'data/{filename}-trending.json').write_text(
                         'fresh list\n', encoding='utf-8')
-                    (payload / 'message.txt').write_text(block, encoding='utf-8')
+                    (payload / 'message.txt').write_text(block, encoding='utf-8', newline='\n')
                     result = _workflowrun.run_step(tmp, self.step,
                                                    self._env(tmp, config, base))
                     self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
@@ -1410,8 +1419,8 @@ class ExecutedCommitMessageTests(_SeededOrigin, unittest.TestCase):
                     expected = block + '\nCaptured by .github/workflows/refresh.yml.\n'
                     if length > 72:
                         expected = subject[:72] + '\n\n' + expected
-                    self.assertEqual((tmp / 'commit-msg.txt').read_text(encoding='utf-8'),
-                                     expected)
+                    self.assertEqual((tmp / 'commit-msg.txt').read_bytes(),
+                                     expected.encode('utf-8'))
                     self.assertEqual(self._git('log', '-1', '--format=%B', cwd=scratch)
                                      .stdout.rstrip('\n'), expected.rstrip('\n'))
 
@@ -1425,7 +1434,8 @@ class ExecutedCommitMessageTests(_SeededOrigin, unittest.TestCase):
             payload = tmp / 'hf-payload'
             (payload / 'data').mkdir(parents=True)
             (payload / 'data/hf-trending.json').write_text('new\n', encoding='utf-8')
-            (payload / 'message.txt').write_text('Trending: new HF\n', encoding='utf-8')
+            (payload / 'message.txt').write_text('Trending: new HF\n',
+                                                 encoding='utf-8', newline='\n')
             result = _workflowrun.run_step(tmp, self.step, self._env(tmp, config, base))
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             self.assertEqual(self._git('log', '-1', '--format=%B', cwd=tmp / 'scratch')
