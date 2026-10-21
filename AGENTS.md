@@ -463,8 +463,10 @@ frontier page. The standalone `openrouter-top` tracker is retired.
   rebuilds and runs the suite. The run pushes at most one bot commit carrying
   every changed source: the AA capture with its rebuilt
   `out/frontier-models.html`, the two trending lists, and
-  `out/trending-rankings.html`. The message gives one line per changed source,
-  using `diff_aa.py`'s summary for AA. A failed source fetch, or a red AA gate
+  `out/trending-rankings.html`. The commit keeps one subject line; each changed
+  source contributes its full message as a block under its own subject line:
+  AA's `diff_aa.py` report and HF/OR's MOVE lines under each tracker's own line.
+  A failed source fetch, or a red AA gate
   or suite, leaves that source out while the sources that succeeded still
   commit. A run in which nothing changed pushes nothing; each page is
   published to docs-hub after the commit lands. The joined workflow requests

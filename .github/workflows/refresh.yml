@@ -465,8 +465,8 @@ jobs:
         # are absolute, and an absolute runner path (/home/runner/work/...)
         # baked into a commit message is permanent noise.
         #
-        # The run log gets the full report; the commit gets the same report
-        # under a subject line naming what moved. The speed section is already
+        # The run log gets the full report; the joined commit keeps it as a
+        # block under AA's own subject line. The speed section is already
         # threshold-filtered and unchanged frontier sections are omitted at
         # the source, so the commit carries everything that is news.
         env:
@@ -550,8 +550,7 @@ jobs:
           # it again. Absent is the normal state and copies nothing.
           [ ! -f data/cost-breakdown-window.txt ] || cp --parents data/cost-breakdown-window.txt "${PAYLOAD}/tree/"
           # The differ's message travels when the hour ran it (CHANGED=true);
-          # the write job's message selection reads it exactly as the old
-          # commit step read the workspace copy.
+          # the write job includes the full message as AA's block.
           [ ! -f commit-msg.txt ] || cp commit-msg.txt "${PAYLOAD}/commit-msg.txt"
 
       - name: Upload the publish payload
@@ -777,31 +776,27 @@ jobs:
             cp "${RUNNER_TEMP}/rankings-page/trending-rankings.html" out/
             git add out/trending-rankings.html
           fi
-          # Only source subjects enter the joined message, in fixed order.
-          # The full differ report stays in the run summary.
-          lines=()
+          # Each source contributes its full message in fixed order, with
+          # one blank line between blocks and before the capture footer.
+          blocks=()
           if [ -f "${PAYLOAD}/aa-mode.txt" ]; then
             case "$(cat "${PAYLOAD}/aa-mode.txt")" in
-              moved) lines+=("$(sed -n '1p' "${PAYLOAD}/commit-msg.txt")") ;;
-              rebuild) lines+=('Rebuild the page: forced run, AA capture unchanged') ;;
+              moved) blocks+=("$(cat "${PAYLOAD}/commit-msg.txt")") ;;
+              rebuild) blocks+=('Rebuild the page: forced run, AA capture unchanged') ;;
             esac
           fi
           if [ -f "${RUNNER_TEMP}/hf-payload/message.txt" ]; then
-            lines+=("$(sed -n '1p' "${RUNNER_TEMP}/hf-payload/message.txt")")
+            blocks+=("$(cat "${RUNNER_TEMP}/hf-payload/message.txt")")
           fi
           if [ -f "${RUNNER_TEMP}/or-payload/message.txt" ]; then
-            lines+=("$(sed -n '1p' "${RUNNER_TEMP}/or-payload/message.txt")")
+            blocks+=("$(cat "${RUNNER_TEMP}/or-payload/message.txt")")
           fi
           if [ -f "${RUNNER_TEMP}/rankings-page/trending-rankings.html" ]; then
-            lines+=("Rebuild the rankings page from this run's snapshots.")
+            blocks+=("Rebuild the rankings page from this run's snapshots.")
           fi
           {
-            if [ "${#lines[@]}" -gt 0 ]; then
-              printf '%s\n\n' "${lines[0]}"
-              if [ "${#lines[@]}" -gt 1 ]; then
-                printf '%s\n' "${lines[@]:1}"
-                echo
-              fi
+            if [ "${#blocks[@]}" -gt 0 ]; then
+              printf '%s\n\n' "${blocks[@]}"
             fi
             echo 'Captured by .github/workflows/refresh.yml.'
           } > "${RUNNER_TEMP}/commit-msg.txt"
