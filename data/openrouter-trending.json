@@ -20,10 +20,10 @@
       "slug": "anthropic/claude-opus-5.5"
     },
     {
-      "slug": "openai/gpt-6-luna"
+      "slug": "minimax/minimax-m3.1-flash"
     },
     {
-      "slug": "minimax/minimax-m3.1-flash"
+      "slug": "openai/gpt-6-luna"
     },
     {
       "slug": "stepfun/step-5-preview"
