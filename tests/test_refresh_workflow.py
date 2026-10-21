@@ -1387,6 +1387,34 @@ class ExecutedCommitMessageTests(_SeededOrigin, unittest.TestCase):
                 self.assertEqual(self._git('log', '-1', '--format=%B', cwd=tmp / 'scratch')
                                  .stdout.strip(), expected.strip())
 
+    def test_leading_tracker_subject_is_capped_without_losing_its_block(self):
+        for tracker, filename in (('hf', 'hf'), ('or', 'openrouter')):
+            for length in (72, 73, 336):
+                with self.subTest(tracker=tracker, length=length), \
+                        tempfile.TemporaryDirectory() as raw:
+                    tmp = pathlib.Path(raw)
+                    config, base, _, _, _ = self._seed_origin(tmp, self.BASE_FILES)
+                    subject = 'Trending: ' + 'm' * (length - len('Trending: '))
+                    block = subject + '\n\nMOVE org/model rank 2 -> 1\n'
+                    payload = tmp / f'{tracker}-payload'
+                    (payload / 'data').mkdir(parents=True)
+                    (payload / f'data/{filename}-trending.json').write_text(
+                        'fresh list\n', encoding='utf-8')
+                    (payload / 'message.txt').write_text(block, encoding='utf-8')
+                    result = _workflowrun.run_step(tmp, self.step,
+                                                   self._env(tmp, config, base))
+                    self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                    scratch = tmp / 'scratch'
+                    self.assertEqual(self._git('log', '-1', '--format=%s', cwd=scratch)
+                                     .stdout.rstrip('\n'), subject[:72])
+                    expected = block + '\nCaptured by .github/workflows/refresh.yml.\n'
+                    if length > 72:
+                        expected = subject[:72] + '\n\n' + expected
+                    self.assertEqual((tmp / 'commit-msg.txt').read_text(encoding='utf-8'),
+                                     expected)
+                    self.assertEqual(self._git('log', '-1', '--format=%B', cwd=scratch)
+                                     .stdout.rstrip('\n'), expected.rstrip('\n'))
+
     def test_republish_payload_contributes_no_aa_line_beside_hf(self):
         with tempfile.TemporaryDirectory() as raw:
             tmp = pathlib.Path(raw)
