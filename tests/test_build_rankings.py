@@ -54,15 +54,12 @@ def _cleanup_rankings_fixture(path):
 
 
 class Page(HTMLParser):
-    """Read the generated chart marks and accessible tables as a consumer."""
+    """Read the generated chart marks, table tags and text as a consumer."""
 
     def __init__(self, document):
         super().__init__()
         self.points = []
         self.tables = []
-        self.headers = []
-        self.header_text = []
-        self.in_header = False
         self.text = []
         self.feed(document)
 
@@ -72,18 +69,9 @@ class Page(HTMLParser):
             self.points.append(attributes)
         if tag == "table":
             self.tables.append(attributes)
-        if tag == "th":
-            self.headers.append(attributes)
-            self.in_header = True
-
-    def handle_endtag(self, tag):
-        if tag == "th":
-            self.in_header = False
 
     def handle_data(self, data):
         self.text.append(data)
-        if self.in_header:
-            self.header_text.append(data)
 
 
 class ReadonlyCleanupTests(unittest.TestCase):
@@ -250,7 +238,7 @@ class RankingsTests(RankingsFixture):
 
     def test_single_snapshot_renders_without_padding(self):
         page = Page(self._document())
-        self.assertEqual(len(page.tables), 2)
+        self.assertEqual(len(page.tables), 0)
         self.assertEqual(len(page.points), 4)
         self.assertEqual({point["data-commit"] for point in page.points},
                          {self.first, self.or_first})
@@ -308,19 +296,29 @@ class RankingsTests(RankingsFixture):
         self.assertNotIn(raw, document)
         self.assertEqual(document.count('class="timestamp-tick"'), 3)
 
-    def test_each_table_exposes_model_rank_history_and_timestamps(self):
+    def test_page_has_no_table_view(self):
         self.commit(HF, ["org/b", "org/a"], "id")
-        page = Page(self._document())
+        document = self._document()
+        page = Page(document)
         text = " ".join(page.text)
-        self.assertEqual(len(page.tables), 2)
-        self.assertEqual(len(page.headers), 8)
-        for heading in ("Model", "Rank history", "First-seen", "Latest timestamp"):
-            self.assertEqual(page.header_text.count(heading), 2)
+        self.assertEqual(len(page.tables), 0)
+        self.assertNotIn("Table view", text)
+        descriptions = re.findall(r'<desc[^>]*>(.*?)</desc>', document, re.S)
+        self.assertEqual(len(descriptions), 2)
+        for description in descriptions:
+            self.assertNotRegex(description, r'(?i)\btable\b')
+        self.assertEqual(document.count('<svg'), 2)
+        self.assertEqual(document.count('<ul class="legend"'), 2)
+        self.assertTrue(page.points)
         self.assertIn("org/a", text)
         self.assertIn("lab/x", text)
-        self.assertTrue(all(header.get("scope") == "col" for header in page.headers))
+        for point in page.points:
+            self.assertEqual(point["tabindex"], "0")
+            self.assertEqual(point["aria-label"],
+                             f'Rank {point["data-rank"]} · {point["data-model"]} · '
+                             f'{point["data-timestamp"]}')
 
-    def test_model_text_is_escaped_in_svg_table_and_tooltip_data(self):
+    def test_model_text_is_escaped_in_svg_and_tooltip_data(self):
         self.commit(HF, ['org/</script><script>alert("x")</script>'], "id")
         document = self._document()
         self.assertNotIn('<script>alert("x")</script>', document)
@@ -560,10 +558,6 @@ class FreshRankingsTests(RankingsFixture):
                 self.assertIn(timestamp[11:19], section)
                 self.assertIn("2 changing commits · ", section)
                 self.assertIn(f" → {timestamp}</p>", section)
-                rows = re.findall(r'<tr><td>.*?</tr>', section, re.S)
-                for model, rank in expected.items():
-                    row = next(row for row in rows if f"<td>{model}</td>" in row)
-                    self.assertIn(f'{timestamp}</time> · Rank {rank}</li>', row)
 
     def test_one_sided_fresh_keeps_the_other_lists_full_history(self):
         self.commit(HF, ["org/b", "org/a"], "id")

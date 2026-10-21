@@ -82,7 +82,7 @@ That is fine in both directions.
 - **Charts follow the house dataviz rules.** Three categorical hues maximum in
   a scatter (lab identity is 23 labs — it lives in the tooltip and the filters,
   never in color), log x-axis, direct labels only on frontier points,
-  nearest-point hover, and one filter row above everything it scopes. **The
+  nearest-point hover, and one filter row above everything it scopes. **On the frontier page, the
   table view is mandatory**: nothing may be reachable only by hovering.
   Dark mode is declared under both the media query and the `data-theme` scope.
 

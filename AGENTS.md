@@ -393,7 +393,7 @@ follow the `dataviz` skill — that means the procedure, not just the vibe:
   surface ring, direct labels **only** on frontier points.
 - Nearest-point hover, not pinpoint hit targets.
 - One filter row above everything it scopes, never per-chart.
-- A table view is mandatory — the accessible twin. Nothing may be reachable
+- On the frontier page, a table view is mandatory — the accessible twin. Nothing may be reachable
   only by hovering.
 - Dark mode is selected from the same ramps and declared under both the media
   query and the `data-theme` scope.
