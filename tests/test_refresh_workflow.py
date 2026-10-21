@@ -1201,7 +1201,7 @@ class _SeededOrigin:
 class ExecutedCommitMessageTests(_SeededOrigin, unittest.TestCase):
     """Execute the joined committer against a local origin and read its result.
 
-    Each source contributes its subject in fixed order. AA's mode separates
+    Each source contributes its full message in fixed order. AA's mode separates
     moved captures, forced rebuilds and republish-only hours (issue #285).
     """
 
@@ -1260,8 +1260,9 @@ class ExecutedCommitMessageTests(_SeededOrigin, unittest.TestCase):
                 pathlib.Path(raw),
                 differ_msg="Refresh capture: 690 models\n\nspeed rows\n")
         self.assertEqual(message.strip(), "Refresh capture: 690 models\n\n"
+                         "speed rows\n\n"
                          "Captured by .github/workflows/refresh.yml.")
-        self.assertNotIn("speed rows", message)
+        self.assertIn("speed rows", message)
         self.assertIn("Captured by .github/workflows/refresh.yml.", message)
         self.assertNotIn("Rebuild the page: forced run", message)
         self.assertIn("M\tdata/aa-raw-models.json", names)
@@ -1304,6 +1305,8 @@ class ExecutedCommitMessageTests(_SeededOrigin, unittest.TestCase):
             self.assertEqual(names, "")
             self.assertEqual(log.count("\n"), 1)
             self.assertNotIn("Rebuild the page", message)
+            self.assertEqual((tmp / 'commit-msg.txt').read_text(encoding='utf-8'),
+                             'Captured by .github/workflows/refresh.yml.\n')
 
     def test_joined_sources_commit_once_in_fixed_order(self):
         for sources in (('hf',), ('hf', 'or'), ('aa', 'hf'),
@@ -1315,11 +1318,11 @@ class ExecutedCommitMessageTests(_SeededOrigin, unittest.TestCase):
                               'data/openrouter-trending.json': 'old or\n',
                               'out/trending-rankings.html': 'old page\n'}
                 config, base, _, _, _ = self._seed_origin(tmp, base_files)
-                lines = []
+                blocks = []
                 changed_paths = []
                 if 'aa' in sources:
                     self._stage_payload(tmp, 'Refresh capture: new models\n\nDisputes\n')
-                    lines.append('Refresh capture: new models')
+                    blocks.append('Refresh capture: new models\n\nDisputes')
                     changed_paths.extend(self.MOVED_FILES)
                 for tracker, filename, line in (
                         ('hf', 'hf', 'Trending: fresh HF'),
@@ -1333,23 +1336,21 @@ class ExecutedCommitMessageTests(_SeededOrigin, unittest.TestCase):
                                                              encoding='utf-8')
                         # An artifact cannot widen the fixed add list.
                         (payload / 'unrelated.txt').write_text('ignore me', encoding='utf-8')
-                        lines.append(line)
+                        blocks.append(line + '\n\nfull report')
                         changed_paths.append(path)
                 if 'rankings' in sources:
                     payload = tmp / 'rankings-page'
                     payload.mkdir()
                     (payload / 'trending-rankings.html').write_text('fresh page\n',
                                                                     encoding='utf-8')
-                    lines.append("Rebuild the rankings page from this run's snapshots.")
+                    blocks.append("Rebuild the rankings page from this run's snapshots.")
                     changed_paths.append('out/trending-rankings.html')
                 result = _workflowrun.run_step(tmp, self.step, self._env(tmp, config, base))
                 self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
                 scratch = tmp / 'scratch'
                 message = self._git('log', '-1', '--format=%B', cwd=scratch).stdout.strip()
-                expected = lines[0] + '\n\n'
-                if len(lines) > 1:
-                    expected += '\n'.join(lines[1:]) + '\n\n'
-                expected += 'Captured by .github/workflows/refresh.yml.'
+                expected = '\n\n'.join(
+                    blocks + ['Captured by .github/workflows/refresh.yml.'])
                 self.assertEqual(message, expected)
                 self.assertEqual(self._git('rev-list', '--count', base + '..HEAD',
                                            cwd=scratch).stdout.strip(), '1')
@@ -1359,6 +1360,32 @@ class ExecutedCommitMessageTests(_SeededOrigin, unittest.TestCase):
                 self.assertEqual(self._git('log', '-1', '--format=%an', cwd=scratch)
                                  .stdout.strip(), 'github-actions[bot]')
                 self.assertNotIn('Co-Authored-By:', message)
+
+    def test_message_blocks_normalize_trailing_newlines(self):
+        for ending in ('', '\n', '\n\n'):
+            with self.subTest(ending=ending), tempfile.TemporaryDirectory() as raw:
+                tmp = pathlib.Path(raw)
+                config, base, _, _, _ = self._seed_origin(tmp, self.BASE_FILES)
+                self._stage_payload(tmp, 'Refresh capture: new models\n\nDisputes' + ending)
+                for tracker, filename, subject in (
+                        ('hf', 'hf', 'Trending: fresh HF'),
+                        ('or', 'openrouter', 'Top 10: fresh OR')):
+                    payload = tmp / f'{tracker}-payload'
+                    (payload / 'data').mkdir(parents=True)
+                    (payload / f'data/{filename}-trending.json').write_text(
+                        'fresh list\n', encoding='utf-8')
+                    (payload / 'message.txt').write_text(
+                        subject + '\n\nMOVE model rank 2 -> 1' + ending, encoding='utf-8')
+                result = _workflowrun.run_step(tmp, self.step, self._env(tmp, config, base))
+                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                expected = ('Refresh capture: new models\n\nDisputes\n\n'
+                            'Trending: fresh HF\n\nMOVE model rank 2 -> 1\n\n'
+                            'Top 10: fresh OR\n\nMOVE model rank 2 -> 1\n\n'
+                            'Captured by .github/workflows/refresh.yml.\n')
+                self.assertEqual((tmp / 'commit-msg.txt').read_text(encoding='utf-8'),
+                                 expected)
+                self.assertEqual(self._git('log', '-1', '--format=%B', cwd=tmp / 'scratch')
+                                 .stdout.strip(), expected.strip())
 
     def test_republish_payload_contributes_no_aa_line_beside_hf(self):
         with tempfile.TemporaryDirectory() as raw:

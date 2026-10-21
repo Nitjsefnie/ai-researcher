@@ -261,7 +261,9 @@ hourly runs (`11 * * * *`); GitHub delivers schedules best-effort. Each run
 captures AA and fetches both trackers, then pushes at most one bot commit
 carrying every changed source: the AA capture with its rebuilt
 `out/frontier-models.html`, the two trending lists, and
-`out/trending-rankings.html`. The message gives one line per changed source.
+`out/trending-rankings.html`. The commit keeps one subject line; each changed
+source contributes its full message as a block under its own subject line:
+AA's `diff_aa.py` report and HF/OR's MOVE lines under each tracker's own line.
 A failed source fetch, or a red AA gate or suite, leaves that source out while
 the sources that succeeded still commit. A run in which nothing changed
 pushes nothing. The single push job uses its write deploy key (the `main-push`
