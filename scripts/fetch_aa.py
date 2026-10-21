@@ -612,7 +612,7 @@ def generation_key(records: list[dict], universe: set[str]) -> str:
     by slug and the field dict is built in sorted order, so two runs that
     read the same bytes compute the same key.
     """
-    fields = sorted(universe - NEVER_RED_FIELDS)
+    fields = sorted(universe - NEVER_RED_FIELDS - {CARRIED_DETAIL_KEY})
     normalized = [
         {f: normalize_for_comparison(rec.get(f)) for f in fields}
         for rec in sorted((r for r in records if isinstance(r, dict)),
@@ -633,7 +633,7 @@ def leaderboard_universe(looks: list[list[dict]]) -> set[str]:
         for rec in look:
             if isinstance(rec, dict):
                 universe.update(rec)
-    return universe
+    return universe - {CARRIED_DETAIL_KEY}
 
 
 def _cost_total(record):
@@ -773,6 +773,8 @@ def cross_generation_merge(corpora: list[list[dict]]) -> list[dict]:
 # and that is what lets a stable retirement settle within one further hour:
 # a look-back that pinned a model disputed forever would be wrong.
 CROSS_RUN_KEY = "crossRunMerged"
+CARRIED_DETAIL_KEY = "carriedDetailFills"
+SYNTHETIC_FIELDS = frozenset({"genVariants", CROSS_RUN_KEY, CARRIED_DETAIL_KEY})
 GENERATION_STATE_FILE = "aa-generation-state.json"
 REMEMBERED_GENERATION_LIMIT = 1000
 HELD_SPEED_FIELDS = frozenset({
@@ -941,7 +943,7 @@ def cross_run_presence_merge(models, prev_records, run_corpora):
         if not isinstance(slug, str) or not slug:
             continue
         canonical[slug] = {k: v for k, v in rec.items()
-                           if k not in ("genVariants", CROSS_RUN_KEY)}
+                           if k not in SYNTHETIC_FIELDS}
         if not rec.get(CROSS_RUN_KEY):
             firm.add(slug)
 
@@ -983,6 +985,37 @@ def cross_run_presence_merge(models, prev_records, run_corpora):
                                + [{}] * (len(run_corpora) - prev_position))
         out.append(base)
     return out, CrossRun(dropped, readded)
+
+
+def carry_detail_fills(models, prev_records, universe):
+    """Fill withheld detail keys after every generation/presence decision.
+
+    Current values win through merge_captures, including its SUM_TOLERANCE
+    guard on a carried breakdown under the current total (issue #303).
+    Leaderboard-key absences remain serving movement, never old fills.
+    """
+    previous = {r["slug"]: r for r in prev_records
+                if isinstance(r, dict) and isinstance(r.get("slug"), str)}
+    out = []
+    for record in models:
+        slug = record.get("slug")
+        if not isinstance(slug, str) or slug not in previous:
+            out.append(record)
+            continue
+        extra = {k: v for k, v in previous[slug].items()
+                 if k not in SYNTHETIC_FIELDS and (k not in universe or (
+                     k == "intelligenceIndexCostPerTask" and k in record))}
+        # The cost key may already carry a total; its missing nested parts
+        # are fills too, subject to merge_captures' breakdown-vs-total guard.
+        extra["slug"] = slug
+        merged = merge_captures([record], [extra])[0]
+        carried = sorted(k for k in extra
+                         if k not in record or (isinstance(merged[k], dict)
+                                                and merged[k] != record[k]))
+        if carried:
+            merged[CARRIED_DETAIL_KEY] = carried
+        out.append(merged)
+    return out
 
 
 def coding_agent_rows(payload: str) -> list[dict]:
@@ -1118,6 +1151,9 @@ def capture(cached_base: str | None, cached_detail: str | None,
     run's capture. The presence layer applies
     on top. In-run disagreements leave the state unchanged. With no state
     argument, capture uses only the in-run and presence layers above.
+
+    With prev_records, a final carry_detail_fills pass restores withheld
+    detail enrichment without changing any layer's decisions or corpora.
     """
     version = check_index_version(
         fetch_html(cached_methodology, METHODOLOGY_URL))
@@ -1215,6 +1251,7 @@ def capture(cached_base: str | None, cached_detail: str | None,
                                                      run_corpora)
         disputed = disputed or bool(cross_run.dropped or cross_run.readded)
     revisit_action = None
+    rendering_hold = False
     if revisit_state is not None:
         models, held_corpora, rendering_hold, revisit_action = revisit_merge(
             models, prev_records, run_corpora, revisit_state)
@@ -1222,6 +1259,11 @@ def capture(cached_base: str | None, cached_detail: str | None,
             models, cross_run = cross_run_presence_merge(
                 models, prev_records or [], held_corpora)
             disputed = True
+    if prev_records is not None:
+        # A hold freezes rendered speeds, including canonical absence.
+        models = carry_detail_fills(
+            models, prev_records,
+            universe | HELD_SPEED_FIELDS if rendering_hold else universe)
     return Capture(models, host, version, generations, disputed, cross_run,
                    revisit_action, frozenset(s for s in listed if isinstance(s, str)))
 

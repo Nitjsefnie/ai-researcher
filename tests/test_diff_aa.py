@@ -10,6 +10,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+import unittest.mock
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent / "scripts"))
 
@@ -450,6 +451,33 @@ class ReportTests(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, self.tmp)
+
+    def test_carried_detail_fills_are_one_summary_clause_not_field_news(self):
+        old = [capture("A", intelligence=50, cost=1.0),
+               capture("B", intelligence=40, cost=2.0)]
+        new = [dict(old[0], carriedDetailFills=["parameters", "releaseDate"]),
+               dict(old[1], carriedDetailFills=["licenseName"])]
+        self.render(old, new)
+        for all_fields in (False, True):
+            # --all must not promote capture bookkeeping into field changes.
+            argv = ["diff_aa.py", str(pathlib.Path(self.tmp) / "old.json"),
+                    str(pathlib.Path(self.tmp) / "new.json")]
+            if all_fields:
+                argv.append("--all")
+            output = io.StringIO()
+            with unittest.mock.patch.object(sys, "argv", argv), \
+                    contextlib.redirect_stdout(output):
+                diff_aa.main()
+            report = output.getvalue()
+            self.assertIn("== field changes\n  (none)", report)
+            self.assertNotIn("carriedDetailFills:", report)
+            self.assertNotIn("== disputes", report)
+            self.assertIn("3 detail fills carried across 2 models", report)
+            self.assertIn("3 detail fills carried across 2 models",
+                          diff_aa.as_commit_message(report).splitlines()[0])
+        restored = self.render(new, old)
+        self.assertNotIn("detail fills carried", restored)
+        self.assertIn("== field changes\n  (none)", restored)
 
     def test_a_new_model_is_reported_and_reaches_the_subject_line(self):
         old = [capture("Incumbent", intelligence=50, cost=1.0)]
