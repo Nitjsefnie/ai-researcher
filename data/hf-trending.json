@@ -20,10 +20,10 @@
       "id": "OpenMOSS-Team/MOSS-Image-SFT"
     },
     {
-      "id": "google/embeddinggemma-2"
+      "id": "OpenMOSS-Team/MOSS-Image-Base"
     },
     {
-      "id": "OpenMOSS-Team/MOSS-Image-Base"
+      "id": "google/embeddinggemma-2"
     },
     {
       "id": "Lightricks/LTX-2.5"
