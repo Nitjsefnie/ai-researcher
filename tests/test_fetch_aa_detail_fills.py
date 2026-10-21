@@ -62,10 +62,21 @@ def assert_same_pages(previous, current):
     assert capture_gate.mask_digest(old_page) == capture_gate.mask_digest(new_page)
 
 
-def test_real_price_and_gdpval_conflicts_remain_paired(tmp_path, monkeypatch):
+@pytest.mark.parametrize("second_total", [0.75, 1.5])
+def test_real_price_and_gdpval_conflicts_remain_paired(tmp_path, monkeypatch, second_total):
     first, second = leaderboard(), leaderboard()
     second[1].update(price1mInputTokens=2, price1mOutputTokens=6,
-                     gdpvalNormalized=0.60, intelligenceIndexCostPerTask=1.5)
+                     gdpvalNormalized=0.60, intelligenceIndexCostPerTask=second_total)
+    prior = rich_detail()
+    expected_fills = {key: prior[key] for key in (
+        "creator", "intelligenceIndexCost", "intelligenceIndexTimePerTask",
+        "licenseName", "parameters", "releaseDate", "sizeClass")}
+    cost_key = "intelligenceIndexCostPerTask"
+    if second_total == 0.75:
+        expected_fills[cost_key] = prior[cost_key]
+        expected_cost = prior[cost_key]
+    else:
+        expected_cost = 1.5
     detail = dict(rich_detail(), intelligenceIndex=53)
     support = detail_record("retired")
     without = capture_pages(tmp_path, monkeypatch, first, second, [detail, support])
@@ -80,22 +91,32 @@ def test_real_price_and_gdpval_conflicts_remain_paired(tmp_path, monkeypatch):
     assert sorted(v["pin"] for v in current["genVariants"]) == [1, 2]
     assert sorted(v["pout"] for v in current["genVariants"]) == [3, 6]
     assert sorted(v["gdpval"] for v in current["genVariants"]) == [0.47, 0.60]
+    assert sorted(v["cost"] for v in current["genVariants"]) == [0.75, second_total]
     assert all("gdpvalCost" not in v for v in current["genVariants"])
-    assert current["parameters"] == 27
+    assert current[cost_key] == expected_cost
+    assert current["carriedDetailFills"] == sorted(expected_fills)
+    assert build.cost_per_task(current) == second_total
+    for field, expected in expected_fills.items():
+        assert current[field] == expected
     row = build.build_rows([current])[0]
-    for field in ("pin", "pout", "gdpval", "cost"):
+    for field in ("pin", "pout", "gdpval"):
         values = build.disputed_field_values(row, field)
         assert values is not None and len(values) == 2
+    if second_total != 0.75:
+        values = build.disputed_field_values(row, "cost")
+        assert values is not None and len(values) == 2
     _, table = build.render_static_tbodies([row])
-    for pair in (("$1 / $2", "$2 / $1"), ("$3 / $6", "$6 / $3"),
-                 ("$0.750 / $1.50", "$1.50 / $0.750")):
+    pairs = [("$1 / $2", "$2 / $1"), ("$3 / $6", "$6 / $3")]
+    if second_total != 0.75:
+        pairs.append(("$0.750 / $1.50", "$1.50 / $0.750"))
+    for pair in pairs:
         assert any(f'<td class="n dispute">{text}</td>' in table for text in pair)
     # Restored cells produce the same page as today's look variants plus
     # these cells supplied by AA, without changing the paired red cells.
     restored = copy.deepcopy(without.models)
     target = next(r for r in restored if r["slug"] == "current")
-    for field in current["carriedDetailFills"]:
-        target[field] = current[field]
+    for field, expected in expected_fills.items():
+        target[field] = expected
     assert_same_pages(restored, captured.models)
 
 

@@ -2645,6 +2645,8 @@ class TestGenerationRevisit(unittest.TestCase):
         self.assertEqual(self.state_path.read_bytes(), frozen)
 
     def test_in_run_disputes_preserve_state_and_render_held_only_for_members(self):
+        cost_key = "intelligenceIndexCostPerTask"
+        expected_cost = detail_record()[cost_key]
         held, _ = self.establish_hold()
         frozen = self.state_path.read_bytes()
         for first, second in [(40, 50), (50, 40)]:
@@ -2663,6 +2665,12 @@ class TestGenerationRevisit(unittest.TestCase):
             self.assertEqual({k: v for k, v in plain.items() if k not in ignored},
                              {k: v for k, v in enriched.items() if k not in ignored})
             self.assertEqual(build.cost_per_task(plain), build.cost_per_task(enriched))
+            if enriched["slug"] == "fixture-model":
+                self.assertEqual(enriched[cost_key], expected_cost)
+                self.assertEqual(enriched["carriedDetailFills"], [cost_key])
+            else:
+                self.assertEqual(enriched[cost_key], plain[cost_key])
+                self.assertNotIn("carriedDetailFills", enriched)
 
     def test_in_run_dispute_without_hold_does_not_remember_either_look(self):
         self.run_hour(40)
