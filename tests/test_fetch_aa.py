@@ -2644,34 +2644,6 @@ class TestGenerationRevisit(unittest.TestCase):
         self.run_hour(50, day=6)
         self.assertEqual(self.state_path.read_bytes(), frozen)
 
-    def test_in_run_disputes_preserve_state_and_render_held_only_for_members(self):
-        cost_key = "intelligenceIndexCostPerTask"
-        expected_cost = detail_record()[cost_key]
-        held, _ = self.establish_hold()
-        frozen = self.state_path.read_bytes()
-        for first, second in [(40, 50), (50, 40)]:
-            models, _ = self.run_hour(first, second=second)
-            self.assertEqual(build.build_rows(models), build.build_rows(held))
-            self.assertEqual(self.state_path.read_bytes(), frozen)
-        models, _ = self.run_hour(40, second=60)
-        self.assertEqual(self.state_path.read_bytes(), frozen)
-        self.run_hour(40, second=60, enabled=False)
-        without_lookback = json.loads(self.output.read_text())
-        # The final look-back can restore a missing plain breakdown, while
-        # every in-run variant and the winning total stay exactly the same.
-        self.assertEqual(len(without_lookback), len(models))
-        for plain, enriched in zip(without_lookback, models):
-            ignored = {"intelligenceIndexCostPerTask", "carriedDetailFills"}
-            self.assertEqual({k: v for k, v in plain.items() if k not in ignored},
-                             {k: v for k, v in enriched.items() if k not in ignored})
-            self.assertEqual(build.cost_per_task(plain), build.cost_per_task(enriched))
-            if enriched["slug"] == "fixture-model":
-                self.assertEqual(enriched[cost_key], expected_cost)
-                self.assertEqual(enriched["carriedDetailFills"], [cost_key])
-            else:
-                self.assertEqual(enriched[cost_key], plain[cost_key])
-                self.assertNotIn("carriedDetailFills", enriched)
-
     def test_in_run_dispute_without_hold_does_not_remember_either_look(self):
         self.run_hour(40)
         frozen = self.state_path.read_bytes()
@@ -2748,28 +2720,6 @@ class TestGenerationRevisit(unittest.TestCase):
                       intelligenceIndexTimePerTask=123, unusedPayload="churn")
         self.assertEqual(self.state_path.read_bytes(), frozen)
 
-    def test_gdpval_breakdowns_are_frozen_per_generation_and_not_re_filled(self):
-        self.run_hour(40, gdpvalNormalized=0.4)
-        self.run_hour(50, gdpvalNormalized=0.5,
-                      intelligenceIndexCostPerTask=1.5,
-                      detail_fields={"intelligenceIndexCostPerTask": 0.75})
-        models, _ = self.run_hour(40, gdpvalNormalized=0.4)
-        fixture = next(m for m in models if m["slug"] == "fixture-model")
-        variants = {v["ii"]: v for v in fixture["genVariants"]}
-        self.assertAlmostEqual(variants[40]["gdpvalCost"], 3)
-        self.assertNotIn("gdpvalCost", variants[50])
-        frozen = self.state_path.read_bytes()
-        changed_detail = {"intelligenceIndexCostPerTask": {
-            "cost": {"total": 0.75}, "evaluations": [
-                {"slug": "gdpval-aa", "weightedCostPerTask": 0.15},
-                {"slug": "scicode", "weightedCostPerTask": 0.6}]}}
-        for ii in (50, 40):
-            current, _ = self.run_hour(
-                ii, gdpvalNormalized=ii / 100, detail_fields=changed_detail,
-                intelligenceIndexCostPerTask=1.5 if ii == 50 else 0.75)
-            self.assertEqual(build.build_rows(current), build.build_rows(models))
-            self.assertEqual(self.state_path.read_bytes(), frozen)
-
     def test_state_write_failure_preserves_previous_bytes_and_leaves_no_temp(self):
         self.run_hour(40)
         frozen = self.state_path.read_bytes()
@@ -2840,66 +2790,6 @@ class HeldPayloadTests(unittest.TestCase):
         self.assertNotIn("-> —", result.stdout)
         self.assertNotIn("critpt", result.stdout)
         self.assertNotIn("hle", result.stdout)
-
-
-class TestGenerationRevisitSpeeds(unittest.TestCase):
-    def setUp(self):
-        self.harness = TestGenerationRevisit()
-        self.harness.setUp()
-        self.addCleanup(self.harness.doCleanups)
-
-    def assert_held_speeds(self, first, second):
-        rendered = {"medianOutputTokensPerSecond", "intelligenceIndexTimePerTask"}
-        unused: dict = {key: 777 for key in fetch_aa.NEVER_RED_FIELDS - rendered}
-        self.harness.run_hour(40, **first, **unused)
-        self.harness.run_hour(50, **second, **unused)
-        models, _ = self.harness.run_hour(40, **first, **unused)
-        state_bytes = self.harness.state_path.read_bytes()
-        rows = build.build_rows(models)
-        self.assertEqual(rows[0]["tps"], first.get("medianOutputTokensPerSecond"))
-        self.assertEqual(rows[0]["secs"], first.get("intelligenceIndexTimePerTask"))
-        for ii, speed in [(40, first), (50, second), (40, first), (50, second)]:
-            current, _ = self.harness.run_hour(ii, **speed, **unused)
-            self.assertEqual(build.build_rows(current), rows)
-            self.assertEqual(self.harness.state_path.read_bytes(), state_bytes)
-        for corpus in self.harness.state()["held"]["generations"].values():
-            record = next(m for m in corpus if m["slug"] == "fixture-model")
-            # Before hold entry, an ordinary hour carries missing detail
-            # speeds from its predecessor; the hold freezes that result.
-            expected = first if record["intelligenceIndex"] == 40 else {**first, **second}
-            self.assertEqual({k: v for k, v in record.items()
-                              if k in fetch_aa.NEVER_RED_FIELDS}, expected)
-        captured = fetch_aa.capture(str(self.harness.root / "base.html"),
-                                    str(self.harness.root / "detail.html"),
-                                    str(self.harness.root / "methodology.html"),
-                                    current, self.harness.state())
-        self.assertEqual(captured.generations, 1)
-        self.assertTrue(captured.disputed)
-
-    def test_held_speeds_above_tolerance_are_frozen_per_generation(self):
-        self.assert_held_speeds(
-            {"medianOutputTokensPerSecond": 150, "intelligenceIndexTimePerTask": 150},
-            {"medianOutputTokensPerSecond": 100, "intelligenceIndexTimePerTask": 100})
-
-    def test_held_speeds_missing_from_canonical_generation_stay_absent(self):
-        self.assert_held_speeds(
-            {}, {"medianOutputTokensPerSecond": 100, "intelligenceIndexTimePerTask": 100})
-
-    def test_held_speeds_missing_from_other_generation_stay_canonical(self):
-        self.assert_held_speeds(
-            {"medianOutputTokensPerSecond": 150, "intelligenceIndexTimePerTask": 150}, {})
-
-    def test_unheld_speed_movement_above_tolerance_still_publishes(self):
-        before, _ = self.harness.run_hour(
-            40, medianOutputTokensPerSecond=150, intelligenceIndexTimePerTask=150)
-        state_bytes = self.harness.state_path.read_bytes()
-        after, _ = self.harness.run_hour(
-            40, medianOutputTokensPerSecond=100, intelligenceIndexTimePerTask=100)
-        self.assertIsNone(self.harness.state()["held"])
-        self.assertEqual(self.harness.state_path.read_bytes(), state_bytes)
-        self.assertNotEqual(before, after)
-        row = build.build_rows(after)[0]
-        self.assertEqual((row["tps"], row["secs"]), (100, 100))
 
 
 if __name__ == "__main__":

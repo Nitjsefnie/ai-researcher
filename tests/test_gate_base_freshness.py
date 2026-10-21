@@ -251,6 +251,7 @@ CORE_PIN = (
     'tests/test_diff_aa.py',
     'tests/test_diff_coverage.py',
     'tests/test_fetch_aa.py',
+    'tests/test_fetch_aa_detail_fills.py',
     'tests/test_fetch_aa_membership.py',
     'tests/test_fetch_hf_trending.py',
     'tests/test_fetch_openrouter_trending.py',
