@@ -30,6 +30,9 @@ RAW = ROOT / "data" / "aa-raw-models.json"
 AGENTS_RAW = ROOT / "data" / "aa-raw-coding-agents.json"
 OUT = ROOT / "out" / "frontier-models.html"
 
+# Share the threshold here so the gate need not import the differ.
+SPEED_TOL = 0.25
+
 # The AA Intelligence Index version this file's weights and field names are
 # written against. AA bumps it every few weeks and a bump can rename or drop a
 # cost-breakdown slug -- v4.3 replaced tau3-banking with automationbench-aa and
