@@ -145,6 +145,35 @@ def test_dependabot_groups_action_updates_into_one_pr():
     )
 
 
+def test_hash_pinned_requirements_name_each_version_only_once():
+    """A comment match hides hashes from Dependabot's bump (issue #300)."""
+    candidates = [
+        path for path in REPO_ROOT.glob("requirements*.txt")
+        if "--hash=sha256:" in path.read_text(encoding="utf-8")
+    ]
+    assert candidates, "no hash-pinned requirements files found"
+    declaration = (
+        r"(?<![\w.\-])(?P<name>[A-Za-z0-9][A-Za-z0-9._-]*)"
+        r"(?![\w.\-])\s*(?:\[\s*[A-Za-z0-9._-]+"
+        r"(?:\s*,\s*[A-Za-z0-9._-]+)*\s*\])?\s*==\s*[0-9][^\s\\]*")
+    for path in candidates:
+        text = path.read_text(encoding="utf-8")
+        pinned = list(re.finditer(
+            rf"^[ \t]*{declaration}[ \t]*\\\r?\n[ \t]*--hash=",
+            text, re.MULTILINE))
+        assert pinned, f"{path.name}: no hash-carrying declaration found"
+        names = [match.group("name").lower()
+                 for match in re.finditer(declaration, text)]
+        for match in pinned:
+            name = match.group("name").lower()
+            assert names.count(name) == 1, (
+                f"{path.name}: a shadow declaration for {name}, possibly in a "
+                "comment with different spacing, can be matched first by "
+                "Dependabot's declaration scan; that match carries no hashes, "
+                "so the bump leaves the old digests behind and the "
+                "--require-hashes install fails")
+
+
 def test_every_job_declares_timeout_minutes():
     # Issue #52: a hung job fails in its declared ceiling instead of holding
     # GitHub's 6-hour default. The invariant rides on the whole catalogue —
