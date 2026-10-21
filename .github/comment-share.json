@@ -61,11 +61,11 @@
   ],
   "page_format.py": [
     1954,
-    3021
+    3035
   ],
   "scripts/capture_gate.py": [
     9962,
-    16790
+    16794
   ],
   "scripts/ci/aggregate_gate.py": [
     3297,
@@ -124,12 +124,12 @@
     8670
   ],
   "scripts/diff_aa.py": [
-    16747,
-    32453
+    16218,
+    32409
   ],
   "scripts/fetch_aa.py": [
-    24082,
-    47542
+    24616,
+    48986
   ],
   "scripts/fetch_hf_trending.py": [
     661,
@@ -156,8 +156,8 @@
     96995
   ],
   "tests/test_capture_gate.py": [
-    13320,
-    43796
+    13376,
+    44289
   ],
   "tests/test_check_committed_page.py": [
     3940,
@@ -212,8 +212,8 @@
     16315
   ],
   "tests/test_diff_aa.py": [
-    13196,
-    50317
+    13251,
+    51387
   ],
   "tests/test_diff_coverage.py": [
     3811,
@@ -225,7 +225,7 @@
   ],
   "tests/test_gate_base_freshness.py": [
     5049,
-    28988
+    29026
   ],
   "tests/test_gitignore.py": [
     3628,
