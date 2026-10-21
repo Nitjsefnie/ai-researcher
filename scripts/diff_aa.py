@@ -56,7 +56,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-from build import SPEED_TOL, build_agent_rows, build_rows, display_name, undominated  # noqa: E402  # pylint: disable=wrong-import-position
+from build import build_agent_rows, build_rows, display_name, undominated  # noqa: E402  # pylint: disable=wrong-import-position
+from page_format import SPEED_TOL  # noqa: E402  # pylint: disable=wrong-import-position
 
 RAW = ROOT / "data" / "aa-raw-models.json"
 
