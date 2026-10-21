@@ -796,6 +796,11 @@ jobs:
           fi
           {
             if [ "${#blocks[@]}" -gt 0 ]; then
+              subject="${blocks[0]%%$'\n'*}"
+              # Keep the full source line below a shortened commit subject.
+              if [ "${#subject}" -gt 72 ]; then
+                printf '%s\n\n' "${subject:0:72}"
+              fi
               printf '%s\n\n' "${blocks[@]}"
             fi
             echo 'Captured by .github/workflows/refresh.yml.'
