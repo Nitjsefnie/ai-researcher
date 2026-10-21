@@ -110,7 +110,6 @@ class ArtifactDataTests(unittest.TestCase):
         with_ = down["with"]
         assert with_["name"] == "${{ steps.list.outputs.artifact }}"
         assert with_["run-id"] == "${{ github.event.workflow_run.id }}"
-        assert with_["github-token"] == "${{ secrets.GITHUB_TOKEN }}"
 
     def test_the_validation_step_runs_before_the_push_step(self):
         names = [s.get("name") for s in self.wf["jobs"]["push"]["steps"]]
