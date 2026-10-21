@@ -16,6 +16,7 @@ import decimal
 import math
 
 EM_DASH = "—"
+SPEED_TOL = 0.25
 
 
 def js_to_fixed(value, digits):

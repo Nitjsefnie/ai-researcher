@@ -68,7 +68,7 @@ if str(ROOT) not in sys.path:
 if str(ROOT / "scripts") not in sys.path:
     sys.path.insert(0, str(ROOT / "scripts"))
 
-from build import SPEED_TOL  # noqa: E402  # pylint: disable=wrong-import-position,wrong-import-order
+from page_format import SPEED_TOL  # noqa: E402  # pylint: disable=wrong-import-position,wrong-import-order
 import build  # noqa: E402  # pylint: disable=wrong-import-position
 
 MODELS_NAME = "aa-raw-models.json"
