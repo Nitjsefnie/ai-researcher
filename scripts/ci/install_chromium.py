@@ -84,7 +84,8 @@ PROVENANCE_FILE = "DIGEST_VERIFIED"
 # The committed digest table: (browser name, playwright revision) -> sha256
 # of the archive cdn.playwright.dev serves for that revision. Observed by
 # downloading each archive (following the CDN's redirect) and hashing it
-# with sha256sum, 2026-09-29, against playwright 1.63.0's browsers.json.
+# with sha256sum: revisions 1243/1011 on 2026-09-29 against playwright
+# 1.63.0's browsers.json, 1248/1013 on 2026-10-21 against 1.64.0's.
 #
 # Playwright publishes no digest anywhere (browsers.json has none and the
 # installer never hashes), so this table IS the trust anchor, and it is
@@ -107,6 +108,12 @@ DIGESTS = {
         "a9da028861a0cf789ff25c2fed45f5f1aaf969ed9247835b6a7821a4f7af9d1d",
     ("ffmpeg", "1011"):
         "ebc74fc5b94830176a3c2914ae96bd8bc7f6a91f4f33890230f84a172ee61ccc",
+    ("chromium", "1248"):
+        "43fd31766c7533a02dda2ded5ad50c2f861cd5400be7509c0abad71129f79d79",
+    ("chromium-headless-shell", "1248"):
+        "c3e50596aef52c58f8fda3c6b3411c33d34c88b177b3ed1c2243359fd3b8ba20",
+    ("ffmpeg", "1013"):
+        "ee986434d158f74fb5d9c5ff1092026ceedb63f324fe90b5be89460926b7b679",
 }
 
 # The products `playwright install chromium` needs on linux x64, with the
