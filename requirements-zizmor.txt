@@ -7,7 +7,7 @@
 #
 # Why a requirements file when the install is one step in a workflow:
 # Dependabot's pip ecosystem reads manifest files and never the pins inside a
-# workflow `run:` block. As an inline `pip install zizmor==1.30.1` this pin
+# workflow `run:` block. As an inline `pip install zizmor==1.31.1` this pin
 # was invisible to automation and could only go stale (issue #50); here it
 # joins the manifests the weekly Dependabot pass already watches, and
 # Dependabot rewrites the --hash lines when it bumps the pin.
@@ -15,7 +15,7 @@
 # One package, no transitives: zizmor's PyPI package ships its Rust binary in
 # the wheel and declares no dependencies, so the hash check has nothing
 # unpinned to trip over.
-zizmor==1.30.1 \
+zizmor==1.31.1 \
     --hash=sha256:17fda74e15fe41a6aa354ea4cf71fc7ff3cd025cda6584bb6d7466b3f1d00fe6 \
     --hash=sha256:f9eb092f089e35fa9fb3b70aeec0a19eca7dacf2ab161f1d50b18351895f085c \
     --hash=sha256:92906f448365672ebb657fb50d36f997290a3aaba8cac723214741ea9054845d \
