@@ -24,6 +24,8 @@ what the page says:
                appearing on / disappearing from / changing on N models,
                one line per shape in its own section -- never a per-model
                field line, which would print the whole variant list
+  carried      withheld detail fills restored from the previous capture,
+               counted in one summary clause rather than as field news
 
 It also recomputes every Pareto layer the page draws -- one per scatter, in page order:
 coding-agent, intelligence, GDPval-AA and parameter-efficiency -- on either side, using build.py's
@@ -149,6 +151,7 @@ DISPUTES_CLASS = "disputes"
 # would print "crossRunMerged: none -> true" once per merged model instead
 # of sectioning.
 CROSS_RUN_KEY = "crossRunMerged"
+CARRIED_DETAIL_KEY = "carriedDetailFills"
 
 
 def is_derived(path):
@@ -298,6 +301,8 @@ def flatten(value, prefix=""):
 
 
 def classify(path):
+    if path == CARRIED_DETAIL_KEY:
+        return "carried-detail"
     if path in (DISPUTES_KEY, CROSS_RUN_KEY):
         return DISPUTES_CLASS
     leaf = path.rsplit(".", 1)[-1]
@@ -502,6 +507,7 @@ def as_commit_message(report: str) -> str:
     models = added = removed = speed = 0
     disputes = multi = 0
     holds = returned = 0
+    carried = ""
     frontier = ""
     for line in lines:
         if line.startswith("new: ") and "(" in line:
@@ -518,6 +524,8 @@ def as_commit_message(report: str) -> str:
             holds = int(line.split(": ")[1].split()[0])
         elif line.startswith("  returned as the routes converged: "):
             returned = int(line.split(": ")[1].split()[0])
+        elif line.startswith("== detail fills carried: "):
+            carried = line.split(": ", 1)[1]
         elif line.startswith("  genVariants appeared on "):
             disputes += int(line.split(" on ")[1].split()[0])
         elif line.startswith("  genVariants disappeared from "):
@@ -571,6 +579,8 @@ def as_commit_message(report: str) -> str:
         if returned:
             out.append(f"{returned} GDPval cost" + ("" if returned == 1 else "s")
                        + " restored")
+        if carried:
+            out.append(carried)
         if speed:
             out.append(f"{speed} rendered speed move" + ("" if speed == 1 else "s"))
         return out
@@ -830,12 +840,9 @@ def print_report(args):
             if a == b:
                 continue
             cls = classify(path)
-            if cls == DISPUTES_CLASS:
-                # Section news, not a field line: the value is the whole
-                # per-generation list, and printing it per model is exactly
-                # the per-field spam the Disputes section exists to prevent.
-                # Never thresholded and never dropped -- the section below
-                # counts it, whatever --all/--tol say.
+            if cls in (DISPUTES_CLASS, "carried-detail"):
+                # Synthetic lists are section news, never per-model field
+                # changes, even with --all or numeric thresholds disabled.
                 continue
             if not args.all:
                 if cls in ("cosmetic", "jitter-unused") or (
@@ -867,6 +874,13 @@ def print_report(args):
 
     print_disputes(old_by_id, new_by_id)
     print_holds(old_by_id, new_by_id)
+
+    carries = [m[CARRIED_DETAIL_KEY] for m in new if m.get(CARRIED_DETAIL_KEY)]
+    if carries:
+        count = sum(len(keys) for keys in carries)
+        print(f"\n== detail fills carried: {count} detail fill"
+              f"{'' if count == 1 else 's'} carried across {len(carries)} "
+              f"model{'' if len(carries) == 1 else 's'}")
 
     if speed_moves:
         print(f"\n== rendered speed re-sampled by more than "

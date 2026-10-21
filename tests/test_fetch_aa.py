@@ -2654,7 +2654,15 @@ class TestGenerationRevisit(unittest.TestCase):
         models, _ = self.run_hour(40, second=60)
         self.assertEqual(self.state_path.read_bytes(), frozen)
         self.run_hour(40, second=60, enabled=False)
-        self.assertEqual(json.loads(self.output.read_text()), models)
+        without_lookback = json.loads(self.output.read_text())
+        # The final look-back can restore a missing plain breakdown, while
+        # every in-run variant and the winning total stay exactly the same.
+        self.assertEqual(len(without_lookback), len(models))
+        for plain, enriched in zip(without_lookback, models):
+            ignored = {"intelligenceIndexCostPerTask", "carriedDetailFills"}
+            self.assertEqual({k: v for k, v in plain.items() if k not in ignored},
+                             {k: v for k, v in enriched.items() if k not in ignored})
+            self.assertEqual(build.cost_per_task(plain), build.cost_per_task(enriched))
 
     def test_in_run_dispute_without_hold_does_not_remember_either_look(self):
         self.run_hour(40)
@@ -2735,6 +2743,7 @@ class TestGenerationRevisit(unittest.TestCase):
     def test_gdpval_breakdowns_are_frozen_per_generation_and_not_re_filled(self):
         self.run_hour(40, gdpvalNormalized=0.4)
         self.run_hour(50, gdpvalNormalized=0.5,
+                      intelligenceIndexCostPerTask=1.5,
                       detail_fields={"intelligenceIndexCostPerTask": 0.75})
         models, _ = self.run_hour(40, gdpvalNormalized=0.4)
         fixture = next(m for m in models if m["slug"] == "fixture-model")
@@ -2748,7 +2757,8 @@ class TestGenerationRevisit(unittest.TestCase):
                 {"slug": "scicode", "weightedCostPerTask": 0.6}]}}
         for ii in (50, 40):
             current, _ = self.run_hour(
-                ii, gdpvalNormalized=ii / 100, detail_fields=changed_detail)
+                ii, gdpvalNormalized=ii / 100, detail_fields=changed_detail,
+                intelligenceIndexCostPerTask=1.5 if ii == 50 else 0.75)
             self.assertEqual(build.build_rows(current), build.build_rows(models))
             self.assertEqual(self.state_path.read_bytes(), frozen)
 
@@ -2846,7 +2856,9 @@ class TestGenerationRevisitSpeeds(unittest.TestCase):
             self.assertEqual(self.harness.state_path.read_bytes(), state_bytes)
         for corpus in self.harness.state()["held"]["generations"].values():
             record = next(m for m in corpus if m["slug"] == "fixture-model")
-            expected = first if record["intelligenceIndex"] == 40 else second
+            # Before hold entry, an ordinary hour carries missing detail
+            # speeds from its predecessor; the hold freezes that result.
+            expected = first if record["intelligenceIndex"] == 40 else {**first, **second}
             self.assertEqual({k: v for k, v in record.items()
                               if k in fetch_aa.NEVER_RED_FIELDS}, expected)
         captured = fetch_aa.capture(str(self.harness.root / "base.html"),

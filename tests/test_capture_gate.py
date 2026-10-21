@@ -161,6 +161,17 @@ class CaptureGateTests(unittest.TestCase):
 
         self.assertEqual((code, out), (0, "false\n"))
 
+    def test_carried_detail_marker_alone_does_not_change_the_page(self):
+        parsed = json.loads(FIXTURE_MODELS)
+        parsed[0]["carriedDetailFills"] = ["parameters", "licenseName"]
+        marked = json.dumps(parsed).encode("utf-8")
+        for head, fresh in ((FIXTURE_MODELS, marked), (marked, FIXTURE_MODELS)):
+            with head_serving(head, FIXTURE_AGENTS), \
+                    mock.patch.object(capture_gate, "read_fresh_captures",
+                                      return_value=(fresh, FIXTURE_AGENTS)):
+                code, out = run_gate()
+            self.assertEqual((code, out), (0, "false\n"))
+
     def test_a_rendered_change_is_a_change(self):
         with head_serving(rendered_field_changed(FIXTURE_MODELS), FIXTURE_AGENTS):
             code, out = run_gate()
@@ -405,7 +416,8 @@ class GenerationStateStagingTests(unittest.TestCase):
                               capture_output=True, text=True).stdout
 
     def stage_hour(self, ii, *, speed=150, day=1, gdp_cost=0.3):
-        extra: dict = {} if speed is None else {
+        # A published missing marker wins; an omitted detail key can carry.
+        extra: dict = {
             "medianOutputTokensPerSecond": speed,
             "intelligenceIndexTimePerTask": speed}
         detail = {"parameters": 1000000000, "intelligenceIndexCostPerTask": {

@@ -80,6 +80,24 @@ gap-fills, one level deep — the split runs *through* the cost object, whose
 `evaluations` the leaderboard drops, so a key-level merge would let a surviving
 stub shadow the complete breakdown.
 
+With `--cross-run-lookback`, the fill chain is leaderboard > this run's detail
+route > the previous committed capture's carried detail fill. A final pass,
+after every in-run, presence and revisit decision, fills absent detail keys
+from the previous record with the same string `slug`. A key in this run's
+leaderboard universe stays absent when the current record lacks it: that is
+serving movement owned by the dispute layers. Present values, including null
+and `$undefined`, keep precedence. `build.merge_captures` supplies the nested
+cost fill under the current total and its `SUM_TOLERANCE` guard; a carried
+breakdown that fails the sum check is dropped whole. `genVariants`,
+`crossRunMerged` and `carriedDetailFills` are synthetic and never carried as
+fills. Records receiving fills list their keys, sorted, in `carriedDetailFills`.
+The marker stays outside generation fingerprints, universes, variants and held
+state, and changes no rendered field; the news summary counts carries in one
+clause. The final pass changes neither decision inputs nor `run_corpora`.
+`intelligenceIndexTimePerTask` is eligible as a detail fill and stays never-red.
+While a revisit hold renders, both `HELD_SPEED_FIELDS` retain their frozen
+values or canonical absence and are excluded from carry-forward.
+
 **The two routes are not the same generation; shared models follow the
 leaderboard.** AA serves each route from its own Vercel cache, so a capture can
 straddle an update. The detail route's embedded corpus is measured to be the
@@ -251,7 +269,8 @@ the layers above keep those versions together. A disputed capture is an
 ordinary hour: the run never exits red, the page renders both values red with
 the pair order canonical, and the scheduled commit's body carries the differ's
 Disputes section — the three-generation corner (the looks disagree AND the
-detail route matches neither fingerprint) gives shared models no detail fills.
+detail route matches neither fingerprint) gives shared models no detail fills
+from that run; the final look-back pass can restore their previous fills.
 Window evidence counts leaderboard models after validating the whole union;
 detail-only breakdowns cannot clear it, even on models that render no rows.
 With that window marker at ≥ 3 observed generations, empty parameters HOLD
@@ -263,7 +282,8 @@ other emptied axis still refuses — the go-re-read-AA-by-hand signal for a
 real shape change. Without the cross-run look-back, a
 run whose looks agree writes no `genVariants` key anywhere and is
 byte-identical to the single-generation capture; with it, the same holds
-when the two slug sets agree and no generation hold renders. A caught
+when the two slug sets agree, no generation hold renders and no detail fill
+needs carrying. A caught
 presence flip or generation revisit writes the disputed shape defined above.
 The provenance consequence is worth saying plainly: the models capture is a merged,
 dispute-bearing artifact — two routes and every held generation — so the
