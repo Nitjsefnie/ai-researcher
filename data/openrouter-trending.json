@@ -5,10 +5,10 @@
       "slug": "deepseek/deepseek-v4.1-flash"
     },
     {
-      "slug": "z-ai/glm-5.3-flash"
+      "slug": "deepseek/deepseek-v4.1-flash-1017"
     },
     {
-      "slug": "deepseek/deepseek-v4.1-flash-1017"
+      "slug": "z-ai/glm-5.3-flash"
     },
     {
       "slug": "xiaomi/mimo-v2.6-flash"
@@ -17,19 +17,19 @@
       "slug": "tencent/hy4-preview"
     },
     {
-      "slug": "stepfun/step-5-preview"
-    },
-    {
       "slug": "anthropic/claude-opus-5.5"
     },
     {
       "slug": "openai/gpt-6-luna"
     },
     {
+      "slug": "stepfun/step-5-preview"
+    },
+    {
       "slug": "z-ai/glm-5.3"
     },
     {
-      "slug": "nvidia/nemotron-3-ultra-550b-a55b"
+      "slug": "minimax/minimax-m3.1-flash"
     }
   ]
 }
