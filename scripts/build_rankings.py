@@ -156,7 +156,7 @@ a { color: var(--text-primary); text-underline-offset: .2em; }
 button { font: inherit; color: var(--text-primary); background: var(--surface-1);
   border: 1px solid var(--axis); border-radius: 4px; padding: .35rem .7rem; }
 section { margin: 3rem 0; }
-.chart-scroll, .table-scroll { overflow-x: auto; }
+.chart-scroll { overflow-x: auto; }
 .chart { background: var(--surface-1); position: relative; }
 svg { display: block; width: 100%; max-width: 100%; height: auto; }
 svg text { fill: var(--text-secondary); font-size: 12px; }
@@ -183,13 +183,7 @@ svg text { fill: var(--text-secondary); font-size: 12px; }
 .tooltip time { display: block; margin-bottom: .5rem; }
 .tooltip-row { display: flex; align-items: center; gap: .5rem; }
 .tooltip-row span:last-child { color: var(--text-secondary); overflow-wrap: anywhere; }
-table { border-collapse: collapse; width: 100%; background: var(--surface-1);
-  font-size: .85rem; font-variant-numeric: tabular-nums; }
-caption { text-align: left; padding: .75rem 0; color: var(--text-secondary); }
-th, td { text-align: left; vertical-align: top; border-bottom: 1px solid var(--grid);
-  padding: .7rem; } td:first-child { overflow-wrap: anywhere; min-width: 16rem; }
-td ul { margin: 0; padding: 0; list-style: none; min-width: 24rem; }
-td time { white-space: nowrap; } .timestamp-tick { font-variant-numeric: tabular-nums; }
+.timestamp-tick { font-variant-numeric: tabular-nums; }
 @media print { .tooltip, button { display: none; } .chart-scroll { overflow: visible; }
   svg { max-width: 100%; height: auto; } }
 """
@@ -297,7 +291,7 @@ def chart_svg(history: list[Snapshot], models: list[str], identifier: str) -> st
              f'aria-describedby="{identifier}-description">',
              f'<title id="{identifier}-title">Top 10 rank history</title>',
              f'<desc id="{identifier}-description">Rank 1 is at the top. '
-             'Each column is a changing commit, oldest to newest. Full data follows in a table.</desc>']
+             'Each column is a changing commit, oldest to newest.</desc>']
     for rank in range(1, 11):
         parts.append(f'<line class="grid" x1="60" x2="{60 + plot_width}" '
                      f'y1="{y(rank):.1f}" y2="{y(rank):.1f}"/>'
@@ -361,26 +355,6 @@ def chart_svg(history: list[Snapshot], models: list[str], identifier: str) -> st
     return "\n".join(parts)
 
 
-def table_html(history: list[Snapshot], models: list[str]) -> str:
-    parts = ['<div class="table-scroll"><table><caption>Full rank history; '
-             '— means absent from that top 10. First-seen is within this window.</caption>'
-             '<thead><tr><th scope="col">Model</th><th scope="col">Rank history</th>'
-             '<th scope="col">First-seen</th><th scope="col">Latest timestamp</th>'
-             '</tr></thead><tbody>']
-    for model in models:
-        carried = [snapshot for snapshot in history if model in snapshot.ranks]
-        cells = [f'<li><time datetime="{escape(snapshot.timestamp)}">'
-                 f'{escape(snapshot.timestamp)}</time> · '
-                 f'{"Rank " + str(snapshot.ranks[model]) if model in snapshot.ranks else "—"}</li>'
-                 for snapshot in history]
-        first, latest = (escape(carried[0].timestamp), escape(carried[-1].timestamp))
-        parts.append(f'<tr><td>{escape(model)}</td><td><ul>{"".join(cells)}</ul></td>'
-                     f'<td><time datetime="{first}">{first}</time></td>'
-                     f'<td><time datetime="{latest}">{latest}</time></td></tr>')
-    parts.append('</tbody></table></div>')
-    return "\n".join(parts)
-
-
 def section_html(identifier: str, title: str, source: str, history: list[Snapshot]) -> str:
     models = list(dict.fromkeys(model for snapshot in history for model in snapshot.ranks))
     window = (f'{escape(history[0].timestamp)} → {escape(history[-1].timestamp)}'
@@ -397,8 +371,6 @@ def section_html(identifier: str, title: str, source: str, history: list[Snapsho
     parts.append('<div class="chart"><div class="chart-scroll">')
     parts.append(chart_svg(history, models, identifier))
     parts.append('</div><div class="tooltip" role="tooltip" hidden></div></div>')
-    parts.append('<h3>Table view</h3>')
-    parts.append(table_html(history, models))
     parts.append('</section>')
     return "\n".join(parts)
 
