@@ -844,6 +844,7 @@
    "financeAndAccounting": 41.4311704363928,
    "strategyAndOps": 45.2250901908207,
    "legal": 43.6665552139188,
+   "healthcareAndMedical": 39.9784734221124,
    "engineering": 42.4008747004,
    "economics": 47.1664230383071
   },
@@ -1023,36 +1024,36 @@
    },
    "indexIntervals": {
     "expressiveness": {
-     "lower": 40.48447313510228,
-     "upper": 49.41999103944017
+     "lower": 40,
+     "upper": 49
     },
     "organization": {
-     "lower": 37.17416597873371,
-     "upper": 60.39401335683061
+     "lower": 37,
+     "upper": 60
     },
     "informativeness": {
-     "lower": 42.01570557686584,
-     "upper": 59.128882140167626
+     "lower": 42,
+     "upper": 59
     },
     "transparency": {
-     "lower": 81.5184249868268,
-     "upper": 87.15379222994287
+     "lower": 82,
+     "upper": 87
     },
     "warmth": {
-     "lower": 47.085052070150574,
-     "upper": 65.00962661998915
+     "lower": 47,
+     "upper": 65
     },
     "conviction": {
-     "lower": 32.77987182620722,
-     "upper": 48.56389385411502
+     "lower": 33,
+     "upper": 49
     },
     "imagination": {
-     "lower": 68.98046000520934,
-     "upper": 78.92034418751032
+     "lower": 69,
+     "upper": 79
     },
     "slop": {
-     "lower": 28.41814416979423,
-     "upper": 35.01154257758754
+     "lower": 28,
+     "upper": 35
     }
    }
   },
@@ -1396,6 +1397,7 @@
    "financeAndAccounting": 48.690586460566,
    "strategyAndOps": 51.1850586654888,
    "legal": 53.4665725317978,
+   "healthcareAndMedical": 43.8024764004443,
    "engineering": 48.7395777870724,
    "economics": 55.1032298617547
   },
@@ -2004,6 +2006,7 @@
    "financeAndAccounting": 53.1979261701724,
    "strategyAndOps": 55.9891005503381,
    "legal": 56.8426862929355,
+   "healthcareAndMedical": 49.8812761040408,
    "engineering": 53.2454536485603,
    "economics": 58.2728629324992
   },
@@ -2349,7 +2352,7 @@
    "financeAndAccounting": 23.5425514933254,
    "strategyAndOps": 22.3907540956692,
    "legal": 30.3187835359036,
-   "healthcareAndMedical": 23.074121756108,
+   "healthcareAndMedical": 23.574121756108,
    "engineering": 24.4081226121268,
    "economics": 31.4467382414272
   },
@@ -2692,7 +2695,7 @@
    "financeAndAccounting": 45.3728047646677,
    "strategyAndOps": 47.1241657884068,
    "legal": 46.2280066508375,
-   "healthcareAndMedical": 40.8171769208551,
+   "healthcareAndMedical": 41.0671769208551,
    "engineering": 44.9763545147623,
    "economics": 52.8491063677788
   },
@@ -2881,36 +2884,36 @@
    },
    "indexIntervals": {
     "expressiveness": {
-     "lower": 24.817576791068305,
-     "upper": 36.11439106920305
+     "lower": 25,
+     "upper": 36
     },
     "organization": {
-     "lower": 80.8594607538359,
-     "upper": 97.21826650281247
+     "lower": 81,
+     "upper": 97
     },
     "informativeness": {
-     "lower": 37.93014950639239,
-     "upper": 51.01628904502911
+     "lower": 38,
+     "upper": 51
     },
     "transparency": {
-     "lower": 32.98345433946045,
-     "upper": 49.31287491094104
+     "lower": 33,
+     "upper": 49
     },
     "warmth": {
-     "lower": 24.77290801168309,
-     "upper": 39.58839380591115
+     "lower": 25,
+     "upper": 40
     },
     "conviction": {
-     "lower": 50.61339119052806,
-     "upper": 66.98601907702586
+     "lower": 51,
+     "upper": 67
     },
     "imagination": {
-     "lower": 24.88456525181878,
-     "upper": 41.469601823961526
+     "lower": 25,
+     "upper": 41
     },
     "slop": {
-     "lower": 43.106634653767586,
-     "upper": 45.52820202441824
+     "lower": 43,
+     "upper": 46
     }
    }
   },
@@ -3882,7 +3885,7 @@
    "financeAndAccounting": 29.4992176308922,
    "strategyAndOps": 23.2215904966969,
    "legal": 31.3892564691921,
-   "healthcareAndMedical": 25.3933378261902,
+   "healthcareAndMedical": 24.4766711595235,
    "engineering": 27.728206611862,
    "economics": 38.4885217408094
   },
@@ -4057,36 +4060,36 @@
    },
    "indexIntervals": {
     "expressiveness": {
-     "lower": 69.3587646156172,
-     "upper": 84.39526708139496
+     "lower": 69,
+     "upper": 84
     },
     "organization": {
-     "lower": 74.10581516646165,
-     "upper": 96.95308942440577
+     "lower": 74,
+     "upper": 97
     },
     "informativeness": {
-     "lower": 58.58036529741661,
-     "upper": 68.37184991458773
+     "lower": 59,
+     "upper": 68
     },
     "transparency": {
-     "lower": 51.14755585454786,
-     "upper": 69.16239820018568
+     "lower": 51,
+     "upper": 69
     },
     "warmth": {
-     "lower": 38.658440406375945,
-     "upper": 48.9466287350238
+     "lower": 39,
+     "upper": 49
     },
     "conviction": {
-     "lower": 65.22271342765634,
-     "upper": 82.68184102115342
+     "lower": 65,
+     "upper": 83
     },
     "imagination": {
-     "lower": 52.03617664853258,
-     "upper": 72.85701148976833
+     "lower": 52,
+     "upper": 73
     },
     "slop": {
-     "lower": 44.97571115517062,
-     "upper": 53.3854021516937
+     "lower": 45,
+     "upper": 53
     }
    }
   },
@@ -4319,6 +4322,7 @@
    "financeAndAccounting": 19.2873288009959,
    "strategyAndOps": 15.1368292695809,
    "legal": 20.9235171708482,
+   "healthcareAndMedical": 16.1747564197711,
    "engineering": 21.4103686453822,
    "economics": 27.2416798154155
   },
@@ -5200,6 +5204,7 @@
    "financeAndAccounting": 40.3489859253634,
    "strategyAndOps": 46.0834634937369,
    "legal": 37.1915497991518,
+   "healthcareAndMedical": 35.6475929141677,
    "engineering": 37.3121574058472,
    "economics": 43.6001759924313
   },
@@ -6517,7 +6522,7 @@
    "financeAndAccounting": 41.9617901866044,
    "strategyAndOps": 45.1369080014028,
    "legal": 39.9056902335994,
-   "healthcareAndMedical": 44.8426192521491,
+   "healthcareAndMedical": 38.9259525854825,
    "engineering": 43.8299853211046,
    "economics": 48.8783500926784
   },
@@ -6707,36 +6712,36 @@
    },
    "indexIntervals": {
     "expressiveness": {
-     "lower": 91.11168051432793,
-     "upper": 96.26092726042017
+     "lower": 91,
+     "upper": 96
     },
     "organization": {
-     "lower": 18.065525573750985,
-     "upper": 49.287080044416065
+     "lower": 18,
+     "upper": 49
     },
     "informativeness": {
-     "lower": 48.359175238299464,
-     "upper": 58.309059577385504
+     "lower": 48,
+     "upper": 58
     },
     "transparency": {
-     "lower": 64.36595018007534,
-     "upper": 81.39554742497951
+     "lower": 64,
+     "upper": 81
     },
     "warmth": {
-     "lower": 81.40130972479447,
-     "upper": 92.48328449227793
+     "lower": 81,
+     "upper": 92
     },
     "conviction": {
-     "lower": 74.75960429979901,
-     "upper": 92.11793556413252
+     "lower": 75,
+     "upper": 92
     },
     "imagination": {
-     "lower": 72.5238194481533,
-     "upper": 81.07010801233102
+     "lower": 73,
+     "upper": 81
     },
     "slop": {
-     "lower": 29.497612561598988,
-     "upper": 36.75955392942755
+     "lower": 29,
+     "upper": 37
     }
    }
   },
@@ -6974,6 +6979,7 @@
    "financeAndAccounting": 37.2456083144612,
    "strategyAndOps": 42.6439502053561,
    "legal": 37.2431345738786,
+   "healthcareAndMedical": 35.9126581690274,
    "engineering": 33.7017593360455,
    "economics": 41.6433847891566
   },
@@ -7314,6 +7320,7 @@
    "financeAndAccounting": 9.1401842436511,
    "strategyAndOps": 5.92001365347729,
    "legal": 9.93167582015379,
+   "healthcareAndMedical": 7.9002411411434,
    "engineering": 13.9248751449354,
    "economics": 14.7994975513048
   },
@@ -7666,6 +7673,7 @@
    "financeAndAccounting": 54.4099161221153,
    "strategyAndOps": 56.7371886641017,
    "legal": 58.1953910131589,
+   "healthcareAndMedical": 51.4546011921215,
    "engineering": 54.7176168177204,
    "economics": 59.4666533827618
   },
@@ -8216,6 +8224,7 @@
    "financeAndAccounting": 37.6782515170274,
    "strategyAndOps": 37.4933078688108,
    "legal": 37.6058438212847,
+   "healthcareAndMedical": 34.0656193980032,
    "engineering": 39.1642979209545,
    "economics": 45.8402683812172
   },
@@ -8562,6 +8571,7 @@
    "financeAndAccounting": 48.0020747163357,
    "strategyAndOps": 50.7827693920973,
    "legal": 50.656477000982,
+   "healthcareAndMedical": 44.2921233306901,
    "engineering": 42.4924221144318,
    "economics": 52.8334442771084
   },
@@ -9073,6 +9083,7 @@
    "financeAndAccounting": 16.5978684304857,
    "strategyAndOps": 12.5585281162766,
    "legal": 17.1977415140983,
+   "healthcareAndMedical": 13.9903496823032,
    "engineering": 18.7079356796031,
    "economics": 24.088344724469
   },
@@ -9697,7 +9708,7 @@
    "financeAndAccounting": 46.0835522889743,
    "strategyAndOps": 47.7833279852225,
    "legal": 44.75076921106,
-   "healthcareAndMedical": 41.8204296860305,
+   "healthcareAndMedical": 40.9870963526972,
    "engineering": 46.898224686759,
    "economics": 53.2171670721347
   },
@@ -9885,36 +9896,36 @@
    },
    "indexIntervals": {
     "expressiveness": {
-     "lower": 22.24245746861213,
-     "upper": 33.61767312606885
+     "lower": 22,
+     "upper": 34
     },
     "organization": {
-     "lower": 16.3744484249074,
-     "upper": 45.03234480457054
+     "lower": 16,
+     "upper": 45
     },
     "informativeness": {
-     "lower": 15.814750888160791,
-     "upper": 22.02689791081402
+     "lower": 16,
+     "upper": 22
     },
     "transparency": {
-     "lower": 37.70861582713537,
-     "upper": 53.94824290417682
+     "lower": 38,
+     "upper": 54
     },
     "warmth": {
-     "lower": 48.50211279354866,
-     "upper": 56.40444223755204
+     "lower": 49,
+     "upper": 56
     },
     "conviction": {
-     "lower": 15.614906849812385,
-     "upper": 23.554445020649972
+     "lower": 16,
+     "upper": 24
     },
     "imagination": {
-     "lower": 54.855327760382885,
-     "upper": 72.36103757431732
+     "lower": 55,
+     "upper": 72
     },
     "slop": {
-     "lower": 54.86739816297036,
-     "upper": 66.09514187084281
+     "lower": 55,
+     "upper": 66
     }
    }
   },
@@ -10152,6 +10163,7 @@
    "financeAndAccounting": 47.1244480657286,
    "strategyAndOps": 51.5657398218653,
    "legal": 48.7470391415751,
+   "healthcareAndMedical": 43.5979934750443,
    "engineering": 48.2770441365863,
    "economics": 51.8128151065802
   },
@@ -10668,7 +10680,7 @@
    "financeAndAccounting": 31.8416791917458,
    "strategyAndOps": 34.355963430208,
    "legal": 33.7582322372788,
-   "healthcareAndMedical": 30.5960281616853,
+   "healthcareAndMedical": 32.1793614950186,
    "engineering": 30.9977330252077,
    "economics": 36.8977917052827
   },
@@ -11014,6 +11026,7 @@
    "financeAndAccounting": 51.7242058019133,
    "strategyAndOps": 54.3697753710923,
    "legal": 54.1686345440172,
+   "healthcareAndMedical": 46.6616428139942,
    "engineering": 46.5630250582751,
    "economics": 55.2786298076923
   },
@@ -11354,7 +11367,7 @@
    "financeAndAccounting": 30.102823606031,
    "strategyAndOps": 24.9915499617907,
    "legal": 31.5443243333167,
-   "healthcareAndMedical": 29.7042505129902,
+   "healthcareAndMedical": 27.7875838463236,
    "engineering": 31.2234136142974,
    "economics": 43.7337568929565
   },
@@ -11544,36 +11557,36 @@
    },
    "indexIntervals": {
     "expressiveness": {
-     "lower": 39.09137557721104,
-     "upper": 58.9674156523527
+     "lower": 39,
+     "upper": 59
     },
     "organization": {
-     "lower": 15.538814761472844,
-     "upper": 41.337090859982226
+     "lower": 16,
+     "upper": 41
     },
     "informativeness": {
-     "lower": 22.73054795391289,
-     "upper": 32.91627981025425
+     "lower": 23,
+     "upper": 33
     },
     "transparency": {
-     "lower": 25.182566761181807,
-     "upper": 30.25774587579718
+     "lower": 25,
+     "upper": 30
     },
     "warmth": {
-     "lower": 68.45668760791823,
-     "upper": 79.41959572680675
+     "lower": 68,
+     "upper": 79
     },
     "conviction": {
-     "lower": 16.12550996948184,
-     "upper": 26.794423962478906
+     "lower": 16,
+     "upper": 27
     },
     "imagination": {
-     "lower": 51.477059304901836,
-     "upper": 71.1164740840892
+     "lower": 51,
+     "upper": 71
     },
     "slop": {
-     "lower": 53.32938172404281,
-     "upper": 65.26622884566811
+     "lower": 53,
+     "upper": 65
     }
    }
   },
@@ -11806,7 +11819,7 @@
    "financeAndAccounting": 12.2355771675463,
    "strategyAndOps": 6.93936490339053,
    "legal": 15.4761748762967,
-   "healthcareAndMedical": 11.5461092106362,
+   "healthcareAndMedical": 11.7127758773028,
    "engineering": 18.0652083171848,
    "economics": 22.8015975633303
   },
@@ -12787,7 +12800,7 @@
    "financeAndAccounting": 10.5648838111861,
    "strategyAndOps": 4.14968337293005,
    "legal": 15.253341329697,
-   "healthcareAndMedical": 11.6857975232683,
+   "healthcareAndMedical": 11.8524641899349,
    "engineering": 18.7109390677764,
    "economics": 23.7582633611368
   },
@@ -13140,7 +13153,7 @@
    "financeAndAccounting": 55.2438222359299,
    "strategyAndOps": 57.3406197123196,
    "legal": 58.5312959598094,
-   "healthcareAndMedical": 51.6668965494132,
+   "healthcareAndMedical": 52.6668965494132,
    "engineering": 54.7065681457097,
    "economics": 59.8311116581711
   },
@@ -13322,36 +13335,36 @@
    },
    "indexIntervals": {
     "expressiveness": {
-     "lower": 46.07458085814717,
-     "upper": 60.84268673600791
+     "lower": 46,
+     "upper": 61
     },
     "organization": {
-     "lower": 52.47092483307703,
-     "upper": 75.32691943560968
+     "lower": 52,
+     "upper": 75
     },
     "informativeness": {
-     "lower": 18.55117001150537,
-     "upper": 24.810537735768406
+     "lower": 19,
+     "upper": 25
     },
     "transparency": {
-     "lower": 87.91115594796261,
-     "upper": 96.85876401239604
+     "lower": 88,
+     "upper": 97
     },
     "warmth": {
-     "lower": 64.40827904748585,
-     "upper": 78.91356059267686
+     "lower": 64,
+     "upper": 79
     },
     "conviction": {
-     "lower": 37.88507306004302,
-     "upper": 54.03280273535623
+     "lower": 38,
+     "upper": 54
     },
     "imagination": {
-     "lower": 56.07424264425097,
-     "upper": 73.02308768544792
+     "lower": 56,
+     "upper": 73
     },
     "slop": {
-     "lower": 10.924874201099753,
-     "upper": 16.093296353121676
+     "lower": 11,
+     "upper": 16
     }
    }
   },
@@ -13589,7 +13602,7 @@
    "financeAndAccounting": 60.7295442846867,
    "strategyAndOps": 63.6788820379322,
    "legal": 63.2602763791642,
-   "healthcareAndMedical": 60.5359874288733,
+   "healthcareAndMedical": 54.7026540955399,
    "engineering": 60.3546025055266,
    "economics": 65.6045449876429
   },
@@ -13771,36 +13784,36 @@
    },
    "indexIntervals": {
     "expressiveness": {
-     "lower": 87.36291952314922,
-     "upper": 90.8841605198657
+     "lower": 87,
+     "upper": 91
     },
     "organization": {
-     "lower": 65.74957075256748,
-     "upper": 92.98255421247585
+     "lower": 66,
+     "upper": 93
     },
     "informativeness": {
-     "lower": 91.24807893119582,
-     "upper": 98.63949532696058
+     "lower": 91,
+     "upper": 99
     },
     "transparency": {
-     "lower": 84.13375358828154,
-     "upper": 95.33863984977589
+     "lower": 84,
+     "upper": 95
     },
     "warmth": {
-     "lower": 80.46154778503526,
-     "upper": 85.36280248254201
+     "lower": 80,
+     "upper": 85
     },
     "conviction": {
-     "lower": 65.75591348748748,
-     "upper": 82.65413138763292
+     "lower": 66,
+     "upper": 83
     },
     "imagination": {
-     "lower": 85.39169205862284,
-     "upper": 95.38743214683778
+     "lower": 85,
+     "upper": 95
     },
     "slop": {
-     "lower": 16.033813289271805,
-     "upper": 21.740548114672364
+     "lower": 16,
+     "upper": 22
     }
    }
   },
@@ -15291,6 +15304,7 @@
    "financeAndAccounting": 38.262600132251,
    "strategyAndOps": 42.2092826635119,
    "legal": 36.9687229783312,
+   "healthcareAndMedical": 34.8771024380824,
    "engineering": 37.5808314171772,
    "economics": 43.5568947713933
   },
@@ -15472,36 +15486,36 @@
    },
    "indexIntervals": {
     "expressiveness": {
-     "lower": 75.2818941774176,
-     "upper": 86.85850363711484
+     "lower": 75,
+     "upper": 87
     },
     "organization": {
-     "lower": 68.74565862868006,
-     "upper": 94.97507984815911
+     "lower": 69,
+     "upper": 95
     },
     "informativeness": {
-     "lower": 58.737744583997504,
-     "upper": 68.11057716329509
+     "lower": 59,
+     "upper": 68
     },
     "transparency": {
-     "lower": 28.783837248040008,
-     "upper": 40.46051372730295
+     "lower": 29,
+     "upper": 40
     },
     "warmth": {
-     "lower": 68.47870716330263,
-     "upper": 79.40733022601164
+     "lower": 68,
+     "upper": 79
     },
     "conviction": {
-     "lower": 29.66380057307264,
-     "upper": 44.92915662917042
+     "lower": 30,
+     "upper": 45
     },
     "imagination": {
-     "lower": 51.45455933634,
-     "upper": 70.88110847488349
+     "lower": 51,
+     "upper": 71
     },
     "slop": {
-     "lower": 54.942790979593774,
-     "upper": 66.39104992843312
+     "lower": 55,
+     "upper": 66
     }
    }
   },
@@ -15837,6 +15851,7 @@
    "financeAndAccounting": 18.6706213492246,
    "strategyAndOps": 16.0023649333163,
    "legal": 22.1663824564424,
+   "healthcareAndMedical": 20.7941244249231,
    "engineering": 22.0514878194095,
    "economics": 29.6647215786222
   },
@@ -16374,36 +16389,36 @@
    },
    "indexIntervals": {
     "expressiveness": {
-     "lower": 40.59260645067475,
-     "upper": 60.54006130019314
+     "lower": 41,
+     "upper": 61
     },
     "organization": {
-     "lower": 16.316197698282068,
-     "upper": 46.07679933037776
+     "lower": 16,
+     "upper": 46
     },
     "informativeness": {
-     "lower": 82.46091238607387,
-     "upper": 90.03946558271439
+     "lower": 82,
+     "upper": 90
     },
     "transparency": {
-     "lower": 44.589557015835645,
-     "upper": 62.3154114002838
+     "lower": 45,
+     "upper": 62
     },
     "warmth": {
-     "lower": 81.20028316477466,
-     "upper": 93.62193595865054
+     "lower": 81,
+     "upper": 94
     },
     "conviction": {
-     "lower": 17.31494312031955,
-     "upper": 31.60943282598377
+     "lower": 17,
+     "upper": 32
     },
     "imagination": {
-     "lower": 96.48817599798444,
+     "lower": 96,
      "upper": 100
     },
     "slop": {
-     "lower": 79.82692471651464,
-     "upper": 89.131113189054
+     "lower": 80,
+     "upper": 89
     }
    }
   },
@@ -16628,6 +16643,7 @@
    "financeAndAccounting": 32.8852583703247,
    "strategyAndOps": 37.4735427490729,
    "legal": 33.042237714179,
+   "healthcareAndMedical": 32.3541297057758,
    "engineering": 29.3868392358645,
    "economics": 37.1004614998455
   },
@@ -17015,7 +17031,7 @@
    "financeAndAccounting": 7.32978864440049,
    "strategyAndOps": 4.79681410229484,
    "legal": 7.26237317395471,
-   "healthcareAndMedical": 6.58531198961824,
+   "healthcareAndMedical": 6.66864532295158,
    "engineering": 11.6791443797167,
    "economics": 11.2646702193389
   },
@@ -17604,6 +17620,7 @@
    "financeAndAccounting": 51.3291790252242,
    "strategyAndOps": 53.8572874613897,
    "legal": 56.7065048846879,
+   "healthcareAndMedical": 44.5724400990641,
    "engineering": 51.482725010331,
    "economics": 57.8018934584492
   },
@@ -17949,6 +17966,7 @@
    "financeAndAccounting": 52.5896337720368,
    "strategyAndOps": 54.8583873057913,
    "legal": 56.1971312677296,
+   "healthcareAndMedical": 49.0157065757862,
    "engineering": 51.8957991406184,
    "economics": 57.6301032978066
   },
@@ -18671,7 +18689,7 @@
    "financeAndAccounting": 56.416905719465,
    "strategyAndOps": 59.6720657328582,
    "legal": 60.4916320056283,
-   "healthcareAndMedical": 58.0046680298741,
+   "healthcareAndMedical": 49.6713346965408,
    "engineering": 56.4696966078099,
    "economics": 62.6707547111523
   },
@@ -18853,36 +18871,36 @@
    },
    "indexIntervals": {
     "expressiveness": {
-     "lower": 97.83332581213813,
+     "lower": 98,
      "upper": 100
     },
     "organization": {
-     "lower": 37.81577885366891,
-     "upper": 64.61037293043634
+     "lower": 38,
+     "upper": 65
     },
     "informativeness": {
-     "lower": 91.9050277040305,
+     "lower": 92,
      "upper": 100
     },
     "transparency": {
-     "lower": 95.07401050862543,
+     "lower": 95,
      "upper": 100
     },
     "warmth": {
-     "lower": 92.8578935808259,
+     "lower": 93,
      "upper": 100
     },
     "conviction": {
-     "lower": 97.87230246149078,
+     "lower": 98,
      "upper": 100
     },
     "imagination": {
-     "lower": 73.71300323919226,
-     "upper": 89.8469030089817
+     "lower": 74,
+     "upper": 90
     },
     "slop": {
-     "lower": 20.198379135791562,
-     "upper": 24.175755637294106
+     "lower": 20,
+     "upper": 24
     }
    }
   },
@@ -19221,6 +19239,7 @@
    "financeAndAccounting": 10.4890476074635,
    "strategyAndOps": 6.66545519622336,
    "legal": 12.7597419902521,
+   "healthcareAndMedical": 10.8205861310693,
    "engineering": 16.3708005779167,
    "economics": 18.0682026045678
   },
@@ -19679,6 +19698,7 @@
    "financeAndAccounting": 40.7857632782172,
    "strategyAndOps": 39.281621532151,
    "legal": 39.9006717721577,
+   "healthcareAndMedical": 35.4322454678444,
    "engineering": 43.1016145693664,
    "economics": 48.704358742663
   },
@@ -20025,6 +20045,7 @@
    "financeAndAccounting": 28.7822173180696,
    "strategyAndOps": 27.9750207106805,
    "legal": 30.647798971037,
+   "healthcareAndMedical": 26.9654449613404,
    "engineering": 31.2103312647192,
    "economics": 37.4612643651529
   },
@@ -20300,6 +20321,7 @@
    "financeAndAccounting": 23.4707263703089,
    "strategyAndOps": 20.5308837786027,
    "legal": 26.1025865890109,
+   "healthcareAndMedical": 23.18352200005,
    "engineering": 27.4803173308619,
    "economics": 35.1744654386778
   },
@@ -20672,6 +20694,7 @@
    "financeAndAccounting": 45.9024094588936,
    "strategyAndOps": 48.4992928988111,
    "legal": 51.6208399223498,
+   "healthcareAndMedical": 42.5862342630495,
    "engineering": 44.5985808580977,
    "economics": 52.5322093759654
   },
@@ -22123,6 +22146,7 @@
    "financeAndAccounting": 32.2623676288588,
    "strategyAndOps": 38.9052383884753,
    "legal": 34.3229817705977,
+   "healthcareAndMedical": 30.2993861883431,
    "engineering": 29.6633925251455,
    "economics": 37.0247372360776
   },
@@ -22132,7 +22156,7 @@
   "gdpval": 1126.79,
   "itBenchSre": null,
   "frontierCode": 0.284774,
-  "terminalBenchScience": null,
+  "terminalBenchScience": 0.00952380952380952,
   "hleDiamond": null,
   "livecodebench": null,
   "aime25": null,
@@ -22939,9 +22963,9 @@
    "financeAndAccounting": 17.5076784453604,
    "strategyAndOps": 14.5146380568915,
    "legal": 18.30893810203,
-   "healthcareAndMedical": 17.5980321302316,
    "engineering": 19.8623891923338,
-   "economics": 24.9783404386778
+   "economics": 24.9783404386778,
+   "healthcareAndMedical": 17.5980321302316
   },
   "omniscienceHallucinationRate": 0.8194476146998402,
   "gdpPdfAllPass": 0.1,
@@ -23126,36 +23150,36 @@
    },
    "indexIntervals": {
     "expressiveness": {
-     "lower": 18.275082455627256,
-     "upper": 32.01039375763884
+     "lower": 18,
+     "upper": 32
     },
     "organization": {
-     "lower": 7.897570217675745,
-     "upper": 14.850426044162107
+     "lower": 8,
+     "upper": 15
     },
     "informativeness": {
-     "lower": 45.31509371876878,
-     "upper": 67.15927248841996
+     "lower": 45,
+     "upper": 67
     },
     "transparency": {
-     "lower": 15.215110770034531,
-     "upper": 27.4020558203408
+     "lower": 15,
+     "upper": 27
     },
     "warmth": {
-     "lower": 47.67102836174417,
-     "upper": 71.60671830952718
+     "lower": 48,
+     "upper": 72
     },
     "conviction": {
-     "lower": 8.109470234906624,
-     "upper": 9.805885290049787
+     "lower": 8,
+     "upper": 10
     },
     "imagination": {
-     "lower": 76.65871284043398,
-     "upper": 90.81223923315629
+     "lower": 77,
+     "upper": 91
     },
     "slop": {
-     "lower": 70.70008892841263,
-     "upper": 87.96474478257133
+     "lower": 71,
+     "upper": 88
     }
    }
   },
@@ -23256,7 +23280,10 @@
   "outputModalityText": true,
   "outputModalityImage": false,
   "outputModalitySpeech": false,
-  "outputModalityVideo": false
+  "outputModalityVideo": false,
+  "carriedDetailFills": [
+   "capabilities"
+  ]
  },
  {
   "slug": "grok-4-7",
@@ -23392,7 +23419,7 @@
    "financeAndAccounting": 51.9317468479662,
    "strategyAndOps": 54.4286295585983,
    "legal": 54.1348249516275,
-   "healthcareAndMedical": 47.1903068758764,
+   "healthcareAndMedical": 47.9403068758764,
    "engineering": 47.4340989149405,
    "economics": 55.6505251197096
   },
@@ -23574,36 +23601,36 @@
    },
    "indexIntervals": {
     "expressiveness": {
-     "lower": 67.91235244776212,
-     "upper": 80.86273515481959
+     "lower": 68,
+     "upper": 81
     },
     "organization": {
-     "lower": 16.355877899413272,
-     "upper": 45.8776606363376
+     "lower": 16,
+     "upper": 46
     },
     "informativeness": {
-     "lower": 22.6038179674041,
-     "upper": 31.90286712904943
+     "lower": 23,
+     "upper": 32
     },
     "transparency": {
-     "lower": 56.97328701684754,
-     "upper": 76.79829073535942
+     "lower": 57,
+     "upper": 77
     },
     "warmth": {
-     "lower": 28.130422183558732,
-     "upper": 41.5309673721339
+     "lower": 28,
+     "upper": 42
     },
     "conviction": {
-     "lower": 81.33519201164808,
-     "upper": 93.54546302986208
+     "lower": 81,
+     "upper": 94
     },
     "imagination": {
-     "lower": 20.632252343522474,
-     "upper": 39.361393644228976
+     "lower": 21,
+     "upper": 39
     },
     "slop": {
-     "lower": 5.58058552890478,
-     "upper": 9.70223245851897
+     "lower": 6,
+     "upper": 10
     }
    }
   },
@@ -24476,7 +24503,7 @@
    "financeAndAccounting": 23.9391934779617,
    "strategyAndOps": 16.356520004053,
    "legal": 26.4453975294204,
-   "healthcareAndMedical": 23.0046725383136,
+   "healthcareAndMedical": 22.1713392049803,
    "engineering": 27.1862258598831,
    "economics": 36.6095551629595
   },
@@ -24665,36 +24692,36 @@
    },
    "indexIntervals": {
     "expressiveness": {
-     "lower": 6.187609932068501,
-     "upper": 9.956216776516477
+     "lower": 6,
+     "upper": 10
     },
     "organization": {
-     "lower": 7.942159911816775,
-     "upper": 14.885418995177941
+     "lower": 8,
+     "upper": 15
     },
     "informativeness": {
-     "lower": 68.0777872161519,
-     "upper": 87.37223472916943
+     "lower": 68,
+     "upper": 87
     },
     "transparency": {
-     "lower": 6.844136435324998,
-     "upper": 14.622401449164395
+     "lower": 7,
+     "upper": 15
     },
     "warmth": {
      "lower": 1,
-     "upper": 3.9052018721978587
+     "upper": 4
     },
     "conviction": {
-     "lower": 10.210129115126088,
-     "upper": 15.992636024591162
+     "lower": 10,
+     "upper": 16
     },
     "imagination": {
-     "lower": 4.922371731743956,
-     "upper": 9.166810638403787
+     "lower": 5,
+     "upper": 9
     },
     "slop": {
-     "lower": 91.1197029289431,
-     "upper": 94.58395349517687
+     "lower": 91,
+     "upper": 95
     }
    }
   },
@@ -26036,6 +26063,7 @@
    "financeAndAccounting": 24.0439790134293,
    "strategyAndOps": 21.7884605251663,
    "legal": 25.8457960236076,
+   "healthcareAndMedical": 22.6290045889648,
    "engineering": 25.379240393141,
    "economics": 35.1795880637936
   },
@@ -26376,6 +26404,7 @@
    "financeAndAccounting": 20.2020055101974,
    "strategyAndOps": 19.8041870446823,
    "legal": 19.3453255223333,
+   "healthcareAndMedical": 20.6221255811433,
    "engineering": 20.6820141809997,
    "economics": 24.176171725363
   },
@@ -27086,6 +27115,7 @@
    "financeAndAccounting": 28.3894073795381,
    "strategyAndOps": 34.2778424100072,
    "legal": 27.4196820894862,
+   "healthcareAndMedical": 25.1112912834439,
    "engineering": 24.5940434128121,
    "economics": 31.1461995288848
   },
@@ -27704,6 +27734,7 @@
    "financeAndAccounting": 5.25090409557013,
    "strategyAndOps": 3.22362260108496,
    "legal": 7.26419943495534,
+   "healthcareAndMedical": 5.78033737376914,
    "engineering": 6.84380213160334,
    "economics": 9.36387164040778
   },
@@ -28236,36 +28267,36 @@
    },
    "indexIntervals": {
     "expressiveness": {
-     "lower": 35.628775728416485,
-     "upper": 49.176158238461355
+     "lower": 36,
+     "upper": 49
     },
     "organization": {
-     "lower": 55.89916420478186,
-     "upper": 90.72039242074483
+     "lower": 56,
+     "upper": 91
     },
     "informativeness": {
-     "lower": 74.5274393832796,
-     "upper": 89.68268847672415
+     "lower": 75,
+     "upper": 90
     },
     "transparency": {
-     "lower": 61.63680666321217,
-     "upper": 81.54224765084076
+     "lower": 62,
+     "upper": 82
     },
     "warmth": {
-     "lower": 22.879928096699576,
-     "upper": 34.064521595875284
+     "lower": 23,
+     "upper": 34
     },
     "conviction": {
-     "lower": 29.20628161862341,
-     "upper": 47.06800485606067
+     "lower": 29,
+     "upper": 47
     },
     "imagination": {
-     "lower": 51.53786706423159,
-     "upper": 71.62365960376182
+     "lower": 52,
+     "upper": 72
     },
     "slop": {
-     "lower": 45.931929458415944,
-     "upper": 55.44284537556535
+     "lower": 46,
+     "upper": 55
     }
    }
   },
@@ -28549,6 +28580,7 @@
    "financeAndAccounting": 23.2283050140638,
    "strategyAndOps": 18.7438396618052,
    "legal": 24.6443738271738,
+   "healthcareAndMedical": 19.5639918405849,
    "engineering": 25.2273439428042,
    "economics": 33.8775691998764
   },
@@ -29350,7 +29382,7 @@
    "financeAndAccounting": 40.2967547784778,
    "strategyAndOps": 45.7388446388429,
    "legal": 40.2779942332056,
-   "healthcareAndMedical": 37.397572885301,
+   "healthcareAndMedical": 38.897572885301,
    "engineering": 37.0938567579007,
    "economics": 45.2162363492431
   },
@@ -29532,36 +29564,36 @@
    },
    "indexIntervals": {
     "expressiveness": {
-     "lower": 32.99765696248889,
-     "upper": 38.06638052767196
+     "lower": 33,
+     "upper": 38
     },
     "organization": {
-     "lower": 15.536939580715117,
-     "upper": 36.79076103181358
+     "lower": 16,
+     "upper": 37
     },
     "informativeness": {
-     "lower": 13.825075020647247,
-     "upper": 15.622829396530134
+     "lower": 14,
+     "upper": 16
     },
     "transparency": {
-     "lower": 55.340734587211436,
-     "upper": 69.7767949458436
+     "lower": 55,
+     "upper": 70
     },
     "warmth": {
-     "lower": 30.188880589810147,
-     "upper": 42.90945501392198
+     "lower": 30,
+     "upper": 43
     },
     "conviction": {
-     "lower": 40.9610251330405,
-     "upper": 57.63116809292486
+     "lower": 41,
+     "upper": 58
     },
     "imagination": {
-     "lower": 13.680632539987576,
-     "upper": 21.300095343208852
+     "lower": 14,
+     "upper": 21
     },
     "slop": {
-     "lower": 3.1388105472582675,
-     "upper": 4.553458905607027
+     "lower": 3,
+     "upper": 5
     }
    }
   },
@@ -30307,6 +30339,7 @@
    "financeAndAccounting": 5.41592276177503,
    "strategyAndOps": 4.07065015828555,
    "legal": 5.86805411522699,
+   "healthcareAndMedical": 6.4021474622023,
    "engineering": 7.73008804448564,
    "economics": 8.59103877046648
   },
@@ -30654,6 +30687,7 @@
    "financeAndAccounting": 27.6640644546456,
    "strategyAndOps": 21.3117216691853,
    "legal": 28.216662702402,
+   "healthcareAndMedical": 23.7325565132014,
    "engineering": 28.916705334224,
    "economics": 37.720406259654
   },
@@ -30996,6 +31030,7 @@
    "financeAndAccounting": 44.6651637604758,
    "strategyAndOps": 48.4844742704171,
    "legal": 51.0370294371609,
+   "healthcareAndMedical": 39.6161554930551,
    "engineering": 40.450052921777,
    "economics": 50.2950674235403
   },
@@ -32899,7 +32934,7 @@
    "financeAndAccounting": 43.899544721027,
    "strategyAndOps": 40.3835291326876,
    "legal": 42.2752066606861,
-   "healthcareAndMedical": 44.1309183628896,
+   "healthcareAndMedical": 39.8809183628896,
    "engineering": 44.8823073189862,
    "economics": 51.2271805877356
   },
@@ -33081,36 +33116,36 @@
    },
    "indexIntervals": {
     "expressiveness": {
-     "lower": 69.78568393919835,
-     "upper": 84.69550937806483
+     "lower": 70,
+     "upper": 85
     },
     "organization": {
-     "lower": 19.616645655333315,
-     "upper": 52.00628326678492
+     "lower": 20,
+     "upper": 52
     },
     "informativeness": {
-     "lower": 68.49659813066381,
-     "upper": 86.65376346480117
+     "lower": 68,
+     "upper": 87
     },
     "transparency": {
-     "lower": 70.42623821104029,
-     "upper": 83.48058317457705
+     "lower": 70,
+     "upper": 83
     },
     "warmth": {
-     "lower": 56.460078525277886,
-     "upper": 72.22533765636237
+     "lower": 56,
+     "upper": 72
     },
     "conviction": {
-     "lower": 65.2301540742424,
-     "upper": 81.80019637251215
+     "lower": 65,
+     "upper": 82
     },
     "imagination": {
-     "lower": 51.24661480449759,
-     "upper": 65.119992583431
+     "lower": 51,
+     "upper": 65
     },
     "slop": {
-     "lower": 5.859792742589795,
-     "upper": 10.335301265197126
+     "lower": 6,
+     "upper": 10
     }
    }
   },
@@ -33348,6 +33383,7 @@
    "financeAndAccounting": 36.4420933792021,
    "strategyAndOps": 41.2425647425962,
    "legal": 35.4302990805277,
+   "healthcareAndMedical": 34.0775744288168,
    "engineering": 31.8477298923968,
    "economics": 40.0257398246833
   },
@@ -33993,6 +34029,7 @@
    "financeAndAccounting": 26.7242631591656,
    "strategyAndOps": 29.2808412991298,
    "legal": 27.6171329869985,
+   "healthcareAndMedical": 23.8838777751284,
    "engineering": 23.8947046535793,
    "economics": 31.5706891411801
   },
@@ -34446,6 +34483,7 @@
    "financeAndAccounting": 9.59019133556559,
    "strategyAndOps": 4.21069850395743,
    "legal": 14.2370601420628,
+   "healthcareAndMedical": 12.1183199852462,
    "engineering": 15.8460269694161,
    "economics": 21.0740045953043
   },
@@ -35256,7 +35294,7 @@
    "financeAndAccounting": 37.1349919814766,
    "strategyAndOps": 39.9643333488231,
    "legal": 36.9611262637965,
-   "healthcareAndMedical": 34.1295711641709,
+   "healthcareAndMedical": 35.1295711641709,
    "engineering": 34.2507258055198,
    "economics": 41.5988405159098
   },
@@ -35919,9 +35957,9 @@
    "financeAndAccounting": 41.358745632102,
    "strategyAndOps": 46.4582599166392,
    "legal": 41.1141460379089,
-   "healthcareAndMedical": 38.2189090158022,
    "engineering": 37.14334131491,
-   "economics": 43.711609785295
+   "economics": 43.711609785295,
+   "healthcareAndMedical": 38.2189090158022
   },
   "omniscienceHallucinationRate": 0.9482645710543549,
   "gdpPdfAllPass": 0.114,
@@ -36136,7 +36174,10 @@
   "outputModalityText": true,
   "outputModalityImage": false,
   "outputModalitySpeech": false,
-  "outputModalityVideo": false
+  "outputModalityVideo": false,
+  "carriedDetailFills": [
+   "capabilities"
+  ]
  },
  {
   "slug": "magistral-medium-2509",
@@ -36373,6 +36414,7 @@
    "financeAndAccounting": 18.3704663179274,
    "strategyAndOps": 13.2588015170406,
    "legal": 20.9106473050263,
+   "healthcareAndMedical": 16.2207207913255,
    "engineering": 21.5764797563882,
    "economics": 29.0748194315724
   },
@@ -36890,7 +36932,7 @@
    "financeAndAccounting": 46.7567637414082,
    "strategyAndOps": 48.4011506829342,
    "legal": 51.6298811903287,
-   "healthcareAndMedical": 41.7830626872104,
+   "healthcareAndMedical": 40.1163960205437,
    "engineering": 42.8134112164944,
    "economics": 52.3615117778808
   },
@@ -37072,36 +37114,36 @@
    },
    "indexIntervals": {
     "expressiveness": {
-     "lower": 68.33631156915743,
-     "upper": 81.41121501457508
+     "lower": 68,
+     "upper": 81
     },
     "organization": {
-     "lower": 54.11345512045886,
-     "upper": 78.95242211111119
+     "lower": 54,
+     "upper": 79
     },
     "informativeness": {
-     "lower": 69.09924425368068,
-     "upper": 86.89136387471615
+     "lower": 69,
+     "upper": 87
     },
     "transparency": {
-     "lower": 17.712960513277398,
-     "upper": 23.900527565420578
+     "lower": 18,
+     "upper": 24
     },
     "warmth": {
-     "lower": 46.829384744722994,
-     "upper": 54.56672178512903
+     "lower": 47,
+     "upper": 55
     },
     "conviction": {
-     "lower": 73.96227798152947,
-     "upper": 92.26372468122557
+     "lower": 74,
+     "upper": 92
     },
     "imagination": {
-     "lower": 20.033035031232423,
-     "upper": 39.204365400865434
+     "lower": 20,
+     "upper": 39
     },
     "slop": {
-     "lower": 69.49469208088374,
-     "upper": 84.51212321405683
+     "lower": 69,
+     "upper": 85
     }
    }
   },
@@ -37505,7 +37547,7 @@
    "financeAndAccounting": 28.8641151093551,
    "strategyAndOps": 27.9791771990976,
    "legal": 27.6904847005433,
-   "healthcareAndMedical": 26.5321596769937,
+   "healthcareAndMedical": 25.9488263436603,
    "engineering": 29.0988307678266,
    "economics": 36.506492056178
   },
@@ -37854,7 +37896,7 @@
    "financeAndAccounting": 42.5746734308852,
    "strategyAndOps": 44.0161638501288,
    "legal": 41.6928658976189,
-   "healthcareAndMedical": 36.0083802003731,
+   "healthcareAndMedical": 40.5917135337064,
    "engineering": 40.3238731541551,
    "economics": 48.9670151374729
   },
@@ -38408,9 +38450,9 @@
    "financeAndAccounting": 9.01094091371792,
    "strategyAndOps": 7.55788271710647,
    "legal": 11.4826938900066,
-   "healthcareAndMedical": 9.11330872561865,
    "engineering": 11.2892933271548,
-   "economics": 12.9866844300278
+   "economics": 12.9866844300278,
+   "healthcareAndMedical": 9.11330872561865
   },
   "omniscienceHallucinationRate": 0.888814913448735,
   "gdpPdfAllPass": 0.008,
@@ -38595,34 +38637,34 @@
    "indexIntervals": {
     "expressiveness": {
      "lower": 1,
-     "upper": 2.080939781682006
+     "upper": 2
     },
     "organization": {
      "lower": 1,
-     "upper": 1.8890983120739149
+     "upper": 2
     },
     "informativeness": {
      "lower": 1,
-     "upper": 3.834874394361007
+     "upper": 4
     },
     "transparency": {
      "lower": 1,
-     "upper": 5.706002010729037
+     "upper": 6
     },
     "warmth": {
      "lower": 1,
-     "upper": 2.8912589398745454
+     "upper": 3
     },
     "conviction": {
      "lower": 1,
-     "upper": 3.141346455711986
+     "upper": 3
     },
     "imagination": {
      "lower": 1,
-     "upper": 2.614965225877138
+     "upper": 3
     },
     "slop": {
-     "lower": 97.80098702993719,
+     "lower": 98,
      "upper": 100
     }
    }
@@ -38724,7 +38766,10 @@
   "outputModalityText": true,
   "outputModalityImage": false,
   "outputModalitySpeech": false,
-  "outputModalityVideo": false
+  "outputModalityVideo": false,
+  "carriedDetailFills": [
+   "capabilities"
+  ]
  },
  {
   "slug": "gpt-6-sol-daybreak-blue",
@@ -39063,6 +39108,7 @@
    "financeAndAccounting": 5.23637078150477,
    "strategyAndOps": 4.091333929013,
    "legal": 5.87659554911978,
+   "healthcareAndMedical": 5.63466692373202,
    "engineering": 6.65948100092679,
    "economics": 8.06045566882917
   },
@@ -39415,6 +39461,7 @@
    "financeAndAccounting": 52.2605298169516,
    "strategyAndOps": 56.2024532877106,
    "legal": 52.228836055256,
+   "healthcareAndMedical": 46.8364301652884,
    "engineering": 53.8744846320346,
    "economics": 55.9113958333333
   },
@@ -40135,6 +40182,7 @@
    "financeAndAccounting": 40.9131636269225,
    "strategyAndOps": 44.4254205279334,
    "legal": 38.8402844340041,
+   "healthcareAndMedical": 38.2770292992255,
    "engineering": 39.4727302045344,
    "economics": 47.0210908055298
   },
@@ -40487,6 +40535,7 @@
    "financeAndAccounting": 56.2337833625754,
    "strategyAndOps": 58.4058749998262,
    "legal": 60.796618714648,
+   "healthcareAndMedical": 48.5910024517232,
    "engineering": 56.7852198526373,
    "economics": 62.3684320551437
   },
@@ -40827,6 +40876,7 @@
    "financeAndAccounting": 21.0333893164421,
    "strategyAndOps": 22.9639739065478,
    "legal": 22.2474233368908,
+   "healthcareAndMedical": 22.7174035348921,
    "engineering": 21.0782741651922,
    "economics": 23.9307637086809
   },
@@ -41275,6 +41325,7 @@
    "financeAndAccounting": 53.7676925731517,
    "strategyAndOps": 56.1195956855044,
    "legal": 58.0870255314713,
+   "healthcareAndMedical": 47.4844148063528,
    "engineering": 54.4981001428291,
    "economics": 60.1962046261971
   },
@@ -41620,7 +41671,7 @@
    "financeAndAccounting": 39.7693028154172,
    "strategyAndOps": 43.5406296115458,
    "legal": 39.7641290981117,
-   "healthcareAndMedical": 37.6164102397672,
+   "healthcareAndMedical": 37.7830769064338,
    "engineering": 37.8068760087302,
    "economics": 44.1332238183503
   },
@@ -42684,6 +42735,7 @@
    "financeAndAccounting": 50.36121889481,
    "strategyAndOps": 52.6065131382804,
    "legal": 54.4280519342768,
+   "healthcareAndMedical": 47.0048180420881,
    "engineering": 49.661809912778,
    "economics": 55.9886980035527
   },
@@ -43140,6 +43192,7 @@
    "financeAndAccounting": 48.5921853538118,
    "strategyAndOps": 49.9151128773531,
    "legal": 52.9219777534747,
+   "healthcareAndMedical": 46.3443960074459,
    "engineering": 47.7410709631734,
    "economics": 54.663031742354
   },
@@ -43675,6 +43728,7 @@
    "financeAndAccounting": 41.9279103149,
    "strategyAndOps": 45.0998149014848,
    "legal": 38.2143331274923,
+   "healthcareAndMedical": 39.1543463576882,
    "engineering": 42.1324992585727,
    "economics": 47.7362566033364
   },
@@ -44340,7 +44394,7 @@
    "financeAndAccounting": 24.5084132194011,
    "strategyAndOps": 18.7321185076633,
    "legal": 27.2960226564422,
-   "healthcareAndMedical": 22.9868420110107,
+   "healthcareAndMedical": 22.9035086776773,
    "engineering": 28.7932207850383,
    "economics": 37.2547589782206
   },
@@ -45864,6 +45918,7 @@
    "financeAndAccounting": 35.4471752244645,
    "strategyAndOps": 33.5360066238334,
    "legal": 35.5422528285353,
+   "healthcareAndMedical": 31.9769635476401,
    "engineering": 35.231640545599,
    "economics": 43.2746768033673
   },
@@ -46313,7 +46368,7 @@
    "financeAndAccounting": 34.3482059447387,
    "strategyAndOps": 37.0618351472389,
    "legal": 34.6097693715945,
-   "healthcareAndMedical": 34.4310443115205,
+   "healthcareAndMedical": 34.5977109781871,
    "engineering": 33.2830135332539,
    "economics": 42.8081662998146
   },
@@ -46501,36 +46556,36 @@
    },
    "indexIntervals": {
     "expressiveness": {
-     "lower": 13.802268070394277,
-     "upper": 17.277917303744214
+     "lower": 14,
+     "upper": 17
     },
     "organization": {
-     "lower": 45.11366162617612,
-     "upper": 69.10647474870545
+     "lower": 45,
+     "upper": 69
     },
     "informativeness": {
-     "lower": 24.78213756467847,
-     "upper": 36.42097210664615
+     "lower": 25,
+     "upper": 36
     },
     "transparency": {
-     "lower": 28.480432548079197,
-     "upper": 38.400016491147134
+     "lower": 28,
+     "upper": 38
     },
     "warmth": {
-     "lower": 21.125853352635946,
-     "upper": 24.392470353845223
+     "lower": 21,
+     "upper": 24
     },
     "conviction": {
-     "lower": 27.49522590390578,
-     "upper": 41.47774374437465
+     "lower": 27,
+     "upper": 41
     },
     "imagination": {
-     "lower": 20.239991714433902,
-     "upper": 39.17801410302781
+     "lower": 20,
+     "upper": 39
     },
     "slop": {
-     "lower": 75.4979390587499,
-     "upper": 87.50663564773612
+     "lower": 75,
+     "upper": 88
     }
    }
   },
@@ -47178,36 +47233,36 @@
    },
    "indexIntervals": {
     "expressiveness": {
-     "lower": 14.317378116705052,
-     "upper": 20.194504044990392
+     "lower": 14,
+     "upper": 20
     },
     "organization": {
-     "lower": 49.750961798376494,
-     "upper": 72.37162185377542
+     "lower": 50,
+     "upper": 72
     },
     "informativeness": {
-     "lower": 27.876735304652975,
-     "upper": 36.73665750211665
+     "lower": 28,
+     "upper": 37
     },
     "transparency": {
-     "lower": 38.68718771909063,
-     "upper": 55.78549922151766
+     "lower": 39,
+     "upper": 56
     },
     "warmth": {
-     "lower": 24.940580892926576,
-     "upper": 39.90351643540071
+     "lower": 25,
+     "upper": 40
     },
     "conviction": {
-     "lower": 24.103466626074248,
-     "upper": 38.99068215714001
+     "lower": 24,
+     "upper": 39
     },
     "imagination": {
-     "lower": 43.08949434345007,
-     "upper": 49.49928437769612
+     "lower": 43,
+     "upper": 49
     },
     "slop": {
-     "lower": 68.81259905623703,
-     "upper": 80.95691235399437
+     "lower": 69,
+     "upper": 81
     }
    }
   },
@@ -47445,7 +47500,7 @@
    "financeAndAccounting": 57.2312616854024,
    "strategyAndOps": 59.6247990896574,
    "legal": 56.435055775641,
-   "healthcareAndMedical": 58.0632988915996,
+   "healthcareAndMedical": 53.0632988915997,
    "engineering": 58.3711344673399,
    "economics": 60.8401739843992
   },
@@ -47627,36 +47682,36 @@
    },
    "indexIntervals": {
     "expressiveness": {
-     "lower": 64.61558336660507,
-     "upper": 71.4029827846436
+     "lower": 65,
+     "upper": 71
     },
     "organization": {
-     "lower": 67.8758587874753,
-     "upper": 94.85306739334415
+     "lower": 68,
+     "upper": 95
     },
     "informativeness": {
-     "lower": 73.62227804228257,
-     "upper": 89.64031686672381
+     "lower": 74,
+     "upper": 90
     },
     "transparency": {
-     "lower": 95.48387835541399,
+     "lower": 95,
      "upper": 100
     },
     "warmth": {
-     "lower": 60.534546477236034,
-     "upper": 74.35215423501116
+     "lower": 61,
+     "upper": 74
     },
     "conviction": {
-     "lower": 48.18123146276889,
-     "upper": 65.74446102433811
+     "lower": 48,
+     "upper": 66
     },
     "imagination": {
-     "lower": 76.12828797420084,
-     "upper": 91.79897116902653
+     "lower": 76,
+     "upper": 92
     },
     "slop": {
-     "lower": 15.17661985129234,
-     "upper": 20.940094929118747
+     "lower": 15,
+     "upper": 21
     }
    }
   },
@@ -48239,7 +48294,7 @@
    "financeAndAccounting": 53.9844924520062,
    "strategyAndOps": 56.9785355034937,
    "legal": 57.6948991540986,
-   "healthcareAndMedical": 51.1786037255156,
+   "healthcareAndMedical": 51.8452703921823,
    "engineering": 53.9031392342597,
    "economics": 59.2824044253939
   },
@@ -48421,36 +48476,36 @@
    },
    "indexIntervals": {
     "expressiveness": {
-     "lower": 46.48648648648649,
-     "upper": 46.48648648648649
+     "lower": 46,
+     "upper": 46
     },
     "organization": {
-     "lower": 78.5945945945946,
-     "upper": 78.5945945945946
+     "lower": 79,
+     "upper": 79
     },
     "informativeness": {
-     "lower": 19.72972972972973,
-     "upper": 19.72972972972973
+     "lower": 20,
+     "upper": 20
     },
     "transparency": {
-     "lower": 91.97297297297298,
-     "upper": 91.97297297297298
+     "lower": 92,
+     "upper": 92
     },
     "warmth": {
-     "lower": 59.86486486486487,
-     "upper": 59.86486486486487
+     "lower": 60,
+     "upper": 60
     },
     "conviction": {
-     "lower": 54.513513513513516,
-     "upper": 54.513513513513516
+     "lower": 55,
+     "upper": 55
     },
     "imagination": {
-     "lower": 54.513513513513516,
-     "upper": 54.513513513513516
+     "lower": 55,
+     "upper": 55
     },
     "slop": {
-     "lower": 11.702702702702704,
-     "upper": 11.702702702702704
+     "lower": 12,
+     "upper": 12
     }
    }
   },
@@ -49508,9 +49563,9 @@
    "financeAndAccounting": 31.9484494375197,
    "strategyAndOps": 32.1703548004312,
    "legal": 31.8890165423417,
-   "healthcareAndMedical": 31.3880853663732,
    "engineering": 32.8392945199379,
-   "economics": 42.3574175162187
+   "economics": 42.3574175162187,
+   "healthcareAndMedical": 31.3880853663732
   },
   "omniscienceHallucinationRate": 0.25850478712568753,
   "gdpPdfAllPass": 0.074,
@@ -49687,36 +49742,36 @@
    },
    "indexIntervals": {
     "expressiveness": {
-     "lower": 18.845323582156112,
-     "upper": 30.726281408810703
+     "lower": 19,
+     "upper": 31
     },
     "organization": {
-     "lower": 24.751078276903034,
-     "upper": 57.08936952172482
+     "lower": 25,
+     "upper": 57
     },
     "informativeness": {
-     "lower": 60.096518798900256,
-     "upper": 68.79867211561015
+     "lower": 60,
+     "upper": 69
     },
     "transparency": {
-     "lower": 8.690460605470737,
-     "upper": 16.333616769373695
+     "lower": 9,
+     "upper": 16
     },
     "warmth": {
-     "lower": 11.285780688057946,
-     "upper": 13.739448913413476
+     "lower": 11,
+     "upper": 14
     },
     "conviction": {
-     "lower": 9.90764636356043,
-     "upper": 16.141972344575485
+     "lower": 10,
+     "upper": 16
     },
     "imagination": {
-     "lower": 35.24860853517371,
-     "upper": 45.24336783404217
+     "lower": 35,
+     "upper": 45
     },
     "slop": {
-     "lower": 91.90902947927682,
-     "upper": 97.35500971529947
+     "lower": 92,
+     "upper": 97
     }
    }
   },
@@ -49817,7 +49872,10 @@
   "outputModalityText": true,
   "outputModalityImage": false,
   "outputModalitySpeech": false,
-  "outputModalityVideo": false
+  "outputModalityVideo": false,
+  "carriedDetailFills": [
+   "capabilities"
+  ]
  },
  {
   "slug": "claude-sonnet-5-5-low",
@@ -49953,6 +50011,7 @@
    "financeAndAccounting": 37.5034918470793,
    "strategyAndOps": 40.9117980805287,
    "legal": 40.5891784145872,
+   "healthcareAndMedical": 37.033134926606,
    "engineering": 37.895984828224,
    "economics": 44.1031023517145
   },
@@ -50293,7 +50352,7 @@
    "financeAndAccounting": 33.4884453694117,
    "strategyAndOps": 30.0416690104094,
    "legal": 43.6957028506217,
-   "healthcareAndMedical": 30.5005432412969,
+   "healthcareAndMedical": 29.8338765746302,
    "engineering": 32.9594471147327,
    "economics": 44.3702518535681
   },
@@ -50475,36 +50534,36 @@
    },
    "indexIntervals": {
     "expressiveness": {
-     "lower": 45.862792709927554,
-     "upper": 61.025046980714414
+     "lower": 46,
+     "upper": 61
     },
     "organization": {
-     "lower": 19.74553698763314,
-     "upper": 55.442297197394716
+     "lower": 20,
+     "upper": 55
     },
     "informativeness": {
-     "lower": 45.12820762179581,
-     "upper": 65.01873259989068
+     "lower": 45,
+     "upper": 65
     },
     "transparency": {
-     "lower": 6.484429563947709,
-     "upper": 9.741558735035426
+     "lower": 6,
+     "upper": 10
     },
     "warmth": {
-     "lower": 40.90587896864275,
-     "upper": 60.648626216341015
+     "lower": 41,
+     "upper": 61
     },
     "conviction": {
-     "lower": 27.843621795480413,
-     "upper": 52.040335229346766
+     "lower": 28,
+     "upper": 52
     },
     "imagination": {
-     "lower": 8.339126248715129,
-     "upper": 28.07816936729792
+     "lower": 8,
+     "upper": 28
     },
     "slop": {
-     "lower": 74.99727705922399,
-     "upper": 92.82588246778602
+     "lower": 75,
+     "upper": 93
     }
    }
   },
@@ -50742,7 +50801,7 @@
    "financeAndAccounting": 41.3543584241679,
    "strategyAndOps": 47.4849824289207,
    "legal": 41.4709348038804,
-   "healthcareAndMedical": 40.2967241831809,
+   "healthcareAndMedical": 39.6300575165142,
    "engineering": 43.0589955949673,
    "economics": 44.9447231811863
   },
@@ -51089,6 +51148,7 @@
    "financeAndAccounting": 24.3152074947385,
    "strategyAndOps": 22.7547529479851,
    "legal": 25.4913840136848,
+   "healthcareAndMedical": 23.0372354782793,
    "engineering": 22.8197990401165,
    "economics": 30.0720185936052
   },
@@ -51641,6 +51701,7 @@
    "financeAndAccounting": 24.8067738017588,
    "strategyAndOps": 29.2741611729726,
    "legal": 29.4848076960187,
+   "healthcareAndMedical": 29.4362447171151,
    "engineering": 24.6572179852276,
    "economics": 30.3489250463392
   },
@@ -52439,6 +52500,7 @@
    "financeAndAccounting": 35.4846233799846,
    "strategyAndOps": 39.0210823050418,
    "legal": 33.0649554567825,
+   "healthcareAndMedical": 32.8234382410033,
    "engineering": 38.0098316839787,
    "economics": 40.5231542323139
   },
@@ -52791,7 +52853,7 @@
    "financeAndAccounting": 29.5408997331034,
    "strategyAndOps": 31.3150773517333,
    "legal": 30.6420055204441,
-   "healthcareAndMedical": 27.4909141044212,
+   "healthcareAndMedical": 29.1575807710879,
    "engineering": 27.5109131218179,
    "economics": 34.4217109206055
   },
@@ -53478,7 +53540,7 @@
    "financeAndAccounting": 44.7076465242297,
    "strategyAndOps": 47.5750527304515,
    "legal": 42.0364240361022,
-   "healthcareAndMedical": 46.6708125611712,
+   "healthcareAndMedical": 42.0041458945045,
    "engineering": 47.1451103250163,
    "economics": 51.2280569199876
   },
@@ -53668,36 +53730,36 @@
    },
    "indexIntervals": {
     "expressiveness": {
-     "lower": 95.61921072406888,
-     "upper": 99.51824900477662
+     "lower": 96,
+     "upper": 100
     },
     "organization": {
-     "lower": 15.613967045188335,
-     "upper": 41.336223932056
+     "lower": 16,
+     "upper": 41
     },
     "informativeness": {
-     "lower": 47.06600616321817,
-     "upper": 58.28265563594132
+     "lower": 47,
+     "upper": 58
     },
     "transparency": {
-     "lower": 70.33751400986314,
-     "upper": 83.60638044285074
+     "lower": 70,
+     "upper": 84
     },
     "warmth": {
-     "lower": 82.84914709010832,
-     "upper": 94.11317122924285
+     "lower": 83,
+     "upper": 94
     },
     "conviction": {
-     "lower": 82.49606943966033,
-     "upper": 93.91995764471059
+     "lower": 82,
+     "upper": 94
     },
     "imagination": {
-     "lower": 81.72846732206939,
-     "upper": 95.27692580289259
+     "lower": 82,
+     "upper": 95
     },
     "slop": {
-     "lower": 26.178794178794192,
-     "upper": 36.08934027959418
+     "lower": 26,
+     "upper": 36
     }
    }
   },
@@ -54318,6 +54380,7 @@
    "financeAndAccounting": 53.7918313752975,
    "strategyAndOps": 56.2412007125334,
    "legal": 60.0248854063997,
+   "healthcareAndMedical": 47.8197442052336,
    "engineering": 55.2171693400977,
    "economics": 60.4193601521471
   },
@@ -54499,36 +54562,36 @@
    },
    "indexIntervals": {
     "expressiveness": {
-     "lower": 71.54934471907804,
-     "upper": 85.74862176885433
+     "lower": 72,
+     "upper": 86
     },
     "organization": {
-     "lower": 34.16013123048351,
-     "upper": 59.16101642749153
+     "lower": 34,
+     "upper": 59
     },
     "informativeness": {
-     "lower": 68.8777171370715,
-     "upper": 87.09191964907235
+     "lower": 69,
+     "upper": 87
     },
     "transparency": {
-     "lower": 16.00026732144994,
-     "upper": 19.174109566438993
+     "lower": 16,
+     "upper": 19
     },
     "warmth": {
-     "lower": 66.13949668862499,
-     "upper": 79.27110855290893
+     "lower": 66,
+     "upper": 79
     },
     "conviction": {
-     "lower": 50.77395831882315,
-     "upper": 67.31919445378497
+     "lower": 51,
+     "upper": 67
     },
     "imagination": {
-     "lower": 37.95115318051276,
-     "upper": 46.39581439106886
+     "lower": 38,
+     "upper": 46
     },
     "slop": {
-     "lower": 66.22109960427717,
-     "upper": 70.2875068031076
+     "lower": 66,
+     "upper": 70
     }
    }
   },
@@ -55110,36 +55173,36 @@
    },
    "indexIntervals": {
     "expressiveness": {
-     "lower": 16.450411066360438,
-     "upper": 23.9864011581094
+     "lower": 16,
+     "upper": 24
     },
     "organization": {
-     "lower": 61.542400195582104,
-     "upper": 91.7006894216932
+     "lower": 62,
+     "upper": 92
     },
     "informativeness": {
-     "lower": 28.74623669414026,
-     "upper": 37.290850059398146
+     "lower": 29,
+     "upper": 37
     },
     "transparency": {
-     "lower": 27.56852741261031,
-     "upper": 37.8520648333863
+     "lower": 28,
+     "upper": 38
     },
     "warmth": {
-     "lower": 9.889957150358512,
-     "upper": 13.595475833917211
+     "lower": 10,
+     "upper": 14
     },
     "conviction": {
-     "lower": 53.347463974581586,
-     "upper": 71.27868653468505
+     "lower": 53,
+     "upper": 71
     },
     "imagination": {
-     "lower": 10.452116912701404,
-     "upper": 12.550081454433524
+     "lower": 10,
+     "upper": 13
     },
     "slop": {
-     "lower": 23.321285782824244,
-     "upper": 29.549126136328862
+     "lower": 23,
+     "upper": 30
     }
    }
   },
@@ -56557,7 +56620,7 @@
    "financeAndAccounting": 14.0457973987115,
    "strategyAndOps": 11.9286750340446,
    "legal": 16.0612849744918,
-   "healthcareAndMedical": 13.5556785369912,
+   "healthcareAndMedical": 14.8056785369912,
    "engineering": 17.2677686349795,
    "economics": 20.3724063970266
   },
@@ -57121,6 +57184,7 @@
    "financeAndAccounting": 58.4289359244956,
    "strategyAndOps": 61.632333788111,
    "legal": 60.758635103544,
+   "healthcareAndMedical": 53.0164049772806,
    "engineering": 58.7412794286035,
    "economics": 62.9803911414891
   },
@@ -57466,6 +57530,7 @@
    "financeAndAccounting": 53.2185961945594,
    "strategyAndOps": 55.4859448397326,
    "legal": 57.9150909008444,
+   "healthcareAndMedical": 50.6404564285582,
    "engineering": 52.9777901439926,
    "economics": 58.4315605885079
   },
@@ -58203,36 +58268,36 @@
    },
    "indexIntervals": {
     "expressiveness": {
-     "lower": 61.01787925072138,
-     "upper": 68.21431712265161
+     "lower": 61,
+     "upper": 68
     },
     "organization": {
-     "lower": 94.52831966123554,
+     "lower": 95,
      "upper": 100
     },
     "informativeness": {
-     "lower": 47.20735391999168,
-     "upper": 58.32103946977432
+     "lower": 47,
+     "upper": 58
     },
     "transparency": {
-     "lower": 43.25711126314883,
-     "upper": 60.87814288277973
+     "lower": 43,
+     "upper": 61
     },
     "warmth": {
-     "lower": 34.61783589439141,
-     "upper": 47.65422585866864
+     "lower": 35,
+     "upper": 48
     },
     "conviction": {
-     "lower": 16.49505494579067,
-     "upper": 28.893207468788546
+     "lower": 16,
+     "upper": 29
     },
     "imagination": {
-     "lower": 44.46287099718365,
-     "upper": 49.76245567622433
+     "lower": 44,
+     "upper": 50
     },
     "slop": {
-     "lower": 57.579477782867606,
-     "upper": 67.23755998989645
+     "lower": 58,
+     "upper": 67
     }
    }
   },
@@ -58676,6 +58741,7 @@
    "financeAndAccounting": 45.4970180212463,
    "strategyAndOps": 45.7265632179121,
    "legal": 49.9460796732072,
+   "healthcareAndMedical": 42.0126173153068,
    "engineering": 43.8630333644267,
    "economics": 52.3542204008341
   },
@@ -59021,6 +59087,7 @@
    "financeAndAccounting": 52.192742596605,
    "strategyAndOps": 54.2191991785412,
    "legal": 56.6211152952975,
+   "healthcareAndMedical": 50.0000939585195,
    "engineering": 51.6537729419175,
    "economics": 57.7946128745752
   },
@@ -59665,6 +59732,7 @@
    "financeAndAccounting": 54.1326811387343,
    "strategyAndOps": 57.4800758970703,
    "legal": 57.4363558844909,
+   "healthcareAndMedical": 48.8179402768489,
    "engineering": 53.7361705413061,
    "economics": 59.6875387125425
   },
@@ -60010,6 +60078,7 @@
    "financeAndAccounting": 15.3319548598709,
    "strategyAndOps": 10.9443048111928,
    "legal": 16.2710190145101,
+   "healthcareAndMedical": 13.6626686956805,
    "engineering": 19.4726728291843,
    "economics": 21.9494695674078
   },
@@ -60528,7 +60597,7 @@
    "financeAndAccounting": 12.2194234113898,
    "strategyAndOps": 7.85982894069489,
    "legal": 11.3353700290954,
-   "healthcareAndMedical": 10.6857319829275,
+   "healthcareAndMedical": 10.7690653162608,
    "engineering": 15.1398009996028,
    "economics": 18.3357064990732
   },
@@ -61066,36 +61135,36 @@
    },
    "indexIntervals": {
     "expressiveness": {
-     "lower": 36.7368166918176,
-     "upper": 52.62577836367858
+     "lower": 37,
+     "upper": 53
     },
     "organization": {
-     "lower": 66.73605874935458,
-     "upper": 95.24975702264328
+     "lower": 67,
+     "upper": 95
     },
     "informativeness": {
-     "lower": 59.007318092828505,
-     "upper": 69.24223658507792
+     "lower": 59,
+     "upper": 69
     },
     "transparency": {
-     "lower": 82.45554832608973,
-     "upper": 92.62683498618036
+     "lower": 82,
+     "upper": 93
     },
     "warmth": {
-     "lower": 15.922184162922793,
-     "upper": 21.12129735366485
+     "lower": 16,
+     "upper": 21
     },
     "conviction": {
-     "lower": 92.59940134687629,
-     "upper": 97.74425351227043
+     "lower": 93,
+     "upper": 98
     },
     "imagination": {
-     "lower": 19.96591504639887,
-     "upper": 39.26177439563883
+     "lower": 20,
+     "upper": 39
     },
     "slop": {
-     "lower": 37.547664253117965,
-     "upper": 41.97336628548618
+     "lower": 38,
+     "upper": 42
     }
    }
   },
@@ -61504,6 +61573,7 @@
    "financeAndAccounting": 55.9199000951004,
    "strategyAndOps": 59.2480549498349,
    "legal": 58.9751539130269,
+   "healthcareAndMedical": 49.290458792681,
    "engineering": 56.1961255668027,
    "economics": 60.6234548578931
   },
@@ -62118,6 +62188,7 @@
    "financeAndAccounting": 39.0508367085147,
    "strategyAndOps": 38.502189448833,
    "legal": 44.5166206104543,
+   "healthcareAndMedical": 33.827996355898,
    "engineering": 34.4918058710366,
    "economics": 45.5626226637319
   },
@@ -62422,7 +62493,7 @@
    "financeAndAccounting": 46.8896359847019,
    "strategyAndOps": 50.4712819162407,
    "legal": 48.6440650427309,
-   "healthcareAndMedical": 45.0434943845881,
+   "healthcareAndMedical": 42.5434943845881,
    "engineering": 43.2683161184197,
    "economics": 53.3939290237875
   },
@@ -62612,36 +62683,36 @@
    },
    "indexIntervals": {
     "expressiveness": {
-     "lower": 90.37917204972159,
-     "upper": 95.64908081661852
+     "lower": 90,
+     "upper": 96
     },
     "organization": {
-     "lower": 16.557269701334462,
-     "upper": 47.34449768954835
+     "lower": 17,
+     "upper": 47
     },
     "informativeness": {
-     "lower": 40.74578651835362,
-     "upper": 57.63757631807865
+     "lower": 41,
+     "upper": 58
     },
     "transparency": {
-     "lower": 64.75231239309593,
-     "upper": 82.10235962884313
+     "lower": 65,
+     "upper": 82
     },
     "warmth": {
-     "lower": 83.1471016800269,
-     "upper": 94.34701355002959
+     "lower": 83,
+     "upper": 94
     },
     "conviction": {
-     "lower": 66.91463879337253,
-     "upper": 87.81857484384473
+     "lower": 67,
+     "upper": 88
     },
     "imagination": {
-     "lower": 77.20061296902658,
-     "upper": 94.54578724137228
+     "lower": 77,
+     "upper": 95
     },
     "slop": {
-     "lower": 29.335496311713747,
-     "upper": 36.952392675038695
+     "lower": 29,
+     "upper": 37
     }
    }
   },
@@ -62879,6 +62950,7 @@
    "financeAndAccounting": 24.179374406872,
    "strategyAndOps": 24.1807377947041,
    "legal": 26.5311231108808,
+   "healthcareAndMedical": 25.3102500412333,
    "engineering": 29.183005685078,
    "economics": 35.1296862449799
   },
@@ -64294,36 +64366,36 @@
    },
    "indexIntervals": {
     "expressiveness": {
-     "lower": 82.99978463487838,
-     "upper": 88.73320924994077
+     "lower": 83,
+     "upper": 89
     },
     "organization": {
-     "lower": 68.66642415546167,
-     "upper": 95.29154989014575
+     "lower": 69,
+     "upper": 95
     },
     "informativeness": {
-     "lower": 91.85821882187892,
+     "lower": 92,
      "upper": 100
     },
     "transparency": {
-     "lower": 51.05003912915492,
-     "upper": 68.74512264650524
+     "lower": 51,
+     "upper": 69
     },
     "warmth": {
-     "lower": 97.33509818649051,
+     "lower": 97,
      "upper": 100
     },
     "conviction": {
-     "lower": 67.46630998671031,
-     "upper": 90.35821579417478
+     "lower": 67,
+     "upper": 90
     },
     "imagination": {
-     "lower": 78.14923302251704,
-     "upper": 94.87254458581458
+     "lower": 78,
+     "upper": 95
     },
     "slop": {
-     "lower": 51.95478048055906,
-     "upper": 62.543723973825095
+     "lower": 52,
+     "upper": 63
     }
    }
   },
@@ -65951,7 +66023,7 @@
    "financeAndAccounting": 14.6668601817526,
    "strategyAndOps": 10.0802876606482,
    "legal": 18.8639679198938,
-   "healthcareAndMedical": 15.7022234401391,
+   "healthcareAndMedical": 15.5355567734725,
    "engineering": 19.4966472196478,
    "economics": 26.4010976791782
   },
@@ -66397,6 +66469,7 @@
    "financeAndAccounting": 21.9352909203275,
    "strategyAndOps": 19.2954476121904,
    "legal": 25.6153988696831,
+   "healthcareAndMedical": 21.4243689693778,
    "engineering": 22.7686885841753,
    "economics": 30.542405545258
   },
@@ -67075,7 +67148,7 @@
    "financeAndAccounting": 53.7817808116862,
    "strategyAndOps": 55.4580400320478,
    "legal": 57.9638737233001,
-   "healthcareAndMedical": 53.8242947218599,
+   "healthcareAndMedical": 47.2409613885266,
    "engineering": 53.0460949628932,
    "economics": 60.4384757491505
   },
@@ -68311,7 +68384,7 @@
    "financeAndAccounting": 45.9656620578139,
    "strategyAndOps": 44.0524911936205,
    "legal": 47.9290396170066,
-   "healthcareAndMedical": 45.1907636817714,
+   "healthcareAndMedical": 41.2740970151047,
    "engineering": 43.4763076392323,
    "economics": 53.7601779232314
   },
@@ -68621,7 +68694,7 @@
    "financeAndAccounting": 54.8890200635187,
    "strategyAndOps": 56.6326572457365,
    "legal": 57.299738099419,
-   "healthcareAndMedical": 53.3389883833501,
+   "healthcareAndMedical": 46.6723217166834,
    "engineering": 54.0203345239379,
    "economics": 60.8374448756565
   },
@@ -68931,7 +69004,7 @@
    "financeAndAccounting": 51.3969366161314,
    "strategyAndOps": 53.246802699846,
    "legal": 54.4558295225948,
-   "healthcareAndMedical": 52.0286946796272,
+   "healthcareAndMedical": 44.8620280129605,
    "engineering": 51.6107573581612,
    "economics": 58.1635919833179
   },
@@ -69240,7 +69313,7 @@
    "financeAndAccounting": 43.7591173339096,
    "strategyAndOps": 46.2153740751438,
    "legal": 47.7707845844624,
-   "healthcareAndMedical": 44.7541280201061,
+   "healthcareAndMedical": 38.7541280201061,
    "engineering": 42.4655965858493,
    "economics": 50.0101707792709
   },
@@ -69549,7 +69622,7 @@
    "financeAndAccounting": 49.0516012295859,
    "strategyAndOps": 51.1034184395003,
    "legal": 51.7245369126439,
-   "healthcareAndMedical": 49.7260320892233,
+   "healthcareAndMedical": 43.39269875589,
    "engineering": 47.4300051203181,
    "economics": 55.9258116890639
   },
@@ -69858,7 +69931,7 @@
    "financeAndAccounting": 54.2843289142293,
    "strategyAndOps": 54.3289581712525,
    "legal": 55.9504152254102,
-   "healthcareAndMedical": 52.9087968696766,
+   "healthcareAndMedical": 45.6587968696766,
    "engineering": 52.7642708638908,
    "economics": 60.2029451652765
   },
@@ -70294,7 +70367,7 @@
    "financeAndAccounting": 33.4841433224134,
    "strategyAndOps": 30.2739927539438,
    "legal": 37.2112331543365,
-   "healthcareAndMedical": 31.2124939887287,
+   "healthcareAndMedical": 28.7124939887287,
    "engineering": 31.3834791501143,
    "economics": 42.3669087923271
   },
@@ -70735,7 +70808,7 @@
    "financeAndAccounting": 40.3527497986385,
    "strategyAndOps": 39.211945414017,
    "legal": 42.3499268404872,
-   "healthcareAndMedical": 42.8340996521525,
+   "healthcareAndMedical": 35.3340996521525,
    "engineering": 40.2275561933207,
    "economics": 49.3768804448563
   },
@@ -71045,6 +71118,7 @@
    "financeAndAccounting": 33.4871863358702,
    "strategyAndOps": 33.4976926043537,
    "legal": 34.950206240437,
+   "healthcareAndMedical": 29.2921046682945,
    "engineering": 32.0740331519886,
    "economics": 41.3297172536299
   },
@@ -71353,6 +71427,7 @@
    "financeAndAccounting": 26.1261012656155,
    "strategyAndOps": 26.2848682805345,
    "legal": 28.3083977791953,
+   "healthcareAndMedical": 24.1176614316407,
    "engineering": 25.2981686149192,
    "economics": 33.0686217176398
   },
@@ -71661,6 +71736,7 @@
    "financeAndAccounting": 29.9535703524917,
    "strategyAndOps": 30.4128223077401,
    "legal": 31.6566983773574,
+   "healthcareAndMedical": 26.4188994028746,
    "engineering": 28.6713642365666,
    "economics": 37.5435958449181
   },
@@ -72097,6 +72173,7 @@
    "financeAndAccounting": 37.4291853487684,
    "strategyAndOps": 36.8301197617634,
    "legal": 38.1833468103473,
+   "healthcareAndMedical": 31.7207375015666,
    "engineering": 35.4962831094608,
    "economics": 45.2591839473278
   },
@@ -75780,7 +75857,7 @@
    "financeAndAccounting": 44.9719825947757,
    "strategyAndOps": 51.7277008355502,
    "legal": 41.3497209791064,
-   "healthcareAndMedical": 40.6388737813166,
+   "healthcareAndMedical": 40.8055404479833,
    "engineering": 39.308854394802,
    "economics": 44.4346942191844
   },
@@ -76043,36 +76120,36 @@
    },
    "indexIntervals": {
     "expressiveness": {
-     "lower": 50.45660497183623,
-     "upper": 61.414262375635786
+     "lower": 50,
+     "upper": 61
     },
     "organization": {
-     "lower": 95.80582232717788,
+     "lower": 96,
      "upper": 100
     },
     "informativeness": {
-     "lower": 68.92490050487187,
-     "upper": 83.80960336432395
+     "lower": 69,
+     "upper": 84
     },
     "transparency": {
-     "lower": 56.70780628844219,
-     "upper": 75.02979540017743
+     "lower": 57,
+     "upper": 75
     },
     "warmth": {
-     "lower": 23.525065126557877,
-     "upper": 34.15384625948523
+     "lower": 24,
+     "upper": 34
     },
     "conviction": {
-     "lower": 94.58276121960748,
-     "upper": 99.08375908299726
+     "lower": 95,
+     "upper": 99
     },
     "imagination": {
-     "lower": 18.784347986858734,
-     "upper": 37.656953804666216
+     "lower": 19,
+     "upper": 38
     },
     "slop": {
-     "lower": 37.492523948290774,
-     "upper": 41.692470707023276
+     "lower": 37,
+     "upper": 42
     }
    }
   },
@@ -76217,8 +76294,8 @@
   "omniscienceAccuracy": 0.2845,
   "omniscienceHallucinationRate": 0.5399487537852318,
   "gdpPdfAllPass": 0.038,
-  "gdpval": 1341.23,
-  "gdpvalNormalized": 0.420615,
+  "gdpval": 1338.79,
+  "gdpvalNormalized": 0.41939499999999996,
   "itBenchSre": null,
   "tau2": null,
   "tauBanking": null,
@@ -76226,7 +76303,7 @@
   "terminalBench21": null,
   "terminalBench40": 0.0555555555555556,
   "frontierCode": null,
-  "terminalBenchScience": null,
+  "terminalBenchScience": 0,
   "hleDiamond": null,
   "scicode": 0.355324074074074,
   "lcr": 0.553333333333333,
@@ -76330,14 +76407,14 @@
   "intelligenceIndexEvaluations": [
    {
     "slug": "aa-briefcase",
-    "score": 1117.62,
+    "score": 1118.3,
     "outputTokensPerTask": 35128.43956043956,
     "costPerTask": 0.21314980986965418,
     "timePerTask": 106.7825341568645
    },
    {
     "slug": "gdpval-aa",
-    "score": 1341.23,
+    "score": 1338.79,
     "outputTokensPerTask": 42247.82272727273,
     "costPerTask": 0.16997030659361606,
     "timePerTask": 128.42385343266602
@@ -76408,20 +76485,20 @@
   },
   "briefcaseBreakdown": {
    "overall": {
-    "elo": 1117.62,
-    "lower95ci": 1108.06,
-    "upper95ci": 1127.33
+    "elo": 1118.3,
+    "lower95ci": 1108.82,
+    "upper95ci": 1128.19
    },
    "rubricPassRate": 0.3363821138211382,
    "analyticalQuality": {
-    "elo": 1014.65,
-    "lower95ci": 996.43,
-    "upper95ci": 1032.64
+    "elo": 1015.05,
+    "lower95ci": 996.82,
+    "upper95ci": 1032.96
    },
    "presentation": {
-    "elo": 1229.57,
-    "lower95ci": 1212.19,
-    "upper95ci": 1247.01
+    "elo": 1230.4,
+    "lower95ci": 1213.39,
+    "upper95ci": 1248.19
    }
   },
   "briefcaseTotalCost": 19.39663269813853,
@@ -76541,9 +76618,9 @@
    "financeAndAccounting": 37.4582912529125,
    "strategyAndOps": 43.0628730135919,
    "legal": 37.6541765788083,
-   "healthcareAndMedical": 35.3811053272842,
    "engineering": 34.9191286340166,
-   "economics": 40.2705592369478
+   "economics": 40.2705592369478,
+   "healthcareAndMedical": 35.3811053272842
   },
   "omniscience": -14.283333333333333,
   "omniscienceAccuracy": 0.4038333333333333,
@@ -76814,7 +76891,10 @@
   "outputModalityImage": false,
   "outputModalitySpeech": false,
   "outputModalityVideo": false,
-  "modelCreatorName": "DeepSeek"
+  "modelCreatorName": "DeepSeek",
+  "carriedDetailFills": [
+   "capabilities"
+  ]
  },
  {
   "id": "d8ddb241-b3e4-4c25-a6a3-72eb1b30c541",
@@ -76855,9 +76935,9 @@
    "financeAndAccounting": 26.8205356926406,
    "strategyAndOps": 26.9821523128209,
    "legal": 27.0160150857326,
-   "healthcareAndMedical": 26.3252422716216,
    "engineering": 26.3775785447484,
-   "economics": 32.0466448872413
+   "economics": 32.0466448872413,
+   "healthcareAndMedical": 26.3252422716216
   },
   "omniscience": -23.9,
   "omniscienceAccuracy": 0.36816666666666664,
@@ -77129,7 +77209,10 @@
   "outputModalityImage": false,
   "outputModalitySpeech": false,
   "outputModalityVideo": false,
-  "modelCreatorName": "DeepSeek"
+  "modelCreatorName": "DeepSeek",
+  "carriedDetailFills": [
+   "capabilities"
+  ]
  },
  {
   "id": "89a2c945-1fab-4ee4-9f45-83a9f46cb221",
@@ -77170,9 +77253,9 @@
    "financeAndAccounting": 28.1916144051268,
    "strategyAndOps": 28.6504357370327,
    "legal": 28.0725693526694,
-   "healthcareAndMedical": 25.2180268106895,
    "engineering": 26.0398060993224,
-   "economics": 33.2102623378128
+   "economics": 33.2102623378128,
+   "healthcareAndMedical": 25.2180268106895
   },
   "omniscience": -23.083333333333332,
   "omniscienceAccuracy": 0.3486666666666667,
@@ -77397,7 +77480,10 @@
   "outputModalityImage": false,
   "outputModalitySpeech": false,
   "outputModalityVideo": false,
-  "modelCreatorName": "DeepSeek"
+  "modelCreatorName": "DeepSeek",
+  "carriedDetailFills": [
+   "capabilities"
+  ]
  },
  {
   "id": "ad173c8d-f14f-4230-90e9-60979b7720e7",
@@ -77536,7 +77622,7 @@
    "financeAndAccounting": 34.4985086721905,
    "strategyAndOps": 39.2559501515285,
    "legal": 33.6692882904525,
-   "healthcareAndMedical": 32.9813672830985,
+   "healthcareAndMedical": 31.2313672830985,
    "engineering": 31.5516974654134,
    "economics": 37.3424348741118
   },
@@ -81112,6 +81198,7 @@
    "financeAndAccounting": 17.2735237827142,
    "strategyAndOps": 12.5831233408171,
    "legal": 23.6712364138008,
+   "healthcareAndMedical": 14.9835972347071,
    "engineering": 18.8663421819145,
    "economics": 24.4922984244671
   },
@@ -81606,7 +81693,7 @@
    "financeAndAccounting": 16.6745672458666,
    "strategyAndOps": 13.7404089909085,
    "legal": 22.1289004441207,
-   "healthcareAndMedical": 13.6217514544706,
+   "healthcareAndMedical": 13.455084787804,
    "engineering": 18.4884627922278,
    "economics": 23.401312171764
   },
@@ -81916,7 +82003,7 @@
    "financeAndAccounting": 38.5186270303751,
    "strategyAndOps": 37.4351817648598,
    "legal": 44.3464953539868,
-   "healthcareAndMedical": 34.4420539987261,
+   "healthcareAndMedical": 33.1920539987261,
    "engineering": 34.6768379459897,
    "economics": 45.641358742663
   },
@@ -82509,7 +82596,7 @@
    "financeAndAccounting": 39.3294218791909,
    "strategyAndOps": 41.5282293371425,
    "legal": 46.0762280667543,
-   "healthcareAndMedical": 35.2890871516527,
+   "healthcareAndMedical": 34.622420484986,
    "engineering": 35.7851460182388,
    "economics": 46.0156932344764
   },
@@ -82818,7 +82905,7 @@
    "financeAndAccounting": 44.8945959297509,
    "strategyAndOps": 48.3290540836871,
    "legal": 50.742820519947,
-   "healthcareAndMedical": 39.9305114786735,
+   "healthcareAndMedical": 39.5138448120068,
    "engineering": 39.7097711878483,
    "economics": 50.6418971655854
   },
@@ -86800,7 +86887,7 @@
    "financeAndAccounting": 33.3227331517984,
    "strategyAndOps": 30.6499528159371,
    "legal": 34.2848710485317,
-   "healthcareAndMedical": 32.4442152824719,
+   "healthcareAndMedical": 33.2775486158053,
    "engineering": 37.202618415119,
    "economics": 45.590953448409
   },
@@ -87745,35 +87832,35 @@
    "indexIntervals": {
     "expressiveness": {
      "lower": 1,
-     "upper": 2.747750227203225
+     "upper": 3
     },
     "organization": {
      "lower": 1,
-     "upper": 1.9765305777545636
+     "upper": 2
     },
     "informativeness": {
      "lower": 1,
-     "upper": 1.470106769729898
+     "upper": 1
     },
     "transparency": {
      "lower": 1,
-     "upper": 2.0769690269497763
+     "upper": 2
     },
     "warmth": {
      "lower": 1,
-     "upper": 5.151344049511218
+     "upper": 5
     },
     "conviction": {
      "lower": 1,
-     "upper": 7.586692394593146
+     "upper": 8
     },
     "imagination": {
      "lower": 1,
-     "upper": 1.4384788701693714
+     "upper": 1
     },
     "slop": {
-     "lower": 85.3430428502648,
-     "upper": 88.71968182885416
+     "lower": 85,
+     "upper": 89
     }
    }
   },
@@ -88628,36 +88715,36 @@
    },
    "indexIntervals": {
     "expressiveness": {
-     "lower": 3.782508206283352,
-     "upper": 5.735333693823779
+     "lower": 4,
+     "upper": 6
     },
     "organization": {
-     "lower": 3.9540604695081103,
-     "upper": 6.021275924258749
+     "lower": 4,
+     "upper": 6
     },
     "informativeness": {
-     "lower": 2.0252060610721365,
-     "upper": 6.020146171138644
+     "lower": 2,
+     "upper": 6
     },
     "transparency": {
      "lower": 1,
-     "upper": 6.989706495444007
+     "upper": 7
     },
     "warmth": {
-     "lower": 2.5239069847252615,
-     "upper": 5.5884075361360335
+     "lower": 3,
+     "upper": 6
     },
     "conviction": {
-     "lower": 2.7822340338991634,
-     "upper": 5.389560859066155
+     "lower": 3,
+     "upper": 5
     },
     "imagination": {
-     "lower": 3.0938436371178453,
-     "upper": 5.509213711796911
+     "lower": 3,
+     "upper": 6
     },
     "slop": {
-     "lower": 95.56906384224912,
-     "upper": 99.31881474834815
+     "lower": 96,
+     "upper": 99
     }
    }
   },
@@ -90944,7 +91031,7 @@
    "financeAndAccounting": 24.1599432921652,
    "strategyAndOps": 25.3474639235843,
    "legal": 26.2470403840028,
-   "healthcareAndMedical": 22.1255081376279,
+   "healthcareAndMedical": 24.5421748042946,
    "engineering": 24.3985647330581,
    "economics": 29.7089511700649
   },
@@ -91460,36 +91547,36 @@
    },
    "indexIntervals": {
     "expressiveness": {
-     "lower": 7.8190352971228245,
-     "upper": 9.420820398727528
+     "lower": 8,
+     "upper": 9
     },
     "organization": {
-     "lower": 55.28406219224321,
-     "upper": 80.12374870513973
+     "lower": 55,
+     "upper": 80
     },
     "informativeness": {
-     "lower": 7.345962164497872,
-     "upper": 13.094045824141915
+     "lower": 7,
+     "upper": 13
     },
     "transparency": {
-     "lower": 15.190710509319333,
-     "upper": 26.768461796422418
+     "lower": 15,
+     "upper": 27
     },
     "warmth": {
-     "lower": 8.05034921854133,
-     "upper": 10.466025641403327
+     "lower": 8,
+     "upper": 10
     },
     "conviction": {
-     "lower": 16.67078949955901,
-     "upper": 26.542095651125017
+     "lower": 17,
+     "upper": 27
     },
     "imagination": {
-     "lower": 7.982983916591704,
-     "upper": 20.031728497821653
+     "lower": 8,
+     "upper": 20
     },
     "slop": {
-     "lower": 52.09460072595282,
-     "upper": 56.38
+     "lower": 52,
+     "upper": 56
     }
    }
   },
@@ -91615,7 +91702,7 @@
    "financeAndAccounting": 20.7499760496729,
    "strategyAndOps": 15.8284713812959,
    "legal": 22.1430700861713,
-   "healthcareAndMedical": 16.7813383187355,
+   "healthcareAndMedical": 18.4480049854022,
    "engineering": 22.6620038307934,
    "economics": 30.2779784543
   },
@@ -92406,7 +92493,7 @@
    "financeAndAccounting": 41.5087900230792,
    "strategyAndOps": 45.1838285278402,
    "legal": 44.6727094903889,
-   "healthcareAndMedical": 38.4665819280787,
+   "healthcareAndMedical": 40.1332485947454,
    "engineering": 39.8664181479163,
    "economics": 47.8177005522088
   },
@@ -92716,6 +92803,7 @@
    "financeAndAccounting": 40.0859767163337,
    "strategyAndOps": 43.4544096146193,
    "legal": 43.510132725222,
+   "healthcareAndMedical": 38.5940701142342,
    "engineering": 38.6150278703224,
    "economics": 46.7479510156008
   },
@@ -93249,6 +93337,7 @@
    "financeAndAccounting": 37.7826578624335,
    "strategyAndOps": 40.5322253921671,
    "legal": 41.4161724001181,
+   "healthcareAndMedical": 35.9830802033203,
    "engineering": 35.0274947698887,
    "economics": 44.6477860287303
   },
@@ -93686,7 +93775,7 @@
    "financeAndAccounting": 40.1003889846017,
    "strategyAndOps": 44.1124070390549,
    "legal": 36.8752003910491,
-   "healthcareAndMedical": 35.740444759121,
+   "healthcareAndMedical": 35.8237780924543,
    "engineering": 36.1631386671561,
    "economics": 42.7458711577078
   },
@@ -93996,7 +94085,7 @@
    "financeAndAccounting": 34.1091625349357,
    "strategyAndOps": 36.804417337489,
    "legal": 33.0006900097956,
-   "healthcareAndMedical": 29.6920130703235,
+   "healthcareAndMedical": 30.3586797369902,
    "engineering": 31.6556869652436,
    "economics": 38.0104895350633
   },
@@ -94305,7 +94394,7 @@
    "financeAndAccounting": 23.0063790007885,
    "strategyAndOps": 21.6527681666805,
    "legal": 23.9787223844296,
-   "healthcareAndMedical": 19.8916402829795,
+   "healthcareAndMedical": 21.3083069496461,
    "engineering": 22.7076911161128,
    "economics": 27.9053626042632
   },
@@ -94614,7 +94703,7 @@
    "financeAndAccounting": 27.0093144768628,
    "strategyAndOps": 28.4527008981933,
    "legal": 27.7003829406195,
-   "healthcareAndMedical": 24.2339334331572,
+   "healthcareAndMedical": 24.9839334331572,
    "engineering": 26.2319185316691,
    "economics": 31.959983897127
   },
@@ -94918,6 +95007,7 @@
    "financeAndAccounting": 16.067502468172,
    "strategyAndOps": 14.6900562057367,
    "legal": 16.990915048025,
+   "healthcareAndMedical": 15.5698374046964,
    "engineering": 18.3000596437699,
    "economics": 21.552016315261
   },
@@ -95226,7 +95316,7 @@
    "financeAndAccounting": 37.2008747498143,
    "strategyAndOps": 40.5803862534672,
    "legal": 34.7514091965174,
-   "healthcareAndMedical": 32.9872948964683,
+   "healthcareAndMedical": 32.8206282298016,
    "engineering": 33.9984199110127,
    "economics": 40.6022477216559
   },
@@ -95535,7 +95625,7 @@
    "financeAndAccounting": 49.017191009069,
    "strategyAndOps": 54.3054784968153,
    "legal": 49.8408911557395,
-   "healthcareAndMedical": 45.4043575131731,
+   "healthcareAndMedical": 45.9876908465064,
    "engineering": 48.8578459428122,
    "economics": 52.867344068582
   },
@@ -95845,7 +95935,7 @@
    "financeAndAccounting": 45.8243944514468,
    "strategyAndOps": 50.5534032516872,
    "legal": 47.3409198297204,
-   "healthcareAndMedical": 41.7684646921207,
+   "healthcareAndMedical": 42.851798025454,
    "engineering": 42.9590777449458,
    "economics": 49.8093358240655
   },
@@ -96154,7 +96244,7 @@
    "financeAndAccounting": 38.1090578060785,
    "strategyAndOps": 41.798621043369,
    "legal": 41.8717780440507,
-   "healthcareAndMedical": 35.7108765139149,
+   "healthcareAndMedical": 37.2942098472482,
    "engineering": 34.4428349582145,
    "economics": 44.1227878822984
   },
@@ -96463,7 +96553,7 @@
    "financeAndAccounting": 42.7784258643643,
    "strategyAndOps": 48.1654632296501,
    "legal": 45.0732210372974,
-   "healthcareAndMedical": 38.9571830885689,
+   "healthcareAndMedical": 40.6238497552356,
    "engineering": 40.1354932108053,
    "economics": 47.504046532283
   },
@@ -96926,7 +97016,7 @@
    "financeAndAccounting": 47.1364760970275,
    "strategyAndOps": 52.2233501468409,
    "legal": 48.9382519021091,
-   "healthcareAndMedical": 42.6991408765333,
+   "healthcareAndMedical": 44.1158075432,
    "engineering": 44.6466844320338,
    "economics": 51.3859808464628
   },
@@ -97747,6 +97837,7 @@
    "financeAndAccounting": 17.2239565846219,
    "strategyAndOps": 12.4269439139571,
    "legal": 19.9823322953007,
+   "healthcareAndMedical": 16.8822086293408,
    "engineering": 20.6728076459685,
    "economics": 27.7247470072598
   },
@@ -98896,7 +98987,7 @@
    "financeAndAccounting": 48.6070197362378,
    "strategyAndOps": 52.4814615916208,
    "legal": 51.066497312248,
-   "healthcareAndMedical": 43.5785669048048,
+   "healthcareAndMedical": 46.2452335714714,
    "engineering": 48.627640899462,
    "economics": 54.3721783866234
   },
@@ -99153,36 +99244,36 @@
    },
    "indexIntervals": {
     "expressiveness": {
-     "lower": 18.655762655712458,
-     "upper": 33.15306231406741
+     "lower": 19,
+     "upper": 33
     },
     "organization": {
-     "lower": 7.330328957281429,
-     "upper": 14.314390510723412
+     "lower": 7,
+     "upper": 14
     },
     "informativeness": {
-     "lower": 7.796448388217128,
-     "upper": 13.319052421998897
+     "lower": 8,
+     "upper": 13
     },
     "transparency": {
-     "lower": 30.352851391381822,
-     "upper": 53.33879454112744
+     "lower": 30,
+     "upper": 53
     },
     "warmth": {
-     "lower": 26.661790276135655,
-     "upper": 38.09174467236668
+     "lower": 27,
+     "upper": 38
     },
     "conviction": {
-     "lower": 35.97698202941133,
-     "upper": 66.58086567869272
+     "lower": 36,
+     "upper": 67
     },
     "imagination": {
-     "lower": 8.576690550465326,
-     "upper": 34.34449579420246
+     "lower": 9,
+     "upper": 34
     },
     "slop": {
      "lower": 1,
-     "upper": 1.834527338438272
+     "upper": 2
     }
    }
   },
@@ -99308,6 +99399,7 @@
    "financeAndAccounting": 45.6919709158811,
    "strategyAndOps": 49.463770876521,
    "legal": 48.2250780454469,
+   "healthcareAndMedical": 43.3377179393319,
    "engineering": 43.0604678371829,
    "economics": 51.5129932615076
   },
@@ -99616,6 +99708,7 @@
    "financeAndAccounting": 37.828074078608,
    "strategyAndOps": 41.4746962186403,
    "legal": 42.2391875249453,
+   "healthcareAndMedical": 37.8384923698154,
    "engineering": 34.8648573619152,
    "economics": 44.1142073293173
   },
@@ -99924,6 +100017,7 @@
    "financeAndAccounting": 43.2494834337796,
    "strategyAndOps": 47.4008803535734,
    "legal": 46.6644403050904,
+   "healthcareAndMedical": 41.6826387508396,
    "engineering": 40.3462729019976,
    "economics": 49.245203564257
   },
@@ -100181,6 +100275,7 @@
    "financeAndAccounting": 32.0061198258876,
    "strategyAndOps": 35.8177650731076,
    "legal": 32.3518990516232,
+   "healthcareAndMedical": 30.5640408600074,
    "engineering": 29.1442465063049,
    "economics": 34.6957697520853
   },
@@ -100489,6 +100584,7 @@
    "financeAndAccounting": 46.4704286551078,
    "strategyAndOps": 50.9035164203823,
    "legal": 49.5352047131576,
+   "healthcareAndMedical": 44.9257727185301,
    "engineering": 45.066834109866,
    "economics": 52.5284814836268
   },
@@ -102623,7 +102719,7 @@
    "financeAndAccounting": 27.0187568416546,
    "strategyAndOps": 16.8204317999296,
    "legal": 32.2709002077795,
-   "healthcareAndMedical": 26.198861545946,
+   "healthcareAndMedical": 25.948861545946,
    "engineering": 30.7155741314882,
    "economics": 40.7166954935125
   },
@@ -103192,6 +103288,7 @@
    "financeAndAccounting": 15.2797492274447,
    "strategyAndOps": 13.250896396316,
    "legal": 18.1437480595517,
+   "healthcareAndMedical": 13.5769924078455,
    "engineering": 14.860428544949,
    "economics": 20.4953499382144
   },
@@ -103500,7 +103597,7 @@
    "financeAndAccounting": 43.9529266607802,
    "strategyAndOps": 46.9658160208682,
    "legal": 48.2019730901569,
-   "healthcareAndMedical": 40.4137081477718,
+   "healthcareAndMedical": 40.5803748144385,
    "engineering": 39.338023436843,
    "economics": 50.0187420009212
   },
@@ -103756,36 +103853,36 @@
    },
    "indexIntervals": {
     "expressiveness": {
-     "lower": 34.72500871729249,
-     "upper": 52.66002651380966
+     "lower": 35,
+     "upper": 53
     },
     "organization": {
-     "lower": 31.658250347649663,
-     "upper": 61.929136823655035
+     "lower": 32,
+     "upper": 62
     },
     "informativeness": {
-     "lower": 46.7654149005438,
-     "upper": 60.337687536591545
+     "lower": 47,
+     "upper": 60
     },
     "transparency": {
-     "lower": 55.805742544629425,
-     "upper": 79.04421320269414
+     "lower": 56,
+     "upper": 79
     },
     "warmth": {
-     "lower": 22.402698326906638,
-     "upper": 32.24369366228966
+     "lower": 22,
+     "upper": 32
     },
     "conviction": {
-     "lower": 74.03574121581818,
-     "upper": 92.25558509739331
+     "lower": 74,
+     "upper": 92
     },
     "imagination": {
-     "lower": 37.91156663819879,
-     "upper": 48.572510170078814
+     "lower": 38,
+     "upper": 49
     },
     "slop": {
-     "lower": 64.96816520628771,
-     "upper": 72.0029467594685
+     "lower": 65,
+     "upper": 72
     }
    }
   },
@@ -103911,7 +104008,7 @@
    "financeAndAccounting": 49.2805651427737,
    "strategyAndOps": 52.4941689450456,
    "legal": 51.9267194752807,
-   "healthcareAndMedical": 45.2327936630622,
+   "healthcareAndMedical": 45.7327936630622,
    "engineering": 44.9650620451837,
    "economics": 53.8880773478529
   },
@@ -104221,6 +104318,7 @@
    "financeAndAccounting": 38.4399208268697,
    "strategyAndOps": 43.5452749840827,
    "legal": 43.7881638748085,
+   "healthcareAndMedical": 39.3669002252807,
    "engineering": 34.9522130568227,
    "economics": 45.3875660719802
   },
@@ -104529,6 +104627,7 @@
    "financeAndAccounting": 46.5376129007301,
    "strategyAndOps": 48.9178158108733,
    "legal": 49.4220572591789,
+   "healthcareAndMedical": 44.4095733518496,
    "engineering": 43.3242401512142,
    "economics": 53.0760049235403
   },
@@ -104837,6 +104936,7 @@
    "financeAndAccounting": 48.8159853476478,
    "strategyAndOps": 51.1150668727922,
    "legal": 51.5091281132138,
+   "healthcareAndMedical": 45.401045525493,
    "engineering": 44.9783377359588,
    "economics": 54.5548162071363
   },
@@ -105091,36 +105191,36 @@
    },
    "indexIntervals": {
     "expressiveness": {
-     "lower": 51.44848294992466,
-     "upper": 64.68232777303024
+     "lower": 51,
+     "upper": 65
     },
     "organization": {
-     "lower": 8.067443650781437,
-     "upper": 17.429899221005762
+     "lower": 8,
+     "upper": 17
     },
     "informativeness": {
-     "lower": 35.11414397610895,
-     "upper": 47.869988555788055
+     "lower": 35,
+     "upper": 48
     },
     "transparency": {
-     "lower": 61.670931345057326,
-     "upper": 83.42605034099614
+     "lower": 62,
+     "upper": 83
     },
     "warmth": {
-     "lower": 16.197025234606237,
-     "upper": 24.708287631595617
+     "lower": 16,
+     "upper": 25
     },
     "conviction": {
-     "lower": 87.49780241165136,
-     "upper": 96.49738670100791
+     "lower": 87,
+     "upper": 96
     },
     "imagination": {
-     "lower": 12.80286847269481,
-     "upper": 22.06512064548297
+     "lower": 13,
+     "upper": 22
     },
     "slop": {
-     "lower": 30.078991982988974,
-     "upper": 38.13970398305523
+     "lower": 30,
+     "upper": 38
     }
    }
   },
@@ -107270,6 +107370,7 @@
    "financeAndAccounting": 28.2547617785423,
    "strategyAndOps": 21.9868598116126,
    "legal": 29.4349629263954,
+   "healthcareAndMedical": 25.3787580197429,
    "engineering": 30.5472198556464,
    "economics": 40.4705703197405
   },
@@ -108526,6 +108627,7 @@
    "financeAndAccounting": 19.7169055227078,
    "strategyAndOps": 13.6240542332582,
    "legal": 21.7592482824834,
+   "healthcareAndMedical": 18.347969924962,
    "engineering": 23.7876427644644,
    "economics": 31.0003914504171
   },
@@ -111542,7 +111644,7 @@
    "financeAndAccounting": 27.032006869814,
    "strategyAndOps": 20.2033878082513,
    "legal": 29.6312806634602,
-   "healthcareAndMedical": 25.5230181804874,
+   "healthcareAndMedical": 24.9396848471541,
    "engineering": 28.5979881527496,
    "economics": 40.5266339179773
   },
@@ -113075,7 +113177,7 @@
    "financeAndAccounting": 23.5211345387932,
    "strategyAndOps": 16.2775396226725,
    "legal": 26.9174723194434,
-   "healthcareAndMedical": 21.1122369027518,
+   "healthcareAndMedical": 21.4455702360851,
    "engineering": 25.6184768899775,
    "economics": 35.8931169099475
   },
@@ -113766,6 +113868,7 @@
    "financeAndAccounting": 8.86667086997702,
    "strategyAndOps": 7.49177272410603,
    "legal": 11.044922264807,
+   "healthcareAndMedical": 10.1120440216812,
    "engineering": 11.9305792400371,
    "economics": 13.0421848934198
   },
@@ -114291,6 +114394,7 @@
    "financeAndAccounting": 8.72972341725294,
    "strategyAndOps": 8.07702647235086,
    "legal": 9.68446609638666,
+   "healthcareAndMedical": 9.60311600247059,
    "engineering": 10.6848389249305,
    "economics": 13.5899241581711
   },
@@ -114870,6 +114974,7 @@
    "financeAndAccounting": 6.74630396904387,
    "strategyAndOps": 4.70810089418579,
    "legal": 8.22019439591376,
+   "healthcareAndMedical": 7.12252408509547,
    "engineering": 10.1139318813716,
    "economics": 11.8475077232005
   },
@@ -115813,6 +115918,7 @@
    "financeAndAccounting": 38.6461684483269,
    "strategyAndOps": 36.7360645939918,
    "legal": 42.6689695704114,
+   "healthcareAndMedical": 36.2307956863415,
    "engineering": 37.7982915167394,
    "economics": 47.8196482082175
   },
@@ -116121,7 +116227,7 @@
    "financeAndAccounting": 44.3251569883984,
    "strategyAndOps": 42.8192089907344,
    "legal": 46.7990844472539,
-   "healthcareAndMedical": 43.8070541075694,
+   "healthcareAndMedical": 40.2237207742361,
    "engineering": 41.577412634153,
    "economics": 52.8822528382762
   },
@@ -116431,7 +116537,7 @@
    "financeAndAccounting": 49.7560357285637,
    "strategyAndOps": 51.2045791404763,
    "legal": 50.948198406155,
-   "healthcareAndMedical": 49.6912519301107,
+   "healthcareAndMedical": 45.2745852634441,
    "engineering": 49.3766967761155,
    "economics": 56.2768133109361
   },
@@ -116688,36 +116794,36 @@
    },
    "indexIntervals": {
     "expressiveness": {
-     "lower": 60.431247320285664,
-     "upper": 67.5032183109333
+     "lower": 60,
+     "upper": 68
     },
     "organization": {
-     "lower": 47.80089109474684,
-     "upper": 69.9430172882035
+     "lower": 48,
+     "upper": 70
     },
     "informativeness": {
-     "lower": 92.78960032578551,
+     "lower": 93,
      "upper": 100
     },
     "transparency": {
-     "lower": 35.90638294866138,
-     "upper": 50.66792464556108
+     "lower": 36,
+     "upper": 51
     },
     "warmth": {
-     "lower": 92.06322189397794,
-     "upper": 99.48068786614775
+     "lower": 92,
+     "upper": 99
     },
     "conviction": {
-     "lower": 67.21834848036464,
-     "upper": 88.65634806124186
+     "lower": 67,
+     "upper": 89
     },
     "imagination": {
-     "lower": 96.57701669806916,
+     "lower": 97,
      "upper": 100
     },
     "slop": {
-     "lower": 69.74574020801063,
-     "upper": 85.65521559501857
+     "lower": 70,
+     "upper": 86
     }
    }
   },
@@ -116861,6 +116967,7 @@
    "financeAndAccounting": 47.7886665428201,
    "strategyAndOps": 49.0634281871943,
    "legal": 48.8386274913882,
+   "healthcareAndMedical": 43.2885049460213,
    "engineering": 45.6196515755329,
    "economics": 54.8654078429101
   },
@@ -117450,9 +117557,9 @@
    "financeAndAccounting": 13.1565121972923,
    "strategyAndOps": 9.11470048627142,
    "legal": 12.7964279514393,
-   "healthcareAndMedical": 10.7644843055634,
    "engineering": 17.0254230107242,
-   "economics": 20.5593203583565
+   "economics": 20.5593203583565,
+   "healthcareAndMedical": 10.7644843055634
   },
   "omniscience": -41.5,
   "omniscienceAccuracy": 0.24316666666666667,
@@ -117730,7 +117837,10 @@
   "outputModalityImage": false,
   "outputModalitySpeech": false,
   "outputModalityVideo": false,
-  "modelCreatorName": "NVIDIA"
+  "modelCreatorName": "NVIDIA",
+  "carriedDetailFills": [
+   "capabilities"
+  ]
  },
  {
   "id": "5ad2f60f-ee05-49fd-85a0-cef69aa7cb7b",
@@ -118255,6 +118365,7 @@
    "financeAndAccounting": 9.99184397593342,
    "strategyAndOps": 6.40786081969836,
    "legal": 11.2064322149686,
+   "healthcareAndMedical": 10.2047823454672,
    "engineering": 13.3638571428571,
    "economics": 16.024
   },
@@ -121153,6 +121264,7 @@
    "financeAndAccounting": 11.3123738507062,
    "strategyAndOps": 7.94031192566478,
    "legal": 11.7518330041246,
+   "healthcareAndMedical": 10.5254559559542,
    "engineering": 14.9666519925857,
    "economics": 17.6155213160334
   },
@@ -121617,6 +121729,7 @@
    "financeAndAccounting": 8.61633729055416,
    "strategyAndOps": 5.58187565128833,
    "legal": 9.39686156803129,
+   "healthcareAndMedical": 6.95586277165484,
    "engineering": 11.7359526016153,
    "economics": 14.5072227371023
   },
@@ -123246,6 +123359,7 @@
    "financeAndAccounting": 21.2843757105686,
    "strategyAndOps": 16.8682212939358,
    "legal": 23.2929727547373,
+   "healthcareAndMedical": 19.3324120048956,
    "engineering": 23.258317032967,
    "economics": 31.3959022435898
   },
@@ -123910,6 +124024,7 @@
    "financeAndAccounting": 31.2952967635495,
    "strategyAndOps": 25.6398907061962,
    "legal": 35.3984745770862,
+   "healthcareAndMedical": 28.6502502483828,
    "engineering": 33.3675779503629,
    "economics": 43.6375996872104
   },
@@ -124214,7 +124329,7 @@
    "financeAndAccounting": 40.3313026749299,
    "strategyAndOps": 42.1561264819066,
    "legal": 41.5288606278247,
-   "healthcareAndMedical": 38.3662725928727,
+   "healthcareAndMedical": 39.3662725928727,
    "engineering": 40.7596482363019,
    "economics": 48.513546010967
   },
