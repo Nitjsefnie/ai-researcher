@@ -48,6 +48,7 @@ import urllib.error
 import urllib.request
 import zipfile
 from dataclasses import dataclass
+from importlib import metadata
 from pathlib import Path
 
 # cdn.playwright.dev is the registry's primary host. The CFT (Chrome for
@@ -80,6 +81,7 @@ INSTALLATION_COMPLETE = "INSTALLATION_COMPLETE"
 # playwright's INSTALLATION_COMPLETE but no matching DIGEST_VERIFIED is an
 # UNVERIFIED install -- it is replaced, never trusted.
 PROVENANCE_FILE = "DIGEST_VERIFIED"
+APT_ARCHIVES = Path("/var/cache/apt/archives")
 
 # The committed digest table: (browser name, playwright revision) -> sha256
 # of the archive cdn.playwright.dev serves for that revision. Observed by
@@ -493,6 +495,75 @@ def seed_product(root: Path, product: Product,
     return outcome
 
 
+def dependency_packages() -> list[str]:
+    """Resolve missing packages, including transitive deps, via apt simulation."""
+    result = subprocess.run(
+        [sys.executable, "-m", "playwright", "install-deps", "--dry-run",
+         "chromium"], capture_output=True, encoding="utf-8", check=False)
+    output = result.stdout.strip()
+    if result.returncode == 0 and output == "All system dependencies are installed.":
+        return []
+    lines = output.splitlines()
+    header = re.fullmatch(r"Missing system dependencies \((\d+)\):", lines[0]) \
+        if lines else None
+    packages = [line.strip() for line in lines[1:]]
+    if result.returncode != 1 or header is None \
+            or int(header[1]) != len(packages) or not packages \
+            or any(not re.fullmatch(r"[a-z0-9][a-z0-9+.-]*(?::[a-z0-9-]+)?", name)
+                   for name in packages):
+        raise InstallError(f"playwright dependency dry-run could not resolve packages: "
+                           f"{result.stderr or output}")
+    return sorted(set(packages))
+
+
+def install_with_cached_deps(root: Path, cache: Path) -> None:
+    """Install local debs when complete; retain Playwright's fallback and validation."""
+    packages: set[str] = set()
+    key = ""
+    try:
+        resolved = sorted(dependency_packages())
+        key = hashlib.sha256(json.dumps(
+            [metadata.version("playwright"), resolved]).encode("utf-8")).hexdigest()
+        print(f"apt-deb cache key: {key}", flush=True)
+        packages = {name.split(":", 1)[0] for name in resolved}
+        if packages:
+            cache.mkdir(parents=True, exist_ok=True)
+            cached = sorted(path for path in cache.glob("*.deb")
+                            if path.name.split("_", 1)[0] in packages)
+            marker = cache / "cache-key"
+            if marker.is_file() and marker.read_text(encoding="utf-8") == key \
+                    and packages <= {path.name.split("_", 1)[0] for path in cached}:
+                result = subprocess.run(
+                    ["sudo", "cp", "--", *[str(path.resolve()) for path in cached],
+                     str(APT_ARCHIVES)],
+                    check=False)
+                if result.returncode == 0:
+                    result = subprocess.run(
+                        ["sudo", "apt-get", "install", "-y", "--no-install-recommends",
+                         "--no-download", *resolved], check=False)
+                if result.returncode != 0:
+                    print("apt-deb cache install failed; using Playwright's apt fallback",
+                          file=sys.stderr, flush=True)
+    except (InstallError, OSError, UnicodeError, metadata.PackageNotFoundError) as error:
+        print(f"apt-deb cache unavailable ({error}); using Playwright's apt fallback",
+              file=sys.stderr, flush=True)
+
+    # shortcut: --with-deps still updates apt; split that step if metadata fetches stall.
+    run_playwright_install(root)
+
+    if packages and key:
+        try:
+            debs = sorted(path for path in APT_ARCHIVES.glob("*.deb")
+                          if path.name.split("_", 1)[0] in packages)
+            if packages <= {path.name.split("_", 1)[0] for path in debs}:
+                for path in debs:
+                    shutil.copyfile(path, cache / path.name)
+                (cache / "cache-key").write_text(key, encoding="utf-8")
+        except OSError as error:
+            print(f"apt-deb cache backfill unavailable ({error})",
+                  file=sys.stderr, flush=True)
+
+
 def run_playwright_install(root: Path) -> None:
     """Run playwright's own install against the pre-seeded directory.
 
@@ -569,7 +640,11 @@ def main(argv=None) -> int:
                     "the committed table in this file, pre-seed the browsers "
                     "directory, then run playwright install --with-deps "
                     "chromium (which then downloads nothing).")
-    parser.parse_args(argv)
+    parser.add_argument(
+        "--deps-cache", type=Path,
+        default=Path.home() / ".cache" / "ai-researcher-playwright-debs",
+        help="Directory holding cached apt dependency debs")
+    args = parser.parse_args(argv)
 
     try:
         registry = load_registry(find_browsers_json())
@@ -580,7 +655,7 @@ def main(argv=None) -> int:
         inodes = {install_dir(root, product).name:
                   install_dir(root, product).stat().st_ino
                   for product in products}
-        run_playwright_install(root)
+        install_with_cached_deps(root, args.deps_cache)
         assert_seeded_intact(root, products, inodes)
     except InstallError as error:
         print(str(error), file=sys.stderr)

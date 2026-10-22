@@ -196,6 +196,13 @@ jobs:
         run: |
           python3 -m pip install -r requirements-test.txt
 
+      # PR coverage restores main's debs; it never saves PR-authored caches.
+      - name: Cache Chromium dependency debs
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/ai-researcher-playwright-debs
+          key: chromium-debs-${{ runner.os }}-${{ hashFiles('requirements-test.txt') }}
+
       - name: Install Chromium for playwright
         # The browser binary is not a pip package, and playwright's own
         # installer performs no integrity check: browsers.json publishes no
