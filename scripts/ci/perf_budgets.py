@@ -292,7 +292,10 @@ def _row_regions(raw):
     the caller excises them to weigh the code alone.
     """
     start = raw.index(_DATA_START) + len(_DATA_START)
-    end = raw.index(_DATA_END, start)
+    try:
+        end = raw.index(_DATA_END, start)
+    except ValueError:
+        end = raw.index(_DATA_END.replace(b'\n', b'\r\n'), start)
     spans = [(start, end)]
     for table_id in _TABLE_IDS:
         table_at = raw.index(f'id="{table_id}"'.encode())

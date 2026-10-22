@@ -44,6 +44,18 @@ def _load(name):
 perf = _load("perf_budgets")
 
 
+@pytest.mark.parametrize("newline", [b"\n", b"\r\n"])
+def test_code_bytes_excludes_row_regions_with_lf_or_crlf(newline):
+    raw = (b'const DATA = {"rows":[1,2]};\n(function(){\n'
+           b'<table id="fTable"><tbody>frontier rows</tbody></table>\n'
+           b'<table id="tbl"><tbody>all rows</tbody></table>\n')
+    chrome = (b'const DATA = ;\n(function(){\n'
+              b'<table id="fTable"></table>\n'
+              b'<table id="tbl"></table>\n')
+    assert perf.code_bytes(raw.replace(b"\n", newline)) == len(
+        chrome.replace(b"\n", newline))
+
+
 @pytest.mark.parametrize("failure", [False, True])
 def test_measure_owns_driver_and_browser_temp(tmp_path, monkeypatch, failure):
     """Exercise measure's wiring without importing or installing Playwright."""
