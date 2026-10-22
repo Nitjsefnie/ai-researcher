@@ -18,7 +18,7 @@ def test_run_step_removes_leaked_temp_files(tmp_path, status):
     probe.mkdir()
     workdir = tmp_path / 'work'
     workdir.mkdir()
-    entry = {'run': 'mktemp > /dev/null\n'
+    entry = {'run': 'mktemp "$TMPDIR/tmp.XXXXXXXXXX" > /dev/null\n'
              '"$TEST_PYTHON" -c \'import os; from pathlib import Path; '
              'p = Path(os.environ["TMPDIR"]); assert any(p.iterdir()); print(p)\'\n'
              f'exit {status}\n'}
@@ -46,7 +46,8 @@ def test_run_step_removes_temp_files_after_timeout(tmp_path):
     probe.mkdir()
     workdir = tmp_path / 'work'
     workdir.mkdir()
-    entry = {'run': 'mktemp\nexec "$TEST_PYTHON" -c "import time; time.sleep(30)"\n'}
+    entry = {'run': 'mktemp "$TMPDIR/tmp.XXXXXXXXXX"\n'
+             'exec "$TEST_PYTHON" -c "import time; time.sleep(30)"\n'}
     env = {**os.environ, 'TMPDIR': str(probe), 'TEST_PYTHON': sys.executable}
     real_run = subprocess.run
 

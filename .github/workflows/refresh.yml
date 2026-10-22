@@ -233,7 +233,8 @@ jobs:
         # step's `captured` verdict through it (issue #103).
         id: fetch
         run: |
-          fetch_err="$(mktemp)"
+          # Explicit templates keep macOS mktemp inside TMPDIR too.
+          fetch_err="$(mktemp "${TMPDIR:-/tmp}/tmp.XXXXXXXXXX")"
           trap 'rm -f "$fetch_err"' EXIT
           set +e
           python3 scripts/fetch_aa.py --cross-run-lookback 2> "$fetch_err"
@@ -1031,7 +1032,7 @@ jobs:
           # before, an extra version costs less than a stale page. The
           # summary names both stamps, so a republish hour says which
           # commit the hub was behind to.
-          live_page="$(mktemp)"
+          live_page="$(mktemp "${TMPDIR:-/tmp}/tmp.XXXXXXXXXX")"
           # Later scratch files may not exist when an early exit runs cleanup.
           trap 'rm -f "$live_page" "${publish_response:-}"' EXIT
           live_stamp="the hub could not be fetched"
@@ -1066,7 +1067,7 @@ jobs:
           cp "${RUNNER_TEMP}/publish-payload/tree/out/frontier-models.html" \
             "${page_dir}/out/frontier-models.html"
           cd "${page_dir}"
-          publish_response="$(mktemp)"
+          publish_response="$(mktemp "${TMPDIR:-/tmp}/tmp.XXXXXXXXXX")"
           code="$(curl -sS --connect-timeout 10 --max-time 120 \
             -o "$publish_response" -w '%{http_code}' \
             -H "x-docs-key: ${DOCS_HUB_API_KEY}" \
@@ -1256,7 +1257,7 @@ jobs:
           # The byte tie is verification: main's committed page must be read
           # successfully and match the artifact before any upload. Unverifiable
           # or different bytes concede; the next hourly run rebuilds and self-heals.
-          main_page="$(mktemp)"
+          main_page="$(mktemp "${TMPDIR:-/tmp}/tmp.XXXXXXXXXX")"
           # Later scratch files may not exist when an early exit runs cleanup.
           trap 'rm -f "$main_page" "${live_page:-}" "${publish_response:-}"' EXIT
           if ! git -C "${scratch}" fetch --quiet origin main ||
@@ -1276,7 +1277,7 @@ jobs:
           # After the tie, this live-page check only avoids duplicate uploads.
           # Its fetch failure still uploads: the verified artifact bytes equal
           # main's committed page, so the failure cannot publish uncommitted bytes.
-          live_page="$(mktemp)"
+          live_page="$(mktemp "${TMPDIR:-/tmp}/tmp.XXXXXXXXXX")"
           if curl -fsS --connect-timeout 10 --max-time 30 \
                https://docs.nitjsefni.eu/d/ai-researcher/trending-rankings \
                -o "$live_page"; then
@@ -1295,7 +1296,7 @@ jobs:
           cp "${RUNNER_TEMP}/rankings-page/trending-rankings.html" \
             "${page_dir}/out/trending-rankings.html"
           cd "${page_dir}"
-          publish_response="$(mktemp)"
+          publish_response="$(mktemp "${TMPDIR:-/tmp}/tmp.XXXXXXXXXX")"
           code="$(curl -sS --connect-timeout 10 --max-time 120 \
             -o "$publish_response" -w '%{http_code}' \
             -H "x-docs-key: ${DOCS_HUB_API_KEY}" \
