@@ -87,3 +87,30 @@ def test_output_appends_without_clobbering(cache_module, tmp_path, monkeypatch):
     monkeypatch.delenv('GITHUB_OUTPUT')
     cache_module.emit_output('cache-changed', 'true')
     assert output.read_text(encoding='utf-8').count('cache-changed=') == 1
+
+
+@pytest.mark.parametrize('filename, complete', [
+    ('valgrind_2_amd64.deb', False),
+    ('valgrind_1%3a2_amd64.deb', True),
+    ('valgrind_1%3A2_amd64.deb', True),
+    ('valgrind_1%3a3_amd64.deb', False),
+    ('valgrind_broken.deb', False),
+])
+def test_exact_backfill_requires_every_resolved_version(
+        cache_module, tmp_path, monkeypatch, filename, complete):
+    archives, cache = tmp_path / 'archives', tmp_path / 'cache'
+    archives.mkdir()
+    cache.mkdir()
+    for name in (filename, 'liba_3_amd64.deb', 'liba_4_amd64.deb', 'other_1_amd64.deb'):
+        (archives / name).write_bytes(name.encode('utf-8'))
+    monkeypatch.setattr(cache_module, 'APT_ARCHIVES', archives)
+    assert cache_module.backfill(
+        cache, {'liba', 'valgrind'}, 'identity',
+        resolved={('liba', '3'), ('valgrind', '1:2')}) == complete
+    if complete:
+        assert sorted(path.name for path in cache.glob('*.deb')) == sorted([
+            filename, 'liba_3_amd64.deb'])
+        assert (cache / filename).read_bytes() == filename.encode('utf-8')
+        assert (cache / 'cache-key').read_text(encoding='utf-8') == 'identity'
+    else:
+        assert not list(cache.iterdir())

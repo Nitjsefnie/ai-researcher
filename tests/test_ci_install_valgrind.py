@@ -135,12 +135,13 @@ def test_present_guard_has_no_outputs_or_subprocesses(installer, environment):
     assert not env.cache.exists()
 
 
-def test_miss_backfills_and_warm_hit_never_updates(installer, environment, capsys):
+def test_miss_backfills_and_updated_warm_hit_installs_offline(installer, environment, capsys):
     env = environment
     assert installer.main(['--deps-cache', str(env.cache)]) == 0
-    assert env.state.calls[1:] == [
-        ['sudo', 'apt-get', 'update'],
-        ['sudo', 'apt-get', 'install', '-y', '--no-install-recommends', 'valgrind']]
+    assert env.state.calls[0] == ['sudo', 'apt-get', 'update']
+    assert '-s' in env.state.calls[1]
+    assert env.state.calls[2] == [
+        'sudo', 'apt-get', 'install', '-y', '--no-install-recommends', *RESOLVED]
     assert env.state.configs == [True]
     assert sorted(path.name for path in env.cache.glob('*.deb')) == sorted(
         path.name for path in env.archives.glob('*.deb'))
@@ -151,11 +152,12 @@ def test_miss_backfills_and_warm_hit_never_updates(installer, environment, capsy
     env.state.calls.clear()
     env.state.configs.clear()
     assert installer.main(['--deps-cache', str(env.cache)]) == 0
-    assert len(env.state.calls) == 3
-    assert 'cp' in env.state.calls[1]
-    assert env.state.calls[2] == ['sudo', 'apt-get', 'install', '-y',
+    assert len(env.state.calls) == 4
+    assert env.state.calls[0] == ['sudo', 'apt-get', 'update']
+    assert 'cp' in env.state.calls[2]
+    assert env.state.calls[3] == ['sudo', 'apt-get', 'install', '-y',
                                   '--no-install-recommends', '--no-download', *RESOLVED]
-    assert env.state.configs == []
+    assert env.state.configs == [True]
     assert 'cache-changed' not in env.output.read_text(encoding='utf-8')
     assert 'cache' in capsys.readouterr().out
 
@@ -188,9 +190,10 @@ def test_cache_failures_degrade_to_mirror(installer, environment, monkeypatch,
         monkeypatch.setattr(installer, 'dependency_packages', resolve)
     env.state.calls.clear()
     assert installer.main(['--deps-cache', str(env.cache)]) == 0
-    assert env.state.calls[-2:] == [
-        ['sudo', 'apt-get', 'update'],
-        ['sudo', 'apt-get', 'install', '-y', '--no-install-recommends', 'valgrind']]
+    assert env.state.calls[0] == ['sudo', 'apt-get', 'update']
+    targets = ['valgrind'] if failure in ('resolver', 'empty') else RESOLVED
+    assert env.state.calls[-1] == [
+        'sudo', 'apt-get', 'install', '-y', '--no-install-recommends', *targets]
     if failure not in ('partial',):
         assert capsys.readouterr().err
 
@@ -228,6 +231,9 @@ def test_nonzero_only_when_valgrind_remains_absent(
         monkeypatch.setattr(installer.subprocess, 'run', fail)
     assert installer.main(['--deps-cache', str(env.cache)]) != 0
     assert not (env.cache / 'cache-key').exists()
+    if failure == 'update':
+        assert env.state.calls == [['sudo', 'apt-get', 'update']]
+        assert not env.output.exists()
 
 
 def test_failed_mirror_with_binary_present_exits_zero_without_publishing_repair(
@@ -245,3 +251,69 @@ def test_failed_mirror_with_binary_present_exits_zero_without_publishing_repair(
     assert installer.main(['--deps-cache', str(env.cache)]) == 0
     assert not (env.cache / 'cache-key').exists()
     assert 'cache-changed' not in env.output.read_text(encoding='utf-8')
+
+
+def test_update_drift_repairs_new_identity_then_restores_it(
+        installer, environment, monkeypatch):
+    env = environment
+    state = env.state
+    candidate = '1'
+    installs = []
+
+    def run(command, **kwargs):
+        nonlocal candidate
+        state.calls.append(command)
+        if 'update' in command:
+            candidate = '2'
+        elif '-s' in command:
+            return SimpleNamespace(
+                returncode=0, stderr='', stdout=(
+                    '0 upgraded, 1 newly installed, 0 to remove and 0 not upgraded.\n'
+                    f'Inst valgrind ({candidate} Debian:13.7/stable [amd64])\n'))
+        elif 'cp' in command:
+            for source in command[3:-1]:
+                shutil.copyfile(source, env.archives / Path(source).name)
+        elif 'install' in command:
+            installs.append(command)
+            if '--no-download' in command:
+                assert (env.archives / f'valgrind_{candidate}_amd64.deb').is_file()
+            else:
+                (env.archives / f'valgrind_{candidate}_amd64.deb').write_bytes(b'new version')
+            state.present = True
+        return SimpleNamespace(returncode=0)
+
+    monkeypatch.setattr(installer.subprocess, 'run', run)
+    new_key = hashlib.sha256(json.dumps(['valgrind=2']).encode('utf-8')).hexdigest()
+    for warm in (False, True):
+        candidate = '1'
+        state.present = False
+        state.calls.clear()
+        env.output.write_text('', encoding='utf-8')
+        assert installer.main(['--deps-cache', str(env.cache)]) == 0
+        assert (env.cache / 'cache-key').read_text(encoding='utf-8') == new_key
+        outputs = env.output.read_text(encoding='utf-8').splitlines()
+        assert f'cache-key={new_key}' in outputs
+        assert ('cache-changed=true' in outputs) != warm
+        assert state.calls[0] == ['sudo', 'apt-get', 'update']
+        assert '-s' in state.calls[1]
+        assert installs[-1][-1] == 'valgrind=2'
+        assert ('--no-download' in installs[-1]) == warm
+
+
+def test_version_mismatch_in_backfill_is_loud_and_never_published(
+        installer, environment, monkeypatch, capsys):
+    env = environment
+    run = installer.subprocess.run
+
+    def wrong_version(command, **kwargs):
+        result = run(command, **kwargs)
+        if command[:3] == ['sudo', 'apt-get', 'install']:
+            archive = env.archives / 'valgrind_1%3a3.24.0-3_amd64.deb'
+            archive.rename(env.archives / 'valgrind_2_amd64.deb')
+        return result
+
+    monkeypatch.setattr(installer.subprocess, 'run', wrong_version)
+    assert installer.main(['--deps-cache', str(env.cache)]) == 0
+    assert not (env.cache / 'cache-key').exists()
+    assert 'cache-changed' not in env.output.read_text(encoding='utf-8')
+    assert 'backfill' in capsys.readouterr().err
