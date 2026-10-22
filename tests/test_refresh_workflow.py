@@ -626,12 +626,8 @@ class GateTests(unittest.TestCase):  # pylint: disable=too-many-public-methods
         self.assertIn('base.txt")" =', run)
 
     def test_the_fetch_runs_above_the_installs_which_gate_on_proceed(self):
-        # Issue 59: pip + Chromium install burned 40-50 s on the large
-        # majority of runs whose capture is unchanged. fetch_aa.py is pure
-        # stdlib (it imports build.py, which is too), so it captures first,
-        # above the installs; the installs gate on `proceed` -- not
-        # `changed` -- so a republish run still installs the toolchain the
-        # suite runs under.
+        # Capture needs only stdlib and runs first to avoid installs on quiet hours.
+        # `proceed` still installs the toolchain for a republish.
         names = [s.get("name") for s in self.wf["jobs"]["refresh"]["steps"]]
 
         self.assertLess(names.index("Capture the leaderboard"),
@@ -658,15 +654,22 @@ class GateTests(unittest.TestCase):  # pylint: disable=too-many-public-methods
 
     def test_chromium_debs_cache_saves_only_when_chromium_is_needed(self):
         steps = self.wf["jobs"]["refresh"]["steps"]
-        [cache] = [entry for entry in steps
-                   if entry.get("uses", "").split("@", 1)[0].startswith(
-                       "actions/cache")]
-        self.assertEqual(cache["uses"].split("@", 1)[0], "actions/cache")
+        caches = {entry["uses"].split("@", 1)[0]: entry for entry in steps
+                  if entry.get("uses", "").split("@", 1)[0].startswith(
+                      "actions/cache")}
+        self.assertEqual(set(caches), {"actions/cache/restore", "actions/cache/save"})
+        restore, save = caches["actions/cache/restore"], caches["actions/cache/save"]
         chromium = step(self.wf, "Install Chromium for playwright")
-        self.assertEqual(cache["if"], chromium["if"])
-        self.assertLess(steps.index(cache), steps.index(chromium))
+        output = f"steps.{chromium['id']}.outputs.cache-key"
+        self.assertEqual(restore["if"], chromium["if"])
+        self.assertEqual(flattened(save["if"]), f"{chromium['if']} && {output} != ''")
+        prefix = restore["with"]["restore-keys"]
+        self.assertEqual(save["with"]["key"], prefix + "${{ " + output + " }}")
+        self.assertEqual(save["with"]["path"], restore["with"]["path"])
+        self.assertLess(steps.index(restore), steps.index(chromium))
+        self.assertLess(steps.index(chromium), steps.index(save))
         self.assertLess(steps.index(step(self.wf, "Capture the leaderboard")),
-                        steps.index(cache))
+                        steps.index(restore))
 
     def test_the_hub_ties_the_upload_to_one_commit(self):
         # The tie is ENFORCED, not asserted: the upload runs only when the

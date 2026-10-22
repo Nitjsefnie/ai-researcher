@@ -442,15 +442,17 @@ jobs:
         run: |
           python3 -m pip install -r requirements-test.txt
 
-      # Main refresh warms the shared apt archives for both Chromium consumers.
+      # Restore the newest snapshot; save by the install's resolved environment below.
       - name: Cache Chromium dependency debs
         if: steps.capture.outputs.proceed == 'true'
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ~/.cache/ai-researcher-playwright-debs
-          key: chromium-debs-${{ runner.os }}-${{ hashFiles('requirements-test.txt') }}
+          key: chromium-debs-${{ runner.os }}-${{ github.run_id }}
+          restore-keys: chromium-debs-${{ runner.os }}-
 
       - name: Install Chromium for playwright
+        id: chromium
         if: steps.capture.outputs.proceed == 'true'
         # The browser binary is not a pip package, and playwright's own
         # installer performs no integrity check: browsers.json publishes no
@@ -464,6 +466,13 @@ jobs:
         # here it produces the page the suite verifies -- nothing a read-only
         # job builds can touch main or the hub.
         run: python3 scripts/ci/install_chromium.py
+
+      - name: Save Chromium dependency debs
+        if: steps.capture.outputs.proceed == 'true' && steps.chromium.outputs.cache-key != ''
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/ai-researcher-playwright-debs
+          key: chromium-debs-${{ runner.os }}-${{ steps.chromium.outputs.cache-key }}
 
       - name: Summarise what changed
         # Runs on `proceed`, not `changed`: this is the ONLY step that executes
