@@ -61,6 +61,17 @@ def main(argv=None) -> int:
         print('valgrind is already present; skipping installation')
         return 0
 
+    apt_deb_cache.configure_apt_acquire()
+    try:
+        result = subprocess.run(['sudo', 'apt-get', 'update'], check=False)
+        if result.returncode != 0:
+            raise OSError(f'apt-get update exited {result.returncode}')
+    except OSError as error:
+        print(f'valgrind mirror update unavailable ({error})', file=sys.stderr)
+        return int(shutil.which('valgrind') is None)
+
+    resolved = []
+    versions: set[tuple[str, str]] = set()
     packages: set[str] = set()
     key = ''
     try:
@@ -70,7 +81,9 @@ def main(argv=None) -> int:
         key = dependency_key(resolved)
         print(f'apt-deb cache key: {key}', flush=True)
         apt_deb_cache.emit_output('cache-key', key)
-        packages = {item.split('=', 1)[0].split(':', 1)[0] for item in resolved}
+        versions = {(name.split(':', 1)[0], version)
+                    for name, version in (item.split('=', 1) for item in resolved)}
+        packages = {name for name, _ in versions}
         args.deps_cache.mkdir(parents=True, exist_ok=True)
         cached = apt_deb_cache.cached_debs(args.deps_cache, packages, key)
         if cached:
@@ -83,14 +96,11 @@ def main(argv=None) -> int:
         print(f'apt-deb cache unavailable ({error}); using the valgrind mirror fallback',
               file=sys.stderr, flush=True)
 
-    apt_deb_cache.configure_apt_acquire()
     mirror_succeeded = False
     try:
-        result = subprocess.run(['sudo', 'apt-get', 'update'], check=False)
-        if result.returncode == 0:
-            result = subprocess.run(
-                ['sudo', 'apt-get', 'install', '-y', '--no-install-recommends', 'valgrind'],
-                check=False)
+        result = subprocess.run(
+            ['sudo', 'apt-get', 'install', '-y', '--no-install-recommends',
+             *(resolved or ['valgrind'])], check=False)
         mirror_succeeded = result.returncode == 0
         if result.returncode != 0:
             print(f'valgrind mirror install exited {result.returncode}', file=sys.stderr)
@@ -102,8 +112,11 @@ def main(argv=None) -> int:
 
     if mirror_succeeded and packages and key:
         try:
-            if apt_deb_cache.backfill(args.deps_cache, packages, key):
+            if apt_deb_cache.backfill(args.deps_cache, packages, key, resolved=versions):
                 apt_deb_cache.emit_output('cache-changed', 'true')
+            else:
+                print('apt-deb cache backfill incomplete for the resolved versions; '
+                      'not publishing a repair', file=sys.stderr, flush=True)
         except OSError as error:
             print(f'apt-deb cache backfill unavailable ({error})', file=sys.stderr, flush=True)
     print('valgrind installed through the mirror fallback')
