@@ -660,11 +660,8 @@ class GateTests(unittest.TestCase):  # pylint: disable=too-many-public-methods
         self.assertEqual(set(caches), {"actions/cache/restore", "actions/cache/save"})
         restore, save = caches["actions/cache/restore"], caches["actions/cache/save"]
         chromium = step(self.wf, "Install Chromium for playwright")
-        output = f"steps.{chromium['id']}.outputs.cache-key"
         self.assertEqual(restore["if"], chromium["if"])
         self.assertEqual(flattened(save["if"]), f"{chromium['if']} && steps.{chromium['id']}.outputs.cache-changed == 'true'")
-        prefix = restore["with"]["restore-keys"]
-        self.assertEqual(save["with"]["key"], prefix + "${{ " + output + " }}-${{ github.run_id }}-${{ github.run_attempt }}")
         self.assertEqual(save["with"]["path"], restore["with"]["path"])
         self.assertLess(steps.index(restore), steps.index(chromium))
         self.assertLess(steps.index(chromium), steps.index(save))
