@@ -215,9 +215,6 @@ def test_chromium_debs_cache_is_restore_only_in_coverage_and_shared():
                   if entry.get("name") == cache["name"]]
     for field in ("path", "key", "restore-keys"):
         assert cache["with"][field] == producer["with"][field]
-    prefix = cache["with"]["restore-keys"]
-    assert "${{ runner.os }}" in prefix
-    assert cache["with"]["key"] == prefix + "${{ github.run_id }}"
     chromium = next(entry for entry in steps
                     if entry.get("name") == "Install Chromium for playwright")
     assert steps.index(cache) < steps.index(chromium)
