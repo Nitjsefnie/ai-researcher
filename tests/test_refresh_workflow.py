@@ -655,8 +655,8 @@ class GateTests(unittest.TestCase):  # pylint: disable=too-many-public-methods
     def test_chromium_debs_cache_saves_only_when_chromium_is_needed(self):
         steps = self.wf["jobs"]["refresh"]["steps"]
         caches = {entry["uses"].split("@", 1)[0]: entry for entry in steps
-                  if entry.get("uses", "").split("@", 1)[0].startswith(
-                      "actions/cache")}
+                  if entry.get("name") in ("Cache Chromium dependency debs",
+                                           "Save Chromium dependency debs")}
         self.assertEqual(set(caches), {"actions/cache/restore", "actions/cache/save"})
         restore, save = caches["actions/cache/restore"], caches["actions/cache/save"]
         chromium = step(self.wf, "Install Chromium for playwright")

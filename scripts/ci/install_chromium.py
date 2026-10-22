@@ -51,6 +51,11 @@ from dataclasses import dataclass
 from importlib import metadata
 from pathlib import Path
 
+if __package__:
+    from . import apt_deb_cache
+else:
+    apt_deb_cache = importlib.import_module("apt_deb_cache")
+
 # cdn.playwright.dev is the registry's primary host. The CFT (Chrome for
 # Testing) paths 307-redirect to Google's chrome-for-testing-public bucket;
 # the digest pins the bytes, so the redirect target is verified like any
@@ -81,7 +86,6 @@ INSTALLATION_COMPLETE = "INSTALLATION_COMPLETE"
 # playwright's INSTALLATION_COMPLETE but no matching DIGEST_VERIFIED is an
 # UNVERIFIED install -- it is replaced, never trusted.
 PROVENANCE_FILE = "DIGEST_VERIFIED"
-APT_ARCHIVES = Path("/var/cache/apt/archives")
 
 # The committed digest table: (browser name, playwright revision) -> sha256
 # of the archive cdn.playwright.dev serves for that revision. Observed by
@@ -527,26 +531,13 @@ def install_with_cached_deps(root: Path, cache: Path) -> None:
         key = hashlib.sha256(json.dumps(
             [metadata.version("playwright"), resolved]).encode("utf-8")).hexdigest()
         print(f"apt-deb cache key: {key}", flush=True)
-        if output := os.environ.get("GITHUB_OUTPUT"):
-            with open(output, "a", encoding="utf-8") as handle:
-                handle.write(f"cache-key={key}\n")
+        apt_deb_cache.emit_output("cache-key", key)
         packages = {name.split(":", 1)[0] for name in resolved}
         if packages:
             cache.mkdir(parents=True, exist_ok=True)
-            cached = sorted(path for path in cache.glob("*.deb")
-                            if path.name.split("_", 1)[0] in packages)
-            marker = cache / "cache-key"
-            if marker.is_file() and marker.read_text(encoding="utf-8") == key \
-                    and packages <= {path.name.split("_", 1)[0] for path in cached}:
-                result = subprocess.run(
-                    ["sudo", "cp", "--", *[str(path.resolve()) for path in cached],
-                     str(APT_ARCHIVES)],
-                    check=False)
-                if result.returncode == 0:
-                    result = subprocess.run(
-                        ["sudo", "apt-get", "install", "-y", "--no-install-recommends",
-                         "--no-download", *resolved], check=False)
-                if result.returncode != 0:
+            cached = apt_deb_cache.cached_debs(cache, packages, key)
+            if cached:
+                if not apt_deb_cache.restore_install(cached, resolved):
                     print("apt-deb cache install failed; using Playwright's apt fallback",
                           file=sys.stderr, flush=True)
                 else:
@@ -559,46 +550,11 @@ def install_with_cached_deps(root: Path, cache: Path) -> None:
 
     if packages and key:
         try:
-            debs = sorted(path for path in APT_ARCHIVES.glob("*.deb")
-                          if path.name.split("_", 1)[0] in packages)
-            if packages <= {path.name.split("_", 1)[0] for path in debs}:
-                for path in debs:
-                    shutil.copyfile(path, cache / path.name)
-                (cache / "cache-key").write_text(key, encoding="utf-8")
-                if not deps_installed and (output := os.environ.get("GITHUB_OUTPUT")):
-                    with open(output, "a", encoding="utf-8") as handle:
-                        handle.write("cache-changed=true\n")
+            if apt_deb_cache.backfill(cache, packages, key) and not deps_installed:
+                apt_deb_cache.emit_output("cache-changed", "true")
         except OSError as error:
             print(f"apt-deb cache backfill unavailable ({error})",
                   file=sys.stderr, flush=True)
-
-
-def configure_apt_acquire(
-        fragment_dir: Path = Path("/etc/apt/apt.conf.d"),
-        sudo: tuple[str, ...] = ("sudo", "-n")) -> None:
-    """Best-effort system fragment, loaded by apt.conf(5) through sudo."""
-    # apt.conf(5): Retries; apt-transport-http(1), apt-transport-https(1): Timeout.
-    settings = ('Acquire::http::Timeout "20";\n'
-                'Acquire::https::Timeout "20";\n'
-                'Acquire::Retries "2";\n')
-    target = fragment_dir / "99ai-researcher-playwright-acquire"
-    # apt.conf(5) ignores .disabled fragments until the atomic rename succeeds.
-    staged = target.with_suffix(".disabled")
-    try:
-        with tempfile.TemporaryDirectory(prefix="playwright-apt-acquire-") as scratch:
-            source = Path(scratch) / "apt.conf"
-            source.write_text(settings, encoding="utf-8")
-            for command in (
-                    [*sudo, "install", "-T", "-m", "0644", str(source), str(staged)],
-                    [*sudo, "mv", "-T", "--", str(staged), str(target)]):
-                result = subprocess.run(command, capture_output=True,
-                                        encoding="utf-8", check=False)
-                if result.returncode != 0:
-                    raise OSError(f"{command[len(sudo)]} exited {result.returncode}: "
-                                  f"{result.stderr.strip()}")
-    except OSError as error:
-        print(f"WARNING: could not configure apt acquire limits ({error}); "
-              "continuing with apt's existing settings", file=sys.stderr, flush=True)
 
 
 def run_playwright_install(root: Path, with_deps: bool = True) -> None:
@@ -609,7 +565,7 @@ def run_playwright_install(root: Path, with_deps: bool = True) -> None:
     """
     command = [sys.executable, "-m", "playwright", "install"]
     if with_deps:
-        configure_apt_acquire()
+        apt_deb_cache.configure_apt_acquire()
         command.append("--with-deps")
     command.append("chromium")
     print(f"+ {' '.join(command)}", flush=True)

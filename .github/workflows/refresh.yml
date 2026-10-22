@@ -474,6 +474,26 @@ jobs:
           path: ~/.cache/ai-researcher-playwright-debs
           key: chromium-debs-${{ runner.os }}-${{ steps.chromium.outputs.cache-key }}-${{ github.run_id }}-${{ github.run_attempt }}
 
+      - name: Cache valgrind dependency debs
+        if: steps.capture.outputs.proceed == 'true'
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/ai-researcher-valgrind-debs
+          key: valgrind-debs-${{ runner.os }}-${{ github.run_id }}
+          restore-keys: valgrind-debs-${{ runner.os }}-
+
+      - name: Install valgrind
+        id: valgrind
+        if: steps.capture.outputs.proceed == 'true'
+        run: python3 scripts/ci/install_valgrind.py
+
+      - name: Save valgrind dependency debs
+        if: steps.capture.outputs.proceed == 'true' && steps.valgrind.outputs.cache-changed == 'true'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/ai-researcher-valgrind-debs
+          key: valgrind-debs-${{ runner.os }}-${{ steps.valgrind.outputs.cache-key }}-${{ github.run_id }}-${{ github.run_attempt }}
+
       - name: Summarise what changed
         # Runs on `proceed`, not `changed`: this is the ONLY step that executes
         # diff_aa.py, so gating it on the data moving meant a forced run could

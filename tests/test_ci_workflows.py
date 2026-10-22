@@ -208,8 +208,7 @@ def test_chromium_debs_cache_is_restore_only_in_coverage_and_shared():
                               "refresh.yml").read_text(encoding="utf-8"))
     steps = tests["jobs"]["coverage"]["steps"]
     [cache] = [entry for entry in steps
-               if entry.get("uses", "").split("@", 1)[0].startswith(
-                   "actions/cache")]
+               if entry.get("name") == "Cache Chromium dependency debs"]
     assert cache["uses"].split("@", 1)[0] == "actions/cache/restore"
     [producer] = [entry for entry in refresh["jobs"]["refresh"]["steps"]
                   if entry.get("name") == cache["name"]]
@@ -434,3 +433,37 @@ def test_pr_gate_template_satisfies_the_gate_contract():
     assert "bugs discovered" in rules, sorted(rules)
     assert rules["footer"][0] == "optional", rules["footer"]
     assert rules["footer"][1] == len(rules) - 1, rules["footer"]
+
+
+def test_valgrind_cache_is_restore_only_before_the_instruction_gate():
+    workflow = yaml.safe_load(TESTS_WORKFLOW.read_text(encoding="utf-8"))
+    steps = workflow["jobs"]["coverage"]["steps"]
+    [cache] = [entry for entry in steps
+               if entry.get("name") == "Cache valgrind dependency debs"]
+    assert cache["uses"].split("@", 1)[0] == "actions/cache/restore"
+    assert not [entry for entry in steps
+                if entry.get("uses", "").split("@", 1)[0] == "actions/cache/save"]
+    [gate] = [entry for entry in steps if entry.get("name") == "Instruction budgets gate"]
+    assert steps.index(cache) < steps.index(gate)
+    assert cache["if"] == gate["if"]
+    lines = gate["run"].splitlines()
+    assert lines == ["python3 scripts/ci/install_valgrind.py", "set -o pipefail",
+                     'python3 scripts/ci/instruction_budgets.py | tee -a "$GITHUB_STEP_SUMMARY"']
+
+
+def test_refresh_valgrind_cache_saves_only_after_a_gated_repair():
+    workflow = yaml.safe_load((REPO_ROOT / '.github' / 'workflows' /
+                               'refresh.yml').read_text(encoding='utf-8'))
+    steps = workflow['jobs']['refresh']['steps']
+    [restore] = [entry for entry in steps if entry.get('name') == 'Cache valgrind dependency debs']
+    [install] = [entry for entry in steps if entry.get('name') == 'Install valgrind']
+    [save] = [entry for entry in steps if entry.get('name') == 'Save valgrind dependency debs']
+    assert restore['uses'].split('@', 1)[0] == 'actions/cache/restore'
+    assert save['uses'].split('@', 1)[0] == 'actions/cache/save'
+    assert install['id'] == 'valgrind'
+    assert install['run'] == 'python3 scripts/ci/install_valgrind.py'
+    assert install['if'] == "steps.capture.outputs.proceed == 'true'"
+    assert restore['if'] == install['if']
+    assert save['if'] == f"{install['if']} && steps.valgrind.outputs.cache-changed == 'true'"
+    capture = next(entry for entry in steps if entry.get('name') == 'Capture the leaderboard')
+    assert steps.index(capture) < steps.index(restore) < steps.index(install) < steps.index(save)

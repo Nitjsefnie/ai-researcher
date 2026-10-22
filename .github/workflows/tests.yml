@@ -329,6 +329,14 @@ jobs:
           python3 scripts/ci/js_coverage.py "$JS_COVERAGE_OUT" \
             "--fail-under=${js_floor}" --format=total
 
+      - name: Cache valgrind dependency debs
+        if: ${{ !cancelled() && steps.pytest.conclusion != 'skipped' }}
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/ai-researcher-valgrind-debs
+          key: valgrind-debs-${{ runner.os }}-${{ github.run_id }}
+          restore-keys: valgrind-debs-${{ runner.os }}-
+
       - name: Instruction budgets gate
         if: ${{ !cancelled() && steps.pytest.conclusion != 'skipped' }}
         # The pipeline's CPU ratchet (issue #110): build.py, capture_gate.py
@@ -351,10 +359,7 @@ jobs:
         # where the next tighten-only PR reads the numbers to calibrate
         # against.
         run: |
-          if ! command -v valgrind >/dev/null 2>&1; then
-            sudo apt-get update
-            sudo apt-get install -y --no-install-recommends valgrind
-          fi
+          python3 scripts/ci/install_valgrind.py
           set -o pipefail
           python3 scripts/ci/instruction_budgets.py | tee -a "$GITHUB_STEP_SUMMARY"
 
