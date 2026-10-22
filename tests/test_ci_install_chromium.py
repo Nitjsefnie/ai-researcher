@@ -566,9 +566,9 @@ def fixture_deps_environment(monkeypatch, tmp_path):
     calls = []
     configurations = []
     installed = False
-    monkeypatch.setattr(install_chromium, "configure_apt_acquire",
+    monkeypatch.setattr(install_chromium.apt_deb_cache, "configure_apt_acquire",
                         lambda: configurations.append(True))
-    monkeypatch.setattr(install_chromium, "APT_ARCHIVES", archives)
+    monkeypatch.setattr(install_chromium.apt_deb_cache, "APT_ARCHIVES", archives)
     monkeypatch.setattr(install_chromium.metadata, "version", lambda _: "1.64.0")
     monkeypatch.setattr(install_chromium, "dependency_packages",
                         lambda: [] if installed else packages)
@@ -848,7 +848,7 @@ def fixture_fake_sudo(tmp_path):
 def test_configure_apt_acquire_writes_only_verified_options(tmp_path, fake_sudo):
     target = tmp_path / "apt.conf.d"
     target.mkdir()
-    install_chromium.configure_apt_acquire(target, sudo=fake_sudo)
+    install_chromium.apt_deb_cache.configure_apt_acquire(target, sudo=fake_sudo)
     [fragment] = list(target.iterdir())
     assert fragment.name == "99ai-researcher-playwright-acquire"
     settings = {}
@@ -870,7 +870,7 @@ def test_configure_apt_acquire_defaults_use_system_fragments_and_sudo(
         return SimpleNamespace(returncode=0, stderr="")
 
     monkeypatch.setattr(install_chromium.subprocess, "run", fake_run)
-    install_chromium.configure_apt_acquire()
+    install_chromium.apt_deb_cache.configure_apt_acquire()
     target = Path("/etc/apt/apt.conf.d/99ai-researcher-playwright-acquire")
     assert commands[0][:6] == ["sudo", "-n", "install", "-T", "-m", "0644"]
     assert commands[0][-1] == str(target.with_suffix(".disabled"))
@@ -889,8 +889,8 @@ def test_configure_apt_acquire_failure_warns_and_install_proceeds(
     if failure == "publish":
         (target / "99ai-researcher-playwright-acquire").mkdir()
     sudo = (str(tmp_path / "absent-sudo"),) if failure == "missing-sudo" else fake_sudo
-    configure = install_chromium.configure_apt_acquire
-    monkeypatch.setattr(install_chromium, "configure_apt_acquire",
+    configure = install_chromium.apt_deb_cache.configure_apt_acquire
+    monkeypatch.setattr(install_chromium.apt_deb_cache, "configure_apt_acquire",
                         lambda: configure(target, sudo=sudo))
     real_run = install_chromium.subprocess.run
     installed = []
@@ -923,7 +923,7 @@ def test_run_playwright_install_spawns_the_module(
         monkeypatch, tmp_path, with_deps, expected):
     seen = {}
     events = []
-    monkeypatch.setattr(install_chromium, "configure_apt_acquire",
+    monkeypatch.setattr(install_chromium.apt_deb_cache, "configure_apt_acquire",
                         lambda: events.append("configure"))
 
     def fake_run(command, env=None, check=False):
@@ -943,7 +943,7 @@ def test_run_playwright_install_spawns_the_module(
 
 
 def test_run_playwright_install_failure_is_loud(monkeypatch, tmp_path):
-    monkeypatch.setattr(install_chromium, "configure_apt_acquire", lambda: None)
+    monkeypatch.setattr(install_chromium.apt_deb_cache, "configure_apt_acquire", lambda: None)
     monkeypatch.setattr(
         install_chromium.subprocess, "run",
         lambda command, env=None, check=False:
