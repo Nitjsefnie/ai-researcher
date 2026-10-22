@@ -14,9 +14,6 @@
       "id": "OpenMOSS-Team/MOSS-Image-SFT"
     },
     {
-      "id": "black-forest-labs/flux-3-image-klein"
-    },
-    {
       "id": "RecursiveSI/flint"
     },
     {
@@ -24,6 +21,9 @@
     },
     {
       "id": "fishaudio/drama-3"
+    },
+    {
+      "id": "black-forest-labs/flux-3-image-klein"
     },
     {
       "id": "Lightricks/LTX-2.5"
