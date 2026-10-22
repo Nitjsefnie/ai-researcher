@@ -48,8 +48,8 @@
     3828
   ],
   ".github/workflows/tests.yml": [
-    17195,
-    23932
+    17269,
+    24470
   ],
   ".github/workflows/types.yml": [
     1021,
@@ -100,8 +100,8 @@
     24115
   ],
   "scripts/ci/install_chromium.py": [
-    7683,
-    19542
+    7773,
+    21941
   ],
   "scripts/ci/instruction_budgets.py": [
     6288,
@@ -187,10 +187,6 @@
     7310,
     14508
   ],
-  "tests/test_ci_install_chromium.py": [
-    3858,
-    22391
-  ],
   "tests/test_ci_instruction_budgets.py": [
     5646,
     20299
@@ -209,7 +205,7 @@
   ],
   "tests/test_ci_workflows.py": [
     5958,
-    16315
+    18780
   ],
   "tests/test_diff_aa.py": [
     13251,
@@ -225,7 +221,7 @@
   ],
   "tests/test_gate_base_freshness.py": [
     5049,
-    29083
+    29185
   ],
   "tests/test_gitignore.py": [
     3628,
@@ -240,8 +236,8 @@
     10113
   ],
   "tests/test_refresh_workflow.py": [
-    24085,
-    113664
+    23915,
+    114370
   ],
   "tests/test_workflow_ci_gate.py": [
     3391,
