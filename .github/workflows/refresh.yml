@@ -233,8 +233,10 @@ jobs:
         # step's `captured` verdict through it (issue #103).
         id: fetch
         run: |
+          fetch_err="$(mktemp)"
+          trap 'rm -f "$fetch_err"' EXIT
           set +e
-          python3 scripts/fetch_aa.py --cross-run-lookback 2> /tmp/fetch-err.txt
+          python3 scripts/fetch_aa.py --cross-run-lookback 2> "$fetch_err"
           rc=$?
           set -e
 
@@ -246,7 +248,7 @@ jobs:
             exit 0
           fi
 
-          cat /tmp/fetch-err.txt >&2
+          cat "$fetch_err" >&2
           exit "$rc"
 
       - name: Did anything move?
@@ -1030,6 +1032,8 @@ jobs:
           # summary names both stamps, so a republish hour says which
           # commit the hub was behind to.
           live_page="$(mktemp)"
+          # Later scratch files may not exist when an early exit runs cleanup.
+          trap 'rm -f "$live_page" "${publish_response:-}"' EXIT
           live_stamp="the hub could not be fetched"
           if curl -fsS --connect-timeout 10 --max-time 30 \
                https://docs.nitjsefni.eu/d/ai-researcher/frontier-models \
@@ -1062,8 +1066,9 @@ jobs:
           cp "${RUNNER_TEMP}/publish-payload/tree/out/frontier-models.html" \
             "${page_dir}/out/frontier-models.html"
           cd "${page_dir}"
+          publish_response="$(mktemp)"
           code="$(curl -sS --connect-timeout 10 --max-time 120 \
-            -o /tmp/publish-response.json -w '%{http_code}' \
+            -o "$publish_response" -w '%{http_code}' \
             -H "x-docs-key: ${DOCS_HUB_API_KEY}" \
             -F 'slug=ai-researcher/frontier-models' \
             -F 'title=Frontier models — intelligence vs cost per task' \
@@ -1078,18 +1083,18 @@ jobs:
           # failure still kills the step under bash -e before the verdict.
           if [ "${code}" -lt 200 ] || [ "${code}" -ge 300 ]; then
             echo "publish failed: HTTP ${code}:" >&2
-            cat /tmp/publish-response.json >&2
+            cat "$publish_response" >&2
             exit 1
           fi
           # A 2xx carrying an error field is still a failure -- the hub uses
           # both, the same verdict publish_docs.py computes for the hub's
           # answers.
-          if jq -e '(.error // null) != null' /tmp/publish-response.json > /dev/null; then
+          if jq -e '(.error // null) != null' "$publish_response" > /dev/null; then
             echo "publish failed: HTTP ${code} with an error field:" >&2
-            cat /tmp/publish-response.json >&2
+            cat "$publish_response" >&2
             exit 1
           fi
-          cat /tmp/publish-response.json
+          cat "$publish_response"
           # No ref move follows (issue #206): the upload response above is
           # the hub's receipt, and the page it stored carries the stamp --
           # the record the next run's republish gate reads. The published
@@ -1252,6 +1257,8 @@ jobs:
           # successfully and match the artifact before any upload. Unverifiable
           # or different bytes concede; the next hourly run rebuilds and self-heals.
           main_page="$(mktemp)"
+          # Later scratch files may not exist when an early exit runs cleanup.
+          trap 'rm -f "$main_page" "${live_page:-}" "${publish_response:-}"' EXIT
           if ! git -C "${scratch}" fetch --quiet origin main ||
              ! git -C "${scratch}" show FETCH_HEAD:out/trending-rankings.html > "$main_page"; then
             echo "could not verify main's committed page — publishing nothing this run; the next hourly run self-heals" \
@@ -1288,8 +1295,9 @@ jobs:
           cp "${RUNNER_TEMP}/rankings-page/trending-rankings.html" \
             "${page_dir}/out/trending-rankings.html"
           cd "${page_dir}"
+          publish_response="$(mktemp)"
           code="$(curl -sS --connect-timeout 10 --max-time 120 \
-            -o /tmp/publish-response.json -w '%{http_code}' \
+            -o "$publish_response" -w '%{http_code}' \
             -H "x-docs-key: ${DOCS_HUB_API_KEY}" \
             -F 'slug=ai-researcher/trending-rankings' \
             -F 'title=Trending rankings — Hugging Face & OpenRouter top 10 over time' \
@@ -1302,15 +1310,15 @@ jobs:
           # a transport failure still ends the step under bash -e.
           if [ "${code}" -lt 200 ] || [ "${code}" -ge 300 ]; then
             echo "publish failed: HTTP ${code}:" >&2
-            cat /tmp/publish-response.json >&2
+            cat "$publish_response" >&2
             exit 1
           fi
-          if jq -e '(.error // null) != null' /tmp/publish-response.json > /dev/null; then
+          if jq -e '(.error // null) != null' "$publish_response" > /dev/null; then
             echo "publish failed: HTTP ${code} with an error field:" >&2
-            cat /tmp/publish-response.json >&2
+            cat "$publish_response" >&2
             exit 1
           fi
-          cat /tmp/publish-response.json
+          cat "$publish_response"
 
   or-fetch:
     name: Fetch and stage the OpenRouter top 10
