@@ -104,6 +104,11 @@ def patch_spec(monkeypatch, fake_spec):
 
 # --- fixtures -----------------------------------------------------------
 
+@pytest.fixture(autouse=True)
+def fixture_isolate_github_output(monkeypatch):
+    monkeypatch.delenv("GITHUB_OUTPUT", raising=False)
+
+
 @pytest.fixture(name="registry_root")
 def fixture_registry_root(tmp_path: Path) -> Path:
     """A fake playwright package root carrying the fixture browsers.json."""
@@ -609,6 +614,32 @@ def test_dependency_cache_backfills_then_installs_locally(deps_environment,
     assert first_log.splitlines()[0] == capsys.readouterr().out.splitlines()[0]
 
 
+@pytest.mark.parametrize("case", ["present", "absent", "unresolved", "empty"])
+def test_dependency_key_output_appends_only_when_resolved(
+        deps_environment, monkeypatch, tmp_path, capsys, case):
+    env = deps_environment
+    output = tmp_path / "step-output"
+    output.write_text("prior=value\n", encoding="utf-8")
+    if case != "absent":
+        monkeypatch.setenv("GITHUB_OUTPUT", str(output))
+    if case == "unresolved":
+        def fail():
+            raise install_chromium.InstallError("dry-run failed")
+
+        monkeypatch.setattr(install_chromium, "dependency_packages", fail)
+    elif case == "empty":
+        env.packages.clear()
+    install_chromium.install_with_cached_deps(env.root, env.cache)
+    if case in ("absent", "unresolved"):
+        assert output.read_text(encoding="utf-8") == "prior=value\n"
+    else:
+        key = capsys.readouterr().out.splitlines()[0].removeprefix(
+            "apt-deb cache key: ")
+        assert output.read_text(encoding="utf-8") == f"prior=value\ncache-key={key}\n"
+        if case == "present":
+            assert (env.cache / "cache-key").read_text(encoding="utf-8") == key
+
+
 @pytest.mark.parametrize("change", ["partial", "version", "packages", "corrupt"])
 def test_dependency_cache_mismatch_uses_normal_install(
         deps_environment, monkeypatch, change, capsys):
@@ -623,13 +654,16 @@ def test_dependency_cache_mismatch_uses_normal_install(
     elif change == "corrupt":
         (env.cache / "cache-key").write_bytes(b"\xff")
     else:
-        env.packages.append("newlib3")
+        env.packages.pop()
     env.calls.clear()
     install_chromium.install_with_cached_deps(env.root, env.cache)
     assert len(env.calls) == 1
     assert "--with-deps" in env.calls[0]
     if change in ("version", "packages"):
-        assert capsys.readouterr().out.splitlines()[0] != old_key
+        new_key = capsys.readouterr().out.splitlines()[0]
+        assert new_key != old_key
+        assert (env.cache / "cache-key").read_text(encoding="utf-8") == \
+            new_key.removeprefix("apt-deb cache key: ")
 
 
 @pytest.mark.parametrize("failure", ["exit", "spawn", "copy"])

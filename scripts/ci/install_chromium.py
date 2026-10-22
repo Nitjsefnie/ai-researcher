@@ -527,6 +527,9 @@ def install_with_cached_deps(root: Path, cache: Path) -> None:
         key = hashlib.sha256(json.dumps(
             [metadata.version("playwright"), resolved]).encode("utf-8")).hexdigest()
         print(f"apt-deb cache key: {key}", flush=True)
+        if output := os.environ.get("GITHUB_OUTPUT"):
+            with open(output, "a", encoding="utf-8") as handle:
+                handle.write(f"cache-key={key}\n")
         packages = {name.split(":", 1)[0] for name in resolved}
         if packages:
             cache.mkdir(parents=True, exist_ok=True)
