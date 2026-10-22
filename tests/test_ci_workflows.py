@@ -202,6 +202,25 @@ def test_coverage_job_installs_chromium_through_the_digest_gate():
     assert chromium["run"] == "python3 scripts/ci/install_chromium.py"
 
 
+def test_chromium_debs_cache_is_restore_only_in_coverage_and_shared():
+    tests = yaml.safe_load(TESTS_WORKFLOW.read_text(encoding="utf-8"))
+    refresh = yaml.safe_load((REPO_ROOT / ".github" / "workflows" /
+                              "refresh.yml").read_text(encoding="utf-8"))
+    steps = tests["jobs"]["coverage"]["steps"]
+    [cache] = [entry for entry in steps
+               if entry.get("uses", "").split("@", 1)[0].startswith(
+                   "actions/cache")]
+    assert cache["uses"].split("@", 1)[0] == "actions/cache/restore"
+    [producer] = [entry for entry in refresh["jobs"]["refresh"]["steps"]
+                  if entry.get("name") == cache["name"]]
+    for field in ("path", "key"):
+        assert cache["with"][field] == producer["with"][field]
+    chromium = next(entry for entry in steps
+                    if entry.get("name") == "Install Chromium for playwright")
+    assert steps.index(cache) < steps.index(chromium)
+    assert "if" not in cache
+
+
 def test_instruction_budgets_gate_runs_only_in_the_coverage_job():
     # Issue #110: the instruction-count gate needs valgrind and four
     # callgrind runs, so it must never appear in a matrix cell (three

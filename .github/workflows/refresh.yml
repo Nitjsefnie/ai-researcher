@@ -442,6 +442,14 @@ jobs:
         run: |
           python3 -m pip install -r requirements-test.txt
 
+      # Main refresh warms the shared apt archives for both Chromium consumers.
+      - name: Cache Chromium dependency debs
+        if: steps.capture.outputs.proceed == 'true'
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/ai-researcher-playwright-debs
+          key: chromium-debs-${{ runner.os }}-${{ hashFiles('requirements-test.txt') }}
+
       - name: Install Chromium for playwright
         if: steps.capture.outputs.proceed == 'true'
         # The browser binary is not a pip package, and playwright's own

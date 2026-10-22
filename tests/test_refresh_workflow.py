@@ -656,6 +656,18 @@ class GateTests(unittest.TestCase):  # pylint: disable=too-many-public-methods
         for entry in setup:
             self.assertNotIn("if", entry)
 
+    def test_chromium_debs_cache_saves_only_when_chromium_is_needed(self):
+        steps = self.wf["jobs"]["refresh"]["steps"]
+        [cache] = [entry for entry in steps
+                   if entry.get("uses", "").split("@", 1)[0].startswith(
+                       "actions/cache")]
+        self.assertEqual(cache["uses"].split("@", 1)[0], "actions/cache")
+        chromium = step(self.wf, "Install Chromium for playwright")
+        self.assertEqual(cache["if"], chromium["if"])
+        self.assertLess(steps.index(cache), steps.index(chromium))
+        self.assertLess(steps.index(step(self.wf, "Capture the leaderboard")),
+                        steps.index(cache))
+
     def test_the_hub_ties_the_upload_to_one_commit(self):
         # The tie is ENFORCED, not asserted: the upload runs only when the
         # payload page's own commit (`tip`, recorded by the publish job) is
