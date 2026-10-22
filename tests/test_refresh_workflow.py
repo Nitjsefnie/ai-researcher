@@ -2034,6 +2034,7 @@ def test_capture_step_removes_temp_files(tmp_path, status):
     scripts.mkdir()
     (scripts / 'fetch_aa.py').write_text(
         'import os, sys\nfrom pathlib import Path\n'
+        'assert "--cross-run-lookback" in sys.argv[1:], sys.argv[1:]\n'
         'stat = os.fstat(2)\n'
         'paths = [p.name for p in Path(os.environ["TMPDIR"]).iterdir()\n'
         '         if (p.stat().st_dev, p.stat().st_ino) == (stat.st_dev, stat.st_ino)]\n'
