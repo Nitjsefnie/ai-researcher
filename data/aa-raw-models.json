@@ -22681,19 +22681,7 @@
   "outputModalityText": true,
   "outputModalityImage": false,
   "outputModalitySpeech": false,
-  "outputModalityVideo": false,
-  "genVariants": [
-   {},
-   {
-    "ii": 43.8973584978265,
-    "cost": 1.4886425967752979,
-    "gdpval": 0.57189,
-    "gdpvalCost": 2.157305658550719,
-    "ctx": 1048576,
-    "pin": 0.3,
-    "pout": 0.9
-   }
-  ]
+  "outputModalityVideo": false
  },
  {
   "slug": "k2-horizon-mova-36b-a4b",

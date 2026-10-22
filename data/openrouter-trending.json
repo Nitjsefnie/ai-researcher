@@ -8,9 +8,6 @@
       "slug": "deepseek/deepseek-v4.1-flash-1017"
     },
     {
-      "slug": "minimax/minimax-m3.1-flash"
-    },
-    {
       "slug": "z-ai/glm-5.3-flash"
     },
     {
@@ -30,6 +27,9 @@
     },
     {
       "slug": "nvidia/nemotron-3-ultra-550b-a55b"
+    },
+    {
+      "slug": "deepseek/deepseek-v4-flash-0731"
     }
   ]
 }
