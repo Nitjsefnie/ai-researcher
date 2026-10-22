@@ -144,6 +144,104 @@ with chromium_temp() as own:
     assert not list(tmp_path.iterdir())
 
 
+@pytest.mark.skipif(sys.platform == "win32", reason="flock is POSIX-only")
+@pytest.mark.parametrize("phase", ["before_flock", "before_rename"])
+def test_dead_initializer_is_reclaimed_on_next_launch(tmp_path, monkeypatch,
+                                                      phase):
+    script = """
+import os
+import sys
+import tempfile
+from pathlib import Path
+from scripts import browser_temp
+tempfile.tempdir = os.environ['TMPDIR']
+flock = browser_temp.fcntl.flock
+def interrupted_flock(file, operation):
+    if str(getattr(file, 'name', '')).endswith('owner.pending'):
+        os._exit(137)
+    return flock(file, operation)
+def interrupted_rename(*args):
+    os._exit(137)
+if sys.argv[1] == 'before_flock':
+    browser_temp.fcntl.flock = interrupted_flock
+else:
+    Path.rename = interrupted_rename
+with browser_temp.chromium_temp():
+    raise AssertionError('initialization was not interrupted')
+"""
+    done = subprocess.run(
+        [sys.executable, "-c", script, phase], check=False,
+        cwd=Path(__file__).resolve().parents[1],
+        env={**os.environ, "TMPDIR": str(tmp_path)})
+    assert done.returncode == 137
+    stale, = tmp_path.iterdir()
+    assert (stale / "owner.pending").is_file()
+    assert not (stale / "owner.lock").exists()
+    monkeypatch.setattr(browser_temp.tempfile, "tempdir", str(tmp_path))
+    with browser_temp.chromium_temp():
+        assert not stale.exists()
+    assert not list(tmp_path.iterdir())
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="flock is POSIX-only")
+@pytest.mark.parametrize("phase", ["before_flock", "before_rename", "after_rename"])
+def test_live_initializer_survives_parallel_sweep(tmp_path, monkeypatch, phase):
+    monkeypatch.setattr(browser_temp.tempfile, "tempdir", str(tmp_path))
+    flock = browser_temp.fcntl.flock
+    rename = Path.rename
+    swept = []
+
+    def sweep(candidate):
+        subprocess.run(
+            [sys.executable, "-c",
+             "from scripts.browser_temp import chromium_temp\n"
+             "with chromium_temp():\n    pass\n"],
+            check=True, timeout=10,
+            cwd=Path(__file__).resolve().parents[1],
+            env={**os.environ, "TMPDIR": str(tmp_path)})
+        assert candidate.is_dir()
+        assert ((candidate / "owner.pending").exists()
+                or (candidate / "owner.lock").exists())
+        swept.append(True)
+
+    def checked_flock(file, operation):
+        if (phase == "before_flock"
+                and str(getattr(file, "name", "")).endswith("owner.pending")):
+            sweep(Path(file.name).parent)
+        return flock(file, operation)
+
+    def checked_rename(source, target):
+        if phase == "before_rename":
+            sweep(source.parent)
+        result = rename(source, target)
+        if phase == "after_rename":
+            sweep(source.parent)
+        return result
+
+    monkeypatch.setattr(browser_temp.fcntl, "flock", checked_flock)
+    monkeypatch.setattr(Path, "rename", checked_rename)
+    with browser_temp.chromium_temp() as own:
+        assert Path(own).is_dir()
+        assert swept == [True]
+    assert not list(tmp_path.iterdir())
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="flock is POSIX-only")
+def test_flock_survives_owner_lock_rename(tmp_path):
+    """Characterize the kernel guarantee the publication protocol needs."""
+    import fcntl  # pylint: disable=import-outside-toplevel
+    pending = tmp_path / "owner.pending"
+    published = tmp_path / "owner.lock"
+    with pending.open("x", encoding="utf-8") as owner:
+        fcntl.flock(owner, fcntl.LOCK_EX)
+        pending.rename(published)
+        with published.open("r+", encoding="utf-8") as contender:
+            with pytest.raises(OSError):
+                fcntl.flock(contender, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    with published.open("r+", encoding="utf-8") as contender:
+        fcntl.flock(contender, fcntl.LOCK_EX | fcntl.LOCK_NB)
+
+
 def test_prefix_only_and_foreign_directories_are_untouched(tmp_path, monkeypatch):
     prefix_only = tmp_path / "aa-cr-foreign"
     prefix_only.mkdir()
