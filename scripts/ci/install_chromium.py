@@ -573,6 +573,34 @@ def install_with_cached_deps(root: Path, cache: Path) -> None:
                   file=sys.stderr, flush=True)
 
 
+def configure_apt_acquire(
+        fragment_dir: Path = Path("/etc/apt/apt.conf.d"),
+        sudo: tuple[str, ...] = ("sudo", "-n")) -> None:
+    """Best-effort system fragment, loaded by apt.conf(5) through sudo."""
+    # apt.conf(5): Retries; apt-transport-http(1), apt-transport-https(1): Timeout.
+    settings = ('Acquire::http::Timeout "20";\n'
+                'Acquire::https::Timeout "20";\n'
+                'Acquire::Retries "2";\n')
+    target = fragment_dir / "99ai-researcher-playwright-acquire"
+    # apt.conf(5) ignores .disabled fragments until the atomic rename succeeds.
+    staged = target.with_suffix(".disabled")
+    try:
+        with tempfile.TemporaryDirectory(prefix="playwright-apt-acquire-") as scratch:
+            source = Path(scratch) / "apt.conf"
+            source.write_text(settings, encoding="utf-8")
+            for command in (
+                    [*sudo, "install", "-T", "-m", "0644", str(source), str(staged)],
+                    [*sudo, "mv", "-T", "--", str(staged), str(target)]):
+                result = subprocess.run(command, capture_output=True,
+                                        encoding="utf-8", check=False)
+                if result.returncode != 0:
+                    raise OSError(f"{command[len(sudo)]} exited {result.returncode}: "
+                                  f"{result.stderr.strip()}")
+    except OSError as error:
+        print(f"WARNING: could not configure apt acquire limits ({error}); "
+              "continuing with apt's existing settings", file=sys.stderr, flush=True)
+
+
 def run_playwright_install(root: Path, with_deps: bool = True) -> None:
     """Run playwright's own install against the pre-seeded directory.
 
@@ -581,6 +609,7 @@ def run_playwright_install(root: Path, with_deps: bool = True) -> None:
     """
     command = [sys.executable, "-m", "playwright", "install"]
     if with_deps:
+        configure_apt_acquire()
         command.append("--with-deps")
     command.append("chromium")
     print(f"+ {' '.join(command)}", flush=True)

@@ -18,6 +18,7 @@ import hashlib
 import importlib.machinery
 import json
 import os
+import re
 import shutil
 import sys
 import zipfile
@@ -563,7 +564,10 @@ def fixture_deps_environment(monkeypatch, tmp_path):
     archives.mkdir()
     packages = ["liba1", "libb2:amd64"]
     calls = []
+    configurations = []
     installed = False
+    monkeypatch.setattr(install_chromium, "configure_apt_acquire",
+                        lambda: configurations.append(True))
     monkeypatch.setattr(install_chromium, "APT_ARCHIVES", archives)
     monkeypatch.setattr(install_chromium.metadata, "version", lambda _: "1.64.0")
     monkeypatch.setattr(install_chromium, "dependency_packages",
@@ -585,7 +589,8 @@ def fixture_deps_environment(monkeypatch, tmp_path):
 
     monkeypatch.setattr(install_chromium.subprocess, "run", fake_run)
     return SimpleNamespace(cache=cache, archives=archives, packages=packages,
-                           calls=calls, run=fake_run, root=tmp_path / "browser")
+                           calls=calls, configurations=configurations,
+                           run=fake_run, root=tmp_path / "browser")
 
 
 def test_dependency_cache_backfills_then_installs_locally(deps_environment,
@@ -593,6 +598,7 @@ def test_dependency_cache_backfills_then_installs_locally(deps_environment,
     env = deps_environment
     install_chromium.install_with_cached_deps(env.root, env.cache)
     assert len(env.calls) == 1
+    assert env.configurations == [True]
     assert sorted(path.name for path in env.cache.glob("*.deb")) == [
         "liba1_2_amd64.deb", "libb2_3_amd64.deb"]
     assert (env.cache / "liba1_2_amd64.deb").read_bytes() == b"a"
@@ -600,7 +606,9 @@ def test_dependency_cache_backfills_then_installs_locally(deps_environment,
     for path in env.archives.glob("*.deb"):
         path.unlink()
     env.calls.clear()
+    env.configurations.clear()
     install_chromium.install_with_cached_deps(env.root, env.cache)
+    assert env.configurations == []
     assert env.calls[0] == [
         "sudo", "cp", "--", str(env.cache / "liba1_2_amd64.deb"),
         str(env.cache / "libb2_3_amd64.deb"), str(env.archives)]
@@ -801,6 +809,7 @@ def test_dependency_cache_empty_list_needs_no_apt_install(deps_environment):
     assert env.calls[0] == [sys.executable, "-m", "playwright", "install",
                             "chromium"]
     assert not env.cache.exists()
+    assert env.configurations == []
 
 
 def test_dependency_cache_backfill_copy_failure_is_nonfatal(
@@ -816,6 +825,96 @@ def test_dependency_cache_backfill_copy_failure_is_nonfatal(
     assert "cache full" in capsys.readouterr().err
 
 
+@pytest.fixture(name="fake_sudo")
+def fixture_fake_sudo(tmp_path):
+    script = tmp_path / "fake_sudo.py"
+    script.write_text(
+        "import shutil\n"
+        "import sys\n"
+        "from pathlib import Path\n"
+        "tool, *args = sys.argv[1:]\n"
+        "if tool == 'install':\n"
+        "    assert args[:3] == ['-T', '-m', '0644']\n"
+        "    shutil.copyfile(args[3], args[4])\n"
+        "elif tool == 'mv':\n"
+        "    assert args[:2] == ['-T', '--']\n"
+        "    Path(args[2]).replace(args[3])\n"
+        "else:\n"
+        "    raise SystemExit('unexpected sudo operation: ' + tool)\n",
+        encoding="utf-8")
+    return (sys.executable, str(script))
+
+
+def test_configure_apt_acquire_writes_only_verified_options(tmp_path, fake_sudo):
+    target = tmp_path / "apt.conf.d"
+    target.mkdir()
+    install_chromium.configure_apt_acquire(target, sudo=fake_sudo)
+    [fragment] = list(target.iterdir())
+    assert fragment.name == "99ai-researcher-playwright-acquire"
+    settings = {}
+    for line in fragment.read_text(encoding="utf-8").splitlines():
+        match = re.fullmatch(r'([A-Za-z:]+) "(\d+)";', line)
+        assert match is not None, line
+        settings[match[1]] = int(match[2])
+    assert settings == {"Acquire::http::Timeout": 20,
+                        "Acquire::https::Timeout": 20,
+                        "Acquire::Retries": 2}
+
+
+def test_configure_apt_acquire_defaults_use_system_fragments_and_sudo(
+        monkeypatch):
+    commands = []
+
+    def fake_run(command, **kwargs):
+        commands.append(command)
+        return SimpleNamespace(returncode=0, stderr="")
+
+    monkeypatch.setattr(install_chromium.subprocess, "run", fake_run)
+    install_chromium.configure_apt_acquire()
+    target = Path("/etc/apt/apt.conf.d/99ai-researcher-playwright-acquire")
+    assert commands[0][:6] == ["sudo", "-n", "install", "-T", "-m", "0644"]
+    assert commands[0][-1] == str(target.with_suffix(".disabled"))
+    assert commands[1] == ["sudo", "-n", "mv", "-T", "--",
+                           str(target.with_suffix(".disabled")), str(target)]
+
+
+@pytest.mark.parametrize("failure", ["unwritable", "missing-sudo", "publish"])
+def test_configure_apt_acquire_failure_warns_and_install_proceeds(
+        tmp_path, fake_sudo, monkeypatch, capsys, failure):
+    target = tmp_path / "apt.conf.d"
+    if failure == "unwritable":
+        target.write_bytes(b"not a directory")
+    else:
+        target.mkdir()
+    if failure == "publish":
+        (target / "99ai-researcher-playwright-acquire").mkdir()
+    sudo = (str(tmp_path / "absent-sudo"),) if failure == "missing-sudo" else fake_sudo
+    configure = install_chromium.configure_apt_acquire
+    monkeypatch.setattr(install_chromium, "configure_apt_acquire",
+                        lambda: configure(target, sudo=sudo))
+    real_run = install_chromium.subprocess.run
+    installed = []
+
+    def fake_run(command, check=False, **kwargs):
+        if command[:len(sudo)] == list(sudo):
+            return real_run(command, check=check, **kwargs)
+        assert command == [sys.executable, "-m", "playwright", "install",
+                           "--with-deps", "chromium"]
+        installed.append(True)
+        return SimpleNamespace(returncode=0)
+
+    monkeypatch.setattr(install_chromium.subprocess, "run", fake_run)
+    install_chromium.run_playwright_install(tmp_path / "browsers")
+    assert installed == [True]
+    warning = capsys.readouterr().err.lower()
+    assert "warning" in warning and "apt" in warning
+    if failure == "unwritable":
+        assert target.read_bytes() == b"not a directory"
+    elif failure == "publish":
+        assert (target / "99ai-researcher-playwright-acquire").is_dir()
+        assert (target / "99ai-researcher-playwright-acquire.disabled").is_file()
+
+
 @pytest.mark.parametrize("with_deps, expected", [
     (True, ["--with-deps", "chromium"]),
     (False, ["chromium"]),
@@ -823,8 +922,12 @@ def test_dependency_cache_backfill_copy_failure_is_nonfatal(
 def test_run_playwright_install_spawns_the_module(
         monkeypatch, tmp_path, with_deps, expected):
     seen = {}
+    events = []
+    monkeypatch.setattr(install_chromium, "configure_apt_acquire",
+                        lambda: events.append("configure"))
 
     def fake_run(command, env=None, check=False):
+        events.append("install")
         seen["command"] = command
         seen["env"] = env
         seen["check"] = check
@@ -836,9 +939,11 @@ def test_run_playwright_install_spawns_the_module(
                                *expected]
     assert seen["env"]["PLAYWRIGHT_BROWSERS_PATH"] == str(tmp_path)
     assert seen["check"] is False
+    assert events == (["configure", "install"] if with_deps else ["install"])
 
 
 def test_run_playwright_install_failure_is_loud(monkeypatch, tmp_path):
+    monkeypatch.setattr(install_chromium, "configure_apt_acquire", lambda: None)
     monkeypatch.setattr(
         install_chromium.subprocess, "run",
         lambda command, env=None, check=False:
