@@ -20,6 +20,7 @@ from playwright.sync_api import (
 import test_build
 
 import build
+from scripts.browser_temp import chromium_browser
 
 # This box has a system Chromium and no playwright-managed browser; CI has the
 # reverse (`playwright install chromium`). Prefer whatever is actually present
@@ -200,12 +201,14 @@ class BrowserInteractionTests(unittest.TestCase):
             # failure skips tearDownClass, so a raise from playwright's
             # start or the launch itself would strand build.OUT at the
             # temp path and leave the dir on disk.
-            cls.playwright = sync_playwright().start()
-            cls.browser = cls.playwright.chromium.launch(
+            cls._browser_stack = contextlib.ExitStack()
+            cls.addClassCleanup(cls._browser_stack.close)
+            cls.browser = cls._browser_stack.enter_context(chromium_browser(
+                sync_playwright,
                 executable_path=CHROMIUM_EXECUTABLE,
                 headless=True,
                 args=["--no-sandbox"],
-            )
+            ))
         except BaseException:
             build.OUT = cls._saved_out
             cls._page_dir.cleanup()
@@ -255,8 +258,7 @@ class BrowserInteractionTests(unittest.TestCase):
         cls._page_dir.cleanup()
         cls._disputed_dir.cleanup()
         flush_page_coverage(cls)
-        cls.browser.close()
-        cls.playwright.stop()
+        cls._browser_stack.close()
 
     # The two captures the dispute-class interaction pins hold on: the
     # ambient single-generation capture, and the class's own in-run
@@ -1949,16 +1951,18 @@ class PerfBudgetTests(unittest.TestCase):
             # BrowserInteractionTests): setUpClass failure skips
             # tearDownClass, so a raise from playwright's start or the
             # launch itself would strand build.OUT at the temp path.
-            cls.playwright = sync_playwright().start()
+            cls._browser_stack = contextlib.ExitStack()
+            cls.addClassCleanup(cls._browser_stack.close)
             # A second browser launch, mirroring the harness's recipe over
             # this module's existing discovery: --js-flags=--expose-gc is
             # load-bearing -- the journeys place the load's garbage
             # collection through window.gc(), which the flag provides.
-            cls.browser = cls.playwright.chromium.launch(
+            cls.browser = cls._browser_stack.enter_context(chromium_browser(
+                sync_playwright,
                 executable_path=CHROMIUM_EXECUTABLE,
                 headless=True,
                 args=["--no-sandbox", "--js-flags=--expose-gc"],
-            )
+            ))
         except BaseException:
             build.RAW, build.AGENTS_RAW, build.OUT = cls._saved
             cls._page_dir.cleanup()
@@ -1973,8 +1977,7 @@ class PerfBudgetTests(unittest.TestCase):
         # a browser-close failure must not leave build.OUT at the temp path.
         build.RAW, build.AGENTS_RAW, build.OUT = cls._saved
         cls._page_dir.cleanup()
-        cls.browser.close()
-        cls.playwright.stop()
+        cls._browser_stack.close()
 
     def test_every_journey_meets_its_committed_budget(self):
         budgets = perf_budgets.load_budgets(
@@ -2324,11 +2327,13 @@ class ZeroScoreBrowserTests(unittest.TestCase):
         try:
             with contextlib.redirect_stdout(io.StringIO()):
                 build.main()
-            cls.playwright = sync_playwright().start()
-            cls.browser = cls.playwright.chromium.launch(
+            cls._browser_stack = contextlib.ExitStack()
+            cls.addClassCleanup(cls._browser_stack.close)
+            cls.browser = cls._browser_stack.enter_context(chromium_browser(
+                sync_playwright,
                 executable_path=CHROMIUM_EXECUTABLE,
                 headless=True,
-                args=["--no-sandbox"])
+                args=["--no-sandbox"]))
         except BaseException:
             build.RAW, build.AGENTS_RAW, build.OUT = cls._saved
             cls._dir.cleanup()
@@ -2339,8 +2344,7 @@ class ZeroScoreBrowserTests(unittest.TestCase):
     def tearDownClass(cls):
         build.RAW, build.AGENTS_RAW, build.OUT = cls._saved
         flush_page_coverage(cls)
-        cls.browser.close()
-        cls.playwright.stop()
+        cls._browser_stack.close()
         cls._dir.cleanup()
 
     def test_the_zero_score_frontier_cell_is_em_dash(self):
@@ -2532,11 +2536,13 @@ class DisputeBrowserTests(unittest.TestCase):
         try:
             with contextlib.redirect_stdout(io.StringIO()):
                 build.main()
-            cls.playwright = sync_playwright().start()
-            cls.browser = cls.playwright.chromium.launch(
+            cls._browser_stack = contextlib.ExitStack()
+            cls.addClassCleanup(cls._browser_stack.close)
+            cls.browser = cls._browser_stack.enter_context(chromium_browser(
+                sync_playwright,
                 executable_path=CHROMIUM_EXECUTABLE,
                 headless=True,
-                args=["--no-sandbox"])
+                args=["--no-sandbox"]))
         except BaseException:
             build.RAW, build.AGENTS_RAW, build.OUT = cls._saved
             cls._dir.cleanup()
@@ -2547,8 +2553,7 @@ class DisputeBrowserTests(unittest.TestCase):
     def tearDownClass(cls):
         build.RAW, build.AGENTS_RAW, build.OUT = cls._saved
         flush_page_coverage(cls)
-        cls.browser.close()
-        cls.playwright.stop()
+        cls._browser_stack.close()
         cls._dir.cleanup()
 
     def _loaded_page(self):
@@ -2788,11 +2793,13 @@ class PresenceDisputeBrowserTests(unittest.TestCase):
         try:
             with contextlib.redirect_stdout(io.StringIO()):
                 build.main()
-            cls.playwright = sync_playwright().start()
-            cls.browser = cls.playwright.chromium.launch(
+            cls._browser_stack = contextlib.ExitStack()
+            cls.addClassCleanup(cls._browser_stack.close)
+            cls.browser = cls._browser_stack.enter_context(chromium_browser(
+                sync_playwright,
                 executable_path=CHROMIUM_EXECUTABLE,
                 headless=True,
-                args=["--no-sandbox"])
+                args=["--no-sandbox"]))
         except BaseException:
             build.RAW, build.AGENTS_RAW, build.OUT = cls._saved
             cls._dir.cleanup()
@@ -2803,8 +2810,7 @@ class PresenceDisputeBrowserTests(unittest.TestCase):
     def tearDownClass(cls):
         build.RAW, build.AGENTS_RAW, build.OUT = cls._saved
         flush_page_coverage(cls)
-        cls.browser.close()
-        cls.playwright.stop()
+        cls._browser_stack.close()
         cls._dir.cleanup()
 
     def _loaded_page(self):
