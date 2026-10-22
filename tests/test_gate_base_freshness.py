@@ -258,6 +258,7 @@ CORE_PIN = (
     'tests/test_gate_base_freshness.py',
     'tests/test_gitignore.py',
     'tests/test_workflow_ci_gate.py',
+    'tests/test_workflowrun.py',
     'tests/test_js_coverage.py',
     'tests/test_publish_docs.py',
     'tests/test_ratchet_push_workflow.py',
