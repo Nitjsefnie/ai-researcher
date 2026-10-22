@@ -472,7 +472,7 @@ jobs:
         uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ~/.cache/ai-researcher-playwright-debs
-          key: chromium-debs-${{ runner.os }}-${{ steps.chromium.outputs.cache-key }}-${{ github.run_id }}
+          key: chromium-debs-${{ runner.os }}-${{ steps.chromium.outputs.cache-key }}-${{ github.run_id }}-${{ github.run_attempt }}
 
       - name: Summarise what changed
         # Runs on `proceed`, not `changed`: this is the ONLY step that executes
