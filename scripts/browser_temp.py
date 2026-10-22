@@ -14,41 +14,62 @@ except ImportError:  # Windows keeps per-launch cleanup, without reclaim.
 PREFIX = "aa-cr-"
 
 
+@contextlib.contextmanager
+def _directory_lock(path, nonblocking=False):
+    """Exclude sweeps while an initializer creates and locks its owner file."""
+    if fcntl is None:
+        yield
+        return
+    descriptor = os.open(path, os.O_RDONLY)
+    try:
+        fcntl.flock(descriptor, fcntl.LOCK_EX | (fcntl.LOCK_NB if nonblocking else 0))
+        yield
+    finally:
+        os.close(descriptor)
+
+
 def _reclaim(parent):
     """Delete only a recognized directory with an acquirable owner lock."""
     if fcntl is None:
         return
     for candidate in parent.glob(PREFIX + "*"):
-        lock_path = candidate / "owner.lock"
-        if candidate.is_symlink() or lock_path.is_symlink():
+        if candidate.is_symlink():
             continue
-        try:
-            lock = lock_path.open("r+", encoding="utf-8")
-        except OSError:
-            continue
-        with lock:
+        with contextlib.ExitStack() as stack:
             try:
-                fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                stack.enter_context(_directory_lock(candidate, nonblocking=True))
+                published, pending = candidate / "owner.lock", candidate / "owner.pending"
+                if published.is_symlink() or pending.is_symlink():
+                    continue
+                try:
+                    lock = published.open("r+", encoding="utf-8")
+                except FileNotFoundError:
+                    lock = pending.open("r+", encoding="utf-8")
             except OSError:
                 continue
-            with contextlib.suppress(FileNotFoundError):
-                shutil.rmtree(candidate)
+            with lock:
+                try:
+                    fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                except OSError:
+                    continue
+                with contextlib.suppress(FileNotFoundError):
+                    shutil.rmtree(candidate)
 
 
 @contextlib.contextmanager
 def chromium_temp():
     """Remove a launch's temp files even when starting or closing fails."""
-    with tempfile.TemporaryDirectory(prefix=PREFIX) as own:
+    with contextlib.ExitStack() as lifetime:
+        own = lifetime.enter_context(tempfile.TemporaryDirectory(prefix=PREFIX))
         path = Path(own)
-        pending = path / ("owner.pending" if fcntl is not None else "owner.lock")
-        with pending.open("x", encoding="utf-8") as lock:
+        with _directory_lock(path):
+            pending = path / ("owner.pending" if fcntl is not None else "owner.lock")
+            lock = lifetime.enter_context(pending.open("x", encoding="utf-8"))
             if fcntl is not None:
                 fcntl.flock(lock, fcntl.LOCK_EX)
-                # Publish only a held lock, so a parallel sweep cannot
-                # reclaim a directory whose owner is still starting.
                 pending.rename(path / "owner.lock")
-            _reclaim(path.parent)
-            yield own
+        _reclaim(path.parent)
+        yield own
 
 
 @contextlib.contextmanager
