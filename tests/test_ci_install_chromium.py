@@ -635,9 +635,48 @@ def test_dependency_key_output_appends_only_when_resolved(
     else:
         key = capsys.readouterr().out.splitlines()[0].removeprefix(
             "apt-deb cache key: ")
-        assert output.read_text(encoding="utf-8") == f"prior=value\ncache-key={key}\n"
+        changed = "cache-changed=true\n" if case == "present" else ""
+        assert output.read_text(encoding="utf-8") == f"prior=value\ncache-key={key}\n{changed}"
         if case == "present":
             assert (env.cache / "cache-key").read_text(encoding="utf-8") == key
+
+
+# GitHub documents immutable entries and newest-created prefix matches:
+# https://docs.github.com/en/actions/reference/workflows-and-actions/dependency-caching
+# Test repair signals and fresh workflow keys without reimplementing selection.
+@pytest.mark.parametrize("case", [
+    "cold", "warm", "empty", "incomplete", "unresolved", "backfill-failed",
+])
+def test_dependency_cache_emits_changed_only_after_mirror_and_complete_backfill(
+        deps_environment, monkeypatch, tmp_path, case):
+    env = deps_environment
+    if case == "warm":
+        install_chromium.install_with_cached_deps(env.root, env.cache)
+    elif case == "empty":
+        env.packages.clear()
+    elif case == "incomplete":
+        env.packages.append("newlib3")
+    elif case == "unresolved":
+        def fail():
+            raise install_chromium.InstallError("dry-run failed")
+
+        monkeypatch.setattr(install_chromium, "dependency_packages", fail)
+    elif case == "backfill-failed":
+        def fail_copy(*args):
+            raise OSError("cache full")
+
+        monkeypatch.setattr(install_chromium.shutil, "copyfile", fail_copy)
+    output = tmp_path / "step-output"
+    monkeypatch.setenv("GITHUB_OUTPUT", str(output))
+    env.calls.clear()
+    install_chromium.install_with_cached_deps(env.root, env.cache)
+    lines = output.read_text(encoding="utf-8").splitlines() if output.exists() else []
+    if case == "cold":
+        assert "cache-changed=true" in lines
+        assert "--with-deps" in env.calls[-1]
+        assert (env.cache / "cache-key").is_file()
+    else:
+        assert not any(line.startswith("cache-changed=") for line in lines)
 
 
 @pytest.mark.parametrize("change", ["partial", "version", "packages", "corrupt"])
