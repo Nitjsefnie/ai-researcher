@@ -558,16 +558,20 @@ def fixture_deps_environment(monkeypatch, tmp_path):
     archives.mkdir()
     packages = ["liba1", "libb2:amd64"]
     calls = []
+    installed = False
     monkeypatch.setattr(install_chromium, "APT_ARCHIVES", archives)
     monkeypatch.setattr(install_chromium.metadata, "version", lambda _: "1.64.0")
     monkeypatch.setattr(install_chromium, "dependency_packages",
-                        lambda: packages)
+                        lambda: [] if installed else packages)
 
     def fake_run(command, **kwargs):
+        nonlocal installed
         calls.append(command)
         if "cp" in command:
             for source in command[3:-1]:
                 shutil.copyfile(source, archives / Path(source).name)
+        if "--no-download" in command:
+            installed = True
         if "--with-deps" in command:
             (archives / "liba1_2_amd64.deb").write_bytes(b"a")
             (archives / "libb2_3_amd64.deb").write_bytes(b"b")
@@ -600,7 +604,8 @@ def test_dependency_cache_backfills_then_installs_locally(deps_environment,
     assert env.calls[1] == [
         "sudo", "apt-get", "install", "-y", "--no-install-recommends",
         "--no-download", "liba1", "libb2:amd64"]
-    assert "--with-deps" in env.calls[2]
+    assert env.calls[2] == [sys.executable, "-m", "playwright", "install",
+                            "chromium"]
     assert first_log.splitlines()[0] == capsys.readouterr().out.splitlines()[0]
 
 
@@ -648,6 +653,27 @@ def test_dependency_cache_rejected_debs_fall_back(
     install_chromium.install_with_cached_deps(env.root, env.cache)
     assert "--with-deps" in env.calls[-1]
     assert "cache" in capsys.readouterr().err
+
+
+@pytest.mark.parametrize("recheck", ["missing", "unresolvable"])
+def test_dependency_cache_requires_an_empty_post_install_dry_run(
+        deps_environment, monkeypatch, recheck):
+    env = deps_environment
+    install_chromium.install_with_cached_deps(env.root, env.cache)
+    checks = []
+
+    def resolve():
+        checks.append(True)
+        if len(checks) == 2 and recheck == "unresolvable":
+            raise install_chromium.InstallError("post-install dry-run failed")
+        return env.packages
+
+    monkeypatch.setattr(install_chromium, "dependency_packages", resolve)
+    env.calls.clear()
+    install_chromium.install_with_cached_deps(env.root, env.cache)
+    assert len(checks) == 2
+    assert "--no-download" in env.calls[1]
+    assert "--with-deps" in env.calls[-1]
 
 
 def test_dependency_cache_resolution_failure_preserves_install(
@@ -699,7 +725,8 @@ def test_dependency_cache_empty_list_needs_no_apt_install(deps_environment):
     env.packages.clear()
     install_chromium.install_with_cached_deps(env.root, env.cache)
     assert len(env.calls) == 1
-    assert "--with-deps" in env.calls[0]
+    assert env.calls[0] == [sys.executable, "-m", "playwright", "install",
+                            "chromium"]
     assert not env.cache.exists()
 
 
@@ -716,7 +743,12 @@ def test_dependency_cache_backfill_copy_failure_is_nonfatal(
     assert "cache full" in capsys.readouterr().err
 
 
-def test_run_playwright_install_spawns_the_module(monkeypatch, tmp_path):
+@pytest.mark.parametrize("with_deps, expected", [
+    (True, ["--with-deps", "chromium"]),
+    (False, ["chromium"]),
+])
+def test_run_playwright_install_spawns_the_module(
+        monkeypatch, tmp_path, with_deps, expected):
     seen = {}
 
     def fake_run(command, env=None, check=False):
@@ -726,9 +758,9 @@ def test_run_playwright_install_spawns_the_module(monkeypatch, tmp_path):
         return SimpleNamespace(returncode=0)
 
     monkeypatch.setattr(install_chromium.subprocess, "run", fake_run)
-    install_chromium.run_playwright_install(tmp_path)
+    install_chromium.run_playwright_install(tmp_path, with_deps=with_deps)
     assert seen["command"] == [sys.executable, "-m", "playwright", "install",
-                               "--with-deps", "chromium"]
+                               *expected]
     assert seen["env"]["PLAYWRIGHT_BROWSERS_PATH"] == str(tmp_path)
     assert seen["check"] is False
 
@@ -825,6 +857,7 @@ def test_main_happy_path_seeds_and_runs_install(browsers_root, digests,
     monkeypatch.setattr(install_chromium.subprocess, "run", fake_run)
     assert install_chromium.main(["--deps-cache", str(tmp_path / "debs")]) == 0
     assert len(runs) == 2
+    assert runs[-1] == [sys.executable, "-m", "playwright", "install", "chromium"]
     out = capsys.readouterr().out
     for name in ("chromium", "chromium-headless-shell", "ffmpeg"):
         assert f"{name} revision" in out

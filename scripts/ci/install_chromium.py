@@ -15,7 +15,7 @@ This script closes that hole without forking playwright's installer. It
 resolves the pinned revision and archive URL from the INSTALLED playwright
 package, checks the archive against a digest committed in this file, and
 pre-seeds the browsers directory so the subsequent ``playwright install
---with-deps chromium`` finds every product present (marker file set) and
+chromium`` finds every product present (marker file set) and
 downloads nothing. Afterwards it asserts that nothing was re-downloaded
 anyway -- a replaced browser directory or an unexpected new browser directory
 fails the job.
@@ -517,11 +517,13 @@ def dependency_packages() -> list[str]:
 
 
 def install_with_cached_deps(root: Path, cache: Path) -> None:
-    """Install local debs when complete; retain Playwright's fallback and validation."""
+    """Use local debs when complete; ask Playwright for apt only when needed."""
     packages: set[str] = set()
     key = ""
+    deps_installed = False
     try:
         resolved = sorted(dependency_packages())
+        deps_installed = not resolved
         key = hashlib.sha256(json.dumps(
             [metadata.version("playwright"), resolved]).encode("utf-8")).hexdigest()
         print(f"apt-deb cache key: {key}", flush=True)
@@ -544,12 +546,13 @@ def install_with_cached_deps(root: Path, cache: Path) -> None:
                 if result.returncode != 0:
                     print("apt-deb cache install failed; using Playwright's apt fallback",
                           file=sys.stderr, flush=True)
+                else:
+                    deps_installed = not dependency_packages()
     except (InstallError, OSError, UnicodeError, metadata.PackageNotFoundError) as error:
-        print(f"apt-deb cache unavailable ({error}); using Playwright's apt fallback",
+        print(f"apt-deb cache unavailable ({error}); using Playwright's installer",
               file=sys.stderr, flush=True)
 
-    # shortcut: --with-deps still updates apt; split that step if metadata fetches stall.
-    run_playwright_install(root)
+    run_playwright_install(root, with_deps=not deps_installed)
 
     if packages and key:
         try:
@@ -564,15 +567,16 @@ def install_with_cached_deps(root: Path, cache: Path) -> None:
                   file=sys.stderr, flush=True)
 
 
-def run_playwright_install(root: Path) -> None:
+def run_playwright_install(root: Path, with_deps: bool = True) -> None:
     """Run playwright's own install against the pre-seeded directory.
 
-    --with-deps still apt-installs the shared libraries headless Chromium
-    links against; the browser archives themselves are already present, so
-    the downloader has nothing left to fetch.
+    --with-deps apt-installs shared libraries only on the mirror fallback.
+    Pre-seeded browser archives leave the downloader nothing to fetch.
     """
-    command = [sys.executable, "-m", "playwright", "install",
-               "--with-deps", "chromium"]
+    command = [sys.executable, "-m", "playwright", "install"]
+    if with_deps:
+        command.append("--with-deps")
+    command.append("chromium")
     print(f"+ {' '.join(command)}", flush=True)
     result = subprocess.run(
         command,
@@ -634,12 +638,12 @@ def assert_seeded_intact(root: Path, products: list,
 
 
 def main(argv=None) -> int:
-    """Resolve, verify, seed, then let playwright install its apt libs."""
+    """Resolve, verify, seed, then install dependencies only when missing."""
     parser = argparse.ArgumentParser(
         description="Digest-verify Playwright's Chromium archives against "
                     "the committed table in this file, pre-seed the browsers "
-                    "directory, then run playwright install --with-deps "
-                    "chromium (which then downloads nothing).")
+                    "directory, then run playwright install chromium "
+                    "(adding --with-deps only for missing system dependencies).")
     parser.add_argument(
         "--deps-cache", type=Path,
         default=Path.home() / ".cache" / "ai-researcher-playwright-debs",
