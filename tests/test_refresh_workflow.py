@@ -510,8 +510,6 @@ class GateTests(unittest.TestCase):  # pylint: disable=too-many-public-methods
         self.assertLess(
             run.index("https://docs.nitjsefni.eu/d/ai-researcher/frontier-models"),
             run.index("curl -sS"))
-        self.assertLess(
-            run.index("curl -sS"), run.index("cat /tmp/publish-response.json"))
         self.assertIn("Source commit <code>", run)
 
     def test_no_refs_api_call_remains(self):
@@ -1100,18 +1098,6 @@ class CaptureStepTests(unittest.TestCase):
         self.block = flattened(self.step["run"])
         self.header = WORKFLOW.read_text(
             encoding="utf-8").split("\njobs:", 1)[0]
-
-    def test_the_fetch_runs_behind_an_rc_trap_that_parks_the_stderr(self):
-        # The capture's stderr is parked in a file so the red path can
-        # re-emit it under the step's own log; the rc is captured before
-        # `set -e` restores the fail-fast the job runs under.
-        for piece in ("set +e",
-                      "python3 scripts/fetch_aa.py --cross-run-lookback "
-                      "2> /tmp/fetch-err.txt",
-                      "rc=$?",
-                      "set -e"):
-            self.assertIn(piece, self.block)
-        self.assertIn("cat /tmp/fetch-err.txt >&2", self.block)
 
     def test_the_step_has_one_recovery_and_one_red_and_no_third_colour(self):
         # Recovery (rc 0) stands first and sets the force gate's verdict,
@@ -2039,6 +2025,88 @@ else:
 
 
 @pytest.mark.skipif(os.name == 'nt', reason='workflow shell runs on Ubuntu')
+@pytest.mark.parametrize('status', [0, 7])
+def test_capture_step_removes_temp_files(tmp_path, status):
+    """Capture stderr uses TMPDIR and is removed on success and fetch failure."""
+    probe = tmp_path / 'probe'
+    probe.mkdir()
+    scripts = tmp_path / 'scripts'
+    scripts.mkdir()
+    (scripts / 'fetch_aa.py').write_text(
+        'import os, sys\nfrom pathlib import Path\n'
+        'stat = os.fstat(2)\n'
+        'paths = [p.name for p in Path(os.environ["TMPDIR"]).iterdir()\n'
+        '         if (p.stat().st_dev, p.stat().st_ino) == (stat.st_dev, stat.st_ino)]\n'
+        'Path("observed").write_text(str(len(paths)), encoding="utf-8")\n'
+        'print("capture diagnostic", file=sys.stderr)\n'
+        f'sys.exit({status})\n', encoding='utf-8')
+    env = {'PATH': os.environ['PATH'], 'TMPDIR': str(probe),
+           'GITHUB_OUTPUT': str(tmp_path / 'output')}
+    done = subprocess.run(
+        ['bash', '-e', '-c', step(load(), 'Capture the leaderboard')['run']],
+        cwd=tmp_path, env=env, check=False, capture_output=True, text=True, timeout=120)
+    assert done.returncode == status, done.stdout + done.stderr
+    if status:
+        assert 'capture diagnostic' in done.stderr
+        assert not (tmp_path / 'output').exists()
+    else:
+        assert (tmp_path / 'output').read_text(encoding='utf-8') == 'captured=true\n'
+    assert (tmp_path / 'observed').read_text(encoding='utf-8') == '1'
+    assert not list(probe.iterdir())
+
+
+@pytest.mark.skipif(os.name == 'nt', reason='workflow shell runs on Ubuntu')
+@pytest.mark.parametrize('job', ['hub', 'rankings-hub'])
+@pytest.mark.parametrize('live,code,expected', [
+    ('same', '200', 0), ('stale', '200', 0),
+    ('stale', '503', 1), ('stale', 'transport', 7)])
+def test_publish_step_removes_temp_files(tmp_path, job, live, code, expected):
+    """Raw publish steps clean scratch on skip, upload, refusal and transport failure."""
+    # pylint: disable=protected-access
+    harness = _SeededOrigin()
+    page_name = 'frontier-models' if job == 'hub' else 'trending-rankings'
+    content = '<html>page</html>\n'
+    config, base, _origin, repo, _seed_env = harness._seed_origin(
+        tmp_path, {f'out/{page_name}.html': content})
+    runner = tmp_path / 'runner'
+    runner.mkdir()
+    artifact = ('publish-payload/tree/out' if job == 'hub' else 'rankings-page')
+    page = runner / artifact / f'{page_name}.html'
+    page.parent.mkdir(parents=True)
+    page.write_text(content, encoding='utf-8')
+    (runner / 'push-data').mkdir()
+    (runner / 'push-data/tip.txt').write_text(base, encoding='utf-8')
+    stub = tmp_path / 'bin'
+    stub.mkdir()
+    (stub / 'curl_payload.py').write_text(
+        RANKINGS_CURL.replace('trending-rankings', page_name), encoding='utf-8')
+    (stub / 'curl').write_text(
+        '#!/bin/sh\nexec "$TEST_PYTHON" "$(dirname "$0")/curl_payload.py" "$@"\n',
+        encoding='utf-8')
+    (stub / 'curl').chmod(0o755)
+    probe = tmp_path / 'probe'
+    probe.mkdir()
+    calls = tmp_path / 'calls'
+    env = {**harness._env(runner, config, base),
+           'PATH': str(stub) + os.pathsep + os.environ['PATH'],
+           'TMPDIR': str(probe), 'TEST_PYTHON': sys.executable,
+           'DOCS_HUB_API_KEY': 'fixture', 'LIVE_PAGE': live,
+           'UPLOAD_CODE': code, 'UPLOAD_BODY': '{}',
+           'HUB_CALLS': str(calls), 'RANKINGS_PAGE': str(page)}
+    done = subprocess.run(
+        ['bash', '-e', '-c', step_in(load(), job, 'Publish to docs-hub')['run']],
+        cwd=repo, env=env, check=False, capture_output=True, text=True, timeout=120)
+    assert done.returncode == expected, done.stdout + done.stderr
+    requests = [json.loads(line) for line in calls.read_text(encoding='utf-8').splitlines()]
+    assert len(requests) == (1 if live == 'same' else 2)
+    for request in requests:
+        output = pathlib.Path(request[request.index('-o') + 1])
+        assert output.parent == probe
+        assert not output.exists()
+    assert not list(probe.iterdir())
+
+
+@pytest.mark.skipif(os.name == 'nt', reason='workflow shell runs on Ubuntu')
 def test_rankings_quiet_hour_recovers_a_failed_upload(tmp_path):
     """An HTTP failure after landing heals next hour without another commit."""
     # Reuse the shared fixture's private seeding and git helpers.
@@ -2084,9 +2152,7 @@ def test_rankings_quiet_hour_recovers_a_failed_upload(tmp_path):
                 'TEST_PYTHON': sys.executable, 'DOCS_HUB_API_KEY': 'fixture',
                 'LIVE_PAGE': 'stale', 'UPLOAD_CODE': '503', 'UPLOAD_BODY': '{}',
                 'HUB_CALLS': str(tmp_path / 'calls')})
-    hub = dict(step_in(load(), 'rankings-hub', 'Publish to docs-hub'))
-    hub['run'] = hub['run'].replace(
-        '/tmp/publish-response.json', '"${RUNNER_TEMP}/publish-response.json"')
+    hub = step_in(load(), 'rankings-hub', 'Publish to docs-hub')
     artifact = landing / 'rankings-page/trending-rankings.html'
     artifact.parent.mkdir()
     artifact.write_bytes(original)
@@ -2377,9 +2443,7 @@ def test_rankings_hub_upload_verdicts(tmp_path, main, live, code, body, expected
            'HUB_CALLS': str(calls), 'RANKINGS_PAGE': str(page),
            'GITHUB_REPOSITORY': 'fixture/rankings', 'GIT_CONFIG_GLOBAL': str(config),
            'REAL_GIT': shutil.which('git') or 'git', 'HEAD_STATE': main}
-    entry = dict(step_in(load(), 'rankings-hub', 'Publish to docs-hub'))
-    entry['run'] = entry['run'].replace(
-        '/tmp/publish-response.json', '"${RUNNER_TEMP}/publish-response.json"')
+    entry = step_in(load(), 'rankings-hub', 'Publish to docs-hub')
     done = _workflowrun.run_step(tmp_path, entry, env)
     assert done.returncode == expected, done.stdout + done.stderr
     if main in ('moved', 'fetch-fail', 'empty-head', 'unreadable-head'):
@@ -2784,11 +2848,6 @@ class ExecutedHubTrackerOrderingTests(unittest.TestCase):
     def _run(self, job, name, context):
         repo, env = self.contexts[context]
         entry = dict(step_in(self.workflow, job, name))
-        if job == 'hub':
-            # Relocate only the response scratch file; the tip comparison and
-            # upload logic run unchanged without touching a shared /tmp file.
-            entry['run'] = entry['run'].replace(
-                '/tmp/publish-response.json', '"${RUNNER_TEMP}/publish-response.json"')
         result = _workflowrun.run_step(repo, entry, env)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         return result

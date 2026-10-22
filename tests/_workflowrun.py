@@ -12,6 +12,7 @@ destination.
 import shlex
 import shutil
 import subprocess
+import tempfile
 from pathlib import Path
 
 import yaml
@@ -31,7 +32,7 @@ def step_by_name(workflow_path, job_id, name):
 
 
 def run_step(workdir, step, env):
-    """Run one decoded workflow step, with `env` winning over its own.
+    """Run one decoded workflow step, with an isolated TMPDIR and env overrides.
 
     The workflow substitutes `${{ ... }}` before a script ever runs, so a
     test must resolve every expression in the step's `env:` itself; an
@@ -54,9 +55,14 @@ def run_step(workdir, step, env):
         assert "${{" not in value or name in env, (
             f"unresolved workflow expression in {name}: {value!r}")
         child_env.setdefault(name, value)
-    return subprocess.run(
-        command, cwd=workdir, env=child_env, check=False,
-        capture_output=True, text=True, timeout=120)
+    temp_dir = tempfile.mkdtemp(prefix="workflow-step-", dir=workdir)
+    child_env["TMPDIR"] = temp_dir
+    try:
+        return subprocess.run(
+            command, cwd=workdir, env=child_env, check=False,
+            capture_output=True, text=True, timeout=120)
+    finally:
+        shutil.rmtree(temp_dir)
 
 
 def write_gh_stub(bin_dir, state_path, calls_path):
