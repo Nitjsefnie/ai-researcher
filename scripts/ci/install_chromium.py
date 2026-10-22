@@ -565,6 +565,9 @@ def install_with_cached_deps(root: Path, cache: Path) -> None:
                 for path in debs:
                     shutil.copyfile(path, cache / path.name)
                 (cache / "cache-key").write_text(key, encoding="utf-8")
+                if not deps_installed and (output := os.environ.get("GITHUB_OUTPUT")):
+                    with open(output, "a", encoding="utf-8") as handle:
+                        handle.write("cache-changed=true\n")
         except OSError as error:
             print(f"apt-deb cache backfill unavailable ({error})",
                   file=sys.stderr, flush=True)

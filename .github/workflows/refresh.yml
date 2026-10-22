@@ -468,11 +468,11 @@ jobs:
         run: python3 scripts/ci/install_chromium.py
 
       - name: Save Chromium dependency debs
-        if: steps.capture.outputs.proceed == 'true' && steps.chromium.outputs.cache-key != ''
+        if: steps.capture.outputs.proceed == 'true' && steps.chromium.outputs.cache-changed == 'true'
         uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ~/.cache/ai-researcher-playwright-debs
-          key: chromium-debs-${{ runner.os }}-${{ steps.chromium.outputs.cache-key }}
+          key: chromium-debs-${{ runner.os }}-${{ steps.chromium.outputs.cache-key }}-${{ github.run_id }}
 
       - name: Summarise what changed
         # Runs on `proceed`, not `changed`: this is the ONLY step that executes
