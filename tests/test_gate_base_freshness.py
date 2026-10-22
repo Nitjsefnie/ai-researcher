@@ -229,6 +229,7 @@ CORE_PIN = (
     'tests/fixtures/pipeline/aa-raw-models.json',
     'tests/fixtures/pipeline/captured-at.txt',
     'tests/test_browser.py',
+    'tests/test_browser_temp.py',
     'tests/test_build.py',
     'tests/test_build_rankings.py',
     'tests/test_capture_gate.py',

@@ -633,16 +633,15 @@ def measure():
         # the no-playwright CI matrix can import the pure half.
         # pylint: disable-next=import-outside-toplevel
         from playwright.sync_api import sync_playwright
+        # pylint: disable-next=import-outside-toplevel
+        from scripts.browser_temp import chromium_browser
 
-        with sync_playwright() as playwright:
-            browser = playwright.chromium.launch(
+        with chromium_browser(
+                sync_playwright,
                 executable_path=_chromium_executable(),
                 headless=True,
-                args=['--no-sandbox', '--js-flags=--expose-gc'])
-            try:
-                journeys = measure_journeys(browser, uri)
-            finally:
-                browser.close()
+                args=['--no-sandbox', '--js-flags=--expose-gc']) as browser:
+            journeys = measure_journeys(browser, uri)
     return {
         'schema_version': SCHEMA_VERSION,
         'page': {'output': PAGE_NAME,

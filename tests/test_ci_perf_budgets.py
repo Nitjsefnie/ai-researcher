@@ -1,9 +1,8 @@
 """Tests for the performance-budgets loader and gate (issue #109).
 
-The pure half of scripts/ci/perf_budgets.py: the budgets-document
-validation and the gate over a measurement. No playwright anywhere in
-this module -- the measurement half runs a browser and is exercised by
-hand (`perf_budgets.py --measure`), never from pytest here.
+The pure half of scripts/ci/perf_budgets.py and the measurement's temp
+wiring. Playwright is replaced at the driver boundary for the wiring
+tests; real-browser measurements run separately.
 """
 from __future__ import annotations
 
@@ -18,6 +17,7 @@ import subprocess
 import sys
 import tempfile
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -42,6 +42,62 @@ def _load(name):
 
 
 perf = _load("perf_budgets")
+
+
+@pytest.mark.parametrize("failure", [False, True])
+def test_measure_owns_driver_and_browser_temp(tmp_path, monkeypatch, failure):
+    """Exercise measure's wiring without importing or installing Playwright."""
+    monkeypatch.setenv("TMPDIR", str(tmp_path))
+    monkeypatch.setattr(tempfile, "tempdir", str(tmp_path))
+    events = []
+    seen = {}
+
+    def close():
+        assert seen["own"].exists()
+        events.append("close")
+
+    browser = SimpleNamespace(close=close)
+
+    def launch(**options):
+        assert os.environ["TMPDIR"] == str(tmp_path)
+        own = Path(options["env"]["TMPDIR"])
+        assert own == seen["own"]
+        (own / "chromium-residue").mkdir()
+        return browser
+
+    def stop():
+        assert seen["own"].exists()
+        events.append("stop")
+
+    driver = SimpleNamespace(chromium=SimpleNamespace(launch=launch), stop=stop)
+
+    class Manager:
+        def start(self):
+            own = Path(os.environ["TMPDIR"])
+            assert own.parent == tmp_path
+            seen["own"] = own
+            (own / "driver-residue").mkdir()
+            return driver
+
+    monkeypatch.setitem(sys.modules, "playwright.sync_api",
+                        SimpleNamespace(sync_playwright=Manager))
+
+    def journeys(opened, uri):
+        assert opened is browser
+        assert Path(uri.removeprefix("file://")).name == "frontier-models.html"
+        if failure:
+            raise RuntimeError("journey failed")
+        return {"measured": True}
+
+    monkeypatch.setattr(perf, "measure_journeys", journeys)
+    if failure:
+        with pytest.raises(RuntimeError, match="journey failed"):
+            perf.measure()
+    else:
+        assert perf.measure()["journeys"] == {"measured": True}
+    assert events == ["close", "stop"]
+    assert os.environ["TMPDIR"] == str(tmp_path)
+    assert not list(tmp_path.iterdir())
 
 
 def _document():
