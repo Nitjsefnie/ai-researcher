@@ -112,8 +112,8 @@
     8151
   ],
   "scripts/ci/perf_budgets.py": [
-    10031,
-    22198
+    10075,
+    22313
   ],
   "scripts/ci/ratchet.py": [
     555,
@@ -144,12 +144,12 @@
     4523
   ],
   "tests/_workflowrun.py": [
-    1399,
-    7198
+    1408,
+    7346
   ],
   "tests/test_browser.py": [
     31755,
-    96575
+    96961
   ],
   "tests/test_build.py": [
     31881,
@@ -196,8 +196,8 @@
     20299
   ],
   "tests/test_ci_perf_budgets.py": [
-    5068,
-    21949
+    5071,
+    23768
   ],
   "tests/test_ci_ratchets.py": [
     10483,
@@ -225,7 +225,7 @@
   ],
   "tests/test_gate_base_freshness.py": [
     5049,
-    29026
+    29083
   ],
   "tests/test_gitignore.py": [
     3628,
@@ -240,8 +240,8 @@
     10113
   ],
   "tests/test_refresh_workflow.py": [
-    24168,
-    111262
+    24085,
+    113664
   ],
   "tests/test_workflow_ci_gate.py": [
     3391,
