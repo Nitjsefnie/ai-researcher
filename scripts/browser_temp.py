@@ -1,4 +1,4 @@
-"""Own Chromium and driver temp files for one browser lifetime (issue #310)."""
+"""Own browser temp files (issue #310)."""
 import contextlib
 import os
 from pathlib import Path
@@ -7,16 +7,16 @@ import tempfile
 
 try:
     import fcntl
-except ImportError:  # Windows keeps per-launch cleanup, without reclaim.
+except ImportError:  # Windows skips reclaim.
     fcntl = None
 
-# Keep room for Chromium's SingletonSocket under Unix socket path limits.
+# Chromium's Unix socket path has a length limit.
 PREFIX = "aa-cr-"
 
 
 @contextlib.contextmanager
 def _directory_lock(path, nonblocking=False):
-    """Exclude sweeps while an initializer creates and locks its owner file."""
+    """Exclude reclaim until the pending file is locked."""
     if fcntl is None:
         yield
         return
@@ -29,7 +29,6 @@ def _directory_lock(path, nonblocking=False):
 
 
 def _reclaim(parent):
-    """Delete only a recognized directory with an acquirable owner lock."""
     if fcntl is None:
         return
     for candidate in parent.glob(PREFIX + "*"):
@@ -58,7 +57,7 @@ def _reclaim(parent):
 
 @contextlib.contextmanager
 def chromium_temp():
-    """Remove a launch's temp files even when starting or closing fails."""
+    """The owner flock survives rename and covers the browser lifetime."""
     with contextlib.ExitStack() as lifetime:
         own = lifetime.enter_context(tempfile.TemporaryDirectory(prefix=PREFIX))
         path = Path(own)
@@ -74,7 +73,6 @@ def chromium_temp():
 
 @contextlib.contextmanager
 def chromium_browser(playwright_factory, **launch_options):
-    """Start the driver and Chromium in one owned temp directory."""
     with chromium_temp() as own:
         saved = os.environ.get("TMPDIR")
         os.environ["TMPDIR"] = own
