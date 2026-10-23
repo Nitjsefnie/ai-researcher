@@ -12,6 +12,7 @@ import contextlib
 import json
 import os
 import pathlib
+import re
 import shutil
 import subprocess
 import tempfile
@@ -108,8 +109,18 @@ class ArtifactDataTests(unittest.TestCase):
         down = step(self.wf, "Download the ratchet data")
         assert down["if"] == "steps.list.outputs.staged == 'true'"
         with_ = down["with"]
-        assert with_["name"] == "${{ steps.list.outputs.artifact }}"
-        assert with_["run-id"] == "${{ github.event.workflow_run.id }}"
+        reference = re.fullmatch(
+            r"\$\{\{\s*steps\s*\.\s*([\w-]+)\s*\.\s*outputs\s*\.\s*([\w-]+)\s*\}\}",
+            with_["name"].strip())
+        assert reference is not None, with_["name"]
+        step_id, output = reference.groups()
+        producers = [entry for entry in self.wf["jobs"]["push"]["steps"]
+                     if entry.get("id") == step_id]
+        assert producers, f"missing output producer: {step_id}"
+        assert re.search(
+            rf"(?m)^[ \t]*(?:echo|printf)\s+[^\n]*?(?<![\w-]){re.escape(output)}="
+            r"[^\n]*>>?\s*[\"']?\$(?:GITHUB_OUTPUT|\{GITHUB_OUTPUT\})[\"']?\s*$",
+            producers[0].get("run", "")), (step_id, output)
 
     def test_the_validation_step_runs_before_the_push_step(self):
         names = [s.get("name") for s in self.wf["jobs"]["push"]["steps"]]

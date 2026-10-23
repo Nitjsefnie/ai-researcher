@@ -19,6 +19,7 @@ timeout-minutes, so a new job cannot silently hold GitHub's 6-hour default.
 from __future__ import annotations
 
 import re
+import unittest
 from pathlib import Path
 
 import yaml
@@ -172,6 +173,28 @@ def test_hash_pinned_requirements_name_each_version_only_once():
                 "Dependabot's declaration scan; that match carries no hashes, "
                 "so the bump leaves the old digests behind and the "
                 "--require-hashes install fails")
+
+
+class WorkflowRunArtifactTests(unittest.TestCase):
+    """Cross-run downloads read artifacts from the triggering run."""
+
+    def test_downloads_use_the_triggering_run_id(self):
+        downloads = []
+        for path in WORKFLOWS:
+            workflow = yaml.load(path.read_text(encoding="utf-8"),
+                                 Loader=yaml.BaseLoader)
+            if "workflow_run" not in workflow.get("on", {}):
+                continue
+            for name, job in workflow["jobs"].items():
+                with self.subTest(workflow=path.name, job=name):
+                    for entry in job.get("steps", []):
+                        if entry.get("uses", "").split("@", 1)[0] != "actions/download-artifact":
+                            continue
+                        downloads.append(entry)
+                        self.assertEqual(
+                            "".join(entry.get("with", {}).get("run-id", "").split()),
+                            "${{github.event.workflow_run.id}}")
+        self.assertTrue(downloads, "no workflow_run artifact downloads found")
 
 
 def test_every_job_declares_timeout_minutes():
