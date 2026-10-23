@@ -55,8 +55,8 @@ raise commit's message carries one declaration line per raised leaf,
 with the exact values the diff carries. The workflow enables
 --allow-declared-raises on both routes: --route push (default) and
 --route pr. Declarations come from base..head: pushes require ancestry;
-PRs use the merge commit's parents (base HEAD^1, head HEAD^2). PR
-declarations additionally require a commit in that window whose subject
+PRs use the merge commit's parents (base HEAD^1, head HEAD^2).
+Declarations require a commit in that window whose subject
 starts with ``feat: `` or ``feat(<scope>): `` (issue #271).
 On both routes
 the lines count only from commits touching nothing outside the two
@@ -90,7 +90,7 @@ BUDGETS = '.github/perf-budgets.json'
 INSTRUCTION_BUDGETS = '.github/instruction-budgets.json'
 REGULAR_FILE = '100644 blob'
 GAP = Decimal('1.5')
-# The push route for a deliberate raise (issue #120): one line per
+# The declared-raise route (issue #120): one line per
 # raised leaf in the raise commit's message, naming the exact values the
 # diff carries. Only these documents' raises may be declared.
 DECLARABLE_DOCUMENTS = (BUDGETS, INSTRUCTION_BUDGETS)
@@ -443,20 +443,20 @@ def _commit_paths(cwd, base, head):
     return paths_by_commit
 
 
-def _collect_declarations(cwd, base, head, require_feat=False):
+def _collect_declarations(cwd, base, head):
     """The parsed declarations by document, plus the findings for the
     lines that can never be consumed: a line on a commit that touches
     anything outside the two budget documents (the route is its own
     act — this is what keeps a raise from riding feature work onto main
     through a squash merge), a malformed line, or one naming a document
-    outside the declarable two. On the PR route, declaration lines also
+    outside the declarable two. On both routes, declaration lines also
     require a feat subject in the same window.
     """
     paths_by_commit = _commit_paths(cwd, base, head)
     raw = []
     findings = []
     commits = _commits_with_declaration_lines(cwd, base, head)
-    if require_feat and commits:
+    if commits:
         subjects = _git(cwd, ['log', '--format=%s', f'{base}..{head}'])
         if subjects.returncode != 0:
             raise ValueError(
@@ -465,7 +465,7 @@ def _collect_declarations(cwd, base, head, require_feat=False):
         if not any(re.match(r'^feat(?:\([^()]+\))?: ', subject)
                    for subject in subjects.stdout.splitlines()):
             findings.append(
-                'Budget-Raise: declarations on a pull request require at '
+                'Budget-Raise: declarations require at '
                 'least one feat: or feat(<scope>): commit subject in '
                 'base..head (colon followed by a space; CONTRIBUTING.md)')
     for sha, lines in commits:
@@ -612,7 +612,7 @@ def check_ratchets(cwd, base_rev, head_rev, allow_declared_raises=False,
         route == 'pr' or _is_ancestor(cwd, base, head))
     if route_open:
         by_document, declaration_findings = _collect_declarations(
-            cwd, base, head, require_feat=route == 'pr')
+            cwd, base, head)
         findings.extend(declaration_findings)
     for document, direction_of, cross_checks in DOCUMENTS:
         kind = entry_kind(cwd, head, document)
