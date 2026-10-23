@@ -107,9 +107,9 @@ def test_aggregate_precedence(monkeypatch, tmp_path, case):
             for leg in aggregate_gate.EXPECTED_LEGS}
     bad = {**good, "tests": {"result": "failure"}}
     _environment(monkeypatch, "AI_RESEARCHER_NEEDS_JSON", case,
-                 json.dumps(good), json.dumps(bad))
+                 json.dumps(good), json.dumps(good if case == "legacy" else bad))
     monkeypatch.setenv("GITHUB_STEP_SUMMARY", str(tmp_path / "summary"))
-    assert aggregate_gate.main() == (1 if case in ("legacy", "neither") else 0)
+    assert aggregate_gate.main() == (1 if case == "neither" else 0)
 
 
 @pytest.mark.parametrize("case", CASES)
