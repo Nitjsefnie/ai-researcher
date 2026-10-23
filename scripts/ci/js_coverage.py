@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Fold a Playwright V8 dump into code-line coverage for the built page.
 
-The input is the JSON file the browser harness writes when ``JS_COVERAGE_OUT``
-is set: the array ``page.coverage.stop_js_coverage()`` returned, one record
+The harness writes JSON to ``AI_RESEARCHER_JS_COVERAGE_OUT`` when set:
+the array ``page.coverage.stop_js_coverage()`` returned, one record
 per script Chromium compiled, each carrying ``url``, ``source`` and the V8
 ``functions[].ranges[]`` block-coverage tree. A record is attributed to the
 page only when its ``source`` equals the text of the single inline

@@ -477,9 +477,9 @@ def test_gate_rejects_a_measurement_without_a_journeys_section():
 def test_chromium_executable_prefers_the_env_path(monkeypatch):
     # white-box: the discovery helper is the contract under test
     # pylint: disable=protected-access
-    monkeypatch.setenv("CHROMIUM_PATH", "/nonexistent-browser")
+    monkeypatch.setenv("AI_RESEARCHER_CHROMIUM_PATH", "/nonexistent-browser")
     assert perf._chromium_executable() is None
-    monkeypatch.setenv("CHROMIUM_PATH", str(REPO_ROOT / "build.py"))
+    monkeypatch.setenv("AI_RESEARCHER_CHROMIUM_PATH", str(REPO_ROOT / "build.py"))
     assert perf._chromium_executable() == REPO_ROOT / "build.py"
 
 
@@ -515,17 +515,17 @@ def test_build_page_strips_the_stamp_and_restores_everything(
     with tempfile.TemporaryDirectory(
             prefix=".build-page-", dir=str(REPO_ROOT)) as tmp:
         out = pathlib.Path(tmp) / "page.html"
-        monkeypatch.setenv("AA_SOURCE_COMMIT", "a" * 40)
+        monkeypatch.setenv("AI_RESEARCHER_AA_SOURCE_COMMIT", "a" * 40)
         page = perf._build_page(build, out)
         assert "a" * 40 not in page.decode("utf-8")
         assert build.OUT == old_out
-        assert os.environ.get("AA_SOURCE_COMMIT") == "a" * 40
+        assert os.environ.get("AI_RESEARCHER_AA_SOURCE_COMMIT") == "a" * 40
 
-        monkeypatch.delenv("AA_SOURCE_COMMIT", raising=False)
+        monkeypatch.delenv("AI_RESEARCHER_AA_SOURCE_COMMIT", raising=False)
         page = perf._build_page(build, out)
         assert "a" * 40 not in page.decode("utf-8")
         assert build.OUT == old_out
-        assert "AA_SOURCE_COMMIT" not in os.environ
+        assert "AI_RESEARCHER_AA_SOURCE_COMMIT" not in os.environ
 
 
 def test_measure_journeys_refuses_a_run_count_of_zero(monkeypatch):
@@ -736,7 +736,10 @@ def _build_bytes(raw_path, agents_path):
     build.RAW, build.AGENTS_RAW = Path(raw_path), Path(agents_path)
     build.OUT = output
     try:
-        saved_stamp = os.environ.pop("AA_SOURCE_COMMIT", None)
+        stamp_env = "AI_RESEARCHER_AA_SOURCE_COMMIT"
+        saved_stamp = {key: os.environ.pop(key) for key in
+                       (stamp_env, stamp_env.removeprefix("AI_RESEARCHER_"))
+                       if key in os.environ}
         try:
             with contextlib.redirect_stdout(io.StringIO()):
                 # astroid cannot infer build.py's members from this
@@ -746,8 +749,7 @@ def _build_bytes(raw_path, agents_path):
                 build.main(generation_state=None)
             page_bytes = output.read_bytes()
         finally:
-            if saved_stamp is not None:
-                os.environ["AA_SOURCE_COMMIT"] = saved_stamp
+            os.environ.update(saved_stamp)
     finally:
         build.RAW, build.AGENTS_RAW, build.OUT = (
             saved_raw, saved_agents, saved_out)

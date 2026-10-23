@@ -7,7 +7,7 @@
 Both sides of each document are read as data with ``git show
 <rev>:<path>`` at the reference revision and at the head — never from the
 working tree, and no head code is executed. On the push route the base
-revision (BEFORE, the previous main tip) is the reference, including on a
+revision (AI_RESEARCHER_BEFORE, the previous main tip) is the reference, including on a
 non-fast-forward push. On the pull-request route the merge base is the
 reference: an automated raise landing on main after a branch forks is
 not something the branch loosened by missing.
@@ -85,7 +85,7 @@ import sys
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
 
-DOCUMENT = '.github/ci-thresholds.json'
+THRESHOLDS_DOCUMENT = '.github/ci-thresholds.json'
 BUDGETS = '.github/perf-budgets.json'
 INSTRUCTION_BUDGETS = '.github/instruction-budgets.json'
 REGULAR_FILE = '100644 blob'
@@ -292,7 +292,7 @@ def _relaxations(base, head, document, direction_of, cross_checks,
     return findings
 
 
-def coverage_relaxations(base, head, document=DOCUMENT):
+def coverage_relaxations(base, head, document=THRESHOLDS_DOCUMENT):
     """Findings for a head thresholds document that relaxes the base's.
 
     ``document`` names the checked path in the finding lines; the default
@@ -328,7 +328,7 @@ def instruction_budgets_relaxations(base, head, document=INSTRUCTION_BUDGETS):
 # The guarded documents, in the order the guard walks and reports them:
 # each entry is (path, direction resolver, cross-checks).
 DOCUMENTS = (
-    (DOCUMENT, _DIRECTIONS.get, (_implied_floor_findings,)),
+    (THRESHOLDS_DOCUMENT, _DIRECTIONS.get, (_implied_floor_findings,)),
     (BUDGETS, _budget_direction, ()),
     (INSTRUCTION_BUDGETS, _budget_direction, ()),
 )
@@ -642,7 +642,7 @@ def main(argv=None):
              'base..head names it exactly')
     parser.add_argument(
         '--route', choices=('push', 'pr'), default='push',
-        help='push compares against the base revision (BEFORE); only its '
+        help='push compares against the base revision (AI_RESEARCHER_BEFORE); only its '
              'declaration route requires a fast-forward. pr compares '
              'against the merge base and reads declarations from the '
              'merge commit\'s own commits (base HEAD^1, head HEAD^2)')

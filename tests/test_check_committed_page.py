@@ -75,7 +75,7 @@ class CommittedStateRebuildTests(unittest.TestCase):
         with mock.patch.object(build, "RAW", data / "aa-raw-models.json"), \
                 mock.patch.object(build, "AGENTS_RAW", data / "aa-raw-coding-agents.json"), \
                 mock.patch.object(build, "OUT", output), \
-                mock.patch.dict(os.environ, {"AA_SOURCE_COMMIT": COMMIT}), \
+                mock.patch.dict(os.environ, {"AI_RESEARCHER_AA_SOURCE_COMMIT": COMMIT}), \
                 contextlib.redirect_stdout(io.StringIO()):
             build.main()
         return output.read_text(encoding="utf-8")
@@ -144,7 +144,7 @@ class CheckCommittedPageTests(unittest.TestCase):
     def test_a_changed_working_capture_does_not_move_the_rebuild(self):
         # The refresh's exact shape (issue #108): fetch_aa.py has just
         # written a fresh capture into the working data/ and the suite runs
-        # BEFORE the commit. The check's subject is the committed tree, so
+        # before the commit. The check's subject is the committed tree, so
         # pointing build's capture paths at that fresh capture -- the state
         # the working data/ sits in at that moment -- must leave the rebuilt
         # side at HEAD's page: staging a rendered change and a future
@@ -345,12 +345,9 @@ class CheckCommittedPageTests(unittest.TestCase):
         self.assertIn("data/aa-raw-models.json", str(caught.exception))
 
     def test_rebuild_page_restores_state_when_the_inner_build_fails(self):
-        # The failing control for rebuild_page's own finally limb: the INNER
-        # build raises -- with AA_SOURCE_COMMIT deliberately set, so the
-        # env-restore has real work to do -- and the real rebuild_page runs,
-        # not a mock of it. The exception must propagate (a build failure is
-        # red, never a silent pass) and the environment and build's module
-        # globals must come back exactly as they went in.
+        # The inner build raises with AI_RESEARCHER_AA_SOURCE_COMMIT set.
+        # The real rebuild_page must propagate the failure and restore
+        # both the environment and build's module globals.
         def broken():
             raise ValueError("the inner build failed")
 

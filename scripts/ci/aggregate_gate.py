@@ -58,7 +58,7 @@ FAILED = 'failed'
 
 # The legs the data-only class still runs: lint and the gate on the
 # gates. The refresh bot's hourly push carries generated data the
-# refresh job ran the full suite against BEFORE pushing, so re-running
+# refresh job ran the full suite against before pushing, so re-running
 # the heavy matrix on it re-verifies nothing; these two cheap legs keep
 # the push witnessed. Pinned in lockstep with the workflow by tests
 # (tests/test_workflow_ci_gate.py).
@@ -204,12 +204,12 @@ def main_with(needs, summary_path=None):
 
 def main():
     try:
-        needs = json.loads(os.environ.get('NEEDS_JSON') or '')
+        needs = json.loads(os.environ.get('AI_RESEARCHER_NEEDS_JSON') or os.environ.get('NEEDS_JSON') or '')
     except ValueError:
-        print('NEEDS_JSON is missing or not JSON', file=sys.stderr)
+        print('AI_RESEARCHER_NEEDS_JSON is missing or not JSON', file=sys.stderr)
         return 1
     if not isinstance(needs, dict):
-        print('NEEDS_JSON is not a needs document', file=sys.stderr)
+        print('AI_RESEARCHER_NEEDS_JSON is not a needs document', file=sys.stderr)
         return 1
     print(f'legs in the document: {", ".join(sorted(needs))}')
     return main_with(needs)

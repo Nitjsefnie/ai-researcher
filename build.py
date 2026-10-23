@@ -154,7 +154,7 @@ def display_label(name):
 
     Identifies an effort variant within a 34-character chart cap (#85): the
     effort groups drop out of place and the FIRST effort re-attaches
-    immediately after the leading text segment -- BEFORE any kept groups, so
+    immediately after the leading text segment -- before any kept groups, so
     the one word that distinguishes effort variants of one model survives a
     truncation -- and the non-effort groups keep their place after it.
     """
@@ -1297,7 +1297,7 @@ def main(*, generation_state: bytes | None | EllipsisType = ...):
     digest = hashlib.sha256()
     for capture in (RAW, AGENTS_RAW):
         digest.update(capture.read_bytes())
-    commit = os.environ.get("AA_SOURCE_COMMIT", "")
+    commit = os.environ.get("AI_RESEARCHER_AA_SOURCE_COMMIT") or os.environ.get("AA_SOURCE_COMMIT") or ""
     # Only a SHA-shaped value renders. The env is build-machine input, and a
     # value carrying a template marker would otherwise be spliced by the
     # later __CAPTURED__/__DATA__ substitutions -- anything else renders
@@ -1355,7 +1355,7 @@ TEMPLATE = r"""<!DOCTYPE html>
        and the frontier tag 4.30:1, under the 4.5:1 WCAG AA floor. The dark
        theme keeps the originals and passes there. */
     --text-primary:#0b0b0b; --text-secondary:#52514e; --muted:#706e67;--grid:#e1e0d9; --axis:#c3c2b7; --border:rgba(11,11,11,0.10);--series-prop:#2a78d6; --series-open:#eb6834; --dim:#a9a7a0;--accent:#2468c0;
-    /* Issue #208's dispute red. A STATUS color from the dataviz skill's
+    /* Issue #208's dispute red. A status color from the dataviz skill's
        fixed status palette (critical #d03b3b) -- never a series hue, and
        the same hex in both modes: it clears the 3:1 mark floor in both
        modes (4.68:1 light, 3.62:1 dark). Text needs 4.5:1, which dark
@@ -1890,7 +1890,7 @@ const DATA = __DATA__;
   }
 
   // Collapse a model's effort settings to one row: its ceiling (highest index,
-  // cheapest variant if two tie there). Deliberately runs BEFORE the dominance
+  // cheapest variant if two tie there). Deliberately runs before the dominance
   // test, so "superseded" is judged between models rather than between a model
   // and its own turned-down settings -- otherwise every low-effort variant is
   // trivially beaten by its high-effort twin and the frontier says nothing.

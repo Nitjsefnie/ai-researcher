@@ -77,10 +77,9 @@ STAMP_NAME = "captured-at.txt"
 WINDOW_MARKER_NAME = "cost-breakdown-window.txt"
 GENERATION_STATE_NAME = "aa-generation-state.json"
 
-# Both gate builds run stamp-less: an unset AA_SOURCE_COMMIT renders nothing
-# extra (build.py renders only a SHA-shaped value), so the source-commit
-# stamp -- build-machine provenance -- can never vote in the comparison.
-STAMP_ENV = "AA_SOURCE_COMMIT"
+# Both gate builds suppress AI_RESEARCHER_AA_SOURCE_COMMIT and its fallback:
+# build-machine provenance can never vote in the comparison.
+STAMP_ENV = "AI_RESEARCHER_AA_SOURCE_COMMIT"
 
 # The page's provenance line embeds a sha256 over the two raw capture files.
 # The digest moves with every raw-byte difference, sub-render churn included,
@@ -321,13 +320,15 @@ def _render_side(side_dir: pathlib.Path,
 
     The temp dir lives under build.ROOT because build.main() prints
     OUT.relative_to(ROOT) and would raise on a page outside it. build's
-    module globals and AA_SOURCE_COMMIT are restored no matter how the build
+    module globals and AI_RESEARCHER_AA_SOURCE_COMMIT are restored no matter how the build
     ends, so a failed gate build cannot poison the caller's tree state.
     """
     _stage(side_dir, captures, window_marker)
     page_path = side_dir / "frontier-models.html"
     saved = (build.RAW, build.AGENTS_RAW, build.OUT)
-    env_saved = os.environ.pop(STAMP_ENV, None)
+    env_saved = {key: os.environ.pop(key) for key in
+                 (STAMP_ENV, STAMP_ENV.removeprefix("AI_RESEARCHER_"))
+                 if key in os.environ}
     try:
         build.RAW = side_dir / MODELS_NAME
         build.AGENTS_RAW = side_dir / AGENTS_NAME
@@ -336,8 +337,7 @@ def _render_side(side_dir: pathlib.Path,
             build.main(generation_state=generation_state)
     finally:
         build.RAW, build.AGENTS_RAW, build.OUT = saved
-        if env_saved is not None:
-            os.environ[STAMP_ENV] = env_saved
+        os.environ.update(env_saved)
     return page_path.read_text(encoding="utf-8")
 
 

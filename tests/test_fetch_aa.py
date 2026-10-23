@@ -261,7 +261,7 @@ class CostBreakdownTests(unittest.TestCase):
         # #217). Window on: the file appears with ONE human-readable line.
         # Window off: the file goes, so a stale marker can never outlive its
         # hour. Clearing when it is already absent is not an error -- that is
-        # the common hour, and the schema sys.exit paths run BEFORE any
+        # the common hour, and the schema sys.exit paths run before any
         # record call, so a schema-broken run never leaves a marker. Since
         # #223 the line also carries the observed in-run generation count
         # when the caller supplies one -- the build layer's refusal reads
@@ -785,7 +785,7 @@ class CaptureGapFillWiringTests(unittest.TestCase):
         # detail_host_slug is computed from THIS leaderboard's rows: the
         # detail page is chosen for what its page excludes, so the corpus
         # must never be paired with a host picked from a different read.
-        # capture() pins the version from the methodology page BEFORE the
+        # capture() pins the version from the methodology page before the
         # leaderboard fetches, so a bumped index fails the capture without
         # spending the other page reads (issue #220).
         with self.cached_routes() as (base, detail, methodology):
@@ -1199,7 +1199,7 @@ class TransportErrorTests(unittest.TestCase):
                 def raiser(e=error):
                     raise e
 
-                # The methodology pin passes (fail fast lives BEFORE the
+                # The methodology pin passes (fail fast lives before the
                 # leaderboard only when the page itself is healthy), then the
                 # leaderboard fetch exercises the transport failure.
                 with self.assertRaises(SystemExit) as caught:
@@ -2487,7 +2487,7 @@ class CrossRunLookbackFlagTests(unittest.TestCase):
         self.assertTrue(all("genVariants" not in m for m in models))
 
     def test_a_malformed_previous_capture_refuses(self):
-        # The loader exits guarded BEFORE any fetch writes: the staged
+        # The loader exits guarded before any fetch writes: the staged
         # malformed text is still the file's content after the run.
         malformed = '{"not": "an array"'
         _stdout, out_text, exit_exc = self.run_main(

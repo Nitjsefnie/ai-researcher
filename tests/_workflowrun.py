@@ -158,18 +158,18 @@ def refuse(reason):
 
 target = endpoint()
 verb = method()
-REPO = os.environ.get("REPO", "")
-PR_NUMBER = os.environ.get("PR_NUMBER", "")
-HEAD_SHA = os.environ.get("HEAD_SHA", "")
+AI_RESEARCHER_REPO = os.environ.get("AI_RESEARCHER_REPO") or os.environ.get("REPO") or ""
+AI_RESEARCHER_PR_NUMBER = os.environ.get("AI_RESEARCHER_PR_NUMBER") or os.environ.get("PR_NUMBER") or ""
+AI_RESEARCHER_HEAD_SHA = os.environ.get("AI_RESEARCHER_HEAD_SHA") or os.environ.get("HEAD_SHA") or ""
 
 # Identity first: the double answers only the run's own repository, and
 # the destination routes only the run's own pull request and head SHA. A
 # step that writes anywhere else is unmodeled, never served.
-if not target.startswith(f"repos/{REPO}/"):
-    refuse(f"route outside {REPO}")
+if not target.startswith(f"repos/{AI_RESEARCHER_REPO}/"):
+    refuse(f"route outside {AI_RESEARCHER_REPO}")
 if "/issues/" in target and "/comments" in target and verb == "POST":
-    if target != f"repos/{REPO}/issues/{PR_NUMBER}/comments":
-        refuse(f"destination is not pull request {PR_NUMBER}")
+    if target != f"repos/{AI_RESEARCHER_REPO}/issues/{AI_RESEARCHER_PR_NUMBER}/comments":
+        refuse(f"destination is not pull request {AI_RESEARCHER_PR_NUMBER}")
     comments = state.setdefault("comments", [])
     comments.append({"id": len(comments) + 1,
                      "user": {"login": "github-actions[bot]"},
@@ -189,8 +189,8 @@ elif "/issues/" in target and target.endswith("/comments") and verb == "GET":
 elif "/pulls?" in target and verb == "GET":
     emit(json.dumps(state.get("pulls", [])))
 elif "/pulls/" in target and verb == "GET":
-    if not target.rstrip("/").endswith(f"/pulls/{PR_NUMBER}"):
-        refuse(f"pull route is not pull request {PR_NUMBER}")
+    if not target.rstrip("/").endswith(f"/pulls/{AI_RESEARCHER_PR_NUMBER}"):
+        refuse(f"pull route is not pull request {AI_RESEARCHER_PR_NUMBER}")
     emit(json.dumps({"head": {"sha": state.get("head_sha", "")}}))
 elif target.endswith("/artifacts") and verb == "GET":
     emit(json.dumps({"total_count": len(state.get("artifacts", [])),
@@ -199,8 +199,8 @@ elif target.endswith("/jobs") and verb == "GET":
     emit(json.dumps({"total_count": len(state.get("jobs", [])),
                      "jobs": state.get("jobs", [])}))
 elif target.endswith("/check-runs") and verb == "GET":
-    if f"/commits/{HEAD_SHA}/" not in target:
-        refuse(f"check route is not head {HEAD_SHA}")
+    if f"/commits/{AI_RESEARCHER_HEAD_SHA}/" not in target:
+        refuse(f"check route is not head {AI_RESEARCHER_HEAD_SHA}")
     checks = state.get("checks", [])
     if fields().get("filter") != "all":
         checks = checks[-1:]

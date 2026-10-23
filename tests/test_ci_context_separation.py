@@ -13,7 +13,7 @@ flowed from two surfaces, and this file pins each shut:
 - the "Ratchet documents" step's fetch of ``refs/pull/<number>/head``. The
   untrusted-checkout query (``GitMutableRefCheckout``) reads a ``git fetch``
   whose command or in-scope env carries the pull-request number — and its
-  ``containsPullRequestNumber`` heuristics match the env name ``PR_NUMBER``
+  ``containsPullRequestNumber`` heuristics match the env name ``AI_RESEARCHER_PR_NUMBER``
   itself, not only the expression it held.
 
 The analyser reads the workflow text, so the pins read it too: either
@@ -130,8 +130,8 @@ def test_ratchet_documents_fetches_the_event_sha():
         candidate for candidate in _steps()
         if candidate.get('name') == 'Ratchet documents')
     env = step['env']
-    assert env['CI_SHA'] == '${{ github.sha }}'
-    assert 'PR_NUMBER' not in env
+    assert env['AI_RESEARCHER_CI_SHA'] == '${{ github.sha }}'
+    assert 'AI_RESEARCHER_PR_NUMBER' not in env
     run = step['run']
-    assert 'git fetch --unshallow origin "${CI_SHA}"' in run
+    assert 'git fetch --unshallow origin "${AI_RESEARCHER_CI_SHA}"' in run
     assert 'refs/pull' not in run

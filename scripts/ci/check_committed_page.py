@@ -4,7 +4,7 @@
     python3 scripts/ci/check_committed_page.py
 
 out/frontier-models.html gets its `Source commit <code>...</code>` footer
-stamp only when AA_SOURCE_COMMIT is set at build time, and only the refresh
+stamp only when AI_RESEARCHER_AA_SOURCE_COMMIT is set at build time, and only the refresh
 workflow sets it -- so a page a contributor builds and commits by hand goes
 out stamp-less, and the hourly republish run then republishes that stamp-less
 page byte for byte (issue #105). This check runs in CI on every commit of
@@ -52,12 +52,12 @@ import build  # noqa: E402  # pylint: disable=wrong-import-position
 
 PAGE = "out/frontier-models.html"
 
-# The env var build.py reads the stamp value from, and that the rebuild
-# below pops so the rebuilt page is stamp-less.
-STAMP_ENV = "AA_SOURCE_COMMIT"
+# The rebuild suppresses AI_RESEARCHER_AA_SOURCE_COMMIT and its fallback
+# so the rebuilt page is stamp-less.
+STAMP_ENV = "AI_RESEARCHER_AA_SOURCE_COMMIT"
 
 # A well-shaped stamp: the exact span build.py renders into the provenance
-# line when AA_SOURCE_COMMIT holds a SHA-shaped value. Exactly-once is
+# line when AI_RESEARCHER_AA_SOURCE_COMMIT holds a SHA-shaped value. Exactly-once is
 # sound: build.py html-escapes the value and escapes `<` to \\u003c in the
 # embedded JSON payload, so the marker cannot occur in data -- the same
 # argument capture_gate.py's DIGEST_RE comment makes for the digest. The
@@ -138,7 +138,7 @@ def rebuild_page() -> str:
     rebuild that honored it judged HEAD's page against data it was never
     built from. HEAD's two captures, captured-at stamp, generation state and
     window marker are staged into a temp data/ dir. build's
-    module globals and AA_SOURCE_COMMIT are restored no matter how the
+    module globals and AI_RESEARCHER_AA_SOURCE_COMMIT are restored no matter how the
     build ends, so a failed rebuild cannot poison the caller's tree state.
     A failed `git show` for a required input raises; for an optional input
     it leaves that file absent, matching the capture gate's staging policy.
@@ -157,7 +157,9 @@ def rebuild_page() -> str:
             (data_dir / name).write_bytes(content)
         page_path = pathlib.Path(tmp) / "frontier-models.html"
         saved = (build.RAW, build.AGENTS_RAW, build.OUT)
-        env_saved = os.environ.pop(STAMP_ENV, None)
+        env_saved = {key: os.environ.pop(key) for key in
+                     (STAMP_ENV, STAMP_ENV.removeprefix("AI_RESEARCHER_"))
+                     if key in os.environ}
         try:
             build.RAW = data_dir / MODELS_NAME
             build.AGENTS_RAW = data_dir / AGENTS_NAME
@@ -166,8 +168,7 @@ def rebuild_page() -> str:
                 build.main()
         finally:
             build.RAW, build.AGENTS_RAW, build.OUT = saved
-            if env_saved is not None:
-                os.environ[STAMP_ENV] = env_saved
+            os.environ.update(env_saved)
         return page_path.read_text(encoding="utf-8")
 
 

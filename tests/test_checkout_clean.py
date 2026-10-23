@@ -2,7 +2,7 @@
 
 The build-writing tests used to call build.main() with only stdout
 redirected, rewriting the real out/frontier-models.html in place -- with
-the source-commit stamp stripped locally (AA_SOURCE_COMMIT unset), so a
+the source-commit stamp stripped locally (AI_RESEARCHER_AA_SOURCE_COMMIT unset), so a
 quiet `python3 -m pytest -q` left `git status --porcelain` reporting
 ` M out/frontier-models.html`.
 
@@ -18,7 +18,7 @@ checkout state to be identical before and after, where the state is BOTH
   sha256 of out/frontier-models.html folds the content into the oracle:
   three of the four writers build with the ambient stamp, so the fresh
   marker below makes their dirtying builds produce bytes nothing else
-  could have written; the fourth (PerfBudgetTests) pops AA_SOURCE_COMMIT
+  could have written; the fourth (PerfBudgetTests) pops AI_RESEARCHER_AA_SOURCE_COMMIT
   and emits deterministic stamp-less bytes, so a regression isolated to
   that writer alone can digest-match across consecutive runs and is
   caught on the first dirtying run, where both oracle sides move off the
@@ -45,18 +45,18 @@ checkout state to be identical before and after, where the state is BOTH
   classes build in setUpClass -- their ids would die in chromium.launch
   and fail every matrix cell. browser_available() probes the suite's own
   launch recipe (test_browser.CHROMIUM_EXECUTABLE for the system path /
-  CHROMIUM_PATH override, playwright's own launch call for its managed
+  AI_RESEARCHER_CHROMIUM_PATH override, playwright's own launch call for its managed
   install) and the pin runs all four ids only where that recipe
   launches; elsewhere it runs the two tests/test_build.py ids, which
   keep the pin biting in every cell. The browser ids are exercised in
   the coverage job, which is where the browser writers actually run.
-- Why AA_SOURCE_COMMIT is set to a fresh random value: in CI the suite
-  step inherits AA_SOURCE_COMMIT = github.sha -- exactly what the
+- Why AI_RESEARCHER_AA_SOURCE_COMMIT is set to a fresh random value: in CI the suite
+  step inherits AI_RESEARCHER_AA_SOURCE_COMMIT = github.sha -- exactly what the
   committed page was stamped with, so even a dirtying rewrite could come
   out byte-identical to HEAD and move nothing. A fresh 40-hex marker
   defeats that: the value is SHA-shaped because build.py renders only
   well-shaped values (7-40 hex chars).
-- Why JS_COVERAGE_OUT is stripped: the coverage job sets it, and
+- Why AI_RESEARCHER_JS_COVERAGE_OUT is stripped: the coverage job sets it, and
   BrowserInteractionTests.tearDownClass OVERWRITES the dump file at that
   path. Inherited into the subprocess, the subset's partial coverage
   would overwrite the outer run's full dump and the JS-coverage ratchet
@@ -114,7 +114,7 @@ def browser_available() -> bool:
     recipe succeeds.
 
     Reuses test_browser's CHROMIUM_EXECUTABLE resolution (the system
-    path, overridable by CHROMIUM_PATH) and lets playwright itself
+    path, overridable by AI_RESEARCHER_CHROMIUM_PATH) and lets playwright itself
     resolve its managed install through the same launch call the suite
     uses -- a launch probe, not a second resolver: since playwright 1.49
     a headless launch resolves to the headless-shell binary, which no
@@ -167,8 +167,10 @@ class CheckoutCleanTests(unittest.TestCase):
                 f"the pre-run git status exceeded its {GIT_TIMEOUT} s ceiling")
 
         env = dict(os.environ)
-        env["AA_SOURCE_COMMIT"] = os.urandom(20).hex()
-        env.pop("JS_COVERAGE_OUT", None)
+        env["AI_RESEARCHER_AA_SOURCE_COMMIT"] = os.urandom(20).hex()
+        for key in ("AI_RESEARCHER_JS_COVERAGE_OUT",
+                    "AI_RESEARCHER_JS_COVERAGE_OUT".removeprefix("AI_RESEARCHER_")):
+            env.pop(key, None)
         try:
             proc = subprocess.run(
                 [sys.executable, "-m", "pytest", "-q", *subset],

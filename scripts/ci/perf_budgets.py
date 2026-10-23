@@ -1,14 +1,11 @@
 #!/usr/bin/env python3
 """Measure the page's reader journeys against performance budgets (issue #109).
 
-Two halves. The pure half -- budgets-document validation and the gate --
-is importable from anywhere: stdlib-only at import time, playwright is
-imported lazily inside the measure path only, so the no-playwright CI
-matrix can import the module. The measure half builds the page to a TEMP
-output (build.OUT is patched aside exactly like the fixture tests in
-tests/test_browser.py; out/frontier-models.html is never written) and
-drives headless Chromium through playwright, browser discovery mirroring
-tests/test_browser.py: CHROMIUM_PATH, else /usr/bin/chromium when it
+The validator and gate import only stdlib; measurement imports playwright
+lazily, so the no-playwright CI matrix can import this module. Measurement
+builds to a temporary build.OUT, preserving out/frontier-models.html, then
+drives headless Chromium through playwright. Browser discovery mirrors
+tests/test_browser.py: AI_RESEARCHER_CHROMIUM_PATH, else /usr/bin/chromium when it
 exists, else playwright's own download.
 
 Measurement JSON (``--measure [--out FILE]``, schema_version 1):
@@ -52,7 +49,7 @@ Measurement JSON (``--measure [--out FILE]``, schema_version 1):
   (builds are byte-deterministic).
 - dom_nodes_mutated: total added+removed nodes over childList mutation
   records in the journey window. The observer is installed from an init
-  script added to the page context BEFORE navigation, so the load window
+  script added to the page context before navigation, so the load window
   covers the entire initial script run. GATED ONLY FOR HOVER: the
   load/filter/sort journeys' mutation counts carry the rendered
   frontier-table rows (fillFrontiers appends one tr with 8 td per
@@ -433,7 +430,7 @@ _JS_CLICK = """(selector) => {
 _JS_NOW = "() => performance.now()"
 
 # Chromium is launched with --js-flags=--expose-gc so the harness can
-# place the load's garbage collection BEFORE a measured window instead
+# place the load's garbage collection before a measured window instead
 # of leaving it to land lazily -- and nondeterministically -- inside one.
 _JS_GC = "() => { if (window.gc) { window.gc(); window.gc(); } }"
 
@@ -442,7 +439,7 @@ HOVER_POINTS = '#svg-intelligence circle.pt'
 
 
 def _chromium_executable():
-    candidate = os.environ.get('CHROMIUM_PATH') or '/usr/bin/chromium'
+    candidate = os.environ.get('AI_RESEARCHER_CHROMIUM_PATH') or os.environ.get('CHROMIUM_PATH') or '/usr/bin/chromium'
     return Path(candidate) if Path(candidate).exists() else None
 
 
@@ -575,22 +572,21 @@ def _build_page(build_module, output):
     """Run build.main() to `output` (stamp-less) and return the page bytes.
 
     build.OUT is patched aside for the build only -- the repo's
-    out/frontier-models.html is never written -- and AA_SOURCE_COMMIT is
+    out/frontier-models.html is never written -- and AI_RESEARCHER_AA_SOURCE_COMMIT is
     removed so the measured page is the canonical stamp-less build.
     """
     old_out = build_module.OUT
-    had_stamp = 'AA_SOURCE_COMMIT' in os.environ
-    saved_stamp = os.environ.get('AA_SOURCE_COMMIT')
+    stamp_env = "AI_RESEARCHER_AA_SOURCE_COMMIT"
+    saved_stamp = {key: os.environ.pop(key) for key in
+                   (stamp_env, stamp_env.removeprefix("AI_RESEARCHER_"))
+                   if key in os.environ}
     build_module.OUT = output
     try:
-        if had_stamp:
-            del os.environ['AA_SOURCE_COMMIT']
         with contextlib.redirect_stdout(io.StringIO()):
             build_module.main()
     finally:
         build_module.OUT = old_out
-        if had_stamp and saved_stamp is not None:
-            os.environ['AA_SOURCE_COMMIT'] = saved_stamp
+        os.environ.update(saved_stamp)
     return output.read_bytes()
 
 

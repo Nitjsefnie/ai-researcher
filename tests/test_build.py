@@ -1606,7 +1606,7 @@ class DisplayLabelTests(unittest.TestCase):
     names: four Claude Opus 5.5 effort variants shared a 33-char prefix, so
     the intelligence chart rendered all four identically. `display_label`
     re-attaches the first effort word immediately after the model name,
-    BEFORE any kept groups, so the distinguishing word survives the cap;
+    before any kept groups, so the distinguishing word survives the cap;
     everything that is not effort keeps its place.
     """
 

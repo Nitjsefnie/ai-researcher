@@ -21,14 +21,11 @@ _SCRIPT = REPO_ROOT / "scripts" / "ci" / "diff_coverage.py"
 def _run_cli(args, **kwargs):
     """Run the reporter as a child, measured when the job asks for it.
 
-    With COVERAGE_MEASURE_CHILDREN_RC set (the coverage job sets it), the
-    child runs under its own `coverage run`: the reporter constructs a
-    second Coverage object of its own — the statement analyzer with
-    `data_file=None` — and a second construction is fatal to the .pth
-    auto-started collector's save, so subprocess measurement cannot be the
-    implicit hook. It must be the explicit command, which saves itself.
+    AI_RESEARCHER_COVERAGE_MEASURE_CHILDREN_RC enables explicit child coverage.
+    The reporter's second Coverage(data_file=None) breaks the .pth
+    auto-started collector's save. Explicit `coverage run` saves itself.
     """
-    rc = os.environ.get("COVERAGE_MEASURE_CHILDREN_RC")
+    rc = os.environ.get("AI_RESEARCHER_COVERAGE_MEASURE_CHILDREN_RC") or os.environ.get("COVERAGE_MEASURE_CHILDREN_RC")
     if rc:
         assert args[0] == sys.executable, args
         args = [sys.executable, "-m", "coverage", "run",
