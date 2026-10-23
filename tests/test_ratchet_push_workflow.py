@@ -118,8 +118,11 @@ class ArtifactDataTests(unittest.TestCase):
                      if entry.get("id") == step_id]
         assert producers, f"missing output producer: {step_id}"
         assert re.search(
-            rf"(?m)^[ \t]*(?:echo|printf)\s+[^\n]*?(?<![\w-]){re.escape(output)}="
-            r"[^\n]*>>?\s*[\"']?\$(?:GITHUB_OUTPUT|\{GITHUB_OUTPUT\})[\"']?\s*$",
+            r"(?m)^[ \t]*(?:echo|printf[ \t]+['\"]%s\\n['\"])[ \t]+"
+            rf"(?P<quote>['\"]){re.escape(output)}=[^'\"\n]*(?P=quote)[ \t]*"
+            r'>>?[ \t]*(?P<destination_quote>"?)'
+            r"\$(?:GITHUB_OUTPUT|\{GITHUB_OUTPUT\})(?P=destination_quote)"
+            r"(?:[ \t]+#.*)?[ \t]*$",
             producers[0].get("run", "")), (step_id, output)
 
     def test_the_validation_step_runs_before_the_push_step(self):
