@@ -64,8 +64,8 @@
     3035
   ],
   "scripts/capture_gate.py": [
-    9962,
-    16794
+    9907,
+    16801
   ],
   "scripts/ci/aggregate_gate.py": [
     3297,
@@ -100,20 +100,20 @@
     24115
   ],
   "scripts/ci/install_chromium.py": [
-    7773,
-    21941
+    7759,
+    21927
   ],
   "scripts/ci/instruction_budgets.py": [
     6288,
     13368
   ],
   "scripts/ci/js_coverage.py": [
-    2496,
-    8151
+    2486,
+    8141
   ],
   "scripts/ci/perf_budgets.py": [
-    10075,
-    22313
+    9934,
+    22197
   ],
   "scripts/ci/ratchet.py": [
     555,
@@ -160,8 +160,8 @@
     44289
   ],
   "tests/test_check_committed_page.py": [
-    3940,
-    13676
+    3775,
+    13525
   ],
   "tests/test_checkout_clean.py": [
     4544,
@@ -196,8 +196,8 @@
     23768
   ],
   "tests/test_ci_ratchets.py": [
-    10545,
-    62002
+    10493,
+    61964
   ],
   "tests/test_ci_thresholds.py": [
     3332,
@@ -212,8 +212,8 @@
     51387
   ],
   "tests/test_diff_coverage.py": [
-    3811,
-    23237
+    3651,
+    23139
   ],
   "tests/test_fetch_aa.py": [
     28402,
