@@ -103,7 +103,7 @@ class ArtifactDataTests(unittest.TestCase):
         self.wf = load()
 
     def test_the_download_is_cross_run_and_gated(self):
-        assert step(self.wf, "List the triggering run's artifacts")["env"]["WORKFLOW_NAME"] == (
+        assert step(self.wf, "List the triggering run's artifacts")["env"]["AI_RESEARCHER_WORKFLOW_NAME"] == (
             "${{ github.event.workflow_run.name }}")
         down = step(self.wf, "Download the ratchet data")
         assert down["if"] == "steps.list.outputs.staged == 'true'"
@@ -122,7 +122,7 @@ class ArtifactDataTests(unittest.TestCase):
 
     def test_the_selected_document_reaches_validation_and_push_as_data(self):
         for name in ("Validate the staged data", "Push the ratchet commit"):
-            assert step(self.wf, name)["env"]["DOCUMENT"] == (
+            assert step(self.wf, name)["env"]["AI_RESEARCHER_DOCUMENT"] == (
                 "${{ steps.list.outputs.document }}")
 
     def test_the_validation_gates_the_push_step(self):
@@ -145,14 +145,14 @@ class DeployKeyTests(unittest.TestCase):
     def test_the_deploy_key_fails_closed(self):
         run = flattened(step(self.wf, "Push the ratchet commit")["run"])
         assert (
-            "MASTER_PUSH_DEPLOY_KEY is empty: the main-push environment is "
+            "AI_RESEARCHER_MASTER_PUSH_DEPLOY_KEY is empty: the main-push environment is "
             "missing its secret" in run)
         assert "github.token" not in run
 
     def test_the_agent_never_outlives_the_step(self):
         run = flattened(step(self.wf, "Push the ratchet commit")["run"])
         assert 'trap \'kill "$SSH_AGENT_PID" 2>/dev/null || true\' EXIT' in run
-        assert "ssh-add <(printf '%s\\n' \"$MASTER_PUSH_DEPLOY_KEY\")" in run
+        assert "ssh-add <(printf '%s\\n' \"$AI_RESEARCHER_MASTER_PUSH_DEPLOY_KEY\")" in run
 
     def test_the_base_check_drops_green_and_the_race_is_classified(self):
         run = flattened(step(self.wf, "Push the ratchet commit")["run"])
@@ -177,7 +177,7 @@ class ExecutedValidationTests(unittest.TestCase):
         },
         "schema_version": 1,
     }
-    BASE = "a" * 40
+    BASE_COMMIT = "a" * 40
 
     @classmethod
     def setUpClass(cls):
@@ -199,7 +199,7 @@ class ExecutedValidationTests(unittest.TestCase):
         (data / "base.txt").write_bytes(base_bytes)
         return _workflowrun.run_step(tmp_path, step_,
                                      {"RUNNER_TEMP": str(tmp_path),
-                                      "DOCUMENT": "ci-thresholds.json"})
+                                      "AI_RESEARCHER_DOCUMENT": "ci-thresholds.json"})
 
     def _run_with(self, tmp_path, document, base):
         return self._validate(
@@ -209,31 +209,31 @@ class ExecutedValidationTests(unittest.TestCase):
 
     def test_the_real_shape_passes(self):
         done = self._run_with(self.enterContext(_dir()), self.VALID,
-                              self.BASE)
+                              self.BASE_COMMIT)
         assert done.returncode == 0, (done.stdout, done.stderr)
 
     def test_wrong_leaf_keys_are_refused(self):
         document = {"coverage": {"javascript": {"a": 1, "b": 2},
                                  "python": {"floor": 1, "measured": 2}},
                     "schema_version": 1}
-        done = self._run_with(self.enterContext(_dir()), document, self.BASE)
+        done = self._run_with(self.enterContext(_dir()), document, self.BASE_COMMIT)
         assert done.returncode != 0, done.stdout
 
     def test_a_garbage_suffixed_base_is_refused(self):
         done = self._run_with(self.enterContext(_dir()), self.VALID,
-                              self.BASE + "\nrm -rf /\n")
+                              self.BASE_COMMIT + "\nrm -rf /\n")
         assert done.returncode != 0, done.stdout
 
     def test_a_string_typed_leaf_is_refused(self):
         document = {"coverage": {"javascript": {"floor": "95", "measured": 1},
                                  "python": {"floor": 1, "measured": 2}},
                     "schema_version": 1}
-        done = self._run_with(self.enterContext(_dir()), document, self.BASE)
+        done = self._run_with(self.enterContext(_dir()), document, self.BASE_COMMIT)
         assert done.returncode != 0, done.stdout
 
     def test_a_string_schema_version_is_refused(self):
         document = dict(self.VALID, schema_version="1")
-        done = self._run_with(self.enterContext(_dir()), document, self.BASE)
+        done = self._run_with(self.enterContext(_dir()), document, self.BASE_COMMIT)
         assert done.returncode != 0, done.stdout
 
     def test_an_extra_staged_file_is_refused(self):
@@ -242,11 +242,11 @@ class ExecutedValidationTests(unittest.TestCase):
         data.mkdir()
         (data / "ci-thresholds.json").write_bytes(
             b'{"coverage": {}, "schema_version": 1}')
-        (data / "base.txt").write_bytes(self.BASE.encode("utf-8"))
+        (data / "base.txt").write_bytes(self.BASE_COMMIT.encode("utf-8"))
         (data / "extra.sh").write_bytes(b"echo nope\n")
         step_ = step(load(), "Validate the staged data")
         done = _workflowrun.run_step(tmp, step_, {
-            "RUNNER_TEMP": str(tmp), "DOCUMENT": "ci-thresholds.json"})
+            "RUNNER_TEMP": str(tmp), "AI_RESEARCHER_DOCUMENT": "ci-thresholds.json"})
         assert done.returncode != 0, done.stdout
 
 
@@ -257,7 +257,7 @@ def _dir():
 
 
 POSIX = pytest.mark.skipif(os.name == "nt", reason="Ubuntu workflow shell")
-BASE = "a" * 40
+BASE_COMMIT = "a" * 40
 COMMENT_WORKFLOW = ROOT / ".github/workflows/comment-share.yml"
 
 
@@ -284,8 +284,8 @@ def test_artifact_selection_and_absent_noop(
     done = _workflowrun.run_step(tmp_path, step(load(), "List the triggering run's artifacts"), {
         **os.environ, "PATH": str(bin_dir) + os.pathsep + os.environ["PATH"],
         "STUB_STATE": str(state), "STUB_CALLS": str(calls),
-        "GITHUB_OUTPUT": str(output), "WORKFLOW_NAME": workflow,
-        "GH_TOKEN": "test", "REPO": "Nitjsefnie/ai-researcher", "RUN_ID": "281",
+        "GITHUB_OUTPUT": str(output), "AI_RESEARCHER_WORKFLOW_NAME": workflow,
+        "GH_TOKEN": "test", "AI_RESEARCHER_REPO": "Nitjsefnie/ai-researcher", "AI_RESEARCHER_RUN_ID": "281",
     })
     assert done.returncode == 0, done.stderr
     outputs = dict(line.split("=", 1) for line in output.read_text().splitlines())
@@ -320,7 +320,7 @@ def test_comment_staging_is_push_only_and_uploads_only_when_changed():
         i for i, s in enumerate(steps)
         if s.get("uses", "").startswith("Nitjsefnie-Actions/comment-ratchet@"))
     assert stage["if"] == "github.event_name == 'push'"
-    assert stage["env"]["HEAD_SHA"] == "${{ github.sha }}"
+    assert stage["env"]["AI_RESEARCHER_HEAD_SHA"] == "${{ github.sha }}"
     assert upload["if"] == "github.event_name == 'push' && steps.stage.outputs.changed == 'true'"
     assert wf["permissions"] == {"contents": "read"}
 
@@ -338,7 +338,7 @@ def test_comment_staging_bytes_and_measured_base(tmp_path, changed):
     bin_dir.mkdir()
     git = bin_dir / "git"
     git.write_text('#!/bin/sh\nset -eu\n'
-                   f'[ "$*" = "show {BASE}:.github/comment-share.json" ]\n'
+                   f'[ "$*" = "show {BASE_COMMIT}:.github/comment-share.json" ]\n'
                    'cat "$ORIGINAL"\n', encoding="utf-8")
     git.chmod(0o755)
     runner = tmp_path / "runner"
@@ -347,7 +347,7 @@ def test_comment_staging_bytes_and_measured_base(tmp_path, changed):
     stage = _workflowrun.step_by_name(COMMENT_WORKFLOW, "comment-share", "Stage tightened records")
     done = _workflowrun.run_step(tmp_path, stage, {
         **os.environ, "PATH": str(bin_dir) + os.pathsep + os.environ["PATH"],
-        "HEAD_SHA": BASE, "ORIGINAL": str(tmp_path / "original"),
+        "AI_RESEARCHER_HEAD_SHA": BASE_COMMIT, "ORIGINAL": str(tmp_path / "original"),
         "RUNNER_TEMP": str(runner), "GITHUB_OUTPUT": str(output),
     })
     assert done.returncode == 0, done.stderr
@@ -355,7 +355,7 @@ def test_comment_staging_bytes_and_measured_base(tmp_path, changed):
     data = runner / "comment-share-data"
     if changed:
         assert sorted(p.name for p in data.iterdir()) == ["base.txt", "comment-share.json"]
-        assert (data / "base.txt").read_text() == BASE + "\n"
+        assert (data / "base.txt").read_text() == BASE_COMMIT + "\n"
         assert (data / "comment-share.json").read_bytes() == current
     else:
         assert not data.exists()
@@ -378,19 +378,19 @@ def test_comment_staging_bytes_and_measured_base(tmp_path, changed):
 def test_comment_schema_executed(tmp_path, payload, valid):
     data = tmp_path / "ratchet-data"
     data.mkdir()
-    (data / "base.txt").write_text(BASE, encoding="utf-8")
+    (data / "base.txt").write_text(BASE_COMMIT, encoding="utf-8")
     (data / "comment-share.json").write_text(payload, encoding="utf-8")
     done = _workflowrun.run_step(tmp_path, step(load(), "Validate the staged data"), {
-        **os.environ, "RUNNER_TEMP": str(tmp_path), "DOCUMENT": "comment-share.json",
+        **os.environ, "RUNNER_TEMP": str(tmp_path), "AI_RESEARCHER_DOCUMENT": "comment-share.json",
     })
     assert (done.returncode == 0) == valid, (payload, done.stdout, done.stderr)
 
 
 @POSIX
 @pytest.mark.parametrize("base,extra", [
-    ("a" * 39, None), ("g" * 40, None), (BASE + "\nextra", None),
-    (BASE, "extra.sh"), (BASE, ".hidden"), (BASE, "ci-thresholds.json"),
-    (BASE, " "),
+    ("a" * 39, None), ("g" * 40, None), (BASE_COMMIT + "\nextra", None),
+    (BASE_COMMIT, "extra.sh"), (BASE_COMMIT, ".hidden"), (BASE_COMMIT, "ci-thresholds.json"),
+    (BASE_COMMIT, " "),
 ])
 def test_comment_artifact_shape_executed(tmp_path, base, extra):
     data = tmp_path / "ratchet-data"
@@ -400,7 +400,7 @@ def test_comment_artifact_shape_executed(tmp_path, base, extra):
     if extra:
         (data / extra).write_text("exit 99", encoding="utf-8")
     done = _workflowrun.run_step(tmp_path, step(load(), "Validate the staged data"), {
-        **os.environ, "RUNNER_TEMP": str(tmp_path), "DOCUMENT": "comment-share.json",
+        **os.environ, "RUNNER_TEMP": str(tmp_path), "AI_RESEARCHER_DOCUMENT": "comment-share.json",
     })
     assert done.returncode != 0, (done.stdout, done.stderr)
 
@@ -438,7 +438,7 @@ def test_records_only_push_and_race_classification(tmp_path, document, outcome):
     _git(tmp_path, "--git-dir", str(remote), "update-ref", "refs/heads/main", base)
     data = tmp_path / "ratchet-data"
     data.mkdir()
-    (data / "base.txt").write_text(BASE if outcome == "stale" else base, encoding="utf-8")
+    (data / "base.txt").write_text(BASE_COMMIT if outcome == "stale" else base, encoding="utf-8")
     payload = (b'{}\n' if document == "comment-share.json" else
                json.dumps(ExecutedValidationTests.VALID).encode("utf-8") + b'\n')
     (data / document).write_bytes(payload)
@@ -460,9 +460,9 @@ def test_records_only_push_and_race_classification(tmp_path, document, outcome):
     home.mkdir()
     env = {
         **os.environ, "PATH": str(bin_dir) + os.pathsep + os.environ["PATH"],
-        "HOME": str(home), "RUNNER_TEMP": str(tmp_path), "DOCUMENT": document,
-        "GITHUB_STEP_SUMMARY": str(summary), "REPO": "Nitjsefnie/ai-researcher",
-        "MASTER_PUSH_DEPLOY_KEY": "" if outcome == "no-key" else "test input",
+        "HOME": str(home), "RUNNER_TEMP": str(tmp_path), "AI_RESEARCHER_DOCUMENT": document,
+        "GITHUB_STEP_SUMMARY": str(summary), "AI_RESEARCHER_REPO": "Nitjsefnie/ai-researcher",
+        "AI_RESEARCHER_MASTER_PUSH_DEPLOY_KEY": "" if outcome == "no-key" else "test input",
         "PUSH_REMOTE": str(remote), "REAL_GIT": shutil.which("git") or "git",
         "TEST_PYTHON": shutil.which("python3") or "python3", "TEST_GIT_STUB": str(stub),
         "TEST_CALLS": str(calls), "TEST_OUTCOME": outcome, "TEST_MOVED": moved,
@@ -500,7 +500,7 @@ def test_records_only_push_and_race_classification(tmp_path, document, outcome):
         assert not (tmp_path / "ratchet-repo").exists()
     if outcome == "no-key":
         assert not recorded
-        assert "MASTER_PUSH_DEPLOY_KEY is empty" in done.stderr
+        assert "AI_RESEARCHER_MASTER_PUSH_DEPLOY_KEY is empty" in done.stderr
     if outcome == "rejected":
         assert "the ratchet push was rejected while main stood still" in done.stderr
 

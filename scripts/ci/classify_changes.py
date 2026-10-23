@@ -297,14 +297,14 @@ def classify(event, run):
             'documentation')
 
 
-def event_from_environment(environ):
+def event_from_environment():
     """Build the `event` mapping from a process environment."""
     return {
-        'name': environ.get('GITHUB_EVENT_NAME', ''),
-        'repository': environ.get('GITHUB_REPOSITORY'),
-        'sha': environ.get('GITHUB_SHA'),
-        'pull_request': environ.get('PR_NUMBER'),
-        'before': environ.get('BEFORE_SHA'),
+        'name': os.environ.get('GITHUB_EVENT_NAME', ''),
+        'repository': os.environ.get('GITHUB_REPOSITORY'),
+        'sha': os.environ.get('GITHUB_SHA'),
+        'pull_request': os.environ.get('AI_RESEARCHER_PR_NUMBER') or os.environ.get('PR_NUMBER'),
+        'before': os.environ.get('AI_RESEARCHER_BEFORE_SHA') or os.environ.get('BEFORE_SHA'),
     }
 
 
@@ -320,7 +320,7 @@ def write_outputs(path, documentation, data, reason):
 
 def main():
     """Classify this run and record the outputs. Returns an exit status."""
-    event = event_from_environment(os.environ)
+    event = event_from_environment()
 
     def run(command):
         return subprocess.run(

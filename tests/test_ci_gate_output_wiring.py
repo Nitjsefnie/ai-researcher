@@ -42,7 +42,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 CLASSIFIER = REPO_ROOT / "scripts" / "ci" / "classify_changes.py"
 CI_GATE = REPO_ROOT / ".github" / "workflows" / "ci-gate.yml"
 
-# These name CHANGED PATHS, not a rate: the classifier's own
+# These name changed paths, not a rate: the classifier's own
 # BOT_SIGNATURE is the refresh bot's push, and the captures are never
 # parsed, priced or asserted on here.
 BOT_PATHS = [
@@ -56,7 +56,7 @@ CODE_PATHS = ["build.py", "scripts/fetch_aa.py"]
 # The classifier checks these are 40 hex digits and nothing more
 # (`_hex40`), so they are synthetic: nothing repository-managed is
 # pinned here for a shape that only needs the length.
-BEFORE = "b" * 40
+BEFORE_COMMIT = "b" * 40
 HEAD = "a" * 40
 
 # A `needs.classify.outputs.<name>` reference inside a leg's condition.
@@ -86,7 +86,7 @@ url = next((arg for arg in sys.argv[1:] if arg.startswith("repos/")), "")
 with open(os.environ["GITHUB_STUB_LOG"], "a", encoding="utf-8") as log:
     log.write(url + "\\n")
 if "/runs?" in url:
-    # The base the walk returns. BEFORE, never HEAD: a self-compare
+    # The base the walk returns. BEFORE_COMMIT, never HEAD: a self-compare
     # (base == sha) is a shape the real API answers with zero files and
     # the classifier has no branch for, so the harness would be agreeing
     # with the code it is testing instead of exercising it.
@@ -124,7 +124,7 @@ def _legs(gate):
 def _stub_gh(directory, paths):
     """An executable stub `gh` on PATH that answers the push-path reads."""
     script = directory / "gh"
-    script.write_text(STUB_GH.format(head=BEFORE, paths=list(paths)),
+    script.write_text(STUB_GH.format(head=BEFORE_COMMIT, paths=list(paths)),
                       encoding="utf-8")
     script.chmod(0o755)
     return script
@@ -133,7 +133,7 @@ def _stub_gh(directory, paths):
 def _run_classifier(tmp_path, paths=None, writes=True):
     """Run the classifier on a push event over the stub `gh`.
 
-    PR_NUMBER is empty and BEFORE_SHA is a 40-hex commit, the shape of
+    AI_RESEARCHER_PR_NUMBER is empty and AI_RESEARCHER_BEFORE_SHA is a 40-hex commit, the shape of
     the refresh bot's own push. Returns the step-output file's text, the
     reads the stub answered, and the classifier's own exit status — the
     third is what the fail-closed test rests on.
@@ -161,8 +161,8 @@ def _run_classifier(tmp_path, paths=None, writes=True):
         "GITHUB_REPOSITORY": "Nitjsefnie/ai-researcher",
         "GITHUB_SHA": HEAD,
         "GITHUB_STUB_LOG": str(log),
-        "PR_NUMBER": "",
-        "BEFORE_SHA": BEFORE,
+        "AI_RESEARCHER_PR_NUMBER": "",
+        "AI_RESEARCHER_BEFORE_SHA": BEFORE_COMMIT,
         "GITHUB_OUTPUT": target,
     })
     _stub_gh(tmp_path, paths)

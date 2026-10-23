@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -381,13 +382,14 @@ def test_classify_unreadable_paths_run_everything():
     assert "full" in reason
 
 
-def test_event_from_environment():
-    event = classify.event_from_environment({
+def test_event_from_environment(monkeypatch):
+    monkeypatch.setattr(os, "environ", {
         "GITHUB_EVENT_NAME": "push",
         "GITHUB_REPOSITORY": "o/r",
-        "BEFORE_SHA": "a" * 40,
+        "AI_RESEARCHER_BEFORE_SHA": "a" * 40,
         "GITHUB_SHA": "b" * 40,
     })
+    event = classify.event_from_environment()
     assert event == {"name": "push", "repository": "o/r",
                      "before": "a" * 40, "sha": "b" * 40,
                      "pull_request": None}
@@ -568,14 +570,14 @@ def test_aggregate_summary_without_a_classify_reason_omits_the_line(tmp_path):
 
 def test_aggregate_main_green_exits_zero(tmp_path, monkeypatch):
     summary = tmp_path / "summary.md"
-    monkeypatch.setenv("NEEDS_JSON", json.dumps(_needs()))
+    monkeypatch.setenv("AI_RESEARCHER_NEEDS_JSON", json.dumps(_needs()))
     monkeypatch.setenv("GITHUB_STEP_SUMMARY", str(summary))
     assert aggregate.main() == 0
 
 
 def test_aggregate_main_red_exits_one(tmp_path, monkeypatch):
     summary = tmp_path / "summary.md"
-    monkeypatch.setenv("NEEDS_JSON", json.dumps(_needs(tests__result="failure")))
+    monkeypatch.setenv("AI_RESEARCHER_NEEDS_JSON", json.dumps(_needs(tests__result="failure")))
     monkeypatch.setenv("GITHUB_STEP_SUMMARY", str(summary))
     assert aggregate.main() == 1
     assert summary.read_text(encoding="utf-8")

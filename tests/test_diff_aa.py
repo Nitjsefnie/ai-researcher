@@ -1269,7 +1269,7 @@ class DisplayNameTests(unittest.TestCase):
 
 
 class RealCaptureTests(unittest.TestCase):
-    """Run the differ over the CAPTURE THIS REPO ACTUALLY SHIPS.
+    """Run the differ over the repository's committed capture.
 
     EVERY ASSERTION HERE MUST BE AN INVARIANT, never a value read off today's
     data. The capture changes hourly by design, so a literal count, model name

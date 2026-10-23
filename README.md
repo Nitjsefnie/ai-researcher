@@ -105,7 +105,7 @@ collects the same files and every test errors on the import.
 
 `tests/test_browser.py` drives the built page in a real headless Chromium. It
 prefers a system browser at `/usr/bin/chromium` and falls back to playwright's
-own download; `CHROMIUM_PATH` overrides both.
+own download; `AI_RESEARCHER_CHROMIUM_PATH` overrides both.
 
 `.gitignore` is deny-by-default: `*` hides everything and each shipped file is
 named back. A new file does not show up in `git status` as untracked — it simply

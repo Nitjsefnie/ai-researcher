@@ -305,7 +305,7 @@ class GateTests(unittest.TestCase):  # pylint: disable=too-many-public-methods
     def test_the_suite_step_rebuilds_the_page_stamped_too(self):
         # Issue #92: the suite's browser tests used to call build.main() over
         # the REAL out/frontier-models.html, and that rebuild used to run with
-        # AA_SOURCE_COMMIT unset -- so the commit step staged an unstamped
+        # AI_RESEARCHER_AA_SOURCE_COMMIT unset -- so the commit step staged an unstamped
         # page and the Rebuild step's stamp was thrown away. The suite step
         # must carry the same env the Rebuild step has: since #114 the suite
         # builds into temp dirs and no longer rewrites the working page, so
@@ -313,9 +313,9 @@ class GateTests(unittest.TestCase):  # pylint: disable=too-many-public-methods
         suite = step(self.wf, "Run the suite against the new capture")
         rebuild = step(self.wf, "Rebuild the page")
 
-        self.assertEqual(suite["env"]["AA_SOURCE_COMMIT"],
-                         rebuild["env"]["AA_SOURCE_COMMIT"])
-        self.assertEqual(suite["env"]["AA_SOURCE_COMMIT"], "${{ github.sha }}")
+        self.assertEqual(suite["env"]["AI_RESEARCHER_AA_SOURCE_COMMIT"],
+                         rebuild["env"]["AI_RESEARCHER_AA_SOURCE_COMMIT"])
+        self.assertEqual(suite["env"]["AI_RESEARCHER_AA_SOURCE_COMMIT"], "${{ github.sha }}")
 
     def test_rebuild_and_suite_stay_gated_on_proceed(self):
         # The uniform guarantee: nothing is rebuilt or published that the
@@ -382,11 +382,11 @@ class GateTests(unittest.TestCase):  # pylint: disable=too-many-public-methods
         s = step(self.wf, "Stage the publish payload")
         run = flattened(s["run"])
 
-        self.assertEqual(s["env"]["CHANGED"],
+        self.assertEqual(s["env"]["AI_RESEARCHER_CHANGED"],
                          "${{ steps.capture.outputs.changed }}")
-        self.assertEqual(s["env"]["FORCE"], "${{ inputs.force }}")
+        self.assertEqual(s["env"]["AI_RESEARCHER_FORCE"], "${{ inputs.force }}")
         self.assertIn(
-            'if [ "$CHANGED" != "true" ] && [ "$FORCE" != "true" ]; then', run)
+            'if [ "$AI_RESEARCHER_CHANGED" != "true" ] && [ "$AI_RESEARCHER_FORCE" != "true" ]; then', run)
         self.assertIn(
             "git show HEAD:out/frontier-models.html > out/frontier-models.html",
             run)
@@ -485,8 +485,8 @@ class GateTests(unittest.TestCase):  # pylint: disable=too-many-public-methods
         raw = s["run"]
         run = flattened(raw)
 
-        self.assertEqual(s["env"]["REF"], "${{ github.ref }}")
-        idx_gate = run.index('if [ "$REF" != "refs/heads/main" ]; then')
+        self.assertEqual(s["env"]["AI_RESEARCHER_REF"], "${{ github.ref }}")
+        idx_gate = run.index('if [ "$AI_RESEARCHER_REF" != "refs/heads/main" ]; then')
         # The off-main gate runs FIRST: before the rendered gate and before
         # any check that could be mislabeled as a main move.
         self.assertLess(idx_gate,
@@ -502,7 +502,7 @@ class GateTests(unittest.TestCase):  # pylint: disable=too-many-public-methods
     def test_the_publish_step_reads_the_live_page_before_the_upload(self):
         # Issue #206: the step decides whether to upload at all by reading
         # the hub's live page -- its embedded source-commit stamp and its
-        # bytes -- BEFORE the upload call. The refs-API GET that used to
+        # bytes -- before the upload call. The refs-API GET that used to
         # precede the upload is gone with the ref; the upload's own curl
         # keeps its status-captured form, branched on explicitly.
         run = flattened(hub_step(self.wf, "Publish to docs-hub")["run"])
@@ -531,7 +531,7 @@ class GateTests(unittest.TestCase):  # pylint: disable=too-many-public-methods
         # can publish), and the live-page gate owns the version spend.
         # The step fetches the live page, extracts its stamp, and when the
         # hub already serves EXACTLY this run's page -- stamp and every
-        # byte -- leaves green through exit 0 BEFORE the upload. A failed
+        # byte -- leaves green through exit 0 before the upload. A failed
         # fetch publishes: availability beats the seconds-wide window, the
         # same stance the ref gates it replaced held.
         run = flattened(hub_step(self.wf, "Publish to docs-hub")["run"])
@@ -620,7 +620,7 @@ class GateTests(unittest.TestCase):  # pylint: disable=too-many-public-methods
         self.assertIn("moved under the run", run)
         self.assertIn("moved before the push landed", run)
         self.assertIn("rejected while main stood still", run)
-        # The stood-still verdict compares the TESTED BASE, not tip^: the
+        # The stood-still verdict compares the TESTED base, not tip^: the
         # bundle carries the hour's own commits on top of that base, so
         # tip^ is not necessarily the commit the run was tested against.
         self.assertIn('base.txt")" =', run)
@@ -850,15 +850,15 @@ class ExecutedHoldProbeTests(unittest.TestCase):
         # The workflow engine substitutes ${{ }} in run text before a
         # script exists; the harness plays that part for the expression
         # the verdict and the quiet line still read inline. The held
-        # branch reads $FORCE from the step env instead.
+        # branch reads $AI_RESEARCHER_FORCE from the step env instead.
         script = step_["run"].replace("${{ inputs.force }}",
                                       "true" if force else "")
         env = {
             "PATH": f"{stub}:{os.environ['PATH']}",
             "HOME": str(tmp),
-            "CAPTURED": "true",
-            "REF": "refs/heads/main",
-            "FORCE": "true" if force else "",
+            "AI_RESEARCHER_CAPTURED": "true",
+            "AI_RESEARCHER_REF": "refs/heads/main",
+            "AI_RESEARCHER_FORCE": "true" if force else "",
             "GITHUB_OUTPUT": str(tmp / "output.txt"),
             "GITHUB_STEP_SUMMARY": str(tmp / "summary.txt"),
             "GATE_OUT": gate_out,
@@ -894,7 +894,7 @@ class ExecutedHoldProbeTests(unittest.TestCase):
     def test_a_gate_or_probe_failure_turns_the_step_red(self):
         # bash -e is the step's whole failure discipline, and no `||` on
         # either gate or probe line may swallow it: a gate or probe that
-        # exits 1 must end the step red BEFORE any verdict is computed --
+        # exits 1 must end the step red before any verdict is computed --
         # every shape here, a forced dispatch included, which is the real
         # red-path pin: a forced run on a refused (converged, empty-axis)
         # capture must exit red, never proceed=true. Asserted: exit
@@ -1587,7 +1587,7 @@ class DeployKeyPushTests(unittest.TestCase):
         run = flattened(
             step_in(self.wf, "push", "Push the tested tree to main")["run"])
         self.assertIn(
-            "MASTER_PUSH_DEPLOY_KEY is empty: the main-push environment is "
+            "AI_RESEARCHER_MASTER_PUSH_DEPLOY_KEY is empty: the main-push environment is "
             "missing its secret", run)
         # The fallback is never a token: the push step names no token at all.
         self.assertNotIn("github.token", run)
@@ -1597,7 +1597,7 @@ class DeployKeyPushTests(unittest.TestCase):
             step_in(self.wf, "push", "Push the tested tree to main")["run"])
         self.assertIn('trap \'kill "$SSH_AGENT_PID" 2>/dev/null || true\' EXIT',
                       run)
-        self.assertIn("ssh-add <(printf '%s\\n' \"$MASTER_PUSH_DEPLOY_KEY\")",
+        self.assertIn("ssh-add <(printf '%s\\n' \"$AI_RESEARCHER_MASTER_PUSH_DEPLOY_KEY\")",
                       run)
 
     def test_no_step_before_the_hub_job_holds_a_credential(self):
@@ -1612,10 +1612,10 @@ class DeployKeyPushTests(unittest.TestCase):
 
         self.assertNotIn("GH_TOKEN", capture.get("env", {}))
         self.assertNotIn("GH_TOKEN", commit.get("env", {}))
-        self.assertNotIn("MASTER_PUSH_DEPLOY_KEY", commit.get("env", {}))
+        self.assertNotIn("AI_RESEARCHER_MASTER_PUSH_DEPLOY_KEY", commit.get("env", {}))
         self.assertEqual(self.wf["jobs"]["push"].get("environment"),
                          "main-push")
-        self.assertEqual(push_step["env"]["MASTER_PUSH_DEPLOY_KEY"],
+        self.assertEqual(push_step["env"]["AI_RESEARCHER_MASTER_PUSH_DEPLOY_KEY"],
                          "${{ secrets.MASTER_PUSH_DEPLOY_KEY }}")
         self.assertNotIn("GH_TOKEN", push_step.get("env", {}))
         self.assertEqual(hub["env"]["DOCS_HUB_API_KEY"],
@@ -1623,7 +1623,7 @@ class DeployKeyPushTests(unittest.TestCase):
         # The job token is mapped nowhere since #206: the refs-API call
         # that held GH_TOKEN is retired with the ref.
         self.assertNotIn("GH_TOKEN", hub.get("env", {}))
-        self.assertNotIn("MASTER_PUSH_DEPLOY_KEY", hub.get("env", {}))
+        self.assertNotIn("AI_RESEARCHER_MASTER_PUSH_DEPLOY_KEY", hub.get("env", {}))
 
     def test_the_refresh_trigger_set_stays_frozen(self):
         # Schedule plus the force dispatch. Issue #180's lesson applies to
@@ -1739,7 +1739,7 @@ def test_aa_payload_mode_and_republish_bytes(tmp_path, changed, force, mode, pag
     (tmp_path / 'out/frontier-models.html').write_text('fresh page', encoding='utf-8')
     (tmp_path / 'commit-msg.txt').write_text('Refresh capture: fresh AA\n\nreport\n',
                                              encoding='utf-8')
-    env = {**os.environ, 'RUNNER_TEMP': str(tmp_path), 'CHANGED': changed, 'FORCE': force}
+    env = {**os.environ, 'RUNNER_TEMP': str(tmp_path), 'AI_RESEARCHER_CHANGED': changed, 'AI_RESEARCHER_FORCE': force}
     result = _workflowrun.run_step(tmp_path, step(load(), 'Stage the publish payload'), env)
     assert result.returncode == 0, result.stdout + result.stderr
     payload = tmp_path / 'publish-payload'
@@ -2533,8 +2533,8 @@ class HFTrackerExecutedStepsTests(unittest.TestCase):
                     'GITHUB_OUTPUT': str(self.root / 'output'),
                     'GITHUB_STEP_SUMMARY': str(self.root / 'summary'),
                     'GITHUB_REPOSITORY': 'fixture/trending',
-                    'REPO': 'fixture/trending',
-                    'MASTER_PUSH_DEPLOY_KEY': '',
+                    'AI_RESEARCHER_REPO': 'fixture/trending',
+                    'AI_RESEARCHER_MASTER_PUSH_DEPLOY_KEY': '',
                     'HOME': str(home), 'PUSH_REMOTE': str(self.origin)}
 
     @staticmethod
@@ -2670,11 +2670,11 @@ class JoinedPushExecutedTests(unittest.TestCase):
         key = self.root / 'key'
         subprocess.run(['ssh-keygen', '-q', '-t', 'ed25519', '-N', '',
                         '-f', str(key)], check=True, capture_output=True, timeout=60)
-        self.env['MASTER_PUSH_DEPLOY_KEY'] = key.read_text(encoding='utf-8')
+        self.env['AI_RESEARCHER_MASTER_PUSH_DEPLOY_KEY'] = key.read_text(encoding='utf-8')
 
     def test_push_missing_key_fails_before_delivery(self):
         result = self.run_step('push', 'Push the tested tree to main', 1)
-        self.assertIn('MASTER_PUSH_DEPLOY_KEY is empty', result.stderr)
+        self.assertIn('AI_RESEARCHER_MASTER_PUSH_DEPLOY_KEY is empty', result.stderr)
         self.assertEqual(self.git(self.origin, 'rev-parse', 'main').strip(), self.base)
 
     @unittest.skipUnless(sys.platform == 'linux',
@@ -2851,9 +2851,9 @@ class ExecutedHubTrackerOrderingTests(unittest.TestCase):
         env = {**os.environ, 'RUNNER_TEMP': str(runner), 'HOME': str(home),
                'GITHUB_OUTPUT': str(runner / 'output'),
                'GITHUB_STEP_SUMMARY': str(runner / 'summary'),
-               'GITHUB_REPOSITORY': 'fixture/trending', 'REPO': 'fixture/trending',
+               'GITHUB_REPOSITORY': 'fixture/trending', 'AI_RESEARCHER_REPO': 'fixture/trending',
                'GIT_CONFIG_GLOBAL': str(self.config), 'PUSH_REMOTE': self.origin.as_uri(),
-               'MASTER_PUSH_DEPLOY_KEY': self.key, 'DOCS_HUB_API_KEY': 'fixture',
+               'AI_RESEARCHER_MASTER_PUSH_DEPLOY_KEY': self.key, 'DOCS_HUB_API_KEY': 'fixture',
                'HUB_PUBLISHED': str(self.published), 'HUB_CALLS': str(self.calls),
                'PATH': str(stub) + os.pathsep + os.environ['PATH']}
         self.contexts[name] = repo, env

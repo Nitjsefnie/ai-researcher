@@ -976,7 +976,7 @@ def test_assert_seeded_intact_catches_a_replaced_directory(
     inodes = inodes_of(browsers_root, seeded)
     chromium_dir = install_chromium.install_dir(browsers_root, seeded[0])
     # A re-download materializes the new directory elsewhere and moves it
-    # in, so build the replacement BEFORE removing the original: both
+    # in, so build the replacement before removing the original: both
     # directories then exist at once, and two simultaneously existing
     # directories never share an inode — the replacement's inode differs
     # from the recorded one on every filesystem. (Creating it after the

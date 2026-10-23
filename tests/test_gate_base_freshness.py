@@ -254,6 +254,7 @@ CORE_PIN = (
     'tests/test_coverage_comment.py',
     'tests/test_diff_aa.py',
     'tests/test_diff_coverage.py',
+    'tests/test_environment_prefix.py',
     'tests/test_fetch_aa.py',
     'tests/test_fetch_aa_detail_fills.py',
     'tests/test_fetch_aa_membership.py',
@@ -514,7 +515,7 @@ def test_green_when_main_advances_a_non_gate_file(tmp_path):
 
 def test_red_names_a_merge_commit(tmp_path):
     _, origin = _fixture(tmp_path)
-    # The stale clone is taken BEFORE the merge lands on origin: its own
+    # The stale clone is taken before the merge lands on origin: its own
     # fetch_base is what brings the merge into view, which is the situation
     # the check exists to answer.
     behind = tmp_path / 'behind'
@@ -528,7 +529,7 @@ def test_red_names_a_merge_commit(tmp_path):
             'name: actionlint\non: push\njobs:\n  actionlint:\n'
             '    runs-on: side\n    steps:\n'
             '      - run: ./actionlint -color .github/workflows/*.yml\n'})
-    # adv diverges BEFORE the side push, so the pull must merge: origin's
+    # adv diverges before the side push, so the pull must merge: origin's
     # main then carries a real merge commit for the stale listing to name.
     adv = tmp_path / 'adv'
     _git(tmp_path, 'clone', str(origin), str(adv))

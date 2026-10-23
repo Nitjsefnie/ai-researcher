@@ -491,7 +491,7 @@ agent drives by hand still carries one.
 Two failure modes are deliberate. `fetch_aa.py` exiting nonzero on a schema
 change, an index bump or a transport failure turns the scheduled run red rather
 than committing a mangled capture — that is the signal to go re-read the
-leaderboard by hand. And the suite runs BEFORE the commit, so a capture that
+leaderboard by hand. And the suite runs before the commit, so a capture that
 breaks the page leaves the last good capture committed and the last good page
 live.
 

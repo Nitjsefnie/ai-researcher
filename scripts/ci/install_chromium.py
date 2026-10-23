@@ -96,7 +96,7 @@ PROVENANCE_FILE = "DIGEST_VERIFIED"
 # Playwright publishes no digest anywhere (browsers.json has none and the
 # installer never hashes), so this table IS the trust anchor, and it is
 # updated BY HAND -- the repo's standard for checksummed binaries, same as
-# actionlint.yml's ACTIONLINT_SHA256:
+# the actionlint digest:
 #
 #   1. Dependabot (or you) bumps playwright in requirements-test.txt;
 #   2. run this script -- it fails naming the new revision and the archive

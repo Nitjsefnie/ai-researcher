@@ -49,13 +49,13 @@ def _env(workdir, state, calls, **extra):
         "STUB_CALLS": str(calls),
         "GITHUB_OUTPUT": str(workdir / "github-output"),
         "GH_TOKEN": "stub-token",
-        "REPO": "Nitjsefnie/ai-researcher",
-        "HEAD_SHA": "a" * 40,
-        "PR_NUMBER": "7",
-        "RUN_ID": "1234",
-        "HEAD_REPO": "Nitjsefnie/ai-researcher",
-        "HEAD_BRANCH": "patch-coverage-126",
-        "EVENT_NUMBERS": "[7]",
+        "AI_RESEARCHER_REPO": "Nitjsefnie/ai-researcher",
+        "AI_RESEARCHER_HEAD_SHA": "a" * 40,
+        "AI_RESEARCHER_PR_NUMBER": "7",
+        "AI_RESEARCHER_RUN_ID": "1234",
+        "AI_RESEARCHER_HEAD_REPO": "Nitjsefnie/ai-researcher",
+        "AI_RESEARCHER_HEAD_BRANCH": "patch-coverage-126",
+        "AI_RESEARCHER_EVENT_NUMBERS": "[7]",
     }
     env.update(extra)
     return env
@@ -183,7 +183,7 @@ def test_a_cancelled_run_marks_an_existing_comment_not_measured(tmp_path):
          "body": f"{MARKER}\n\nPatch coverage for commit {'b' * 40}."},
     ])
     done = _run(workdir, state, calls, "Mark missing patch coverage",
-                _env(workdir, state, calls, RUN_CONCLUSION="cancelled"))
+                _env(workdir, state, calls, AI_RESEARCHER_RUN_CONCLUSION="cancelled"))
     assert done.returncode == 0, (done.stdout, done.stderr)
     outputs = _outputs(workdir)
     assert outputs["skipped"] == "true", outputs
@@ -200,7 +200,7 @@ def test_a_cancelled_run_with_no_prior_comment_writes_nothing(tmp_path):
     workdir, state, calls = _workdir(tmp_path)
     _state(state, head_sha="a" * 40, comments=[])
     done = _run(workdir, state, calls, "Mark missing patch coverage",
-                _env(workdir, state, calls, RUN_CONCLUSION="cancelled"))
+                _env(workdir, state, calls, AI_RESEARCHER_RUN_CONCLUSION="cancelled"))
     assert done.returncode == 0, (done.stdout, done.stderr)
     assert "no patch-coverage marker to update" in done.stdout, done.stdout
     assert _workflowrun.recorded_writes(calls) == [], "a write escaped"
@@ -231,7 +231,7 @@ def test_a_docs_only_run_marks_an_existing_comment_not_measured(tmp_path):
          "body": f"{MARKER}\n\nPatch coverage for commit {'b' * 40}."},
     ])
     done = _run(workdir, state, calls, "Mark missing patch coverage",
-                _env(workdir, state, calls, RUN_CONCLUSION="success"))
+                _env(workdir, state, calls, AI_RESEARCHER_RUN_CONCLUSION="success"))
     assert done.returncode == 0, (done.stdout, done.stderr)
     outputs = _outputs(workdir)
     assert outputs["skipped"] == "true", outputs
@@ -249,7 +249,7 @@ def test_a_docs_only_run_with_no_prior_comment_writes_nothing(tmp_path):
     workdir, state, calls = _workdir(tmp_path)
     _state(state, head_sha="a" * 40, jobs=DOCS_ONLY_JOBS, comments=[])
     done = _run(workdir, state, calls, "Mark missing patch coverage",
-                _env(workdir, state, calls, RUN_CONCLUSION="success"))
+                _env(workdir, state, calls, AI_RESEARCHER_RUN_CONCLUSION="success"))
     assert done.returncode == 0, (done.stdout, done.stderr)
     assert "no patch-coverage marker to update" in done.stdout, done.stdout
     assert _workflowrun.recorded_writes(calls) == [], "a write escaped"
@@ -266,7 +266,7 @@ def test_a_successful_run_whose_tests_leg_ran_keeps_the_failure_default(tmp_path
          "body": f"{MARKER}\n\nPatch coverage for commit {'b' * 40}."},
     ])
     done = _run(workdir, state, calls, "Mark missing patch coverage",
-                _env(workdir, state, calls, RUN_CONCLUSION="success"))
+                _env(workdir, state, calls, AI_RESEARCHER_RUN_CONCLUSION="success"))
     assert done.returncode == 0, (done.stdout, done.stderr)
     outputs = _outputs(workdir)
     assert "skipped" not in outputs, outputs
@@ -282,7 +282,7 @@ def test_a_successful_run_without_a_tests_leg_is_refused(tmp_path):
         {"name": "aggregate", "conclusion": "success"},
     ], comments=[])
     done = _run(workdir, state, calls, "Mark missing patch coverage",
-                _env(workdir, state, calls, RUN_CONCLUSION="success"))
+                _env(workdir, state, calls, AI_RESEARCHER_RUN_CONCLUSION="success"))
     assert done.returncode != 0, (done.stdout, done.stderr)
     assert "names no tests leg" in done.stderr, done.stderr
 
@@ -291,9 +291,9 @@ def test_the_check_publishes_on_the_pull_request_head(tmp_path):
     workdir, state, calls = _workdir(tmp_path)
     _state(state, head_sha="a" * 40, checks=[])
     done = _run(workdir, state, calls, "Publish coverage check",
-                _env(workdir, state, calls, STATUS="success",
-                     JOB_SKIPPED="", NOT_MEASURED_REASON="", VERDICT="",
-                     RUN_URL="https://github.invalid/runs/1"))
+                _env(workdir, state, calls, AI_RESEARCHER_STATUS="success",
+                     AI_RESEARCHER_JOB_SKIPPED="", AI_RESEARCHER_NOT_MEASURED_REASON="", AI_RESEARCHER_VERDICT="",
+                     AI_RESEARCHER_RUN_URL="https://github.invalid/runs/1"))
     assert done.returncode == 0, (done.stdout, done.stderr)
     writes = _workflowrun.recorded_writes(calls)
     assert len(writes) == 1 and '"POST"' in writes[0], writes
@@ -310,11 +310,11 @@ def test_a_skipped_measurement_publishes_a_neutral_check(tmp_path):
     workdir, state, calls = _workdir(tmp_path)
     _state(state, head_sha="a" * 40, checks=[])
     done = _run(workdir, state, calls, "Publish coverage check",
-                _env(workdir, state, calls, STATUS="success",
-                     JOB_SKIPPED="true",
-                     NOT_MEASURED_REASON="a cancelled tests run",
-                     VERDICT="",
-                     RUN_URL="https://github.invalid/runs/1"))
+                _env(workdir, state, calls, AI_RESEARCHER_STATUS="success",
+                     AI_RESEARCHER_JOB_SKIPPED="true",
+                     AI_RESEARCHER_NOT_MEASURED_REASON="a cancelled tests run",
+                     AI_RESEARCHER_VERDICT="",
+                     AI_RESEARCHER_RUN_URL="https://github.invalid/runs/1"))
     assert done.returncode == 0, (done.stdout, done.stderr)
     state_now = json.loads(state.read_text(encoding="utf-8"))
     [check] = state_now["checks"]
@@ -326,9 +326,9 @@ def test_a_neutral_verdict_without_a_reason_is_refused(tmp_path):
     workdir, state, calls = _workdir(tmp_path)
     _state(state, head_sha="a" * 40, checks=[])
     done = _run(workdir, state, calls, "Publish coverage check",
-                _env(workdir, state, calls, STATUS="success",
-                     JOB_SKIPPED="true", NOT_MEASURED_REASON="", VERDICT="",
-                     RUN_URL="https://github.invalid/runs/1"))
+                _env(workdir, state, calls, AI_RESEARCHER_STATUS="success",
+                     AI_RESEARCHER_JOB_SKIPPED="true", AI_RESEARCHER_NOT_MEASURED_REASON="", AI_RESEARCHER_VERDICT="",
+                     AI_RESEARCHER_RUN_URL="https://github.invalid/runs/1"))
     assert done.returncode != 0, done.stdout
     assert "not_measured_reason" in done.stderr, done.stderr
 
@@ -339,7 +339,7 @@ def test_the_resolver_takes_the_event_pull_request(tmp_path):
     _state(state, head_sha="a" * 40)
     done = _run(workdir, state, calls,
                 "Resolve the target pull request from the event",
-                _env(workdir, state, calls, EVENT_NUMBERS="[7]"))
+                _env(workdir, state, calls, AI_RESEARCHER_EVENT_NUMBERS="[7]"))
     assert done.returncode == 0, (done.stdout, done.stderr)
     outputs = _outputs(workdir)
     assert outputs["number"] == "7", outputs
@@ -347,7 +347,7 @@ def test_the_resolver_takes_the_event_pull_request(tmp_path):
 
 
 def test_the_resolver_falls_back_to_a_base_namespace_head_label(tmp_path):
-    """A fork run resolves in the BASE repository's number namespace.
+    """A fork run resolves in the base repository's number namespace.
 
     The lookup is `repos/<base>/pulls?head=<owner>:<branch>` — never a
     commit association on the head repository, whose answer can be a
@@ -364,9 +364,9 @@ def test_the_resolver_falls_back_to_a_base_namespace_head_label(tmp_path):
     ])
     done = _run(workdir, state, calls,
                 "Resolve the target pull request from the event",
-                _env(workdir, state, calls, EVENT_NUMBERS="[]",
-                     HEAD_REPO="forker/ai-researcher",
-                     HEAD_BRANCH="patch"))
+                _env(workdir, state, calls, AI_RESEARCHER_EVENT_NUMBERS="[]",
+                     AI_RESEARCHER_HEAD_REPO="forker/ai-researcher",
+                     AI_RESEARCHER_HEAD_BRANCH="patch"))
     assert done.returncode == 0, (done.stdout, done.stderr)
     assert _outputs(workdir)["number"] == "7", done.stderr
 
@@ -377,9 +377,9 @@ def test_the_resolver_without_any_pull_request_posts_nothing(tmp_path):
     _state(state, head_sha="a" * 40, pulls=[])
     done = _run(workdir, state, calls,
                 "Resolve the target pull request from the event",
-                _env(workdir, state, calls, EVENT_NUMBERS="[]",
-                     HEAD_REPO="forker/ai-researcher",
-                     HEAD_BRANCH="patch"))
+                _env(workdir, state, calls, AI_RESEARCHER_EVENT_NUMBERS="[]",
+                     AI_RESEARCHER_HEAD_REPO="forker/ai-researcher",
+                     AI_RESEARCHER_HEAD_BRANCH="patch"))
     assert done.returncode == 0, (done.stdout, done.stderr)
     assert _outputs(workdir).get("present") == "false"
 
@@ -391,9 +391,9 @@ def test_the_resolver_refuses_an_ambiguous_head(tmp_path):
         {"number": 7}, {"number": 8}])
     done = _run(workdir, state, calls,
                 "Resolve the target pull request from the event",
-                _env(workdir, state, calls, EVENT_NUMBERS="[]",
-                     HEAD_REPO="forker/ai-researcher",
-                     HEAD_BRANCH="patch"))
+                _env(workdir, state, calls, AI_RESEARCHER_EVENT_NUMBERS="[]",
+                     AI_RESEARCHER_HEAD_REPO="forker/ai-researcher",
+                     AI_RESEARCHER_HEAD_BRANCH="patch"))
     assert done.returncode != 0, done.stdout
     assert "found 2" in done.stderr, done.stderr
 
@@ -404,7 +404,7 @@ def test_the_resolver_calls_a_moved_head_stale(tmp_path):
     _state(state, head_sha="b" * 40)
     done = _run(workdir, state, calls,
                 "Resolve the target pull request from the event",
-                _env(workdir, state, calls, EVENT_NUMBERS="[7]"))
+                _env(workdir, state, calls, AI_RESEARCHER_EVENT_NUMBERS="[7]"))
     assert done.returncode == 0, (done.stdout, done.stderr)
     outputs = _outputs(workdir)
     assert outputs["stale"] == "true", outputs

@@ -30,11 +30,11 @@ jobs:
         id: stage
         if: github.event_name == 'push'
         env:
-          HEAD_SHA: ${{ github.sha }}
+          AI_RESEARCHER_HEAD_SHA: ${{ github.sha }}
         run: |
           set -euo pipefail
           original="${RUNNER_TEMP}/comment-share-original.json"
-          git show "${HEAD_SHA}:.github/comment-share.json" > "$original"
+          git show "${AI_RESEARCHER_HEAD_SHA}:.github/comment-share.json" > "$original"
           if cmp -s "$original" .github/comment-share.json; then
             echo 'changed=false' >> "$GITHUB_OUTPUT"
             exit 0
@@ -42,7 +42,7 @@ jobs:
           data="${RUNNER_TEMP}/comment-share-data"
           mkdir -p "$data"
           cp .github/comment-share.json "$data/comment-share.json"
-          printf '%s\n' "$HEAD_SHA" > "$data/base.txt"
+          printf '%s\n' "$AI_RESEARCHER_HEAD_SHA" > "$data/base.txt"
           echo 'changed=true' >> "$GITHUB_OUTPUT"
       - name: Upload tightened records
         if: github.event_name == 'push' && steps.stage.outputs.changed == 'true'

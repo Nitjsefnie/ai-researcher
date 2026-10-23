@@ -61,7 +61,7 @@ def added_paths(workflow_name="refresh.yml", job="publish",
         f"expected exactly one {step_name!r} step in {workflow_name}'s "
         f"{job} job, found {len(steps)}")
     # Join backslash continuations first, so an add split across lines
-    # is read whole. Comment lines are dropped BEFORE the join, not after:
+    # is read whole. Comment lines are dropped before the join, not after:
     # prose in the step mentions the adds it makes -- `git add <path>` in
     # a rationale for issue #202 -- and a comment is not an add, so a
     # path named only in one must not join the pin and be measured

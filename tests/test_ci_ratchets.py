@@ -534,13 +534,11 @@ def test_end_to_end_unknown_revision_is_exit_2(tmp_path):
 
 def test_end_to_end_push_lowering_on_main_is_flagged(tmp_path, capsys,
                                                      monkeypatch):
-    """The push path's shape: BEFORE..HEAD, both tips of main.
+    """The push path's shape: AI_RESEARCHER_BEFORE..HEAD, both tips of main.
 
-    The workflow's push branch invokes the guard as
-    ``check_ratchets.py "${BEFORE}" HEAD`` with the previous main tip and
-    the new one; a direct-push lowering must be flagged exactly as a
-    branch's lowering is. main() runs in-process so coverage.py can trace
-    the guard's lines.
+    The workflow passes main's previous and new tips to the guard; a
+    direct-push lowering must be flagged like a branch's lowering.
+    main() runs in-process so coverage.py can trace the guard's lines.
     """
     repo = _seed_repo(tmp_path, _document())
     before = _git(repo, "rev-parse", "main").stdout.strip()
@@ -1837,7 +1835,7 @@ def test_workflow_wiring_pins_the_invocations():
     name, and dropping either flag goes red here."""
     text = (REPO_ROOT / ".github" / "workflows" / "tests.yml").read_text(
         encoding="utf-8")
-    assert ('check_ratchets.py --allow-declared-raises "${BEFORE}" HEAD'
+    assert ('check_ratchets.py --allow-declared-raises "${AI_RESEARCHER_BEFORE}" HEAD'
             in text)
     assert "--route pr HEAD^1 HEAD^2" in text
     # Exactly two invocations carry the flag; the comment's prose mention

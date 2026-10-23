@@ -384,7 +384,7 @@ def test_coverage_job_collects_its_measured_subprocesses():
         "${{ github.workspace }}/.coverage")
     [run_tests] = [s for s in coverage["steps"]
                    if s.get("name") == "Run tests"]
-    assert run_tests["env"]["COVERAGE_MEASURE_CHILDREN_RC"] == (
+    assert run_tests["env"]["AI_RESEARCHER_COVERAGE_MEASURE_CHILDREN_RC"] == (
         "${{ github.workspace }}/.github/coverage-children.rc")
     [summary] = [s for s in coverage["steps"]
                  if s.get("name") == "Coverage summary"]

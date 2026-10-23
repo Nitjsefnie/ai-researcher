@@ -144,7 +144,7 @@ jobs:
   # asymmetry is deliberate, see the header and the matrix job's --ignore
   # comment. One pytest run produces BOTH measurements: coverage.py counts
   # the Python statements, and the browser harness writes the V8 block
-  # coverage of the page's inline script to JS_COVERAGE_OUT for
+  # coverage of the page's inline script to AI_RESEARCHER_JS_COVERAGE_OUT for
   # scripts/ci/js_coverage.py to fold into code-line coverage.
   coverage:
     runs-on: ubuntu-latest
@@ -225,11 +225,11 @@ jobs:
       - name: Run tests
         id: pytest
         # Under coverage, and with the repo root as cwd — see the header.
-        # JS_COVERAGE_OUT makes tests/test_browser.py record every page's V8
+        # AI_RESEARCHER_JS_COVERAGE_OUT makes tests/test_browser.py record every page's V8
         # coverage and dump it on teardown; unset, the suite behaves exactly
         # as before.
         env:
-          JS_COVERAGE_OUT: ${{ runner.temp }}/js-coverage.json
+          AI_RESEARCHER_JS_COVERAGE_OUT: ${{ runner.temp }}/js-coverage.json
           # Measured subprocesses: the CLI contract tests launch the
           # patch-coverage reporter as a real child interpreter, which this
           # run's collector cannot trace, and the IMPLICIT .pth hook cannot
@@ -239,7 +239,7 @@ jobs:
           # this variable and run the child under an explicit `coverage
           # run`, whose save survives; .github/coverage-children.rc bounds
           # what such a child records.
-          COVERAGE_MEASURE_CHILDREN_RC: ${{ github.workspace }}/.github/coverage-children.rc
+          AI_RESEARCHER_COVERAGE_MEASURE_CHILDREN_RC: ${{ github.workspace }}/.github/coverage-children.rc
         run: |
           # --parallel-mode: the outer run writes a sidecar like every
           # measured child, because `coverage combine` REPLACES the data
@@ -256,7 +256,7 @@ jobs:
         # physical code-line coverage are separate metrics.
         if: ${{ !cancelled() && steps.pytest.conclusion != 'skipped' }}
         env:
-          JS_COVERAGE_OUT: ${{ runner.temp }}/js-coverage.json
+          AI_RESEARCHER_JS_COVERAGE_OUT: ${{ runner.temp }}/js-coverage.json
         run: |
           # Fold the measured subprocess sidecars into the outer run's data
           # FIRST, so every report and gate below reads one complete
@@ -271,7 +271,7 @@ jobs:
             echo
             echo '### JavaScript coverage'
             echo
-            python3 scripts/ci/js_coverage.py "$JS_COVERAGE_OUT"
+            python3 scripts/ci/js_coverage.py "$AI_RESEARCHER_JS_COVERAGE_OUT"
           } >> "$GITHUB_STEP_SUMMARY"
           python3 -m coverage xml -o coverage.xml
 
@@ -315,18 +315,18 @@ jobs:
         if: ${{ !cancelled() && steps.pytest.conclusion != 'skipped' }}
         # The front-end half of the same ratchet. The browser harness wrote
         # the V8 block coverage Chromium collected for the built page to
-        # JS_COVERAGE_OUT; js_coverage.py attributes a record only when its
+        # AI_RESEARCHER_JS_COVERAGE_OUT; js_coverage.py attributes a record only when its
         # source is the page's single inline <script> and folds the rest of
         # what the browser compiled into an unattributed count that is never
         # scored. The floor is the committed javascript record, same rules
         # as python: seeded 1.5 under measured, never lowered, raised on
         # main by ratchet.py --language javascript.
         env:
-          JS_COVERAGE_OUT: ${{ runner.temp }}/js-coverage.json
+          AI_RESEARCHER_JS_COVERAGE_OUT: ${{ runner.temp }}/js-coverage.json
         run: |
           js_floor="$(python3 scripts/ci/thresholds.py \
             --coverage-floor javascript)"
-          python3 scripts/ci/js_coverage.py "$JS_COVERAGE_OUT" \
+          python3 scripts/ci/js_coverage.py "$AI_RESEARCHER_JS_COVERAGE_OUT" \
             "--fail-under=${js_floor}" --format=total
 
       - name: Cache valgrind dependency debs
@@ -372,18 +372,18 @@ jobs:
         # so thresholds --check alone accepted it (issue #53). The guard
         # now runs on push too. The automated raise is unaffected: a raise
         # only lifts values, so its own push run is clean, and this step
-        # runs BEFORE "Ratchet the thresholds", so a lowered document
+        # runs before "Ratchet the thresholds", so a lowered document
         # fails the job before any raise could paper over it.
         #
         # On a pull request the merge ref merges the head into the base,
         # so HEAD^1 is the base tip and HEAD^2 the head, and the check
         # compares the document at their merge base with the head's copy
-        # — never the working tree. On a push, BEFORE is the previous tip
+        # — never the working tree. On a push, AI_RESEARCHER_BEFORE is the previous tip
         # of main and HEAD the new one. The history is still shallow by
         # the time this runs, and a shallow history can make git
         # merge-base return a wrong base without erroring, so the step
         # completes the history of both sides first. A branch-creation
-        # push carries the all-zero BEFORE — nothing to compare against.
+        # push carries the all-zero AI_RESEARCHER_BEFORE — nothing to compare against.
         #
         # Both branches pass --allow-declared-raises (issues #120 and
         # #133): a deliberate budget raise lands as its own commit whose
@@ -412,20 +412,20 @@ jobs:
         # provenance, and a mutable PR-head refspec is not what the guard
         # compares: HEAD^1 and HEAD^2 are its only inputs.
         env:
-          CI_SHA: ${{ github.sha }}
-          BEFORE: ${{ github.event.before }}
+          AI_RESEARCHER_CI_SHA: ${{ github.sha }}
+          AI_RESEARCHER_BEFORE: ${{ github.event.before }}
         run: |
           if [ "${GITHUB_EVENT_NAME}" = "pull_request" ]; then
-            git fetch --unshallow origin "${CI_SHA}"
+            git fetch --unshallow origin "${AI_RESEARCHER_CI_SHA}"
             python3 scripts/ci/check_ratchets.py --allow-declared-raises \
               --route pr HEAD^1 HEAD^2
           else
-            if [ "${BEFORE}" = "0000000000000000000000000000000000000000" ]; then
+            if [ "${AI_RESEARCHER_BEFORE}" = "0000000000000000000000000000000000000000" ]; then
               echo "branch creation: no previous main tip to compare against"
               exit 0
             fi
-            git fetch --unshallow origin main "${BEFORE}"
-            python3 scripts/ci/check_ratchets.py --allow-declared-raises "${BEFORE}" HEAD
+            git fetch --unshallow origin main "${AI_RESEARCHER_BEFORE}"
+            python3 scripts/ci/check_ratchets.py --allow-declared-raises "${AI_RESEARCHER_BEFORE}" HEAD
           fi
 
       - name: Ratchet the thresholds
@@ -444,11 +444,11 @@ jobs:
                 && github.event_name == 'push'
                 && github.ref == 'refs/heads/main' }}
         env:
-          JS_COVERAGE_OUT: ${{ runner.temp }}/js-coverage.json
+          AI_RESEARCHER_JS_COVERAGE_OUT: ${{ runner.temp }}/js-coverage.json
         run: |
           measured="$(python3 -m coverage report --format=total --precision=1)"
           js_measured="$(python3 scripts/ci/js_coverage.py \
-            "$JS_COVERAGE_OUT" --format=total)"
+            "$AI_RESEARCHER_JS_COVERAGE_OUT" --format=total)"
           python3 scripts/ci/ratchet.py --measured "${measured}"
           python3 scripts/ci/ratchet.py --language javascript \
             --measured "${js_measured}"
@@ -476,11 +476,11 @@ jobs:
         # raise when main no longer stands at the staged base.
         if: ${{ !cancelled() && steps.ratchet.outputs.changed == 'true' }}
         env:
-          BASE: ${{ github.sha }}
+          AI_RESEARCHER_BASE: ${{ github.sha }}
         run: |
           mkdir -p "${RUNNER_TEMP}/ratchet-stage"
           cp .github/ci-thresholds.json "${RUNNER_TEMP}/ratchet-stage/"
-          printf '%s\n' "${BASE}" > "${RUNNER_TEMP}/ratchet-stage/base.txt"
+          printf '%s\n' "${AI_RESEARCHER_BASE}" > "${RUNNER_TEMP}/ratchet-stage/base.txt"
 
       - name: Upload the ratchet artifact
         if: ${{ !cancelled() && steps.ratchet.outputs.changed == 'true' }}
@@ -564,9 +564,9 @@ jobs:
 
       - name: Package the comment for the trusted commenter
         env:
-          PR_NUMBER: ${{ github.event.pull_request.number }}
+          AI_RESEARCHER_PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
-          printf '%s\n' "$PR_NUMBER" > pr-number.txt
+          printf '%s\n' "$AI_RESEARCHER_PR_NUMBER" > pr-number.txt
 
       - name: Upload the comment for the trusted commenter
         # actions/upload-artifact v7.0.1
@@ -581,7 +581,7 @@ jobs:
 
   # --- The committed-page check -------------------------------------------
   # Issue #105: out/frontier-models.html gets its "Source commit <code>…
-  # </code>" stamp only when AA_SOURCE_COMMIT is set at build time, and only
+  # </code>" stamp only when AI_RESEARCHER_AA_SOURCE_COMMIT is set at build time, and only
   # refresh.yml sets it — so a page a pull request builds and commits by
   # hand goes out stamp-less, and the #94 hourly republish run restores HEAD's
   # committed page byte for byte, stamp-less. This job refuses a committed

@@ -25,8 +25,8 @@ from scripts.browser_temp import chromium_browser
 # This box has a system Chromium and no playwright-managed browser; CI has the
 # reverse (`playwright install chromium`). Prefer whatever is actually present
 # rather than hard-coding one of them — passing executable_path=None makes
-# playwright use its own download. CHROMIUM_PATH overrides both.
-CHROMIUM = os.environ.get("CHROMIUM_PATH") or "/usr/bin/chromium"
+# playwright use its own download. AI_RESEARCHER_CHROMIUM_PATH overrides both.
+CHROMIUM = os.environ.get("AI_RESEARCHER_CHROMIUM_PATH") or os.environ.get("CHROMIUM_PATH") or "/usr/bin/chromium"
 CHROMIUM_EXECUTABLE = CHROMIUM if pathlib.Path(CHROMIUM).exists() else None
 
 
@@ -135,7 +135,7 @@ def flush_page_coverage(cls):
         except Exception:  # pylint: disable=broad-exception-caught
             pass
     cls._open_pages.clear()
-    dump = os.environ.get("JS_COVERAGE_OUT")
+    dump = os.environ.get("AI_RESEARCHER_JS_COVERAGE_OUT") or os.environ.get("JS_COVERAGE_OUT")
     if dump:
         # The coverage job runs more than one page-building class, and
         # each dumps at ITS teardown: merge with whatever an earlier
@@ -164,7 +164,7 @@ class BrowserInteractionTests(unittest.TestCase):
     # pylint: disable=too-many-public-methods
     # One behaviour, one test: #85's per-chart label-distinctness guarantee is
     # a 21st method here, not a subTest of an unrelated test.
-    # V8 coverage for the JavaScript ratchet. With JS_COVERAGE_OUT set (the
+    # V8 coverage for the JavaScript ratchet. With AI_RESEARCHER_JS_COVERAGE_OUT set (the
     # coverage job sets it), every page this class creates records V8 block
     # coverage and its dump joins a class-level list written out when the
     # class tears down; unset, nothing changes. One pytest run then produces
@@ -1943,7 +1943,10 @@ class PerfBudgetTests(unittest.TestCase):
         build.RAW = data / "models.json"
         build.AGENTS_RAW = data / "coding-agents.json"
         build.OUT = pathlib.Path(cls._page_dir.name) / "frontier-models.html"
-        saved_stamp = os.environ.pop("AA_SOURCE_COMMIT", None)
+        stamp_env = "AI_RESEARCHER_AA_SOURCE_COMMIT"
+        saved_stamp = {key: os.environ.pop(key) for key in
+                       (stamp_env, stamp_env.removeprefix("AI_RESEARCHER_"))
+                       if key in os.environ}
         try:
             with contextlib.redirect_stdout(io.StringIO()):
                 build.main()
@@ -1968,8 +1971,7 @@ class PerfBudgetTests(unittest.TestCase):
             cls._page_dir.cleanup()
             raise
         finally:
-            if saved_stamp is not None:
-                os.environ["AA_SOURCE_COMMIT"] = saved_stamp
+            os.environ.update(saved_stamp)
 
     @classmethod
     def tearDownClass(cls):
@@ -2012,13 +2014,15 @@ class PerfBudgetTests(unittest.TestCase):
             build.RAW, build.AGENTS_RAW, build.OUT)
         build.RAW, build.AGENTS_RAW, build.OUT = raw, agents_raw, page
         try:
-            saved_stamp = os.environ.pop("AA_SOURCE_COMMIT", None)
+            stamp_env = "AI_RESEARCHER_AA_SOURCE_COMMIT"
+            saved_stamp = {key: os.environ.pop(key) for key in
+                           (stamp_env, stamp_env.removeprefix("AI_RESEARCHER_"))
+                           if key in os.environ}
             try:
                 with contextlib.redirect_stdout(io.StringIO()):
                     build.main()
             finally:
-                if saved_stamp is not None:
-                    os.environ["AA_SOURCE_COMMIT"] = saved_stamp
+                os.environ.update(saved_stamp)
         finally:
             build.RAW, build.AGENTS_RAW, build.OUT = (
                 old_raw, old_agents, old_out)
@@ -2216,15 +2220,16 @@ class BuildProvenanceTests(unittest.TestCase):
         return digest.hexdigest()
 
     def _build(self, destination, commit=None):
-        """Run build.main() to `destination`, with AA_SOURCE_COMMIT set or
+        """Run build.main() to `destination`, with AI_RESEARCHER_AA_SOURCE_COMMIT set or
         unset, and return the page bytes."""
         old_out = build.OUT
         build.OUT = destination
         try:
-            env = {} if commit is None else {"AA_SOURCE_COMMIT": commit}
+            env = {} if commit is None else {"AI_RESEARCHER_AA_SOURCE_COMMIT": commit}
             with mock.patch.dict(os.environ, env, clear=False):
+                os.environ.pop("AI_RESEARCHER_AA_SOURCE_COMMIT".removeprefix("AI_RESEARCHER_"), None)
                 if commit is None:
-                    os.environ.pop("AA_SOURCE_COMMIT", None)
+                    os.environ.pop("AI_RESEARCHER_AA_SOURCE_COMMIT", None)
                 with contextlib.redirect_stdout(io.StringIO()):
                     build.main()
             return destination.read_bytes()
@@ -2260,7 +2265,7 @@ class BuildProvenanceTests(unittest.TestCase):
             self.assertIn(self._expected_digest(build.RAW.parent), foot)
 
     def test_a_malformed_source_commit_renders_no_stamp_and_no_marker_splice(self):
-        # AA_SOURCE_COMMIT is build-machine input, so only SHA-shaped values
+        # AI_RESEARCHER_AA_SOURCE_COMMIT is build-machine input, so only SHA-shaped values
         # (7-40 hex chars) render. Anything else must be treated exactly like
         # an unset variable -- otherwise a value carrying a template marker
         # would be spliced by the later __CAPTURED__/__DATA__ substitutions.

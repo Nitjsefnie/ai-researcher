@@ -358,7 +358,7 @@ class RankingsTests(RankingsFixture):
     def test_browser_rings_stay_solid_and_crosshair_hides_after_escape(self):
         self.commit(HF, [f"org/model-{rank}" for rank in range(10)], "id")
         document = self._document()
-        chromium = os.environ.get("CHROMIUM_PATH") or "/usr/bin/chromium"
+        chromium = os.environ.get("AI_RESEARCHER_CHROMIUM_PATH") or os.environ.get("CHROMIUM_PATH") or "/usr/bin/chromium"
         executable = chromium if pathlib.Path(chromium).exists() else None
         with sync_playwright() as playwright:
             try:
@@ -410,7 +410,7 @@ class RankingsTests(RankingsFixture):
             latest_or = self.commit(OR, router_models, "slug")
 
         document = self._document("--limit", "10")
-        chromium = os.environ.get("CHROMIUM_PATH") or "/usr/bin/chromium"
+        chromium = os.environ.get("AI_RESEARCHER_CHROMIUM_PATH") or os.environ.get("CHROMIUM_PATH") or "/usr/bin/chromium"
         executable = chromium if pathlib.Path(chromium).exists() else None
         with sync_playwright() as playwright:
             try:

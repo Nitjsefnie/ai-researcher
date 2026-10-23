@@ -100,11 +100,11 @@ python3 build.py                # → out/frontier-models.html
 git:HEAD~5` diffs the working capture against an older one.
 
 **A page committed to the repository carries its source-commit stamp.** The
-footer stamp is rendered only when `AA_SOURCE_COMMIT` is set at build time,
+footer stamp is rendered only when `AI_RESEARCHER_AA_SOURCE_COMMIT` is set at build time,
 and nothing but the refresh workflow sets it for you. Build with
 
 ```sh
-AA_SOURCE_COMMIT="$(git rev-parse HEAD)" python3 build.py
+AI_RESEARCHER_AA_SOURCE_COMMIT="$(git rev-parse HEAD)" python3 build.py
 ```
 
 immediately before committing, and change no build input afterwards. CI (the
@@ -126,7 +126,7 @@ import. `unittest discover` refuses outright.
 `tests/test_browser.py` drives the built page in a real headless Chromium
 through playwright. It prefers a system browser at `/usr/bin/chromium` and
 falls back to playwright's own download (`python3 -m playwright install
-chromium`); `CHROMIUM_PATH` overrides both. Half the page's behaviour — the
+chromium`); `AI_RESEARCHER_CHROMIUM_PATH` overrides both. Half the page's behaviour — the
 frontier line, the tooltip, the filter chips, the sortable table — is only
 reachable through those tests, so a change to the emitted JavaScript needs one.
 
@@ -156,11 +156,11 @@ push is not a job in tests.yml (issue #133 part 2b). There are two floors: Pytho
 coverage from the pytest run,
 and JavaScript physical code-line coverage of the page's inline script,
 measured through the browser suite (`tests/test_browser.py` records V8
-coverage when `JS_COVERAGE_OUT` is set, and `scripts/ci/js_coverage.py` folds
+coverage when `AI_RESEARCHER_JS_COVERAGE_OUT` is set, and `scripts/ci/js_coverage.py` folds
 the dump). A push to `main` whose coverage climbs more than 1.5 points past
 the recorded measurement raises the floor automatically; nothing can relax
 the file — a guard step compares it against the merge base on a pull request
-and against BEFORE (the previous tip) on a push to `main`, including a
+and against AI_RESEARCHER_BEFORE (the previous tip) on a push to `main`, including a
 non-fast-forward push, and refuses any change that lowers a value.
 `thresholds.py --check` refuses a working-tree copy below the committed one.
 Scripts are counted deliberately — `--omit` leaves out only `tests/*` —

@@ -1,5 +1,5 @@
 # The collector configuration for MEASURED SUBPROCESSes of the coverage
-# job. tests.yml's coverage job sets COVERAGE_MEASURE_CHILDREN_RC to this
+# job. tests.yml's coverage job sets AI_RESEARCHER_COVERAGE_MEASURE_CHILDREN_RC to this
 # file, and the CLI contract tests run the patch-coverage reporter under
 # an explicit `coverage run --rcfile=<this file>` — that is how a child
 # interpreter's lines reach the same ratchet the in-process suite feeds.

@@ -58,7 +58,7 @@ name: refresh
 #
 # THE LIVE PAGE IS THE REPUBLISH GATE'S MEMORY (issue #206). The page HTML
 # embeds its own provenance: the source-commit stamp, rendered from
-# AA_SOURCE_COMMIT, names the main commit the page was built from. A branch
+# AI_RESEARCHER_AA_SOURCE_COMMIT, names the main commit the page was built from. A branch
 # can be deleted; a stamp inside the page the hub serves cannot -- and it
 # needs no ref, no ref move, and no write permission anywhere in the
 # workflow to keep working. When a run's capture is unchanged, it fetches
@@ -80,7 +80,7 @@ name: refresh
 # comparison against the live page repairs any residual seconds-wide
 # inversion on the next unchanged-capture run.
 #
-# THE SUITE RUNS BEFORE THE COMMIT JOB, NOT AFTER. A capture can break the
+# THE SUITE RUNS before THE COMMIT JOB, NOT AFTER. A capture can break the
 # page — a new field shape, a model with a null AA never emitted before —
 # and the whole point of a scheduled publish is that nobody is watching it
 # happen. A red build here fails the refresh job, and a failed need never
@@ -261,12 +261,12 @@ jobs:
         # output, not attacker-controlled -- the env form is still the
         # convention.
         env:
-          CAPTURED: ${{ steps.fetch.outputs.captured }}
-          REF: ${{ github.ref }}
-          # Same convention as CAPTURED and REF: zizmor's template-injection
+          AI_RESEARCHER_CAPTURED: ${{ steps.fetch.outputs.captured }}
+          AI_RESEARCHER_REF: ${{ github.ref }}
+          # Same convention as AI_RESEARCHER_CAPTURED and AI_RESEARCHER_REF: zizmor's template-injection
           # audit fails direct ${{ }} in run text, and the env mapping is
           # its sanctioned route. The value is the dispatch's own input.
-          FORCE: ${{ inputs.force }}
+          AI_RESEARCHER_FORCE: ${{ inputs.force }}
         run: |
           # THE OFF-MAIN DISPATCH GATE (issue #206). workflow_dispatch can
           # target any branch, and a payload built from a non-main tree must
@@ -278,14 +278,14 @@ jobs:
           # refs/heads/main IS an off-main dispatch by construction, and the
           # hour is dropped green here, before anything expensive, under its
           # own truthful heading. (The ref reaches this shell as the env var
-          # $REF, not an inline template expression -- zizmor's
+          # $AI_RESEARCHER_REF, not an inline template expression -- zizmor's
           # template-injection audit fails those in run text, and the env
           # mapping is its sanctioned route.)
-          if [ "$REF" != "refs/heads/main" ]; then
+          if [ "$AI_RESEARCHER_REF" != "refs/heads/main" ]; then
             {
               echo "### Dropped: dispatched off main"
               echo
-              echo "This run was dispatched at ${REF:-no ref}; a payload built"
+              echo "This run was dispatched at ${AI_RESEARCHER_REF:-no ref}; a payload built"
               echo "from a non-main tree does not land on main. Dispatch on"
               echo "main to publish."
             } >> "$GITHUB_STEP_SUMMARY"
@@ -334,10 +334,10 @@ jobs:
                 # if it had rebuilt. One line on purpose -- the held branch
                 # exits before the live-page check runs, so no second cause
                 # can be named here. (inputs.force reaches the shell as the
-                # env var $FORCE, the same env route as CAPTURED and REF
+                # env var $AI_RESEARCHER_FORCE, the same env route as AI_RESEARCHER_CAPTURED and AI_RESEARCHER_REF
                 # above -- zizmor's template-injection audit fails inline
                 # template expressions in run text.)
-                if [ "$FORCE" = 'true' ]; then echo 'Force was requested; the hold outranks it, so nothing was rebuilt.'; fi
+                if [ "$AI_RESEARCHER_FORCE" = 'true' ]; then echo 'Force was requested; the hold outranks it, so nothing was rebuilt.'; fi
               } >> "$GITHUB_STEP_SUMMARY"
               git checkout -- data/
               echo "proceed=false" >> "$GITHUB_OUTPUT"
@@ -397,14 +397,14 @@ jobs:
           # as an ordinary forced no-op. A run whose only cause is the hub
           # being behind still proceeds: that is the republish hour.
           # `inputs.force` is the empty
-          # string on a schedule run, and `$CAPTURED` is empty only for run
+          # string on a schedule run, and `$AI_RESEARCHER_CAPTURED` is empty only for run
           # shapes older than the output, so both defaults keep the scheduled
           # path unchanged. (The verdict reaches this shell as the env var
-          # $CAPTURED, not an inline template expression -- zizmor's
+          # $AI_RESEARCHER_CAPTURED, not an inline template expression -- zizmor's
           # template-injection audit fails those in run text, and the env
           # mapping is its sanctioned route.)
           if [ "$changed" = true ] \
-             || { [ "$CAPTURED" != "false" ] && [ "${{ inputs.force }}" = 'true' ]; } \
+             || { [ "$AI_RESEARCHER_CAPTURED" != "false" ] && [ "${{ inputs.force }}" = 'true' ]; } \
              || [ "$hub_stale" = true ]; then
             echo "proceed=true" >> "$GITHUB_OUTPUT"
           else
@@ -417,7 +417,7 @@ jobs:
           # #103): the Capture step's own skip line already explains the
           # hour, and "AA capture unchanged" would mislabel it.
           if [ "$changed" = false ] && [ "${{ inputs.force }}" != 'true' ] \
-             && [ "$CAPTURED" != "false" ] && [ "$hub_stale" = false ]; then
+             && [ "$AI_RESEARCHER_CAPTURED" != "false" ] && [ "$hub_stale" = false ]; then
             echo 'AA capture unchanged and the live page is current.' \
               >> "$GITHUB_STEP_SUMMARY"
           fi
@@ -510,12 +510,12 @@ jobs:
         # threshold-filtered and unchanged frontier sections are omitted at
         # the source, so the commit carries everything that is news.
         env:
-          CHANGED: ${{ steps.capture.outputs.changed }}
+          AI_RESEARCHER_CHANGED: ${{ steps.capture.outputs.changed }}
         run: |
           python3 scripts/diff_aa.py git:HEAD data/aa-raw-models.json > diff.txt
           # Only a run whose DATA moved gets diff_aa's message; a forced
           # build-only run writes its own in the write job's commit step.
-          if [ "$CHANGED" = true ]; then
+          if [ "$AI_RESEARCHER_CHANGED" = true ]; then
             python3 scripts/diff_aa.py git:HEAD data/aa-raw-models.json \
               --commit-msg > commit-msg.txt
           fi
@@ -534,7 +534,7 @@ jobs:
         # rebase lands the same build in a later commit, the printed SHA
         # still names the build's source — that is the honest claim.
         env:
-          AA_SOURCE_COMMIT: ${{ github.sha }}
+          AI_RESEARCHER_AA_SOURCE_COMMIT: ${{ github.sha }}
         run: python3 build.py
 
       - name: Run the suite against the new capture
@@ -545,7 +545,7 @@ jobs:
         # step has: unstamped, that rewrite would throw the stamp away and
         # the payload would ship an unstamped page (issue #92).
         env:
-          AA_SOURCE_COMMIT: ${{ github.sha }}
+          AI_RESEARCHER_AA_SOURCE_COMMIT: ${{ github.sha }}
         run: python3 -m pytest -q -ra
 
       - name: Stage the publish payload
@@ -556,14 +556,14 @@ jobs:
         # old commit step's, moved wholesale.
         if: steps.capture.outputs.proceed == 'true'
         env:
-          CHANGED: ${{ steps.capture.outputs.changed }}
-          FORCE: ${{ inputs.force }}
+          AI_RESEARCHER_CHANGED: ${{ steps.capture.outputs.changed }}
+          AI_RESEARCHER_FORCE: ${{ inputs.force }}
         run: |
           PAYLOAD="${RUNNER_TEMP}/publish-payload"
           mkdir -p "${PAYLOAD}/tree"
-          if [ "$CHANGED" = "true" ]; then
+          if [ "$AI_RESEARCHER_CHANGED" = "true" ]; then
             echo moved > "${PAYLOAD}/aa-mode.txt"
-          elif [ "$FORCE" = "true" ]; then
+          elif [ "$AI_RESEARCHER_FORCE" = "true" ]; then
             echo rebuild > "${PAYLOAD}/aa-mode.txt"
           else
             echo none > "${PAYLOAD}/aa-mode.txt"
@@ -573,7 +573,7 @@ jobs:
           # the only thing that differs from HEAD's page -- so restore HEAD's
           # page before it ships; a forced run may commit stamp churn, accepted
           # because force is manual and rare.
-          if [ "$CHANGED" != "true" ] && [ "$FORCE" != "true" ]; then
+          if [ "$AI_RESEARCHER_CHANGED" != "true" ] && [ "$AI_RESEARCHER_FORCE" != "true" ]; then
             git show HEAD:out/frontier-models.html > out/frontier-models.html
           fi
           # The fixed add list the old commit stage staged: unchanged files
@@ -589,7 +589,7 @@ jobs:
           # commit must carry it, and the first healthy hour's commit removes
           # it again. Absent is the normal state and copies nothing.
           [ ! -f data/cost-breakdown-window.txt ] || cp --parents data/cost-breakdown-window.txt "${PAYLOAD}/tree/"
-          # The differ's message travels when the hour ran it (CHANGED=true);
+          # The differ's message travels when the hour ran it (AI_RESEARCHER_CHANGED=true);
           # the write job includes the full message as AA's block.
           [ ! -f commit-msg.txt ] || cp commit-msg.txt "${PAYLOAD}/commit-msg.txt"
 
@@ -915,22 +915,22 @@ jobs:
       - name: Push the tested tree to main
         id: push
         env:
-          MASTER_PUSH_DEPLOY_KEY: ${{ secrets.MASTER_PUSH_DEPLOY_KEY }}
-          REPO: ${{ github.repository }}
+          AI_RESEARCHER_MASTER_PUSH_DEPLOY_KEY: ${{ secrets.MASTER_PUSH_DEPLOY_KEY }}
+          AI_RESEARCHER_REPO: ${{ github.repository }}
         run: |
           set -o pipefail
           # Fail closed when the environment is missing its secret: with no
           # key there is nothing to authenticate the push with, and the
           # fallback must never be a token.
-          if [ -z "${MASTER_PUSH_DEPLOY_KEY:-}" ]; then
-            echo "MASTER_PUSH_DEPLOY_KEY is empty: the main-push environment is missing its secret" >&2
+          if [ -z "${AI_RESEARCHER_MASTER_PUSH_DEPLOY_KEY:-}" ]; then
+            echo "AI_RESEARCHER_MASTER_PUSH_DEPLOY_KEY is empty: the main-push environment is missing its secret" >&2
             exit 1
           fi
           eval "$(ssh-agent -s)" >/dev/null
           # The agent is stopped when this step ends, whatever its outcome:
           # the key never outlives the step that loaded it.
           trap 'kill "$SSH_AGENT_PID" 2>/dev/null || true' EXIT
-          ssh-add <(printf '%s\n' "$MASTER_PUSH_DEPLOY_KEY") >/dev/null
+          ssh-add <(printf '%s\n' "$AI_RESEARCHER_MASTER_PUSH_DEPLOY_KEY") >/dev/null
           mkdir -p ~/.ssh
           # GitHub SSH host keys, published by GitHub's Meta endpoint:
           # https://docs.github.com/en/rest/meta/meta#get-github-meta-information
@@ -939,7 +939,7 @@ jobs:
             'github.com ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQCj7ndNxQowgcQnjshcLrqPEiiphnt+VTTvDP6mHBL9j1aNUkY4Ue1gvwnGLVlOhGeYrnZaMgRK6+PKCUXaDbC7qtbW8gIkhL7aGCsOr/C56SJMy/BCZfxd1nWzAOxSDPgVsmerOBYfNqltV9/hWCqBywINIR+5dIg6JTJ72pcEpEjcYgXkE2YEFXV1JHnsKgbLWNlhScqb2UmyRkQyytRLtL+38TGxkxCflmO+5Z8CSSNY7GidjMIZ7Q4zMjA2n1nGrlTDkzwDCsw+wqFPGQA179cnfGWOWRVruj16z6XyvxvjJwbz0wQZ75XK5tKSb7FNyeIEs4TT4jk+S4dhPeAUC5y+bDYirYgM4GC7uEnztnZyaVWQ7B381AK4Qdrwt51ZqExKbQpTUNn+EjqoTwvqNj4kqx5QUCI0ThS/YkOxJCXmPUWZbhjpCg56i+2aB6CmK2JGhn57K5mj0MNdBXA4/WnwH6XoPWJzK5Nyu2zB3nAZp+S5hpQs+p1vN1/wsjk=' \
             >> ~/.ssh/known_hosts
           export GIT_SSH_COMMAND='ssh -o StrictHostKeyChecking=yes'
-          remote="${PUSH_REMOTE:-git@github.com:${REPO}.git}"
+          remote="${PUSH_REMOTE:-git@github.com:${AI_RESEARCHER_REPO}.git}"
           base="$(cat "${RUNNER_TEMP}/push-data/base.txt")"
           fetched="$(git ls-remote "$remote" refs/heads/main | cut -f1)"
           if [ "$fetched" != "$base" ]; then
@@ -1060,7 +1060,7 @@ jobs:
           # never regressing the hub, when nothing needs publishing -- the
           # page proves for itself: the live page's HTML embeds its
           # source-commit stamp, so the served bytes carry their own
-          # record. The page is fetched and read BEFORE the upload, and
+          # record. The page is fetched and read before the upload, and
           # the hub already serving EXACTLY this run's page -- stamp and
           # every other byte -- is a green skip: a hub version is not
           # spent re-storing the same bytes. Any difference (the hub
