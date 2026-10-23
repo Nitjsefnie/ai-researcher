@@ -23,13 +23,13 @@
       "id": "fishaudio/drama-3"
     },
     {
-      "id": "meta-models/Muse-Spark-Open-816B-A42B"
-    },
-    {
       "id": "google/embeddinggemma-2"
     },
     {
-      "id": "black-forest-labs/flux-3-image-klein"
+      "id": "meta-models/Muse-Spark-Open-816B-A42B"
+    },
+    {
+      "id": "Comfy-Org/MOSS-Image"
     }
   ]
 }
