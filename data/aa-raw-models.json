@@ -27877,7 +27877,7 @@
    "upper": 1872
   },
   "itBenchSre": null,
-  "frontierCode": null,
+  "frontierCode": 0.470664,
   "terminalBenchScience": null,
   "hleDiamond": null,
   "livecodebench": null,
@@ -56379,7 +56379,7 @@
    "type": "firstParty",
    "providerName": "MiniMax"
   },
-  "hostModelCount": 1,
+  "hostModelCount": 13,
   "creator": {
    "id": "a31a9071-6144-4dbb-92dc-2e02d653ecea",
    "slug": "minimax",
@@ -59198,10 +59198,12 @@
    "financeAndAccounting": 27.1898695604114,
    "strategyAndOps": 22.5653667608007,
    "legal": 28.1134112990134,
+   "healthcareAndMedical": 25.5371544868505,
    "engineering": 30.1143480206541,
    "economics": 38.4726370481928
   },
   "omniscienceHallucinationRate": 0.3584618726917228,
+  "mlcrOverall": 0.133333333333333,
   "gdpPdfAllPass": 0.08,
   "gdpval": 1162.41,
   "gdpvalInterval": {
@@ -60507,7 +60509,7 @@
   },
   "itBenchSre": null,
   "frontierCode": 0.448865666666667,
-  "terminalBenchScience": null,
+  "terminalBenchScience": 0.371428571428571,
   "hleDiamond": null,
   "livecodebench": null,
   "aime25": null,
@@ -62399,7 +62401,7 @@
    "type": "firstParty",
    "providerName": "DeepSeek"
   },
-  "hostModelCount": 20,
+  "hostModelCount": 22,
   "creator": {
    "id": "58b835bf-4c87-4f87-a846-df4b692c6e7d",
    "slug": "deepseek",
