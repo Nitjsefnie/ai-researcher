@@ -196,8 +196,8 @@
     23768
   ],
   "tests/test_ci_ratchets.py": [
-    10483,
-    60320
+    10545,
+    62002
   ],
   "tests/test_ci_thresholds.py": [
     3332,
