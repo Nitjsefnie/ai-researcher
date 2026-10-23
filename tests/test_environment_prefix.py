@@ -209,8 +209,8 @@ def test_coverage_workflow_handoff(monkeypatch, tmp_path):
         "AI_RESEARCHER_JS_COVERAGE_OUT": "${{ runner.temp }}/js-coverage.json",
         "AI_RESEARCHER_COVERAGE_MEASURE_CHILDREN_RC": "${{ github.workspace }}/.github/coverage-children.rc",
     }
-    env = {key: value.replace("${{ runner.temp }}", str(tmp_path))
-           .replace("${{ github.workspace }}", str(ROOT))
+    env = {key: str(pathlib.Path(value.replace("${{ runner.temp }}", str(tmp_path))
+                                 .replace("${{ github.workspace }}", str(ROOT))))
            for key, value in expressions.items()}
     monkeypatch.setattr(os, "environ", env)
     test_browser.flush_page_coverage(SimpleNamespace(
