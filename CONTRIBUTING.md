@@ -192,8 +192,8 @@ message carries one declaration line per raised leaf,
 
 naming the exact values the diff carries. The guard honors the lines on a
 main **push** and on a **pull request** whose raise commit touches nothing
-outside the two budget documents (issue #133 part 3), with PR declarations
-additionally requiring a `feat: ` or `feat(<scope>): ` commit subject in
+outside the two budget documents (issue #133 part 3), with both routes
+requiring a `feat: ` or `feat(<scope>): ` commit subject in
 `base..head` (issue #271) — a raise cannot ride
 feature work onto main on either shape; a declaration whose values do not
 match the diff exactly refuses too. Merge a raise pull request with **rebase**:
@@ -222,8 +222,8 @@ deliberate raise follows the perf budgets' route (issue #120): its own
 commit, one `Budget-Raise: <document> <key> <from> -> <to>` line
 per raised leaf with the exact values the diff carries — the lines count
 on a main push or a pull request's own raise commit, from a commit
-touching nothing outside the two budget documents, with PR declarations
-additionally requiring a `feat: ` or `feat(<scope>): ` commit subject in
+touching nothing outside the two budget documents, with both routes
+requiring a `feat: ` or `feat(<scope>): ` commit subject in
 `base..head` (issue #271). Budgets are pinned to
 the CI cell that runs the gate —
 the coverage job's ubuntu-latest runner, CPython 3.13.15 / valgrind

@@ -1207,8 +1207,10 @@ def _rewritten_budget_push(tmp_path):
     fork = _git(repo, "rev-parse", "HEAD").stdout.strip()
     raised = _budgets_document()
     raised["bytes"]["code_bytes"] = 79700
-    raise_tip = _commit_budgets_here(repo, raised, _push_message(_declaration(
+    _commit_budgets_here(repo, raised, _push_message(_declaration(
         ".github/perf-budgets.json", "bytes.code_bytes", 71627, 79700)))
+    _git(repo, "commit", "-q", "--allow-empty", "-m", "feat: add a chart")
+    raise_tip = _git(repo, "rev-parse", "HEAD").stdout.strip()
     landed = _workflow_push_check(repo, fork, raise_tip)
     assert landed.returncode == 0, landed.stdout + landed.stderr
     (repo / "page.html").write_text("Rebuilt page\n", encoding="utf-8")
@@ -1291,10 +1293,12 @@ def test_end_to_end_push_declared_raise_is_clean(tmp_path, capsys,
     raised = _budgets_document()
     raised["bytes"]["code_bytes"] = 79700
     before = _git(repo, "rev-parse", "main").stdout.strip()
-    head = _commit_budgets_here(
+    _commit_budgets_here(
         repo, raised,
         _push_message(_declaration(".github/perf-budgets.json",
                                    "bytes.code_bytes", was, 79700)))
+    _git(repo, "commit", "-q", "--allow-empty", "-m", "feat: add a chart")
+    head = _git(repo, "rev-parse", "HEAD").stdout.strip()
     guard = _guard()
     monkeypatch.chdir(repo)
     assert guard.main([before, head, "--allow-declared-raises"]) == 0
@@ -1319,6 +1323,46 @@ def test_end_to_end_push_undeclared_raise_refuses_with_the_route_hint(
     assert "bytes.code_bytes" in out
     assert "raised; it may only fall" in out
     assert "Budget-Raise: <document> <key> <from> -> <to>" in out
+
+
+@pytest.mark.parametrize("document,build_doc,write_doc,section,key,to", [
+    (".github/perf-budgets.json", _budgets_document, _budgets_written,
+     "bytes", "code_bytes", 79700),
+    (".github/instruction-budgets.json", _instruction_budgets_document,
+     _instruction_budgets_written, "scripts", "build", 999999999),
+])
+@pytest.mark.parametrize("feat_sibling", [True, False])
+def test_end_to_end_push_declared_raise_requires_feat(
+        tmp_path, capsys, monkeypatch, document, build_doc, write_doc,
+        section, key, to, feat_sibling):
+    """An exact push declaration needs a feat subject inside base..head."""
+    repo = _seed_repo(tmp_path, _document(), budgets=_budgets_document(),
+                      instruction_budgets=_instruction_budgets_document())
+    _git(repo, "commit", "-q", "--allow-empty", "-m", "feat: earlier work")
+    before = _git(repo, "rev-parse", "HEAD").stdout.strip()
+    raised = build_doc()
+    was = raised[section][key]
+    raised[section][key] = to
+    write_doc(repo, raised)
+    _git(repo, "add", document)
+    _git(repo, "commit", "-qm", "fix: raise budgets\n\n" + _declaration(
+        document, f"{section}.{key}", was, to))
+    if feat_sibling:
+        _git(repo, "commit", "-q", "--allow-empty", "-m",
+             "feat: add a chart")
+    head = _git(repo, "rev-parse", "HEAD").stdout.strip()
+    guard = _guard()
+    monkeypatch.chdir(repo)
+    assert guard.main([before, head, "--allow-declared-raises"]) == (
+        0 if feat_sibling else 1)
+    out = capsys.readouterr().out
+    if feat_sibling:
+        assert out.count("not relaxed") == 3
+    else:
+        assert "feat:" in out
+        assert "feat(<scope>):" in out
+        assert "CONTRIBUTING.md" in out
+        assert "1 relaxation(s)" in out
 
 
 @pytest.mark.parametrize("subject", ["feat: add a chart",
@@ -1577,6 +1621,7 @@ def test_end_to_end_push_declared_raises_across_both_documents(
                      budgets_was, 79700),
         _declaration(".github/instruction-budgets.json", "scripts.build",
                      instructions_was, 999999999)))
+    _git(repo, "commit", "-q", "--allow-empty", "-m", "feat: add a chart")
     head = _git(repo, "rev-parse", "HEAD").stdout.strip()
     guard = _guard()
     monkeypatch.chdir(repo)
