@@ -27827,19 +27827,19 @@
   "price1mOutputTokens": 10,
   "cacheHitPrice": 0.2,
   "cacheWritePrice": null,
-  "medianOutputTokensPerSecond": 84.1654564215285,
-  "percentile05OutputTokensPerSecond": 74.5303359355715,
-  "quartile25OutputTokensPerSecond": 78.8126117071079,
-  "quartile75OutputTokensPerSecond": 89.5183011359491,
-  "percentile95OutputTokensPerSecond": 93.8005769074855,
-  "medianTimeToFirstTokenSeconds": 3.08462318100001,
-  "medianTimeToFirstAnswerTokenSeconds": 26.847341106312946,
-  "percentile05TimeToFirstTokenSeconds": 2.97772370909999,
-  "quartile25TimeToFirstTokenSeconds": 3.0252345855,
-  "quartile75TimeToFirstTokenSeconds": 3.14401177650002,
-  "percentile95TimeToFirstTokenSeconds": 3.19152265290003,
-  "medianEndToEndResponseTimeSeconds": 32.78802058764118,
-  "medianReasoningTimeSeconds": 23.762717925312934,
+  "medianOutputTokensPerSecond": 73.4597669926874,
+  "percentile05OutputTokensPerSecond": 71.2223075460526,
+  "quartile25OutputTokensPerSecond": 72.2167339667792,
+  "quartile75OutputTokensPerSecond": 84.1654564215285,
+  "percentile95OutputTokensPerSecond": 92.7300079646014,
+  "medianTimeToFirstTokenSeconds": 3.20340037200003,
+  "medianTimeToFirstAnswerTokenSeconds": 30.42918779110648,
+  "percentile05TimeToFirstTokenSeconds": 2.98960142819999,
+  "quartile25TimeToFirstTokenSeconds": 3.08462318100001,
+  "quartile75TimeToFirstTokenSeconds": 3.53861525400004,
+  "percentile95TimeToFirstTokenSeconds": 3.80678715960004,
+  "medianEndToEndResponseTimeSeconds": 37.235634645883096,
+  "medianReasoningTimeSeconds": 27.22578741910645,
   "id": "665c67ca-09eb-48f0-a7a3-0096e1d5de51",
   "suffix": null,
   "chartDefaultSelected": true,
@@ -27888,7 +27888,7 @@
   "price1mBlended0To1To1": 6,
   "price1mBlended100To1To1": 0.3137254901960784,
   "price1mBlended0To100To1": 2.0792079207920793,
-  "intelligenceIndexTimePerTask": 542.8725500162654,
+  "intelligenceIndexTimePerTask": 599.6084964990467,
   "intelligenceIndexCost": {
    "total": 3117.3066101613126,
    "input": 1637.5696101613125,
@@ -27916,70 +27916,70 @@
     "score": 1677.79,
     "outputTokensPerTask": 144267.9120879121,
     "costPerTask": 7.220636366641112,
-    "timePerTask": 1418.9628152543798
+    "timePerTask": 1567.2594980483748
    },
    {
     "slug": "gdpval-aa",
     "score": 1845.72,
     "outputTokensPerTask": 83651.47272727273,
     "costPerTask": 3.0181638378640225,
-    "timePerTask": 822.7632016254249
+    "timePerTask": 908.7506934852055
    },
    {
     "slug": "automationbench-aa",
     "score": 0.7329771090921112,
     "outputTokensPerTask": 36825.770167427705,
     "costPerTask": 0.8287553527406801,
-    "timePerTask": 362.20388688263455
+    "timePerTask": 400.0580394667223
    },
    {
     "slug": "terminalbench-4-0",
     "score": 0.671717171717172,
     "outputTokensPerTask": 115722.69696969698,
     "costPerTask": 5.265564268428178,
-    "timePerTask": 1138.2032324754855
+    "timePerTask": 1257.1575573576756
    },
    {
     "slug": "scicode",
     "score": 0.607638888888889,
     "outputTokensPerTask": 6527.340277777777,
     "costPerTask": 0.06983243055555555,
-    "timePerTask": 64.20036862413919
+    "timePerTask": 70.90998891775111
    },
    {
     "slug": "humanitys-last-exam",
     "score": 0.524559777571826,
     "outputTokensPerTask": 24505.505560704354,
     "costPerTask": 0.24584799165894344,
-    "timePerTask": 241.0265779576803
+    "timePerTask": 266.21641492314325
    },
    {
     "slug": "gdp-pdf",
     "score": 0.314,
     "outputTokensPerTask": 19104.11,
     "costPerTask": 0.52183804,
-    "timePerTask": 187.90056164402395
+    "timePerTask": 207.53816573581395
    },
    {
     "slug": "critpt",
     "score": 0.245714285714286,
     "outputTokensPerTask": 60577.07142857143,
     "costPerTask": 0.6121963714285714,
-    "timePerTask": 595.8124060308869
+    "timePerTask": 658.0811296591727
    },
    {
     "slug": "omniscience",
     "score": 29.516666666666666,
     "outputTokensPerTask": 3910.1035,
     "costPerTask": 0.03952076166666666,
-    "timePerTask": 38.458250278932844
+    "timePerTask": 42.477545838418344
    },
    {
     "slug": "artificial-analysis-long-context-reasoning",
     "score": 0.863333333333333,
     "outputTokensPerTask": 2355.85,
     "costPerTask": 0.21399322,
-    "timePerTask": 23.171220127452877
+    "timePerTask": 25.592858696307616
    }
   ],
   "briefcaseBreakdown": {
@@ -28002,22 +28002,22 @@
   },
   "briefcaseTotalCost": 657.0779093643412,
   "timescaleData": {
-   "medianOutputSpeed": 84.1654564215285,
-   "medianTimeToFirstChunk": 3.08462318100001
+   "medianOutputSpeed": 73.4597669926874,
+   "medianTimeToFirstChunk": 3.20340037200003
   },
   "outputSpeedVariance": {
-   "p05": 74.5303359355715,
-   "q25": 78.8126117071079,
-   "median": 84.1654564215285,
-   "q75": 89.5183011359491,
-   "p95": 93.8005769074855
+   "p05": 71.2223075460526,
+   "q25": 72.2167339667792,
+   "median": 73.4597669926874,
+   "q75": 84.1654564215285,
+   "p95": 92.7300079646014
   },
   "timeToFirstChunkVariance": {
-   "p05": 2.97772370909999,
-   "q25": 3.0252345855,
-   "median": 3.08462318100001,
-   "q75": 3.14401177650002,
-   "p95": 3.19152265290003
+   "p05": 2.98960142819999,
+   "q25": 3.08462318100001,
+   "median": 3.20340037200003,
+   "q75": 3.53861525400004,
+   "p95": 3.80678715960004
   },
   "performanceByPromptType": {
    "medium": {
@@ -28027,34 +28027,34 @@
     "medianEndToEndResponseTime": 35.362808075989356
    },
    "long": {
-    "medianOutputSpeed": 84.1654564215285,
-    "medianTimeToFirstChunk": 3.08462318100001,
-    "medianTimeToFirstAnswerToken": 26.847341106312946,
-    "medianEndToEndResponseTime": 32.78802058764118
+    "medianOutputSpeed": 73.4597669926874,
+    "medianTimeToFirstChunk": 3.20340037200003,
+    "medianTimeToFirstAnswerToken": 30.42918779110648,
+    "medianEndToEndResponseTime": 37.235634645883096
    },
    "hundredK": {
-    "medianOutputSpeed": 71.5394421790614,
-    "medianTimeToFirstChunk": 11.794098949,
-    "medianTimeToFirstAnswerToken": 39.75070497052937,
-    "medianEndToEndResponseTime": 46.739856475911715
+    "medianOutputSpeed": 81.0546900995046,
+    "medianTimeToFirstChunk": 11.2650430809999,
+    "medianTimeToFirstAnswerToken": 35.939741084838474,
+    "medianEndToEndResponseTime": 42.10841558579811
    },
    "mediumParallel": {
-    "medianOutputSpeed": 79.7638691844539,
-    "medianTimeToFirstChunk": 1.89105574749999,
-    "medianTimeToFirstAnswerToken": 26.96506507589655,
-    "medianEndToEndResponseTime": 33.23356740799569
+    "medianOutputSpeed": 77.6820481320403,
+    "medianTimeToFirstChunk": 1.90073756550004,
+    "medianTimeToFirstAnswerToken": 27.646711675251808,
+    "medianEndToEndResponseTime": 34.08320520268975
    }
   },
   "endToEndResponseTime": {
-   "input": 3.08462318100001,
-   "reasoning": 23.762717925312934,
-   "answer": 5.9406794813282335,
-   "total": 32.78802058764118
+   "input": 3.20340037200003,
+   "reasoning": 27.22578741910645,
+   "answer": 6.806446854776612,
+   "total": 37.235634645883096
   },
   "timeToFirstAnswerToken": {
-   "input": 3.08462318100001,
-   "reasoning": 23.762717925312934,
-   "total": 26.847341106312946
+   "input": 3.20340037200003,
+   "reasoning": 27.22578741910645,
+   "total": 30.42918779110648
   },
   "performanceDataSource": {
    "type": "firstParty",
@@ -28076,19 +28076,7 @@
   "outputModalityText": true,
   "outputModalityImage": false,
   "outputModalitySpeech": false,
-  "outputModalityVideo": false,
-  "genVariants": [
-   {},
-   {
-    "ii": 55.0869210959395,
-    "cost": 2.1145052918767275,
-    "gdpval": 0.67286,
-    "gdpvalCost": 3.018163837864022,
-    "ctx": 1000000,
-    "pin": 2,
-    "pout": 10
-   }
-  ]
+  "outputModalityVideo": false
  },
  {
   "slug": "motif-2-12-7b",
