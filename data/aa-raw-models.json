@@ -26500,13 +26500,7 @@
   "outputModalityText": true,
   "outputModalityImage": false,
   "outputModalitySpeech": false,
-  "outputModalityVideo": false,
-  "genVariants": [
-   {},
-   {
-    "ctx": 131072
-   }
-  ]
+  "outputModalityVideo": false
  },
  {
   "slug": "nova-2-0-lite-reasoning",

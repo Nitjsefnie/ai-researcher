@@ -2,10 +2,10 @@
   "source": "https://openrouter.ai/api/frontend/v1/models/find?order=top-weekly",
   "models": [
     {
-      "slug": "deepseek/deepseek-v4.1-flash"
+      "slug": "deepseek/deepseek-v4.1-flash-1017"
     },
     {
-      "slug": "deepseek/deepseek-v4.1-flash-1017"
+      "slug": "deepseek/deepseek-v4.1-flash"
     },
     {
       "slug": "z-ai/glm-5.3-flash"
