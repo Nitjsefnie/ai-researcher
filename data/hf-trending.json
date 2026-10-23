@@ -8,10 +8,10 @@
       "id": "black-forest-labs/flux-3-image-klein-comfy"
     },
     {
-      "id": "OpenMOSS-Team/MOSS-Image-SFT"
+      "id": "RecursiveSI/flint"
     },
     {
-      "id": "RecursiveSI/flint"
+      "id": "OpenMOSS-Team/MOSS-Image-SFT"
     },
     {
       "id": "OpenMOSS-Team/MOSS-Image-Base"
@@ -23,10 +23,10 @@
       "id": "fishaudio/drama-3"
     },
     {
-      "id": "google/embeddinggemma-2"
+      "id": "Comfy-Org/MOSS-Image"
     },
     {
-      "id": "Comfy-Org/MOSS-Image"
+      "id": "google/embeddinggemma-2"
     },
     {
       "id": "meta-models/Muse-Spark-Open-816B-A42B"
