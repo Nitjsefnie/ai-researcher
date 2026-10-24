@@ -296,7 +296,8 @@ is resolved by fixed precedence rather than by a state. So the only scheduled
 commit is `Refresh capture: N models, …`, there is no disagreement that turns a
 run red, and the published document only moves forward. The two rules that
 matter when you touch the capture are in AGENTS.md — the leaderboard-wins
-precedence and the breakdown-drop guard at the cost shape split.
+precedence and the breakdown-drop guard at the cost shape split. The dispute-layer
+detail is in "Capture dispute layers" below.
 Membership is the union of both routes (issue #266): detail-only retired models
 remain visible, with their detail lab and no leaderboard-only speed; their
 values can lag a generation.
@@ -317,6 +318,174 @@ back, with every kept directory re-opened and its contents denied again. A new
 file of an unlisted type is invisible to git and will NOT appear in `git
 status` as untracked — it simply never appears. `git check-ignore -v <path>`
 names the rule hiding it.
+
+## Capture dispute layers
+
+How `fetch_aa.py` merges and disputes `data/aa-raw-models.json`. AGENTS.md
+carries the rules these implement (single source, leaderboard-wins precedence,
+the cost-shape guard, keep both versions of an inconsistency); this section is
+binding detail for anyone touching the capture's merge, dispute or look-back
+code.
+
+**Routes.** The leaderboard ships scored records in `initialModels` beside a
+three-field `models` index and omits `licenseName`, `releaseDate`, parameters
+and the cost breakdown; any model detail page (`/models/<slug>`) embeds the
+whole corpus as rich `models` arrays, including those. Gap-fills go one level
+deep: the split runs *through* the cost object (the leaderboard drops its
+`evaluations`), so a key-level merge would let a surviving stub shadow the
+complete breakdown. Detail-only models (membership is leaderboard ∪ detail
+corpus, issue #266): leaderboard-only speed stays absent; `creator.name`, when
+a string on a mapping, fills an absent `modelCreatorName`; retired values rarely
+change. Union membership lets the presence layer see genuinely new models
+instead of about 430 retirements going red.
+
+A detail page lists every model **except** its own, so the host slug loses its
+detail-only fields: `detail_host_slug` picks a model with no measured cost (it
+cannot be on any chart), deterministically, so the capture does not churn.
+Field renames absorbed: `totalParameters` → `parameters` (identical values);
+`name` falls back to `shortName`. `modelCreatorCountry` is gone from every
+route; nothing rendered it.
+
+**Look-back fills** (`--cross-run-lookback`): the chain is leaderboard > this
+run's detail route > the previous committed capture's carried detail fill.
+- A final pass, after every in-run, presence and revisit decision, fills absent
+  detail keys from the previous record with the same string `slug`; it changes
+  neither decision inputs nor `run_corpora`.
+- A key in this run's leaderboard universe stays absent when the current record
+  lacks it (serving movement, owned by the dispute layers). Present values,
+  including null and `$undefined`, keep precedence.
+- `build.merge_captures` supplies the nested cost fill under the current total
+  and its `SUM_TOLERANCE` guard; a carried breakdown failing the sum check is
+  dropped whole.
+- `genVariants`, `crossRunMerged` and `carriedDetailFills` are synthetic and
+  never carried as fills. Records receiving fills list their keys, sorted, in
+  `carriedDetailFills`; the marker stays outside generation fingerprints,
+  universes, variants and held state, changes no rendered field, and the news
+  summary counts carries in one clause.
+- `intelligenceIndexTimePerTask` is eligible as a detail fill and stays
+  never-red. While a revisit hold renders, both `HELD_SPEED_FIELDS` retain their
+  frozen values or canonical absence and are excluded from carry-forward.
+
+**In-run dispute layer.** AA serves the leaderboard from its own Vercel cache,
+so the run's two looks, `DISPUTE_LOOK_SPACING_SECONDS` (180 seconds) apart, can
+land on different generations while a publish window is live. Each read is
+fingerprinted by `generation_key`: a 16-hex sha256 prefix over the slug-sorted
+records normalized on the leaderboard field universe minus the never-red
+speed/latency family; absent, null, `""` and `$undefined` fold to one missing
+marker before any comparison, and a cost object compares as the scalar of its
+own `cost.total`. Reads sharing a fingerprint are one generation; the detail
+route joins whichever generation it IS and never raises a dispute by itself (a
+stale detail corpus is the known, precedence-handled state). One fingerprint on
+the same slug set → the plain merge, byte for byte. Two fingerprints, or one
+fingerprint on different slug sets (a model present in one look and absent from
+the other: an inconsistency between the generations, Overseer ruling,
+2026-10-06, issue #211) → the capture holds both, and leaderboard records carry
+`genVariants`: one flat map per generation whose fields are that generation's
+own published values.
+
+**`genVariants` encoding: canonical order, canonical-first silence.**
+- Variants are ordered by ascending `generation_key`, so the corpus bytes do not
+  depend on which look a run read first. A record's plain fields are the first
+  carrying variant's (the canonical generation's) value, gap-filled only where
+  it lacks the field (a missing marker is a fill, never a winner). The
+  cross-run generation hold has one exception: a rendered speed missing from the
+  canonical carrying generation stays absent, never filled from another held
+  generation.
+- The map list is padded to one entry per generation, with `{}` at every
+  generation that does not carry the model: `{}` means *not carried* (rendered
+  as an em-dash side), and a carried variant is never `{}` (a carried record
+  always publishes at least one variant field).
+- Presence in one look and absence from the other keeps the model in the union,
+  disputed by presence; this supersedes the reading that a model AA added or
+  retired between the looks is a corpus union, never a conflict (Overseer
+  ruling, 2026-10-06, issue #211).
+- Never disputed, rendering the canonical value silently (the PM-approved
+  canonical-first rule): identity and flag fields (`name`, `shortName`, `slug`,
+  `creator`, `modelCreatorName`, `isOpenWeights`, `deprecated`, `isReasoning`,
+  `intelligenceIndexIsEstimated`) and everything outside the variant map's
+  fields (`ii`, `cost`, `gdpval`, `gdpvalCost`, `ctx`, `pin`, `pout`).
+  Parameters, licence and release date are detail-fills with a single in-run
+  source, so they cannot dispute either.
+- The never-red family (`NEVER_RED_FIELDS`, hardcoded, never widened silently:
+  a new speed-shaped field joins it only by a reviewed change) is the
+  speed/latency set. It re-samples every hour, so two looks of the SAME
+  generation routinely disagree on it and a dispute there would hold the page
+  red permanently.
+- `gdpvalCost` is recovered from each variant's own cost breakdown and is absent
+  when that breakdown does not sum to its own total; never supplied from another
+  generation's parts.
+
+**Cross-run generation layer** (`--cross-run-lookback`):
+- Remembers the newest 1000 distinct fingerprints in
+  `data/aa-generation-state.json`, beside the capture. `revisit_key`
+  fingerprints the published merged corpus over `DISPUTE_CAPABLE` only,
+  excluding speed and unrendered payload churn.
+- One-way movement (A → B, A → B → C) stays ordinary; a remembered revisit
+  (A → B → A) holds both generations with `genVariants`. The state stores their
+  AA-published `HELD_FIELDS`, including each side's cost breakdown, and renders
+  their union in ascending revisit-key order. Other fields follow the current
+  capture, so a hold does not manufacture payload removals in the differ;
+  capture bytes may change while built rows stay fixed.
+- Both rendered speed fields (`medianOutputTokensPerSecond` and
+  `intelligenceIndexTimePerTask`) stay frozen for the length of a hold,
+  including canonical absence.
+- Alternating held members leaves the state and held render unchanged; a
+  remembered nonmember joins without resetting the hold date. Only a fingerprint
+  outside the remembered set ends the hold automatically and publishes alone;
+  an evicted fingerprint counts as new. A retired side stays held until a new
+  generation arrives or the state is cleared by hand.
+- In-run disagreements leave this state unchanged: they render the frozen hold
+  only if all their revisit keys are held, otherwise the in-run dispute renders.
+- The date is written once at hold entry and rendered as "held since <date>"
+  beside the dispute explanation; no state or no hold renders no such text. A
+  hold older than 7 days prints a stdout warning without changing state.
+- The repository tracks a bootstrap generated from its committed capture, so a
+  quiet refresh's `git checkout -- data/` restores state too and a republish
+  does not commit an untracked bootstrap. Later state changes are committed with
+  data-moving hours, so runs remember the published hold without deriving it
+  from git history. A missing state bootstraps from the previous capture; a
+  no-hold `last` inconsistent with that capture is re-bootstrapped before a
+  clean run's transition.
+- The flag always writes state atomically on success; without it state is
+  neither read nor written. The gate stages HEAD's state from git and fresh
+  state from disk, including the fresh-only `--fresh-held` probe; unchanged
+  held alternation answers `false`, while hold entry and a new generation change
+  the page.
+
+**Cross-run presence layer** (Overseer ruling, 2026-10-06, evening, on the
+reopened issue #211). The in-run layer cannot see a flip between runs: a run
+whose looks agree holds one generation, and an AA-side serving change lands as a
+one-model flip of the published set. So the hourly refresh
+(`fetch_aa.py --cross-run-lookback`, the refresh workflow's flag) reads the
+previous committed capture before the fetch overwrites it, and a model present
+in that capture's **firm set** (records without the `crossRunMerged` marker)
+and absent from this run's fetch, or the reverse, is merged and marked disputed:
+kept, both generations shown, red, paired.
+- Presence-only: the previous corpus participates only through the diff slugs,
+  and shared models take no previous-generation slot here.
+- A record merged from the previous capture carries `crossRunMerged: true`: this
+  run's fetch did not serve it, and the marker lets the NEXT run read its
+  look-back correctly. A marked record is dispute state, not serving evidence,
+  so this layer neither merges nor disputes it again. Outside a generation hold,
+  a stable retirement settles within one further hour; the hold's frozen union
+  can retain a retired side until its exit rule fires.
+- A re-added model (served now, absent from the firm set; a brand-new model
+  included, which therefore disputes red for its first hour) takes the
+  empty-map previous slot and carries no marker: it is serving evidence the
+  moment the run's own fetch returned it.
+- A cross-run-disputed record's `genVariants` extends to one entry per
+  generation the record is disputed across (the run's own generations plus the
+  previous run's), the previous slot positioned by ascending `generation_key`
+  over the joint field universe.
+
+**Disputed hours.** The three-generation corner (the looks disagree AND the
+detail route matches neither fingerprint) gives shared models no detail fills
+from that run; the final look-back pass can restore their previous fills.
+Without the cross-run look-back, a run whose looks agree writes no `genVariants`
+key anywhere and is byte-identical to the single-generation capture; with it,
+the same holds when the two slug sets agree, no generation hold renders and no
+detail fill needs carrying. A caught presence flip or generation revisit writes
+the disputed shape above.
 
 ## Commit subjects
 

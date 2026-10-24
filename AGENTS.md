@@ -2,47 +2,39 @@
 
 ## Role
 
-You are **the AI researcher**. You track frontier AI models and publish one
-comparison artifact: **capability against cost per task**.
-
-Primary deliverable: an HTML page published and kept up to date on
-`docs.nitjsefni.eu` via the docs-hub CLI. Slug:
+You are **the AI researcher**: you track frontier AI models and publish one
+comparison artifact, **capability against cost per task**, as an HTML page kept
+up to date on `docs.nitjsefni.eu` via the docs-hub CLI, slug
 `ai-researcher/frontier-models`.
 
 ## Single source of truth for the frontier page — artificialanalysis.ai
 
-**Every number on the frontier page comes from
-<https://artificialanalysis.ai/> and nowhere else.** This is a standing user
-decision (2026-07-30), not a default to re-litigate.
+**Every number on the frontier page comes from <https://artificialanalysis.ai/>
+(AA) and nowhere else** — a standing user decision (2026-07-30), not a default to
+re-litigate.
 
-- **Do not** pull numbers for the frontier page from lab blogs, model cards,
-  technical reports, pricing pages, LMSYS, Vellum, swebench.com,
-  livecodebench.com, journalism, or any other third party — not even to
-  "cross-check" or "fill a gap" on the frontier page.
-- A model AA has not measured is **absent from the frontier page**, not
-  estimated. Never interpolate a missing page cell from another source.
-- The predecessor contract (typed `lab`/`3p` sources, per-cell lab-vs-3p `alt`
-  numbers) is **retired**. The corpus built under it was purged in `3375657`;
-  it is recoverable from `0bd00c0` but must not be reintroduced.
+- Never take frontier-page numbers from lab blogs, model cards, technical
+  reports, pricing pages, LMSYS, Vellum, swebench.com, livecodebench.com,
+  journalism or any other third party, not even to cross-check or fill a gap.
+- A model AA has not measured is absent from the page; never estimate or
+  interpolate a missing cell from another source.
+- The retired multi-source contract (typed `lab`/`3p` sources, per-cell
+  lab-vs-3p `alt` numbers) and its purged corpus must not be reintroduced.
+- One source, so no per-cell citation: the page states its source once,
+  prominently, and links the leaderboard.
 
 The Hugging Face trending and OpenRouter weekly top-10 lists are separate
-tracked outputs: `scripts/fetch_hf_trending.py` writes `data/hf-trending.json`,
-and `scripts/fetch_openrouter_trending.py` writes `data/openrouter-trending.json`.
-The joined `.github/workflows/refresh.yml` updates both hourly and publishes
-[trending rankings over time](https://docs.nitjsefni.eu/d/ai-researcher/trending-rankings)
-from their git history. Neither tracker feeds the frontier page.
-
-Because there is exactly one source, per-cell citation is redundant: the page
-states its source once, prominently, and links the leaderboard.
+outputs (`scripts/fetch_hf_trending.py` → `data/hf-trending.json`,
+`scripts/fetch_openrouter_trending.py` → `data/openrouter-trending.json`);
+neither feeds the frontier page.
 
 ## The metric
 
-Capability against cost, on three axes. **Every axis pairs a score with a cost
-AA measured on the same run**, and that constraint decides which AA number each
-axis may use — never the other way round. `x` is always cost per task in USD on
-a log scale: AA's *measured* spend (input, cached reads, output, reasoning
-tokens), **not** a quoted per-token price. A verbose reasoning model therefore
-costs more than its sticker price implies, which is the point of using it.
+Every axis pairs a score with a cost AA measured on the same run; that
+constraint decides which AA number an axis may use, never the reverse. `x` is
+always cost per task in USD, log scale: AA's *measured* spend (input, cached
+reads, output, reasoning tokens), never a quoted per-token price, so a verbose
+reasoning model costs more than its sticker price — the point of using it.
 
 | axis | y | source | unit |
 |---|---|---|---|
@@ -51,284 +43,115 @@ costs more than its sticker price implies, which is the point of using it.
 | agentic | GDPval-AA v2 | leaderboard + model detail | model |
 | parameters | Intelligence Index vs parameters | leaderboard + model detail | model |
 
-- **Coding Agent Index** — DeepSWE, Terminal-Bench v2.1 and SWE-Atlas-QnA at
-  equal weight. Its rows carry `indexScore` and `mean.costUsd` on ONE record,
-  so nothing is reweighted. Its unit is an agent+model+harness combination
-  (Claude Code on Opus 5 (xhigh) ≠ Codex on the same model), because the
-  harness is part of what AA measured.
-- **Intelligence Index v4.3** — AA-Briefcase, GDPval-AA v2, AutomationBench-AA,
+- **Coding Agent Index**: DeepSWE, Terminal-Bench v2.1, SWE-Atlas-QnA at equal
+  weight. `indexScore` and `mean.costUsd` sit on ONE record, so nothing is
+  reweighted. The unit is agent+model+harness (Claude Code on Opus 5 (xhigh) ≠
+  Codex on the same model): AA measured the harness too.
+- **Intelligence Index v4.3**: AA-Briefcase, GDPval-AA v2, AutomationBench-AA,
   Terminal-Bench v4.0, SciCode, AA-Omniscience, GDP.pdf, AA-LCR v1.1,
-  Humanity's Last Exam, CritPt. Cost is AA's own `cost.total`.
-- **GDPval-AA v2** — a single evaluation, not a composite. Cost is AA's figure
-  for it with its 10% index weight divided back out; the per-evaluation costs
-  sum exactly to the published total, so the recovery is checkable.
+  Humanity's Last Exam, CritPt. Cost is AA's `cost.total`.
+- **GDPval-AA v2**: one evaluation, not a composite. Cost is AA's figure for it
+  with its 10% index weight divided back out; per-evaluation costs sum exactly
+  to the published total, so the recovery is checkable.
 
-**`codingIndex` and `agenticIndex` are deliberately NOT used.** AA scores both
-from Terminal-Bench v2.1 and τ³-Banking, and v4.3 removed both from the cost
-breakdown — the scores are still published, the costs are not. A score with no
-cost cannot go on a cost axis, and estimating the missing half is forbidden by
-the single-source rule above. This is why the coding axis moved to a different
-AA product rather than being dropped.
+**Never use `codingIndex` or `agenticIndex`**: AA scores them from
+Terminal-Bench v2.1 and τ³-Banking, whose costs v4.3 removed from the
+breakdown. A score with no cost cannot go on a cost axis, and estimating the
+cost breaks the single-source rule; hence the coding axis uses another AA
+product.
 
-**The model capture is TWO ROUTES stitched together — and the leaderboard
-wins shared values.** Its scored records now ship in `initialModels` beside a
-three-field `models` index; detail pages still carry rich `models` arrays.
+### Two routes: the leaderboard wins shared values
+
 The leaderboard omits `licenseName`, `releaseDate`, parameters and the cost
-breakdown. Those ship on any model detail page (`/models/<slug>`), which embeds
-the whole corpus for its comparison widgets. `fetch_aa.py` fetches both and
-gap-fills, one level deep — the split runs *through* the cost object, whose
-`evaluations` the leaderboard drops, so a key-level merge would let a surviving
-stub shadow the complete breakdown.
+breakdown; any model detail page (`/models/<slug>`) embeds the whole corpus
+with them. `fetch_aa.py` fetches both and gap-fills one level deep. AA caches
+each route separately, so a capture can straddle an update; the detail corpus
+is the measured-stale side, and per-route timestamps do NOT identify it (a
+detail page regenerated later still embeds the older corpus, so comparing
+dates picks the wrong side). Hence fixed precedence, never a comparison (Overseer ruling, delegated by the
+maintainer, 2026-10-05, issue #200): the leaderboard publishes every value it
+carries, the detail route fills only what the leaderboard omits, and a
+conflicting detail value loses. No disagreement state, heal, skip, baseline or
+exit code exists for it, and it never turns a run red. A field the leaderboard
+drops is a *fill*, not a disagreement.
 
-With `--cross-run-lookback`, the fill chain is leaderboard > this run's detail
-route > the previous committed capture's carried detail fill. A final pass,
-after every in-run, presence and revisit decision, fills absent detail keys
-from the previous record with the same string `slug`. A key in this run's
-leaderboard universe stays absent when the current record lacks it: that is
-serving movement owned by the dispute layers. Present values, including null
-and `$undefined`, keep precedence. `build.merge_captures` supplies the nested
-cost fill under the current total and its `SUM_TOLERANCE` guard; a carried
-breakdown that fails the sum check is dropped whole. `genVariants`,
-`crossRunMerged` and `carriedDetailFills` are synthetic and never carried as
-fills. Records receiving fills list their keys, sorted, in `carriedDetailFills`.
-The marker stays outside generation fingerprints, universes, variants and held
-state, and changes no rendered field; the news summary counts carries in one
-clause. The final pass changes neither decision inputs nor `run_corpora`.
-`intelligenceIndexTimePerTask` is eligible as a detail fill and stays never-red.
-While a revisit hold renders, both `HELD_SPEED_FIELDS` retain their frozen
-values or canonical absence and are excluded from carry-forward.
+**Cost shape.** `intelligenceIndexCostPerTask` is a **bare number** (the
+flattened `cost.total`) on the leaderboard and the full **object** on the
+detail route. The number wins; the object fills under it only while its
+per-evaluation breakdown sums to that number. A breakdown that does not sum is not
+this total's breakdown and is dropped whole, whatever its route, leaving the scalar; that model's GDPval cost
+renders absent until the routes converge (the alternatives are a stale total or
+hours of red).
 
-**The two routes are not the same generation; shared models follow the
-leaderboard.** AA serves each route from its own Vercel cache, so a capture can
-straddle an update. The detail route's embedded corpus is measured to be the
-stale one, and the per-route generation timestamps do NOT identify it — a detail
-page regenerated later still embeds the older corpus, so comparing dates picks
-the wrong side. The rule is therefore not a comparison but a fixed precedence
-(Overseer ruling, delegated by the maintainer, 2026-10-05, issue #200): the
-leaderboard publishes every value it carries, the detail route fills only what
-the leaderboard omits, and a conflicting detail value simply loses. There is no
-disagreement state, no heal, no skip, no baseline, and no exit code for a
-disagreement. A field the leaderboard ever drops is a *fill* from the detail
-route, not a disagreement. That is the routes against each other; the two
-leaderboard looks one run takes against each other are the in-run dispute
-layer; cross-run presence and generation revisits are handled separately below.
-
-Membership is the leaderboard ∪ detail corpus (issue #266, 2026-10-17).
-Shared models retain the precedence and cost guards below. Detail-only models
-use their detail record alone: leaderboard-only speed stays absent;
-`creator.name`, when a string on a mapping, fills an absent `modelCreatorName`.
-Their values can lag a generation (issue #200); retired values rarely change.
+**Membership** is leaderboard ∪ detail corpus (issue #266, 2026-10-17). Shared
+models keep the precedence and cost guards; detail-only models use their detail
+record alone, and their values can lag a generation (issue #200).
 Vendor-retired models stay visible and tagged, preserving the independent
 `MISMATCH` verdict that leaderboard-only membership would silently end.
-The cross-run presence layer then sees genuinely new AA models instead of
-about 430 retirements going red. Detail-only records join after the in-run
-comparison, so their presence cannot alter its dispute or canonical order.
+Detail-only records join after the in-run comparison, so
+they cannot alter its dispute or canonical order.
 
-One place needs care, because the merge is where two generations could still
-mix: `intelligenceIndexCostPerTask` ships as a **bare number** on the
-leaderboard (its flattened `cost.total`) and as the full **object** on the
-detail route. The leaderboard's number wins, and the detail object is taken as a
-fill under it — but only while its per-evaluation breakdown still sums to that
-number. A breakdown that does not sum is not this total's breakdown, whatever
-route it came from, so it is dropped whole and the plain scalar is left. That
-model's GDPval cost then renders absent until the routes converge, which is the
-honest outcome: the alternatives are publishing a stale total or failing the
-refresh red for hours.
+### Inconsistency: keep both versions (standing rule)
 
-**Standing rule: when something is inconsistent, both versions are kept.**
-Inconsistency is two versions of the same thing asserted at once where
-precedence does not already settle the case: two generations of one run's
-reads, a model present in one look or capture and absent from another, or a
-revisit of a remembered generation after another superseded it.
-Both are then held — kept, red, paired. The in-run dispute layer's
-`genVariants` and the cross-run presence layer's `crossRunMerged` marker are
-instances of this rule, not the rule itself; route against route is not one,
-fixed precedence above settling it by publication alone. One-way value
-movement (A → B, A → B → C) is ordinary; a remembered revisit (A → B → A)
-holds both versions under the cross-run generation rule below.
+Inconsistency is two versions of one thing asserted at once where precedence
+does not settle it: two generations among one run's reads, a model present in
+one look or capture and absent from another, or a revisit of a remembered
+generation after another superseded it. Both are held: kept, red, paired.
+Route against route is not one (precedence settles it). One-way movement
+(A → B, A → B → C) is ordinary; a remembered revisit (A → B → A) is held.
 
-**When the run's two leaderboard looks disagree, both generations are held —
-the dispute layer.** The precedence above settles the routes against each
-other; it cannot settle a run against itself. AA serves the leaderboard from
-its own Vercel cache, so the two looks one run takes — 180 seconds apart
-(`DISPUTE_LOOK_SPACING_SECONDS`) — can land on different generations while a
-publish window is live. Detection starts in-run: each
-read is fingerprinted (`generation_key`, a 16-hex sha256 prefix over the
-slug-sorted records normalized on the leaderboard field universe minus the
-never-red speed/latency family — absent, null, `""` and `$undefined` fold
-to one missing marker before any comparison, and a cost object compares as
-the scalar of its own `cost.total`), reads sharing a fingerprint are one
-generation, and the detail route joins whichever generation it IS — it never
-raises a dispute by itself, a stale detail corpus being the known,
-precedence-handled state above. One fingerprint **on the same slug set** →
-the merge above, byte for byte. Two fingerprints, or one fingerprint on
-different slug sets — a model present in one look and absent from the other,
-which the Overseer ruled an inconsistency between the generations (2026-10-06,
-issue #211) — and the capture holds both; leaderboard records carry `genVariants`:
-one flat map per generation whose fields are that generation's own published
-values.
+The layers implementing it, and the look-back fill chain, are specified in
+CONTRIBUTING.md "Capture dispute layers"; read it before touching the
+capture's merge, dispute or look-back code, and whenever a page shows "held
+since" or the run prints the 7-day hold warning. In short:
+- **In-run**: the run's two leaderboard looks, 180 s apart, are fingerprinted
+  (`generation_key`); two fingerprints, or one on different slug sets (Overseer
+  ruling, 2026-10-06, issue #211), hold both generations in `genVariants`. The
+  detail route never raises a dispute by itself.
+- **Cross-run generation** (`--cross-run-lookback`, the refresh workflow's flag only: a hand run does not
+  pass it; state in
+  `data/aa-generation-state.json`): a remembered revisit holds both generations
+  until a fingerprint outside the remembered set arrives, or the state is
+  cleared by hand (a retired side stays held otherwise); the hold carries a
+  7-day stdout warning.
+- **Cross-run presence** (Overseer ruling, 2026-10-06, evening, issue #211): a
+  model in the previous capture's firm set and absent from this fetch, or the
+  reverse, is merged and disputed; one merged from the previous capture carries
+  `crossRunMerged: true`.
 
-**`genVariants` encoding: canonical order, canonical-first silence.** The
-variants are ordered by ascending `generation_key`, so the corpus bytes do
-not depend on which look a run read first, and a record's plain fields are
-the first carrying variant's — the canonical generation's value, gap-filled
-only where it lacks the field (a missing marker is a fill, never a winner).
-The cross-run generation hold has one exception: a rendered speed missing
-from the canonical carrying generation stays absent, never filled from
-another held generation. An em-dash side marks a generation that does not
-carry the model at all.
-The map list
-is padded to one entry per generation, with the empty map (`{}`) at every
-generation that does not carry the model — `{}` means *not carried*, and a
-carried variant is never `{}` (a carried record always publishes at least one
-variant field). Presence in one look and absence from the other keeps the
-model in the union, disputed by presence; it supersedes the earlier reading
-that a model AA added or retired between the looks is a corpus union, never a
-conflict (Overseer ruling, 2026-10-06, issue #211). Identity and
-flag fields (`name`, `shortName`, `slug`, `creator`, `modelCreatorName`,
-`isOpenWeights`, `deprecated`, `isReasoning`,
-`intelligenceIndexIsEstimated`) and everything outside the variant map's
-fields (`ii`, `cost`, `gdpval`, `gdpvalCost`, `ctx`, `pin`, `pout`) are never
-disputed: they render the canonical value, silent — the PM-approved
-canonical-first rule. parameters, licence and release date are detail-fills
-with a single in-run source, so they cannot dispute either. The never-red
-family (`NEVER_RED_FIELDS`, hardcoded, never widened silently — a new
-speed-shaped field joins it only by a reviewed change) is the speed/latency
-set: it re-samples every hour by design, so two looks of the SAME generation
-routinely disagree on it and a dispute there would hold the page red
-permanently. `gdpvalCost` is recovered from each variant's own cost breakdown
-and is absent when that breakdown does not sum to its own total — never
-supplied from another generation's parts, which is what makes a disputed axis
-honest.
+**Disputed hours** are ordinary: the run never exits red, the page renders both
+values red in canonical pair order, and the scheduled commit's body carries the
+differ's Disputes section. The capture is merged and dispute-bearing (two
+routes, every held generation), so the page's raw-byte provenance digest is a
+sha256 over that merged content, never over AA's raw payload.
 
-**The cross-run generation layer** runs under `--cross-run-lookback` and
-remembers the newest 1000 distinct fingerprints in
-`data/aa-generation-state.json`, beside the capture. `revisit_key` fingerprints
-the published merged corpus over `DISPUTE_CAPABLE` only, excluding speed and
-unrendered payload churn. One-way movement (A → B, A → B → C) stays ordinary;
-a remembered revisit (A → B → A) holds both generations with `genVariants`.
-The state stores their AA-published `HELD_FIELDS`, including each side's cost
-breakdown, and renders their union in ascending revisit-key order. Other
-fields follow the current capture, so a hold does not manufacture payload
-removals in the differ; capture bytes may change while built rows stay fixed.
-Both rendered speed fields (`medianOutputTokensPerSecond` and
-`intelligenceIndexTimePerTask`) stay frozen for the length of a hold, including
-canonical absence. Alternating held members leaves the state and held render
-unchanged; a remembered nonmember joins without resetting the hold date.
-Only a fingerprint outside the remembered set ends the hold automatically
-and publishes alone; an evicted fingerprint counts as new. A retired side
-stays held until a new generation arrives or the state is cleared by hand.
-In-run disagreements leave this state unchanged: they render the frozen hold
-only if all their revisit keys are held, otherwise the in-run dispute renders.
-The date is written once at hold-entry and rendered as "held since <date>"
-beside the dispute explanation; no state or no hold renders no such text.
-A hold older than 7 days prints a stdout warning without changing state.
-The repository tracks a bootstrap generated from its committed capture, so
-a quiet refresh's `git checkout -- data/` restores state too and a republish
-does not commit an untracked bootstrap. Later state changes are committed
-with data-moving hours so runs remember the published hold without deriving
-it from git history. A missing state
-bootstraps from the previous capture; a no-hold `last` inconsistent with that
-capture is re-bootstrapped before a clean run's transition. The flag always
-writes state atomically on success; without it state is neither read nor
-written. The gate stages HEAD's state from git and fresh state from disk,
-including the fresh-only `--fresh-held` probe; unchanged held alternation
-answers `false`, while hold entry and a new generation change the page.
+### Rows
 
-**The cross-run presence layer: the previous capture against this run's fetch
-(Overseer ruling, 2026-10-06, evening, on the reopened issue #211).** The
-in-run layer above cannot see a flip that happens between runs: a run whose
-own looks agree holds one generation, and an AA-side serving change lands as
-a one-model flip of the published set. So the hourly refresh reads the
-previous committed capture before the fetch overwrites it
-(`fetch_aa.py --cross-run-lookback`, the refresh workflow's flag), and a
-model present in that capture's **firm set** — the records it holds without
-the `crossRunMerged` marker — and absent from this run's fetch, or the
-reverse, is merged and marked disputed: kept, both generations shown, red,
-paired. This layer is presence-only: the previous corpus participates only
-through the diff slugs, and shared models take no previous-generation slot
-here. One-way value movement is ordinary; remembered revisits are held by
-the generation layer above. A record the presence layer merges from the
-previous capture carries `crossRunMerged: true` — this run's own fetch did
-not serve the model, and the marker is what lets the NEXT run read its
-look-back correctly: a marked record is dispute state, not serving
-evidence, so this layer neither merges nor disputes it again. Outside a
-generation hold, a stable retirement settles within one further hour;
-the hold's frozen union can retain a retired side until its exit rule fires.
-A re-added model — served now, absent from the firm
-set (a brand-new model included, which therefore disputes red for its first
-hour) — takes the empty-map previous slot and carries no marker: it is
-serving evidence the moment the run's own fetch returned it. A
-cross-run-disputed record's `genVariants` extends to one entry per
-generation the record is disputed across — the run's own generations plus
-the previous run's, the previous slot positioned by ascending
-`generation_key` over the joint field universe.
+**Coding rows: anchor on the PAIR, not an array shape.** AA splits them between
+`rows` (its highlighted selection) and `benchmarkRows` (which begins with an RSC
+back-reference string); taking one array silently drops rows, frontier points
+included. `coding_agent_rows` takes every object carrying `indexScore` and
+`mean.costUsd`, wherever it sits, deduped by id.
 
-Route precedence does not settle disagreements between looks or captures;
-the layers above keep those versions together. A disputed capture is an
-ordinary hour: the run never exits red, the page renders both values red with
-the pair order canonical, and the scheduled commit's body carries the differ's
-Disputes section — the three-generation corner (the looks disagree AND the
-detail route matches neither fingerprint) gives shared models no detail fills
-from that run; the final look-back pass can restore their previous fills.
-Window evidence counts leaderboard models after validating the whole union;
-detail-only breakdowns cannot clear it, even on models that render no rows.
-With that window marker at ≥ 3 observed generations, empty parameters HOLD
-the page: the gate reports unchanged and the last good page stays live.
-If detail-only rows rescue parameters, only agentic stays empty and the page
-publishes with the window note; rescuing both axes publishes a full page.
-Unplottable extras rescue neither axis and preserve the original HOLD. Any
-other emptied axis still refuses — the go-re-read-AA-by-hand signal for a
-real shape change. Without the cross-run look-back, a
-run whose looks agree writes no `genVariants` key anywhere and is
-byte-identical to the single-generation capture; with it, the same holds
-when the two slug sets agree, no generation hold renders and no detail fill
-needs carrying. A caught
-presence flip or generation revisit writes the disputed shape defined above.
-The provenance consequence is worth saying plainly: the models capture is a merged,
-dispute-bearing artifact — two routes and every held generation — so the
-page's raw-byte provenance digest is a sha256 over
-merged, dispute-bearing content, never over AA's raw payload.
+**Two row universes, one table.** Rows carry a `kind`: `model` rows have the
+intelligence, agentic and parameter axes, `agent` rows have coding, and neither
+has the other's columns. An agent row inherits weights status by matching
+`hostModelSlug` to the captured model's `slug`; runs on models AA has no row for
+(unreleased codenames) are **unknown**, drawn hollow, never defaulted to
+proprietary (that would assert something AA never said).
 
-A detail page lists every model **except** its own, so the host slug loses its
-detail-only fields. `detail_host_slug` therefore picks a model with no measured
-cost — without one it cannot be on any chart — and picks it deterministically,
-so the capture does not churn.
+Secondary columns, from the same record: per-1M input/output price, output
+tokens/sec, context window, release date, weights license, open-weights flag,
+deprecation flag.
 
-Field renames absorbed: `totalParameters` → `parameters` (identical values
-across the rename), `name` → falls back to `shortName` — the leaderboard ships
-`name` again as of 2026-10-05. `modelCreatorCountry` is gone from every route;
-nothing rendered it.
-
-**Coding rows are scattered across arrays, so the extractor anchors on the
-PAIR, not on an array shape.** AA splits them between `rows` (its highlighted
-selection) and `benchmarkRows`, which begins with an RSC back-reference string
-rather than an object. Taking the largest array published 10 of 13 rows in
-silence, and the dropped rows included the cheapest run on the chart — a
-frontier point. `coding_agent_rows` finds every object carrying an
-`indexScore` and a `mean.costUsd`, wherever it sits, and dedupes by id.
-
-**Two captures means two row universes in one table.** Rows carry a `kind`;
-`model` rows have the intelligence, agentic and parameter axes, `agent` rows
-have coding, and neither has the other's columns. Weights status belongs to a
-model, so an agent row inherits it by matching `hostModelSlug` against the
-captured model's `slug`; runs on models AA has no row for (unreleased codenames)
-are **unknown**, drawn hollow — never defaulted to proprietary, which would
-assert something AA never said.
-
-Secondary columns carried through from the same record: per-1M input/output
-price, output tokens/sec, context window, release date, weights license,
-open-weights flag, deprecation flag.
-
-The **efficient frontier** — models where nothing cheaper scores at least as
-high — is the analytical payload. Everything off it is strictly dominated.
-
+The **efficient frontier** (models where nothing cheaper scores at least as
+high) is the analytical payload; everything off it is strictly dominated.
 Missing values render as `—` (em-dash), never `N/A` or blank.
 
 ## Pipeline
 
-AA ships the leaderboard as a Next.js RSC flight payload; there is no public
-JSON API. The extractor reassembles it.
+AA has no public JSON API; the extractor reassembles its Next.js RSC flight
+payload.
 
 ```
 python3 scripts/fetch_aa.py     # → data/aa-raw-models.json + data/aa-raw-coding-agents.json
@@ -340,82 +163,79 @@ python3 ~/.agent-bundle/scripts/docs_hub.py publish ./out/frontier-models.html \
   --project ai-researcher
 ```
 
-In CI the publish step is `scripts/publish_docs.py` instead of the canonical
-CLI: `docs_hub.py` lives in a private bundle repo and imports a module from
-beside it, so a runner cannot reach it. That script implements the one endpoint
-(`POST /api/publish`) and nothing else — on a workstation, keep using the
-canonical CLI.
+CI publishes with `scripts/publish_docs.py` (only `POST /api/publish`), because
+`docs_hub.py` lives in a private bundle repo a runner cannot reach; on a
+workstation use the canonical CLI.
 
-`fetch_aa.py` exits nonzero — the signal to go re-read AA by hand, never to
-retry or to hand-fix JSON — when any of these move:
+`fetch_aa.py` exits nonzero — the signal to re-read AA by hand, never to retry
+or hand-fix JSON — when:
+- the flight payload or model schema changes shape, or the transport fails;
+- **AA bumps the Intelligence Index version** past `build.py`'s `INDEX_VERSION`
+  pin. This matters most: AA publishes per-evaluation weights only on its
+  methodology page, so a rebalance leaves every payload field well-formed (v4.2
+  silently shipped costs wrong by 2–3×); the pin is the only catch;
+- the cost breakdown drops a slug `build.py` reads, or per-evaluation costs stop
+  summing to the published total — except an all-dropped window hour, which is
+  reported and returned (issue #217);
+- the Coding Agent Index falls below `CODING_ROW_FLOOR` paired rows.
 
-- the flight payload or the model schema changes shape;
-- **AA bumps the Intelligence Index version** past the `INDEX_VERSION` pin in
-  `build.py`. This one matters most and is the least obvious: AA publishes the
-  per-evaluation weights on its *methodology page* and never in the payload, so
-  a rebalance leaves every field name and every value well-formed. v4.2 changed
-  four weights that way and the page silently shipped costs that were wrong by
-  factors of 2–3 for a day. The pin is the only place that can be caught;
-- the cost breakdown drops a slug `build.py` reads, or the per-evaluation costs
-  stop summing to the published total — except an all-dropped window hour, which
-  is reported and returned (issue #217);
-- the Coding Agent Index collapses below `CODING_ROW_FLOOR` paired rows.
+A route disagreement is never one of these: precedence resolves it, silently and
+always.
 
-A disagreement between the two routes is deliberately NOT one of these: it is
-resolved by the fixed precedence above, silently and always, and never turns
-the refresh red.
+`build.py` refuses to write a page where a rendered axis has no rows (a build
+failure, not a published blank), except:
+- a leaderboard all-dropped window hour (marker `data/cost-breakdown-window.txt`,
+  written by `fetch_aa.py`) publishes with the agentic axis empty and a named
+  on-page note;
+- a three-generation window hour (the marker records ≥ 3 generations observed
+  in-run): when parameters stay empty after detail-only rows join, with or
+  without agentic, the page HOLDS (the gate reports unchanged, the last good page
+  stays live). Detail-only rows rescuing parameters leave an agentic-only gap,
+  which publishes with the window note; rescuing both publishes a full page.
+  Unplottable extras rescue neither axis and keep the HOLD.
 
-`build.py` additionally refuses to write a page where a rendered axis has no
-rows, so an emptied chart is a build failure rather than a published blank.
-Two exemptions. A leaderboard all-dropped window hour (marked by
-`data/cost-breakdown-window.txt`, written by `fetch_aa.py`) publishes with
-the agentic axis empty and a named on-page note. A three-generation window
-hour — the marker records ≥ 3 generations observed in-run — holds when
-parameters remain empty after detail-only rows join, with or without agentic.
-An agentic-only gap publishes with a note; no gap publishes a full page.
-Every other empty axis remains a
-refusal.
+Window evidence counts leaderboard models after validating the whole union;
+detail-only breakdowns cannot clear it, even on models that render no rows.
+Every other empty axis refuses: the go-re-read-AA-by-hand signal for a real
+shape change.
 
-Never hand-edit either capture; both are captured artifacts.
-
-Re-publishing the same slug adds a version and never destroys history.
+Never hand-edit either capture. Re-publishing a slug adds a version and never
+destroys history.
 
 ## Output format
 
-Per global rule, a user-facing analytical artifact is **HTML only**. Charts
-follow the `dataviz` skill — that means the procedure, not just the vibe:
+A user-facing analytical artifact is HTML only (global rule). Charts follow the
+`dataviz` skill's procedure, not just its look:
 
 - **Run the palette validator; never eyeball colorblind-safety.** A scatter is
-  an *all-pairs* form, so it caps at **three** categorical hues. Lab identity
-  cannot be color (23 labs); it lives in the tooltip and filters. Color encodes
-  proprietary vs open-weights, with superseded models in de-emphasis gray.
+  an all-pairs form: at most **three** categorical hues. Lab identity (23 labs)
+  is never color; it lives in the tooltip and filters. Color encodes proprietary
+  vs open-weights; superseded models draw in de-emphasis gray.
 - Log x-axis (cost spans ~300×), solid hairline grid, markers ≥8px with a 2px
   surface ring, direct labels **only** on frontier points.
 - Nearest-point hover, not pinpoint hit targets.
 - One filter row above everything it scopes, never per-chart.
-- On the frontier page, a table view is mandatory — the accessible twin. Nothing may be reachable
-  only by hovering.
-- Dark mode is selected from the same ramps and declared under both the media
-  query and the `data-theme` scope.
+- On the frontier page a table view is mandatory (the accessible twin); nothing
+  may be reachable only by hovering.
+- Dark mode uses the same ramps, declared under both the media query and the
+  `data-theme` scope.
 
-Interactive affordances: filter chips, lab select, search, sortable table,
-copy-as-Markdown and copy-as-JSON of the current filtered slice, TOC.
+Affordances: filter chips, lab select, search, sortable table, copy-as-Markdown
+and copy-as-JSON of the current filtered slice, TOC.
 
 ### "Superseded" means beaten on the metric
 
-Not the vendor's deprecation flag. A model is superseded when another model is
-at least as smart **and** at least as cheap (strictly better on one). Vendor-
-retired models stay visible and tagged. The two verdicts are genuinely
-independent: a vendor can retire a model that still sits on the efficient
-frontier, and the frontier can drop a model the vendor still sells.
-`build.py` prints `MISMATCH` when a retired model is still undominated — that
-is a finding to report, not a bug to fix.
+Not the vendor's deprecation flag: a model is superseded when another is at
+least as smart **and** at least as cheap (strictly better on one). Vendor-retired
+models stay visible and tagged; the verdicts are independent (a retired model
+can sit on the frontier, a sold one can drop off it). `build.py` prints
+`MISMATCH` when a retired model is still undominated: a finding to report, not
+a bug to fix.
 
-**One function computes this layer** — the chart's dashed line, the frontier
-table, the table's frontier tag and the Hide-superseded chip all render from
-the single per-pass computation, over the same slice. Never precompute it into
-the data: a build-time flag silently disagreed with the live chart under a lab
-filter (the chart marked 6 Anthropic models, the table tagged 4).
+**One function computes this layer**, once per pass over the same slice: the
+dashed frontier line, the frontier table, the table's frontier tag and the
+Hide-superseded chip. Never precompute it into the data (a build-time flag
+disagreed with the live chart under a lab filter).
 
 ### Effort levels
 
@@ -424,107 +244,65 @@ the effort component is stripped — `(Adaptive Reasoning, Max Effort)` →
 `(Adaptive Reasoning)`, while `(Reasoning)`, `(Non-reasoning)` and date
 snapshots like `(Jan '25)` identify genuinely different models and must survive.
 
-*Dump effort levels* collapses each model to its ceiling, and is applied
-**before** the superseded test so the frontier is drawn between models. Say
-what it costs rather than hiding it: turning a model down makes it cheaper *and*
-dumber, so a low-effort variant is **not** dominated by its high-effort twin —
-in practice only a handful of variants are beaten by another setting of the
-same model. Collapsing therefore deletes real frontier points, and `build.py`
-prints both counts so the loss is visible rather than assumed. Expanded answers
-"which configuration", collapsed answers "which model".
+*Dump effort levels* collapses each model to its ceiling, **before** the
+superseded test, so the frontier is drawn between models. A low-effort variant
+is cheaper *and* dumber, so rarely dominated by its high-effort twin;
+collapsing deletes real frontier points, and `build.py` prints both counts so
+the loss is visible. Expanded answers "which configuration", collapsed "which
+model".
 
 ### Tooltip
 
-Snaps to the quadrant furthest from the pointer, so it never sits under the
-cursor and parks in a corner instead of jittering with the mouse. Deliberately
-unclamped and allowed to hang outside the plot rather than be squeezed inside.
+Snaps to the quadrant furthest from the pointer, never under the cursor and
+without jitter; deliberately unclamped, so it may hang outside the plot.
 
 ## Update cadence
 
-The joined `.github/workflows/refresh.yml` refreshes the AA frontier page,
-the Hugging Face trending list and the OpenRouter weekly top 10. `rankings`
-builds from full git history plus this run's changed tracker snapshots, and
-`out/trending-rankings.html` joins the same commit as the changed data.
-For each changed list, the newest column identifies its snapshot by the run
-and its fetch time: a commit cannot contain its own SHA and committer time.
-After the commit lands, `rankings-hub` publishes the
-[rankings page](https://docs.nitjsefni.eu/d/ai-researcher/trending-rankings).
-An identical live rankings page skips the upload. Neither tracker feeds the
-frontier page. The standalone `openrouter-top` tracker is retired.
+`.github/workflows/refresh.yml` refreshes the frontier page, the Hugging Face
+trending list and the OpenRouter weekly top 10 hourly (requested at `:11`;
+GitHub delivers best-effort) and publishes the
+[trending rankings page](https://docs.nitjsefni.eu/d/ai-researcher/trending-rankings)
+from git history. Its single-commit, per-source isolation, rankings and publish
+mechanics are in CONTRIBUTING.md "CI". The standalone `openrouter-top` tracker
+is retired.
 
-- **Automated, every hour** — `.github/workflows/refresh.yml` captures the
-  leaderboard and the Coding Agent Index and fetches both trackers. When the
-  page the fresh AA capture would build differs from the live one — compared
-  by building the page from both captures with provenance (source stamp,
-  capture date, raw-byte digest) normalized out and sub-threshold speed
-  re-samples reconciled against the last committed values at `diff_aa.py`'s
-  news threshold (`--speed-tol`),
-  since AA's payload also churns in fields the page never renders — it
-  rebuilds and runs the suite. The run pushes at most one bot commit carrying
-  every changed source: the AA capture with its rebuilt
-  `out/frontier-models.html`, the two trending lists, and
-  `out/trending-rankings.html`. The commit keeps one subject line; each changed
-  source contributes its full message as a block under its own subject line:
-  AA's `diff_aa.py` report and HF/OR's MOVE lines under each tracker's own line.
-  A failed source fetch, or a red AA gate
-  or suite, leaves that source out while the sources that succeeded still
-  commit. A run in which nothing changed pushes nothing; each page is
-  published to docs-hub after the commit lands. The joined workflow requests
-  hourly runs at `:11`; GitHub delivers schedules best-effort. A capture that
-  would render the identical frontier page adds no AA change, version or
-  notification as long as the live page is current; when a publish failed or
-  was missed, the next run's live-page check -- the served page compared
-  byte-for-byte against the page main carries, the embedded source-commit
-  stamp among those bytes --
-  republishes instead. The stamp file therefore moves when the DATA
+- **Hourly**: AA counts as changed only when the page the fresh capture would
+  build differs from the live one. Both captures are built with provenance
+  (source stamp, capture date, raw-byte digest) normalized out and
+  sub-threshold speed re-samples reconciled against the last committed values
+  at `diff_aa.py`'s news threshold (`--speed-tol`), since AA's payload churns in
+  fields the page never renders. Then it rebuilds and runs the suite before
+  committing. An identical page adds no AA change, version or notification
+  while the live page is current; after a failed or missed publish, the next
+  run's live-page check (served page vs main's page, byte for byte, embedded
+  source-commit stamp included) republishes. The stamp file moves when the DATA
   moves, not every calendar day.
-- **On-demand refresh** when asked ("update the table", "did GPT-6 land yet").
-  Run the same three commands by hand; the workflow is not the only route.
-- **Drift check** at session start: re-run `fetch_aa.py`, diff the model count
+- **On demand** ("update the table", "did GPT-6 land yet"): run the three
+  pipeline commands by hand; the workflow is not the only route.
+- **Drift check at session start**: re-run `fetch_aa.py`, diff the model count
   and the frontier against the published version, surface the diff before
   publishing.
 
-The scheduled commits are authored by `github-actions[bot]` and carry **no**
-model co-author trailer, because no model wrote them. A refresh a person or an
-agent drives by hand still carries one.
+Scheduled commits are authored by `github-actions[bot]` with **no** model
+co-author trailer (no model wrote them); a refresh a person or agent drives by
+hand carries one.
 
-Two failure modes are deliberate. `fetch_aa.py` exiting nonzero on a schema
-change, an index bump or a transport failure turns the scheduled run red rather
-than committing a mangled capture — that is the signal to go re-read the
-leaderboard by hand. And the suite runs before the commit, so a capture that
-breaks the page leaves the last good capture committed and the last good page
-live.
-
-A third thing that used to be a failure mode is not one any more. A cross-route
-disagreement — AA's two routes independently cached, serving two generations of
-the same data — used to exit 3, or heal, or publish a disputed page, and it is
-what made the published document oscillate between generations hour by hour
-(issues #100, #118, #176, #189). Under the fixed precedence documented above it
-is simply resolved: the leaderboard publishes, the detail route fills, and the
-hour is an ordinary one whose only scheduled commit is `Refresh capture: …`.
-There is no window to open, close, record or heal, and no disagreement that can
-turn a run red. Every value still comes only from AA; nothing is estimated or
-interpolated. Route precedence does not settle disagreements between
-leaderboard looks, cross-run presence flips, or remembered generation
-revisits; the layers above keep those versions paired and red on the page.
+Deliberate failures: a nonzero `fetch_aa.py` exit turns the scheduled run red
+instead of committing a mangled capture; the suite runs before the commit, so a
+capture that breaks the page leaves the last good capture committed and the
+last good page live. A cross-route disagreement is never a failure: that hour's
+only scheduled commit is `Refresh capture: …`, with nothing estimated or
+interpolated.
 
 ## Commit / co-author trailer
 
-Every commit ends with:
-
-```
-Co-Authored-By: <model name> <noreply@anthropic.com>
-```
-
-Use whichever model drives the session. One primary-author trailer per commit.
+Every commit ends with `Co-Authored-By: <model name> <noreply@anthropic.com>`,
+naming the model driving the session; one primary-author trailer per commit.
 
 ## What this repo is NOT
 
-- Not a benchmark harness — we collect AA's numbers, we don't rerun evals.
-- Not a live-scraping dashboard. The page never fetches anything when a browser
-  opens it; it is a static artifact built from a captured file. Capture is
-  scheduled (hourly) but each one is still diffed, tested and gated —
-  scheduled is not the same as live.
-- Not a model directory — if AA hasn't measured cost per task for it, it isn't
-  on the chart.
-- The frontier page is not multi-source. See above; this is the whole point.
+- Not a benchmark harness: we collect AA's numbers, never rerun evals.
+- Not a live dashboard: the page fetches nothing when a browser opens it; it is
+  a static artifact built from a captured file. Captures are scheduled hourly,
+  and each is still diffed, tested and gated.
+- Not a model directory: no AA cost per task, no place on the chart.
