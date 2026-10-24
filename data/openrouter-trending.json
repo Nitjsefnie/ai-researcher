@@ -17,10 +17,10 @@
       "slug": "anthropic/claude-opus-5.5"
     },
     {
-      "slug": "xiaomi/mimo-v2.6-flash"
+      "slug": "openai/gpt-6-luna"
     },
     {
-      "slug": "openai/gpt-6-luna"
+      "slug": "xiaomi/mimo-v2.6-flash"
     },
     {
       "slug": "nvidia/nemotron-3-ultra-550b-a55b"
