@@ -132,7 +132,7 @@ reachable through those tests, so a change to the emitted JavaScript needs one.
 
 ## CI
 
-Ten workflows run. Five of them you can run locally:
+Sixteen workflows run. Five of them you can run locally:
 
 ```sh
 python3 -m pytest -q                                             # tests
@@ -506,8 +506,9 @@ is never a failure.
 - **The page is emitted as plain strings.** There is no template engine and no
   DOM library; match the surrounding code.
 - Missing values render as `—` (em-dash), never `N/A` and never blank.
-- pylint's DESIGN limits are raised rather than disabled. If your patch trips
-  one, that is worth a look before you raise it further.
+- pylint's DESIGN limits are raised rather than disabled, and file length is
+  gated by the size-baseline workflow instead of pylint. If your patch trips
+  a DESIGN limit, that is worth a look before you raise it further.
 
 ## Pull requests
 
