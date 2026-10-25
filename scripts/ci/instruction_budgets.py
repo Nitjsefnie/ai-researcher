@@ -38,8 +38,8 @@ that runs this gate -- the coverage job's ubuntu-latest runner,
 CPython 3.15.1 / valgrind 3.22.0 -- and were seeded from that cell's
 measured counts (build 215,934,993, capture_gate 316,217,922,
 diff_aa 282,204,262 startup-subtracted Ir), each plus 3% rounded up to
-the next million; the authoring box's counts (Python 3.15.1 /
-valgrind 3.24.0) sit about 5% above them. The check mode always prints its
+the next million; the authoring box (Python 3.15.1 /
+valgrind 3.24.0) sits about 5% above them. The check mode always prints its
 measured counts, so a later tighten-only PR calibrates against fresh
 CI numbers.
 
