@@ -1895,7 +1895,7 @@ perf_budgets = _load_perf_budgets()
 class PerfBudgetTests(unittest.TestCase):
     """The CI gate for issue #109's tighten-only perf ratchet.
 
-    This class runs in the coverage job; the 3x3 matrix --ignores
+    This class runs in the coverage job; the 3x2 matrix --ignores
     tests/test_browser.py, so this is where CI enforces the committed
     budgets in .github/perf-budgets.json on every pull request. Nothing
     about the journeys or the verdict is re-implemented here: the
