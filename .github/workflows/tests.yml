@@ -4,7 +4,7 @@ name: tests
 # tests/test_browser.py, drives the built HTML in a real headless Chromium
 # through playwright.
 #
-# FIVE JOBS, split on purpose. `suites` is a 3-OS x 3-Python matrix running the
+# FIVE JOBS, split on purpose. `suites` is a 3-OS x 2-Python matrix running the
 # non-browser suite on every cell — that is what buys portability coverage of
 # the tooling itself. `coverage` is the dedicated Linux job: the full suite
 # (browser included) under the coverage ratchet, and it holds a read-only
@@ -79,7 +79,7 @@ concurrency:
 jobs:
   # --- The portability matrix -------------------------------------------
   # The non-browser suite across ubuntu-latest, windows-latest and
-  # macos-latest x Python 3.11/3.12/3.13. No playwright, no Chromium, no
+  # macos-latest x Python 3.14/3.15. No playwright, no Chromium, no
   # coverage — those live in the `coverage` job below.
   suites:
     name: pytest (${{ matrix.os }}, ${{ matrix.python }})
@@ -98,14 +98,12 @@ jobs:
 
     strategy:
       fail-fast: false
-      # 3.11 is the floor: all three pinned test tools (pytest 9.1.1,
-      # playwright 1.63.0, coverage 7.16.1) declare requires_python >=3.10,
-      # and 3.11/3.12/3.13 is the catalogue's standard triple. The full suite
-      # was measured green under 3.11 and 3.12 locally on Linux; CI runs 3.13
-      # today.
+      # 3.14 is the floor: the pinned test tools (pytest, playwright,
+      # coverage, pyyaml) all declare requires_python at or below it, and
+      # 3.14/3.15 is the catalogue's standard pair.
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
-        python: ["3.11", "3.12", "3.13"]
+        python: ["3.14", "3.15"]
 
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -181,7 +179,7 @@ jobs:
 
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
-          python-version: "3.13"
+          python-version: "3.15"
           cache: pip
           # There is no requirements.txt here (the runtime is pure stdlib), so
           # the cache must be keyed off the pins that do exist or setup-python
@@ -350,7 +348,7 @@ jobs:
         #
         # COVERAGE JOB ONLY. The measurement needs valgrind (installed
         # below when the runner lacks it) and four callgrind runs, which
-        # run 20-50x slower than the targets alone; the 3x3 matrix neither
+        # run 20-50x slower than the targets alone; the 3x2 matrix neither
         # installs valgrind nor has the minutes to spare, and its cells'
         # 20-minute ceiling is standing. This job already carries the
         # dedicated tooling and the 30-minute ceiling.
@@ -610,7 +608,7 @@ jobs:
 
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
-          python-version: "3.13"
+          python-version: "3.15"
           # No pip cache: the check is pure stdlib — nothing to install, so
           # nothing to key a cache off.
       - name: Check the committed page
@@ -635,7 +633,7 @@ jobs:
 
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
-          python-version: "3.13"
+          python-version: "3.15"
           # Pure stdlib, like the frontier check: nothing to install or cache.
       - name: Check the committed rankings page
         run: python3 scripts/ci/check_committed_rankings_page.py
