@@ -331,15 +331,27 @@ def test_the_size_baseline_artifact_name_is_the_staging_directory_name():
         if s.get("uses", "").startswith("actions/download-artifact@")
         and " ".join(s["with"]["path"].split())
         == "${{ runner.temp }}/" + directory]
-    # The name is the list step's output for the same candidate the
-    # staging step uploads; the executed selection tests pin that output's
-    # value to the uploaded name, so the downloaded bytes are the staged
-    # bytes.
-    assert " ".join(size_download["with"]["name"].split()) == (
-        "${{ steps.list.outputs.size_artifact }}")
-    list_run = " ".join(next(
-        s for s in push_steps if s.get("id") == "list")["run"].split())
-    assert '"${tag}_artifact=$artifact"' in list_run
+    # The name references a list-step output for the same candidate the
+    # staging step uploads: the referenced step exists, its script emits
+    # tag-prefixed outputs, and its candidate table binds the tag to the
+    # size document. The executed selection tests pin the emitted value to
+    # the uploaded name, so the downloaded bytes are the staged bytes.
+    reference = re.fullmatch(
+        r"\$\{\{\s*steps\.([\w-]+)\.outputs\.(\w+)\s*\}\}",
+        " ".join(size_download["with"]["name"].split()))
+    assert reference is not None, size_download["with"]["name"]
+    step_id, output = reference.groups()
+    [list_step] = [s for s in push_steps if s.get("id") == step_id]
+    list_run = " ".join(list_step["run"].split())
+    assert '"${tag}_artifact=$artifact"' in list_run, list_run
+    # The candidate table binds one tag to the size document and its
+    # artifact; the referenced output is that tag's, naming the artifact
+    # the staging step uploaded.
+    row = re.search(r"\b([\w-]+) ([a-z0-9-]+-data) size-baseline\.json",
+                    list_step["run"])
+    assert row is not None, list_step["run"]
+    assert output == row.group(1) + "_artifact"
+    assert row.group(2) == directory
 
 
 @POSIX
