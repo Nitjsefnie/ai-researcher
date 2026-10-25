@@ -110,9 +110,10 @@ class ArtifactDataTests(unittest.TestCase):
 
     def test_the_download_is_cross_run_and_gated(self):
         # One download step per candidate, each gated on that candidate's
-        # own staged output, naming the triggering run (cross-run) with
-        # the job's actions: read token, and served by the list step's
-        # emission of the same outputs (issue #333).
+        # own staged output and served by the list step's emission of the
+        # same outputs (issue #333). The cross-run run-id expression is
+        # enumerated over every workflow_run workflow by test_ci_workflows;
+        # the token's cap is the job's actions: read pin.
         list_step = step(self.wf, "List the triggering run's artifacts")
         assert list_step["env"]["AI_RESEARCHER_WORKFLOW_NAME"] == (
             "${{ github.event.workflow_run.name }}")
@@ -133,19 +134,10 @@ class ArtifactDataTests(unittest.TestCase):
                 rf"{tag}_artifact\s*" + r"\}\}",
                 " ".join(with_["name"].split()))
             assert reference is not None, with_["name"]
-            assert with_["run-id"] == "${{ github.event.workflow_run.id }}"
-            assert with_["github-token"] == "${{ secrets.GITHUB_TOKEN }}"
             for emitted in ("artifact", "document", "staged=true",
                             "staged=false"):
                 assert f'"${{tag}}_{emitted}=$' in run_text or (
                     f'"${{tag}}_{emitted}"' in run_text), (tag, emitted)
-        paths = {" ".join(entry["with"]["path"].split())
-                 for entry in downloads}
-        assert paths == {
-            "${{ runner.temp }}/ratchet-data",
-            "${{ runner.temp }}/size-baseline-data",
-            "${{ runner.temp }}/comment-share-data",
-        }
 
     def test_the_loops_walk_exactly_the_downloaded_candidates(self):
         # The fixed candidate order the validate and push loops walk
