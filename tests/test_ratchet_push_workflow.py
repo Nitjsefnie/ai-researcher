@@ -7,6 +7,11 @@ and the workflow_run trigger's hazard — another run's data reaching a
 privileged job — is gated shut four ways (event, branch, conclusion,
 head repository) before the artifact is even downloaded. The artifact is
 data and nothing else: validated inline, executed never.
+
+The ci gate arm carries TWO candidates — the coverage thresholds, then
+the size records (issue #333). Documents staged by one run land one per
+main-tip generation: the first landing moves main, so the second drops
+green and re-stages on the next main push's gate run.
 """
 import contextlib
 import json
@@ -104,40 +109,70 @@ class ArtifactDataTests(unittest.TestCase):
         self.wf = load()
 
     def test_the_download_is_cross_run_and_gated(self):
-        assert step(self.wf, "List the triggering run's artifacts")["env"]["AI_RESEARCHER_WORKFLOW_NAME"] == (
+        # One download step per candidate, each gated on that candidate's
+        # own staged output, naming the triggering run (cross-run) with
+        # the job's actions: read token, and served by the list step's
+        # emission of the same outputs (issue #333).
+        list_step = step(self.wf, "List the triggering run's artifacts")
+        assert list_step["env"]["AI_RESEARCHER_WORKFLOW_NAME"] == (
             "${{ github.event.workflow_run.name }}")
-        down = step(self.wf, "Download the ratchet data")
-        assert down["if"] == "steps.list.outputs.staged == 'true'"
-        with_ = down["with"]
-        reference = re.fullmatch(
-            r"\$\{\{\s*steps\s*\.\s*([\w-]+)\s*\.\s*outputs\s*\.\s*([\w-]+)\s*\}\}",
-            with_["name"].strip())
-        assert reference is not None, with_["name"]
-        step_id, output = reference.groups()
-        producers = [entry for entry in self.wf["jobs"]["push"]["steps"]
-                     if entry.get("id") == step_id]
-        assert producers, f"missing output producer: {step_id}"
-        assert re.search(
-            r"(?m)^[ \t]*(?:echo|printf[ \t]+['\"]%s\\n['\"])[ \t]+"
-            rf"(?P<quote>['\"]){re.escape(output)}=[^'\"\n]*(?P=quote)[ \t]*"
-            r'>>?[ \t]*(?P<destination_quote>"?)'
-            r"\$(?:GITHUB_OUTPUT|\{GITHUB_OUTPUT\})(?P=destination_quote)"
-            r"(?:[ \t]+#.*)?[ \t]*$",
-            producers[0].get("run", "")), (step_id, output)
+        downloads = [entry for entry in self.wf["jobs"]["push"]["steps"]
+                     if entry.get("uses", "").startswith(
+                         "actions/download-artifact@")]
+        assert len(downloads) == 3, downloads
+        run_text = flattened(list_step["run"])
+        for download in downloads:
+            gate = re.fullmatch(
+                r"steps\.list\.outputs\.(\w+)_staged == 'true'",
+                " ".join(download["if"].split()))
+            assert gate, download["if"]
+            tag = gate.group(1)
+            with_ = download["with"]
+            reference = re.fullmatch(
+                r"\$\{\{\s*steps\s*\.\s*list\s*\.\s*outputs\s*\.\s*"
+                rf"{tag}_artifact\s*" + r"\}\}",
+                " ".join(with_["name"].split()))
+            assert reference is not None, with_["name"]
+            assert with_["run-id"] == "${{ github.event.workflow_run.id }}"
+            assert with_["github-token"] == "${{ secrets.GITHUB_TOKEN }}"
+            for emitted in ("artifact", "document", "staged=true",
+                            "staged=false"):
+                assert f'"${{tag}}_{emitted}=$' in run_text or (
+                    f'"${{tag}}_{emitted}"' in run_text), (tag, emitted)
+        paths = {" ".join(entry["with"]["path"].split())
+                 for entry in downloads}
+        assert paths == {
+            "${{ runner.temp }}/ratchet-data",
+            "${{ runner.temp }}/size-baseline-data",
+            "${{ runner.temp }}/comment-share-data",
+        }
+
+    def test_the_loops_walk_exactly_the_downloaded_candidates(self):
+        # The fixed candidate order the validate and push loops walk
+        # must cover exactly the artifacts a download step can land:
+        # nothing validated is not downloaded, nothing downloaded is
+        # never validated (issue #333).
+        loop_text = " ".join(
+            step(self.wf, name)["run"]
+            for name in ("Validate the staged data", "Push the ratchet commit"))
+        walked = set(re.findall(
+            r"'([a-z0-9-]+) ([a-z0-9.-]+\.json)'", loop_text))
+        assert walked == {
+            ("ratchet-data", "ci-thresholds.json"),
+            ("size-baseline-data", "size-baseline.json"),
+            ("comment-share-data", "comment-share.json"),
+        }
 
     def test_the_validation_step_runs_before_the_push_step(self):
         names = [s.get("name") for s in self.wf["jobs"]["push"]["steps"]]
         assert names == [
             "List the triggering run's artifacts",
             "Download the ratchet data",
+            "Download the size records",
+            "Download the comment records",
             "Validate the staged data",
             "Push the ratchet commit",
         ], names
-
-    def test_the_selected_document_reaches_validation_and_push_as_data(self):
-        for name in ("Validate the staged data", "Push the ratchet commit"):
-            assert step(self.wf, name)["env"]["AI_RESEARCHER_DOCUMENT"] == (
-                "${{ steps.list.outputs.document }}")
 
     def test_the_validation_gates_the_push_step(self):
         # A validation failure must hold the push step back entirely:
@@ -191,6 +226,11 @@ class ExecutedValidationTests(unittest.TestCase):
         },
         "schema_version": 1,
     }
+    SIZE_VALID = {
+        "schema_version": 1,
+        "baseline": {"build.py": 2890,
+                     "tests/test_ratchet_push_workflow.py": 549},
+    }
     BASE_COMMIT = "a" * 40
 
     @classmethod
@@ -205,63 +245,102 @@ class ExecutedValidationTests(unittest.TestCase):
                 "the validate step is a POSIX script; the Windows cells "
                 "skip its execution")
 
-    def _validate(self, tmp_path, threshold_bytes, base_bytes):
+    def _validate(self, tmp_path, document, payload_bytes, base_bytes,
+                  directory=None):
+        """Stage one candidate in its staging directory and run the
+        validate step's script over RUNNER_TEMP; `directory` overrides
+        the candidate's own staging directory (the wrong-arm cases)."""
         step_ = step(load(), "Validate the staged data")
-        data = tmp_path / "ratchet-data"
-        data.mkdir()
-        (data / "ci-thresholds.json").write_bytes(threshold_bytes)
+        data = tmp_path / (directory or DIRECTORIES[document])
+        data.mkdir(parents=True)
+        (data / document).write_bytes(payload_bytes)
         (data / "base.txt").write_bytes(base_bytes)
         return _workflowrun.run_step(tmp_path, step_,
-                                     {"RUNNER_TEMP": str(tmp_path),
-                                      "AI_RESEARCHER_DOCUMENT": "ci-thresholds.json"})
+                                     {"RUNNER_TEMP": str(tmp_path)})
 
     def _run_with(self, tmp_path, document, base):
+        payloads = {"ci-thresholds.json": self.VALID,
+                    "size-baseline.json": self.SIZE_VALID,
+                    "comment-share.json": {}}
         return self._validate(
-            tmp_path,
-            json.dumps(document).encode("utf-8"),
+            tmp_path, document,
+            json.dumps(payloads[document]).encode("utf-8"),
             base.encode("utf-8"))
 
     def test_the_real_shape_passes(self):
-        done = self._run_with(self.enterContext(_dir()), self.VALID,
-                              self.BASE_COMMIT)
-        assert done.returncode == 0, (done.stdout, done.stderr)
+        for document in ("ci-thresholds.json", "size-baseline.json"):
+            done = self._run_with(self.enterContext(_dir()), document,
+                                  self.BASE_COMMIT)
+            assert done.returncode == 0, (done.stdout, done.stderr)
 
     def test_wrong_leaf_keys_are_refused(self):
         document = {"coverage": {"javascript": {"a": 1, "b": 2},
                                  "python": {"floor": 1, "measured": 2}},
                     "schema_version": 1}
-        done = self._run_with(self.enterContext(_dir()), document, self.BASE_COMMIT)
+        done = self._validate(
+            self.enterContext(_dir()), "ci-thresholds.json",
+            json.dumps(document).encode("utf-8"),
+            self.BASE_COMMIT.encode("utf-8"))
         assert done.returncode != 0, done.stdout
 
     def test_a_garbage_suffixed_base_is_refused(self):
-        done = self._run_with(self.enterContext(_dir()), self.VALID,
-                              self.BASE_COMMIT + "\nrm -rf /\n")
-        assert done.returncode != 0, done.stdout
+        for document in ("ci-thresholds.json", "size-baseline.json"):
+            done = self._run_with(self.enterContext(_dir()), document,
+                                  self.BASE_COMMIT + "\nrm -rf /\n")
+            assert done.returncode != 0, (document, done.stdout)
 
     def test_a_string_typed_leaf_is_refused(self):
         document = {"coverage": {"javascript": {"floor": "95", "measured": 1},
                                  "python": {"floor": 1, "measured": 2}},
                     "schema_version": 1}
-        done = self._run_with(self.enterContext(_dir()), document, self.BASE_COMMIT)
+        done = self._validate(
+            self.enterContext(_dir()), "ci-thresholds.json",
+            json.dumps(document).encode("utf-8"),
+            self.BASE_COMMIT.encode("utf-8"))
         assert done.returncode != 0, done.stdout
 
     def test_a_string_schema_version_is_refused(self):
         document = dict(self.VALID, schema_version="1")
-        done = self._run_with(self.enterContext(_dir()), document, self.BASE_COMMIT)
+        done = self._validate(
+            self.enterContext(_dir()), "ci-thresholds.json",
+            json.dumps(document).encode("utf-8"),
+            self.BASE_COMMIT.encode("utf-8"))
         assert done.returncode != 0, done.stdout
 
-    def test_an_extra_staged_file_is_refused(self):
-        tmp = self.enterContext(_dir())
-        data = tmp / "ratchet-data"
-        data.mkdir()
-        (data / "ci-thresholds.json").write_bytes(
-            b'{"coverage": {}, "schema_version": 1}')
-        (data / "base.txt").write_bytes(self.BASE_COMMIT.encode("utf-8"))
-        (data / "extra.sh").write_bytes(b"echo nope\n")
-        step_ = step(load(), "Validate the staged data")
-        done = _workflowrun.run_step(tmp, step_, {
-            "RUNNER_TEMP": str(tmp), "AI_RESEARCHER_DOCUMENT": "ci-thresholds.json"})
-        assert done.returncode != 0, done.stdout
+    def test_a_size_records_value_that_is_not_an_admissible_integer_is_refused(self):
+        for value in (-1, 1.5, "1", True, None):
+            payload = {"schema_version": 1, "baseline": {"a.py": value}}
+            done = self._validate(
+                self.enterContext(_dir()), "size-baseline.json",
+                json.dumps(payload).encode("utf-8"),
+                self.BASE_COMMIT.encode("utf-8"))
+            assert done.returncode != 0, (value, done.stdout, done.stderr)
+
+    def test_a_size_records_shape_outside_the_schema_is_refused(self):
+        for payload in ({"schema_version": 1},
+                        {"baseline": {}},
+                        {"schema_version": 1, "baseline": {}, "extra": 1},
+                        {"schema_version": 2, "baseline": {}},
+                        {"schema_version": 1, "baseline": []},
+                        {"schema_version": 1, "baseline": None}):
+            done = self._validate(
+                self.enterContext(_dir()), "size-baseline.json",
+                json.dumps(payload).encode("utf-8"),
+                self.BASE_COMMIT.encode("utf-8"))
+            assert done.returncode != 0, (payload, done.stdout, done.stderr)
+
+    def test_a_sibling_document_in_the_wrong_staging_directory_is_refused(self):
+        # The staging directory selects the schema: a sibling document in
+        # another arm's directory is an unexpected file there, and a
+        # wrong-arm download must not pass as the right arm's document
+        # (issue #333).
+        for sibling in ("size-baseline.json", "comment-share.json"):
+            done = self._validate(
+                self.enterContext(_dir()), sibling,
+                json.dumps({}).encode("utf-8"),
+                self.BASE_COMMIT.encode("utf-8"),
+                directory="ratchet-data")
+            assert done.returncode != 0, (sibling, done.stdout, done.stderr)
 
 
 @contextlib.contextmanager
@@ -273,26 +352,63 @@ def _dir():
 POSIX = pytest.mark.skipif(os.name == "nt", reason="Ubuntu workflow shell")
 BASE_COMMIT = "a" * 40
 COMMENT_WORKFLOW = ROOT / ".github/workflows/comment-share.yml"
+# Each candidate's staging directory, as the validate and push loops walk it.
+DIRECTORIES = {
+    "ci-thresholds.json": "ratchet-data",
+    "size-baseline.json": "size-baseline-data",
+    "comment-share.json": "comment-share-data",
+}
+MESSAGES = {
+    "ci-thresholds.json":
+        "Ratchet ci-thresholds: raise the coverage floor (automated)",
+    "size-baseline.json":
+        "Ratchet size-baseline: tighten the records (automated)",
+    "comment-share.json":
+        "Ratchet comment-share: tighten the records (automated)",
+}
+# The outputs the list step emits per triggering workflow, executed below.
+EXPECTED_OUTPUTS = {
+    "ci gate": lambda staged: {
+        "ratchet_artifact": "ratchet-data",
+        "ratchet_document": "ci-thresholds.json",
+        "size_artifact": "size-baseline-data",
+        "size_document": "size-baseline.json",
+        "ratchet_staged": str("ratchet-data" in staged).lower(),
+        "size_staged": str("size-baseline-data" in staged).lower(),
+        "staged": str(bool(staged)).lower(),
+    },
+    "comment share": lambda staged: {
+        "comment_artifact": "comment-share-data",
+        "comment_document": "comment-share.json",
+        "comment_staged": str(bool(staged)).lower(),
+        "staged": str(bool(staged)).lower(),
+    },
+}
 
 
 @POSIX
-@pytest.mark.parametrize("workflow,artifact,document", [
-    ("ci gate", "ratchet-data", "ci-thresholds.json"),
-    ("comment share", "comment-share-data", "comment-share.json"),
+@pytest.mark.parametrize("workflow,staged", [
+    ("ci gate", []),
+    ("ci gate", ["ratchet-data"]),
+    ("ci gate", ["size-baseline-data"]),
+    ("ci gate", ["ratchet-data", "size-baseline-data"]),
+    ("comment share", []),
+    ("comment share", ["comment-share-data"]),
 ])
-@pytest.mark.parametrize("available", [True, False])
-def test_artifact_selection_and_absent_noop(
-        tmp_path, workflow, artifact, document, available):
-    """A producer can only consume its own unexpired artifact (issue #281)."""
+def test_artifact_selection_and_absent_noop(tmp_path, workflow, staged):
+    """A producer can only consume its own unexpired artifacts (issues
+    #281 and #333): the arm's candidates are selected by the triggering
+    workflow's name, each staged independently."""
     state, calls = tmp_path / "state.json", tmp_path / "calls.jsonl"
     bin_dir = tmp_path / "bin"
     _workflowrun.write_gh_stub(bin_dir, state, calls)
+    sibling = ("comment-share-data" if workflow == "ci gate"
+               else "ratchet-data")
     artifacts = [{"name": "unrelated", "expired": False},
-                 {"name": artifact, "expired": True},
-                 {"name": ("ratchet-data" if artifact == "comment-share-data"
-                           else "comment-share-data"), "expired": False}]
-    if available:
-        artifacts.append({"name": artifact, "expired": False})
+                 {"name": sibling, "expired": False}]
+    for name in staged:
+        artifacts.append({"name": name, "expired": True})
+        artifacts.append({"name": name, "expired": False})
     state.write_text(json.dumps({"artifacts": artifacts}), encoding="utf-8")
     output = tmp_path / "output"
     done = _workflowrun.run_step(tmp_path, step(load(), "List the triggering run's artifacts"), {
@@ -303,8 +419,7 @@ def test_artifact_selection_and_absent_noop(
     })
     assert done.returncode == 0, done.stderr
     outputs = dict(line.split("=", 1) for line in output.read_text().splitlines())
-    assert outputs == {"artifact": artifact, "document": document,
-                       "staged": str(available).lower()}
+    assert outputs == EXPECTED_OUTPUTS[workflow](staged)
     [call] = [json.loads(line) for line in calls.read_text().splitlines()]
     assert "repos/Nitjsefnie/ai-researcher/actions/runs/281/artifacts" in call
 
@@ -392,31 +507,84 @@ def test_comment_staging_bytes_and_measured_base(tmp_path, changed):
     ('[] {}', False), ('{} {}', False), ('', False),
 ])
 def test_comment_schema_executed(tmp_path, payload, valid):
-    data = tmp_path / "ratchet-data"
+    data = tmp_path / "comment-share-data"
     data.mkdir()
     (data / "base.txt").write_text(BASE_COMMIT, encoding="utf-8")
     (data / "comment-share.json").write_text(payload, encoding="utf-8")
     done = _workflowrun.run_step(tmp_path, step(load(), "Validate the staged data"), {
-        **os.environ, "RUNNER_TEMP": str(tmp_path), "AI_RESEARCHER_DOCUMENT": "comment-share.json",
+        **os.environ, "RUNNER_TEMP": str(tmp_path),
     })
     assert (done.returncode == 0) == valid, (payload, done.stdout, done.stderr)
 
 
 @POSIX
+@pytest.mark.parametrize("payload,valid", [
+    ('{"schema_version": 1, "baseline": {}}', True),
+    ('{"schema_version": 1, "baseline": {"build.py": 2890}}', True),
+    ('{"schema_version": 1, "baseline": {"a b/c.py": 0}}', True),
+    ('{"baseline": {}}', False),
+    ('{"schema_version": 1}', False),
+    ('{"schema_version": 1, "baseline": {}, "x": 1}', False),
+    ('{"schema_version": 2, "baseline": {}}', False),
+    ('{"schema_version": "1", "baseline": {}}', False),
+    ('{"schema_version": true, "baseline": {}}', False),
+    ('{"schema_version": 1, "baseline": []}', False),
+    ('{"schema_version": 1, "baseline": null}', False),
+    ('{"schema_version": 1, "baseline": {"a.py": -1}}', False),
+    ('{"schema_version": 1, "baseline": {"a.py": 1.5}}', False),
+    ('{"schema_version": 1, "baseline": {"a.py": "1"}}', False),
+    ('{"schema_version": 1, "baseline": {"a.py": true}}', False),
+    ('{"schema_version": 1, "baseline": {"a.py": null}}', False),
+    ('{"schema_version": 1, "baseline": {"a.py": NaN}}', False),
+    ('{"schema_version": 1, "baseline": {"a.py": Infinity}}', False),
+    ('{"schema_version": 1, "baseline": {"a.py": 1e999}}', False),
+    ('{"schema_version": 1, "baseline": {"a.py": -Infinity}}', False),
+    ('{"schema_version": 1, "baseline": {}} {}', False),
+    ('{"schema_version": 1, "baseline": {}} {"schema_version": 1, "baseline": {}}',
+     False),
+    ('', False),
+])
+def test_size_schema_executed(tmp_path, payload, valid):
+    """The size records schema, executed: exact top-level keys,
+    schema_version exactly 1, and a baseline of finite non-negative
+    integers — one JSON document, no stream (issue #333)."""
+    data = tmp_path / "size-baseline-data"
+    data.mkdir()
+    (data / "base.txt").write_text(BASE_COMMIT, encoding="utf-8")
+    (data / "size-baseline.json").write_text(payload, encoding="utf-8")
+    done = _workflowrun.run_step(tmp_path, step(load(), "Validate the staged data"), {
+        **os.environ, "RUNNER_TEMP": str(tmp_path),
+    })
+    assert (done.returncode == 0) == valid, (payload, done.stdout, done.stderr)
+
+
+@POSIX
+@pytest.mark.parametrize("directory,document,payload,sibling", [
+    ("ratchet-data", "ci-thresholds.json",
+     json.dumps(ExecutedValidationTests.VALID), "size-baseline.json"),
+    ("size-baseline-data", "size-baseline.json",
+     '{"schema_version": 1, "baseline": {}}', "ci-thresholds.json"),
+    ("comment-share-data", "comment-share.json", "{}", "size-baseline.json"),
+])
 @pytest.mark.parametrize("base,extra", [
     ("a" * 39, None), ("g" * 40, None), (BASE_COMMIT + "\nextra", None),
-    (BASE_COMMIT, "extra.sh"), (BASE_COMMIT, ".hidden"), (BASE_COMMIT, "ci-thresholds.json"),
-    (BASE_COMMIT, " "),
+    (BASE_COMMIT, "extra.sh"), (BASE_COMMIT, ".hidden"),
+    (BASE_COMMIT, "SIBLING"), (BASE_COMMIT, " "),
 ])
-def test_comment_artifact_shape_executed(tmp_path, base, extra):
-    data = tmp_path / "ratchet-data"
+def test_artifact_shape_executed(tmp_path, directory, document, payload,
+                                 sibling, base, extra):
+    """Every arm's two-file shape: base.txt plus only that arm's
+    document; the sibling document planted in the directory is refused
+    in every arm (issue #333)."""
+    data = tmp_path / directory
     data.mkdir()
     (data / "base.txt").write_text(base, encoding="utf-8")
-    (data / "comment-share.json").write_text("{}", encoding="utf-8")
+    (data / document).write_text(payload, encoding="utf-8")
     if extra:
-        (data / extra).write_text("exit 99", encoding="utf-8")
+        (data / (sibling if extra == "SIBLING" else extra)).write_text(
+            "exit 99", encoding="utf-8")
     done = _workflowrun.run_step(tmp_path, step(load(), "Validate the staged data"), {
-        **os.environ, "RUNNER_TEMP": str(tmp_path), "AI_RESEARCHER_DOCUMENT": "comment-share.json",
+        **os.environ, "RUNNER_TEMP": str(tmp_path),
     })
     assert done.returncode != 0, (done.stdout, done.stderr)
 
@@ -427,13 +595,11 @@ def _git(workdir, *args):
     return done.stdout.strip()
 
 
-@POSIX
-@pytest.mark.parametrize("document", ["comment-share.json", "ci-thresholds.json"])
-@pytest.mark.parametrize("outcome", [
-    "landed", "stale", "moved-before-fetch", "rejected", "moved", "no-key", "transport",
-])
-def test_records_only_push_and_race_classification(tmp_path, document, outcome):
-    """Run the real push script with isolated SSH and controlled remote movement."""
+def _push_fixture(tmp_path, outcome, staged):
+    """Build the isolated push fixture: a source repo whose tip is the
+    measured base, a bare remote pinned at it, the push step's stub bin
+    dir, and one staging directory per requested candidate. Returns the
+    step env and the base and moved SHAs."""
     source = tmp_path / "source"
     _git(tmp_path, "init", "-q", "-b", "main", str(source))
     _git(source, "config", "user.name", "fixture")
@@ -452,12 +618,19 @@ def test_records_only_push_and_race_classification(tmp_path, document, outcome):
     objects = _git(source, "rev-parse", "--path-format=absolute", "--git-path", "objects")
     (remote / "objects/info/alternates").write_text(objects + "\n", encoding="utf-8")
     _git(tmp_path, "--git-dir", str(remote), "update-ref", "refs/heads/main", base)
-    data = tmp_path / "ratchet-data"
-    data.mkdir()
-    (data / "base.txt").write_text(BASE_COMMIT if outcome == "stale" else base, encoding="utf-8")
-    payload = (b'{}\n' if document == "comment-share.json" else
-               json.dumps(ExecutedValidationTests.VALID).encode("utf-8") + b'\n')
-    (data / document).write_bytes(payload)
+    payloads = {
+        "comment-share.json": b'{}\n',
+        "ci-thresholds.json": json.dumps(
+            ExecutedValidationTests.VALID).encode("utf-8") + b"\n",
+        "size-baseline.json": json.dumps(
+            ExecutedValidationTests.SIZE_VALID).encode("utf-8") + b"\n",
+    }
+    for document in staged:
+        data = tmp_path / DIRECTORIES[document]
+        data.mkdir()
+        (data / "base.txt").write_text(
+            BASE_COMMIT if outcome == "stale" else base, encoding="utf-8")
+        (data / document).write_bytes(payloads[document])
     bin_dir = tmp_path / "bin"
     bin_dir.mkdir()
     for name, body in {
@@ -470,42 +643,58 @@ def test_records_only_push_and_race_classification(tmp_path, document, outcome):
         path.chmod(0o755)
     stub = bin_dir / "git_stub.py"
     stub.write_text(PUSH_GIT_STUB, encoding="utf-8")
-    summary, calls = tmp_path / "summary", tmp_path / "calls.jsonl"
     # Isolate SSH's known_hosts writes from the user's home directory.
     home = tmp_path / "home"
     home.mkdir()
     env = {
         **os.environ, "PATH": str(bin_dir) + os.pathsep + os.environ["PATH"],
-        "HOME": str(home), "RUNNER_TEMP": str(tmp_path), "AI_RESEARCHER_DOCUMENT": document,
-        "GITHUB_STEP_SUMMARY": str(summary), "AI_RESEARCHER_REPO": "Nitjsefnie/ai-researcher",
+        "HOME": str(home), "RUNNER_TEMP": str(tmp_path),
+        "GITHUB_STEP_SUMMARY": str(tmp_path / "summary"),
+        "AI_RESEARCHER_REPO": "Nitjsefnie/ai-researcher",
         "AI_RESEARCHER_MASTER_PUSH_DEPLOY_KEY": "" if outcome == "no-key" else "test input",
         "PUSH_REMOTE": str(remote), "REAL_GIT": shutil.which("git") or "git",
         "TEST_PYTHON": shutil.which("python3") or "python3", "TEST_GIT_STUB": str(stub),
-        "TEST_CALLS": str(calls), "TEST_OUTCOME": outcome, "TEST_MOVED": moved,
+        "TEST_CALLS": str(tmp_path / "calls.jsonl"), "TEST_OUTCOME": outcome,
+        "TEST_MOVED": moved,
         "GIT_ALTERNATE_OBJECT_DIRECTORIES": objects,
     }
+    return env, base, moved, remote
+
+
+@POSIX
+@pytest.mark.parametrize("document", ["comment-share.json", "ci-thresholds.json",
+                                      "size-baseline.json"])
+@pytest.mark.parametrize("outcome", [
+    "landed", "stale", "moved-before-fetch", "rejected", "moved", "no-key", "transport",
+])
+def test_records_only_push_and_race_classification(tmp_path, document, outcome):
+    """Run the real push script with isolated SSH and controlled remote movement."""
+    env, base, moved, remote = _push_fixture(tmp_path, outcome, [document])
     done = _workflowrun.run_step(tmp_path, step(load(), "Push the ratchet commit"), env)
     assert (done.returncode != 0) == (outcome in {"no-key", "transport", "rejected"}), (
         done.stdout, done.stderr)
     tip = _git(tmp_path, "--git-dir", str(remote), "rev-parse", "refs/heads/main")
-    recorded = [json.loads(line) for line in calls.read_text().splitlines()] if calls.exists() else []
+    recorded = [json.loads(line) for line in
+                (tmp_path / "calls.jsonl").read_text().splitlines()] if (
+        tmp_path / "calls.jsonl").exists() else []
     if outcome == "landed":
+        payload = (b'{}\n' if document == "comment-share.json" else
+                   json.dumps(ExecutedValidationTests.SIZE_VALID
+                              if document == "size-baseline.json"
+                              else ExecutedValidationTests.VALID).encode("utf-8") + b"\n")
         assert _git(tmp_path, "--git-dir", str(remote), "rev-parse", tip + "^") == base
         assert _git(tmp_path, "--git-dir", str(remote), "diff-tree", "--no-commit-id",
                     "--name-only", "-r", tip) == f".github/{document}"
         assert _git(tmp_path, "--git-dir", str(remote), "show", f"{tip}:.github/{document}") == payload.decode().strip()
-        expected_message = ("Ratchet comment-share: tighten the records (automated)"
-                            if document == "comment-share.json"
-                            else "Ratchet ci-thresholds: raise the coverage floor (automated)")
-        assert _git(tmp_path, "--git-dir", str(remote), "show", "-s", "--format=%s", tip) == expected_message
-        assert not summary.exists()
+        assert _git(tmp_path, "--git-dir", str(remote), "show", "-s", "--format=%s", tip) == MESSAGES[document]
+        assert not (tmp_path / "summary").exists()
     else:
         assert tip == (moved if outcome in {"moved", "moved-before-fetch"} else base)
     if outcome in {"stale", "moved-before-fetch", "moved"}:
-        assert "main moved while this run measured" in summary.read_text().lower()
+        assert "main moved while this run measured" in (tmp_path / "summary").read_text().lower()
     if outcome == "moved-before-fetch":
-        assert "### Dropped: main moved while this run measured" in summary.read_text()
-        assert f"({moved})" in summary.read_text()
+        assert "### Dropped: main moved while this run measured" in (tmp_path / "summary").read_text()
+        assert f"({moved})" in (tmp_path / "summary").read_text()
         commands_ = [args[2:] if args[0] == "-C" else args for args in recorded]
         assert any(args[0] == "fetch" for args in commands_)
         assert not any(args[0] in {"checkout", "add", "commit", "push"} for args in commands_)
@@ -519,6 +708,28 @@ def test_records_only_push_and_race_classification(tmp_path, document, outcome):
         assert "AI_RESEARCHER_MASTER_PUSH_DEPLOY_KEY is empty" in done.stderr
     if outcome == "rejected":
         assert "the ratchet push was rejected while main stood still" in done.stderr
+
+
+@POSIX
+def test_two_staged_documents_land_one_per_tip_generation(tmp_path):
+    """Ruling 2's accepted consequence, executed: with both ci gate
+    candidates staged against one measured base, the thresholds document
+    lands first and the size records drop green (main moved) — they
+    re-stage on the next main push's gate run (issue #333)."""
+    env, base, _moved, remote = _push_fixture(
+        tmp_path, "landed", ["ci-thresholds.json", "size-baseline.json"])
+    done = _workflowrun.run_step(tmp_path, step(load(), "Push the ratchet commit"), env)
+    assert done.returncode == 0, (done.stdout, done.stderr)
+    tip = _git(tmp_path, "--git-dir", str(remote), "rev-parse", "refs/heads/main")
+    assert _git(tmp_path, "--git-dir", str(remote), "rev-parse", tip + "^") == base
+    assert _git(tmp_path, "--git-dir", str(remote), "show", "-s", "--format=%s",
+                tip) == MESSAGES["ci-thresholds.json"]
+    # Exactly one landing: the thresholds document's commit is the only
+    # one past the measured base.
+    assert _git(tmp_path, "--git-dir", str(remote), "log", "--format=%s",
+                f"{base}..{tip}").splitlines() == [MESSAGES["ci-thresholds.json"]]
+    summary = (tmp_path / "summary").read_text(encoding="utf-8")
+    assert "main moved while this run measured" in summary.lower()
 
 
 PUSH_GIT_STUB = '''import json

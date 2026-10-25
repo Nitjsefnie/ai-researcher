@@ -200,6 +200,7 @@ CORE_PIN = (
     '.github/workflows/refresh.yml',
     '.github/workflows/scorecard.yml',
     '.github/workflows/secrets.yml',
+    '.github/workflows/size-baseline.yml',
     '.github/workflows/tests.yml',
     '.github/workflows/types.yml',
     'data/aa-generation-state.json',

@@ -792,6 +792,25 @@ def test_end_to_end_budgets_absent_from_history_is_clean(tmp_path):
     assert findings == []
 
 
+def test_end_to_end_size_records_landing_is_outside_the_guarded_set(
+        tmp_path, capsys, monkeypatch):
+    """A records-only landing commit touching only the size records
+    passes the next main push's guard unchanged (issue #333)."""
+    repo = _seed_repo(tmp_path, _document(), budgets=_budgets_document())
+    before = _git(repo, "rev-parse", "main").stdout.strip()
+    (repo / ".github" / "size-baseline.json").write_text(
+        json.dumps({"schema_version": 1,
+                    "baseline": {"build.py": 2890}}), encoding="utf-8")
+    _git(repo, "add", ".github/size-baseline.json")
+    _git(repo, "commit", "-qm",
+         "Ratchet size-baseline: tighten the records (automated)")
+    head = _git(repo, "rev-parse", "HEAD").stdout.strip()
+    guard = _guard()
+    monkeypatch.chdir(repo)
+    assert guard.main([before, head]) == 0
+    assert capsys.readouterr().out.count("not relaxed") == 3
+
+
 # --- the guard: the instruction budgets document (issue #110) -----------------
 
 
