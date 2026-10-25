@@ -311,7 +311,8 @@ def test_artifact_selection_and_absent_noop(
 
 def test_ratchet_artifact_names_have_exclusive_producers():
     """A same-name upload anywhere else could substitute another data path."""
-    producers = {"ratchet-data": [], "comment-share-data": []}
+    producers = {"ratchet-data": [], "comment-share-data": [],
+                 "size-baseline-data": []}
     for path in (ROOT / ".github/workflows").glob("*.y*ml"):
         wf = yaml.safe_load(path.read_text(encoding="utf-8"))
         for job in wf["jobs"].values():
@@ -322,7 +323,8 @@ def test_ratchet_artifact_names_have_exclusive_producers():
                     if name in producers:
                         producers[name].append(path.name)
     assert producers == {"ratchet-data": ["tests.yml"],
-                         "comment-share-data": ["comment-share.yml"]}
+                         "comment-share-data": ["comment-share.yml"],
+                         "size-baseline-data": ["size-baseline.yml"]}
 
 
 def test_comment_staging_is_push_only_and_uploads_only_when_changed():

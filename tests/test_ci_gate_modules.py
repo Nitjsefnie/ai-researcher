@@ -424,7 +424,7 @@ def test_main_writes_full_run_over_an_unhandled_event(tmp_path, monkeypatch):
 # ---------------------------------------------------------------------------
 
 LEGS = ("classify", "tests", "lint", "types", "audit", "actionlint",
-        "codeql")
+        "size-baseline", "codeql")
 
 
 def _needs(**overrides):
