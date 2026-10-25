@@ -10,7 +10,7 @@ here:
   `workflow_call`;
 - the aggregate job runs with `if: always()` and needs every leg, so it
   reports even when legs fail, skip or never start;
-- trigger ownership really moved: the six callees no longer carry
+- trigger ownership really moved: the seven callees no longer carry
   `push`/`pull_request`, and ci-gate's push and pull_request triggers
   are unfiltered by path — the classification, not a trigger filter,
   narrows;
@@ -25,28 +25,41 @@ here:
 - coverage-comment relays on the ci-gate run, the run that carries the
   diff-coverage-comment artifact once tests.yml is a workflow_call
   callee.
+- the size-baseline leg (issue #333) is a workflow_call-only callee
+  (mode: auto fails closed on a dispatch event), checks out the event
+  head, and stages its tightened records as an artifact on a main push
+  only when the action changed them — the staging step is executed
+  here, not only read, since a `run:` block is executable code.
 """
 from __future__ import annotations
 
 import importlib.util
+import os
 import re
 import sys
 from pathlib import Path
 
+import pytest
 import yaml
+
+import _workflowrun
 
 ROOT = Path(__file__).resolve().parents[1]
 WORKFLOWS = ROOT / ".github" / "workflows"
 CI_GATE = WORKFLOWS / "ci-gate.yml"
 COVERAGE_COMMENT = WORKFLOWS / "coverage-comment.yml"
 TESTS_WORKFLOW = WORKFLOWS / "tests.yml"
+SIZE_BASELINE = WORKFLOWS / "size-baseline.yml"
 
-# The six gate workflows ci-gate calls, plus the classifier job.
-LEG_WORKFLOWS = (
-    "tests.yml", "lint.yml", "types.yml", "audit.yml", "actionlint.yml",
-    "codeql.yml",
-)
+# The seven gate workflows ci-gate calls, plus the classifier job.
+LEG_WORKFLOWS = ("tests.yml", "lint.yml", "types.yml", "audit.yml",
+                 "actionlint.yml", "size-baseline.yml", "codeql.yml")
 LEG_IDS = tuple(Path(name).stem for name in LEG_WORKFLOWS)
+
+# A pushed SHA for the executed staging control: the step's git double
+# answers only `git show <this>:<records path>`.
+POSIX = pytest.mark.skipif(os.name == "nt", reason="Ubuntu workflow shell")
+BASE_COMMIT = "a" * 40
 
 
 def _load(path):
@@ -224,7 +237,8 @@ def test_every_leg_grants_read_only():
     # workflow floor. The codeql leg forwards the security-events write
     # its callee's job requests — the one non-contents elevation.
     doc = _ci_gate()
-    for leg in ("tests", "lint", "types", "audit", "actionlint"):
+    for leg in ("tests", "lint", "types", "audit", "actionlint",
+                "size-baseline"):
         assert (doc["jobs"][leg].get("permissions") or {}).get(
             "contents") == "read", leg
     codeql = doc["jobs"]["codeql"].get("permissions") or {}
@@ -259,3 +273,97 @@ def test_the_diff_coverage_job_still_runs_on_pull_request_events():
     jobs = _load(TESTS_WORKFLOW)["jobs"]
     condition = str(jobs["diff-coverage"].get("if") or "")
     assert "github.event_name == 'pull_request'" in condition
+
+
+def test_the_size_baseline_callee_declares_workflow_call_alone():
+    # issue #333: the size-ratchet action's mode: auto checks pull
+    # requests and tightens main pushes; any other event —
+    # workflow_dispatch among them — fails closed, so the callee declares
+    # workflow_call and nothing else. ci-gate owns the trigger surface.
+    triggers = _load(SIZE_BASELINE).get("on") or {}
+    assert list(triggers) == ["workflow_call"]
+
+
+def test_the_size_baseline_leg_checks_out_the_event_head():
+    # On the workflow_call path github.event is the caller's, so the
+    # checkout selects the PR head on a pull_request event and the pushed
+    # SHA on a push. Full history supplies the PR base to the action
+    # without retaining a token.
+    steps = _load(SIZE_BASELINE)["jobs"]["size-baseline"]["steps"]
+    [checkout] = [s for s in steps
+                  if s.get("uses", "").startswith("actions/checkout@")]
+    assert checkout["with"] == {
+        "ref": "${{ github.event.pull_request.head.sha || github.sha }}",
+        "fetch-depth": "0",
+        "persist-credentials": "false",
+    }
+
+
+def test_the_size_baseline_staging_is_push_only_and_uploads_only_when_changed():
+    # The action writes the records file into the checkout when tighten
+    # changed it; the staging step detects exactly that difference against
+    # the pushed SHA and stages base.txt + the changed file. The staging
+    # step sits after the size-ratchet step because the action's write is
+    # what it stages — the locator reads the step's action name and pins
+    # nothing about its pin or inputs (issue item 6).
+    doc = _load(SIZE_BASELINE)
+    steps = doc["jobs"]["size-baseline"]["steps"]
+    stage = next(s for s in steps if s.get("id") == "stage")
+    upload = next(s for s in steps
+                  if s.get("uses", "").startswith("actions/upload-artifact@"))
+    ratchet_at = next(i for i, s in enumerate(steps) if s.get(
+        "uses", "").startswith("Nitjsefnie-Actions/size-ratchet@"))
+    assert steps.index(stage) > ratchet_at
+    assert stage["if"] == "github.event_name == 'push'"
+    assert stage["env"]["AI_RESEARCHER_HEAD_SHA"] == "${{ github.sha }}"
+    assert upload["if"] == (
+        "github.event_name == 'push' "
+        "&& steps.stage.outputs.changed == 'true'")
+    assert upload["with"]["name"] == "size-baseline-data"
+
+
+@POSIX
+@pytest.mark.parametrize("changed", [False, True])
+def test_size_baseline_staging_bytes_and_measured_base(tmp_path, changed):
+    """The stage compares the pushed SHA's bytes and copies the tightened bytes.
+
+    Executed control for the step above: the git double answers only
+    `git show <pushed sha>:.github/size-baseline.json`, so the verdict
+    comes from the step's own shell, not its text.
+    """
+    original = b'{"schema_version": 1, "baseline": {"build.py": 2900}}\n'
+    current = (b'{"schema_version": 1, "baseline": {"build.py": 2890}}\n'
+               if changed else original)
+    (tmp_path / ".github").mkdir()
+    (tmp_path / ".github/size-baseline.json").write_bytes(current)
+    (tmp_path / "original").write_bytes(original)
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    git = bin_dir / "git"
+    git.write_text('#!/bin/sh\nset -eu\n'
+                   f'[ "$*" = "show {BASE_COMMIT}:.github/size-baseline.json" ]\n'
+                   'cat "$ORIGINAL"\n', encoding="utf-8")
+    git.chmod(0o755)
+    runner = tmp_path / "runner"
+    runner.mkdir()
+    output = tmp_path / "output"
+    stage = _workflowrun.step_by_name(
+        SIZE_BASELINE, "size-baseline", "Stage tightened records")
+    done = _workflowrun.run_step(tmp_path, stage, {
+        **os.environ, "PATH": str(bin_dir) + os.pathsep + os.environ["PATH"],
+        "AI_RESEARCHER_HEAD_SHA": BASE_COMMIT,
+        "ORIGINAL": str(tmp_path / "original"),
+        "RUNNER_TEMP": str(runner), "GITHUB_OUTPUT": str(output),
+    })
+    assert done.returncode == 0, done.stderr
+    assert output.read_text(encoding="utf-8").strip() == (
+        f"changed={str(changed).lower()}")
+    data = runner / "size-baseline-data"
+    if changed:
+        assert sorted(p.name for p in data.iterdir()) == [
+            "base.txt", "size-baseline.json"]
+        assert (data / "base.txt").read_text(encoding="utf-8") == (
+            BASE_COMMIT + "\n")
+        assert (data / "size-baseline.json").read_bytes() == current
+    else:
+        assert not data.exists()

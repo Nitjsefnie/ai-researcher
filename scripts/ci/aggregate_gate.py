@@ -51,7 +51,7 @@ import sys
 # tests/test_workflow_ci_gate.py pins this tuple against the workflow's
 # needs list, so the two cannot drift apart.
 EXPECTED_LEGS = ('classify', 'tests', 'lint', 'types', 'audit',
-                 'actionlint', 'codeql')
+                 'actionlint', 'size-baseline', 'codeql')
 
 PASSED = 'passed'
 FAILED = 'failed'

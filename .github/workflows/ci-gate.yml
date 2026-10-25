@@ -21,11 +21,13 @@ name: ci gate
 # scripts/ci/aggregate_gate.py, and its one check name is what a future
 # ruleset requires.
 #
-# TRIGGER OWNERSHIP. The six gate workflows below are called as
+# TRIGGER OWNERSHIP. The seven gate workflows below are called as
 # reusable workflows; they keep `workflow_call`, their crons (audit
-# daily, codeql weekly) and `workflow_dispatch`, and they carry no
-# `push` or `pull_request` trigger any more — this file owns that
-# surface. Each callee keeps its own `permissions:` blocks and its
+# daily, codeql weekly) and `workflow_dispatch` — except the
+# size-baseline callee, which declares `workflow_call` alone (issue
+# #333: its mode: auto fails closed on a dispatch event) — and they
+# carry no `push` or `pull_request` trigger any more — this file owns
+# that surface. Each callee keeps its own `permissions:` blocks and its
 # concurrency group (the latter governs its standalone dispatch runs).
 # refresh.yml, secrets.yml, scorecard.yml, claim.yml and
 # coverage-comment.yml are outside the aggregate.
@@ -168,6 +170,19 @@ jobs:
     permissions:
       contents: read
 
+  size-baseline:
+    needs: classify
+    if: needs.classify.outputs.docs_only != 'true' && needs.classify.outputs.data_only != 'true'
+    # Skipped on a docs-only or bot-data-only change like the other
+    # conditioned legs: neither class moves a measured file. The callee
+    # stages its tightened records as an artifact on a main push; the
+    # top-level ratchet-push workflow is its only writer.
+    # The local reusable-workflow syntax GitHub documents; nothing else
+    # resolves in-repo (suppressed at the line below).
+    uses: ./.github/workflows/size-baseline.yml  # zizmor: ignore[self-repository]
+    permissions:
+      contents: read
+
   codeql:
     needs: classify
     if: needs.classify.outputs.docs_only != 'true' && needs.classify.outputs.data_only != 'true'
@@ -182,7 +197,8 @@ jobs:
       contents: read
 
   aggregate:
-    needs: [classify, tests, lint, types, audit, actionlint, codeql]
+    needs: [classify, tests, lint, types, audit, actionlint, size-baseline,
+            codeql]
     if: ${{ always() }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
