@@ -35,7 +35,7 @@ user-site .pth execution out of every count. Under the pins the observed
 run-to-run spread was under 0.002% (recorded in CONTRIBUTING.md); the
 3% margin covers that jitter. The budgets are pinned to the CI cell
 that runs this gate -- the coverage job's ubuntu-latest runner,
-CPython 3.13.15 / valgrind 3.22.0 -- and were seeded from its first
+CPython 3.15.1 / valgrind 3.22.0 -- and were seeded from its first
 measured counts (build 171,504,264, capture_gate 267,669,619,
 diff_aa 222,551,193 startup-subtracted Ir), each plus 3% rounded up to
 the next million; the authoring box's counts (Python 3.13.14 /
