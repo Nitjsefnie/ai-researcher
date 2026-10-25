@@ -50,6 +50,7 @@ CI_GATE = WORKFLOWS / "ci-gate.yml"
 COVERAGE_COMMENT = WORKFLOWS / "coverage-comment.yml"
 TESTS_WORKFLOW = WORKFLOWS / "tests.yml"
 SIZE_BASELINE = WORKFLOWS / "size-baseline.yml"
+RATCHET_PUSH = WORKFLOWS / "ratchet-push.yml"
 
 # The seven gate workflows ci-gate calls, plus the classifier job.
 LEG_WORKFLOWS = ("tests.yml", "lint.yml", "types.yml", "audit.yml",
@@ -309,11 +310,11 @@ def test_the_size_baseline_staging_is_push_only_and_uploads_only_when_changed():
 def test_the_size_baseline_artifact_name_is_the_staging_directory_name():
     # The artifact name is not pinned as a literal input: the upload's
     # name must be the staging directory the stage step itself populates,
-    # so the workflow's two steps cannot disagree about where the
-    # artifact's bytes come from. (The name's exclusivity across the
-    # catalogue is pinned by test_ratchet_push_workflow.py's producers
-    # map; ratchet-push's own download mapping joins when it learns the
-    # document.)
+    # AND the artifact ratchet-push downloads for the size document must
+    # land in that same directory — one relational chain read from both
+    # workflows, so no step can disagree about where the bytes come from
+    # or where they go. (The name's exclusivity across the catalogue is
+    # pinned by test_ratchet_push_workflow.py's producers map.)
     steps = _load(SIZE_BASELINE)["jobs"]["size-baseline"]["steps"]
     stage = next(s for s in steps if s.get("id") == "stage")
     upload = next(s for s in steps
@@ -321,7 +322,24 @@ def test_the_size_baseline_artifact_name_is_the_staging_directory_name():
     directories = re.findall(r'data="\$\{RUNNER_TEMP\}/([a-z0-9-]+)"',
                              stage["run"])
     assert len(directories) == 1, stage["run"]
-    assert upload["with"]["name"] == directories[0]
+    directory = directories[0]
+    assert upload["with"]["name"] == directory
+
+    push_steps = _load(RATCHET_PUSH)["jobs"]["push"]["steps"]
+    [size_download] = [
+        s for s in push_steps
+        if s.get("uses", "").startswith("actions/download-artifact@")
+        and " ".join(s["with"]["path"].split())
+        == "${{ runner.temp }}/" + directory]
+    # The name is the list step's output for the same candidate the
+    # staging step uploads; the executed selection tests pin that output's
+    # value to the uploaded name, so the downloaded bytes are the staged
+    # bytes.
+    assert " ".join(size_download["with"]["name"].split()) == (
+        "${{ steps.list.outputs.size_artifact }}")
+    list_run = " ".join(next(
+        s for s in push_steps if s.get("id") == "list")["run"].split())
+    assert '"${tag}_artifact=$artifact"' in list_run
 
 
 @POSIX
