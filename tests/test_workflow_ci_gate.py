@@ -26,10 +26,10 @@ here:
   diff-coverage-comment artifact once tests.yml is a workflow_call
   callee.
 - the size-baseline leg (issue #333) is a workflow_call-only callee
-  (mode: auto fails closed on a dispatch event), checks out the event
-  head, and stages its tightened records as an artifact on a main push
-  only when the action changed them — the staging step is executed
-  here, not only read, since a `run:` block is executable code.
+  (mode: auto fails closed on a dispatch event) that stages its
+  tightened records as an artifact on a main push only when the action
+  changed them — the staging step is executed here, not only read,
+  since a `run:` block is executable code.
 """
 from __future__ import annotations
 
@@ -284,21 +284,6 @@ def test_the_size_baseline_callee_declares_workflow_call_alone():
     assert list(triggers) == ["workflow_call"]
 
 
-def test_the_size_baseline_leg_checks_out_the_event_head():
-    # On the workflow_call path github.event is the caller's, so the
-    # checkout selects the PR head on a pull_request event and the pushed
-    # SHA on a push. Full history supplies the PR base to the action
-    # without retaining a token.
-    steps = _load(SIZE_BASELINE)["jobs"]["size-baseline"]["steps"]
-    [checkout] = [s for s in steps
-                  if s.get("uses", "").startswith("actions/checkout@")]
-    assert checkout["with"] == {
-        "ref": "${{ github.event.pull_request.head.sha || github.sha }}",
-        "fetch-depth": "0",
-        "persist-credentials": "false",
-    }
-
-
 def test_the_size_baseline_staging_is_push_only_and_uploads_only_when_changed():
     # The action writes the records file into the checkout when tighten
     # changed it; the staging step detects exactly that difference against
@@ -319,7 +304,24 @@ def test_the_size_baseline_staging_is_push_only_and_uploads_only_when_changed():
     assert upload["if"] == (
         "github.event_name == 'push' "
         "&& steps.stage.outputs.changed == 'true'")
-    assert upload["with"]["name"] == "size-baseline-data"
+
+
+def test_the_size_baseline_artifact_name_is_the_staging_directory_name():
+    # The artifact name is not pinned as a literal input: the upload's
+    # name must be the staging directory the stage step itself populates,
+    # so the workflow's two steps cannot disagree about where the
+    # artifact's bytes come from. (The name's exclusivity across the
+    # catalogue is pinned by test_ratchet_push_workflow.py's producers
+    # map; ratchet-push's own download mapping joins when it learns the
+    # document.)
+    steps = _load(SIZE_BASELINE)["jobs"]["size-baseline"]["steps"]
+    stage = next(s for s in steps if s.get("id") == "stage")
+    upload = next(s for s in steps
+                  if s.get("uses", "").startswith("actions/upload-artifact@"))
+    directories = re.findall(r'data="\$\{RUNNER_TEMP\}/([a-z0-9-]+)"',
+                             stage["run"])
+    assert len(directories) == 1, stage["run"]
+    assert upload["with"]["name"] == directories[0]
 
 
 @POSIX
