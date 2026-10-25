@@ -170,6 +170,10 @@ jobs:
         # work. A staging directory exists only where its download step
         # ran.
         if: steps.list.outputs.staged == 'true'
+        env:
+          AI_RESEARCHER_RATCHET_STAGED: ${{ steps.list.outputs.ratchet_staged }}
+          AI_RESEARCHER_SIZE_STAGED: ${{ steps.list.outputs.size_staged }}
+          AI_RESEARCHER_COMMENT_STAGED: ${{ steps.list.outputs.comment_staged }}
         run: |
           set -euo pipefail
           shopt -s nullglob dotglob
@@ -179,7 +183,18 @@ jobs:
             'comment-share-data comment-share.json'; do
             data="${RUNNER_TEMP}/${staged%% *}"
             document="${staged#* }"
-            [ -d "$data" ] || continue
+            case "$document" in
+              ci-thresholds.json) staged_flag="$AI_RESEARCHER_RATCHET_STAGED" ;;
+              size-baseline.json) staged_flag="$AI_RESEARCHER_SIZE_STAGED" ;;
+              comment-share.json) staged_flag="$AI_RESEARCHER_COMMENT_STAGED" ;;
+            esac
+            if [ ! -d "$data" ]; then
+              if [ "$staged_flag" = true ]; then
+                echo "the $document staging directory is missing though its artifact was staged" >&2
+                exit 1
+              fi
+              continue
+            fi
             case "$document" in
               ci-thresholds.json|comment-share.json|size-baseline.json) ;;
               *) echo 'unexpected ratchet document' >&2; exit 1 ;;
@@ -256,6 +271,9 @@ jobs:
         env:
           AI_RESEARCHER_MASTER_PUSH_DEPLOY_KEY: ${{ secrets.MASTER_PUSH_DEPLOY_KEY }}
           AI_RESEARCHER_REPO: ${{ github.repository }}
+          AI_RESEARCHER_RATCHET_STAGED: ${{ steps.list.outputs.ratchet_staged }}
+          AI_RESEARCHER_SIZE_STAGED: ${{ steps.list.outputs.size_staged }}
+          AI_RESEARCHER_COMMENT_STAGED: ${{ steps.list.outputs.comment_staged }}
         run: |
           # Fail closed when the environment is missing its secret: with
           # no key there is nothing to authenticate the push with, and
@@ -287,7 +305,18 @@ jobs:
             'comment-share-data comment-share.json'; do
             data="${RUNNER_TEMP}/${staged%% *}"
             document="${staged#* }"
-            [ -d "$data" ] || continue
+            case "$document" in
+              ci-thresholds.json) staged_flag="$AI_RESEARCHER_RATCHET_STAGED" ;;
+              size-baseline.json) staged_flag="$AI_RESEARCHER_SIZE_STAGED" ;;
+              comment-share.json) staged_flag="$AI_RESEARCHER_COMMENT_STAGED" ;;
+            esac
+            if [ ! -d "$data" ]; then
+              if [ "$staged_flag" = true ]; then
+                echo "the $document staging directory is missing though its artifact was staged" >&2
+                exit 1
+              fi
+              continue
+            fi
             case "$document" in
               comment-share.json)
                 message='Ratchet comment-share: tighten the records (automated)'

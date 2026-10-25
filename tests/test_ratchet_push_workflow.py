@@ -248,7 +248,8 @@ class ExecutedValidationTests(unittest.TestCase):
         (data / document).write_bytes(payload_bytes)
         (data / "base.txt").write_bytes(base_bytes)
         return _workflowrun.run_step(tmp_path, step_,
-                                     {"RUNNER_TEMP": str(tmp_path)})
+                                     {"RUNNER_TEMP": str(tmp_path),
+                                      **staged_flags(data.name, "true")})
 
     def _run_with(self, tmp_path, document, base):
         payloads = {"ci-thresholds.json": self.VALID,
@@ -358,6 +359,21 @@ MESSAGES = {
     "comment-share.json":
         "Ratchet comment-share: tighten the records (automated)",
 }
+# Each staging directory's list-step tag, as the steps' env reads it.
+TAGS = {"ratchet-data": "ratchet", "size-baseline-data": "size",
+        "comment-share-data": "comment"}
+
+
+def staged_flags(directory=None, truth="true"):
+    """The list step's staged outputs, as the validate and push steps
+    read them from their env."""
+    flags = {tag: "false" for tag in TAGS.values()}
+    if directory:
+        flags[TAGS[directory]] = truth
+    return {f"AI_RESEARCHER_{tag.upper()}_STAGED": value
+            for tag, value in flags.items()}
+
+
 # The outputs the list step emits per triggering workflow, executed below.
 EXPECTED_OUTPUTS = {
     "ci gate": lambda staged: {
@@ -505,6 +521,7 @@ def test_comment_schema_executed(tmp_path, payload, valid):
     (data / "comment-share.json").write_text(payload, encoding="utf-8")
     done = _workflowrun.run_step(tmp_path, step(load(), "Validate the staged data"), {
         **os.environ, "RUNNER_TEMP": str(tmp_path),
+        **staged_flags("comment-share-data", "true"),
     })
     assert (done.returncode == 0) == valid, (payload, done.stdout, done.stderr)
 
@@ -546,6 +563,7 @@ def test_size_schema_executed(tmp_path, payload, valid):
     (data / "size-baseline.json").write_text(payload, encoding="utf-8")
     done = _workflowrun.run_step(tmp_path, step(load(), "Validate the staged data"), {
         **os.environ, "RUNNER_TEMP": str(tmp_path),
+        **staged_flags("size-baseline-data", "true"),
     })
     assert (done.returncode == 0) == valid, (payload, done.stdout, done.stderr)
 
@@ -577,6 +595,7 @@ def test_artifact_shape_executed(tmp_path, directory, document, payload,
             "exit 99", encoding="utf-8")
     done = _workflowrun.run_step(tmp_path, step(load(), "Validate the staged data"), {
         **os.environ, "RUNNER_TEMP": str(tmp_path),
+        **staged_flags(directory, "true"),
     })
     assert done.returncode != 0, (done.stdout, done.stderr)
 
@@ -649,7 +668,10 @@ def _push_fixture(tmp_path, outcome, staged):
         "TEST_CALLS": str(tmp_path / "calls.jsonl"), "TEST_OUTCOME": outcome,
         "TEST_MOVED": moved,
         "GIT_ALTERNATE_OBJECT_DIRECTORIES": objects,
+        **staged_flags(),
     }
+    for document in staged:
+        env.update(staged_flags(DIRECTORIES[document], "true"))
     return env, base, moved, remote
 
 
@@ -704,10 +726,10 @@ def test_records_only_push_and_race_classification(tmp_path, document, outcome):
 
 @POSIX
 def test_two_staged_documents_land_one_per_tip_generation(tmp_path):
-    """Ruling 2's accepted consequence, executed: with both ci gate
-    candidates staged against one measured base, the thresholds document
-    lands first and the size records drop green (main moved) — they
-    re-stage on the next main push's gate run (issue #333)."""
+    """One document lands per main-tip generation, executed: with both
+    ci gate candidates staged at one base, thresholds lands first (the
+    determinism order) and the size records drop green (main moved),
+    re-staging on the next main push's gate run (issue #333)."""
     env, base, _moved, remote = _push_fixture(
         tmp_path, "landed", ["ci-thresholds.json", "size-baseline.json"])
     done = _workflowrun.run_step(tmp_path, step(load(), "Push the ratchet commit"), env)
@@ -722,6 +744,57 @@ def test_two_staged_documents_land_one_per_tip_generation(tmp_path):
                 f"{base}..{tip}").splitlines() == [MESSAGES["ci-thresholds.json"]]
     summary = (tmp_path / "summary").read_text(encoding="utf-8")
     assert "main moved while this run measured" in summary.lower()
+
+
+@POSIX
+@pytest.mark.parametrize("document", ["ci-thresholds.json", "size-baseline.json",
+                                      "comment-share.json"])
+def test_a_staged_artifact_without_its_directory_is_a_loud_failure(
+        tmp_path, document):
+    """A staged artifact with no staging directory is a loud failure,
+    never a green no-op (issue #333)."""
+    done = _workflowrun.run_step(tmp_path, step(load(), "Validate the staged data"), {
+        **os.environ, "RUNNER_TEMP": str(tmp_path),
+        **staged_flags(DIRECTORIES[document], "true"),
+    })
+    assert done.returncode != 0, (document, done.stdout, done.stderr)
+    assert document in done.stderr
+
+
+@POSIX
+@pytest.mark.parametrize("directory", ["ratchet-data", "size-baseline-data",
+                                       "comment-share-data"])
+def test_an_unstaged_candidate_without_a_directory_stays_a_no_op(
+        tmp_path, directory):
+    """With the staged output false, an absent directory stays a
+    green no-op (issue #333)."""
+    done = _workflowrun.run_step(tmp_path, step(load(), "Validate the staged data"), {
+        **os.environ, "RUNNER_TEMP": str(tmp_path),
+        **staged_flags(directory, "false"),
+    })
+    assert done.returncode == 0, (directory, done.stdout, done.stderr)
+
+
+@POSIX
+def test_push_staged_artifact_without_its_directory_is_a_loud_failure(tmp_path):
+    """A staged artifact with no staging directory fails the push
+    step loudly, never a silent no-op (issue #333)."""
+    env, _base, _moved, _remote = _push_fixture(tmp_path, "landed", [])
+    env.update(staged_flags("ratchet-data", "true"))
+    done = _workflowrun.run_step(tmp_path, step(load(), "Push the ratchet commit"), env)
+    assert done.returncode != 0, (done.stdout, done.stderr)
+    assert "ci-thresholds.json" in done.stderr
+
+
+@POSIX
+def test_push_unstaged_candidates_without_directories_stay_a_no_op(tmp_path):
+    """With every staged output false and no directories, the push
+    step completes without touching the remote (issue #333)."""
+    env, base, _moved, remote = _push_fixture(tmp_path, "landed", [])
+    done = _workflowrun.run_step(tmp_path, step(load(), "Push the ratchet commit"), env)
+    assert done.returncode == 0, (done.stdout, done.stderr)
+    tip = _git(tmp_path, "--git-dir", str(remote), "rev-parse", "refs/heads/main")
+    assert tip == base
 
 
 PUSH_GIT_STUB = '''import json
