@@ -24,8 +24,8 @@
     "tests/test_diff_aa.py": 1489,
     "tests/test_diff_coverage.py": 754,
     "tests/test_fetch_aa.py": 2796,
-    "tests/test_gate_base_freshness.py": 989,
-    "tests/test_ratchet_push_workflow.py": 825,
+    "tests/test_gate_base_freshness.py": 987,
+    "tests/test_ratchet_push_workflow.py": 823,
     "tests/test_refresh_workflow.py": 2897
   }
 }
