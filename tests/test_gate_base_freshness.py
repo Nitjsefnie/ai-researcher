@@ -182,9 +182,6 @@ def test_the_pin_refuses_a_tracked_file_the_pipeline_cannot_commit():
 
 # The derived set -- the pin itself. Frozen so a required job naming a new
 # file forces a same-commit pin change.
-# The derived set -- the pin itself. Frozen so a required job naming a new
-# file forces a same-commit pin change.
-# without an edit.
 CORE_PIN = (
     '.github/ci-thresholds.json',
     '.github/workflows/actionlint.yml',
@@ -267,6 +264,7 @@ CORE_PIN = (
     'tests/test_workflowrun.py',
     'tests/test_js_coverage.py',
     'tests/test_publish_docs.py',
+    'tests/test_ratchet_push_direction.py',
     'tests/test_ratchet_push_workflow.py',
     'tests/test_refresh_workflow.py',
     'tests/_workflowrun.py',
