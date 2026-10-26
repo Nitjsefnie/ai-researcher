@@ -48,8 +48,8 @@
     3828
   ],
   ".github/workflows/tests.yml": [
-    17269,
-    24470
+    17247,
+    24693
   ],
   ".github/workflows/types.yml": [
     1021,
@@ -104,8 +104,8 @@
     21927
   ],
   "scripts/ci/instruction_budgets.py": [
-    6288,
-    13368
+    6219,
+    13299
   ],
   "scripts/ci/js_coverage.py": [
     2486,
