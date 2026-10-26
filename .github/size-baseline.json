@@ -3,7 +3,7 @@
   "baseline": {
     ".github/workflows/coverage-comment.yml": 517,
     ".github/workflows/refresh.yml": 1402,
-    ".github/workflows/tests.yml": 641,
+    ".github/workflows/tests.yml": 639,
     "build.py": 2859,
     "scripts/ci/check_ratchets.py": 690,
     "scripts/ci/gate_base_freshness.py": 705,
