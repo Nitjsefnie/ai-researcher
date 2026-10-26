@@ -11,10 +11,10 @@
       "id": "black-forest-labs/flux-3-image-klein-comfy"
     },
     {
-      "id": "XHToken/Spark-X2.6-4B"
+      "id": "Nanbeige/Nanbeige4.3-33B"
     },
     {
-      "id": "Nanbeige/Nanbeige4.3-33B"
+      "id": "XHToken/Spark-X2.6-4B"
     },
     {
       "id": "Lightricks/LTX-2.5"
@@ -26,10 +26,10 @@
       "id": "OpenMOSS-Team/MOSS-Image-SFT"
     },
     {
-      "id": "abenzerps/Qwen-Image-2.1-Uncensored-Quantized"
+      "id": "Qwen/Qwen3.8-27B"
     },
     {
-      "id": "Qwen/Qwen3.8-27B"
+      "id": "abenzerps/Qwen-Image-2.1-Uncensored-Quantized"
     }
   ]
 }
