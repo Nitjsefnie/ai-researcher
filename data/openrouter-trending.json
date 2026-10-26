@@ -14,10 +14,10 @@
       "slug": "tencent/hy4-preview"
     },
     {
-      "slug": "anthropic/claude-opus-5.5"
+      "slug": "openai/gpt-6-luna"
     },
     {
-      "slug": "openai/gpt-6-luna"
+      "slug": "anthropic/claude-opus-5.5"
     },
     {
       "slug": "xiaomi/mimo-v2.6-flash"
