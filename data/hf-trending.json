@@ -26,10 +26,10 @@
       "id": "OpenMOSS-Team/MOSS-Image-SFT"
     },
     {
-      "id": "Qwen/Qwen3.8-27B"
+      "id": "abenzerps/Qwen-Image-2.1-Uncensored-Quantized"
     },
     {
-      "id": "abenzerps/Qwen-Image-2.1-Uncensored-Quantized"
+      "id": "Qwen/Qwen3.8-27B"
     }
   ]
 }
