@@ -501,19 +501,19 @@ def test_comment_staging_bytes_and_measured_base(tmp_path, changed):
 
 
 @POSIX
-@pytest.mark.parametrize("payload,valid", [
-    ('[]', False), ('null', False), ('{"x": [1.5, 2]}', False),
-    ('{"x": [-1, 2]}', False), ('{"x": [1, -2]}', False),
-    ('{"x": [1, 2.5]}', False), ('{"x": [1]}', False),
-    ('{"x": [1, 2, 3]}', False), ('{"x": []}', False),
-    ('{"x": {"a": 1, "b": 2}}', False), ('{"x": [true, 2]}', False),
-    ('{"x": ["1", 2]}', False), ('{"x": [null, 2]}', False),
-    ('{"x": [NaN, 2]}', False), ('{"x": [1, NaN]}', False),
-    ('{"x": [Infinity, 2]}', False), ('{"x": [1, Infinity]}', False),
-    ('{"x": [1e999, 2]}', False), ('{"x": [1, -Infinity]}', False),
-    ('[] {}', False), ('{} {}', False), ('', False),
+@pytest.mark.parametrize("payload", [
+    '[]', 'null', '{"x": [1.5, 2]}',
+    '{"x": [-1, 2]}', '{"x": [1, -2]}',
+    '{"x": [1, 2.5]}', '{"x": [1]}',
+    '{"x": [1, 2, 3]}', '{"x": []}',
+    '{"x": {"a": 1, "b": 2}}', '{"x": [true, 2]}',
+    '{"x": ["1", 2]}', '{"x": [null, 2]}',
+    '{"x": [NaN, 2]}', '{"x": [1, NaN]}',
+    '{"x": [Infinity, 2]}', '{"x": [1, Infinity]}',
+    '{"x": [1e999, 2]}', '{"x": [1, -Infinity]}',
+    '[] {}', '{} {}', '',
 ])
-def test_comment_schema_executed(tmp_path, payload, valid):
+def test_comment_schema_executed(tmp_path, payload):
     data = tmp_path / "comment-share-data"
     data.mkdir()
     (data / "base.txt").write_text(BASE_COMMIT, encoding="utf-8")
@@ -522,37 +522,38 @@ def test_comment_schema_executed(tmp_path, payload, valid):
         **os.environ, "RUNNER_TEMP": str(tmp_path),
         **staged_flags("comment-share-data", "true"),
     })
-    assert (done.returncode == 0) == valid, (payload, done.stdout, done.stderr)
+    assert done.returncode != 0, (payload, done.stdout, done.stderr)
+    assert "does not match the records schema" in done.stderr
 
 
 @POSIX
-@pytest.mark.parametrize("payload,valid", [
-    ('{"baseline": {}}', False),
-    ('{"schema_version": 1}', False),
-    ('{"schema_version": 1, "baseline": {}, "x": 1}', False),
-    ('{"schema_version": 2, "baseline": {}}', False),
-    ('{"schema_version": "1", "baseline": {}}', False),
-    ('{"schema_version": true, "baseline": {}}', False),
-    ('{"schema_version": 1, "baseline": []}', False),
-    ('{"schema_version": 1, "baseline": null}', False),
-    ('{"schema_version": 1, "baseline": {"a.py": -1}}', False),
-    ('{"schema_version": 1, "baseline": {"a.py": 1.5}}', False),
-    ('{"schema_version": 1, "baseline": {"a.py": "1"}}', False),
-    ('{"schema_version": 1, "baseline": {"a.py": true}}', False),
-    ('{"schema_version": 1, "baseline": {"a.py": null}}', False),
-    ('{"schema_version": 1, "baseline": {"a.py": NaN}}', False),
-    ('{"schema_version": 1, "baseline": {"a.py": Infinity}}', False),
-    ('{"schema_version": 1, "baseline": {"a.py": 1e999}}', False),
-    ('{"schema_version": 1, "baseline": {"a.py": -Infinity}}', False),
-    ('{"schema_version": 1, "baseline": {}} {}', False),
-    ('{"schema_version": 1, "baseline": {}} {"schema_version": 1, "baseline": {}}',
-     False),
-    ('', False),
+@pytest.mark.parametrize("payload", [
+    '{"baseline": {}}',
+    '{"schema_version": 1}',
+    '{"schema_version": 1, "baseline": {}, "x": 1}',
+    '{"schema_version": 2, "baseline": {}}',
+    '{"schema_version": "1", "baseline": {}}',
+    '{"schema_version": true, "baseline": {}}',
+    '{"schema_version": 1, "baseline": []}',
+    '{"schema_version": 1, "baseline": null}',
+    '{"schema_version": 1, "baseline": {"a.py": -1}}',
+    '{"schema_version": 1, "baseline": {"a.py": 1.5}}',
+    '{"schema_version": 1, "baseline": {"a.py": "1"}}',
+    '{"schema_version": 1, "baseline": {"a.py": true}}',
+    '{"schema_version": 1, "baseline": {"a.py": null}}',
+    '{"schema_version": 1, "baseline": {"a.py": NaN}}',
+    '{"schema_version": 1, "baseline": {"a.py": Infinity}}',
+    '{"schema_version": 1, "baseline": {"a.py": 1e999}}',
+    '{"schema_version": 1, "baseline": {"a.py": -Infinity}}',
+    '{"schema_version": 1, "baseline": {}} {}',
+    '{"schema_version": 1, "baseline": {}} '
+    '{"schema_version": 1, "baseline": {}}',
+    '',
 ])
-def test_size_schema_executed(tmp_path, payload, valid):
-    """The size records schema, executed: exact top-level keys,
-    schema_version exactly 1, and a baseline of finite non-negative
-    integers — one JSON document, no stream (issue #333)."""
+def test_size_schema_executed(tmp_path, payload):
+    """The size records schema, executed: exact keys, schema_version
+    exactly 1, finite non-negative integer baseline, no stream
+    (issue #333)."""
     data = tmp_path / "size-baseline-data"
     data.mkdir()
     (data / "base.txt").write_text(BASE_COMMIT, encoding="utf-8")
@@ -561,7 +562,8 @@ def test_size_schema_executed(tmp_path, payload, valid):
         **os.environ, "RUNNER_TEMP": str(tmp_path),
         **staged_flags("size-baseline-data", "true"),
     })
-    assert (done.returncode == 0) == valid, (payload, done.stdout, done.stderr)
+    assert done.returncode != 0, (payload, done.stdout, done.stderr)
+    assert "does not match the records schema" in done.stderr
 
 
 @POSIX

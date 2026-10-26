@@ -171,9 +171,8 @@ def test_a_byte_rise_with_a_share_rise_is_refused(tmp_path):
 
 @POSIX
 def test_the_comment_ratchets_real_tightening_lands(tmp_path):
-    # comment-ratchet's tighten raises both leaves as the share falls
-    # ([4623, 10811] -> [5536, 14438] on this very workflow): a per-leaf
-    # compare would refuse exactly this shape.
+    # A real tighten: test_ci_ratchets.py [10483, 60320] ->
+    # [10545, 62002] raised both leaves as the share fell.
     done = _direction_case(
         tmp_path, COMMENT, {"x.yml": [5536, 14438]}, {"x.yml": [4623, 10811]})
     assert done.returncode == 0, done.stderr
