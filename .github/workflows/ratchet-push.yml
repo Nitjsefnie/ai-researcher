@@ -264,6 +264,52 @@ jobs:
                 exit 1
               }
             fi
+            if [ "$document" = ci-thresholds.json ]; then
+              # The thresholds document's direction check runs from
+              # tests.yml on the next push, never here (issue #340).
+              continue
+            fi
+            # Downward-only records gate (issue #340): a staged record
+            # may lower or drop an entry, or add a first one, but never
+            # raise a value recorded at its own measured base. The base
+            # copy rides keylessly on the public HTTPS URL — one blob
+            # under RUNNER_TEMP, no checkout, nothing executed.
+            git init -q "${RUNNER_TEMP}/base-docs"
+            git -C "${RUNNER_TEMP}/base-docs" fetch --quiet \
+              "${AI_RESEARCHER_BASE_FETCH_REMOTE:-https://github.com/${GITHUB_REPOSITORY}.git}" main
+            # The measured base must be reachable from main; anything
+            # else is a loud error, never a silent "absent at base".
+            git -C "${RUNNER_TEMP}/base-docs" cat-file -e "${base}^{commit}" || {
+              echo "the staged base ${base} is not reachable from main" >&2
+              exit 1
+            }
+            # A failed show after a good fetch means the document does
+            # not exist at the base: a first landing, everything lands.
+            if git -C "${RUNNER_TEMP}/base-docs" show "${base}:.github/${document}" \
+                > "${RUNNER_TEMP}/base-${document}"; then
+              if [ "$document" = size-baseline.json ]; then
+                jq -es --slurpfile base "${RUNNER_TEMP}/base-${document}" '
+                  length == 1 and all(.[0].baseline | to_entries[];
+                    ($base[0].baseline[.key] // null) as $p |
+                    $p == null or .value <= $p)
+                ' "${data}/$document" > /dev/null || {
+                  echo "size-baseline.json raises a value recorded at its base commit" >&2
+                  exit 1
+                }
+              else
+                # Cross-multiplied: a tighten raises both leaves as
+                # the share falls, so a per-leaf compare would brick.
+                jq -es --slurpfile base "${RUNNER_TEMP}/base-${document}" '
+                  length == 1 and all(.[0] | to_entries[];
+                    ($base[0][.key] // null) as $p |
+                    $p == null or
+                    (.value[0] * $p[1] <= $p[0] * .value[1]))
+                ' "${data}/$document" > /dev/null || {
+                  echo "comment-share.json raises a share recorded at its base commit" >&2
+                  exit 1
+                }
+              fi
+            fi
           done
 
       - name: Push the ratchet commit
