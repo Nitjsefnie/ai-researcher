@@ -227,11 +227,10 @@ requiring a `feat: ` or `feat(<scope>): ` commit subject in
 `base..head` (issue #271). Budgets are pinned to
 the CI cell that runs the gate —
 the coverage job's ubuntu-latest runner, CPython 3.15.1 / valgrind
-3.22.0 — and were seeded from that cell's measured counts
+3.26.0 — and were seeded from that cell's measured counts
 (build 215,934,993, capture_gate 316,217,922, diff_aa 282,204,262
 startup-subtracted Ir), each plus 3% rounded up to the next million.
-Authoring-box counts (CPython 3.15.1 / valgrind 3.24.0) sit about 5%
-above them; the budgets follow the CI cell because it is the only place the
+The budgets follow the CI cell because it is the only place the
 gate runs. The observed run-to-run spread under the pinned environment
 (`PYTHONDONTWRITEBYTECODE`, `PYTHONHASHSEED=0`, `PYTHONNOUSERSITE=1` —
 without the first, a .pyc compile-then-load pair was measured swinging
