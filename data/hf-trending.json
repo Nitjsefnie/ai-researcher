@@ -8,13 +8,13 @@
       "id": "RecursiveSI/flint"
     },
     {
-      "id": "black-forest-labs/flux-3-image-klein-comfy"
-    },
-    {
       "id": "Nanbeige/Nanbeige4.3-33B"
     },
     {
       "id": "XHToken/Spark-X2.6-4B"
+    },
+    {
+      "id": "black-forest-labs/flux-3-image-klein-comfy"
     },
     {
       "id": "Lightricks/LTX-2.5"
@@ -26,10 +26,10 @@
       "id": "OpenMOSS-Team/MOSS-Image-SFT"
     },
     {
-      "id": "Qwen/Qwen3.8-27B"
+      "id": "abenzerps/Qwen-Image-2.1-Uncensored-Quantized"
     },
     {
-      "id": "abenzerps/Qwen-Image-2.1-Uncensored-Quantized"
+      "id": "Qwen/Qwen3.8-27B"
     }
   ]
 }
