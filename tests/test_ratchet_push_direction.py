@@ -86,18 +86,19 @@ def _records_repo(tmp_path, documents):
     return str(repo), _git(repo, "rev-parse", "HEAD")
 
 
-def _validate(tmp_path, document, payload, base, remote):
+def _validate(tmp_path, document, payload, base, remote, **extra):
     """Stage one candidate; run the validate step with the seam at
-    remote."""
+    remote (None omits it) and any extra env."""
     data = tmp_path / DIRECTORIES[document]
     data.mkdir(parents=True)
     (data / document).write_bytes(payload)
     (data / "base.txt").write_text(base, encoding="utf-8")
+    env = {"RUNNER_TEMP": str(tmp_path),
+           **staged_flags(DIRECTORIES[document], "true"), **extra}
+    if remote is not None:
+        env["AI_RESEARCHER_BASE_FETCH_REMOTE"] = remote
     return _workflowrun.run_step(
-        tmp_path, step(load(), "Validate the staged data"),
-        {"RUNNER_TEMP": str(tmp_path),
-         "AI_RESEARCHER_BASE_FETCH_REMOTE": remote,
-         **staged_flags(DIRECTORIES[document], "true")})
+        tmp_path, step(load(), "Validate the staged data"), env)
 
 
 def _direction_case(tmp_path, document, staged, base_payload):
@@ -239,6 +240,39 @@ def test_a_failed_base_fetch_fails_loudly(tmp_path):
     done = _validate(tmp_path, COMMENT, b'{"x.yml": [2, 2]}\n', tip,
                      str(tmp_path / "not-a-repo"))
     assert done.returncode != 0, done.stdout
+
+
+@POSIX
+def test_the_default_remote_is_the_runner_repository(tmp_path):
+    # No seam: the loud failure must name the GITHUB_REPOSITORY default URL.
+    done = _validate(tmp_path, COMMENT, b'{"x.yml": [1, 2]}\n',
+                     "b" * 40, None,
+                     GITHUB_REPOSITORY="nonexistent-owner/nonexistent-repo",
+                     GIT_TRACE="1",
+                     GIT_CONFIG_COUNT="1",
+                     GIT_CONFIG_KEY_0="url.file:///nonexistent-repo.insteadOf",
+                     GIT_CONFIG_VALUE_0="https://github.com/")
+    assert done.returncode != 0, done.stdout
+    assert ("https://github.com/nonexistent-owner/"
+            "nonexistent-repo.git") in done.stderr
+
+
+@POSIX
+def test_the_base_compare_reads_the_staged_base_not_mains_tip(tmp_path):
+    # Main advanced past the base and raised it there: a tip-compare lands.
+    remote, base = _records_repo(
+        tmp_path,
+        {SIZE: b'{"schema_version": 1, "baseline": {"a.py": 100}}\n'})
+    repo = tmp_path / "base-records"
+    (repo / ".github/size-baseline.json").write_bytes(
+        b'{"schema_version": 1, "baseline": {"a.py": 200}}\n')
+    _git(repo, "add", ".github/size-baseline.json")
+    _git(repo, "commit", "-q", "-m", "records raise")
+    done = _validate(
+        tmp_path, SIZE,
+        b'{"schema_version": 1, "baseline": {"a.py": 150}}\n', base, remote)
+    assert done.returncode != 0, done.stdout
+    assert "raises a value recorded at its base commit" in done.stderr
 
 
 @POSIX
