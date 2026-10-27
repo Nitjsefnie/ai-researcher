@@ -96828,7 +96828,7 @@
   "medianReasoningTimeSeconds": null,
   "id": "539ed227-38f4-4bea-a015-117057c14b18",
   "suffix": null,
-  "chartDefaultSelected": false,
+  "chartDefaultSelected": true,
   "chartHighlighted": false,
   "knowledgeCutoffDate": null,
   "reasoningTokens": 2000,
@@ -107945,7 +107945,7 @@
    "type": "firstParty",
    "providerName": "MiniMax"
   },
-  "hostModelCount": 14,
+  "hostModelCount": 15,
   "creator": {
    "id": "a31a9071-6144-4dbb-92dc-2e02d653ecea",
    "slug": "minimax",
