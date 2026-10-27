@@ -26,10 +26,10 @@
       "id": "ISTA-DASLab/DeepSeek-V4.1-Flash-1017-GSQ-RCO-GGUF"
     },
     {
-      "id": "OpenMOSS-Team/MOSS-Image-SFT"
+      "id": "Qwen/Qwen3.8-27B"
     },
     {
-      "id": "Qwen/Qwen3.8-27B"
+      "id": "OpenMOSS-Team/MOSS-Image-SFT"
     }
   ]
 }
