@@ -11,19 +11,19 @@
       "slug": "z-ai/glm-5.3-flash"
     },
     {
-      "slug": "tencent/hy4-preview"
+      "slug": "openai/gpt-6-luna"
     },
     {
-      "slug": "openai/gpt-6-luna"
+      "slug": "tencent/hy4-preview"
     },
     {
       "slug": "anthropic/claude-opus-5.5"
     },
     {
-      "slug": "nvidia/nemotron-3-ultra-550b-a55b"
+      "slug": "z-ai/glm-5.3"
     },
     {
-      "slug": "z-ai/glm-5.3"
+      "slug": "nvidia/nemotron-3-ultra-550b-a55b"
     },
     {
       "slug": "xiaomi/mimo-v2.6-flash"
