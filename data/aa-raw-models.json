@@ -6875,7 +6875,7 @@
   "intelligenceIndexIsEstimated": false,
   "omniscience": 0.6666666666666666,
   "scores": {
-   "aa-briefcase": 1450.28,
+   "aa-briefcase": 1450.57,
    "omniscience-accuracy": 0.282,
    "omniscience-non-hallucination": 0.6165273909006499,
    "automationbench-aa": 0.6036862782167782,
@@ -6883,10 +6883,11 @@
    "hle-diamond": 0.182,
    "gdp-pdf": 0.154,
    "terminalbench-4-0": 0.328282828282828,
+   "critpt-v2-hard": 0.24,
    "aa-analyst-agent": 0.25,
    "harvey-lab-aa": 0.008333333333333333,
    "enterprise-ops-gym-aa": 0.3321396598030439,
-   "gdpval-aa-normalized": 1650.37,
+   "gdpval-aa-normalized": 1649.37,
    "aa-3d": 936.6148,
    "code2video-aa": 974.54,
    "itbench-aa": 0.512429378531074,
@@ -6955,10 +6956,10 @@
   "mlcrOverall": 0.116666666666667,
   "harveyLab": 0.008333333333333333,
   "gdpPdfAllPass": 0.154,
-  "gdpval": 1650.37,
+  "gdpval": 1649.37,
   "gdpvalInterval": {
-   "lower": 1633,
-   "upper": 1667
+   "lower": 1632,
+   "upper": 1666
   },
   "itBenchSre": 0.512429378531074,
   "tau2": null,
@@ -6972,7 +6973,7 @@
   "healthbench": null,
   "healthbenchProfessional": null,
   "hleDiamond": 0.182,
-  "critptAgenticHard": null,
+  "critptAgenticHard": 0.24,
   "scicode": 0.516203703703704,
   "lcr": 0.8,
   "ifbench": null,
@@ -7003,20 +7004,20 @@
   },
   "briefcaseBreakdown": {
    "overall": {
-    "elo": 1450.28,
-    "lower95ci": 1442.45,
-    "upper95ci": 1458.87
+    "elo": 1450.57,
+    "lower95ci": 1442.32,
+    "upper95ci": 1458.94
    },
    "rubricPassRate": 0.4635897435897436,
    "analyticalQuality": {
-    "elo": 1621.57,
-    "lower95ci": 1604.82,
-    "upper95ci": 1638.37
+    "elo": 1622.56,
+    "lower95ci": 1605.86,
+    "upper95ci": 1638.98
    },
    "presentation": {
-    "elo": 1409.46,
-    "lower95ci": 1396.72,
-    "upper95ci": 1422.02
+    "elo": 1409.34,
+    "lower95ci": 1396.52,
+    "upper95ci": 1422.13
    }
   },
   "briefcaseTotalCost": 89.54268436893602,
