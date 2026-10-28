@@ -287,14 +287,26 @@ class CostBreakdownTests(unittest.TestCase):
             self.assertFalse(marker.exists())
 
     def refused_breakdown(self, evaluations):
-        """The refusal message for one model whose parts still sum to its
-        total, so only the slug-set check can refuse it."""
+        """The slug check's refusal message for one model whose parts still
+        sum to its total, so the breakdown is otherwise well-formed."""
         self.assertAlmostEqual(sum(e["weightedCostPerTask"] for e in evaluations), 1.0)
         with self.assertRaises(SystemExit) as caught:
-            fetch_aa.check_cost_breakdown([costed("slug-model", evaluations=evaluations)])
+            fetch_aa.check_breakdown_slugs([costed("slug-model", evaluations=evaluations)])
         message = str(caught.exception)
         self.assertIn("slug-model", message)
         return message
+
+    def test_the_pinned_slug_set_passes(self):
+        self.assertIsNone(fetch_aa.check_breakdown_slugs(
+            [costed("A"), {"slug": "bare", "intelligenceIndexCostPerTask": 1.5}]))
+
+    def test_an_entry_without_a_slug_exits(self):
+        parts = v5_evaluations(1.0) + [{"weightedCostPerTask": 0.0}]
+
+        message = self.refused_breakdown(parts)
+
+        self.assertIn("missing []", message)
+        self.assertIn("unexpected [None]", message)
 
     def test_a_dropped_slug_exits(self):
         # Exactly what v4.3 did to terminalbench-v2-1 and tau3-banking.
@@ -324,8 +336,8 @@ class CostBreakdownTests(unittest.TestCase):
         self.assertIn("unexpected ['critpt']", message)
 
     def test_components_that_stop_summing_to_the_total_exit(self):
-        # build.py divides an index weight back out of these; that is only
-        # valid while the parts still make up the published whole.
+        # Parts that no longer make up the published whole mean AA changed
+        # what the breakdown contains.
         models = [costed(total=1.0, evaluations=v5_evaluations(0.2))]
 
         with self.assertRaises(SystemExit) as caught:
@@ -2377,7 +2389,7 @@ class CrossRunLookbackFlagTests(unittest.TestCase):
 
     DETAIL_URL = fetch_aa.MODEL_DETAIL_URL.format(slug="detail-host-model")
 
-    def run_main(self, argv, prev_text=None):
+    def run_main(self, argv, prev_text=None, detail_overrides=None):
         """fetch_aa.main() over a stubbed urlopen, with an optional
         previous capture staged at OUT. -> (stdout, OUT text after the
         run, the SystemExit or None)."""
@@ -2388,7 +2400,7 @@ class CrossRunLookbackFlagTests(unittest.TestCase):
             fetch_aa.URL: lambda: _FakeResponse(
                 flight_html(leaderboard_payload())),
             self.DETAIL_URL: lambda: _FakeResponse(
-                flight_html(detail_payload())),
+                flight_html(detail_payload(**(detail_overrides or {})))),
             fetch_aa.AGENTS_URL: lambda: _FakeResponse(agents),
         })
         old = (fetch_aa.ROOT, fetch_aa.OUT, fetch_aa.AGENTS_OUT,
@@ -2423,6 +2435,45 @@ class CrossRunLookbackFlagTests(unittest.TestCase):
             sys.argv = argv_saved
             (fetch_aa.ROOT, fetch_aa.OUT, fetch_aa.AGENTS_OUT,
              fetch_aa.STAMP) = old
+
+    def test_a_record_carried_from_the_previous_capture_keeps_its_old_breakdown(self):
+        # The previous capture priced a model under an older index version,
+        # and this fetch no longer serves it: the presence layer merges it
+        # back with that version's breakdown. The slug check judges only
+        # what this run fetched, so the carried record cannot red the hour.
+        host = {"slug": "detail-host-model",
+                "intelligenceIndexCostPerTask": "$undefined"}
+        departed = {"slug": "departed-model", "intelligenceIndex": 40,
+                    "intelligenceIndexCostPerTask": {
+                        "cost": {"total": 1.0}, "evaluations": [
+                            {"slug": "scicode", "weightedCostPerTask": 0.6},
+                            {"slug": "humanitys-last-exam", "weightedCostPerTask": 0.4}]}}
+        prev = json.dumps([host, detail_record(), departed], indent=1)
+
+        _stdout, out_text, exit_exc = self.run_main(
+            ["fetch_aa.py", "--cross-run-lookback"], prev_text=prev)
+
+        self.assertIsNone(exit_exc)
+        carried = next(m for m in json.loads(out_text) if m["slug"] == "departed-model")
+        self.assertTrue(carried["crossRunMerged"])
+        self.assertEqual(carried["intelligenceIndexCostPerTask"],
+                         departed["intelligenceIndexCostPerTask"])
+
+    def test_a_fetched_breakdown_off_the_pinned_slugs_still_exits(self):
+        stale = {"cost": {"total": 0.75}, "evaluations": [
+            {"slug": "scicode", "weightedCostPerTask": 0.75}]}
+
+        prev = json.dumps([{"slug": "detail-host-model",
+                            "intelligenceIndexCostPerTask": "$undefined"},
+                           detail_record()], indent=1)
+
+        _stdout, out_text, exit_exc = self.run_main(
+            ["fetch_aa.py", "--cross-run-lookback"], prev_text=prev,
+            detail_overrides={"intelligenceIndexCostPerTask": stale})
+
+        self.assertIsNotNone(exit_exc)
+        self.assertIn("fixture-model: cost breakdown slugs left", str(exit_exc))
+        self.assertEqual(out_text, prev)
 
     def prev_without_fixture(self):
         host = {"slug": "detail-host-model",

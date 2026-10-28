@@ -67,7 +67,7 @@ python3 ~/.agent-bundle/scripts/docs_hub.py publish ./out/frontier-models.html \
 
 `fetch_aa.py` exits nonzero when the flight payload or the model schema changes
 shape, when AA bumps the Intelligence Index version `build.py` is pinned to,
-when the cost breakdown's slugs stop matching that version's exactly or its
+when a fetched cost breakdown's slugs stop matching that version's exactly or its
 costs stop summing to the published total — except an all-dropped window hour,
 which is reported and returned (issue #217) — or when the Coding Agent Index
 table collapses. `build.py` refuses to write a page with an empty chart on it —
