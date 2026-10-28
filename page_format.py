@@ -8,8 +8,8 @@ one for one; the browser drift test loads the built page with JavaScript
 enabled and disabled and holds the two renders equal cell-for-cell, so any
 drift between a function here and its JavaScript original fails there.
 
-Every value the page formats is non-negative and finite -- scores, costs,
-parameter counts, token prices -- which several of the rules below lean on.
+Every value the page formats is finite, and all but GDPval-AA's Elo score
+(negative for the weakest models) are non-negative, which fmt_* lean on.
 """
 
 import decimal
@@ -22,12 +22,12 @@ SPEED_TOL = 0.25
 def js_to_fixed(value, digits):
     """V8's Number.prototype.toFixed for the page's values.
 
-    V8 rounds the number's EXACT binary expansion, and an exact tie picks
-    the larger candidate -- 2.25.toFixed(1) is "2.3". Decimal(float) is that
-    exact expansion, and ROUND_HALF_UP picks the larger candidate on a tie;
-    the two only diverge on negative values, which the page never formats.
+    V8 rounds the EXACT binary expansion of the magnitude, a tie away from
+    zero -- (-2.25).toFixed(1) is "-2.3". Decimal(float) is that expansion
+    and ROUND_HALF_UP breaks ties away from zero; + 0.0 folds -0.0, which V8
+    prints unsigned.
     """
-    return str(decimal.Decimal(float(value)).quantize(
+    return str(decimal.Decimal(float(value) + 0.0).quantize(
         decimal.Decimal(1).scaleb(-digits), rounding=decimal.ROUND_HALF_UP))
 
 

@@ -15,7 +15,7 @@ import capture_gate  # noqa: E402  # pylint: disable=wrong-import-position
 import test_fetch_aa as fetch_cases  # noqa: E402  # pylint: disable=wrong-import-position
 from test_fetch_aa import detail_record  # noqa: E402  # pylint: disable=wrong-import-position
 from test_capture_gate import FIXTURE_AGENTS, head_serving  # noqa: E402  # pylint: disable=wrong-import-position
-from test_fetch_aa_membership import capture_pages, detail_record as membership_detail_record, leaderboard  # noqa: E402  # pylint: disable=wrong-import-position
+from test_fetch_aa_membership import capture_pages, detail_record as membership_detail_record, leaderboard, with_gdpval  # noqa: E402  # pylint: disable=wrong-import-position
 import build  # noqa: E402  # pylint: disable=wrong-import-position,wrong-import-order
 
 
@@ -57,9 +57,10 @@ def test_no_variant_three_generation_corner_restores_page_fields(tmp_path, monke
 
 
 def assert_same_pages(previous, current):
-    """Compare actual builds, with only raw-byte provenance masked away."""
-    old = (json.dumps(previous).encode("utf-8"), FIXTURE_AGENTS)
-    fresh = (json.dumps(current).encode("utf-8"), FIXTURE_AGENTS)
+    """Compare actual builds, with only raw-byte provenance masked away; both
+    sides carry the same GDPval-AA pair so every axis plots."""
+    old = (json.dumps(with_gdpval(previous)).encode("utf-8"), FIXTURE_AGENTS)
+    fresh = (json.dumps(with_gdpval(current)).encode("utf-8"), FIXTURE_AGENTS)
     with head_serving(*old):
         old_page, new_page = capture_gate.build_page_pair(old, fresh)
     assert capture_gate.mask_digest(old_page) == capture_gate.mask_digest(new_page)

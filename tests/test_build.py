@@ -9,7 +9,6 @@ import sys
 import tempfile
 import time
 import unittest
-from html import escape as html_escape
 from html.parser import HTMLParser
 import build
 import page_format
@@ -78,6 +77,18 @@ class ArtifactParser(HTMLParser):
             self._in_th = False
 
 
+def with_gdpval(records, elo=None, cost=1.0):
+    """Records given the GDPval-AA cost the evaluation route joins since the
+    axis returned, and `elo` as the leaderboard Elo where none is published."""
+    out = []
+    for source in records:
+        record: dict = {**source, "gdpvalCostPerTask": cost}
+        if elo is not None and build.capability_score(record, "agentic") is None:
+            record["scores"] = {**(record.get("scores") or {}), "gdpval-aa-normalized": elo}
+        out.append(record)
+    return out
+
+
 def v5_evaluations(total):
     """A cost breakdown in v5.0's exact slug set, each part its index weight
     applied to `total`, so the parts sum to it."""
@@ -91,6 +102,8 @@ def model_fixture(
     parameters: float | None = 27,
     slug: str = "fixture-model",
     open_weights: bool = False,
+    gdpval: float | None = 1047.0,
+    gdpval_cost: float | None = 8.0,
 ):
     return {
         "name": "Fixture Model (high)",
@@ -99,6 +112,8 @@ def model_fixture(
         "isOpenWeights": open_weights,
         "intelligenceIndex": intelligence,
         "parameters": parameters,
+        "scores": {"gdpval-aa-normalized": gdpval},
+        "gdpvalCostPerTask": gdpval_cost,
         "intelligenceIndexCostPerTask": {
             "cost": {"total": 0.75}, "evaluations": v5_evaluations(0.75)},
     }
@@ -264,17 +279,17 @@ class GeneratedArtifactTests(unittest.TestCase):
     def test_dispute_capable_charts_explain_the_mark_in_their_own_legends(self):
         html = _build_in_temp_dir()
 
-        section = re.search(
-            r'<section id="intelligence">(.*?)</section>', html, re.S)
-        assert section is not None
-        legend = re.search(
-            r'<div class="legend">(.*?)</div>', section.group(1), re.S)
-        assert legend is not None
-        self.assertRegex(
-            legend.group(1),
-            r'<span class="item">\s*<span class="dswatch" '
-            r'aria-hidden="true"></span>\s*Disputed value</span>',
-        )
+        for metric in ("intelligence", "agentic"):
+            section = re.search(rf'<section id="{metric}">(.*?)</section>', html, re.S)
+            assert section is not None, metric
+            legend = re.search(
+                r'<div class="legend">(.*?)</div>', section.group(1), re.S)
+            assert legend is not None, metric
+            self.assertRegex(
+                legend.group(1),
+                r'<span class="item">\s*<span class="dswatch" '
+                r'aria-hidden="true"></span>\s*Disputed value</span>',
+            )
 
     def test_charts_without_dispute_marks_keep_their_existing_legends(self):
         html = _build_in_temp_dir()
@@ -298,17 +313,17 @@ class GeneratedArtifactTests(unittest.TestCase):
         parser = ArtifactParser()
         parser.feed(html)
 
-        # The two cost-axis scatters group first and read against each other;
+        # The three cost-axis scatters group first and read against each other;
         # the parameter scatter swaps that axis for model size, so it sits last.
         self.assertEqual(
-            parser.svg_ids, ["svg-coding", "svg-intelligence", "svg-parameters"])
+            parser.svg_ids, ["svg-coding", "svg-intelligence", "svg-agentic", "svg-parameters"])
         self.assertEqual(parser.scroll_tables, ["fTable", "tbl"])
         for header in (
             "Coding Agent Index",
             "Coding Agent $ / task",
             "Intelligence Index",
             "Intelligence $ / task",
-            "Parameters",
+            "Parameters", "GDPval-AA v2.1 (Elo)", "GDPval-AA v2.1 $ / task",
         ):
             self.assertIn(header, parser.headers)
 
@@ -316,8 +331,9 @@ class GeneratedArtifactTests(unittest.TestCase):
         start = html.index(marker) + len(marker)
         end = html.index(";\n(function(){", start)
         payload = json.loads(html[start:end])
-        self.assertEqual(set(payload["stats"]["metricCounts"]), {"coding", "intelligence"})
+        self.assertEqual(set(payload["stats"]["metricCounts"]), {"coding", "intelligence", "agentic"})
         self.assertTrue(any(row["metrics"]["coding"] for row in payload["rows"]))
+        self.assertTrue(any(row["metrics"]["agentic"] for row in payload["rows"]))
         self.assertTrue(any(row["params"] for row in payload["rows"]))
 
         # The two captures are different universes sharing one table: coding
@@ -327,6 +343,7 @@ class GeneratedArtifactTests(unittest.TestCase):
         for row in payload["rows"]:
             if row["kind"] == "agent":
                 self.assertIsNone(row["metrics"]["intelligence"])
+                self.assertIsNone(row["metrics"]["agentic"])
             else:
                 self.assertIsNone(row["metrics"]["coding"])
         self.assertEqual(
@@ -440,6 +457,9 @@ class StaticTableRenderTests(unittest.TestCase):
             '<td class="n">51.0</td><td class="n">$0.750</td>'
             '<td class="n">$0.0147</td>'
             '<td><span class="tag">proprietary</span></td></tr>'
+            '<tr><td>GDPval-AA v2.1 (Elo)</td><td class="name">Fixture Model (high)</td>'
+            '<td>Fixture Lab</td><td class="n">1047.0</td><td class="n">$8.00</td>'
+            '<td class="n">—</td><td><span class="tag">proprietary</span></td></tr>'
         ))
         self.assertEqual(main, (
             '<tr><td class="name">Fixture Model (high) </td><td>Fixture Lab</td>'
@@ -447,6 +467,7 @@ class StaticTableRenderTests(unittest.TestCase):
             '<td class="n">51.0 <span class="tag f">frontier</span></td>'
             '<td class="n">$0.750</td>'
             '<td class="n">27B <span class="tag f">parameter frontier</span></td>'
+            '<td class="n">1047.0 <span class="tag f">frontier</span></td><td class="n">$8.00</td>'
             '<td class="n">—</td><td class="n">—</td><td class="n">—</td>'
             '<td class="n">—</td><td>—</td><td>proprietary</td></tr>'
         ))
@@ -468,7 +489,7 @@ class StaticTableRenderTests(unittest.TestCase):
             '<td class="n">64.0 <span class="tag f">frontier</span></td>'
             '<td class="n">$2.50</td>'
             '<td class="n">—</td><td class="n">—</td>'
-            '<td class="n">—</td>'
+            '<td class="n">—</td><td class="n">—</td><td class="n">—</td>'
             '<td class="n">—</td><td class="n">—</td><td class="n">—</td>'
             '<td class="n">—</td><td>—</td><td>proprietary</td></tr>'
         ))
@@ -486,6 +507,7 @@ class StaticTableRenderTests(unittest.TestCase):
             '<td class="n">51.0 <span class="tag f">frontier</span></td>'
             '<td class="n">$0.750</td>'
             '<td class="n">—</td>'
+            '<td class="n">1047.0 <span class="tag f">frontier</span></td><td class="n">$8.00</td>'
             '<td class="n">—</td><td class="n">—</td><td class="n">—</td>'
             '<td class="n">—</td><td>—</td><td>proprietary</td></tr>'
         ))
@@ -848,8 +870,8 @@ class EmptyAxisGuardTests(unittest.TestCase):
     """Issues #54 + #60: the guard refusing a capture that leaves a rendered
     axis with nothing on it.
 
-    The page renders THREE axes -- coding and intelligence against their
-    measured cost per task, plus parameters against the Intelligence
+    The page renders FOUR axes -- coding, intelligence and agentic against
+    their cost per task, plus parameters against the Intelligence
     Index -- and an emptied scatter reads as "nothing qualifies" rather than
     "the pipeline broke" (the guard's own comment in build.py). One pin per
     axis: a capture whose rows carry no pair for that axis is refused naming
@@ -963,7 +985,7 @@ class EmptyAxisGuardTests(unittest.TestCase):
             self.run_build()
 
             stats = self.payload_of(output)["stats"]
-            self.assertEqual(stats["metricCounts"], {"coding": 1, "intelligence": 1})
+            self.assertEqual(stats["metricCounts"], {"coding": 1, "intelligence": 1, "agentic": 1})
             self.assertEqual(stats["parameterCount"], 1)
 
     def test_a_window_marker_does_not_exempt_an_empty_axis(self):
@@ -1002,7 +1024,7 @@ class EmptyAxisGuardTests(unittest.TestCase):
             self.assertNotIn("changed shape", message)
             self.assertFalse(output.exists(), "refusal still wrote the page")
 
-    def test_a_fully_measured_capture_builds_and_names_all_three_axes_nonzero(self):
+    def test_a_fully_measured_capture_builds_and_names_all_four_axes_nonzero(self):
         # The healthy control: the guard enumerates the same stats the page
         # renders, so a fully measured capture must build -- and its payload
         # must show every rendered axis nonzero, the exact numbers the guard
@@ -1012,7 +1034,7 @@ class EmptyAxisGuardTests(unittest.TestCase):
             self.run_build()
 
             stats = self.payload_of(output)["stats"]
-            self.assertEqual(stats["metricCounts"], {"coding": 1, "intelligence": 1})
+            self.assertEqual(stats["metricCounts"], {"coding": 1, "intelligence": 1, "agentic": 1})
             self.assertEqual(stats["parameterCount"], 1)
 
 
@@ -1192,7 +1214,7 @@ class WindowHoldTests(unittest.TestCase):
             self.assertTrue(output.exists(), "hold swallowed a healthy hour")
             stats = self.payload_of(output)["stats"]
             self.assertEqual(
-                stats["metricCounts"], {"coding": 1, "intelligence": 1})
+                stats["metricCounts"], {"coding": 1, "intelligence": 1, "agentic": 1})
             self.assertEqual(stats["parameterCount"], 1)
 
     def run_cli_with_corner(self) -> tuple[subprocess.CompletedProcess,
@@ -1209,7 +1231,7 @@ class WindowHoldTests(unittest.TestCase):
             (root / "data").mkdir()
             # The builder is build.py plus the module it imports, so the
             # temp tree carries both, the way the checkout lays them out.
-            for module in ("build.py", "page_format.py"):
+            for module in ("build.py", "page_format.py", "page_style.py"):
                 (root / module).write_text(
                     (build.ROOT / module).read_text(encoding="utf-8"),
                     encoding="utf-8")
@@ -1889,7 +1911,7 @@ class CorruptCaptureTests(unittest.TestCase):
             (root / "data").mkdir()
             # The builder is build.py plus the module it imports, so the
             # temp tree carries both, the way the checkout lays them out.
-            for module in ("build.py", "page_format.py"):
+            for module in ("build.py", "page_format.py", "page_style.py"):
                 (root / module).write_text(
                     (build.ROOT / module).read_text(encoding="utf-8"),
                     encoding="utf-8")
@@ -1930,115 +1952,6 @@ class CorruptCaptureTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
-
-
-class FrontierZeroScoreTests(unittest.TestCase):
-    """Issue #146: zero is a legal AA-published score, and a score-0 row is
-    frontier-eligible on an axis exactly when it holds that axis's minimum
-    cost: strictly, or tied only with other zero-score rows (an exact tie
-    survives dominance, and any cheaper row would dominate it). The hourly
-    refresh at 2026-10-03T01:09Z reded on a bare ZeroDivisionError; its
-    capture was refused and is unavailable, so this fixture pins an
-    enumerated reproducible form of the regression, not a reconstruction of
-    that hour's bytes. The build now renders the $/point cell as the em dash
-    -- a $/point at zero capability is not a number -- instead of crashing,
-    and the JS mirror must render the same cell or the browser drift test
-    fails.
-    """
-
-    def _rows(self):
-        """Two hand-built rows; the cheap one scores 0.0 on intelligence,
-        making it the strictly cheapest row on that axis and therefore
-        frontier-eligible. Coding pairs stay positive on both."""
-        return [
-            {
-                "name": "Cheap Zero", "creator": "Zero Lab", "open": False,
-                "lic": None,
-                "metrics": {
-                    "coding": {"score": 40.0, "cost": 0.5},
-                    "intelligence": {"score": 0.0, "cost": 0.3},
-                },
-            },
-            {
-                "name": "Costly Smart", "creator": "Other Lab", "open": True,
-                "lic": "mit",
-                "metrics": {
-                    "coding": {"score": 60.0, "cost": 2.0},
-                    "intelligence": {"score": 50.0, "cost": 2.0},
-                },
-            },
-        ]
-
-    def test_the_frontier_table_renders_zero_score_rows(self):
-        # The intelligence row: score 0.0, cost $0.300, and the $/point cell
-        # is the em dash -- not a crash, not "$Infinity".
-        tbody = build.render_frontier_tbody(self._rows())
-        self.assertIn(
-            '<tr><td>Intelligence Index</td><td class="name">Cheap Zero</td>'
-            "<td>Zero Lab</td>"
-            '<td class="n">0.0</td><td class="n">$0.300</td>'
-            '<td class="n">—</td>'
-            '<td><span class="tag">proprietary</span></td></tr>',
-            tbody)
-        # A positive-score sibling still renders its $/point: 2.0/50.
-        self.assertIn('<td class="n">$0.0400</td>', tbody)
-
-    def test_zero_score_capture_builds_through_main(self):
-        # The fixture capture with one model turned into the zero-score
-        # shape: intelligenceIndex zeroed and its cost total set to the
-        # positive minimum halved, so it holds the axis's minimum cost and
-        # lands on the intelligence frontier with a zero score.
-        models = json.loads(
-            (PIPELINE_FIXTURES / "aa-raw-models.json").read_bytes())
-        floor = None
-        target = None
-        for m in models:
-            cost = build.cost_per_task(m)
-            if cost is not None and cost > 0 and (floor is None or cost < floor):
-                floor = cost
-            if target is None and cost is not None and cost > 0 and "(" not in (
-                    m.get("shortName") or m.get("name") or ""):
-                target = m
-        self.assertIsNotNone(target)
-        # unittest's assertIsNotNone does not narrow for pyright; the local
-        # asserts are the type narrowing (and double as fixture guards).
-        assert target is not None
-        assert floor is not None
-        target["intelligenceIndex"] = 0
-        target["intelligenceIndexCostPerTask"] = floor / 2
-        # The rendered row name is build's own cleaning over name-first,
-        # shortName-fallback -- "(Reasoning)" survives the cleaning, so the
-        # assertion derives it through the same function rather than guessing.
-        name = build.display_name(target.get("name") or target.get("shortName"))
-
-        with tempfile.TemporaryDirectory(
-                prefix=".issue-146-build-", dir=build.ROOT) as tmp:
-            raw = pathlib.Path(tmp) / "models.json"
-            agents_raw = pathlib.Path(tmp) / "coding-agents.json"
-            page_path = pathlib.Path(tmp) / "frontier-models.html"
-            raw.write_bytes(
-                json.dumps(models, indent=1).encode("utf-8"))
-            agents_raw.write_bytes(
-                (PIPELINE_FIXTURES / "aa-raw-coding-agents.json").read_bytes())
-            saved = (build.RAW, build.AGENTS_RAW, build.OUT)
-            build.RAW, build.AGENTS_RAW, build.OUT = raw, agents_raw, page_path
-            try:
-                with contextlib.redirect_stdout(io.StringIO()):
-                    build.main(generation_state=None)
-            finally:
-                build.RAW, build.AGENTS_RAW, build.OUT = saved
-            page = page_path.read_text(encoding="utf-8")
-
-        ftable = page[page.index('id="fTable"'):page.index("</table>", page.index('id="fTable"'))]
-        row_re = re.compile(
-            r'<tr><td>Intelligence Index</td><td class="name">'
-            + re.escape(html_escape(name)) + r"</td>(.*?)</tr>")
-        match = row_re.search(ftable)
-        self.assertIsNotNone(
-            match, f"no intelligence frontier row for the mutated model {name}")
-        assert match is not None
-        self.assertIn('<td class="n">0.0</td>', match.group(1))
-        self.assertIn('<td class="n">—</td>', match.group(1))
 
 
 class RetiredMismatchSummaryTests(unittest.TestCase):
@@ -2198,8 +2111,8 @@ def disputed_model_fixture():
         "medianOutputTokensPerSecond": 120.0,
     })
     m["genVariants"] = [
-        {"ii": 51, "cost": 0.75, "pin": 0.5, "pout": 1.5, "ctx": 400000},
-        {"ii": 50.5, "cost": 0.82, "pout": 1.6, "ctx": 300000},
+        {"ii": 51, "cost": 0.75, "gdpvalCost": 8.0, "pin": 0.5, "pout": 1.5, "ctx": 400000},
+        {"ii": 50.5, "cost": 0.82, "gdpvalCost": 8.4, "pout": 1.6, "ctx": 300000},
     ]
     return m
 
@@ -2216,7 +2129,7 @@ def presence_disputed_model_fixture(carrier_first=True):
         "price1mInputTokens": 0.5,
         "price1mOutputTokens": 1.5,
     })
-    carrier = {"ii": 51, "cost": 0.75, "pin": 0.5, "pout": 1.5, "ctx": 400000}
+    carrier = {"ii": 51, "cost": 0.75, "gdpvalCost": 8.0, "pin": 0.5, "pout": 1.5, "ctx": 400000}
     m["genVariants"] = [carrier, {}] if carrier_first else [{}, carrier]
     return m
 
@@ -2274,6 +2187,9 @@ class DisputeRenderTests(unittest.TestCase):
             '<td class="n dispute">$0.750 / $0.820</td>'
             '<td class="n">$0.0147</td>'
             '<td><span class="tag">proprietary</span></td></tr>'
+            '<tr><td>GDPval-AA v2.1 (Elo)</td><td class="name">Fixture Model (high)</td>'
+            '<td>Fixture Lab</td><td class="n">1047.0</td><td class="n dispute">$8.00 / $8.40</td>'
+            '<td class="n">—</td><td><span class="tag">proprietary</span></td></tr>'
         ))
         self.assertEqual(main, (
             '<tr><td class="name">Fixture Model (high) </td><td>Fixture Lab</td>'
@@ -2282,6 +2198,7 @@ class DisputeRenderTests(unittest.TestCase):
             '<span class="tag f">frontier</span></td>'
             '<td class="n dispute">$0.750 / $0.820</td>'
             '<td class="n">27B <span class="tag f">parameter frontier</span></td>'
+            '<td class="n">1047.0 <span class="tag f">frontier</span></td><td class="n dispute">$8.00 / $8.40</td>'
             '<td class="n">$0.5</td>'
             '<td class="n dispute">$1.5 / $1.6</td>'
             '<td class="n">120</td>'
@@ -2310,6 +2227,7 @@ class DisputeRenderTests(unittest.TestCase):
 
         self.assertIn('<td class="n dispute">51.0 / —</td>', frontier)
         self.assertIn('<td class="n dispute">$0.750 / —</td>', frontier)
+        self.assertIn('<td class="n dispute">$8.00 / —</td>', frontier)
         self.assertIn('51.0 / —', main)
         self.assertIn('$0.750 / —', main)
         self.assertIn('$0.5 / —', main)

@@ -28,7 +28,8 @@ def _capture(tmp_path, monkeypatch, first, second, detail, costs, prev=None, sta
     monkeypatch.setattr(fetch_aa, "_sleep", lambda _: base.write_text(
         page(second, "initialModels"), encoding="utf-8"))
     if evaluated is None:
-        evaluated = [{"slug": slug} for slug in costs] or [{"slug": "current"}]
+        evaluated = [{"slug": slug, "price1mInputTokens": 1}
+                     for slug in costs] or [{"slug": "current", "price1mInputTokens": 1}]
     snapshot = fetch_aa.fetch_gdpval.Evaluation(evaluated, costs, "/data/example.txt")
     return fetch_aa.capture(str(base), str(detailed), str(method), prev, state,
                             gdpval_loader=lambda: snapshot)
@@ -157,6 +158,57 @@ def test_no_shared_comparison_fields_refuses_and_names_the_data_file(tmp_path, m
         _capture(tmp_path, monkeypatch, first, first, [detail_record()], {}, evaluated=[])
 
 
+@pytest.mark.parametrize("evaluated", [
+    [{"slug": "current", "renamedIntelligenceIndex": 51, "creator": {"name": "Lab"}}],
+    [{"slug": "current", "id": "model-id", "gdpvalCostPerTask": 1.25}],
+], ids=["renamed-fields", "identity-and-cost-only"])
+def test_records_without_dispute_capable_fields_refuse(tmp_path, monkeypatch, evaluated):
+    first = leaderboard()
+    first[1]["gdpvalCostPerTask"] = 1.25  # the cost field never pairs, even when both routes carry it
+    with pytest.raises(SystemExit, match="/data/example.txt"):
+        _capture(tmp_path, monkeypatch, first, first, [detail_record()], {"current": 1.25},
+                 evaluated=evaluated)
+
+
+def test_real_record_shape_noise_outside_dispute_fields_still_matches(tmp_path, monkeypatch):
+    first, second = leaderboard(51), leaderboard(52)
+    for look in (first, second):
+        look[1].update(creator={"id": "lab", "slug": "lab", "name": "Lab", "color": "gray"},
+                       release={"date": "2026-01-01", "deprecatedTo": None},
+                       omniscience=18.633333333333333)
+    evaluated = [{"slug": "current", "id": "model-id", "intelligenceIndex": 51,
+                  "price1mInputTokens": 1, "price1mOutputTokens": 3, "gdpval": 1200.5,
+                  "creator": {"name": "Lab"}, "release": {"date": "2026-01-01"},
+                  "omniscience": 18.6333333333333}]
+    captured = _capture(tmp_path, monkeypatch, first, second, [detail_record(ii=51)],
+                        {"current": 1.25}, evaluated=evaluated)
+    current = next(row for row in captured.models if row["slug"] == "current")
+    assert {v["ii"]: v["gdpvalCost"] for v in current["genVariants"]
+            if "gdpvalCost" in v} == {51: 1.25}
+
+
+def test_comparable_field_absent_from_both_looks_does_not_block_the_match(tmp_path, monkeypatch):
+    first, second = leaderboard(51), leaderboard(52)
+    for look in (first, second):
+        del look[1]["price1mOutputTokens"]
+        look[1]["omniscience"] = 18.6  # the parser's field-count floor; not comparable
+    evaluated = [{"slug": "current", "intelligenceIndex": 51, "price1mOutputTokens": 3}]
+    captured = _capture(tmp_path, monkeypatch, first, second, [detail_record(ii=51)],
+                        {"current": 1.25}, evaluated=evaluated)
+    current = next(row for row in captured.models if row["slug"] == "current")
+    assert {v["ii"]: v["gdpvalCost"] for v in current["genVariants"]
+            if "gdpvalCost" in v} == {51: 1.25}
+
+
+@pytest.mark.parametrize("observed,generations", [(51, 2), (52, 2), (53, 3)])
+def test_unmatched_evaluation_counts_as_an_in_run_generation(
+        tmp_path, monkeypatch, observed, generations):
+    captured = _capture(tmp_path, monkeypatch, leaderboard(51), leaderboard(52),
+                        [detail_record(ii=51)], {"current": 1.25},
+                        evaluated=[{"slug": "current", "intelligenceIndex": observed}])
+    assert captured.disputed and captured.generations == generations
+
+
 def test_missing_current_cost_is_not_carried_from_previous_capture(tmp_path, monkeypatch):
     first = leaderboard()
     previous = [dict(row, gdpvalCostPerTask=1.25) if row["slug"] == "current" else row
@@ -197,7 +249,8 @@ def _main_files(tmp_path, monkeypatch, content=None):
                       encoding="utf-8")
     method.write_text(methodology_html(), encoding="utf-8")
     if content is None:
-        content = gzip.compress(json.dumps(payload(model(slug="fixture-model"))).encode("utf-8"))
+        record = model(slug="fixture-model", intelligenceIndex=51)
+        content = gzip.compress(json.dumps(payload(record)).encode("utf-8"))
     evaluation, data = fixture_files(tmp_path, content=content)
     paths = {"ROOT": tmp_path, "OUT": tmp_path / "models.json",
              "AGENTS_OUT": tmp_path / "agents.json", "STAMP": tmp_path / "stamp.txt"}

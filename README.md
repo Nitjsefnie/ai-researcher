@@ -19,7 +19,7 @@ from their git history. Neither tracker feeds the frontier page.
 
 ## What the page plots
 
-Three scatters. **x** is always cost per task in USD on a log scale — AA's
+Four scatters. **x** is always cost per task in USD on a log scale — AA's
 *measured* spend, not a quoted per-token price, so a verbose reasoning model
 costs more than its sticker price implies. **y** differs per chart, and every
 pair is a score and a cost AA measured on the same run:
@@ -28,12 +28,19 @@ pair is a score and a cost AA measured on the same run:
 |---|---|---|---|
 | Coding agents | Coding Agent Index v1.4 | `/agents/coding-agents` | an agent + a model |
 | Intelligence | Intelligence Index v5.0 | leaderboard + model detail | a model |
+| GDPval-AA | GDPval-AA v2.1 (Elo) | Elo: leaderboard + model detail; cost: `/evaluations/gdpval-aa` and its data file | a model |
 | Parameter efficiency | Intelligence Index vs parameters | leaderboard + model detail | a model |
 
 The coding chart measures an agent *with* a model, because that is what AA
 benchmarks there: Claude Code on Opus 5 (xhigh) is a different row from Codex
 on the same model. Its rows carry their score and their cost on one record, so
 nothing is reweighted to line the two axes up.
+
+The GDPval-AA cost is AA's own figure: `scripts/fetch_gdpval.py` (called by
+`fetch_aa.py`) computes it exactly as AA's evaluation page does, from the
+model's measured token counts, its prices and its cache-hit rate. A model that
+page gives no own cost, including one it prices by fallback, has no GDPval-AA
+row.
 
 The **efficient frontier** — nothing cheaper matches or beats it — is the
 analytical payload. Everything off it is strictly dominated.
@@ -53,7 +60,8 @@ AA ships the leaderboard as a Next.js RSC flight payload; there is no public
 JSON API, so the extractor reassembles it.
 
 ```sh
-# models = leaderboard + a model detail page, stitched; agents = coding index
+# models = leaderboard + a model detail page, stitched, + GDPval-AA evaluation
+# costs; agents = coding index
 python3 scripts/fetch_aa.py     # → data/aa-raw-models.json + data/aa-raw-coding-agents.json
 python3 scripts/diff_aa.py      # what moved since the last capture
 python3 build.py                # → out/frontier-models.html
@@ -69,8 +77,10 @@ python3 ~/.agent-bundle/scripts/docs_hub.py publish ./out/frontier-models.html \
 shape, when AA bumps the Intelligence Index version `build.py` is pinned to,
 when a fetched cost breakdown's slugs stop matching that version's exactly or its
 costs stop summing to the published total — except an all-dropped window hour,
-which is reported and returned (issue #217) — or when the Coding Agent Index
-table collapses. `build.py` refuses to write a page with an empty chart on it —
+which is reported and returned (issue #217) — when the GDPval-AA evaluation
+page stops naming v2.1, or its data file is missing, undecryptable or changes
+schema (the message names the file) — or when the Coding Agent Index table
+collapses. `build.py` refuses to write a page with an empty chart on it —
 except a three-generation window hour whose only empty chart is parameters,
 which holds the last good page instead (issue #232). All of those are signals to
 re-read AA by hand, not to retry or to hand-fix JSON — never hand-edit either

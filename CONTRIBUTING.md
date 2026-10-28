@@ -50,13 +50,15 @@ That is fine in both directions.
   from their git history. Neither tracker feeds the frontier page.
 
 - **`data/aa-raw-models.json` is a captured artifact — never hand-edit it.**
-  `scripts/fetch_aa.py` reassembles it from the leaderboard's Next.js RSC
-  flight payload and exits nonzero when that payload or the model schema
-  changes shape. That exit status is the signal to go re-read the page, not to
-  patch the JSON into passing.
+  `scripts/fetch_aa.py` reassembles it from AA's Next.js RSC flight payloads
+  (the leaderboard, a model detail page, and the GDPval-AA evaluation page
+  with the data file it loads) and exits nonzero when a payload, that data
+  file or the model schema changes shape. That exit status is the signal to
+  go re-read the page, not to patch the JSON into passing.
 
 - **Cost is measured, not quoted.** The x-axis is AA's own spend running the
-  model through the index — input, cached reads, output and reasoning tokens.
+  model through the benchmark — input, cached reads, output and reasoning
+  tokens.
   A verbose reasoning model therefore lands well right of its sticker price,
   which is the entire reason the page uses the measured figure. Do not
   substitute per-1M pricing.
@@ -360,6 +362,8 @@ run's detail route > the previous committed capture's carried detail fill.
   `carriedDetailFills`; the marker stays outside generation fingerprints,
   universes, variants and held state, changes no rendered field, and the news
   summary counts carries in one clause.
+- `gdpvalCostPerTask` counts as a leaderboard-universe key for this pass, so a
+  record lacking it never takes the previous capture's cost.
 - `intelligenceIndexTimePerTask` is eligible as a detail fill and stays
   never-red. While a revisit hold renders, both `HELD_SPEED_FIELDS` retain their
   frozen values or canonical absence and are excluded from carry-forward.
@@ -382,9 +386,11 @@ the other: an inconsistency between the generations, Overseer ruling,
 own published values.
 
 During a disputed run, the GDPval evaluation route matches each look on shared
-slugs and fields present in both routes, excluding never-red fields; only matching
-looks receive its costs. A quiet run uses the plain join, and an empty comparison
-field set refuses.
+slugs and on the dispute-capable fields both routes carry, minus its own cost
+field (the narrowing `revisit_key` uses); only matching looks receive its costs,
+and matching neither counts one more in-run generation. Detail-only records
+receive costs only when at least one look matched. A quiet run uses the plain
+join, and an empty comparison field set refuses.
 
 **`genVariants` encoding: canonical order, canonical-first silence.**
 - Variants are ordered by ascending `generation_key`, so the corpus bytes do not
@@ -406,7 +412,7 @@ field set refuses.
   canonical-first rule): identity and flag fields (`name`, `shortName`, `slug`,
   `creator`, `modelCreatorName`, `isOpenWeights`, `deprecated`, `isReasoning`,
   `intelligenceIndexIsEstimated`) and everything outside the variant map's
-  fields (`ii`, `cost`, `ctx`, `pin`, `pout`).
+  fields (`ii`, `cost`, `gdpval`, `gdpvalCost`, `ctx`, `pin`, `pout`).
   Parameters, licence and release date are detail-fills with a single in-run
   source, so they cannot dispute either.
 - The never-red family (`NEVER_RED_FIELDS`, hardcoded, never widened silently:
@@ -418,14 +424,16 @@ field set refuses.
 **Cross-run generation layer** (`--cross-run-lookback`):
 - Remembers the newest 1000 distinct fingerprints in
   `data/aa-generation-state.json`, beside the capture. `revisit_key`
-  fingerprints the published merged corpus over `DISPUTE_CAPABLE` only,
-  excluding speed and unrendered payload churn.
+  fingerprints the published merged corpus over `DISPUTE_CAPABLE` and, when
+  the corpus carries one, the GDPval-AA Elo only, excluding speed and
+  unrendered payload churn.
 - One-way movement (A → B, A → B → C) stays ordinary; a remembered revisit
   (A → B → A) holds both generations with `genVariants`. The state stores their
-  AA-published `HELD_FIELDS`, including each side's cost breakdown, and renders
-  their union in ascending revisit-key order. Other fields follow the current
-  capture, so a hold does not manufacture payload removals in the differ;
-  capture bytes may change while built rows stay fixed.
+  AA-sourced `HELD_FIELDS`, including each side's cost breakdown, GDPval-AA
+  cost and Elo, and renders their union in ascending revisit-key order.
+  Other fields follow the current capture, so a hold does not manufacture
+  payload removals in the differ; capture bytes may change while built rows
+  stay fixed.
 - Both rendered speed fields (`medianOutputTokensPerSecond` and
   `intelligenceIndexTimePerTask`) stay frozen for the length of a hold,
   including canonical absence.
@@ -478,9 +486,11 @@ kept, both generations shown, red, paired.
   previous run's), the previous slot positioned by ascending `generation_key`
   over the joint field universe.
 
-**Disputed hours.** The three-generation corner (the looks disagree AND the
-detail route matches neither fingerprint) gives shared models no detail fills
-from that run; the final look-back pass can restore their previous fills.
+**Disputed hours.** A run whose looks disagree counts a third in-run
+generation when the detail route matches neither look's fingerprint, or when
+the GDPval-AA evaluation route matches neither look, and a fourth when both
+miss. A detail route matching neither gives shared models no detail fills from
+that run; the final look-back pass can restore their previous fills.
 Without the cross-run look-back, a run whose looks agree writes no `genVariants`
 key anywhere and is byte-identical to the single-generation capture; with it,
 the same holds when the two slug sets agree, no generation hold renders and no

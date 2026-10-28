@@ -47,7 +47,7 @@ ROOT_FOR_IMPORT = pathlib.Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT_FOR_IMPORT))
 
 from build import (  # noqa: E402  # pylint: disable=wrong-import-position
-    INDEX_EVAL_WEIGHTS, INDEX_VERSION, SUM_TOLERANCE, merge_captures,
+    INDEX_EVAL_WEIGHTS, INDEX_VERSION, SUM_TOLERANCE, gdpval_elo, merge_captures,
 )
 
 URL = "https://artificialanalysis.ai/leaderboards/models"
@@ -160,6 +160,19 @@ NEVER_RED_FIELDS = frozenset({
 DISPUTE_CAPABLE = ("intelligenceIndex", "intelligenceIndexCostPerTask",
                    "contextWindowTokens", "price1mInputTokens",
                    "price1mOutputTokens", fetch_gdpval.COST_FIELD)
+
+
+def fill_gdpval_elo(plain, record):
+    """Fill `plain`'s missing Elo from `record` the way a top-level field fills
+    (a missing marker is a fill, never a winner), writing back where
+    gdpval_elo reads it; other nested scores are left alone."""
+    elo = gdpval_elo(record)
+    if normalize_for_comparison(gdpval_elo(plain)) is not None or normalize_for_comparison(elo) is None:
+        return
+    if isinstance(plain.get("scores"), dict):
+        plain["scores"] = {**plain["scores"], "gdpval-aa-normalized": elo}
+    else:
+        plain["gdpval"] = elo
 
 
 def _sleep(seconds: float) -> None:
@@ -499,7 +512,7 @@ def _cost_total(record):
 
 def variant_fields(record) -> dict:
     """The per-generation flat map the page renders from: {"ii", "cost",
-    "ctx", "pin", "pout", "gdpvalCost"}, absent keys absent.
+    "gdpval", "gdpvalCost", "ctx", "pin", "pout"}, absent keys absent.
     """
     fields: dict = {}
     ii = _number(record.get("intelligenceIndex"))
@@ -508,6 +521,9 @@ def variant_fields(record) -> dict:
     total = _cost_total(record)
     if total is not None:
         fields["cost"] = total
+    elo = _number(gdpval_elo(record))
+    if elo is not None:
+        fields["gdpval"] = elo
     gdpval_cost = _number(record.get(fetch_gdpval.COST_FIELD))
     if gdpval_cost is not None:
         fields["gdpvalCost"] = gdpval_cost
@@ -526,7 +542,8 @@ def variant_fields(record) -> dict:
 def _dispute_columns(record):
     """The record's dispute-capable values, normalized, in DISPUTE_CAPABLE
     order -- one column per field for the pairwise conflict test."""
-    return [normalize_for_comparison(record.get(f)) for f in DISPUTE_CAPABLE]
+    return ([normalize_for_comparison(record.get(f)) for f in DISPUTE_CAPABLE]
+            + [normalize_for_comparison(gdpval_elo(record))])
 
 
 def _conflicting(values) -> bool:
@@ -587,6 +604,7 @@ def cross_generation_merge(corpora: list[list[dict]], universe: set[str] | None 
                 if ((k not in plain or normalize_for_comparison(plain[k]) is None)
                         and normalize_for_comparison(v) is not None):
                     plain[k] = v
+            fill_gdpval_elo(plain, rec)
         columns: list = []
         if len(present) > 1:
             columns = list(zip(*[_dispute_columns(rec) for _, rec in present]))
@@ -619,7 +637,7 @@ REMEMBERED_GENERATION_LIMIT = 1000
 HELD_SPEED_FIELDS = frozenset({
     "medianOutputTokensPerSecond", "intelligenceIndexTimePerTask",
 })
-HELD_FIELDS = frozenset(DISPUTE_CAPABLE) | HELD_SPEED_FIELDS | {
+HELD_FIELDS = frozenset(DISPUTE_CAPABLE) | HELD_SPEED_FIELDS | {"scores", "gdpval"} | {
     "slug", "name", "shortName", "modelCreatorName", "parameters",
     "isOpenWeights", "deprecated", "isReasoning", "intelligenceIndexIsEstimated",
     "licenseName", "releaseDate", CROSS_RUN_KEY,
@@ -631,7 +649,12 @@ def _today() -> dt.date:
 
 
 def revisit_key(records: list[dict]) -> str:
-    return generation_key(records, set(DISPUTE_CAPABLE))
+    # The Elo joins under its own key, so a nested-only change is a new
+    # generation; a corpus carrying no Elo keeps its earlier fingerprint.
+    if all(gdpval_elo(r) is None for r in records):
+        return generation_key(records, set(DISPUTE_CAPABLE))
+    return generation_key([dict(r, gdpval=gdpval_elo(r)) for r in records],
+                          set(DISPUTE_CAPABLE) | {"gdpval"})
 
 
 def remember_generation(state, key):
@@ -692,6 +715,7 @@ def render_revisit_hold(held, current):
                         and normalize_for_comparison(plain.get(key)) is None
                         and normalize_for_comparison(value) is not None):
                     plain[key] = value
+            fill_gdpval_elo(plain, rec)
         plain["genVariants"] = [variant_fields(corpus[slug]) if slug in corpus else {}
                                 for corpus in by_slug]
         out.append(plain)
@@ -886,7 +910,8 @@ class Capture(typing.NamedTuple):
     all -- the pin passed on absence (issue #220), and the log says so
     rather than interpolating a version where none was found.
     `generations` counts distinct generation fingerprints observed in-run
-    across the leaderboard and detail reads. `disputed` says the written
+    across the leaderboard and detail reads, plus a disputed run's
+    evaluation read that matches neither look. `disputed` says the written
     corpus carries genVariants, including cross-run presence and revisit
     holds; it can be true even when this run's two looks agree.
     `leaderboard_slugs` is the union of the looks' membership, used only to
@@ -991,15 +1016,22 @@ def capture(cached_base: str | None, cached_detail: str | None,
                     if isinstance(m.get("slug"), str)}
 
     def same_generation(look, look_slugs, source, source_slugs, fields) -> bool:
-        """Compare the two reads on their common slugs and supplied fields."""
+        """Whether the `source` corpus (detail or evaluation) IS this look's
+        generation, compared on the slugs both reads carry and on `fields`."""
         shared_slugs = look_slugs & source_slugs
         return keyed(look, shared_slugs, fields) == keyed(source, shared_slugs, fields)
 
-    # The evaluation route uses the same match on shared slugs and shared fields.
+    # The evaluation route matches on the dispute-capable fields both routes
+    # carry (revisit_key's narrowing: its other fields differ in shape from
+    # the leaderboard's); matching both looks gives both its cost, neither
+    # gives none and counts one more generation. The leaderboard carries no
+    # gdpvalCostPerTask key today (it is fetch_gdpval's own name), so
+    # subtracting it is a fail-safe against that changing.
     if evaluation is not None:
-        eval_fields = universe & leaderboard_universe([evaluation.records])
-        if not eval_fields - NEVER_RED_FIELDS - {CARRIED_DETAIL_KEY}:
-            sys.exit(f"{evaluation.path}: no shared comparison fields -- schema changed")
+        eval_fields = (universe & set(DISPUTE_CAPABLE)
+                       & leaderboard_universe([evaluation.records])) - {fetch_gdpval.COST_FIELD}
+        if not eval_fields:
+            sys.exit(f"{evaluation.path}: no dispute-capable comparison fields -- schema changed")
         eval_slugs = {r["slug"] for r in evaluation.records if isinstance(r.get("slug"), str)}
 
     run_corpora: list[list[dict]]
@@ -1038,7 +1070,8 @@ def capture(cached_base: str | None, cached_detail: str | None,
                        for corpus, matched in zip(corpora, eval_matches)]
         models = cross_generation_merge(corpora, rank_universe)
         disputed = any("genVariants" in m for m in models)
-        generations = 2 + (0 if matches1 or matches2 else 1)
+        generations = 2 + (0 if matches1 or matches2 else 1) + (
+            0 if evaluation is None or any(eval_matches) else 1)
         run_corpora = corpora
 
     # Issue #266: membership is the union of both routes. Append detail-only
@@ -1181,7 +1214,8 @@ def main() -> None:
           f"(gaps filled from /models/{captured.host}; the leaderboard's own "
           "value wins wherever both routes carry the field)")
     # The run's one-line generation summary (issue #208): how many distinct
-    # generations the three reads observed, and how many records the
+    # generations this run's leaderboard, detail and evaluation reads
+    # observed (Capture.generations), and how many records the
     # dispute layer holds. The quiet hour prints the 1 / 0 shape the
     # capture-log test pins.
     disputed = sum(1 for m in models if "genVariants" in m)

@@ -286,12 +286,12 @@ def _tail(text, limit=200):
 def _stage_tree(mini):
     """The mini-tree: the code under test plus the fixture capture.
 
-    build.py and page_format.py sit at the mini-tree root; the two scripts
+    build.py and the page_ modules it imports sit at the mini-tree root; the scripts
     keep their scripts/ layout because both resolve their ROOT as their
     own parent's parent. Raises MeasureError when the fixture is missing
     or corrupt -- a broken input is exit 3, never a zero measurement.
     """
-    for name in ("build.py", "page_format.py"):
+    for name in ("build.py", "page_format.py", "page_style.py"):
         shutil.copy2(ROOT / name, mini / name)
     (mini / "scripts").mkdir()
     for name in ("capture_gate.py", "diff_aa.py"):

@@ -22,6 +22,7 @@ from types import SimpleNamespace
 import pytest
 
 import build
+from test_build import with_gdpval  # pylint: disable=wrong-import-order
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
@@ -743,8 +744,7 @@ def _build_bytes(raw_path, agents_path):
         try:
             with contextlib.redirect_stdout(io.StringIO()):
                 # astroid cannot infer build.py's members from this
-                # module (test_browser.py calls the same name clean);
-                # the member exists and the suite exercises it.
+                # module; the member exists and the suite exercises it.
                 # pylint: disable-next=no-member
                 build.main(generation_state=None)
             page_bytes = output.read_bytes()
@@ -771,7 +771,7 @@ def test_code_bytes_is_identical_across_the_686_688_capture_growth():
     try:
         models = tmp / "models.json"
         agents = tmp / "coding-agents.json"
-        models.write_bytes(models_686)
+        models.write_text(json.dumps(with_gdpval(json.loads(models_686))), encoding="utf-8")
         agents.write_bytes(agents_686)
         grown = perf.code_bytes(_build_bytes(models, agents))
         live = perf.code_bytes(_build_bytes(build.RAW, build.AGENTS_RAW))
