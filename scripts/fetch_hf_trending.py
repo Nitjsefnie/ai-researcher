@@ -15,7 +15,8 @@ from __future__ import annotations
 import argparse
 import json
 import pathlib
-import urllib.request
+
+import fetch_http
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 URL = "https://huggingface.co/api/models?sort=trendingScore&limit=10"
@@ -24,9 +25,8 @@ DATA = ROOT / "data" / "hf-trending.json"
 
 def fetch() -> list[dict[str, str]]:
     """Fetch the top ten model ids in Hugging Face's trending order."""
-    req = urllib.request.Request(URL, headers={"User-Agent": "hf-trending"})
-    with urllib.request.urlopen(req, timeout=30) as resp:
-        models = json.load(resp)
+    body = fetch_http.fetch_bytes(URL, {"User-Agent": "hf-trending"}, 30)
+    models = json.loads(body)
     return [{"id": model["id"]} for model in models[:10]]
 
 

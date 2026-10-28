@@ -2584,9 +2584,8 @@ class HFTrackerExecutedStepsTests(unittest.TestCase):
     def test_fetch_script_is_invoked_with_message_and_failure_propagates(self):
         scripts = self.repo / 'scripts'
         scripts.mkdir()
-        script = f'scripts/fetch_{self.fetcher}_trending.py'
-        target = self.repo / script
-        shutil.copyfile(ROOT / script, target)
+        for script in (f'fetch_{self.fetcher}_trending.py', 'fetch_http.py'):
+            shutil.copyfile(ROOT / 'scripts' / script, scripts / script)
         # A sitecustomize stub answers the fetcher's network boundary only.
         stub = self.root / 'stub'
         stub.mkdir()

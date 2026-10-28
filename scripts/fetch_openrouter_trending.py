@@ -15,7 +15,8 @@ from __future__ import annotations
 import argparse
 import json
 import pathlib
-import urllib.request
+
+import fetch_http
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 URL = "https://openrouter.ai/api/frontend/v1/models/find?order=top-weekly"
@@ -24,11 +25,10 @@ DATA = ROOT / "data" / "openrouter-trending.json"
 
 def fetch() -> list[dict[str, str]]:
     """Fetch the top ten model slugs in OpenRouter's weekly token order."""
-    req = urllib.request.Request(
-        URL, headers={"User-Agent": "Mozilla/5.0 (openrouter-top)",
-                      "Cache-Control": "no-cache"})
-    with urllib.request.urlopen(req, timeout=60) as resp:
-        models = json.load(resp)["data"]["models"]
+    body = fetch_http.fetch_bytes(
+        URL, {"User-Agent": "Mozilla/5.0 (openrouter-top)",
+              "Cache-Control": "no-cache"}, 60)
+    models = json.loads(body)["data"]["models"]
     return [{"slug": model["slug"]} for model in models[:10]]
 
 

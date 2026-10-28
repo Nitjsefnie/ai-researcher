@@ -26,7 +26,6 @@ from __future__ import annotations
 import argparse
 import datetime as dt
 import hashlib
-import http.client
 import json
 import os
 import pathlib
@@ -34,8 +33,8 @@ import re
 import sys
 import time
 import typing
-import urllib.error
-import urllib.request
+
+import fetch_http
 
 ROOT_FOR_IMPORT = pathlib.Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT_FOR_IMPORT))
@@ -92,7 +91,7 @@ CHUNK_RE = re.compile(r'self\.__next_f\.push\(\[1,("(?:[^"\\]|\\.)*")\]\)')
 FETCH_TIMEOUT_SECONDS = 25
 # The page-fetch retry (issue #154): a transient upstream answer -- HTTP
 # 429, a 5xx, a timeout, a dropped connection -- is attempted at most
-# PAGE_ATTEMPTS times IN TOTAL (fetch_html's loop bound, not a retry
+# PAGE_ATTEMPTS times IN TOTAL (the fetch loop bound, not a retry
 # count) with linear backoff (attempt k waits k * PAGE_BACKOFF_SECONDS)
 # before the page is refused for good. A non-retryable 4xx is an ANSWER,
 # not an outage, and fails on attempt 1; the classifier's precedent is
@@ -109,8 +108,8 @@ FETCH_TIMEOUT_SECONDS = 25
 # the process exits inside one page bound. The fetch terms are the per-attempt
 # BOUND, not a promise: a slow-drip body can outlast a single socket timeout,
 # and the job's headroom is what absorbs the difference.
-PAGE_ATTEMPTS = 3
-PAGE_BACKOFF_SECONDS = 5
+PAGE_ATTEMPTS = fetch_http.ATTEMPTS
+PAGE_BACKOFF_SECONDS = fetch_http.BACKOFF_SECONDS
 
 # Issue #208: AA's two routes can serve two different generations of the
 # corpus at once, and a single leaderboard read takes whichever half is
@@ -186,25 +185,6 @@ PINNED_VERSION = tuple(int(p) for p in INDEX_VERSION.split("."))
 # silently emptied two charts at v4.3.
 
 
-def _retryable_transport_error(exc: BaseException) -> bool:
-    """Whether a page-fetch attempt's failure is worth another attempt.
-
-    The classifier mirrors audit.yml's pip-audit retry (issue #128): HTTP
-    429 and the 5xx family are the rate-limit and server-outage answers a
-    retry can clear; every OTHER 4xx is an answer -- a 404 is a moved page,
-    a 403 a block -- that no retry will change, so it fails on attempt 1.
-    Beyond the status code everything transport-shaped gets the full bound:
-    URLError and its reason (DNS, connect, refused, SSL), socket timeouts,
-    and dropped connections (http.client.HTTPException -- RemoteDisconnected,
-    IncompleteRead). HTTPError subclasses URLError subclasses OSError, so
-    the status-bearing exception is tested FIRST and the bare transport
-    check last.
-    """
-    if isinstance(exc, urllib.error.HTTPError):
-        return exc.code == 429 or exc.code >= 500
-    return isinstance(exc, (OSError, http.client.HTTPException))
-
-
 def fetch_html(cached: str | None, url: str = URL) -> str:
     """The page text, from the pinned copy or a bounded set of live attempts.
 
@@ -215,30 +195,9 @@ def fetch_html(cached: str | None, url: str = URL) -> str:
     """
     if cached:
         return pathlib.Path(cached).read_text(encoding="utf-8", errors="replace")
-    for attempt in range(1, PAGE_ATTEMPTS + 1):
-        try:
-            req = urllib.request.Request(url, headers={"User-Agent": UA})
-            with urllib.request.urlopen(req, timeout=FETCH_TIMEOUT_SECONDS) as r:
-                return r.read().decode("utf-8", errors="replace")
-        except (urllib.error.URLError, OSError, http.client.HTTPException) as exc:
-            # HTTPError subclasses URLError and socket.timeout subclasses
-            # OSError, so this is every transport shape: DNS, connect,
-            # refused status, a dead read, a dropped body (issue #66).
-            # The classifier decides whether the answer is transient;
-            # either way the refusal is the same one actionable stderr
-            # line, not a traceback.
-            if not _retryable_transport_error(exc) or attempt == PAGE_ATTEMPTS:
-                exhausted = f" after {attempt} attempts" if attempt > 1 else ""
-                sys.exit(f"{url}: fetch failed{exhausted}: {exc} -- nothing "
-                         "was captured; check connectivity or the site, "
-                         "then re-run")
-            delay = attempt * PAGE_BACKOFF_SECONDS
-            print(f"{url}: attempt {attempt} of {PAGE_ATTEMPTS} failed "
-                  f"({exc}); retrying in {delay}s", file=sys.stderr)
-            _sleep(delay)
-    # Unreachable while PAGE_ATTEMPTS >= 1: the last attempt's try returns
-    # on success and exits on failure, so the loop cannot fall through.
-    raise AssertionError("fetch_html ran out of attempts without a verdict")
+    body = fetch_http.fetch_bytes(url, {"User-Agent": UA},
+                                  FETCH_TIMEOUT_SECONDS, sleep=_sleep)
+    return body.decode("utf-8", errors="replace")
 
 
 def flight_payload(html: str) -> str:
