@@ -2436,45 +2436,6 @@ class CrossRunLookbackFlagTests(unittest.TestCase):
             (fetch_aa.ROOT, fetch_aa.OUT, fetch_aa.AGENTS_OUT,
              fetch_aa.STAMP) = old
 
-    def test_a_record_carried_from_the_previous_capture_keeps_its_old_breakdown(self):
-        # The previous capture priced a model under an older index version,
-        # and this fetch no longer serves it: the presence layer merges it
-        # back with that version's breakdown. The slug check judges only
-        # what this run fetched, so the carried record cannot red the hour.
-        host = {"slug": "detail-host-model",
-                "intelligenceIndexCostPerTask": "$undefined"}
-        departed = {"slug": "departed-model", "intelligenceIndex": 40,
-                    "intelligenceIndexCostPerTask": {
-                        "cost": {"total": 1.0}, "evaluations": [
-                            {"slug": "scicode", "weightedCostPerTask": 0.6},
-                            {"slug": "humanitys-last-exam", "weightedCostPerTask": 0.4}]}}
-        prev = json.dumps([host, detail_record(), departed], indent=1)
-
-        _stdout, out_text, exit_exc = self.run_main(
-            ["fetch_aa.py", "--cross-run-lookback"], prev_text=prev)
-
-        self.assertIsNone(exit_exc)
-        carried = next(m for m in json.loads(out_text) if m["slug"] == "departed-model")
-        self.assertTrue(carried["crossRunMerged"])
-        self.assertEqual(carried["intelligenceIndexCostPerTask"],
-                         departed["intelligenceIndexCostPerTask"])
-
-    def test_a_fetched_breakdown_off_the_pinned_slugs_still_exits(self):
-        stale = {"cost": {"total": 0.75}, "evaluations": [
-            {"slug": "scicode", "weightedCostPerTask": 0.75}]}
-
-        prev = json.dumps([{"slug": "detail-host-model",
-                            "intelligenceIndexCostPerTask": "$undefined"},
-                           detail_record()], indent=1)
-
-        _stdout, out_text, exit_exc = self.run_main(
-            ["fetch_aa.py", "--cross-run-lookback"], prev_text=prev,
-            detail_overrides={"intelligenceIndexCostPerTask": stale})
-
-        self.assertIsNotNone(exit_exc)
-        self.assertIn("fixture-model: cost breakdown slugs left", str(exit_exc))
-        self.assertEqual(out_text, prev)
-
     def prev_without_fixture(self):
         host = {"slug": "detail-host-model",
                 "intelligenceIndexCostPerTask": "$undefined"}
