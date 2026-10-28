@@ -128,8 +128,8 @@
     27599
   ],
   "scripts/fetch_aa.py": [
-    24567,
-    48915
+    23566,
+    47147
   ],
   "scripts/fetch_hf_trending.py": [
     661,
@@ -220,8 +220,8 @@
     104015
   ],
   "tests/test_gate_base_freshness.py": [
-    4942,
-    29190
+    4927,
+    29203
   ],
   "tests/test_gitignore.py": [
     3628,
