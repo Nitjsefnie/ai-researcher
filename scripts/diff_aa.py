@@ -28,9 +28,9 @@ what the page says:
                counted in one summary clause rather than as field news
 
 It also recomputes every Pareto layer the page draws -- one per scatter, in page order:
-coding-agent, intelligence and parameter-efficiency -- on either side, using build.py's
-own `undominated`, so "who entered / left the frontier" is answered by the same
-function the page uses rather than a second implementation of the rule. The three
+coding-agent, intelligence, GDPval-AA and parameter-efficiency -- on either side, using
+build.py's own `undominated`, so "who entered / left the frontier" is answered by the same
+function the page uses rather than a second implementation of the rule. The four
 move independently: a model can join one while sitting dominated on the rest.
 
 Usage:
@@ -58,10 +58,10 @@ from page_format import SPEED_TOL  # noqa: E402  # pylint: disable=wrong-import-
 RAW = ROOT / "data" / "aa-raw-models.json"
 
 # Relative move below which a significant numeric field is not reported.
-# An Elo-scored component is renormalised over the whole field, so every
-# newcomer nudges every incumbent by a hundredth of a percent; at 0 that is a
-# dozen +0.01% lines per refresh. 0.5% is below anything the page renders
-# to one decimal, so a move that clears it can change what the page says.
+# Elo-scored values renormalise over the whole field, so every newcomer nudges
+# every incumbent; at 0 that is a dozen +0.01% lines per refresh. The bar is
+# relative, so it under-reports a GDPval-AA Elo (0.5% of 1500 is 7.5 points
+# the page shows) and over-reports one near that scale's arbitrary zero.
 DEFAULT_TOL = 0.005
 
 # Re-measured every crawl; a different number is a new sample of the same thing,
@@ -98,9 +98,7 @@ COST_TOTAL_PATH = "intelligenceIndexCostPerTask.cost.total"
 # name is what survives AA adding a field family: the detail-route merge
 # brought eighteen new nested families in one day, and a name-based list
 # reported every one of them, per model, per value, as an index move.
-HEADLINE_PATHS = {
-    COST_TOTAL_PATH,
-}
+HEADLINE_PATHS = {COST_TOTAL_PATH, "scores.gdpval-aa-normalized"}
 
 # Components of a headline this differ already reports. They move whenever the
 # headline moves, so listing them restates one finding a dozen times.
@@ -115,9 +113,8 @@ DERIVED_EXACT = {
     "intelligenceIndexCostTotal", "intelligenceIndexCostInput",
     "intelligenceIndexCostOutput", "intelligenceIndexCostReasoning",
     "intelligenceIndexCostAnswer", "intelligenceIndexCost",
-    # Raw Elo (GDPval's included, which the page does not read) and token
-    # tallies behind headlines the page renders normalised.
-    "gdpval", "briefcaseTotalCost", "canonicalIntelligenceIndexTokenCount",
+    # Totals and token tallies behind rendered headlines (`gdpval` scores GDPval-AA).
+    "briefcaseTotalCost", "canonicalIntelligenceIndexTokenCount",
     "reasoningTokens",
 }
 
@@ -348,7 +345,7 @@ def shown_name(m):
 
 
 def frontier_names(models, collapse=False):
-    rows = build_rows(models)
+    rows = [r for r in build_rows(models) if r["ii"] is not None]
     if collapse:
         ceiling = {}
         for r in rows:
@@ -363,12 +360,13 @@ def fmt_params(b):
     return f"{b / 1000:.1f}T".replace(".0T", "T") if b >= 1000 else f"{b:g}B"
 
 
-# The page draws three scatters (sections 1-3), each with its own Pareto layer,
+# The page draws four scatters (sections 1-4), each with its own Pareto layer,
 # and they move independently -- a model can join one while sitting dominated on
-# the others. Diffing only the headline left two of the three unreviewed.
+# the others. Diffing only the headline left three of the four unreviewed.
 # label -> (metric key, x-axis formatter)
 CHART_FRONTIERS = (
     ("coding agent", "coding", lambda v: f"${v:.2f}/task"),
+    ("GDPval-AA", "agentic", lambda v: f"${v:.2f}/task"),
     ("parameter-efficiency", "parameters", fmt_params),
 )
 
@@ -376,26 +374,28 @@ CHART_FRONTIERS = (
 def chart_frontier(models, agents, metric):
     """One CHART_FRONTIERS chart's Pareto layer, via build.py's own `undominated`.
 
-    Coding is drawn over the agent capture's rows; parameters over the model
-    rows AA discloses a size for, with size standing in for cost (build_rows()
-    seats no metrics entry for it). Either way the dominance rule itself is
-    never spelled a second time.
-    """
+    Coding is drawn over the agent capture's rows, GDPval-AA over the model
+    rows carrying its pair, parameters over the model rows AA discloses a size
+    for, with size standing in for cost (build_rows() seats no metrics entry
+    for it). The dominance rule itself is never spelled a second time."""
     if metric == "coding":
         rows = build_agent_rows(agents, models)
-        return {r["name"]: r for r in undominated(rows, metric)}, rows
-    rows = [r for r in build_rows(models) if r.get("params") and r.get("ii") is not None]
-    for r in rows:
-        r["metrics"]["parameters"] = {"score": r["ii"], "cost": r["params"]}
+    elif metric == "parameters":
+        rows = [r for r in build_rows(models) if r.get("params") and r.get("ii") is not None]
+        for r in rows:
+            r["metrics"]["parameters"] = {"score": r["ii"], "cost": r["params"]}
+    else:
+        rows = [r for r in build_rows(models) if r["metrics"].get(metric)]
     return {r["name"]: r for r in undominated(rows, metric)}, rows
 
 
 # Report section header -> the short name a subject line uses for it. The
 # effort-collapsed frontier is a SECOND VIEW of the intelligence chart rather
-# than a fourth chart, so it stays in the body and never double-counts here.
+# than a fifth chart, so it stays in the body and never double-counts here.
 SUBJECT_FRONTIERS = {
     "efficient frontier (expanded)": "intelligence",
     "coding agent frontier": "coding",
+    "GDPval-AA frontier": "GDPval-AA",
     "parameter-efficiency frontier": "parameters",
 }
 
@@ -636,9 +636,8 @@ def print_disputes(old_by_id, new_by_id):
 
 
 def print_chart_frontiers(old, new, old_agents, new_agents):
-    """The two scatter-specific Pareto sections -- coding agent and
-    parameter-efficiency, in page order -- one per CHART_FRONTIERS entry.
-    """
+    """The three scatter-specific Pareto sections -- coding agent, GDPval-AA
+    and parameter-efficiency, in page order -- one per CHART_FRONTIERS entry."""
     for label, metric, fmt_x in CHART_FRONTIERS:
         fo, rows_o = chart_frontier(old, old_agents, metric)
         fn, rows_n = chart_frontier(new, new_agents, metric)
@@ -686,8 +685,8 @@ def print_report(args):
         # II/cost silently degrades to the em-dash fallback.
         label = m.get("name") or m.get("shortName") or ""
         r = rows.get(display_name(label))
-        ii = f"{r['ii']:.1f}" if r else fmt(m.get("intelligenceIndex"))
-        cost = f"${r['cost']:.2f}" if r else "—"
+        ii = f"{r['ii']:.1f}" if r and r["ii"] is not None else fmt(m.get("intelligenceIndex"))
+        cost = f"${r['cost']:.2f}" if r and r["cost"] is not None else "—"
         return (f"{shown_name(m)}  [{one_line(m.get('modelCreatorName'))}]  "
                 f"II {ii}  cost/task {cost}"
                 f"{'  open-weights' if m.get('isOpenWeights') else ''}"

@@ -85,6 +85,15 @@ def leaderboard(ii=51):
     return [{"slug": "host", "intelligenceIndexCostPerTask": None}, record]
 
 
+def with_gdpval(records, elo=900.0, cost=2.0):
+    """The records with the GDPval-AA pair a full capture carries for scored
+    models: the evaluation route's cost (fetch_gdpval.join) and an Elo."""
+    priced = fetch_aa.fetch_gdpval.join(records, {
+        r["slug"]: cost for r in records if r.get("intelligenceIndex") is not None})
+    return [dict(r, scores={"gdpval-aa-normalized": elo})
+            if fetch_aa.fetch_gdpval.COST_FIELD in r else r for r in priced]
+
+
 def page(records, rich_name):
     index = [{"slug": r["slug"], "name": r.get("name", r["slug"]),
               "releaseSlug": r["slug"]} for r in records]
@@ -246,7 +255,7 @@ def test_build_renders_detail_only_retirement_lab_speed_and_mismatch(
     captured = capture_pages(tmp_path, monkeypatch, leaderboard(), leaderboard(),
                              [detail_record(), retired])
     raw, agents, output = (tmp_path / name for name in ("models.json", "agents.json", "page.html"))
-    raw.write_text(json.dumps(captured.models), encoding="utf-8")
+    raw.write_text(json.dumps(with_gdpval(captured.models)), encoding="utf-8")
     agents.write_text(json.dumps([{
         "id": "agent", "displayLabel": "Agent", "agentName": "Agent",
         "hostModelSlug": "current", "indexScore": 0.5,
@@ -259,7 +268,7 @@ def test_build_renders_detail_only_retirement_lab_speed_and_mismatch(
     stdout = capsys.readouterr().out
     assert "MISMATCH -- still undominated: Retired" in stdout
     html = output.read_text(encoding="utf-8")
-    rows = build.build_rows(captured.models)
+    rows = build.build_rows(with_gdpval(captured.models))
     row = next(r for r in rows if r["name"] == "Retired")
     assert row["creator"] == "Detail Lab"
     assert row["tps"] is None
@@ -273,17 +282,22 @@ def test_build_renders_detail_only_retirement_lab_speed_and_mismatch(
     # Detail-only membership does not relax the existing empty-axis refusal.
     for record in captured.models:
         record.pop("parameters", None)
-    raw.write_text(json.dumps(captured.models), encoding="utf-8")
+    raw.write_text(json.dumps(with_gdpval(captured.models)), encoding="utf-8")
     with pytest.raises(SystemExit, match="no rows carry a score/cost pair for: parameters"):
         build.main(generation_state=None)
 
 
-@pytest.mark.parametrize("rescued,outcome", [
-    ("no-extra", "hold"), ("neither", "hold"), ("parameters", "publish"),
+@pytest.mark.parametrize("rescued,eval_ii,outcome", [
+    ("no-extra", 51, "hold"), ("neither", 51, "hold"), ("parameters", 51, "publish"),
+    ("no-extra", 50, "refuse"),
 ])
 def test_three_generation_window_uses_leaderboard_provenance(
-        tmp_path, monkeypatch, capsys, rescued, outcome):
-    """Real capture CLI through build: extras cannot erase a route window."""
+        tmp_path, monkeypatch, capsys, rescued, eval_ii, outcome):
+    """Real capture CLI through build: extras cannot erase a route window.
+
+    The GDPval read matching the first look gives the axis its costs; matching
+    neither look leaves it empty, which refuses rather than holds: the window
+    marker reports leaderboard breakdowns, which no GDPval cost comes from."""
     data = tmp_path / "data"
     data.mkdir()
     base, detail, methodology, agents = (tmp_path / name for name in
@@ -295,7 +309,10 @@ def test_three_generation_window_uses_leaderboard_provenance(
     detail_rows = [detail_record(ii=53)]
     if rescued != "no-extra":
         detail_rows.append(retired)
-    base.write_text(page(leaderboard(51), "initialModels"), encoding="utf-8")
+    looks = [leaderboard(ii) for ii in (51, 52)]
+    for look in looks:
+        look[1]["scores"] = {"gdpval-aa-normalized": 900.0}
+    base.write_text(page(looks[0], "initialModels"), encoding="utf-8")
     detail.write_text(page(detail_rows, "models"), encoding="utf-8")
     methodology.write_text(f"Artificial Analysis Intelligence Index v{fetch_aa.INDEX_VERSION}",
                            encoding="utf-8")
@@ -316,16 +333,23 @@ def test_three_generation_window_uses_leaderboard_provenance(
                                       "--detail-html", str(detail), "--agents-html", str(agents),
                                       "--methodology-html", str(methodology)])
     monkeypatch.setattr(fetch_aa, "_sleep", lambda _seconds:
-                        base.write_text(page(leaderboard(52), "initialModels"), encoding="utf-8"))
+                        base.write_text(page(looks[1], "initialModels"), encoding="utf-8"))
     # Redirect only marker IO while exercising the real recording decision.
     record_window = fetch_aa.record_cost_window
     monkeypatch.setattr(fetch_aa, "record_cost_window", lambda priced, dropped, **kwargs:
                         record_window(priced, dropped, data / "cost-breakdown-window.txt", **kwargs))
-    monkeypatch.setattr(fetch_aa.fetch_gdpval, "fetch", lambda *_args: None)
+    monkeypatch.setattr(fetch_aa.fetch_gdpval, "fetch", lambda *_args: fetch_aa.fetch_gdpval.Evaluation(
+        [{"slug": "current", "intelligenceIndex": eval_ii}], {"current": 2.0}, "/data/gdpval.txt"))
     fetch_aa.main()
-    assert "3 generation(s) observed in-run" in capsys.readouterr().out
+    generations = 3 if eval_ii == 51 else 4
+    assert f"{generations} generation(s) observed in-run" in capsys.readouterr().out
     if outcome == "hold":
         with pytest.raises(build.WindowHold, match="3 generation\\(s\\) observed in-run"):
+            build.main(generation_state=None)
+        assert not output.exists()
+    elif outcome == "refuse":
+        with pytest.raises(SystemExit, match="for: agentic, parameters -- the capture records a "
+                           "cross-generation AA window, not a shape change: 4 generation"):
             build.main(generation_state=None)
         assert not output.exists()
     else:

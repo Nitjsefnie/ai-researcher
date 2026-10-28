@@ -1125,7 +1125,7 @@ class ClassifierStructureTests(unittest.TestCase):
             "isOpenWeights", "deprecated", "isReasoning", "licenseName",
             "contextWindowTokens", "releaseDate", "price1mInputTokens",
             "price1mOutputTokens", "intelligenceIndexCostPerTask.cost.total",
-        }
+            "scores.gdpval-aa-normalized", "gdpval", "gdpvalCostPerTask"}
         shown_speed = {"medianOutputTokensPerSecond", "intelligenceIndexTimePerTask"}
 
         for path in rendered:
@@ -1139,7 +1139,7 @@ class ClassifierStructureTests(unittest.TestCase):
                      "timeToFirstChunkVariance.q75", "timescaleData.medianTimeToFirstChunk",
                      "briefcaseBreakdown.overall.elo", "timeToFirstAnswerToken.total"):
             self.assertNotEqual(diff_aa.classify(path), "significant", path)
-        for leaf in ("gdpval", "intelligenceIndexCost", "chartHighlighted",
+        for leaf in ("scores.tau3-banking", "intelligenceIndexCost", "chartHighlighted",
                      "hostModelCount", "reasoningTokens"):
             self.assertNotEqual(diff_aa.classify(leaf), "significant", leaf)
 

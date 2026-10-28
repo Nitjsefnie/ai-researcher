@@ -16,6 +16,7 @@ temp path, so a fresh uncommitted capture in the working data/ cannot move
 the rebuilt side (issue #108).
 """
 import contextlib
+import hashlib
 import io
 import json
 import os
@@ -376,3 +377,96 @@ class HeadStateTests(unittest.TestCase):
         self.assertTrue(re.fullmatch(r"[0-9a-fA-F]{7,40}",
                                      stamps[0][len(" Source commit <code>"):
                                                -len("</code>.")]))
+
+
+class BuildProvenanceTests(unittest.TestCase):
+    """#49: the footer's provenance -- the source commit when the build
+    environment carries one, and a sha256 over the two capture files, whole
+    bytes models-then-agents, that a reader can verify by hashing them."""
+
+    COMMIT = "e5e10f1c0ffee4215deadbeefcafe0123456789a"
+
+    @staticmethod
+    def _foot(html):
+        """The footer div's text, without the payload <script> after it."""
+        start = html.index('class="foot"')
+        return html[start:html.index("<script>", start)]
+
+    @staticmethod
+    def _expected_digest(data_dir):
+        """The sha256 a reader recomputes from the data directory."""
+        digest = hashlib.sha256()
+        digest.update((data_dir / "aa-raw-models.json").read_bytes())
+        digest.update((data_dir / "aa-raw-coding-agents.json").read_bytes())
+        return digest.hexdigest()
+
+    def _build(self, destination, commit=None):
+        """build.main() to `destination` with the commit env set or unset."""
+        old_out = build.OUT
+        build.OUT = destination
+        try:
+            env = {} if commit is None else {"AI_RESEARCHER_AA_SOURCE_COMMIT": commit}
+            with mock.patch.dict(os.environ, env, clear=False):
+                os.environ.pop("AI_RESEARCHER_AA_SOURCE_COMMIT".removeprefix("AI_RESEARCHER_"), None)
+                if commit is None:
+                    os.environ.pop("AI_RESEARCHER_AA_SOURCE_COMMIT", None)
+                with contextlib.redirect_stdout(io.StringIO()):
+                    build.main()
+            return destination.read_bytes()
+        finally:
+            build.OUT = old_out
+
+    def test_footer_carries_the_source_commit_and_the_content_hash(self):
+        with tempfile.TemporaryDirectory(prefix=".issue-49-build-",
+                                         dir=build.ROOT) as tmp:
+            output = pathlib.Path(tmp) / "frontier-models.html"
+            html = self._build(output, commit=self.COMMIT).decode("utf-8")
+
+            # verbatim in the footer, not merely somewhere in the payload
+            foot = self._foot(html)
+            self.assertIn(self.COMMIT, foot)
+            # an independently computed sha256 of the data directory's inputs
+            self.assertIn(self._expected_digest(build.RAW.parent), foot)
+
+    def test_footer_omits_the_source_commit_when_the_environment_is_unset(self):
+        with tempfile.TemporaryDirectory(prefix=".issue-49-build-",
+                                         dir=build.ROOT) as tmp:
+            output = pathlib.Path(tmp) / "frontier-models.html"
+            html = self._build(output).decode("utf-8")
+
+            foot = self._foot(html)
+            # the SHA itself is the thing that would render on regression, so
+            # its absence -- here and page-wide -- is the absence oracle
+            self.assertNotIn(self.COMMIT, foot)
+            self.assertNotIn(self.COMMIT, html)
+            # the content hash renders with or without the commit
+            self.assertIn(self._expected_digest(build.RAW.parent), foot)
+
+    def test_a_malformed_source_commit_renders_no_stamp_and_no_marker_splice(self):
+        # AI_RESEARCHER_AA_SOURCE_COMMIT is build-machine input, so only SHA-shaped values
+        # (7-40 hex chars) render. Anything else must be treated exactly like
+        # an unset variable -- otherwise a value carrying a template marker
+        # would be spliced by the later __CAPTURED__/__DATA__ substitutions.
+        malformed = "__CAPTURED__ <script>__DATA__</script>"
+        with tempfile.TemporaryDirectory(prefix=".issue-49-build-",
+                                         dir=build.ROOT) as tmp:
+            output = pathlib.Path(tmp) / "frontier-models.html"
+            html = self._build(output, commit=malformed).decode("utf-8")
+
+            foot = self._foot(html)
+            self.assertNotIn("Source commit", foot)
+            self.assertNotIn(malformed, foot)
+            # nothing the env carried survived into the page, spliced or not
+            self.assertNotIn("__CAPTURED__", foot)
+            self.assertNotIn("__DATA__", foot)
+            self.assertNotIn("<script>", foot)
+
+    def test_rebuild_without_the_env_var_stays_byte_identical(self):
+        with tempfile.TemporaryDirectory(prefix=".issue-49-build-",
+                                         dir=build.ROOT) as tmp:
+            first = pathlib.Path(tmp) / "first.html"
+            second = pathlib.Path(tmp) / "second.html"
+            self._build(first)
+            self._build(second)
+
+            self.assertEqual(first.read_bytes(), second.read_bytes())

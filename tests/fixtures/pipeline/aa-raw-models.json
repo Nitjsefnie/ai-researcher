@@ -1,5 +1,6 @@
 [
  {
+  "gdpvalCostPerTask": 4.2,
   "intelligenceIndex": 62.1,
   "intelligenceIndexCostPerTask": {
    "cost": {
@@ -48,9 +49,13 @@
   "modelCreatorName": "Alpha Fixtures",
   "name": "Alpha One",
   "parameters": 405,
+  "scores": {
+   "gdpval-aa-normalized": 1450.2
+  },
   "slug": "alpha-1"
  },
  {
+  "gdpvalCostPerTask": 3.8,
   "intelligenceIndex": 55.4,
   "intelligenceIndexCostPerTask": {
    "cost": {
@@ -99,9 +104,13 @@
   "modelCreatorName": "Beta Fixtures",
   "name": "Beta Two",
   "parameters": 235,
+  "scores": {
+   "gdpval-aa-normalized": 1320.7
+  },
   "slug": "beta-2"
  },
  {
+  "gdpvalCostPerTask": 3.1,
   "intelligenceIndex": 48.9,
   "intelligenceIndexCostPerTask": {
    "cost": {
@@ -150,9 +159,13 @@
   "modelCreatorName": "Alpha Fixtures",
   "name": "Gamma Three",
   "parameters": 72,
+  "scores": {
+   "gdpval-aa-normalized": 1105.3
+  },
   "slug": "gamma-3"
  },
  {
+  "gdpvalCostPerTask": 2.5,
   "intelligenceIndex": 43.2,
   "intelligenceIndexCostPerTask": {
    "cost": {
@@ -201,9 +214,13 @@
   "modelCreatorName": "Gamma Fixtures",
   "name": "Delta Four",
   "parameters": 32,
+  "scores": {
+   "gdpval-aa-normalized": 980.4
+  },
   "slug": "delta-4"
  },
  {
+  "gdpvalCostPerTask": 1.9,
   "intelligenceIndex": 38.6,
   "intelligenceIndexCostPerTask": {
    "cost": {
@@ -252,9 +269,13 @@
   "modelCreatorName": "Beta Fixtures",
   "name": "Epsilon Five",
   "parameters": 8,
+  "scores": {
+   "gdpval-aa-normalized": 612.9
+  },
   "slug": "epsilon-5"
  },
  {
+  "gdpvalCostPerTask": 1.4,
   "intelligenceIndex": 33.0,
   "intelligenceIndexCostPerTask": {
    "cost": {
@@ -303,6 +324,9 @@
   "modelCreatorName": "Gamma Fixtures",
   "name": "Zeta Six",
   "parameters": 3,
+  "scores": {
+   "gdpval-aa-normalized": -120.5
+  },
   "slug": "zeta-6"
  }
 ]

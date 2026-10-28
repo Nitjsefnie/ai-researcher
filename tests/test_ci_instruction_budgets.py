@@ -4,7 +4,7 @@ Three layers, and none of them runs valgrind. The committed pipeline
 fixture (tests/fixtures/pipeline/) is the fixed input every measured run
 reads -- pinning the budgets to it is what keeps the ratchet invariant to
 live-capture growth, so its bytes must be exactly what the generator in
-this module produces and build.py must accept it and render all three
+this module produces and build.py must accept it and render all four
 axes. The budgets-document validation and the gate itself run on
 synthetic measurements. The mini-tree seeding functions are exercised on
 real files and a real git repository, but the callgrind subprocesses of
@@ -65,17 +65,17 @@ def _load(name):
 
 # --- the committed pipeline fixture -------------------------------------------
 #
-# slug, lab, name, ii, params (billions), intelligence cost total, open
-# weights. Each cost breakdown is the total split over build.py's v5.0 slugs
-# by index weight, rounded to six places, so its parts sum to the total.
-
+# slug, lab, name, ii, params (billions), intelligence cost total, GDPval-AA
+# Elo (one below zero), GDPval cost per task, open weights. Each cost breakdown
+# is the total split over build.py's v5.0 slugs by index weight, rounded to six
+# places, so its parts sum to the total.
 _MODEL_TABLE = (
-    ("alpha-1", "Alpha Fixtures", "Alpha One", 62.1, 405, 1.20, False),
-    ("beta-2", "Beta Fixtures", "Beta Two", 55.4, 235, 0.80, True),
-    ("gamma-3", "Alpha Fixtures", "Gamma Three", 48.9, 72, 0.50, True),
-    ("delta-4", "Gamma Fixtures", "Delta Four", 43.2, 32, 0.28, False),
-    ("epsilon-5", "Beta Fixtures", "Epsilon Five", 38.6, 8, 0.14, True),
-    ("zeta-6", "Gamma Fixtures", "Zeta Six", 33.0, 3, 0.06, False),
+    ("alpha-1", "Alpha Fixtures", "Alpha One", 62.1, 405, 1.20, 1450.2, 4.20, False),
+    ("beta-2", "Beta Fixtures", "Beta Two", 55.4, 235, 0.80, 1320.7, 3.80, True),
+    ("gamma-3", "Alpha Fixtures", "Gamma Three", 48.9, 72, 0.50, 1105.3, 3.10, True),
+    ("delta-4", "Gamma Fixtures", "Delta Four", 43.2, 32, 0.28, 980.4, 2.50, False),
+    ("epsilon-5", "Beta Fixtures", "Epsilon Five", 38.6, 8, 0.14, 612.9, 1.90, True),
+    ("zeta-6", "Gamma Fixtures", "Zeta Six", 33.0, 3, 0.06, -120.5, 1.40, False),
 )
 
 
@@ -90,6 +90,8 @@ def fixture_models() -> list:
             "isOpenWeights": open_weights,
             "intelligenceIndex": ii,
             "parameters": params,
+            "scores": {"gdpval-aa-normalized": elo},
+            "gdpvalCostPerTask": gdpval_cost,
             "intelligenceIndexCostPerTask": {
                 "cost": {"total": total},
                 "evaluations": [
@@ -97,7 +99,7 @@ def fixture_models() -> list:
                     for eval_slug, weight in build.INDEX_EVAL_WEIGHTS.items()],
             },
         }
-        for (slug, lab, name, ii, params, total, open_weights) in _MODEL_TABLE
+        for (slug, lab, name, ii, params, total, elo, gdpval_cost, open_weights) in _MODEL_TABLE
     ]
 
 
@@ -181,22 +183,22 @@ def test_fixture_covers_two_labs_and_matching_agent_hosts():
 
 
 class FixtureBuildsEveryAxis(unittest.TestCase):
-    """build.py accepts the committed fixture and renders all three axes.
+    """build.py accepts the committed fixture and renders all four axes.
 
     In-process, the import-and-call style of tests/test_build.py:
     RAW/AGENTS_RAW/OUT redirected to the fixture and a temp output under
     build.ROOT, build.main() run for real.
     """
 
-    def test_build_accepts_the_fixture_and_renders_all_three_axes(self):
+    def test_build_accepts_the_fixture_and_renders_all_four_axes(self):
         stats = self._build_fixture()
-        self.assertEqual(stats["metricCounts"], {"coding": 3, "intelligence": 6})
+        self.assertEqual(stats["metricCounts"], {"coding": 3, "intelligence": 6, "agentic": 6})
         self.assertEqual(stats["parameterCount"], 6)
         self.assertEqual(stats["total"], 6)
 
-    def test_the_built_page_carries_all_three_chart_svgs(self):
+    def test_the_built_page_carries_all_four_chart_svgs(self):
         html = self._page_text()
-        for svg in ("svg-coding", "svg-intelligence", "svg-parameters"):
+        for svg in ("svg-coding", "svg-intelligence", "svg-agentic", "svg-parameters"):
             self.assertIn(f'id="{svg}"', html)
 
     # -- helpers --------------------------------------------------------------
@@ -538,7 +540,7 @@ def test_the_committed_budgets_fail_a_measurement_one_over():
 
 
 def test_stage_tree_copies_the_code_under_test_and_the_fixture(tmp_path):
-    """The mini-tree gets the CURRENT tree's four code files and the
+    """The mini-tree gets the CURRENT tree's five code files and the
     fixture's three data files -- never the live data/ captures."""
     gate = _gate()
     mini = tmp_path / "mini"
@@ -546,10 +548,8 @@ def test_stage_tree_copies_the_code_under_test_and_the_fixture(tmp_path):
     # white-box: the staging layout IS the contract under test
     # pylint: disable-next=protected-access
     gate._stage_tree(mini)
-    assert (mini / "build.py").read_bytes() == (
-        REPO_ROOT / "build.py").read_bytes()
-    assert (mini / "page_format.py").read_bytes() == (
-        REPO_ROOT / "page_format.py").read_bytes()
+    for name in ("build.py", "page_format.py", "page_style.py"):
+        assert (mini / name).read_bytes() == (REPO_ROOT / name).read_bytes()
     assert (mini / "scripts" / "capture_gate.py").is_file()
     assert (mini / "scripts" / "diff_aa.py").is_file()
     for name in ("aa-raw-models.json", "aa-raw-coding-agents.json",

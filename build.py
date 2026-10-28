@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Build out/frontier-models.html from data/aa-raw-models.json.
 
-Single deliverable: AA's Coding Agent and Intelligence indices against their
-matched measured cost per task, plus total parameter count against Intelligence
-Index, sourced exclusively from artificialanalysis.ai.
+Single deliverable: AA's Coding Agent and Intelligence indices and GDPval-AA
+v2.1 Elo against their matched measured cost per task, plus total parameter
+count against Intelligence Index, sourced exclusively from artificialanalysis.ai.
 
 Usage:  python3 build.py
 """
@@ -19,11 +19,10 @@ import pathlib
 import re
 from types import EllipsisType
 
-# The page's formatting rules live beside the build that renders them into
-# the static table bodies, not inside it: build.py is one line-budgeted HTML
-# emitter, and these mirrors are the page's own, shared shape (#97).
+# The page's formatting mirrors (#97) and stylesheet live in sibling modules.
 from page_format import (EM_DASH, fmt_cost, fmt_ctx, fmt_params, js_number,
                          js_to_fixed, show_text, weights_text)
+from page_style import STYLE
 
 ROOT = pathlib.Path(__file__).resolve().parent
 RAW = ROOT / "data" / "aa-raw-models.json"
@@ -50,7 +49,7 @@ INDEX_EVAL_WEIGHTS = {
     "terminalbench-4-0": 0.10, "terminal-bench-science": 0.15, "critpt-v2-hard": 0.10,
     "omniscience": 0.15, "hle-diamond": 0.10}
 
-METRIC_ORDER = ("coding", "intelligence")
+METRIC_ORDER = ("coding", "intelligence", "agentic")
 
 # Every axis is now a score and a cost AA measured on the same run, and each
 # comes from the source that publishes them together:
@@ -60,6 +59,8 @@ METRIC_ORDER = ("coding", "intelligence")
 #                 is an agent+model+harness combination, not a bare model.
 #   intelligence  the model corpus's intelligenceIndex against its own
 #                 measured intelligenceIndexCostPerTask.cost.total.
+#   agentic       the leaderboard's GDPval-AA v2.1 Elo against the cost per task
+#                 AA's GDPval-AA page computes (fetch_gdpval.py's field).
 #
 # The leaderboard's `codingIndex` and `agenticIndex` fields are deliberately NOT
 # used: AA scores both from Terminal-Bench v2.1 and tau3-banking, whose per-task
@@ -261,16 +262,27 @@ def capability_cost_per_task(m, metric):
     """AA's measured average task cost for one displayed axis of a model row."""
     if metric == "intelligence":
         return cost_per_task(m)
+    if metric == "agentic":
+        return num(m.get("gdpvalCostPerTask"))
     if metric == "coding":
         # Model rows have no coding pair; coding lives on the agent capture.
         return None
     raise ValueError(f"unknown metric: {metric}")
 
 
+def gdpval_elo(m):
+    """GDPval-AA's Elo, for the page and fetch_aa alike: the leaderboard's
+    `scores` entry, else (no `scores` mapping) the detail route's `gdpval`."""
+    scores = m.get("scores")
+    return scores.get("gdpval-aa-normalized") if isinstance(scores, dict) else m.get("gdpval")
+
+
 def capability_score(m, metric):
-    """The score AA publishes for one axis, on a 0-100 scale."""
+    """AA's score for one axis: a 0-100 index, or GDPval-AA's unbounded Elo."""
     if metric == "intelligence":
         return num(m.get("intelligenceIndex"))
+    if metric == "agentic":
+        return num(gdpval_elo(m))
     if metric == "coding":
         return None
     raise ValueError(f"unknown metric: {metric}")
@@ -312,9 +324,8 @@ def build_rows(models):
             # distinguishable under the page's 34-character chart cap.
             "label": display_label(label),
             # Which capture the row came from. Model rows carry the
-            # intelligence and parameter axes; agent rows carry coding. Neither
-            # universe has the other's columns, and the page renders an absent
-            # column as an em-dash, not a blank.
+            # intelligence, agentic and parameter axes; agent rows carry coding.
+            # Neither universe has the other's columns; absent ones render the em-dash.
             "kind": "model",
             "agent": None,
             "creator": m.get("modelCreatorName") or "",
@@ -343,10 +354,7 @@ def build_rows(models):
         # carry `genVariants` -- one flat map per generation in canonical
         # order, whose fields are THAT generation's published values. The
         # row carries them as `gv` with every map's keys in the canonical
-        # field order (canonical_variant_maps, issue #226): the page must
-        # be a function of the capture's PARSED content, so a key
-        # reordering in the raw bytes -- the exact churn the capture gate
-        # exists to ignore -- cannot reach the embedded payload. A quiet
+        # field order (canonical_variant_maps says why, issue #226). A quiet
         # capture has no key and no `gv`: the payload is byte-what it has
         # always shipped. Agent rows never carry it -- the agents capture
         # has one in-run source.
@@ -425,6 +433,7 @@ def build_agent_rows(agents, models):
             "metrics": {
                 "coding": {"score": round(score * 100, 2), "cost": round(cost, 4)},
                 "intelligence": None,
+                "agentic": None,
             },
             "params": None,
             "open": open_weights(a.get("hostModelSlug")),
@@ -468,6 +477,7 @@ def metric_of(row, metric):
 VARIANT_PAIR_FIELDS = {
     # metric -> (score field, cost field, per-variant score formatter).
     "intelligence": ("ii", "cost", lambda v: js_to_fixed(v, 1)),
+    "agentic": ("gdpval", "gdpvalCost", lambda v: js_to_fixed(v, 1)),
 }
 
 # The fields a variant map carries, in fetch_aa.variant_fields' own
@@ -476,7 +486,7 @@ VARIANT_PAIR_FIELDS = {
 # bytes happened to lay them out (issue #226). Anything outside the list
 # (a field an older capture still carries) is appended sorted, so nothing is
 # dropped.
-GV_FIELD_ORDER = ("ii", "cost", "ctx", "pin", "pout")
+GV_FIELD_ORDER = ("ii", "cost", "gdpval", "gdpvalCost", "ctx", "pin", "pout")
 
 
 def canonical_variant_maps(gen_variants):
@@ -882,11 +892,12 @@ def read_capture(path):
 METRIC_LABELS = {
     "coding": "Coding Agent Index",
     "intelligence": "Intelligence Index",
+    "agentic": "GDPval-AA v2.1 (Elo)",
 }
 
 # The metric views the page unions for the full table, in Object.keys()
 # order -- the order the script's Set-union preserves for ties.
-VIEW_ORDER = ("coding", "intelligence", "parameters")
+VIEW_ORDER = ("coding", "intelligence", "parameters", "agentic")
 
 # A marker in a rendered tbody would be spliced by a substitution that runs
 # after the tbody replacements -- "__DATA__" in a name would have the JSON
@@ -967,16 +978,11 @@ def render_frontier_tbody(rows):
                 + f'<td class="{score_cls}">{score}</td>'
                 + f'<td class="{cost_cls}">{cost}</td>'
                 + '<td class="n">'
-                # A zero score is a legal AA publication, and a score-0 row
-                # sits on this layer exactly when it holds the axis's
-                # minimum cost -- strictly, or tied only with other
-                # zero-score rows. $/point at zero capability is not a
-                # number:
-                # em dash, the page's missing-value mark -- never a crash
-                # (issue #146 red an hour on the bare ZeroDivisionError)
-                # and never a "$Infinity" cell.
+                # $/point at zero capability is not a number (issue #146 red an
+                # hour on the bare ZeroDivisionError), nor on an Elo, whose zero
+                # is arbitrary: em dash, never a crash or "$Infinity".
                 + ('$' + js_to_fixed(pair["cost"] / pair["score"], 4)
-                   if pair["score"] else EM_DASH)
+                   if pair["score"] and metric != "agentic" else EM_DASH)
                 + "</td>"
                 + f"<td>{_tag(weights_text(row), 'tag')}</td>"
                 + "</tr>"
@@ -1005,15 +1011,16 @@ def render_main_tbody(rows):
         for metric in METRIC_ORDER:
             pair = metric_of(row, metric)
             score, cost, score_disp, cost_disp = _variant_cells(row, metric)
-            # A missing pair renders the em dash. It never disputes: a model
-            # row always carries its intelligence pair, and only model rows
-            # carry variants.
+            # A disputed value renders even when the row has no pair for the
+            # axis; only an undisputed missing value renders the em dash.
             if pair:
                 score = js_to_fixed(pair["score"], 1) if score is None else score
                 cost = fmt_cost(pair["cost"]) if cost is None else cost
             else:
-                score = cost = EM_DASH
+                score = score if score_disp else EM_DASH
+                cost = cost if cost_disp else EM_DASH
             if pair and id(row) in front_sets[metric]:
+                assert score is not None  # the pair branch filled it
                 score += " " + _tag("frontier", "tag f")
             cells.append(f'<td class="n{" dispute" if score_disp else ""}">{score}</td>')
             cells.append(f'<td class="n{" dispute" if cost_disp else ""}">{cost}</td>')
@@ -1144,9 +1151,8 @@ def main(*, generation_state: bytes | None | EllipsisType = ...):
     # A rendered axis with nothing on it means the capture moved under us --
     # a renamed field, a dropped cost slug. The page must not be published in
     # that state: an empty scatter reads as "nothing qualifies" rather than
-    # "the pipeline broke", and the browser tests can only report it as an
-    # opaque locator timeout. The page renders THREE axes: metricCounts
-    # quantifies the two score/cost ones, parameterCount the third, which
+    # "the pipeline broke". The page renders FOUR axes: metricCounts
+    # quantifies the three score/cost ones, parameterCount the fourth, which
     # pairs the Intelligence Index with model size rather than with a cost
     # (issue #60) -- so the enumeration here covers both stats, and a stale
     # capture (AA's totalParameters rename) fails red instead of publishing
@@ -1154,7 +1160,8 @@ def main(*, generation_state: bytes | None | EllipsisType = ...):
     #
     # The guard's arms, narrowest first. The designed three-generation corner
     # (issue #232): the marker records >= 3 generations AND parameters is the
-    # only emptied axis -- the hour HOLDS rather than refuses: WindowHold,
+    # only emptied axis (never agentic: the marker reports leaderboard
+    # breakdowns, which no GDPval cost comes from) -- the hour HOLDS: WindowHold,
     # which scripts/capture_gate.py reports as the hour unchanged -- the last
     # good page stays live, nothing commits or publishes -- until AA's routes
     # converge. Every other emptied axis still refuses (SystemExit, nonzero):
@@ -1176,6 +1183,10 @@ def main(*, generation_state: bytes | None | EllipsisType = ...):
             "page exists to build -- holding the page: the last good page "
             "stays live, nothing commits or publishes this hour, and the "
             "axes return when AA's routes converge")
+    gdpval_note = ("; agentic: no GDPval-AA evaluation cost joined this capture "
+                   "(the evaluation read matched none of the run's leaderboard "
+                   "generations, or its fields changed shape) -- re-read the "
+                   "GDPval-AA evaluation page" if "agentic" in empty else "")
     if empty and window:
         generations = window_generations(RAW.parent)
         count_phrase = (f"{generations} generation(s) observed in-run"
@@ -1186,13 +1197,13 @@ def main(*, generation_state: bytes | None | EllipsisType = ...):
             + " -- the capture records a cross-generation AA window, not a "
             "shape change: " + count_phrase + ", and leaderboard detail fills "
             "are unavailable for these axes -- re-read the AA leaderboard "
-            "by hand; the page recovers when AA's routes converge"
+            "by hand; the page recovers when AA's routes converge" + gdpval_note
         )
     if empty:
         raise SystemExit(
             "no rows carry a score/cost pair for: " + ", ".join(sorted(empty))
             + " -- the AA capture changed shape; re-read the leaderboard rather "
-            "than publishing an empty chart"
+            "than publishing an empty chart" + gdpval_note
         )
 
     payload = json.dumps({"rows": rows, "stats": stats}, separators=(",", ":")).replace(
@@ -1220,7 +1231,8 @@ def main(*, generation_state: bytes | None | EllipsisType = ...):
     commit_note = (f" Source commit <code>{html.escape(commit)}</code>."
                    if commit else "")
     inputs_note = ("data/aa-raw-models.json -- the merged, dispute-bearing "
-                   "capture of AA's leaderboard looks and model detail route, "
+                   "capture of AA's leaderboard looks, model detail route and "
+                   "GDPval-AA evaluation route, "
                    "holding every generation a dispute caught -- then "
                    "data/aa-raw-coding-agents.json, whole files "
                    "concatenated in that order.")
@@ -1260,153 +1272,7 @@ TEMPLATE = r"""<!DOCTYPE html>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Frontier models &mdash; capability vs cost per task</title>
 <style>
-  .viz-root, body {
-    color-scheme: light;--surface-1:#fcfcfb; --plane:#f9f9f7;
-    /* --muted and --accent are darkened one step from their original values
-       (#898781, #2a78d6): at those values the table headers measured 3.50:1
-       and the frontier tag 4.30:1, under the 4.5:1 WCAG AA floor. The dark
-       theme keeps the originals and passes there. */
-    --text-primary:#0b0b0b; --text-secondary:#52514e; --muted:#706e67;--grid:#e1e0d9; --axis:#c3c2b7; --border:rgba(11,11,11,0.10);--series-prop:#2a78d6; --series-open:#eb6834; --dim:#a9a7a0;--accent:#2468c0;
-    /* Issue #208's dispute red. A status color from the dataviz skill's
-       fixed status palette (critical #d03b3b) -- never a series hue, and
-       the same hex in both modes: it clears the 3:1 mark floor in both
-       modes (4.68:1 light, 3.62:1 dark). Text needs 4.5:1, which dark
-       misses, so --dispute-text steps lighter there (#e05e5e, 4.92:1) --
-       the palette's success-text move. Both stepped with the skill
-       validator's contrast(), not eyeballed. */
-    --dispute:#d03b3b;--dispute-text:#d03b3b;
-    /* Dedicated token for the dashed frontier line: the line used to borrow
-       --muted, which now also fills every superseded point on every chart.
-       It keeps the original gray -- --muted itself was darkened to 4.5:1 for
-       AA text contrast, which is exactly the retuning this token exists to
-       absorb without silently restyling the line. */
-    --frontier-line:#898781;--sans:system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;--mono:ui-monospace,'SF Mono',Menlo,Monaco,monospace;--radius:12px;
-  }
-  @media (prefers-color-scheme: dark) {
-    :root:where(:not([data-theme="light"])) .viz-root,
-    :root:where(:not([data-theme="light"])) body {
-      color-scheme: dark;
-      --surface-1:#1a1a19; --plane:#0d0d0d;
-      --text-primary:#ffffff; --text-secondary:#c3c2b7; --muted:#898781;
-      --grid:#2c2c2a; --axis:#383835; --border:rgba(255,255,255,0.10);
-      --series-prop:#3987e5; --series-open:#d95926; --dim:#6f6d67;
-      --accent:#3987e5; --dispute-text:#e05e5e;
-    }
-  }
-  :root[data-theme="dark"] .viz-root, :root[data-theme="dark"] body {
-    color-scheme: dark;--surface-1:#1a1a19; --plane:#0d0d0d;--text-primary:#ffffff; --text-secondary:#c3c2b7; --muted:#898781;--grid:#2c2c2a; --axis:#383835; --border:rgba(255,255,255,0.10);--series-prop:#3987e5; --series-open:#d95926; --dim:#6f6d67;--accent:#3987e5; --dispute-text:#e05e5e;
-  }
-  *{margin:0;padding:0;box-sizing:border-box}
-  body{font-family:var(--sans);background:var(--plane);color:var(--text-secondary);line-height:1.58;padding:44px 24px 100px;-webkit-font-smoothing:antialiased}
-  /* No width cap: the chart and tables use the whole monitor. Prose blocks keep
-     their own max-width below, because a 3000px-wide paragraph is unreadable. */
-  .page{margin:0 auto;max-width:none}
-  .eyebrow{font-family:var(--mono);font-size:11.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:10px}
-  h1{font-size:34px;line-height:1.15;color:var(--text-primary);font-weight:600;letter-spacing:-.015em;margin-bottom:12px}
-  .lede{font-size:15.5px;max-width:860px;margin-bottom:26px}
-  a{color:var(--accent)}
-
-  .method{background:var(--surface-1);border:1px solid var(--border);border-radius:var(--radius);padding:16px 20px;margin-bottom:16px}
-  .method .label{font-family:var(--mono);font-size:10.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin-bottom:10px}
-  .mgrid{display:grid;grid-template-columns:repeat(5,1fr);gap:14px;font-size:13.5px}
-  @media (max-width:900px){.mgrid{grid-template-columns:repeat(2,1fr)}}
-  .mgrid .k{font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);margin-bottom:2px}
-  .mgrid .v{color:var(--text-primary);font-weight:600}
-
-  .callout{background:var(--surface-1);border:1px solid var(--border);border-left:3px solid var(--accent);border-radius:var(--radius);padding:13px 18px;margin-bottom:30px;font-size:13.5px;max-width:980px}
-  .callout b{color:var(--text-primary)}
-
-  .filters{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:16px}
-  .chip{font-family:var(--mono);font-size:12px;padding:6px 13px;border-radius:999px;border:1px solid var(--border);background:var(--surface-1);color:var(--text-secondary);cursor:pointer;user-select:none;display:inline-flex;align-items:center;gap:7px}
-  /* .chip sets display:inline-flex, and an author rule beats the UA sheet's
-     [hidden]{display:none} -- so without this the pin chips render even when
-     the hidden attribute is set. */
-  .chip[hidden]{display:none}
-  .chip:hover{border-color:var(--accent)}
-  .chip[aria-pressed="true"]{border-color:var(--accent);color:var(--text-primary);box-shadow:0 0 0 1px var(--accent) inset}
-  .chip .dot{width:9px;height:9px;border-radius:50%;display:inline-block}
-  .chip .dot.prop{background:var(--series-prop)}
-  .chip .dot.open{background:var(--series-open)}
-  /* Hollow, matching how these points draw: an absent value, not a third category. */
-  .chip .dot.unk{background:none;border:2px solid var(--series-prop);box-sizing:border-box}
-  select,input[type=search]{font-family:var(--mono);font-size:12px;padding:6px 11px;border-radius:999px;border:1px solid var(--border);background:var(--surface-1);color:var(--text-primary)}
-  .count{font-family:var(--mono);font-size:12px;color:var(--muted);margin-left:auto}
-
-  .card{background:var(--surface-1);border:1px solid var(--border);border-radius:var(--radius);padding:20px;margin-bottom:34px}
-  .cap{font-family:var(--mono);font-size:10.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px}
-  /* explicit: the tooltip is allowed to hang outside the plot and the card */
-  .plotwrap{position:relative;overflow:visible}
-  .card{overflow:visible}
-  svg{display:block;width:100%;height:auto}
-  svg text{font-family:var(--mono);font-size:10.5px;fill:var(--muted)}
-  /* Boxed labels: the filled box hides the gridlines behind the lettering (so
-     no halo is needed), and the leader line ties the text to its own dot. */
-  svg text.lbl{font-size:10px;fill:var(--text-secondary)}
-  svg rect.lblbox{fill:var(--surface-1);stroke:var(--border);stroke-width:1}
-  svg line.lead{stroke:var(--muted);stroke-width:1}
-  .pt{cursor:pointer}
-  .pt.fade{opacity:.18}
-  .pt:focus{outline:none;stroke:var(--accent);stroke-width:4}
-  /* a pinned point keeps a dark ring so you can see what you have stuck down */
-  .pt.pinned{stroke:var(--text-primary);stroke-width:2}
-  svg rect.lblbox.pinned{stroke:var(--accent)}
-  th[data-k]:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
-
-  .legend{display:flex;gap:18px;flex-wrap:wrap;font-size:12.5px;margin:14px 0 2px;font-family:var(--mono);color:var(--text-secondary)}
-  .legend .item{display:inline-flex;align-items:center;gap:7px}
-  .legend .swatch{width:11px;height:11px;border-radius:50%;display:inline-block}
-  .legend .swatch.hollow{background:none !important;border:2px solid var(--series-prop);box-sizing:border-box}
-  .legend .line{width:20px;height:0;border-top:2px dashed var(--frontier-line);display:inline-block}
-
-  .tip{position:absolute;pointer-events:none;opacity:0;background:var(--surface-1);border:1px solid var(--border);border-radius:9px;padding:9px 12px;font-size:12.5px;min-width:190px;max-width:280px;box-shadow:0 6px 22px rgba(0,0,0,.18);z-index:50}
-  .tip.on{opacity:1}
-  /* The fades are a nicety, not information: under prefers-reduced-motion
-     the tooltip and the copy toast must appear and vanish instantly rather
-     than animate. */
-  @media (prefers-reduced-motion: no-preference) {
-    .tip{transition:opacity 120ms ease}
-    .toast{transition:opacity .2s}
-  }
-  .tip .tname{color:var(--text-primary);font-weight:600;font-size:13px;margin-bottom:5px}
-  .tip .trow{display:flex;justify-content:space-between;gap:14px;font-family:var(--mono);font-size:11.5px}
-  .tip .trow .tv{color:var(--text-primary);font-weight:600}
-  .tip .tkey{display:inline-block;width:14px;height:2px;vertical-align:middle;margin-right:6px}
-
-  table{width:100%;border-collapse:separate;border-spacing:0;font-size:13px}
-  th,td{text-align:left;padding:9px 12px;border-bottom:1px solid var(--border)}
-  th{font-family:var(--mono);font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);cursor:pointer;user-select:none;white-space:nowrap;position:sticky;top:0;background:var(--surface-1);z-index:2}
-  th:hover{color:var(--text-primary)}
-  th .ar{opacity:.45}
-  td.n{font-family:var(--mono);text-align:right;font-variant-numeric:tabular-nums;color:var(--text-primary)}
-  td.name{color:var(--text-primary);font-weight:600}
-  tbody tr:hover{background:var(--plane)}
-  .tag{font-family:var(--mono);font-size:10px;padding:1px 7px;border-radius:999px;border:1px solid var(--border);color:var(--text-secondary);white-space:nowrap}
-  .tag.f{border-color:var(--accent);color:var(--accent)}
-  /* Issue #208: disputed cells and tooltip values render red -- the
-     --dispute-text token, 4.5:1 in both modes (see the token block above). */
-  td.n.dispute{color:var(--dispute-text)}
-  .tip .trow .tv.dispute{color:var(--dispute-text)}
-  /* The footer legend's dispute swatch: the mark red, ringed by the
-     surface so it reads on both themes. */
-  .dswatch{display:inline-block;width:10px;height:10px;border-radius:50%;background:var(--dispute);border:2px solid var(--surface-1);box-sizing:border-box}
-  .scroll{max-height:560px;overflow:auto;border:1px solid var(--border);border-radius:var(--radius)}
-  /* An empty filtered slice says so inside the table region instead of
-     leaving a silent zero-row body; aria-live announces the change. */
-  .empty-state{padding:28px 16px;font-size:13.5px;color:var(--text-secondary)}
-  .empty-state[hidden]{display:none}
-
-  h2{font-size:22px;color:var(--text-primary);font-weight:600;margin-bottom:6px;letter-spacing:-.01em}
-  .sub{font-size:14px;margin-bottom:16px;max-width:880px}
-  .toc{display:flex;gap:16px;flex-wrap:wrap;font-family:var(--mono);font-size:12px;margin-bottom:30px}
-  button.action{font-family:var(--mono);font-size:12px;padding:8px 15px;background:var(--surface-1);color:var(--accent);border:1px solid var(--accent);border-radius:8px;cursor:pointer}
-  button.action:hover{background:var(--plane)}
-  .toast{font-family:var(--mono);font-size:11.5px;color:var(--muted);margin-left:10px;opacity:0}
-  .toast.show{opacity:1}
-  .foot{color:var(--muted);font-size:12.5px;margin-top:56px;padding-top:20px;border-top:1px solid var(--border)}
-  /* The global reset removes paragraph margins, so the footer's stacked
-     lines would butt together without re-spacing them here. */
-  .foot p+p{margin-top:8px}
-</style>
+""" + STYLE + r"""</style>
 </head>
 <body class="viz-root">
 <div class="page">
@@ -1416,10 +1282,11 @@ TEMPLATE = r"""<!DOCTYPE html>
     <h1>Frontier models &mdash; capability vs cost and size</h1>
     <p class="lede">Every number on this page comes from
       <a href="https://artificialanalysis.ai/leaderboards/models">artificialanalysis.ai</a> and nowhere else &mdash;
-      the <a href="https://artificialanalysis.ai/leaderboards/models">model leaderboard</a> and the
-      <a href="https://artificialanalysis.ai/agents/coding-agents">Coding Agent Index</a>.
-      The first two charts pair an AA capability index with AA's measured cost to complete one task in
-      that same index, so they share an axis and read against each other; the third swaps that axis for
+      the <a href="https://artificialanalysis.ai/leaderboards/models">model leaderboard</a>, the
+      <a href="https://artificialanalysis.ai/agents/coding-agents">Coding Agent Index</a> and the
+      <a href="https://artificialanalysis.ai/evaluations/gdpval-aa">GDPval-AA evaluation</a>.
+      The first three charts pair an AA capability score with AA's measured cost to complete one task in
+      that same evaluation, so they share an axis and read against each other; the fourth swaps that axis for
       AA's reported total parameter count and so sits apart, last. Together they show both economic and
       parameter efficiency without stitching numbers from different sources.</p>
   </header>
@@ -1428,7 +1295,7 @@ TEMPLATE = r"""<!DOCTYPE html>
     <div class="label">Method</div>
     <div class="mgrid">
       <div><div class="k">Source</div><div class="v">Artificial Analysis</div></div>
-      <div><div class="k">Metric &middot; y</div><div class="v">Coding Agent &middot; Intelligence</div></div>
+      <div><div class="k">Metric &middot; y</div><div class="v">Coding Agent &middot; Intelligence &middot; GDPval-AA v2.1 Elo</div></div>
       <div><div class="k">Metric &middot; x</div><div class="v">Matched $ / task &middot; total parameters</div></div>
       <div><div class="k">Models plotted</div><div class="v" id="mStat">&mdash;</div></div>
       <div><div class="k">Captured</div><div class="v">__CAPTURED__</div></div>
@@ -1440,8 +1307,8 @@ TEMPLATE = r"""<!DOCTYPE html>
     model through each index &mdash; input, cached reads, output and reasoning tokens included &mdash; so a
     verbose reasoning model costs more than its per-token price suggests. That is also why the plot is
     smaller than the full catalogue: AA lists <span id="cTotal">&mdash;</span> models, while complete
-    score-and-cost pairs cover <span id="cCoding">&mdash;</span> agent runs for Coding and <span id="cPlot">&mdash;</span>
-    models for Intelligence; <span id="cParams">&mdash;</span>
+    score-and-cost pairs cover <span id="cCoding">&mdash;</span> agent runs for Coding, <span id="cPlot">&mdash;</span>
+    models for Intelligence and <span id="cAgentic">&mdash;</span> for GDPval-AA v2.1; <span id="cParams">&mdash;</span>
     models have both Intelligence Index and total parameters. Everything else is absent rather than estimated.
   </div>
 
@@ -1451,15 +1318,16 @@ TEMPLATE = r"""<!DOCTYPE html>
     against whatever else you have filtered to. <em>Dump effort levels</em> collapses each model's effort
     settings to a single row at its highest score for each chart, applied before that chart's superseded
     test so every frontier is drawn between models rather than knobs. Because a configuration can peak on
-    one capability but not another, all three charts collapse and judge dominance independently.
+    one capability but not another, all four charts collapse and judge dominance independently.
   </div>
 
   <nav class="toc">
     <a href="#coding">1 &middot; Coding agents</a>
     <a href="#intelligence">2 &middot; Intelligence</a>
-    <a href="#parameters">3 &middot; Parameter efficiency</a>
-    <a href="#frontier">4 &middot; Efficient frontiers</a>
-    <a href="#table">5 &middot; Full table</a>
+    <a href="#agentic">3 &middot; GDPval-AA v2.1</a>
+    <a href="#parameters">4 &middot; Parameter efficiency</a>
+    <a href="#frontier">5 &middot; Efficient frontiers</a>
+    <a href="#table">6 &middot; Full table</a>
   </nav>
 
   <div class="filters" role="group" aria-label="Filters">
@@ -1535,8 +1403,31 @@ TEMPLATE = r"""<!DOCTYPE html>
     </div>
   </section>
 
+  <section id="agentic">
+    <h2>3 &middot; GDPval-AA v2.1 (Elo)</h2>
+    <p class="sub">Agentic work tasks judged against human experts, scored as an Elo rating with no floor:
+      the weakest models score below zero. The cost is the per-task figure AA's GDPval-AA page computes from
+      each model's own tokens and prices; a model priced there by a fallback rate is absent.</p>
+    <div class="card">
+      <div class="cap">GDPval-AA v2.1 (Elo) vs its cost per task &middot; log cost axis &middot; up-and-left is better
+        &middot; click any point to pin its name</div>
+      <div class="plotwrap">
+        <svg id="svg-agentic" viewBox="0 0 980 560" role="img"
+             aria-label="Scatter plot of GDPval-AA v2.1 Elo against its cost per task in US dollars"></svg>
+        <div class="tip" id="tip-agentic" role="status"></div>
+      </div>
+      <div class="legend">
+        <span class="item"><span class="swatch" style="background:var(--series-prop)"></span>Proprietary</span>
+        <span class="item"><span class="swatch" style="background:var(--series-open)"></span>Open-weights</span>
+        <span class="item"><span class="swatch" style="background:var(--muted)"></span>Superseded</span>
+        <span class="item"><span class="line"></span>Efficient frontier</span>
+        <span class="item"><span class="dswatch" aria-hidden="true"></span>Disputed value</span>
+      </div>
+    </div>
+  </section>
+
   <section id="parameters">
-    <h2>3 &middot; Parameter efficiency</h2>
+    <h2>4 &middot; Parameter efficiency</h2>
     <p class="sub">AA Intelligence Index against AA's reported total parameter count. The logarithmic
       x-axis measures model size, not active parameters or inference compute; models missing either value
       are absent rather than estimated.</p>
@@ -1558,7 +1449,7 @@ TEMPLATE = r"""<!DOCTYPE html>
   </section>
 
   <section id="frontier">
-    <h2>4 &middot; The cost-efficient frontiers</h2>
+    <h2>5 &middot; The cost-efficient frontiers</h2>
     <p class="sub">The models nothing else beats on both axes at once for each capability &mdash; no other model is
       simultaneously at least as smart <em>and</em> at least as cheap. Anything missing from this list is
       <b>superseded on that metric</b>. Each layer recomputes against the filters above.</p>
@@ -1571,9 +1462,9 @@ TEMPLATE = r"""<!DOCTYPE html>
   </section>
 
   <section id="table">
-    <h2>5 &middot; Full table</h2>
-    <p class="sub">The union of the three filtered slices, as numbers &mdash; click any header to sort.
-      This is the accessible twin of all three plots: nothing is reachable only by hovering.</p>
+    <h2>6 &middot; Full table</h2>
+    <p class="sub">The union of the four filtered slices, as numbers &mdash; click any header to sort.
+      This is the accessible twin of all four plots: nothing is reachable only by hovering.</p>
     <div style="margin-bottom:12px">
       <button class="action" id="copyMd">Copy as Markdown</button>
       <button class="action" id="copyJson"
@@ -1589,6 +1480,8 @@ TEMPLATE = r"""<!DOCTYPE html>
         <th data-k="ii" style="text-align:right">Intelligence Index <span class="ar" aria-hidden="true">&#8597;</span></th>
         <th data-k="cost" style="text-align:right">Intelligence $ / task <span class="ar" aria-hidden="true">&#8597;</span></th>
         <th data-k="params" style="text-align:right">Parameters <span class="ar" aria-hidden="true">&#8597;</span></th>
+        <th data-k="agenticScore" style="text-align:right">GDPval-AA v2.1 (Elo) <span class="ar" aria-hidden="true">&#8597;</span></th>
+        <th data-k="agenticCost" style="text-align:right">GDPval-AA v2.1 $ / task <span class="ar" aria-hidden="true">&#8597;</span></th>
         <th data-k="pin" style="text-align:right">$ / 1M in <span class="ar" aria-hidden="true">&#8597;</span></th>
         <th data-k="pout" style="text-align:right">$ / 1M out <span class="ar" aria-hidden="true">&#8597;</span></th>
         <th data-k="tps" style="text-align:right">tok/s <span class="ar" aria-hidden="true">&#8597;</span></th>
@@ -1648,6 +1541,7 @@ const DATA = __DATA__;
   $("cTotal").textContent = S.total;
   $("cPlot").textContent  = S.plotted;
   $("cCoding").textContent = S.metricCounts.coding;
+  $("cAgentic").textContent = S.metricCounts.agentic;
   $("cParams").textContent = S.parameterCount;
   $("evals").textContent  = S.evals.join(", ");
 
@@ -1690,10 +1584,12 @@ const DATA = __DATA__;
   const METRICS={
     coding:{label:"Coding Agent Index",svg:"svg-coding",tip:"tip-coding"},
     intelligence:{label:"Intelligence Index",svg:"svg-intelligence",tip:"tip-intelligence"},
+    agentic:{label:"GDPval-AA v2.1 (Elo)",svg:"svg-agentic",tip:"tip-agentic"},
   };
   const PLOTS={
     coding:METRICS.coding,
     parameters:{label:"Parameter efficiency",svg:"svg-parameters",tip:"tip-parameters"},
+    agentic:METRICS.agentic,
   };
   const metricOf=(r,key)=>key==="parameters"
     ? (r.params!=null && r.ii!=null ? {score:r.ii,cost:r.params} : null)
@@ -1709,8 +1605,10 @@ const DATA = __DATA__;
   // parameters never dispute -- both have a single in-run source.
   const variantPair=(r,key)=>{
     const vs=variantsOf(r);
-    if(!vs||key!=="intelligence") return null;
-    return vs.map(v=>v.ii!=null&&v.cost!=null?{score:v.ii,cost:v.cost}:null);
+    if(!vs||key==="parameters"||key==="coding") return null;
+    return vs.map(v=>key==="intelligence"
+      ?(v.ii!=null&&v.cost!=null?{score:v.ii,cost:v.cost}:null)
+      :(v.gdpval!=null&&v.gdpvalCost!=null?{score:v.gdpval,cost:v.gdpvalCost}:null));
   };
   // The per-variant values of one rendered field, or null when the cell
   // shows today's single value: no two PRESENT variant values differ and
@@ -1729,7 +1627,8 @@ const DATA = __DATA__;
   // The variant fields a metric's score/cost cells render -- [score field,
   // cost field] -- or null for a metric that never disputes (coding,
   // parameters). Mirrors build.py's VARIANT_PAIR_FIELDS one for one.
-  const metricVariantFields=key=>key==="intelligence"?["ii","cost"]:null;
+  const metricVariantFields=key=>key==="intelligence"?["ii","cost"]
+    :key==="agentic"?["gdpval","gdpvalCost"]:null;
   // The dispute marks for one row: a red ring on the canonical anchor, a
   // red point per FURTHER generation, a thin solid red connector. Extra
   // points join `pts`, so hover resolves every variant to its row.
@@ -2209,7 +2108,7 @@ const DATA = __DATA__;
     render();
   });
 
-  /* ---------- coding + parameter-efficiency scatters ---------- */
+  /* ---------- coding, parameter-efficiency + agentic scatters ---------- */
   const extraPlots={};
   function drawCapability(key,rows,frontier){
     const cfg=PLOTS[key], chart=$(cfg.svg), NS="http://www.w3.org/2000/svg";
@@ -2225,16 +2124,26 @@ const DATA = __DATA__;
       msg.textContent="No models match these filters."; chart.appendChild(msg);
       extraPlots[key]={w,h,pts:[],front:new Set()}; return;
     }
-    // Coding and parameters never dispute, so the domain is the rows' own
-    // points: no variant point can sit outside it.
-    const costs=rows.map(r=>metricOf(r,key).cost), scores=rows.map(r=>metricOf(r,key).score);
+    // The domain spans every variant point too, or a second generation
+    // outside the canonical range would plot off-chart.
+    const costs=[], scores=[];
+    for(const r of rows){
+      const m=metricOf(r,key);
+      costs.push(m.cost); scores.push(m.score);
+      const vp=variantPair(r,key);
+      if(vp) for(const p of vp) if(p){costs.push(p.cost); scores.push(p.score);}
+    }
     const lo=Math.log10(Math.min(...costs)), hi=Math.log10(Math.max(...costs));
     const pad=(hi-lo)*.06||.3, x0=lo-pad, x1=hi+pad;
-    const yMax=Math.min(100,Math.ceil((Math.max(...scores)+4)/10)*10);
-    const yMin=Math.max(0,Math.floor((Math.min(...scores)-4)/10)*10);
+    // Elo has no 0-100 bounds and goes negative: its ticks step with the span.
+    const sMin=Math.min(...scores), sMax=Math.max(...scores), elo=key==="agentic";
+    let step=elo?10**Math.floor(Math.log10(Math.max(sMax-sMin,10))):10;
+    if(elo&&(sMax-sMin)/step<4) step/=2;
+    const yMax=elo?Math.ceil((sMax+step*.4)/step)*step:Math.min(100,Math.ceil((sMax+4)/10)*10);
+    const yMin=elo?Math.floor((sMin-step*.4)/step)*step:Math.max(0,Math.floor((sMin-4)/10)*10);
     const X=c=>l+(Math.log10(c)-x0)/(x1-x0)*px;
     const Y=v=>t+py-(v-yMin)/(yMax-yMin)*py;
-    for(let v=yMin;v<=yMax;v+=10){
+    for(let v=yMin;v<=yMax;v+=step){
       chart.appendChild(el("line",{x1:l,y1:Y(v),x2:l+px,y2:Y(v),
         stroke:"var(--grid)","stroke-width":1}));
       const tick=el("text",{x:l-9,y:Y(v)+3.5,"text-anchor":"end"});
@@ -2259,7 +2168,7 @@ const DATA = __DATA__;
     const xlabel=el("text",{x:l+px/2,y:h-13,"text-anchor":"middle"});
     xlabel.textContent=key==="parameters"
       ? "Total parameters (billions, log scale) →"
-      : "Cost per "+cfg.label+" task (USD, log scale) →";
+      : "Cost per "+cfg.label.replace(" (Elo)","")+" task (USD, log scale) →";
     chart.appendChild(xlabel);
 
     // The pass's frontier arrives already computed (#109); the Set keeps the
@@ -2277,7 +2186,7 @@ const DATA = __DATA__;
     for(const r of rows){
       const m=metricOf(r,key), x=X(m.cost), y=Y(m.score), on=front.has(r);
       // the de-emphasis gray is page-wide: a point off THIS chart's frontier
-      // draws var(--muted) here and on the other two charts alike, while a
+      // draws var(--muted) here and on the other three charts alike, while a
       // frontier point keeps its weights fill.
       const fill=on?fillOf(r):"var(--muted)";
       const mark=el("circle",{cx:x,cy:y,r:on?6:5,fill:fill,
@@ -2286,6 +2195,7 @@ const DATA = __DATA__;
         "aria-label":"Pin "+r.name+" on the "+cfg.label+" chart",
         "aria-pressed":String(pins.has(r.name))});
       chart.appendChild(mark); pts.push({r,x,y,el:mark});
+      addDisputeMarks(mark,r,key,(x,y)=>[X(x),Y(y)],chart,el,pts,x,y);
     }
 
     // Pinned names get first claim on space, followed by frontier names. A pin
@@ -2368,16 +2278,21 @@ const DATA = __DATA__;
     const hit=nearestCapability(key,ev), cfg=PLOTS[key], chart=$(cfg.svg), box=chart.getBoundingClientRect();
     if(!hit){hideCapabilityTip(key);return;}
     const plot=extraPlots[key], m=metricOf(hit.r,key), popup=$(cfg.tip);
-    // Hover keeps the hovered row's point lit and fades the others.
+    // Hover resolves to the ROW: hovering either of a disputed row's
+    // variant points keeps the whole variant set lit and fades the others.
     for(const p of plot.pts) p.el.classList.toggle("fade",p.r!==hit.r);
     if(lastHovered[key]!==hit.r){
       lastHovered[key]=hit.r;
       popup.innerHTML="";
       const name=document.createElement("div"); name.className="tname"; name.textContent=hit.r.name; popup.appendChild(name);
+      const fields=metricVariantFields(key);
+      const dv=fields?disputedOf(hit.r,fields[0]):null;
+      const dc=fields?disputedOf(hit.r,fields[1]):null;
       const lines=key==="parameters"
         ? [["Intelligence Index",m.score.toFixed(1)],["Parameters",fmtParams(m.cost)],
            ...secondaryRows(hit.r)]
-        : [[cfg.label,m.score.toFixed(1)],["Cost per task",fmtCost(m.cost)],
+        : [[cfg.label,dv?pairText(dv,v=>v.toFixed(1)):m.score.toFixed(1),dv?"dispute":null],
+           ["Cost per task",dc?pairText(dc,fmtCost):fmtCost(m.cost),dc?"dispute":null],
            ...secondaryRows(hit.r)];
       lines.push([key==="parameters" ? "On parameter frontier" : "On frontier",
                   plot.front.has(hit.r) ? "yes" : "no — superseded"]);
@@ -2396,7 +2311,7 @@ const DATA = __DATA__;
     popup.style.top=(down?box.height-popup.offsetHeight-margin:margin)+"px";
   }
 
-  for(const key of ["coding","parameters"]){
+  for(const key of ["coding","agentic","parameters"]){
     const chart=$(PLOTS[key].svg);
     chart.addEventListener("pointermove",ev=>moveCapabilityTip(key,ev));
     chart.addEventListener("pointerleave",()=>hideCapabilityTip(key));
@@ -2434,10 +2349,9 @@ const DATA = __DATA__;
         add(dv?pairText(dv,v=>v.toFixed(1))
               :m.score.toFixed(1), dv?"n dispute":"n");
         add(dc?pairText(dc,fmtCost):fmtCost(m.cost), dc?"n dispute":"n");
-        // Zero is a legal AA score (#146); $/point at 0 capability is not
-        // a number -- em dash, matching the static render, never
-        // "$Infinity".
-        add(m.score?"$"+(m.cost/m.score).toFixed(4):"—","n");
+        // No $/point at zero (#146) or on an Elo (arbitrary zero) -- em dash,
+        // matching the static render, never "$Infinity".
+        add(m.score&&key!=="agentic"?"$"+(m.cost/m.score).toFixed(4):"—","n");
         const td=document.createElement("td");
         const sp=document.createElement("span"); sp.className="tag";
         sp.textContent=weightsOf(r);
@@ -2450,6 +2364,7 @@ const DATA = __DATA__;
     const fields={
       codingScore:["coding","score"],codingCost:["coding","cost"],
       ii:["intelligence","score"],cost:["intelligence","cost"],
+      agenticScore:["agentic","score"],agenticCost:["agentic","cost"],
     };
     if(fields[key]){
       const [metric,field]=fields[key], m=metricOf(r,metric);
@@ -2461,9 +2376,9 @@ const DATA = __DATA__;
 
   function fillTable(metricRows,fronts){
     // The pass's frontier arrives already computed (#109); one Set per metric
-    // over the threaded arrays replaces fillTable's own three recomputations
-    // (coding and intelligence in the METRICS loop, parameters spelled out
-    // after it).
+    // over the threaded arrays replaces fillTable's own four recomputations
+    // (coding, intelligence and agentic in the METRICS loop, parameters
+    // spelled out after it).
     const frontSets={};
     for(const key of Object.keys(fronts)) frontSets[key]=new Set(fronts[key]);
     const rows=[...new Set(Object.values(metricRows).flat())];
@@ -2549,7 +2464,7 @@ const DATA = __DATA__;
       const k=th.dataset.k;
       if(st.sortK===k) st.sortDir*=-1;
       else { st.sortK=k; st.sortDir = (k==="name"||k==="creator"||k==="rel") ? 1 : -1; }
-      // A sort reorders rows, not points: the three charts are a pure function
+      // A sort reorders rows, not points: the four charts are a pure function
       // of the filter state, which a sort never touches, so their DOM is
       // provably identical and redrawing it is pure loss (#84's no-op pin --
       // labels must not move -- holds trivially). Only the tables refill
@@ -2561,7 +2476,7 @@ const DATA = __DATA__;
       // only place charts are drawn.
       const {views,fronts}=computePass();
       fillFrontiers(views,fronts); fillTable(views,fronts);
-      hideTip(); hideCapabilityTip("coding"); hideCapabilityTip("parameters");
+      hideTip(); hideCapabilityTip("coding"); hideCapabilityTip("parameters"); hideCapabilityTip("agentic");
     };
     th.addEventListener("click",activate);
     th.addEventListener("keydown",ev=>{
@@ -2591,8 +2506,8 @@ const DATA = __DATA__;
     // text the table cell shows; an agreeing field exports its single value.
     const disp=(r,f,fmt,single)=>{const dv=disputedOf(r,f);
       return dv?pairText(dv,fmt):single;};
-    const head="| Model | Lab | Coding Agent | Coding Agent $/task | Intelligence | Intelligence $/task | Parameters | $/1M in | $/1M out | Context | Weights |\n"
-              +"|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---|\n";
+    const head="| Model | Lab | Coding Agent | Coding Agent $/task | Intelligence | Intelligence $/task | Parameters | GDPval-AA v2.1 (Elo) | GDPval-AA v2.1 $/task | $/1M in | $/1M out | Context | Weights |\n"
+              +"|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|\n";
     // Every cell goes through mdCell, so a captured name or lab carrying a
     // pipe, backtick or newline round-trips as text instead of restructuring
     // the pasted row.
@@ -2601,6 +2516,8 @@ const DATA = __DATA__;
       disp(r,"ii",v=>v.toFixed(1),val(r,"intelligence","score")),
       disp(r,"cost",fmtCost,val(r,"intelligence","cost")),
       fmtParams(r.params),
+      disp(r,"gdpval",v=>v.toFixed(1),val(r,"agentic","score")),
+      disp(r,"gdpvalCost",fmtCost,val(r,"agentic","cost")),
       disp(r,"pin",v=>"$"+v,r.pin==null?"—":"$"+r.pin),
       disp(r,"pout",v=>"$"+v,r.pout==null?"—":"$"+r.pout),
       disp(r,"ctx",fmtCtx,fmtCtx(r.ctx)),
@@ -2622,6 +2539,7 @@ const DATA = __DATA__;
       coding:metricSlice("coding"),
       intelligence:metricSlice("intelligence"),
       parameters:metricSlice("parameters"),
+      agentic:metricSlice("agentic"),
     };
   }
 
@@ -2651,7 +2569,7 @@ const DATA = __DATA__;
     }
     const {views,fronts}=computePass(), union=[...new Set(Object.values(views).flat())];
     const bits=[views.coding.length+" coding",views.intelligence.length+" intelligence",
-      views.parameters.length+" parameter"];
+      views.parameters.length+" parameter",views.agentic.length+" agentic"];
     if(st.eff) bits.push("effort levels dumped per metric");
     if(st.sup) bits.push("frontiers only");
     // Pins are never cleared by filtering or searching -- they are keyed by
@@ -2667,8 +2585,9 @@ const DATA = __DATA__;
     drawCapability("coding",views.coding,fronts.coding);
     draw(views.intelligence,fronts.intelligence);
     drawCapability("parameters",views.parameters,fronts.parameters);
+    drawCapability("agentic",views.agentic,fronts.agentic);
     fillFrontiers(views,fronts); fillTable(views,fronts); hideTip();
-    hideCapabilityTip("coding"); hideCapabilityTip("parameters");
+    hideCapabilityTip("coding"); hideCapabilityTip("parameters"); hideCapabilityTip("agentic");
     if(focusAfterRender){
       const request=focusAfterRender;
       focusAfterRender=null;
@@ -2688,7 +2607,7 @@ const DATA = __DATA__;
   // re-render on resize so the plot re-fits and labels re-place for the new width
   let rzT=null;
   window.addEventListener("resize",()=>{
-    hideTip(); hideCapabilityTip("coding"); hideCapabilityTip("parameters");
+    hideTip(); hideCapabilityTip("coding"); hideCapabilityTip("parameters"); hideCapabilityTip("agentic");
     clearTimeout(rzT); rzT=setTimeout(render,150);
   });
   render();

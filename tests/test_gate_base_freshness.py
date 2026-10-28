@@ -210,6 +210,7 @@ CORE_PIN = (
     'tests/fixtures/pipeline/aa-raw-models.json',
     'tests/fixtures/pipeline/captured-at.txt',
     'tests/test_aa_aes_gcm.py',
+    'tests/test_agentic_axis.py',
     'tests/test_browser.py',
     'tests/test_browser_temp.py',
     'tests/test_build.py',

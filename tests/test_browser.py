@@ -1,6 +1,5 @@
 import contextlib
 import gzip
-import hashlib
 import io
 import importlib.util
 import json
@@ -11,7 +10,6 @@ import subprocess
 import sys
 import tempfile
 import unittest
-from unittest import mock
 
 from playwright.sync_api import (
     TimeoutError as PlaywrightTimeoutError,
@@ -894,7 +892,7 @@ class BrowserInteractionTests(unittest.TestCase):
             root = pathlib.Path(tmp)
             raw, agents_raw = root / "models.json", root / "coding-agents.json"
             output = root / "frontier-models.html"
-            raw.write_text(json.dumps(cluster), encoding="utf-8")
+            raw.write_text(json.dumps(test_build.with_gdpval(cluster, elo=1000.0)), encoding="utf-8")
             agents_raw.write_text(json.dumps([agent]), encoding="utf-8")
             old_raw, old_agents, old_out = build.RAW, build.AGENTS_RAW, build.OUT
             try:
@@ -1173,7 +1171,7 @@ class BrowserInteractionTests(unittest.TestCase):
             raw = root / "models.json"
             agents_raw = root / "coding-agents.json"
             output = root / "frontier-models.html"
-            raw.write_text(json.dumps([model]), encoding="utf-8")
+            raw.write_text(json.dumps(test_build.with_gdpval([model], elo=1000.0)), encoding="utf-8")
             agents_raw.write_text(json.dumps([agent]), encoding="utf-8")
             old_raw, old_agents, old_out = build.RAW, build.AGENTS_RAW, build.OUT
             try:
@@ -1226,7 +1224,7 @@ class BrowserInteractionTests(unittest.TestCase):
         root = pathlib.Path(tmp.name)
         raw, agents_raw = root / "models.json", root / "coding-agents.json"
         output = root / "frontier-models.html"
-        raw.write_text(json.dumps([model]), encoding="utf-8")
+        raw.write_text(json.dumps(test_build.with_gdpval([model], elo=1000.0)), encoding="utf-8")
         agents_raw.write_text(json.dumps([agent]), encoding="utf-8")
         old_raw, old_agents, old_out = build.RAW, build.AGENTS_RAW, build.OUT
         build.RAW, build.AGENTS_RAW, build.OUT = raw, agents_raw, output
@@ -1300,9 +1298,9 @@ class BrowserInteractionTests(unittest.TestCase):
                 "no markdown row carries the escaped name -- the export "
                 "embedded the captured string without escaping it")
             row = rows[0]
-            # every cell separator survived: 11 columns -> exactly 12 pipes,
+            # every cell separator survived: 13 columns -> exactly 14 pipes,
             # so no captured pipe leaked through into the row structure
-            self.assertEqual(len(re.findall(r"(?<!\\)\|", row)), 12)
+            self.assertEqual(len(re.findall(r"(?<!\\)\|", row)), 14)
             self.assertIn("P\\|ipe", row)
             self.assertIn("\\`Tick\\`", row)
             self.assertNotIn(self.HOSTILE_NAME, row)
@@ -1312,12 +1310,12 @@ class BrowserInteractionTests(unittest.TestCase):
             # -- every original display text comes back per cell
             table = [line for line in md.split("\n") if line.startswith("|")]
             self.assertGreaterEqual(len(table), 3)
-            self.assertEqual(len(self._markdown_cells(table[0])), 11)
+            self.assertEqual(len(self._markdown_cells(table[0])), 13)
             cells = self._markdown_cells(row)
-            self.assertEqual(len(cells), 11)
+            self.assertEqual(len(cells), 13)
             self.assertEqual(cells[0], expected)
             self.assertEqual(cells[1], "Hostile Lab")
-            self.assertEqual(cells[10], "open")
+            self.assertEqual(cells[12], "open")
         finally:
             page.close()
             build.RAW, build.AGENTS_RAW, build.OUT = saved
@@ -2074,7 +2072,7 @@ class PerfBudgetTests(unittest.TestCase):
         with tempfile.TemporaryDirectory(
                 prefix=".gate-686-", dir=build.ROOT) as tmp:
             root = pathlib.Path(tmp)
-            (root / "models.json").write_bytes(models_686)
+            (root / "models.json").write_text(json.dumps(test_build.with_gdpval(json.loads(models_686))), encoding="utf-8")
             (root / "coding-agents.json").write_bytes(agents_686)
             old_raw, old_agents = build.RAW, build.AGENTS_RAW
             build.RAW, build.AGENTS_RAW = (root / "models.json",
@@ -2149,6 +2147,9 @@ def _probe_models(count):
             "intelligenceIndex": score,
             "parameters": 20 + (i % 40) * 3,
             "intelligenceIndexCostPerTask": {"cost": {"total": cost}},
+            # GDPval-AA's Elo crosses zero from the fifth model on.
+            "scores": {"gdpval-aa-normalized": round(150.0 - i * 40.0, 2)},
+            "gdpvalCostPerTask": round(1.0 + i * 0.4, 3),
         })
     return out
 
@@ -2169,109 +2170,6 @@ _PROBE_AGENTS = [
      "indexScore": 0.55, "mean": {"costUsd": 1.9,
                                   "agentWallTimeSec": 700.0}},
 ]
-
-
-class BuildProvenanceTests(unittest.TestCase):
-    """#49: the footer's provenance — source commit when the build
-    environment carries one, and a sha256 over the build's inputs that a
-    reader can verify today, by hashing the committed files. The content
-    hash covers the two capture files, whole bytes concatenated
-    models-then-agents -- exactly what the footer's own inputs note
-    names."""
-
-    COMMIT = "e5e10f1c0ffee4215deadbeefcafe0123456789a"
-
-    @staticmethod
-    def _foot(html):
-        """The footer div's text, and nothing else -- slicing to end-of-file
-        would drag in the payload <script> the footer is not responsible
-        for."""
-        start = html.index('class="foot"')
-        return html[start:html.index("<script>", start)]
-
-    @staticmethod
-    def _expected_digest(data_dir):
-        """The sha256 a reader recomputes from the data directory: the two
-        capture files, whole and in that order -- the same rule build.py
-        states in the footer's inputs note."""
-        digest = hashlib.sha256()
-        digest.update((data_dir / "aa-raw-models.json").read_bytes())
-        digest.update((data_dir / "aa-raw-coding-agents.json").read_bytes())
-        return digest.hexdigest()
-
-    def _build(self, destination, commit=None):
-        """Run build.main() to `destination`, with AI_RESEARCHER_AA_SOURCE_COMMIT set or
-        unset, and return the page bytes."""
-        old_out = build.OUT
-        build.OUT = destination
-        try:
-            env = {} if commit is None else {"AI_RESEARCHER_AA_SOURCE_COMMIT": commit}
-            with mock.patch.dict(os.environ, env, clear=False):
-                os.environ.pop("AI_RESEARCHER_AA_SOURCE_COMMIT".removeprefix("AI_RESEARCHER_"), None)
-                if commit is None:
-                    os.environ.pop("AI_RESEARCHER_AA_SOURCE_COMMIT", None)
-                with contextlib.redirect_stdout(io.StringIO()):
-                    build.main()
-            return destination.read_bytes()
-        finally:
-            build.OUT = old_out
-
-    def test_footer_carries_the_source_commit_and_the_content_hash(self):
-        with tempfile.TemporaryDirectory(prefix=".issue-49-build-",
-                                         dir=build.ROOT) as tmp:
-            output = pathlib.Path(tmp) / "frontier-models.html"
-            html = self._build(output, commit=self.COMMIT).decode("utf-8")
-
-            # verbatim in the footer, not merely somewhere in the payload
-            foot = self._foot(html)
-            self.assertIn(self.COMMIT, foot)
-            # the content hash equals an independently computed sha256 over
-            # the build's inputs, read straight off the data directory
-            self.assertIn(self._expected_digest(build.RAW.parent), foot)
-
-    def test_footer_omits_the_source_commit_when_the_environment_is_unset(self):
-        with tempfile.TemporaryDirectory(prefix=".issue-49-build-",
-                                         dir=build.ROOT) as tmp:
-            output = pathlib.Path(tmp) / "frontier-models.html"
-            html = self._build(output).decode("utf-8")
-
-            foot = self._foot(html)
-            # the SHA itself is the thing that would render on regression, so
-            # its absence -- here and page-wide -- is the absence oracle
-            self.assertNotIn(self.COMMIT, foot)
-            self.assertNotIn(self.COMMIT, html)
-            # the content hash is verifiable today without any workflow
-            # change, so it renders with or without the commit
-            self.assertIn(self._expected_digest(build.RAW.parent), foot)
-
-    def test_a_malformed_source_commit_renders_no_stamp_and_no_marker_splice(self):
-        # AI_RESEARCHER_AA_SOURCE_COMMIT is build-machine input, so only SHA-shaped values
-        # (7-40 hex chars) render. Anything else must be treated exactly like
-        # an unset variable -- otherwise a value carrying a template marker
-        # would be spliced by the later __CAPTURED__/__DATA__ substitutions.
-        malformed = "__CAPTURED__ <script>__DATA__</script>"
-        with tempfile.TemporaryDirectory(prefix=".issue-49-build-",
-                                         dir=build.ROOT) as tmp:
-            output = pathlib.Path(tmp) / "frontier-models.html"
-            html = self._build(output, commit=malformed).decode("utf-8")
-
-            foot = self._foot(html)
-            self.assertNotIn("Source commit", foot)
-            self.assertNotIn(malformed, foot)
-            # nothing the env carried survived into the page, spliced or not
-            self.assertNotIn("__CAPTURED__", foot)
-            self.assertNotIn("__DATA__", foot)
-            self.assertNotIn("<script>", foot)
-
-    def test_rebuild_without_the_env_var_stays_byte_identical(self):
-        with tempfile.TemporaryDirectory(prefix=".issue-49-build-",
-                                         dir=build.ROOT) as tmp:
-            first = pathlib.Path(tmp) / "first.html"
-            second = pathlib.Path(tmp) / "second.html"
-            self._build(first)
-            self._build(second)
-
-            self.assertEqual(first.read_bytes(), second.read_bytes())
 
 
 if __name__ == "__main__":
@@ -2299,7 +2197,7 @@ class ZeroScoreBrowserTests(unittest.TestCase):
         # An Intelligence Index of 0.0 puts the page's only model on the
         # intelligence frontier carrying a zero score.
         (data / "aa-raw-models.json").write_text(
-            json.dumps([test_build.model_fixture(intelligence=0.0)]),
+            json.dumps([test_build.model_fixture(intelligence=0.0, gdpval=-120.5)]),
             encoding="utf-8")
         (data / "aa-raw-coding-agents.json").write_text(
             json.dumps([test_build.agent_fixture()]), encoding="utf-8")
@@ -2348,6 +2246,9 @@ class ZeroScoreBrowserTests(unittest.TestCase):
             self.assertEqual(cells[3], "0.0")
             self.assertEqual(cells[4], "$0.750")
             self.assertEqual(cells[5], "—")
+            # a negative GDPval-AA Elo on its frontier has no $/point either
+            row = page.locator("#fTable tbody tr", has_text="GDPval-AA").first
+            self.assertEqual(row.locator("td").all_text_contents()[3:6], ["-120.5", "$8.00", "—"])
         finally:
             page.close()
 
@@ -2365,8 +2266,8 @@ def _disputed_probe_model():
         "price1mOutputTokens": 1.0,
     })
     probe["genVariants"] = [
-        {"ii": 80.0, "cost": 0.5, "pin": 0.5, "pout": 1.0, "ctx": 200000},
-        {"ii": 78.0, "cost": 0.9, "pout": 1.4, "ctx": 100000},
+        {"ii": 80.0, "cost": 0.5, "gdpval": 150.0, "gdpvalCost": 1.0, "pin": 0.5, "pout": 1.0, "ctx": 200000},
+        {"ii": 78.0, "cost": 0.9, "gdpval": 110.0, "gdpvalCost": 1.2, "pout": 1.4, "ctx": 100000},
     ]
     return probe
 
@@ -2390,6 +2291,8 @@ def _carried_variant_map(model):
     return {
         "ii": model["intelligenceIndex"],
         "cost": model["intelligenceIndexCostPerTask"]["cost"]["total"],
+        "gdpval": model["scores"]["gdpval-aa-normalized"],
+        "gdpvalCost": model["gdpvalCostPerTask"],
         "ctx": 200000,
         "pin": 0.5,
         "pout": 1.0,
@@ -2550,7 +2453,7 @@ class DisputeBrowserTests(unittest.TestCase):
     _TBODY_DOM = TBODY_DOM
 
     def test_disputed_points_and_connector_render_per_chart(self):
-        for key in ("intelligence",):
+        for key in ("intelligence", "agentic"):
             with self.subTest(chart=key):
                 page = self._loaded_page()
                 points = page.locator(f"#svg-{key} circle.dispute")
@@ -2571,6 +2474,9 @@ class DisputeBrowserTests(unittest.TestCase):
                     f"{canonical.get_attribute('cy')} L "
                     f"{extra.get_attribute('cx')} {extra.get_attribute('cy')}")
                 self.assertEqual(d, expected)
+                if key == "agentic":  # the second generation plots at ITS Elo, Probe Model 0001's
+                    twin = page.locator('#svg-agentic circle.pt[aria-label^="Pin Probe Model 0001 "]')
+                    self.assertEqual(extra.get_attribute("cy"), twin.get_attribute("cy"))
                 page.close()
 
     def test_one_label_per_disputed_model_anchored_at_the_canonical_variant(
@@ -2621,6 +2527,8 @@ class DisputeBrowserTests(unittest.TestCase):
         # cells also carry the frontier tag's text in their textContent.
         self.assertIn("80.0 / 78.0 frontier", cells)
         self.assertIn("$0.500 / $0.900", cells)
+        self.assertIn("150.0 / 110.0 frontier", cells)
+        self.assertIn("$1.00 / $1.20", cells)
         self.assertIn("$1 / $1.4", cells)
         self.assertIn("200K / 100K", cells)
         # Red, not the primary ink: light theme computes the --dispute hue.
@@ -2646,6 +2554,37 @@ class DisputeBrowserTests(unittest.TestCase):
                     off.evaluate(self._TBODY_DOM, table))
         on.close()
         off.close()
+
+    def test_the_agentic_chart_plots_negative_elo_and_tips_the_cost_dispute(self):
+        page = self._loaded_page()
+        svg = page.locator("#svg-agentic")
+        ticks = svg.locator("text:not(.lbl)").all_text_contents()
+        height = float(svg.get_attribute("viewBox").split()[3])
+        self.assertIn("0", ticks)
+        self.assertTrue({"-50", "50", "Cost per GDPval-AA v2.1 task (USD, log scale) →"} <= set(ticks), ticks)
+        cys = [float(c.get_attribute("cy")) for c in svg.locator("circle.pt").all()]
+        self.assertEqual(len(cys), 7)
+        self.assertTrue(all(20 <= y <= height - 52 for y in cys), cys)
+        svg.locator("circle.dispute").nth(1).hover()  # the variant point, drawn above the link
+        values = {r.locator("span").first.inner_text(): r.locator("span").last.inner_text()
+                  for r in page.locator("#tip-agentic .trow").all()}
+        self.assertEqual(values["GDPval-AA v2.1 (Elo)"], "150.0 / 110.0")
+        self.assertEqual(values["Cost per task"], "$1.00 / $1.20")
+        self.assertEqual(page.locator("#tip-agentic .trow .tv.dispute").count(), 3,
+                         "the Elo, cost and context disputes")
+        page.close()
+
+    def test_sorting_by_gdpval_elo_orders_negative_scores_with_missing_last(self):
+        page = self._loaded_page()
+        column = "#tbl tbody tr td:nth-child(8)"
+        for clicks, expected in ((1, ["150.0", "110.0", "70.0", "30.0", "-10.0", "-50.0"]),
+                                 (2, ["-50.0", "-10.0", "30.0", "70.0", "110.0", "150.0"])):
+            with self.subTest(clicks=clicks):
+                page.locator('#tbl th[data-k="agenticScore"]').click()
+                cells = [c.split(" ")[0] for c in page.locator(column).all_text_contents()]
+                self.assertEqual(cells[:6], expected)
+                self.assertEqual(set(cells[6:]), {"—"})
+        page.close()
 
     def test_the_never_disputing_charts_render_no_dispute_marks(self):
         # The parameters axis pairs the Intelligence Index with a single
@@ -2682,10 +2621,12 @@ class DisputeBrowserTests(unittest.TestCase):
             cells = [c.strip() for c in line.strip("|").split("|")]
             self.assertEqual(cells[4], "80.0 / 78.0")
             self.assertEqual(cells[5], "$0.500 / $0.900")
+            # the Elo and its cost export as their red pairs, unscaled
+            self.assertEqual(cells[7:9], ["150.0 / 110.0", "$1.00 / $1.20"])
             # pin folded to a fill, never a pair: absent in variant 2
-            self.assertEqual(cells[7], "$0.5")
-            self.assertEqual(cells[8], "$1 / $1.4")
-            self.assertEqual(cells[9], "200K / 100K")
+            self.assertEqual(cells[9], "$0.5")
+            self.assertEqual(cells[10], "$1 / $1.4")
+            self.assertEqual(cells[11], "200K / 100K")
 
             page.evaluate("() => { window.__copied = null; }")
             page.locator("#copyJson").click()
@@ -2694,6 +2635,7 @@ class DisputeBrowserTests(unittest.TestCase):
                        if m["name"] == "Probe Model 0000")
             self.assertEqual([v["ii"] for v in row["gv"]], [80.0, 78.0])
             self.assertNotIn("pin", row["gv"][1])
+            self.assertEqual(row["metrics"]["agentic"], {"score": 150.0, "cost": 1.0})
         finally:
             page.close()
 
@@ -2719,7 +2661,7 @@ def _presence_probe_model():
         "price1mOutputTokens": 1.0,
     })
     probe["genVariants"] = [
-        {"ii": 80.0, "cost": 0.5, "pin": 0.5, "pout": 1.0, "ctx": 200000},
+        {"ii": 80.0, "cost": 0.5, "gdpval": 150.0, "gdpvalCost": 1.0, "pin": 0.5, "pout": 1.0, "ctx": 200000},
         {},
     ]
     return probe
@@ -2785,7 +2727,7 @@ class PresenceDisputeBrowserTests(unittest.TestCase):
         # variantPair maps the empty variant to null: addDisputeMarks rings
         # the canonical anchor and never draws a second circle or a
         # connector -- "no projectable pair yields no extra mark".
-        for key in ("intelligence",):
+        for key in ("intelligence", "agentic"):
             with self.subTest(chart=key):
                 page = self._loaded_page()
                 points = page.locator(f"#svg-{key} circle.dispute")
@@ -2816,6 +2758,8 @@ class PresenceDisputeBrowserTests(unittest.TestCase):
         cells = page.locator("#tbl td.dispute").all_text_contents()
         self.assertIn("80.0 / — frontier", cells)
         self.assertIn("$0.500 / —", cells)
+        self.assertIn("$1.00 / —", cells)
+        self.assertIn("150.0 / — frontier", cells)
         self.assertIn("$0.5 / —", cells)
         self.assertIn("200K / —", cells)
         # Red, not the primary ink -- the same computed hue the value

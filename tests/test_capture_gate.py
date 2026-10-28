@@ -419,10 +419,10 @@ class GenerationStateStagingTests(unittest.TestCase):
         # A published missing marker wins; an omitted detail key can carry.
         extra: dict = {
             "medianOutputTokensPerSecond": speed,
-            "intelligenceIndexTimePerTask": speed}
+            "intelligenceIndexTimePerTask": speed, "scores": {"gdpval-aa-normalized": 900.0}}
         detail = {"parameters": 1000000000, "intelligenceIndexCostPerTask": {
             "cost": {"total": 0.75}, "evaluations": test_fetch_aa.v5_evaluations(0.75)}}
-        self.harness.run_hour(ii, day=day, detail_fields=detail, **extra)
+        self.harness.run_hour(ii, day=day, detail_fields=detail, gdpval=test_fetch_aa.fixture_gdpval(), **extra)
         for source, dest in (
                 ("aa-raw-models.json", "aa-raw-models.json"),
                 ("agents.json", "aa-raw-coding-agents.json"),
@@ -458,8 +458,8 @@ class GenerationStateStagingTests(unittest.TestCase):
         self.establish_hold()
         self.assertEqual(run_gate(), (0, "true\n"))
         row = build.build_rows(json.loads(self.harness.output.read_bytes()))[0]
-        self.assertEqual((row["tps"], row["secs"]), (100, 100))
-        self.assertEqual([v["ii"] for v in row["gv"]], [50, 40])
+        self.assertEqual((row["tps"], row["secs"]), (150, 150))
+        self.assertEqual([v["ii"] for v in row["gv"]], [40, 50])
         self.commit_hour()
         for ii, speed in ((40, 150), (50, 100)):
             with self.subTest(ii=ii):
@@ -471,17 +471,17 @@ class GenerationStateStagingTests(unittest.TestCase):
     def assert_missing_speed_quiet(self, first, second):
         self.establish_hold(first, second)
         row = build.build_rows(json.loads(self.harness.output.read_bytes()))[0]
-        self.assertEqual((row["tps"], row["secs"]), (second, second))
+        self.assertEqual((row["tps"], row["secs"]), (first, first))
         self.commit_hour()
         for ii, speed in ((40, first), (50, second)):
             self.stage_hour(ii, speed=speed, day=4)
             self.assertEqual(run_gate(), (0, "false\n"))
 
     def test_missing_canonical_held_speeds_remain_quiet_through_gate(self):
-        self.assert_missing_speed_quiet(150, None)
+        self.assert_missing_speed_quiet(None, 100)
 
     def test_missing_other_held_speeds_remain_quiet_through_gate(self):
-        self.assert_missing_speed_quiet(None, 100)
+        self.assert_missing_speed_quiet(150, None)
 
     def test_each_gate_side_renders_its_own_state_from_git_or_disk(self):
         self.establish_hold()

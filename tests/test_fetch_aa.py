@@ -23,10 +23,17 @@ import build  # noqa: E402  # pylint: disable=wrong-import-position
 from test_build import v5_evaluations  # noqa: E402  # pylint: disable=wrong-import-position,wrong-import-order
 
 
-def legacy_main():
-    """Exercise the existing routes without an evaluation dataset."""
-    with unittest.mock.patch.object(fetch_aa.fetch_gdpval, "fetch", return_value=None):
+def legacy_main(evaluation=None):
+    """Exercise the existing routes with `evaluation` as the GDPval route's read
+    (fetch_gdpval.fetch's return); None reads no evaluation dataset."""
+    with unittest.mock.patch.object(fetch_aa.fetch_gdpval, "fetch", return_value=evaluation):
         fetch_aa.main()
+
+
+def fixture_gdpval(cost=2.0):
+    """The GDPval route's read for fixture-model: one own-priced cost."""
+    return fetch_aa.fetch_gdpval.Evaluation(
+        [{"slug": "fixture-model", "intelligenceIndex": 51}], {"fixture-model": cost}, "/data/fixture.txt")
 
 
 def flight_html(*payloads: str) -> str:
@@ -1951,7 +1958,7 @@ class GenVariantsSeamTests(unittest.TestCase):
         # record carrying every dispute-capable field, through the
         # producer, comes out in exactly the consumer's declared order --
         # and the row build.py emits carries its gv in the same order.
-        record = priced_look("a", 1.0)
+        record = dict(priced_look("a", 1.0), gdpvalCostPerTask=2.0, scores={"gdpval-aa-normalized": 900.0})
 
         variant = fetch_aa.variant_fields(record)
 
@@ -2461,7 +2468,7 @@ class TestGenerationRevisit(unittest.TestCase):
         self.stack.enter_context(unittest.mock.patch.object(fetch_aa, "_sleep"))
 
     def run_hour(self, ii, *, second=None, day=1, enabled=True,
-                 detail_fields=None, extra_rows=(), **extra):
+                 detail_fields=None, extra_rows=(), gdpval=None, **extra):
         base = self.root / "base.html"
         detail = self.root / "detail.html"
         methodology = self.root / "methodology.html"
@@ -2491,7 +2498,7 @@ class TestGenerationRevisit(unittest.TestCase):
                                            return_value=datetime.date(2026, 10, day)), \
                 unittest.mock.patch.object(fetch_aa, "_sleep", side_effect=between_looks), \
                 contextlib.redirect_stdout(stdout):
-            legacy_main()
+            legacy_main(gdpval)
         return json.loads(self.output.read_text()), stdout.getvalue()
 
     def state(self):

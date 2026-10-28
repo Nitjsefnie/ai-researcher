@@ -22,6 +22,11 @@ re-litigate.
   lab-vs-3p `alt` numbers) and its purged corpus must not be reintroduced.
 - One source, so no per-cell citation: the page states its source once,
   prominently, and links the leaderboard.
+- The GDPval-AA cost is AA's own figure: `scripts/fetch_gdpval.py` (called by
+  `fetch_aa.py`) computes it exactly as AA's evaluation page does, from AA's
+  measured inputs (token counts, prices, cache-hit rate, its task count), with
+  nothing estimated; a model the page gives no own cost, fallback-blended ones
+  included, is absent from that axis.
 
 The Hugging Face trending and OpenRouter weekly top-10 lists are separate
 outputs (`scripts/fetch_hf_trending.py` → `data/hf-trending.json`,
@@ -40,6 +45,7 @@ reasoning model costs more than its sticker price — the point of using it.
 |---|---|---|---|
 | coding | Coding Agent Index v1.4 | `/agents/coding-agents` | agent + model |
 | intelligence | Intelligence Index v5.0 | leaderboard + model detail | model |
+| agentic | GDPval-AA v2.1 (Elo) | Elo: leaderboard + model detail; cost: `/evaluations/gdpval-aa` + the data file it loads | model |
 | parameters | Intelligence Index vs parameters | leaderboard + model detail | model |
 
 - **Coding Agent Index**: DeepSWE, Terminal-Bench v2.1, SWE-Atlas-QnA at equal
@@ -50,8 +56,16 @@ reasoning model costs more than its sticker price — the point of using it.
   FrontierCode 2.0, Terminal-Bench 4.0, Terminal-Bench-Science 0.1, CritPt v2
   (Hard Subset), AA-Omniscience v1.1, HLE-Diamond, in four categories at 25%
   each. Cost is AA's `cost.total`.
-
-GDPval-AA left the Intelligence Index in v5.0; AA's cost breakdown no longer carries it, and its evaluation page publishes only token counts for a subset of models, so no AA-published same-run cost exists for the axis. The axis returns only if AA publishes a GDPval cost.
+- **GDPval-AA v2.1**: one evaluation, outside the Intelligence Index; the
+  score is its Elo, unbounded and possibly negative. Cost is
+  `gdpvalCostPerTask`: the model's own GDPval token counts (input, cacheable
+  input, reasoning, answer) at its own input, cache-hit, cache-write and output
+  prices and cache-hit rate, divided by AA's 220-task count, as the evaluation
+  page's chart computes it; a missing cache-hit or cache-write price falls back
+  to the input price, as AA's page does. A model whose evaluation row has no
+  Elo, no token counts, a missing price or cache-hit rate the computation
+  needs, a cost not above zero, or a nonzero GDPval rate in
+  `priceFallbackByModelId` has no cost.
 
 **Never use `codingIndex` or `agenticIndex`**: AA scores them from
 Terminal-Bench v2.1 and τ³-Banking, whose costs v4.3 removed from the
@@ -90,6 +104,26 @@ Vendor-retired models stay visible and tagged, preserving the independent
 Detail-only records join after the in-run comparison, so
 they cannot alter its dispute or canonical order.
 
+### Third route: the GDPval-AA evaluation page
+
+`scripts/fetch_gdpval.py` reads `/evaluations/gdpval-aa`, takes the data
+file's path and key from the page's flight `manifest`, authenticates and
+decrypts the file (AES-256-GCM), and computes each model's cost; of all that,
+only `gdpvalCostPerTask` enters the capture.
+- The Elo comes from the leaderboard's `scores["gdpval-aa-normalized"]`; the
+  detail route's top-level `gdpval` is read only for a record with no `scores`
+  mapping (a detail-only model).
+- The cost comes only from the evaluation route.
+- The evaluation page's own Elo is never used; a null one only withholds that
+  model's cost.
+- A quiet run joins the costs by slug. A disputed run joins them only to each
+  look whose generation the evaluation records match, on the slugs and the
+  dispute-capable fields both routes carry; matching neither look joins no
+  cost and counts one more in-run generation.
+- The Elo and the cost are dispute-capable, so every dispute layer holds them
+  like any other disputed value, and the look-back never fills a missing cost
+  from the previous capture (CONTRIBUTING.md "Capture dispute layers").
+
 ### Inconsistency: keep both versions (standing rule)
 
 Inconsistency is two versions of one thing asserted at once where precedence
@@ -105,8 +139,11 @@ capture's merge, dispute or look-back code, and whenever a page shows "held
 since" or the run prints the 7-day hold warning. In short:
 - **In-run**: the run's two leaderboard looks, 180 s apart, are fingerprinted
   (`generation_key`); two fingerprints, or one on different slug sets (Overseer
-  ruling, 2026-10-06, issue #211), hold both generations in `genVariants`. The
-  detail route never raises a dispute by itself.
+  ruling, 2026-10-06, issue #211), hold both generations in `genVariants`.
+  Neither the detail route nor the GDPval-AA evaluation route raises a dispute
+  by itself, but an evaluation read matching neither disputed look joins no
+  GDPval-AA cost, and an agentic axis left empty refuses at the build until
+  AA's routes converge.
 - **Cross-run generation** (`--cross-run-lookback`, the refresh workflow's flag only: a hand run does not
   pass it; state in
   `data/aa-generation-state.json`): a remembered revisit holds both generations
@@ -118,11 +155,14 @@ since" or the run prints the 7-day hold warning. In short:
   reverse, is merged and disputed; one merged from the previous capture carries
   `crossRunMerged: true`.
 
-**Disputed hours** are ordinary: the run never exits red, the page renders both
-values red in canonical pair order, and the scheduled commit's body carries the
-differ's Disputes section. The capture is merged and dispute-bearing (two
-routes, every held generation), so the page's raw-byte provenance digest is a
-sha256 over that merged content, never over AA's raw payload.
+**Disputed hours** are ordinary: the run never exits red (except one whose
+GDPval-AA evaluation read matches neither leaderboard look: it joins no cost,
+and an agentic axis left empty refuses at the build until AA's routes
+converge), the page renders both values red in canonical pair order, and the
+scheduled commit's body carries the differ's Disputes section. The capture is
+merged and dispute-bearing (three routes, every held generation), so the
+page's raw-byte provenance digest is a sha256 over that merged content, never
+over AA's raw payload.
 
 ### Rows
 
@@ -133,7 +173,7 @@ included. `coding_agent_rows` takes every object carrying `indexScore` and
 `mean.costUsd`, wherever it sits, deduped by id.
 
 **Two row universes, one table.** Rows carry a `kind`: `model` rows have the
-intelligence and parameter axes, `agent` rows have coding, and neither
+intelligence, agentic and parameter axes, `agent` rows have coding, and neither
 has the other's columns. An agent row inherits weights status by matching
 `hostModelSlug` to the captured model's `slug`; runs on models AA has no row for
 (unreleased codenames) are **unknown**, drawn hollow, never defaulted to
@@ -178,6 +218,15 @@ or hand-fix JSON — when:
   the previous capture were judged when captured), or per-evaluation costs stop
   summing to the published total — except an all-dropped window hour, which is
   reported and returned (issue #217);
+- the GDPval-AA evaluation page's title stops naming `fetch_gdpval.py`'s
+  pinned `GDPVAL_VERSION` (2.1). The cost divides by the pinned
+  `GDPVAL_TASK_COUNT` (220), which is never read from the page: a task-count
+  change under the same v2.1 title would rescale every cost unnoticed, a known
+  limitation that no check guards;
+- the evaluation page or its flight `manifest` is missing or invalid, or its
+  data file is unreadable, fails authentication or decryption, fails to
+  decompress or parse, changes schema, or shares no dispute-capable field with
+  the leaderboard — each message naming the page URL or the data file's path;
 - the Coding Agent Index falls below `CODING_ROW_FLOOR` paired rows.
 
 A route disagreement is never one of these: precedence resolves it, silently and
@@ -196,7 +245,9 @@ Window evidence counts leaderboard models after validating the whole union;
 detail-only breakdowns cannot clear it, even on models that render no rows.
 Every other empty axis refuses: with a marker, naming the window and the
 generation count it records (or that it records none); without one, as the
-go-re-read-AA-by-hand signal for a real shape change.
+go-re-read-AA-by-hand signal for a real shape change. An empty agentic axis
+never holds, and its refusal adds that no GDPval-AA evaluation cost joined
+the capture.
 
 Never hand-edit either capture. Re-publishing a slug adds a version and never
 destroys history.
@@ -291,7 +342,8 @@ instead of committing a mangled capture; the suite runs before the commit, so a
 capture that breaks the page leaves the last good capture committed and the
 last good page live. A cross-route disagreement is never a failure: that hour's
 only scheduled commit is `Refresh capture: …`, with nothing estimated or
-interpolated.
+interpolated. The one red disputed hour is the GDPval-AA case under "Disputed
+hours".
 
 ## Commit / co-author trailer
 
