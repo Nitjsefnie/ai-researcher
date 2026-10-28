@@ -180,8 +180,7 @@ def test_the_pin_refuses_a_tracked_file_the_pipeline_cannot_commit():
     assert 'scripts/ci/not-a-bot-data-file.py' not in CORE_PIN
 
 
-# The derived set -- the pin itself. Frozen so a required job naming a new
-# file forces a same-commit pin change.
+# The derived set is pinned; a required job naming a new file forces a same-commit pin change.
 CORE_PIN = (
     '.github/ci-thresholds.json',
     '.github/workflows/actionlint.yml',
