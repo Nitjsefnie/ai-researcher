@@ -41,8 +41,7 @@ ROOT_FOR_IMPORT = pathlib.Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT_FOR_IMPORT))
 
 from build import (  # noqa: E402  # pylint: disable=wrong-import-position
-    GDPVAL_INDEX_WEIGHT, GDPVAL_SLUG, INDEX_VERSION, SUM_TOLERANCE,
-    breakdown_matches_total, evaluation_cost_per_task, merge_captures,
+    INDEX_EVAL_WEIGHTS, INDEX_VERSION, SUM_TOLERANCE, merge_captures,
 )
 
 URL = "https://artificialanalysis.ai/leaderboards/models"
@@ -153,8 +152,8 @@ NEVER_RED_FIELDS = frozenset({
 # outside this list never renders twice, so two published values for it
 # are not a dispute (the canonical generation's value simply wins).
 DISPUTE_CAPABLE = ("intelligenceIndex", "intelligenceIndexCostPerTask",
-                   "gdpvalNormalized", "contextWindowTokens",
-                   "price1mInputTokens", "price1mOutputTokens")
+                   "contextWindowTokens", "price1mInputTokens",
+                   "price1mOutputTokens")
 
 
 def _sleep(seconds: float) -> None:
@@ -376,16 +375,19 @@ def label(m: dict) -> str:
 
 
 def check_cost_breakdown(models: list[dict]) -> tuple[int, list[str]]:
-    """The cost breakdown still contains what build.py reads from it.
+    """Every usable cost breakdown carries exactly build.py's slugs and sums to its total.
+
+    A dropped, renamed or added slug is a rebalance or rename build.py was not
+    written against, which is what the version pin exists to catch.
 
     Returns (models carrying a usable breakdown, models whose breakdown
     merge_captures DROPPED). The second is not an error: a detail-route
     breakdown that does not sum to the leaderboard's total is not that
-    total's breakdown, so the merge leaves the leaderboard's number alone and
-    the GDPval axis reads absent for that model until the routes converge
-    (issue #200). When the merge dropped EVERY breakdown, the hour is a
-    cross-generation window the merge is holding honest through, not a schema
-    change: it is reported and returned as (0, dropped). These are whole-union
+    total's breakdown, so the merge leaves the leaderboard's number alone
+    until the routes converge (issue #200). When the merge dropped EVERY
+    breakdown, the hour is a cross-generation window the merge is holding
+    honest through, not a schema change: it is reported and returned as
+    (0, dropped). These are whole-union
     validation counts; main() separately counts leaderboard members for the
     window marker, so detail-only prices cannot erase the window (issue #266).
     """
@@ -403,12 +405,12 @@ def check_cost_breakdown(models: list[dict]) -> tuple[int, list[str]]:
             sys.exit(f"{label(m)}: cost breakdown lost its evaluations or total "
                      "-- schema changed")
         slugs = {e.get("slug") for e in evaluations if isinstance(e, dict)}
-        if GDPVAL_SLUG not in slugs:
+        if slugs != set(INDEX_EVAL_WEIGHTS):
             sys.exit(
-                f"{label(m)}: cost breakdown no longer carries "
-                f"'{GDPVAL_SLUG}' -- the GDPval axis has no cost to plot. "
-                "Re-read the leaderboard rather than publishing an empty chart."
-            )
+                f"{label(m)}: cost breakdown slugs left v{INDEX_VERSION}'s -- missing "
+                f"{sorted(set(INDEX_EVAL_WEIGHTS) - slugs)}, unexpected {sorted(slugs - set(INDEX_EVAL_WEIGHTS), key=str)}. "
+                "A dropped, renamed or added slug is a rebalance build.py was not "
+                f"written against: re-read {METHODOLOGY_URL}.")
         summed = sum(e["weightedCostPerTask"] for e in evaluations
                      if isinstance(e, dict)
                      and isinstance(e.get("weightedCostPerTask"), (int, float)))
@@ -458,7 +460,7 @@ def record_cost_window(priced: int, dropped: list[str],
     the file with ONE human-readable line -- count and first dropped slug,
     plus the in-run generation count when the caller supplies one (issue
     #223: the build layer's refusal reads it, so a window hour that empties
-    an axis beyond the #217 exemption names the window instead of blaming a
+    an axis outside the #232 hold names the window instead of blaming a
     capture shape change). The line stays a git-history note first: nothing
     from the file is page input, build.py reads EXISTENCE plus this one
     integer, and no marker text is ever interpolated into the page. Any other
@@ -650,12 +652,8 @@ def _cost_total(record):
 
 def variant_fields(record) -> dict:
     """The per-generation flat map the page renders from: {"ii", "cost",
-    "gdpval", "gdpvalCost", "ctx", "pin", "pout"}, absent keys absent.
-
-    gdpvalCost is recovered from THIS record's own breakdown and is absent
-    when that breakdown does not decompose its own total -- never supplied
-    from another generation's parts, which is what makes a disputed axis
-    honest: each variant carries exactly what its generation published.
+    "ctx", "pin", "pout"}, absent keys absent. Each variant carries exactly
+    what its generation published.
     """
     fields: dict = {}
     ii = _number(record.get("intelligenceIndex"))
@@ -664,15 +662,6 @@ def variant_fields(record) -> dict:
     total = _cost_total(record)
     if total is not None:
         fields["cost"] = total
-    gdp = _number(record.get("gdpvalNormalized"))
-    if gdp is not None:
-        fields["gdpval"] = gdp
-    outer = record.get("intelligenceIndexCostPerTask")
-    if isinstance(outer, dict) and breakdown_matches_total(outer):
-        gdpval_cost = evaluation_cost_per_task(record, GDPVAL_SLUG,
-                                               GDPVAL_INDEX_WEIGHT)
-        if gdpval_cost is not None:
-            fields["gdpvalCost"] = gdpval_cost
     ctx = _number(record.get("contextWindowTokens"))
     if ctx is not None:
         fields["ctx"] = ctx
@@ -1368,12 +1357,11 @@ def main() -> None:
               f"{len(cross_run.readded)} re-added since it "
               f"({names(cross_run.readded)})")
     if dropped:
-        # Named, not counted: each is a model whose GDPval cost renders absent
-        # until AA's two routes agree, and a count alone does not say which.
+        # Named, not counted: a count alone does not say which models the
+        # two routes still disagree on.
         print(f"{len(dropped)} model(s) carry the leaderboard's measured cost "
               "but no cost breakdown to decompose it (the detail route's "
-              "breakdown is another generation's), so their GDPval cost renders "
-              "absent until the routes converge: "
+              "breakdown is another generation's) until the routes converge: "
               + ", ".join(dropped[:10])
               + (", ..." if len(dropped) > 10 else ""))
     print(f"wrote {AGENTS_OUT.relative_to(ROOT)}: {len(agents)} agent+model rows "

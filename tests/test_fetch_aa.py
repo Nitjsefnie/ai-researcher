@@ -20,6 +20,7 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent / "scripts
 import fetch_aa  # noqa: E402  # pylint: disable=wrong-import-position
 import diff_aa  # noqa: E402  # pylint: disable=wrong-import-position
 import build  # noqa: E402  # pylint: disable=wrong-import-position
+from test_build import v5_evaluations  # noqa: E402  # pylint: disable=wrong-import-position,wrong-import-order
 
 
 def flight_html(*payloads: str) -> str:
@@ -119,10 +120,7 @@ class RichestModelsArrayTests(unittest.TestCase):
 def costed(name="M", *, total=1.0, evaluations=None):
     """A model carrying the cost breakdown build.py reads."""
     if evaluations is None:
-        evaluations = [
-            {"slug": "gdpval-aa", "weightedCostPerTask": total * 0.4},
-            {"slug": "scicode", "weightedCostPerTask": total * 0.6},
-        ]
+        evaluations = v5_evaluations(total)
     return {"name": name,
             "intelligenceIndexCostPerTask": {"cost": {"total": total},
                                              "evaluations": evaluations}}
@@ -221,9 +219,8 @@ class CostBreakdownTests(unittest.TestCase):
     def test_a_dropped_breakdown_is_reported_and_is_not_an_error(self):
         # merge_captures leaves the leaderboard's bare number when the detail
         # route's breakdown is another generation's (issue #200). The validator
-        # reads that as a dropped model and NAMES it -- it is a model whose
-        # GDPval cost renders absent until the routes converge, which a count
-        # alone would not say.
+        # reads that as a dropped model and NAMES it -- a count alone would
+        # not say which model the routes disagree on.
         models = [costed("A"),
                   {"slug": "b-dropped", "intelligenceIndexCostPerTask": 1.5}]
 
@@ -264,8 +261,8 @@ class CostBreakdownTests(unittest.TestCase):
         # record call, so a schema-broken run never leaves a marker. Since
         # #223 the line also carries the observed in-run generation count
         # when the caller supplies one -- the build layer's refusal reads
-        # that integer, so a window hour that empties an axis beyond the
-        # #217 exemption names the window instead of blaming a shape change.
+        # that integer, so a window hour that empties an axis outside the
+        # #232 hold names the window instead of blaming a shape change.
         with tempfile.TemporaryDirectory() as tmp:
             marker = pathlib.Path(tmp) / "cost-breakdown-window.txt"
 
@@ -289,22 +286,47 @@ class CostBreakdownTests(unittest.TestCase):
             fetch_aa.record_cost_window(2, [], marker)
             self.assertFalse(marker.exists())
 
-    def test_a_dropped_slug_exits_before_the_chart_can_empty(self):
-        # Exactly what v4.3 did to terminalbench-v2-1 and tau3-banking.
-        models = [costed(evaluations=[{"slug": "scicode", "weightedCostPerTask": 1.0}])]
-
+    def refused_breakdown(self, evaluations):
+        """The refusal message for one model whose parts still sum to its
+        total, so only the slug-set check can refuse it."""
+        self.assertAlmostEqual(sum(e["weightedCostPerTask"] for e in evaluations), 1.0)
         with self.assertRaises(SystemExit) as caught:
-            fetch_aa.check_cost_breakdown(models)
+            fetch_aa.check_cost_breakdown([costed("slug-model", evaluations=evaluations)])
+        message = str(caught.exception)
+        self.assertIn("slug-model", message)
+        return message
 
-        self.assertIn("gdpval-aa", str(caught.exception))
+    def test_a_dropped_slug_exits(self):
+        # Exactly what v4.3 did to terminalbench-v2-1 and tau3-banking.
+        parts = [e for e in v5_evaluations(1.0) if e["slug"] != "hle-diamond"]
+        parts[0] = {**parts[0], "weightedCostPerTask": parts[0]["weightedCostPerTask"] + 0.10}
+
+        message = self.refused_breakdown(parts)
+
+        self.assertIn("missing ['hle-diamond']", message)
+        self.assertIn("unexpected []", message)
+
+    def test_an_added_slug_exits(self):
+        parts = v5_evaluations(1.0) + [{"slug": "scicode", "weightedCostPerTask": 0.0}]
+
+        message = self.refused_breakdown(parts)
+
+        self.assertIn("missing []", message)
+        self.assertIn("unexpected ['scicode']", message)
+
+    def test_a_renamed_slug_exits(self):
+        parts = [dict(e, slug="critpt") if e["slug"] == "critpt-v2-hard" else e
+                 for e in v5_evaluations(1.0)]
+
+        message = self.refused_breakdown(parts)
+
+        self.assertIn("missing ['critpt-v2-hard']", message)
+        self.assertIn("unexpected ['critpt']", message)
 
     def test_components_that_stop_summing_to_the_total_exit(self):
         # build.py divides an index weight back out of these; that is only
         # valid while the parts still make up the published whole.
-        models = [costed(total=1.0, evaluations=[
-            {"slug": "gdpval-aa", "weightedCostPerTask": 0.1},
-            {"slug": "scicode", "weightedCostPerTask": 0.1},
-        ])]
+        models = [costed(total=1.0, evaluations=v5_evaluations(0.2))]
 
         with self.assertRaises(SystemExit) as caught:
             fetch_aa.check_cost_breakdown(models)
@@ -505,22 +527,20 @@ class MergeCapturesTests(unittest.TestCase):
         # The shape AA shipped before it flattened the cost to a bare number:
         # the leaderboard kept intelligenceIndexCostPerTask.cost and dropped
         # .evaluations. A key-level merge leaves the stub in place and the
-        # GDPval axis silently loses its cost. The breakdown here sums to the
+        # breakdown is lost. The breakdown here sums to the
         # leaderboard's total, which is what AA publishes -- so it survives
         # this arm's sum check as well as the one-level-deep fill.
         base = [{"slug": "a",
                  "intelligenceIndexCostPerTask": {"cost": {"total": 1.0}}}]
         detail = [{"slug": "a", "intelligenceIndexCostPerTask": {
-            "cost": {"total": 1.0},
-            "evaluations": [{"slug": "gdpval-aa", "weightedCostPerTask": 0.4},
-                            {"slug": "scicode", "weightedCostPerTask": 0.6}]}}]
+            "cost": {"total": 1.0}, "evaluations": v5_evaluations(1.0)}}]
 
         got = fetch_aa.merge_captures(base, detail)
 
         cost = got[0]["intelligenceIndexCostPerTask"]
         self.assertEqual(cost["cost"]["total"], 1.0)
         self.assertEqual(
-            [e["slug"] for e in cost["evaluations"]], ["gdpval-aa", "scicode"])
+            [e["slug"] for e in cost["evaluations"]], list(build.INDEX_EVAL_WEIGHTS))
 
     def test_a_nested_stub_whose_breakdown_will_not_sum_is_dropped_too(self):
         # The same shape, where the detail breakdown does NOT decompose the
@@ -528,13 +548,11 @@ class MergeCapturesTests(unittest.TestCase):
         # at all, so a cross-generation breakdown decomposing someone else's
         # total shipped unnoticed -- the flattened-scalar arm's guard is
         # hoisted so both arms share it. The leaderboard's own number is what
-        # is left, and the GDPval axis reads absent rather than lying.
+        # is left.
         base = [{"slug": "a",
                  "intelligenceIndexCostPerTask": {"cost": {"total": 1.0}}}]
         detail = [{"slug": "a", "intelligenceIndexCostPerTask": {
-            "cost": {"total": 1.0},
-            "evaluations": [{"slug": "gdpval-aa", "weightedCostPerTask": 0.4},
-                            {"slug": "scicode", "weightedCostPerTask": 0.45}]}}]
+            "cost": {"total": 1.0}, "evaluations": v5_evaluations(0.85)}}]
 
         got = fetch_aa.merge_captures(base, detail)
 
@@ -552,10 +570,7 @@ class MergeCapturesTests(unittest.TestCase):
             with self.subTest(unpriced=unpriced):
                 base = [{"slug": "a", "intelligenceIndexCostPerTask": unpriced}]
                 detail = [{"slug": "a", "intelligenceIndexCostPerTask": {
-                    "cost": {"total": 1.0},
-                    "evaluations": [
-                        {"slug": "gdpval-aa", "weightedCostPerTask": 0.4},
-                        {"slug": "scicode", "weightedCostPerTask": 0.6}]}}]
+                    "cost": {"total": 1.0}, "evaluations": v5_evaluations(1.0)}}]
 
                 got = fetch_aa.merge_captures(base, detail)
 
@@ -576,27 +591,22 @@ class MergeCapturesTests(unittest.TestCase):
         # that lands proves which side won.
         base = [{"slug": "a", "intelligenceIndexCostPerTask": 1.5}]
         detail = [{"slug": "a", "intelligenceIndexCostPerTask": {
-            "cost": {"total": 1.2},
-            "evaluations": [{"slug": "gdpval-aa", "weightedCostPerTask": 0.4},
-                            {"slug": "scicode", "weightedCostPerTask": 1.1}]}}]
+            "cost": {"total": 1.2}, "evaluations": v5_evaluations(1.5)}}]
 
         got = fetch_aa.merge_captures(base, detail)
 
         cost = got[0]["intelligenceIndexCostPerTask"]
         self.assertEqual(cost["cost"]["total"], 1.5)
-        self.assertEqual(len(cost["evaluations"]), 2)
+        self.assertEqual(len(cost["evaluations"]), len(build.INDEX_EVAL_WEIGHTS))
 
     def test_a_breakdown_that_will_not_sum_to_the_leaderboards_total_is_dropped(self):
         # The same shape-split pair, where the detail route's breakdown does
         # NOT sum to the leaderboard's number (0.85 against 1.5). It is not
         # this total's breakdown, whatever route it came from, so it is
-        # dropped whole and the plain scalar stays: the GDPval axis reads
-        # absent for this model rather than decomposing someone else's total.
+        # dropped whole and the plain scalar stays.
         base = [{"slug": "a", "intelligenceIndexCostPerTask": 1.5}]
         detail = [{"slug": "a", "intelligenceIndexCostPerTask": {
-            "cost": {"total": 1.5},
-            "evaluations": [{"slug": "gdpval-aa", "weightedCostPerTask": 0.4},
-                            {"slug": "scicode", "weightedCostPerTask": 0.45}]}}]
+            "cost": {"total": 1.5}, "evaluations": v5_evaluations(0.85)}}]
 
         got = fetch_aa.merge_captures(base, detail)
 
@@ -708,11 +718,7 @@ def detail_record(**overrides: object) -> dict:
     return {**model(21, "shared"), "slug": "fixture-model",
             "intelligenceIndex": 51,
             "intelligenceIndexCostPerTask": {
-                "cost": {"total": 0.75},
-                "evaluations": [
-                    {"slug": "gdpval-aa", "weightedCostPerTask": 0.30},
-                    {"slug": "scicode", "weightedCostPerTask": 0.45},
-                ]},
+                "cost": {"total": 0.75}, "evaluations": v5_evaluations(0.75)},
             **overrides}
 
 
@@ -1625,26 +1631,21 @@ def host_priced_payload(host_ii: float, host_cost: object,
     }, separators=(",", ":"))
 
 
-def _look(slug, ii=40.0, cost=2.0, gdp=0.31, speed=120.0, **extra):
+def _look(slug, ii=40.0, cost=2.0, speed=120.0, **extra):
     rec = {"slug": slug, "name": slug, "intelligenceIndex": ii,
-           "intelligenceIndexCostPerTask": cost, "gdpvalNormalized": gdp,
+           "intelligenceIndexCostPerTask": cost,
            "medianOutputTokensPerSecond": speed, "contextWindowTokens": 200000,
            "price1mInputTokens": 0.5, "price1mOutputTokens": 1.5}
     rec.update(extra)
     return rec
 
 
-def priced_look(slug, total, gdpval_part, **extra):
+def priced_look(slug, total, **extra):
     """A look whose cost carries the per-evaluation breakdown shape; its
-    parts sum to the total unless the caller breaks them on purpose."""
+    parts sum to the total."""
     rec = _look(slug, **extra)
     rec["intelligenceIndexCostPerTask"] = {
-        "cost": {"total": total},
-        "evaluations": [
-            {"slug": "gdpval-aa", "weightedCostPerTask": gdpval_part},
-            {"slug": "scicode", "weightedCostPerTask": total - gdpval_part},
-        ],
-    }
+        "cost": {"total": total}, "evaluations": v5_evaluations(total)}
     return rec
 
 
@@ -1665,12 +1666,14 @@ class TestCrossGenerationMerge(unittest.TestCase):
         self.assertTrue(all("genVariants" not in r for r in out))
 
     def test_disagreement_writes_variants_canonical_order(self):
-        out = fetch_aa.cross_generation_merge(
-            [[_look("a", ii=41.0)], [_look("a", ii=40.5)]])
+        looks = [[_look("a", ii=41.0)], [_look("a", ii=40.5)]]
+        out = fetch_aa.cross_generation_merge(looks)
         r = out[0]
         self.assertEqual(len(r["genVariants"]), 2)
+        universe = fetch_aa.leaderboard_universe(looks)
+        canonical = sorted(looks, key=lambda c: fetch_aa.generation_key(c, universe))
         self.assertEqual([v["ii"] for v in r["genVariants"]],
-                         sorted(v["ii"] for v in r["genVariants"]))
+                         [c[0]["intelligenceIndex"] for c in canonical])
         self.assertEqual(r["intelligenceIndex"],
                          r["genVariants"][0]["ii"])
 
@@ -1731,25 +1734,6 @@ class TestCrossGenerationMerge(unittest.TestCase):
         r = out[0]
         self.assertNotIn("genVariants", r)
         self.assertEqual(r["price1mInputTokens"], 2.5)
-
-    def test_variant_fields_recovered_per_generation(self):
-        # gdpvalCost comes from EACH variant's own breakdown; the variant
-        # whose breakdown does not sum to its own total renders that axis
-        # absent, never fabricated from the other generation's parts.
-        good = priced_look("a", total=2.0, gdpval_part=0.16, ii=40.0)
-        bad = priced_look("a", total=2.0, gdpval_part=0.40, ii=40.5)
-        bad["intelligenceIndexCostPerTask"]["evaluations"] = [
-            {"slug": "gdpval-aa", "weightedCostPerTask": 0.40},
-            {"slug": "scicode", "weightedCostPerTask": 0.45},
-        ]
-        out = fetch_aa.cross_generation_merge([[good], [bad]])
-
-        r = out[0]
-        self.assertEqual(len(r["genVariants"]), 2)
-        by_ii = {v["ii"]: v for v in r["genVariants"]}
-        self.assertIn("gdpvalCost", by_ii[40.0])
-        self.assertNotIn("gdpvalCost", by_ii[40.5])
-        self.assertAlmostEqual(by_ii[40.0]["gdpvalCost"], 1.6)
 
 
 class CarriedVariantNeverEmptyTests(unittest.TestCase):
@@ -1836,20 +1820,18 @@ class MultiLookCaptureTests(unittest.TestCase):
         self.assertEqual(by_slug["fixture-model"]["intelligenceIndex"], iis[0])
 
     def test_the_detail_fill_lands_on_the_generation_it_belongs_to(self):
-        # The detail route carries ii 51, so its breakdown widens the 51
-        # generation ONLY: that variant's gdpvalCost is recovered from its
-        # own parts, and the 52 variant -- whose corpus the detail route
-        # did not describe -- renders the axis absent rather than
-        # decomposing another generation's total.
-        captured, _sleeps, _stub = self.capture_two_looks(
-            [flight_html(look_payload(51)), flight_html(look_payload(52))])
-
-        by_slug = {m["slug"]: m for m in captured.models}
-        by_ii = {v["ii"]: v
-                 for v in by_slug["fixture-model"]["genVariants"]}
-        self.assertIn("gdpvalCost", by_ii[51])
-        self.assertAlmostEqual(by_ii[51]["gdpvalCost"], 3.0)
-        self.assertNotIn("gdpvalCost", by_ii[52])
+        # The canonical record is the ii 51 generation. A detail route
+        # carrying ii 51 widens it with the breakdown; one carrying ii 52
+        # widens only the 52 corpus, so the canonical record keeps the
+        # leaderboard's bare total rather than another generation's parts.
+        pages = [flight_html(look_payload(51)), flight_html(look_payload(52))]
+        for detail_ii, filled in ((51, True), (52, False)):
+            captured, _sleeps, _stub = self.capture_two_looks(
+                pages, intelligenceIndex=detail_ii)
+            record = {m["slug"]: m for m in captured.models}["fixture-model"]
+            self.assertEqual(record["intelligenceIndex"], 51)
+            self.assertEqual(
+                isinstance(record["intelligenceIndexCostPerTask"], dict), filled)
 
     def test_a_speed_only_difference_between_looks_is_not_a_generation(self):
         # Review Focus 2's capture-level pin: the speed family re-samples
@@ -1877,11 +1859,11 @@ class MultiLookCaptureTests(unittest.TestCase):
                          build.merge_captures(look1, [detail_record()]))
 
     def test_a_detail_generation_matching_neither_look_fills_no_shared_model(self):
-        # D a third generation: it widens no shared model that hour -- both
-        # variants render their own generation's values with the GDPval
-        # cost absent (no breakdown is that generation's own), the summary
-        # counts three observed generations, and the hour self-heals once
-        # the routes converge.
+        # D a third generation: it widens no shared model that hour -- the
+        # canonical record keeps the leaderboard's bare total, both variants
+        # render their own generation's values, the summary counts three
+        # observed generations, and the hour self-heals once the routes
+        # converge.
         captured, _sleeps, _stub = self.capture_two_looks(
             [flight_html(look_payload(51)), flight_html(look_payload(52))],
             intelligenceIndex=53)
@@ -1891,7 +1873,7 @@ class MultiLookCaptureTests(unittest.TestCase):
         by_slug = {m["slug"]: m for m in captured.models}
         variants = by_slug["fixture-model"]["genVariants"]
         self.assertEqual(sorted(v["ii"] for v in variants), [51, 52])
-        self.assertTrue(all("gdpvalCost" not in v for v in variants))
+        self.assertEqual(by_slug["fixture-model"]["intelligenceIndexCostPerTask"], 0.75)
 
     def presence_flip_pages(self):
         """Two leaderboard pages shaped like the real alternating captures
@@ -1986,12 +1968,11 @@ class MultiLookCaptureTests(unittest.TestCase):
         self.assertEqual(sorted(v["ii"] for v in host_variants), [30, 31])
         self.assertEqual(sorted(v["cost"] for v in host_variants
                                 if "cost" in v), [1.25])
-        # Both corpora were widened by the same detail snapshot, so both
-        # fixture-model variants carry its recovered gdpvalCost.
+        # Both corpora were widened by the same detail snapshot, so the
+        # canonical fixture-model record carries its breakdown.
         fixture_variants = by_slug["fixture-model"]["genVariants"]
         self.assertEqual(len(fixture_variants), 2)
-        for variant in fixture_variants:
-            self.assertAlmostEqual(variant["gdpvalCost"], 3.0)
+        self.assertIsInstance(by_slug["fixture-model"]["intelligenceIndexCostPerTask"], dict)
 
 
 class GenVariantsSeamTests(unittest.TestCase):
@@ -2032,7 +2013,7 @@ class GenVariantsSeamTests(unittest.TestCase):
         # record carrying every dispute-capable field, through the
         # producer, comes out in exactly the consumer's declared order --
         # and the row build.py emits carries its gv in the same order.
-        record = priced_look("a", 1.0, 0.1)
+        record = priced_look("a", 1.0)
 
         variant = fetch_aa.variant_fields(record)
 

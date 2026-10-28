@@ -10,6 +10,7 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent / "scripts
 
 import fetch_aa  # noqa: E402  # pylint: disable=wrong-import-position
 import build  # noqa: E402  # pylint: disable=wrong-import-position
+from test_build import v5_evaluations  # noqa: E402  # pylint: disable=wrong-import-position,wrong-import-order
 
 
 @pytest.mark.parametrize("rich_key", ["initialModels", "models"])
@@ -56,7 +57,7 @@ def detail_record(slug="current", ii=51):
     """Small synthetic scored record with the detail route's published shape."""
     return {
         "slug": slug, "name": slug.title(), "shortName": slug.title(),
-        "intelligenceIndex": ii, "gdpvalNormalized": 0.47,
+        "intelligenceIndex": ii,
         "contextWindowTokens": 100000, "parameters": 27,
         "price1mInputTokens": 1, "price1mOutputTokens": 3,
         "isOpenWeights": False, "deprecated": slug == "retired",
@@ -65,10 +66,8 @@ def detail_record(slug="current", ii=51):
         "creator": {"id": "lab", "slug": "lab", "name": "Detail Lab",
                     "logo": None, "color": "gray", "country": "US"},
         "intelligenceIndexCostPerTask": {
-            "cost": {"total": 0.75}, "evaluations": [
-                {"slug": "gdpval-aa", "weightedCostPerTask": 0.30},
-                {"slug": "scicode", "weightedCostPerTask": 0.45}]},
-        "codingIndex": 40, "agenticIndex": 40, "releaseSlug": slug,
+            "cost": {"total": 0.75}, "evaluations": v5_evaluations(0.75)},
+        "codingIndex": 40, "releaseSlug": slug,
         "medianTimeToFirstTokenSeconds": 0.1,
         "medianEndToEndResponseTimeSeconds": 1,
         "quartile25OutputTokensPerSecond": 90,
@@ -135,10 +134,9 @@ def test_detail_only_additions_preserve_existing_records_and_in_run_decision(
         assert current["intelligenceIndexCostPerTask"]["cost"]["total"] == 0.75
     else:
         assert sorted(v["ii"] for v in current["genVariants"]) == [51, 52]
-        assert sorted(v["ii"] for v in current["genVariants"]
-                      if "gdpvalCost" in v) == filled
-        assert all(v["gdpvalCost"] == pytest.approx(3.0) for v in current["genVariants"]
-                   if "gdpvalCost" in v)
+        # The breakdown widens only the generation the detail route matched.
+        assert isinstance(current["intelligenceIndexCostPerTask"], dict) == (
+            current["intelligenceIndex"] in filled)
     assert captured.disputed == baseline.disputed
     assert captured.generations == baseline.generations
     reversed_capture = capture_pages(tmp_path, monkeypatch, second, first,
@@ -281,8 +279,7 @@ def test_build_renders_detail_only_retirement_lab_speed_and_mismatch(
 
 
 @pytest.mark.parametrize("rescued,outcome", [
-    ("no-extra", "hold"), ("neither", "hold"), ("agentic", "hold"),
-    ("parameters", "publish"), ("both", "publish"),
+    ("no-extra", "hold"), ("neither", "hold"), ("parameters", "publish"),
 ])
 def test_three_generation_window_uses_leaderboard_provenance(
         tmp_path, monkeypatch, capsys, rescued, outcome):
@@ -292,11 +289,9 @@ def test_three_generation_window_uses_leaderboard_provenance(
     base, detail, methodology, agents = (tmp_path / name for name in
                                          ("base.html", "detail.html", "method.html", "agents.html"))
     retired = detail_record("retired")
-    if rescued not in ("parameters", "both"):
+    if rescued != "parameters":
         retired.pop("parameters")
         retired.pop("intelligenceIndex")
-    if rescued not in ("agentic", "both"):
-        retired.pop("gdpvalNormalized")
     detail_rows = [detail_record(ii=53)]
     if rescued != "no-extra":
         detail_rows.append(retired)
@@ -334,8 +329,6 @@ def test_three_generation_window_uses_leaderboard_provenance(
         assert not output.exists()
     else:
         build.main(generation_state=None)
-        html = output.read_text(encoding="utf-8")
-        note = "Empty during a capture window"
-        assert (note in html) == (rescued == "parameters")
+        assert output.exists()
     assert (data / "cost-breakdown-window.txt").exists()
     assert "changed shape" not in capsys.readouterr().out

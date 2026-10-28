@@ -324,7 +324,7 @@ class BrowserInteractionTests(unittest.TestCase):
             f"(last error: {last})")
 
     def test_non_frontier_points_pin_a_visible_name_on_capability_charts(self):
-        for metric in ("coding", "agentic"):
+        for metric in ("coding", "parameters"):
             with self.subTest(metric=metric):
                 page = self.browser.new_page(viewport={"width": 1280, "height": 900})
                 page.goto(build.OUT.as_uri())
@@ -512,7 +512,7 @@ class BrowserInteractionTests(unittest.TestCase):
     def _de_emphasis_gray_holds(self, capture):
         page = self._capture_page(capture)
         try:
-            for chart in ("coding", "intelligence", "agentic", "parameters"):
+            for chart in ("coding", "intelligence", "parameters"):
                 with self.subTest(chart=chart):
                     off_frontier = page.evaluate(
                         "sel => [...new Set([...document.querySelectorAll(sel)]"
@@ -589,8 +589,6 @@ class BrowserInteractionTests(unittest.TestCase):
                 cells = row_cells("Probe Model 0002")
                 self.assertIn("79.9 / 77.9", cells)
                 self.assertIn("$2.30 / $4.14", cells)
-                self.assertIn("42.0 / 40.0 frontier", cells)
-                self.assertIn("$2.30 / $5.06", cells)
                 self.assertIn("200K / 100K", cells)
                 self.assertIn("$1 / $1.5", cells)
                 self.assertIn("$0.5", cells)  # pin agrees: single value
@@ -683,7 +681,6 @@ class BrowserInteractionTests(unittest.TestCase):
         page = self.browser.new_page(viewport={"width": 1280, "height": 900})
         chart_labels = {"coding": "Coding Agent Index",
                         "intelligence": "Intelligence Index",
-                        "agentic": "GDPval-AA v2",
                         "parameters": "Parameter efficiency"}
         # 40 probe pins on the intelligence chart -- the crowd the audit used,
         # enough to exhaust the clear slots -- plus a couple on every other
@@ -707,24 +704,18 @@ class BrowserInteractionTests(unittest.TestCase):
              "isOpenWeights": False,
              "slug": "probe-crafted-alpha",
              "intelligenceIndex": 79.0,
-             "gdpvalNormalized": 0.42,
              "parameters": 33,
              "intelligenceIndexCostPerTask": {
                  "cost": {"total": 0.6},
-                 "evaluations": [{"slug": "gdpval-aa",
-                                  "weightedCostPerTask": 0.06}],
              }},
             {"name": pin_unicode,
              "modelCreatorName": "Probe Lab",
              "isOpenWeights": True,
              "slug": "probe-crafted-unicode",
              "intelligenceIndex": 78.5,
-             "gdpvalNormalized": 0.44,
              "parameters": 61,
              "intelligenceIndexCostPerTask": {
                  "cost": {"total": 0.9},
-                 "evaluations": [{"slug": "gdpval-aa",
-                                  "weightedCostPerTask": 0.09}],
              }},
             {"name": "Probe Dynamics Ultra Long Benchmark Model Beta "
                      "(Reasoning)",
@@ -732,48 +723,36 @@ class BrowserInteractionTests(unittest.TestCase):
              "isOpenWeights": False,
              "slug": "probe-crafted-beta",
              "intelligenceIndex": 60.0,
-             "gdpvalNormalized": 0.5,
              "parameters": 95,
              "intelligenceIndexCostPerTask": {
                  "cost": {"total": 1.6},
-                 "evaluations": [{"slug": "gdpval-aa",
-                                  "weightedCostPerTask": 0.16}],
              }},
             {"name": "Probe Short Beta",
              "modelCreatorName": "Probe Lab",
              "isOpenWeights": False,
              "slug": "probe-crafted-gamma",
              "intelligenceIndex": 59.0,
-             "gdpvalNormalized": 0.52,
              "parameters": 130,
              "intelligenceIndexCostPerTask": {
                  "cost": {"total": 2.4},
-                 "evaluations": [{"slug": "gdpval-aa",
-                                  "weightedCostPerTask": 0.24}],
              }},
             {"name": "Probe Dynamics Ultra Long Benchmark Model Delta",
              "modelCreatorName": "Probe Lab",
              "isOpenWeights": True,
              "slug": "probe-crafted-delta",
              "intelligenceIndex": 40.0,
-             "gdpvalNormalized": 0.6,
              "parameters": 180,
              "intelligenceIndexCostPerTask": {
                  "cost": {"total": 6.0},
-                 "evaluations": [{"slug": "gdpval-aa",
-                                  "weightedCostPerTask": 0.6}],
              }},
             {"name": "Probe Short Delta",
              "modelCreatorName": "Probe Lab",
              "slug": "probe-crafted-epsilon",
              "isOpenWeights": True,
              "intelligenceIndex": 39.0,
-             "gdpvalNormalized": 0.62,
              "parameters": 220,
              "intelligenceIndexCostPerTask": {
                  "cost": {"total": 9.0},
-                 "evaluations": [{"slug": "gdpval-aa",
-                                  "weightedCostPerTask": 0.9}],
              }},
         ]
         agents = list(_PROBE_AGENTS) + [
@@ -787,15 +766,13 @@ class BrowserInteractionTests(unittest.TestCase):
                                           "agentWallTimeSec": 600.0}},
         ]
         pin_counts = {"intelligence": PIN_CROWD + 2,
-                      "coding": len(agents), "agentic": 2, "parameters": 2}
+                      "coding": len(agents), "parameters": 2}
         models = _probe_models(PIN_CROWD) + crafted
         fresh = {
             "coding": [a["displayLabel"] for a in agents],
             "intelligence": ([m["name"] for m in models
                               if m["name"].startswith("Probe Model")]
                              + [pin_long, pin_unicode]),
-            "agentic": ["Probe Dynamics Ultra Long Benchmark Model Beta "
-                        "(Reasoning)", "Probe Short Beta"],
             "parameters": ["Probe Dynamics Ultra Long Benchmark Model Delta",
                            "Probe Short Delta"],
         }
@@ -887,12 +864,9 @@ class BrowserInteractionTests(unittest.TestCase):
                 "isOpenWeights": i % 2 == 0,
                 "slug": f"cluster-{i}",
                 "intelligenceIndex": 51,
-                "gdpvalNormalized": 0.47,
                 "parameters": 27,
                 "intelligenceIndexCostPerTask": {
                     "cost": {"total": 0.75},
-                    "evaluations": [{"slug": "gdpval-aa",
-                                     "weightedCostPerTask": 0.075}],
                 },
             })
         cluster.append({
@@ -901,12 +875,9 @@ class BrowserInteractionTests(unittest.TestCase):
             "isOpenWeights": False,
             "slug": "cluster-anchor",
             "intelligenceIndex": 80,
-            "gdpvalNormalized": 0.47,
             "parameters": 27,
             "intelligenceIndexCostPerTask": {
                 "cost": {"total": 8.0},
-                "evaluations": [{"slug": "gdpval-aa",
-                                 "weightedCostPerTask": 0.8}],
             },
         })
         agent = {
@@ -1061,7 +1032,7 @@ class BrowserInteractionTests(unittest.TestCase):
     def test_tooltip_secondary_rows_identical_across_charts(self):
         # #29: one record must read the same wherever it is hovered. The
         # intelligence tooltip used to carry "Output speed" and "Context"
-        # rows the three capability tooltips omitted. All four tooltips now
+        # rows the capability tooltips omitted. Every tooltip now
         # share one secondary-row builder; the chart's own metric rows stay
         # chart-specific and first.
         # Issue #226: pinned against the in-run disputed fixture capture
@@ -1078,7 +1049,6 @@ class BrowserInteractionTests(unittest.TestCase):
         try:
             chart_labels = {"coding": "Coding Agent Index",
                             "intelligence": "Intelligence Index",
-                            "agentic": "GDPval-AA v2",
                             "parameters": "Parameter efficiency"}
             secondary = ["Lab", "Weights", "Output speed", "Context"]
 
@@ -1102,10 +1072,9 @@ class BrowserInteractionTests(unittest.TestCase):
                 ).first.hover()
                 return tip_rows(chart)
 
-            # a model present on the intelligence, agentic and parameter
-            # charts
+            # a model present on the intelligence and parameter charts
             name_sets = {}
-            for chart in ("intelligence", "agentic", "parameters"):
+            for chart in ("intelligence", "parameters"):
                 aris = page.evaluate(
                     "sel => [...document.querySelectorAll(sel)]"
                     ".map(c => c.getAttribute('aria-label'))",
@@ -1124,21 +1093,19 @@ class BrowserInteractionTests(unittest.TestCase):
                     a[len("Pin "):-len(suffix)] for a in aris
                     if a.startswith("Pin ") and a.endswith(suffix)
                 }
-            common = name_sets["intelligence"] & name_sets["agentic"] \
-                & name_sets["parameters"]
+            common = name_sets["intelligence"] & name_sets["parameters"]
             self.assertTrue(common)
             model = sorted(n for n in common if '"' not in n)[0]
 
             snapshots = {chart: hover_by_name(chart, model)
-                         for chart in ("intelligence", "agentic",
-                                       "parameters")}
+                         for chart in ("intelligence", "parameters")}
             for chart, rows in snapshots.items():
                 with self.subTest(chart=chart):
                     for key in secondary:
                         self.assertIn(key, rows)
             for key in secondary:
                 values = {snapshots[c][key]
-                          for c in ("intelligence", "agentic", "parameters")}
+                          for c in ("intelligence", "parameters")}
                 self.assertEqual(len(values), 1,
                                  f"{key} differs across charts: {values}")
 
@@ -1183,18 +1150,13 @@ class BrowserInteractionTests(unittest.TestCase):
             "isOpenWeights": True,
             "slug": "audit-model",
             "intelligenceIndex": 51,
-            "gdpvalNormalized": 0.47,
             # The CURRENT field name: the empty-axis guard refuses a capture
             # still carrying the pre-rename `totalParameters` (issue #60), so
             # a stale name here would fail the build before the browser opens.
             "parameters": 27,
             "intelligenceIndexCostPerTask": {
                 "cost": {"total": 0.75},
-                "evaluations": [
-                    {"slug": "gdpval-aa", "weightedCostPerTask": 0.80},
-                    {"slug": "scicode", "weightedCostPerTask": 0.24},
-                ],
-            },
+                "evaluations": test_build.v5_evaluations(0.75)},
         }
         # The agent capture carries AA strings too -- an agent's display label
         # reaches the same inline JSON -- so it gets the same hostile input.
@@ -1245,12 +1207,9 @@ class BrowserInteractionTests(unittest.TestCase):
             "isOpenWeights": True,
             "slug": "hostile-model",
             "intelligenceIndex": 51,
-            "gdpvalNormalized": 0.47,
             "parameters": 27,
             "intelligenceIndexCostPerTask": {
                 "cost": {"total": 0.75},
-                "evaluations": [{"slug": "gdpval-aa",
-                                 "weightedCostPerTask": 0.80}],
             },
         }
         agent = {
@@ -1343,9 +1302,9 @@ class BrowserInteractionTests(unittest.TestCase):
                 "no markdown row carries the escaped name -- the export "
                 "embedded the captured string without escaping it")
             row = rows[0]
-            # every cell separator survived: 13 columns -> exactly 14 pipes,
+            # every cell separator survived: 11 columns -> exactly 12 pipes,
             # so no captured pipe leaked through into the row structure
-            self.assertEqual(len(re.findall(r"(?<!\\)\|", row)), 14)
+            self.assertEqual(len(re.findall(r"(?<!\\)\|", row)), 12)
             self.assertIn("P\\|ipe", row)
             self.assertIn("\\`Tick\\`", row)
             self.assertNotIn(self.HOSTILE_NAME, row)
@@ -1355,12 +1314,12 @@ class BrowserInteractionTests(unittest.TestCase):
             # -- every original display text comes back per cell
             table = [line for line in md.split("\n") if line.startswith("|")]
             self.assertGreaterEqual(len(table), 3)
-            self.assertEqual(len(self._markdown_cells(table[0])), 13)
+            self.assertEqual(len(self._markdown_cells(table[0])), 11)
             cells = self._markdown_cells(row)
-            self.assertEqual(len(cells), 13)
+            self.assertEqual(len(cells), 11)
             self.assertEqual(cells[0], expected)
             self.assertEqual(cells[1], "Hostile Lab")
-            self.assertEqual(cells[12], "open")
+            self.assertEqual(cells[10], "open")
         finally:
             page.close()
             build.RAW, build.AGENTS_RAW, build.OUT = saved
@@ -1566,7 +1525,7 @@ class BrowserInteractionTests(unittest.TestCase):
                         "`#svg-${c} text.lbl`)].map(t => "
                         "[t.textContent, [t.getAttribute('x'), "
                         "t.getAttribute('y')]]))]))")
-                charts = ["coding", "intelligence", "agentic", "parameters"]
+                charts = ["coding", "intelligence", "parameters"]
                 before = page.evaluate(snap, charts)
                 # an empty snapshot compares vacuously equal to everything --
                 # the page must have rendered labels before any click is
@@ -1595,7 +1554,7 @@ class BrowserInteractionTests(unittest.TestCase):
     def _labels_take_the_nearest_clear_slot(self, capture):
         page = self._capture_page(capture)
         try:
-            for chart in ("coding", "agentic", "parameters"):
+            for chart in ("coding", "parameters"):
                 with self.subTest(chart=chart):
                     res = page.evaluate(self._REPLAY_NEAREST_CLEAR_SLOT,
                                         f"svg-{chart}")
@@ -1637,7 +1596,7 @@ class BrowserInteractionTests(unittest.TestCase):
         # chart) and all-distinct.
         page = self.browser.new_page(viewport={"width": 1280, "height": 900})
         page.goto(build.OUT.as_uri())
-        for chart in ("coding", "intelligence", "agentic", "parameters"):
+        for chart in ("coding", "intelligence", "parameters"):
             with self.subTest(chart=chart):
                 labels = page.locator(
                     f"#svg-{chart} text.lbl").all_text_contents()
@@ -1648,6 +1607,36 @@ class BrowserInteractionTests(unittest.TestCase):
                     duplicates, [],
                     f"duplicate chart labels on {chart}")
         page.close()
+
+    def test_a_truncated_name_collision_takes_a_numeric_suffix(self):
+        # #85's last resort: two frontier rows whose compact labels and full
+        # names truncate to the same 34-character text -- the second gets a
+        # numeric suffix, so the chart's labels stay distinct.
+        base = "Probe Collision Benchmark Model Alpha"
+        models = [dict(test_build.model_fixture(intelligence=60, slug="collide-a"),
+                       name=base + " One"),
+                  dict(test_build.model_fixture(intelligence=50, slug="collide-b"),
+                       name=base + " Two", intelligenceIndexCostPerTask=0.1)]
+        with tempfile.TemporaryDirectory(prefix=".issue-85-labels-",
+                                         dir=build.ROOT) as tmp:
+            root = pathlib.Path(tmp)
+            raw, agents_raw = root / "models.json", root / "coding-agents.json"
+            raw.write_text(json.dumps(models), encoding="utf-8")
+            agents_raw.write_text(json.dumps([test_build.agent_fixture()]),
+                                  encoding="utf-8")
+            saved = (build.RAW, build.AGENTS_RAW, build.OUT)
+            build.RAW, build.AGENTS_RAW, build.OUT = raw, agents_raw, root / "page.html"
+            try:
+                with contextlib.redirect_stdout(io.StringIO()):
+                    build.main()
+                page = self.browser.new_page(viewport={"width": 1280, "height": 900})
+                page.goto(build.OUT.as_uri())
+                labels = page.locator("#svg-intelligence text.lbl").all_text_contents()
+                page.close()
+            finally:
+                build.RAW, build.AGENTS_RAW, build.OUT = saved
+        stem = base[:33] + "…"
+        self.assertEqual(sorted(labels), [stem, stem + " (2)"])
 
     def test_table_name_cells_carry_no_dict_effort_text(self):
         # #88: AA's dict-form effort text must not reach the table -- the
@@ -2160,15 +2149,8 @@ def _probe_models(count):
             "isOpenWeights": i % 3 == 0,
             "slug": f"probe-model-{i:04d}",
             "intelligenceIndex": score,
-            "gdpvalNormalized": 0.4 + (i % 20) * 0.01,
             "parameters": 20 + (i % 40) * 3,
-            "intelligenceIndexCostPerTask": {
-                "cost": {"total": cost},
-                "evaluations": [
-                    {"slug": "gdpval-aa",
-                     "weightedCostPerTask": round(cost / 10.0, 4)},
-                ],
-            },
+            "intelligenceIndexCostPerTask": {"cost": {"total": cost}},
         })
     return out
 
@@ -2316,11 +2298,10 @@ class ZeroScoreBrowserTests(unittest.TestCase):
             prefix=".issue-146-browser-", dir=build.ROOT)
         data = pathlib.Path(cls._dir.name) / "data"
         data.mkdir()
-        # gdpval 0.0 with the fixture's gdpval eval (weightedCostPerTask
-        # 0.80 -> measured cost 8.00) puts the page's only model on the
-        # agentic frontier carrying a zero score.
+        # An Intelligence Index of 0.0 puts the page's only model on the
+        # intelligence frontier carrying a zero score.
         (data / "aa-raw-models.json").write_text(
-            json.dumps([test_build.model_fixture(gdpval=0.0)]),
+            json.dumps([test_build.model_fixture(intelligence=0.0)]),
             encoding="utf-8")
         (data / "aa-raw-coding-agents.json").write_text(
             json.dumps([test_build.agent_fixture()]), encoding="utf-8")
@@ -2359,15 +2340,15 @@ class ZeroScoreBrowserTests(unittest.TestCase):
             # fillTable/fillFrontiers ran to completion -- a crash in the
             # new JS branch would leave the frontier table empty.
             page.wait_for_selector("#fTable tbody tr")
-            # The agentic section, not the agent row's coding section --
-            # both rows carry the model text.
+            # The intelligence section, not the agent row's coding section
+            # -- both rows carry the model text.
             row = page.locator("#fTable tbody tr",
-                               has_text="GDPval-AA v2").filter(
+                               has_text="Intelligence Index").filter(
                                    has_text="Fixture Model").first
             cells = row.locator("td").all_text_contents()
             # metric | name | creator | score | cost | $/point | weights
             self.assertEqual(cells[3], "0.0")
-            self.assertEqual(cells[4], "$8.00")
+            self.assertEqual(cells[4], "$0.750")
             self.assertEqual(cells[5], "—")
         finally:
             page.close()
@@ -2379,17 +2360,15 @@ def _disputed_probe_model():
     carries each generation's own flat map, canonical order. Variant 2 drops
     `pin` -- a missing marker folds to a fill, never a dispute -- and carries
     no speed field, so the page's never-red rule holds visibly."""
-    probe = _probe_models(1)[0]  # ii 80.0, cost 0.5, gdpval 0.4
+    probe = _probe_models(1)[0]  # ii 80.0, cost 0.5
     probe.update({
         "contextWindowTokens": 200000,
         "price1mInputTokens": 0.5,
         "price1mOutputTokens": 1.0,
     })
     probe["genVariants"] = [
-        {"ii": 80.0, "cost": 0.5, "gdpval": 0.4, "gdpvalCost": 0.5,
-         "pin": 0.5, "pout": 1.0, "ctx": 200000},
-        {"ii": 78.0, "cost": 0.9, "gdpval": 0.38, "gdpvalCost": 1.1,
-         "pout": 1.4, "ctx": 100000},
+        {"ii": 80.0, "cost": 0.5, "pin": 0.5, "pout": 1.0, "ctx": 200000},
+        {"ii": 78.0, "cost": 0.9, "pout": 1.4, "ctx": 100000},
     ]
     return probe
 
@@ -2413,9 +2392,6 @@ def _carried_variant_map(model):
     return {
         "ii": model["intelligenceIndex"],
         "cost": model["intelligenceIndexCostPerTask"]["cost"]["total"],
-        "gdpval": model["gdpvalNormalized"],
-        "gdpvalCost": (model["intelligenceIndexCostPerTask"]["evaluations"][0]
-                       ["weightedCostPerTask"] / build.GDPVAL_INDEX_WEIGHT),
         "ctx": 200000,
         "pin": 0.5,
         "pout": 1.0,
@@ -2484,8 +2460,6 @@ def _in_run_disputed_models(total=14):
     second.update({
         "ii": carried[2]["ii"] - 2.0,
         "cost": carried[2]["cost"] * 1.8,
-        "gdpval": carried[2]["gdpval"] - 0.02,
-        "gdpvalCost": carried[2]["gdpvalCost"] * 2.2,
         "pout": 1.5,
         "ctx": 100000,
     })
@@ -2578,7 +2552,7 @@ class DisputeBrowserTests(unittest.TestCase):
     _TBODY_DOM = TBODY_DOM
 
     def test_disputed_points_and_connector_render_per_chart(self):
-        for key in ("intelligence", "agentic"):
+        for key in ("intelligence",):
             with self.subTest(chart=key):
                 page = self._loaded_page()
                 points = page.locator(f"#svg-{key} circle.dispute")
@@ -2627,17 +2601,6 @@ class DisputeBrowserTests(unittest.TestCase):
         self.assertEqual(dispute_rows.count(), 3,
                          "the three disputed values -- score, cost and "
                          "context -- render red; nothing else does")
-
-        # The capability charts' tooltip follows the same rule, with the
-        # gdpval score scaled *100 per variant exactly as the single value
-        # is.
-        page.locator("#svg-agentic circle.dispute").first.hover()
-        rows = page.locator("#tip-agentic .trow").all()
-        values = {r.locator("span").first.inner_text():
-                  r.locator("span").last.inner_text() for r in rows}
-        self.assertEqual(values["GDPval-AA v2"], "40.0 / 38.0")
-        self.assertEqual(values["Cost per task"], "$0.500 / $1.10")
-        self.assertEqual(values["Context"], "200K / 100K")
         page.close()
 
     def test_hovering_one_variant_highlights_the_whole_variant_set(self):
@@ -2660,8 +2623,6 @@ class DisputeBrowserTests(unittest.TestCase):
         # cells also carry the frontier tag's text in their textContent.
         self.assertIn("80.0 / 78.0 frontier", cells)
         self.assertIn("$0.500 / $0.900", cells)
-        self.assertIn("40.0 / 38.0 frontier", cells)
-        self.assertIn("$0.500 / $1.10", cells)
         self.assertIn("$1 / $1.4", cells)
         self.assertIn("200K / 100K", cells)
         # Red, not the primary ink: light theme computes the --dispute hue.
@@ -2723,12 +2684,10 @@ class DisputeBrowserTests(unittest.TestCase):
             cells = [c.strip() for c in line.strip("|").split("|")]
             self.assertEqual(cells[4], "80.0 / 78.0")
             self.assertEqual(cells[5], "$0.500 / $0.900")
-            self.assertEqual(cells[7], "40.0 / 38.0")
-            self.assertEqual(cells[8], "$0.500 / $1.10")
             # pin folded to a fill, never a pair: absent in variant 2
-            self.assertEqual(cells[9], "$0.5")
-            self.assertEqual(cells[10], "$1 / $1.4")
-            self.assertEqual(cells[11], "200K / 100K")
+            self.assertEqual(cells[7], "$0.5")
+            self.assertEqual(cells[8], "$1 / $1.4")
+            self.assertEqual(cells[9], "200K / 100K")
 
             page.evaluate("() => { window.__copied = null; }")
             page.locator("#copyJson").click()
@@ -2755,15 +2714,14 @@ def _presence_probe_model():
     #211): variant 2 is the EMPTY map -- that generation does not carry the
     model at all -- and variant 1 is the carried generation's full map,
     never `{}` by construction."""
-    probe = _probe_models(1)[0]  # ii 80.0, cost 0.5, gdpval 0.4
+    probe = _probe_models(1)[0]  # ii 80.0, cost 0.5
     probe.update({
         "contextWindowTokens": 200000,
         "price1mInputTokens": 0.5,
         "price1mOutputTokens": 1.0,
     })
     probe["genVariants"] = [
-        {"ii": 80.0, "cost": 0.5, "gdpval": 0.4, "gdpvalCost": 0.5,
-         "pin": 0.5, "pout": 1.0, "ctx": 200000},
+        {"ii": 80.0, "cost": 0.5, "pin": 0.5, "pout": 1.0, "ctx": 200000},
         {},
     ]
     return probe
@@ -2829,7 +2787,7 @@ class PresenceDisputeBrowserTests(unittest.TestCase):
         # variantPair maps the empty variant to null: addDisputeMarks rings
         # the canonical anchor and never draws a second circle or a
         # connector -- "no projectable pair yields no extra mark".
-        for key in ("intelligence", "agentic"):
+        for key in ("intelligence",):
             with self.subTest(chart=key):
                 page = self._loaded_page()
                 points = page.locator(f"#svg-{key} circle.dispute")
@@ -2853,14 +2811,6 @@ class PresenceDisputeBrowserTests(unittest.TestCase):
                          "score, cost and context render red; the em-dash "
                          "side is the generation that does not carry the "
                          "model")
-
-        page.locator("#svg-agentic circle.dispute").first.hover()
-        rows = page.locator("#tip-agentic .trow").all()
-        values = {r.locator("span").first.inner_text():
-                  r.locator("span").last.inner_text() for r in rows}
-        self.assertEqual(values["GDPval-AA v2"], "40.0 / —")
-        self.assertEqual(values["Cost per task"], "$0.500 / —")
-        self.assertEqual(values["Context"], "200K / —")
         page.close()
 
     def test_a_presence_row_renders_red_in_the_table(self):
@@ -2868,7 +2818,6 @@ class PresenceDisputeBrowserTests(unittest.TestCase):
         cells = page.locator("#tbl td.dispute").all_text_contents()
         self.assertIn("80.0 / — frontier", cells)
         self.assertIn("$0.500 / —", cells)
-        self.assertIn("40.0 / — frontier", cells)
         self.assertIn("$0.5 / —", cells)
         self.assertIn("200K / —", cells)
         # Red, not the primary ink -- the same computed hue the value

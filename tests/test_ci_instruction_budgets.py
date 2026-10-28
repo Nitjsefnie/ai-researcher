@@ -4,7 +4,7 @@ Three layers, and none of them runs valgrind. The committed pipeline
 fixture (tests/fixtures/pipeline/) is the fixed input every measured run
 reads -- pinning the budgets to it is what keeps the ratchet invariant to
 live-capture growth, so its bytes must be exactly what the generator in
-this module produces and build.py must accept it and render all four
+this module produces and build.py must accept it and render all three
 axes. The budgets-document validation and the gate itself run on
 synthetic measurements. The mini-tree seeding functions are exercised on
 real files and a real git repository, but the callgrind subprocesses of
@@ -65,25 +65,17 @@ def _load(name):
 
 # --- the committed pipeline fixture -------------------------------------------
 #
-# slug, lab, name, ii, gdpval (0-1 fraction), params (billions), intelligence
-# cost total, gdpval-aa weighted cost, scicode weighted cost, open weights.
-# The gdpval-aa weightedCostPerTask values are the agentic task cost times the
-# 10% index weight (build.GDPVAL_INDEX_WEIGHT), so build's recovery
-# `weighted / 0.10` lands on clean numbers -- e.g. 0.42 / 0.10 = 4.20.
+# slug, lab, name, ii, params (billions), intelligence cost total, open
+# weights. Each cost breakdown is the total split over build.py's v5.0 slugs
+# by index weight, rounded to six places, so its parts sum to the total.
 
 _MODEL_TABLE = (
-    ("alpha-1", "Alpha Fixtures", "Alpha One", 62.1, 0.58, 405, 1.20, 0.42,
-     0.30, False),
-    ("beta-2", "Beta Fixtures", "Beta Two", 55.4, 0.51, 235, 0.80, 0.38,
-     0.22, True),
-    ("gamma-3", "Alpha Fixtures", "Gamma Three", 48.9, 0.44, 72, 0.50, 0.31,
-     0.18, True),
-    ("delta-4", "Gamma Fixtures", "Delta Four", 43.2, 0.39, 32, 0.28, 0.25,
-     0.12, False),
-    ("epsilon-5", "Beta Fixtures", "Epsilon Five", 38.6, 0.30, 8, 0.14, 0.19,
-     0.07, True),
-    ("zeta-6", "Gamma Fixtures", "Zeta Six", 33.0, 0.21, 3, 0.06, 0.14,
-     0.04, False),
+    ("alpha-1", "Alpha Fixtures", "Alpha One", 62.1, 405, 1.20, False),
+    ("beta-2", "Beta Fixtures", "Beta Two", 55.4, 235, 0.80, True),
+    ("gamma-3", "Alpha Fixtures", "Gamma Three", 48.9, 72, 0.50, True),
+    ("delta-4", "Gamma Fixtures", "Delta Four", 43.2, 32, 0.28, False),
+    ("epsilon-5", "Beta Fixtures", "Epsilon Five", 38.6, 8, 0.14, True),
+    ("zeta-6", "Gamma Fixtures", "Zeta Six", 33.0, 3, 0.06, False),
 )
 
 
@@ -97,22 +89,15 @@ def fixture_models() -> list:
             "modelCreatorName": lab,
             "isOpenWeights": open_weights,
             "intelligenceIndex": ii,
-            # AA reports GDPval as a 0-1 fraction; the page shows it out of
-            # 100.
-            "gdpvalNormalized": gdpval,
             "parameters": params,
             "intelligenceIndexCostPerTask": {
                 "cost": {"total": total},
                 "evaluations": [
-                    {"slug": "gdpval-aa",
-                     "weightedCostPerTask": gdpval_weighted},
-                    {"slug": "scicode",
-                     "weightedCostPerTask": scicode_weighted},
-                ],
+                    {"slug": eval_slug, "weightedCostPerTask": round(total * weight, 6)}
+                    for eval_slug, weight in build.INDEX_EVAL_WEIGHTS.items()],
             },
         }
-        for (slug, lab, name, ii, gdpval, params, total, gdpval_weighted,
-             scicode_weighted, open_weights) in _MODEL_TABLE
+        for (slug, lab, name, ii, params, total, open_weights) in _MODEL_TABLE
     ]
 
 
@@ -196,25 +181,22 @@ def test_fixture_covers_two_labs_and_matching_agent_hosts():
 
 
 class FixtureBuildsEveryAxis(unittest.TestCase):
-    """build.py accepts the committed fixture and renders all four axes.
+    """build.py accepts the committed fixture and renders all three axes.
 
     In-process, the import-and-call style of tests/test_build.py:
     RAW/AGENTS_RAW/OUT redirected to the fixture and a temp output under
     build.ROOT, build.main() run for real.
     """
 
-    def test_build_accepts_the_fixture_and_renders_all_four_axes(self):
+    def test_build_accepts_the_fixture_and_renders_all_three_axes(self):
         stats = self._build_fixture()
-        self.assertEqual(
-            stats["metricCounts"],
-            {"coding": 3, "intelligence": 6, "agentic": 6})
+        self.assertEqual(stats["metricCounts"], {"coding": 3, "intelligence": 6})
         self.assertEqual(stats["parameterCount"], 6)
         self.assertEqual(stats["total"], 6)
 
-    def test_the_built_page_carries_all_four_chart_svgs(self):
+    def test_the_built_page_carries_all_three_chart_svgs(self):
         html = self._page_text()
-        for svg in ("svg-coding", "svg-intelligence", "svg-agentic",
-                    "svg-parameters"):
+        for svg in ("svg-coding", "svg-intelligence", "svg-parameters"):
             self.assertIn(f'id="{svg}"', html)
 
     # -- helpers --------------------------------------------------------------

@@ -15,8 +15,8 @@ import unittest.mock
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent / "scripts"))
 
 import diff_aa  # noqa: E402  # pylint: disable=wrong-import-position
-import fetch_aa  # noqa: E402  # pylint: disable=wrong-import-position
 import build  # noqa: E402  # pylint: disable=wrong-import-position,wrong-import-order
+from test_build import v5_evaluations  # noqa: E402  # pylint: disable=wrong-import-position
 
 # A report in the exact shape diff_aa.report() prints, trimmed to one entry per
 # section. The renderer reads this back rather than re-running the analysis, so
@@ -206,15 +206,9 @@ def capture(name, *, ident=None, intelligence: float | None = 51,
         "modelCreatorName": creator,
         "slug": (ident or name.lower().replace(" ", "-")),
         "intelligenceIndex": intelligence,
-        "gdpvalNormalized": None if intelligence is None else intelligence / 100,
         "parameters": params,
         "intelligenceIndexCostPerTask": {
-            "cost": {"total": cost},
-            "evaluations": [
-                {"slug": "gdpval-aa", "weightedCostPerTask": cost / 10},
-                {"slug": "scicode", "weightedCostPerTask": cost / 4},
-            ],
-        },
+            "cost": {"total": cost}, "evaluations": v5_evaluations(cost)},
     }
     model.update(extra)
     return model
@@ -252,14 +246,14 @@ class ClassifyTests(unittest.TestCase):
             diff_aa.classify("intelligenceIndexEvaluations[scicode].score"),
             "derived")
         self.assertEqual(
-            diff_aa.classify("intelligenceIndexEvaluations[gdpval-aa].costPerTask"),
+            diff_aa.classify("intelligenceIndexEvaluations[aa-briefcase].costPerTask"),
             "derived")
 
     def test_lab_branding_is_cosmetic(self):
         self.assertEqual(diff_aa.classify("modelCreatorColor"), "cosmetic")
 
     def test_components_of_a_reported_headline_are_derived(self):
-        self.assertEqual(diff_aa.classify("evalTokenCounts.gdpval"), "derived")
+        self.assertEqual(diff_aa.classify("evalTokenCounts.hle-diamond"), "derived")
         self.assertEqual(diff_aa.classify("intelligenceIndexCostInput"), "derived")
         self.assertEqual(diff_aa.classify("price1mBlended3to1"), "derived")
         self.assertEqual(
@@ -409,15 +403,6 @@ class FrontierTests(unittest.TestCase):
         self.assertEqual([r["name"] for r in rows], ["Open"])
         self.assertIn("Open", names)
 
-    def test_a_cost_chart_drops_models_with_no_measurement_for_it(self):
-        models = [capture("Measured", intelligence=50),
-                  capture("Unmeasured", ident="unmeasured", intelligence=50,
-                          intelligenceIndexCostPerTask=None)]
-
-        _, rows = diff_aa.chart_frontier(models, [], "agentic")
-
-        self.assertEqual([r["name"] for r in rows], ["Measured"])
-
     def test_the_coding_frontier_is_drawn_over_the_agent_capture(self):
         # Coding rows come from a different AA product entirely, so feeding it
         # the model capture must not silently produce a model-shaped frontier.
@@ -488,12 +473,12 @@ class ReportTests(unittest.TestCase):
         self.assertIn("== models added: 1", report)
         self.assertIn("+ Newcomer  [Fixture Lab]", report)
         subject = diff_aa.as_commit_message(report).splitlines()[0]
-        # The newcomer displaces the incumbent on three charts at once. The
+        # The newcomer displaces the incumbent on two charts at once. The
         # effort-collapsed frontier is a second VIEW of the intelligence
-        # chart, so it must not inflate that count to four.
+        # chart, so it must not inflate that count to three.
         self.assertEqual(
             subject,
-            "Refresh capture: 2 models, 6 frontier moves across 3 charts, +1/-0")
+            "Refresh capture: 2 models, 4 frontier moves across 2 charts, +1/-0")
 
     def test_a_removed_model_is_reported(self):
         old = [capture("Incumbent"), capture("Doomed", ident="doomed")]
@@ -544,25 +529,25 @@ class ReportTests(unittest.TestCase):
         self.assertIn("nothing the page renders", diff_aa.as_commit_message(report))
 
     def test_a_score_wiggle_inside_the_tolerance_is_discarded_and_counted(self):
-        # gdpvalNormalized is an Elo renormalised over the field, so every
+        # An Elo-scored index is renormalised over the field, so every
         # newcomer nudges every incumbent by a hundredth of a percent -- a
         # dozen lines of +0.01% per refresh that no reader can act on.
-        old = [capture("Steady", intelligence=50, gdpvalNormalized=0.54762)]
-        new = [capture("Steady", intelligence=50, gdpvalNormalized=0.547705)]
+        old = [capture("Steady", intelligence=54.762)]
+        new = [capture("Steady", intelligence=54.7705)]
 
         report = self.render(old, new, tol=0.005)
 
         self.assertIn("(none)", report)
-        self.assertNotIn("gdpvalNormalized", report)
+        self.assertNotIn("intelligenceIndex:", report)
         self.assertIn("1 other numeric moves <= 0.5%", report)
 
     def test_a_score_move_past_the_tolerance_is_still_reported(self):
-        old = [capture("Mover", intelligence=50, gdpvalNormalized=0.500)]
-        new = [capture("Mover", intelligence=50, gdpvalNormalized=0.504)]
+        old = [capture("Mover", intelligence=50)]
+        new = [capture("Mover", intelligence=50.4)]
 
         report = self.render(old, new, tol=0.005)
 
-        self.assertIn("gdpvalNormalized: 0.5 -> 0.504", report)
+        self.assertIn("intelligenceIndex: 50 -> 50.4", report)
 
     def test_the_undefined_sentinel_produces_no_hit_at_all(self):
         # The bug that made a re-encoding look like 615 models moving.
@@ -584,8 +569,7 @@ class ReportTests(unittest.TestCase):
 
         for label in ("efficient frontier (expanded)",
                       "efficient frontier (effort-collapsed)",
-                      "coding agent frontier", "GDPval-AA frontier",
-                      "parameter-efficiency frontier"):
+                      "coding agent frontier", "parameter-efficiency frontier"):
             self.assertNotIn(label, report)
         self.assertNotIn("(unchanged)", report)
 
@@ -595,7 +579,7 @@ class ReportTests(unittest.TestCase):
 
         report = self.render(old, new)
 
-        for label in ("efficient frontier (expanded)", "GDPval-AA frontier",
+        for label in ("efficient frontier (expanded)",
                       "parameter-efficiency frontier"):
             self.assertIn(f"== {label}", report)
         self.assertIn("+ Cheaper", report)
@@ -666,8 +650,8 @@ class DisputeSectionTests(unittest.TestCase):
     def test_variants_appearing_are_one_section_line_never_per_model_lines(self):
         old = [capture("Incumbent", intelligence=50)]
         new = [dict(capture("Incumbent", intelligence=50), genVariants=[
-            {"ii": 50.0, "cost": 0.75, "gdpval": 0.50},
-            {"ii": 51.0, "cost": 0.80, "gdpval": 0.49},
+            {"ii": 50.0, "cost": 0.75},
+            {"ii": 51.0, "cost": 0.80},
         ])]
 
         report = self.render(old, new)
@@ -822,30 +806,18 @@ class DisputeSectionTests(unittest.TestCase):
         # the body the moment a frontier also moved.
         gv = [{"ii": 50.0, "cost": 0.75}, {"ii": 49.5, "cost": 0.80}]
 
-        def gdp(model, weighted):
-            out = dict(model)
-            out["intelligenceIndexCostPerTask"] = {
-                "cost": {"total": 0.75},
-                "evaluations": [
-                    {"slug": "gdpval-aa", "weightedCostPerTask": weighted},
-                    {"slug": "scicode",
-                     "weightedCostPerTask": 0.75 - weighted},
-                ],
-            }
-            return out
-
-        old = [gdp(capture("Alpha", intelligence=50), 0.075),
-               gdp(capture("Ex", ident="ex", intelligence=49), 0.030)]
-        new = [dict(gdp(capture("Alpha", intelligence=50), 0.025),
-                    genVariants=gv),
-               gdp(capture("Ex", ident="ex", intelligence=49), 0.030)]
+        # Ex is on the parameter frontier until Alpha shrinks below it.
+        old = [capture("Alpha", intelligence=50, params=27),
+               capture("Ex", ident="ex", intelligence=49, params=10)]
+        new = [dict(capture("Alpha", intelligence=50, params=5), genVariants=gv),
+               capture("Ex", ident="ex", intelligence=49, params=10)]
 
         subject = diff_aa.as_commit_message(
             self.render(old, new)).splitlines()[0]
 
         self.assertEqual(
             subject,
-            "Refresh capture: 2 models, GDPval-AA frontier: Ex out, "
+            "Refresh capture: 2 models, parameters frontier: Ex out, "
             "1 disputed value")
 
     def test_the_disputes_clause_outranks_the_speed_clause(self):
@@ -855,25 +827,12 @@ class DisputeSectionTests(unittest.TestCase):
         # into the body, which carries every section in full.
         gv = [{"ii": 50.0, "cost": 0.75}, {"ii": 49.5, "cost": 0.80}]
 
-        def gdp(model, weighted):
-            out = dict(model)
-            out["intelligenceIndexCostPerTask"] = {
-                "cost": {"total": 0.75},
-                "evaluations": [
-                    {"slug": "gdpval-aa", "weightedCostPerTask": weighted},
-                    {"slug": "scicode",
-                     "weightedCostPerTask": 0.75 - weighted},
-                ],
-            }
-            return out
-
-        old = [gdp(capture("Alpha", intelligence=50,
-                           medianOutputTokensPerSecond=100.0), 0.075),
-               gdp(capture("Ex", ident="ex", intelligence=49), 0.030)]
-        new = [dict(gdp(capture("Alpha", intelligence=50,
-                                medianOutputTokensPerSecond=180.0), 0.025),
-                    genVariants=gv),
-               gdp(capture("Ex", ident="ex", intelligence=49), 0.030)]
+        old = [capture("Alpha", intelligence=50, params=27,
+                       medianOutputTokensPerSecond=100.0),
+               capture("Ex", ident="ex", intelligence=49, params=10)]
+        new = [dict(capture("Alpha", intelligence=50, params=5,
+                            medianOutputTokensPerSecond=180.0), genVariants=gv),
+               capture("Ex", ident="ex", intelligence=49, params=10)]
 
         message = diff_aa.as_commit_message(self.render(old, new))
         subject = message.splitlines()[0]
@@ -895,15 +854,13 @@ class DisputeSectionTests(unittest.TestCase):
             subject, "Refresh capture: 1 models, nothing the page renders")
 
 
-class CrossGenerationHoldTests(unittest.TestCase):
-    """The cross-generation cost hold (issue #244).
+class CostShapeSwitchTests(unittest.TestCase):
+    """The cost field's shape switch (issue #244).
 
     The merge drops a cost breakdown that belongs to another generation,
     leaving the leaderboard's bare total. The record then flips shape with
-    its value unchanged and drops off the GDPval-AA frontier -- and the
-    differ reported both as news: two field-change lines spelling one
-    unchanged total, and frontier moves for membership the hold caused on
-    both ends of the comparison.
+    its value unchanged, and the differ reported that as two field-change
+    lines spelling one unchanged total.
     """
 
     def setUp(self):
@@ -924,27 +881,17 @@ class CrossGenerationHoldTests(unittest.TestCase):
         return buffer.getvalue()
 
     @staticmethod
-    def held(model, total):
+    def bare(model, total):
         """The same record as the merge leaves it when it drops the detail
         route's breakdown: the leaderboard's bare measured total."""
         out = dict(model)
         out["intelligenceIndexCostPerTask"] = total
         return out
 
-    @staticmethod
-    def frontier_trio():
-        """Alpha Prime strictly dominates the other two on every chart, so
-        dropping it from one side alone manufactures entry/exit moves."""
-        return [
-            capture("Alpha Prime", intelligence=90, cost=0.5),
-            capture("Beta Standin", ident="beta", intelligence=70, cost=1.0),
-            capture("Gamma Least", ident="gamma", intelligence=60, cost=2.0),
-        ]
-
     def test_a_shape_switch_with_an_unchanged_total_is_not_a_field_change(self):
         total = 0.985689
         old = [capture("Held Model", cost=total)]
-        new = [self.held(old[0], total)]
+        new = [self.bare(old[0], total)]
 
         report = self.render(old, new)
 
@@ -953,12 +900,10 @@ class CrossGenerationHoldTests(unittest.TestCase):
         # from cost.total.
         self.assertIn("  (none)", report)
         self.assertNotIn("intelligenceIndexCostPerTask", report)
-        # The hold itself is the section that speaks instead.
-        self.assertIn("held absent: 1 model(s): Held Model", report)
 
     def test_a_total_that_moves_across_shapes_reports_once_on_the_headline(self):
         old = [capture("Mover", cost=0.9)]
-        new = [self.held(old[0], 1.0)]
+        new = [self.bare(old[0], 1.0)]
 
         report = self.render(old, new)
 
@@ -968,187 +913,6 @@ class CrossGenerationHoldTests(unittest.TestCase):
         self.assertIn(
             "intelligenceIndexCostPerTask.cost.total: 0.9 -> 1", report)
         self.assertEqual(report.count("intelligenceIndexCostPerTask"), 1)
-
-    def test_hold_driven_frontier_churn_is_not_reported_as_moves(self):
-        # The issue's shape: Alpha Prime on the GDPval-AA frontier, held
-        # absent next hour with score and total unchanged, so "+ Beta, -
-        # Alpha" appears while nothing moved.
-        alpha, beta, gamma = self.frontier_trio()
-        old = [alpha, beta, gamma]
-        new = [self.held(alpha, 0.5), beta, gamma]
-
-        report = self.render(old, new)
-
-        self.assertNotIn("== GDPval-AA frontier", report)
-        # The hold section's own lines must never parse as frontier moves.
-        self.assertEqual(diff_aa.frontier_moves(report.splitlines()), [])
-        self.assertIn("held absent: 1 model(s): Alpha Prime", report)
-        subject = diff_aa.as_commit_message(report).splitlines()[0]
-        self.assertEqual(
-            subject, "Refresh capture: 3 models, 1 GDPval cost held absent")
-
-    def test_returning_models_report_the_hold_ending_not_frontier_moves(self):
-        # The convergence hour, mirror of the hold hour: the model comes
-        # back to the chart, which used to read as "+ Alpha, - Beta".
-        alpha, beta, gamma = self.frontier_trio()
-        old = [self.held(alpha, 0.5), beta, gamma]
-        new = [alpha, beta, gamma]
-
-        report = self.render(old, new)
-
-        self.assertNotIn("== GDPval-AA frontier", report)
-        self.assertEqual(diff_aa.frontier_moves(report.splitlines()), [])
-        self.assertIn(
-            "returned as the routes converged: 1 model(s): Alpha Prime",
-            report)
-        subject = diff_aa.as_commit_message(report).splitlines()[0]
-        self.assertEqual(
-            subject, "Refresh capture: 3 models, 1 GDPval cost restored")
-
-    def test_the_hold_section_names_models_and_the_reason(self):
-        one = capture("First Held", ident="first", intelligence=55, cost=0.6)
-        two = capture("Second Held", ident="second", intelligence=45, cost=1.2)
-        old = [one, two]
-        new = [self.held(one, 0.6), self.held(two, 1.2)]
-
-        report = self.render(old, new)
-
-        self.assertIn("held absent: 2 model(s): First Held, Second Held",
-                      report)
-        self.assertIn("another generation's cost breakdown was dropped", report)
-        self.assertIn("renders absent until the routes converge", report)
-        subject = diff_aa.as_commit_message(report).splitlines()[0]
-        self.assertEqual(
-            subject, "Refresh capture: 2 models, 2 GDPval costs held absent")
-
-    def test_a_held_models_real_move_on_another_chart_still_reports(self):
-        # The hold unplots a model on the GDPval-AA chart ONLY -- its bare
-        # total still plots the intelligence axis -- so suppressing the
-        # hold's churn must not swallow a genuine move elsewhere.
-        alpha, beta, gamma = self.frontier_trio()
-        fell = capture("Alpha Prime", intelligence=40, cost=5.0)
-        fell["intelligenceIndexCostPerTask"] = 5.0
-        old = [alpha, beta, gamma]
-        new = [fell, beta, gamma]
-
-        report = self.render(old, new)
-
-        # Its intelligence index really fell off the frontier: reported.
-        self.assertIn("== efficient frontier (expanded)", report)
-        self.assertIn("  - Alpha Prime", report)
-        self.assertIn("  + Beta Standin", report)
-        # The filter's NEGATIVE limb, discriminating: the hold unplots the
-        # GDPval chart alone, so dropping held models from EVERY chart
-        # (deleting the `metric == "agentic"` guard) must fail here --
-        # that mutant zeroes the parameter section, and no other assertion
-        # in this class sees it (the intelligence frontier is computed
-        # outside print_chart_frontiers).
-        self.assertIn("== parameter-efficiency frontier", report)
-        # The hold's own chart still reports nothing...
-        self.assertNotIn("== GDPval-AA frontier", report)
-        # ... and the hold is named as the reason it is unplotted there.
-        self.assertIn("held absent: 1 model(s): Alpha Prime", report)
-
-    def test_a_removed_held_model_is_neither_restored_nor_held(self):
-        # Presence first: a model gone from the new capture is models-
-        # removed news. Counting it as "restored" would put removed and
-        # restored in one message for one model -- a phantom line of
-        # exactly the class this section exists to replace.
-        stayer = capture("Stayer", ident="stayer")
-        departed = self.held(capture("Departed", ident="departed"), 0.5)
-        old = [departed, stayer]
-        new = [stayer]
-
-        report = self.render(old, new)
-
-        self.assertIn("== models removed: 1", report)
-        self.assertNotIn("== GDPval cost hold", report)
-        self.assertNotIn("restored", report)
-
-    def test_a_partial_convergence_reports_both_hold_lines(self):
-        # One model newly held while another comes back, same hour: both
-        # lines of one section, and the subject carries the hold clause
-        # (the width budget drops the restorable one when both do not fit).
-        alpha, beta, gamma = self.frontier_trio()
-        old = [self.held(alpha, 0.5), beta, gamma]
-        new = [alpha, beta, self.held(gamma, 2.0)]
-
-        report = self.render(old, new)
-
-        self.assertIn("held absent: 1 model(s): Gamma Least", report)
-        self.assertIn(
-            "returned as the routes converged: 1 model(s): Alpha Prime",
-            report)
-        self.assertEqual(diff_aa.frontier_moves(report.splitlines()), [])
-        subject = diff_aa.as_commit_message(report).splitlines()[0]
-        self.assertIn("1 GDPval cost held absent", subject)
-
-    def test_a_converged_quiet_hour_gains_no_hold_section(self):
-        # The quiet path is a real branch, not just an absent string: two
-        # fully converged captures must print no hold section and no hold
-        # clause anywhere in the message.
-        records = [capture("Stable One", ident="stable-one"),
-                   capture("Stable Two", ident="stable-two")]
-
-        report = self.render(records, records)
-
-        self.assertNotIn("== GDPval cost hold", report)
-        self.assertNotIn("held absent", report)
-        subject = diff_aa.as_commit_message(report).splitlines()[0]
-        self.assertEqual(
-            subject, "Refresh capture: 2 models, nothing the page renders")
-
-    def test_a_mixed_hour_counts_plotted_rows_on_both_full_captures(self):
-        # Hold onset coinciding with a genuine GDPval move: the section
-        # prints, and its "of N -> M plotted" denominators describe what
-        # each CAPTURE drew -- 5 rows old, 4 new. Counting the filtered
-        # sides instead would say 4 -> 4, understating the old capture by
-        # exactly the model the union filter removed; both literals here
-        # are what fails if the full-capture re-read is dropped.
-        alpha, beta, gamma = self.frontier_trio()
-        mover = capture("Mover Model", ident="mover", intelligence=70,
-                        cost=0.9)
-        mover["gdpvalNormalized"] = 0.55  # old capture: dominated
-        holden = capture("Holden Model", ident="holden", intelligence=85,
-                         cost=1.5)
-        old = [alpha, beta, gamma, mover, holden]
-        risen = dict(mover, gdpvalNormalized=0.92)  # new: enters the frontier
-        new = [alpha, beta, gamma, risen, self.held(holden, 1.5)]
-
-        report = self.render(old, new)
-
-        self.assertIn("== GDPval-AA frontier: 1 -> 2 of 5 -> 4 plotted",
-                      report)
-        self.assertIn("  + Mover Model  92.0  $0.90/task", report)
-        self.assertIn("held absent: 1 model(s): Holden Model", report)
-        subject = diff_aa.as_commit_message(report).splitlines()[0]
-        self.assertEqual(
-            subject,
-            "Refresh capture: 5 models, GDPval-AA frontier: Mover Model in")
-
-    def test_the_hold_predicate_matches_fetch_aa_drop(self):
-        # The held_slugs docstring claims the same predicate as
-        # fetch_aa.check_cost_breakdown's `dropped` list; a shared
-        # predicate tested on one side only drifts silently when the other
-        # side widens, so this seam pins both implementations to one input.
-        bare = capture("Bare Held", ident="bare-held", cost=0.5)
-        bare["intelligenceIndexCostPerTask"] = 0.5
-        whole = dict(capture("Whole Model", ident="whole-model", cost=0.9))
-        whole["intelligenceIndexCostPerTask"] = {
-            "cost": {"total": 0.9},
-            "evaluations": [{"slug": "gdpval-aa",
-                             "weightedCostPerTask": 0.09},
-                            {"slug": "scicode",
-                             "weightedCostPerTask": 0.81}],
-        }
-
-        checked, dropped = fetch_aa.check_cost_breakdown([bare, whole])
-
-        self.assertEqual(checked, 1)
-        self.assertEqual(set(dropped), {"bare-held"})
-        self.assertEqual(
-            diff_aa.held_slugs({"bare-held": bare, "whole-model": whole}),
-            set(dropped))
 
 
 class DisplayNameTests(unittest.TestCase):
@@ -1357,7 +1121,7 @@ class ClassifierStructureTests(unittest.TestCase):
         # change without the commit message saying so.
         rendered = {
             "name", "shortName", "slug", "modelCreatorName", "intelligenceIndex",
-            "intelligenceIndexIsEstimated", "gdpvalNormalized", "parameters",
+            "intelligenceIndexIsEstimated", "parameters",
             "isOpenWeights", "deprecated", "isReasoning", "licenseName",
             "contextWindowTokens", "releaseDate", "price1mInputTokens",
             "price1mOutputTokens", "intelligenceIndexCostPerTask.cost.total",
