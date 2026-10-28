@@ -11,7 +11,7 @@
     "scripts/ci/perf_budgets.py": 723,
     "scripts/diff_aa.py": 800,
     "scripts/fetch_aa.py": 1384,
-    "tests/test_browser.py": 2845,
+    "tests/test_browser.py": 2843,
     "tests/test_build.py": 2458,
     "tests/test_build_rankings.py": 778,
     "tests/test_capture_gate.py": 1181,
