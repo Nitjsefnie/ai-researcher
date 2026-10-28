@@ -60,8 +60,8 @@
     107173
   ],
   "page_format.py": [
-    1954,
-    3035
+    1906,
+    2991
   ],
   "scripts/capture_gate.py": [
     9865,
@@ -128,8 +128,8 @@
     27599
   ],
   "scripts/fetch_aa.py": [
-    23566,
-    47147
+    22484,
+    46362
   ],
   "scripts/fetch_hf_trending.py": [
     661,
@@ -148,12 +148,12 @@
     7346
   ],
   "tests/test_browser.py": [
-    31755,
-    96961
+    30611,
+    94722
   ],
   "tests/test_build.py": [
-    31881,
-    96995
+    27831,
+    86011
   ],
   "tests/test_capture_gate.py": [
     13376,
@@ -192,8 +192,8 @@
     19932
   ],
   "tests/test_ci_perf_budgets.py": [
-    5071,
-    23768
+    5066,
+    24001
   ],
   "tests/test_ci_ratchets.py": [
     10493,
@@ -218,10 +218,6 @@
   "tests/test_fetch_aa.py": [
     28402,
     104015
-  ],
-  "tests/test_gate_base_freshness.py": [
-    4927,
-    29203
   ],
   "tests/test_gitignore.py": [
     3628,
