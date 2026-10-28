@@ -375,21 +375,15 @@ def label(m: dict) -> str:
 
 
 def check_breakdown_slugs(fetched: list[dict]) -> None:
-    """Every usable cost breakdown THIS run fetched carries exactly build.py's slugs.
-
-    A dropped, renamed or added slug is a rebalance or rename build.py was not
-    written against, which is what the version pin exists to catch. Records the
-    cross-run layers carry in from the previous capture were judged when they
-    were captured, possibly under an older index version, so they are not
-    passed here.
-    """
+    """Refuse a breakdown this run fetched whose slugs are not exactly build.py's:
+    a rebalance or rename the version pin exists to catch. Records carried from
+    the previous capture were judged when captured, under their own version."""
     expected = set(INDEX_EVAL_WEIGHTS)
     for m in fetched:
         outer = m.get("intelligenceIndexCostPerTask")
         evaluations = outer.get("evaluations") if isinstance(outer, dict) else None
-        if not isinstance(evaluations, list):
-            continue
-        slugs = {e.get("slug") for e in evaluations if isinstance(e, dict)}
+        slugs = ({e.get("slug") for e in evaluations if isinstance(e, dict)}
+                 if isinstance(evaluations, list) else expected)
         if slugs != expected:
             sys.exit(
                 f"{label(m)}: cost breakdown slugs left v{INDEX_VERSION}'s -- missing "
@@ -1106,9 +1100,7 @@ class Capture(typing.NamedTuple):
     revisit_action: str | None = None
     # Window evidence belongs to leaderboard models, not detail-only prices.
     leaderboard_slugs: frozenset[str] = frozenset()
-    # This run's own reads (both routes) before any cross-run layer carries
-    # records in from the previous capture: what the slug check judges.
-    fetched: tuple = ()
+    fetched: tuple = ()  # this run's reads, before any cross-run layer
 
 
 def capture(cached_base: str | None, cached_detail: str | None,

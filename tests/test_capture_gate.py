@@ -953,10 +953,9 @@ class WindowMarkerStagingTests(unittest.TestCase):
                                return_value=WINDOW_MARKER), \
              mock.patch.object(capture_gate, "read_fresh_window_marker",
                                return_value=None), \
-             self.assertRaises(build.WindowHold) as raised:
+             self.assertRaises(build.WindowHold):
             capture_gate.build_page_pair((head, FIXTURE_AGENTS),
                                          (FIXTURE_MODELS, FIXTURE_AGENTS))
-
 
     def test_an_unchanged_window_hour_stays_silent(self):
         # The same state with no movement: two window captures, both sides
