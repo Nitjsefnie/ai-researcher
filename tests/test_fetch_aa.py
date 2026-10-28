@@ -140,7 +140,7 @@ class IndexVersionTests(unittest.TestCase):
         # rebalancing, so the pin compares at MAJOR.MINOR granularity -- and
         # the FULL found version is what the capture log reports.
         text = (f"Artificial Analysis Intelligence Index "
-                f"v{fetch_aa.INDEX_VERSION}.2 incorporates 10 evaluations")
+                f"v{fetch_aa.INDEX_VERSION}.2 incorporates 9 evaluations")
 
         self.assertEqual(fetch_aa.check_index_version(text),
                          f"{fetch_aa.INDEX_VERSION}.2")
@@ -191,10 +191,9 @@ class IndexVersionTests(unittest.TestCase):
         self.assertIn("methodology", message)
 
     def test_a_multi_part_minor_bump_exits_against_the_string_compare(self):
-        # "4.10" sorts below "4.3" as a plain string; the pin compares the
-        # integer parts, so a v4.10 page refuses the v4.3 pin exactly like a
-        # single-digit bump would.
-        with self.assertRaises(SystemExit) as caught:
+        # "4.10" sorts below "4.3" as a plain string; the pin, patched to
+        # 4.3, compares the integer parts, so a v4.10 page still refuses.
+        with unittest.mock.patch.object(fetch_aa, "PINNED_VERSION", (4, 3)), self.assertRaises(SystemExit) as caught:
             fetch_aa.check_index_version(
                 "Artificial Analysis Intelligence Index v4.10")
 
@@ -208,9 +207,9 @@ class IndexVersionTests(unittest.TestCase):
         # match, never the first.
         text = ("Earlier the Artificial Analysis Intelligence Index v4.1 ran "
                 "three evals. Today the Artificial Analysis Intelligence "
-                "Index v4.3.2 incorporates 10 evaluations")
+                f"Index v{fetch_aa.INDEX_VERSION}.2 incorporates 9 evaluations")
 
-        self.assertEqual(fetch_aa.check_index_version(text), "4.3.2")
+        self.assertEqual(fetch_aa.check_index_version(text), f"{fetch_aa.INDEX_VERSION}.2")
 
 
 class CostBreakdownTests(unittest.TestCase):
@@ -743,7 +742,7 @@ def methodology_html(version: str | None = fetch_aa.INDEX_VERSION) -> str:
         return ("<html><body>The methodology page describes the benchmark "
                 "suite.</body></html>")
     return (f"<html><body><h1>Artificial Analysis Intelligence Index "
-            f"v{version}</h1><p>incorporates 10 evaluations</p></body>"
+            f"v{version}</h1><p>incorporates 9 evaluations</p></body>"
             "</html>")
 
 

@@ -66,7 +66,7 @@ MODEL_DETAIL_URL = "https://artificialanalysis.ai/models/{slug}"
 AGENTS_URL = "https://artificialanalysis.ai/agents/coding-agents"
 # The Intelligence Index version pin reads THIS page (issue #220): the version
 # string left the leaderboard payload, and the methodology page headlines its
-# live version ("Artificial Analysis Intelligence Index v4.3.2"). The pin
+# live version ("Artificial Analysis Intelligence Index v5.0"). The pin
 # compares at MAJOR.MINOR granularity -- AA ships point releases within a
 # generation without rebalancing the weights.
 METHODOLOGY_URL = (
