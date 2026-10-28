@@ -36,7 +36,8 @@ OUT = ROOT / "out" / "frontier-models.html"
 # Terminal-Bench-Science and HLE-Diamond, swapped CritPt for CritPt v2 (Hard
 # Subset), cut GDP.pdf to 5% and removed GDPval-AA, SciCode, AA-LCR and
 # Humanity's Last Exam -- so fetch_aa.py refuses any other MAJOR.MINOR on that
-# page's live headline (issue #220); point releases (v4.3.2) do not rebalance and pass.
+# page's live headline (issue #220); point releases (v4.3.2) do not rebalance
+# and pass.
 INDEX_VERSION = "5.0"
 
 # v5.0's evaluations as AA names them, then each cost-breakdown slug's index
@@ -311,8 +312,9 @@ def build_rows(models):
             # distinguishable under the page's 34-character chart cap.
             "label": display_label(label),
             # Which capture the row came from. Model rows carry the
-            # intelligence and parameter axes; agent rows carry coding. Neither universe has the other's columns, and the page
-            # renders an absent column as an em-dash, not a blank.
+            # intelligence and parameter axes; agent rows carry coding. Neither
+            # universe has the other's columns, and the page renders an absent
+            # column as an em-dash, not a blank.
             "kind": "model",
             "agent": None,
             "creator": m.get("modelCreatorName") or "",
@@ -702,8 +704,8 @@ def merge_captures(base: list, detail: list) -> list:
                 }
             if k == COST_KEY and not breakdown_matches_total(out[k]):
                 # The breakdown is not this total's breakdown, whatever route
-                # it came from, so it is dropped whole, leaving the total
-                # until the routes converge. Dropping is the honest outcome -- the
+                # it came from, so it is dropped whole, leaving the total until
+                # the routes converge. Dropping is the honest outcome -- the
                 # alternatives are publishing another generation's total or
                 # failing the refresh red for hours. Reached on BOTH shape
                 # arms: the flattened scalar above, and the nested stub AA
@@ -819,9 +821,9 @@ def cost_breakdown_window(data_dir: pathlib.Path) -> bool:
 def window_generations(data_dir: pathlib.Path) -> int | None:
     """The in-run generation count the window marker records, or None.
 
-    Issue #223: a window hour that empties an axis is refused unless it is
-    the #232 parameters hold, and the refusal must name the window it is
-    instead of blaming a capture shape change. The count rides the marker's one line as
+    Issue #223: a window hour that empties an axis is refused unless it is the
+    #232 parameters hold, and the refusal must name the window it is instead of
+    blaming a capture shape change. The count rides the marker's one line as
     "; N generation(s) observed in-run" -- record_cost_window writes it, and
     this reads the ONE integer back by its own literal; a marker without it
     (an older fetch_aa.py wrote those) reads as None and the refusal names
@@ -1150,17 +1152,16 @@ def main(*, generation_state: bytes | None | EllipsisType = ...):
     # capture (AA's totalParameters rename) fails red instead of publishing
     # an empty parameters chart.
     #
-    # The guard's arms, narrowest first. The designed three-generation
-    # corner (issue #232): the marker records >= 3 generations AND
-    # parameters is the only emptied axis -- the hour HOLDS rather than refuses:
-    # WindowHold, which scripts/capture_gate.py reports as the hour
-    # unchanged -- the last good page stays live, nothing commits or
-    # publishes -- until AA's routes converge. Every other emptied axis
-    # still refuses (SystemExit, nonzero): AGENTS.md's designed
-    # go-re-read-AA-by-hand signal, naming the observed in-run generation
-    # count when the marker carries one, with the shape-change wording only
-    # for a capture that does NOT record a window, where shape change is
-    # the honest cause (issue #223).
+    # The guard's arms, narrowest first. The designed three-generation corner
+    # (issue #232): the marker records >= 3 generations AND parameters is the
+    # only emptied axis -- the hour HOLDS rather than refuses: WindowHold,
+    # which scripts/capture_gate.py reports as the hour unchanged -- the last
+    # good page stays live, nothing commits or publishes -- until AA's routes
+    # converge. Every other emptied axis still refuses (SystemExit, nonzero):
+    # AGENTS.md's designed go-re-read-AA-by-hand signal, naming the observed
+    # in-run generation count when the marker carries one, with the
+    # shape-change wording only for a capture that does NOT record a window,
+    # where shape change is the honest cause (issue #223).
     rendered = {**stats["metricCounts"], "parameters": stats["parameterCount"]}
     empty = [axis for axis, n in rendered.items() if not n]
     if (window and empty == ["parameters"]

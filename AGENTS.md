@@ -173,9 +173,11 @@ or hand-fix JSON — when:
   pin. This matters most: AA publishes per-evaluation weights only on its
   methodology page, so a rebalance leaves every payload field well-formed (v4.2
   silently shipped costs wrong by 2–3×); the pin is the only catch;
-- the cost breakdown's slug set is not exactly `build.py`'s `INDEX_EVAL_WEIGHTS`
-  keys, or per-evaluation costs stop summing to the published total — except an
-  all-dropped window hour, which is reported and returned (issue #217);
+- a cost breakdown this run fetched has a slug set other than exactly
+  `build.py`'s `INDEX_EVAL_WEIGHTS` keys (records the look-back carries in from
+  the previous capture were judged when captured), or per-evaluation costs stop
+  summing to the published total — except an all-dropped window hour, which is
+  reported and returned (issue #217);
 - the Coding Agent Index falls below `CODING_ROW_FLOOR` paired rows.
 
 A route disagreement is never one of these: precedence resolves it, silently and
@@ -192,9 +194,9 @@ nothing and keep the HOLD.
 
 Window evidence counts leaderboard models after validating the whole union;
 detail-only breakdowns cannot clear it, even on models that render no rows.
-Every other empty axis refuses: with a marker, naming the window and its
-generation count; without one, as the go-re-read-AA-by-hand signal for a real
-shape change.
+Every other empty axis refuses: with a marker, naming the window and the
+generation count it records (or that it records none); without one, as the
+go-re-read-AA-by-hand signal for a real shape change.
 
 Never hand-edit either capture. Re-publishing a slug adds a version and never
 destroys history.

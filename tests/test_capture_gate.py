@@ -533,20 +533,27 @@ class GenerationBootstrapTests(unittest.TestCase):
         self.assertEqual(raw, json.dumps(state, sort_keys=True, indent=1) + "\n")
         self.assertIn(state["last"], state["remembered"])
         held = state["held"]
-        if held is not None and all(fetcher.revisit_key(records) == key
-                                    for key, records in held["generations"].items()):
-            # Later refreshes legitimately commit holds; the seed pin must not block them.
-            for key in held["generations"]:
+        if held is not None:
+            # Later refreshes legitimately commit holds; the seed pin must not
+            # block them. A hold keyed while gdpvalNormalized was still in
+            # DISPUTE_CAPABLE (before v5.0) reproduces only under that field set.
+            older = set(fetcher.DISPUTE_CAPABLE) | {"gdpvalNormalized"}
+            current = True
+            for key, records in held["generations"].items():
                 self.assertIn(key, state["remembered"])
-        elif held is None and state["remembered"] == expected["remembered"]:
+                reproduces = fetcher.revisit_key(records) == key
+                self.assertTrue(reproduces or fetcher.generation_key(records, older) == key, key)
+                current = current and reproduces
+            if current:
+                return
+        elif state["remembered"] == expected["remembered"]:
             self.assertEqual(state, expected)
-        else:
-            # A later capture can outlive its last key, and a change to the
-            # fingerprint's field set (DISPUTE_CAPABLE) leaves a committed
-            # hold's keys unreproducible; the real clean-run path repairs both.
-            fetcher.revisit_merge(models, models, [models], state)
-            self.assertIsNone(state["held"])
-            self.assertEqual(state["last"], expected["last"])
+            return
+        # A later capture can outlive its last key, and a hold its field set;
+        # the real clean-run path repairs both.
+        fetcher.revisit_merge(models, models, [models], state)
+        self.assertIsNone(state["held"])
+        self.assertEqual(state["last"], expected["last"])
 
 
 class StateReadTests(unittest.TestCase):
@@ -936,6 +943,20 @@ class WindowMarkerStagingTests(unittest.TestCase):
             code, out = run_gate()
 
         self.assertEqual((code, out), (0, "true\n"))
+
+    def test_heads_own_marker_is_staged_on_the_old_side(self):
+        # HEAD's corner holds on the old side only with HEAD's marker
+        # staged there; without it the same capture refuses as a shape change.
+        head = corner_capture(FIXTURE_MODELS)
+        with head_serving(head, FIXTURE_AGENTS), \
+             mock.patch.object(capture_gate, "read_head_window_marker",
+                               return_value=WINDOW_MARKER), \
+             mock.patch.object(capture_gate, "read_fresh_window_marker",
+                               return_value=None), \
+             self.assertRaises(build.WindowHold) as raised:
+            capture_gate.build_page_pair((head, FIXTURE_AGENTS),
+                                         (FIXTURE_MODELS, FIXTURE_AGENTS))
+
 
     def test_an_unchanged_window_hour_stays_silent(self):
         # The same state with no movement: two window captures, both sides

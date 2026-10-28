@@ -374,11 +374,32 @@ def label(m: dict) -> str:
     return "<unidentifiable model>"
 
 
-def check_cost_breakdown(models: list[dict]) -> tuple[int, list[str]]:
-    """Every usable cost breakdown carries exactly build.py's slugs and sums to its total.
+def check_breakdown_slugs(fetched: list[dict]) -> None:
+    """Every usable cost breakdown THIS run fetched carries exactly build.py's slugs.
 
     A dropped, renamed or added slug is a rebalance or rename build.py was not
-    written against, which is what the version pin exists to catch.
+    written against, which is what the version pin exists to catch. Records the
+    cross-run layers carry in from the previous capture were judged when they
+    were captured, possibly under an older index version, so they are not
+    passed here.
+    """
+    expected = set(INDEX_EVAL_WEIGHTS)
+    for m in fetched:
+        outer = m.get("intelligenceIndexCostPerTask")
+        evaluations = outer.get("evaluations") if isinstance(outer, dict) else None
+        if not isinstance(evaluations, list):
+            continue
+        slugs = {e.get("slug") for e in evaluations if isinstance(e, dict)}
+        if slugs != expected:
+            sys.exit(
+                f"{label(m)}: cost breakdown slugs left v{INDEX_VERSION}'s -- missing "
+                f"{sorted(expected - slugs)}, unexpected {sorted(slugs - expected, key=str)}. "
+                "A dropped, renamed or added slug is a rebalance build.py was not "
+                f"written against: re-read {METHODOLOGY_URL}.")
+
+
+def check_cost_breakdown(models: list[dict]) -> tuple[int, list[str]]:
+    """Every usable cost breakdown is well-formed and sums to its total.
 
     Returns (models carrying a usable breakdown, models whose breakdown
     merge_captures DROPPED). The second is not an error: a detail-route
@@ -387,8 +408,7 @@ def check_cost_breakdown(models: list[dict]) -> tuple[int, list[str]]:
     until the routes converge (issue #200). When the merge dropped EVERY
     breakdown, the hour is a cross-generation window the merge is holding
     honest through, not a schema change: it is reported and returned as
-    (0, dropped). These are whole-union
-    validation counts; main() separately counts leaderboard members for the
+    (0, dropped). These are whole-union validation counts; main() separately counts leaderboard members for the
     window marker, so detail-only prices cannot erase the window (issue #266).
     """
     checked = 0
@@ -404,21 +424,14 @@ def check_cost_breakdown(models: list[dict]) -> tuple[int, list[str]]:
         if not isinstance(evaluations, list) or not isinstance(total, (int, float)):
             sys.exit(f"{label(m)}: cost breakdown lost its evaluations or total "
                      "-- schema changed")
-        slugs = {e.get("slug") for e in evaluations if isinstance(e, dict)}
-        if slugs != set(INDEX_EVAL_WEIGHTS):
-            sys.exit(
-                f"{label(m)}: cost breakdown slugs left v{INDEX_VERSION}'s -- missing "
-                f"{sorted(set(INDEX_EVAL_WEIGHTS) - slugs)}, unexpected {sorted(slugs - set(INDEX_EVAL_WEIGHTS), key=str)}. "
-                "A dropped, renamed or added slug is a rebalance build.py was not "
-                f"written against: re-read {METHODOLOGY_URL}.")
         summed = sum(e["weightedCostPerTask"] for e in evaluations
                      if isinstance(e, dict)
                      and isinstance(e.get("weightedCostPerTask"), (int, float)))
         if abs(summed - total) > SUM_TOLERANCE * max(1.0, abs(total)):
             sys.exit(
                 f"{label(m)}: per-evaluation costs sum to {summed!r} but the "
-                f"published total is {total!r}. build.py divides an index weight "
-                "back out of these, which is only valid while they sum to the total."
+                f"published total is {total!r} -- the parts no longer make up the "
+                "whole, so AA changed what the breakdown contains."
             )
         checked += 1
     if not checked:
@@ -1093,6 +1106,9 @@ class Capture(typing.NamedTuple):
     revisit_action: str | None = None
     # Window evidence belongs to leaderboard models, not detail-only prices.
     leaderboard_slugs: frozenset[str] = frozenset()
+    # This run's own reads (both routes) before any cross-run layer carries
+    # records in from the previous capture: what the slug check judges.
+    fetched: tuple = ()
 
 
 def capture(cached_base: str | None, cached_detail: str | None,
@@ -1233,6 +1249,7 @@ def capture(cached_base: str | None, cached_detail: str | None,
             rec["modelCreatorName"] = creator["name"]
     models = models + detail_only
     run_corpora = [corpus + detail_only for corpus in run_corpora]
+    fetched = tuple(models)
 
     cross_run = CrossRun([], [])
     if prev_records:
@@ -1254,7 +1271,8 @@ def capture(cached_base: str | None, cached_detail: str | None,
             models, prev_records,
             universe | HELD_SPEED_FIELDS if rendering_hold else universe)
     return Capture(models, host, version, generations, disputed, cross_run,
-                   revisit_action, frozenset(s for s in listed if isinstance(s, str)))
+                   revisit_action, frozenset(s for s in listed if isinstance(s, str)),
+                   fetched)
 
 
 def load_previous_capture() -> list | None:
@@ -1305,6 +1323,7 @@ def main() -> None:
                        prev_records, revisit_state)
     models = captured.models
     priced, dropped = check_cost_breakdown(models)
+    check_breakdown_slugs(list(captured.fetched))
     # All records were validated above. Only leaderboard records establish
     # the route window: a detail-only breakdown cannot clear that provenance
     # merely by existing, whether or not it renders an axis (issue #266).

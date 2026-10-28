@@ -115,7 +115,7 @@ DERIVED_EXACT = {
     "intelligenceIndexCostTotal", "intelligenceIndexCostInput",
     "intelligenceIndexCostOutput", "intelligenceIndexCostReasoning",
     "intelligenceIndexCostAnswer", "intelligenceIndexCost",
-    # Raw Elo (GDPval's included, which the page no longer reads) and token
+    # Raw Elo (GDPval's included, which the page does not read) and token
     # tallies behind headlines the page renders normalised.
     "gdpval", "briefcaseTotalCost", "canonicalIntelligenceIndexTokenCount",
     "reasoningTokens",
@@ -164,9 +164,9 @@ def normalize_cost_shape(flat):
 
     The bare number IS the flattened cost.total (AGENTS.md, the cost shape
     split), so a record switching shape with its total unchanged -- a
-    cross-generation breakdown drop, issue #244 -- must diff as no change rather than
-    as the value "appearing" at the bare path and "disappearing" from
-    cost.total. One quantity compares under one path; a total that really
+    cross-generation breakdown drop, issue #244 -- must diff as no change
+    rather than as the value "appearing" at the bare path and "disappearing"
+    from cost.total. One quantity compares under one path; a total that really
     moved still reports, once, at the headline path.
     """
     if COST_BARE_PATH in flat:
@@ -498,12 +498,12 @@ def as_commit_message(report: str) -> str:
         width budget spends itself on.
 
         Who is on the efficient frontier is the analytical payload, so it
-        outranks the model count; a moved dispute layer is rarer than an
-        add or a remove and names real published disagreement, so it sits
-        between the counts and the speed noise; re-sampled throughput is the noisiest thing that still clears the
-        tolerance, so it goes last and is the first to be dropped. Nothing
-        is lost by dropping it: the body carries every section in full, and
-        the subject is a headline, not a summary.
+        outranks the model count; a moved dispute layer is rarer than an add or
+        a remove and names real published disagreement, so it sits between the
+        counts and the speed noise; re-sampled throughput is the noisiest thing
+        that still clears the tolerance, so it goes last and is the first to be
+        dropped. Nothing is lost by dropping it: the body carries every section
+        in full, and the subject is a headline, not a summary.
         """
         out = []
         phrase = frontier_phrase(moves, named)
