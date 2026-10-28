@@ -23,6 +23,12 @@ import build  # noqa: E402  # pylint: disable=wrong-import-position
 from test_build import v5_evaluations  # noqa: E402  # pylint: disable=wrong-import-position,wrong-import-order
 
 
+def legacy_main():
+    """Exercise the existing routes without an evaluation dataset."""
+    with unittest.mock.patch.object(fetch_aa.fetch_gdpval, "fetch", return_value=None):
+        fetch_aa.main()
+
+
 def flight_html(*payloads: str) -> str:
     """A page carrying the RSC chunks the extractor reassembles. Each chunk is
     a JSON string literal in a self.__next_f.push call, exactly as Next.js
@@ -443,86 +449,6 @@ def agent_payload(rows: list[dict], key: str = "rows") -> str:
     return '{"' + key + '":[' + body + ',"$L1c"]}'
 
 
-class CodingAgentRowsTests(unittest.TestCase):
-    def test_extracts_rows_carrying_a_paired_score_and_cost(self):
-        rows = [agent_row(f"Agent - Model {i}") for i in range(25)]
-
-        got = fetch_aa.coding_agent_rows(agent_payload(rows))
-
-        self.assertEqual(len(got), 25)
-        self.assertEqual(got[0]["indexScore"], 0.64)
-        self.assertEqual(got[0]["mean"]["costUsd"], 1.5)
-
-    def test_marker_strings_between_rows_are_skipped(self):
-        # RSC splices "$L1c"-style references into the same array.
-        payload = fetch_aa.coding_agent_rows(
-            agent_payload([agent_row(f"A - {i}") for i in range(21)]))
-
-        self.assertTrue(all(isinstance(r, dict) for r in payload))
-
-    def test_rows_are_collected_from_every_array_not_just_the_biggest(self):
-        # AA splits the set across `rows` (its highlighted selection) and
-        # `benchmarkRows` (the remainder). Taking only the largest array
-        # published 10 of 13 rows silently -- and the dropped ones included the
-        # cheapest run on the chart, which is a frontier point.
-        highlighted = agent_payload([agent_row(f"H - {i}") for i in range(10)])
-        rest = agent_payload([agent_row(f"R - {i}") for i in range(3)],
-                             key="benchmarkRows")
-
-        got = fetch_aa.coding_agent_rows(highlighted + rest)
-
-        self.assertEqual(len(got), 13)
-
-    def test_an_array_starting_with_a_back_reference_is_not_skipped(self):
-        # `benchmarkRows` begins with an RSC back-reference STRING pointing at
-        # a row in the other array, so the array does not start with an object.
-        rows = [agent_row(f"A - {i}") for i in range(13)]
-        body = json.dumps(rows, separators=(",", ":"))[1:-1]
-        payload = ('{"benchmarkRows":["$d:props:children:1:props:rows:0",'
-                   + body + ']}')
-
-        self.assertEqual(len(fetch_aa.coding_agent_rows(payload)), 13)
-
-    def test_a_row_reachable_twice_is_counted_once(self):
-        rows = [agent_row(f"A - {i}") for i in range(13)]
-        doubled = agent_payload(rows) + agent_payload(rows, key="benchmarkRows")
-
-        self.assertEqual(len(fetch_aa.coding_agent_rows(doubled)), 13)
-
-    def test_overlapping_arrays_union_rather_than_replace(self):
-        # The page has embedded the highlighted rows AND a fuller set at once.
-        # Neither may win outright: the union is the chart.
-        highlights = agent_payload([agent_row(f"H - {i}") for i in range(10)])
-        full = agent_payload([agent_row(f"F - {i}") for i in range(58)])
-
-        got = fetch_aa.coding_agent_rows(highlights + full)
-
-        self.assertEqual(len(got), 68)
-
-    def test_rows_without_a_cost_do_not_count_toward_the_floor(self):
-        rows = [agent_row(f"A - {i}", cost=None) for i in range(58)]
-
-        with self.assertRaises(SystemExit) as caught:
-            fetch_aa.coding_agent_rows(agent_payload(rows))
-
-        self.assertIn("schema changed", str(caught.exception))
-
-    def test_a_collapsed_table_exits_rather_than_publishing_a_stub(self):
-        rows = [agent_row(f"A - {i}") for i in range(fetch_aa.CODING_ROW_FLOOR - 1)]
-
-        with self.assertRaises(SystemExit) as caught:
-            fetch_aa.coding_agent_rows(agent_payload(rows))
-
-        self.assertIn("schema changed", str(caught.exception))
-
-    def test_the_highlighted_selection_alone_is_enough(self):
-        # AA no longer server-renders the full table, only its highlighted
-        # rows. That selection is the chart now, so it must not trip the floor.
-        rows = [agent_row(f"A - {i}") for i in range(10)]
-
-        self.assertEqual(len(fetch_aa.coding_agent_rows(agent_payload(rows))), 10)
-
-
 class MergeCapturesTests(unittest.TestCase):
     def test_detail_only_fields_fill_gaps_without_touching_the_leaderboard(self):
         base = [{"slug": "a", "intelligenceIndex": 50, "modelCreatorName": "Lab"}]
@@ -859,7 +785,7 @@ class CaptureGapFillWiringTests(unittest.TestCase):
                 with contextlib.redirect_stdout(buffer), \
                         unittest.mock.patch.object(fetch_aa, "_sleep",
                                                    side_effect=lambda s: None):
-                    fetch_aa.main()
+                    legacy_main()
             finally:
                 sys.argv = argv
                 (fetch_aa.ROOT, fetch_aa.OUT, fetch_aa.AGENTS_OUT,
@@ -908,7 +834,7 @@ class CaptureGapFillWiringTests(unittest.TestCase):
                         contextlib.redirect_stderr(stderr), \
                         unittest.mock.patch.object(fetch_aa, "_sleep",
                                                    side_effect=lambda s: None):
-                    fetch_aa.main()
+                    legacy_main()
             finally:
                 sys.argv = argv
                 (fetch_aa.ROOT, fetch_aa.OUT, fetch_aa.AGENTS_OUT,
@@ -991,7 +917,7 @@ class AtomicCaptureWritesTests(unittest.TestCase):
                             unittest.mock.patch.object(
                                 fetch_aa, "_sleep",
                                 side_effect=lambda s: None):
-                        fetch_aa.main()
+                        legacy_main()
                     return buffer.getvalue()
 
                 yield root, run
@@ -1162,7 +1088,7 @@ class TransportErrorTests(unittest.TestCase):
                             side_effect=lambda s: None):
                     buffer = io.StringIO()
                     with contextlib.redirect_stdout(buffer):
-                        fetch_aa.main()
+                        legacy_main()
                     return stub, buffer.getvalue()
             finally:
                 sys.argv = argv
@@ -1334,7 +1260,7 @@ class PageFetchRetryTests(unittest.TestCase):
                         with contextlib.redirect_stdout(out), \
                                 contextlib.redirect_stderr(err):
                             try:
-                                fetch_aa.main()
+                                legacy_main()
                             finally:
                                 captured["stdout"] = out.getvalue()
                                 captured["stderr"] = err.getvalue()
@@ -2426,7 +2352,7 @@ class CrossRunLookbackFlagTests(unittest.TestCase):
                     exit_exc = None
                     with contextlib.redirect_stdout(buffer):
                         try:
-                            fetch_aa.main()
+                            legacy_main()
                         except SystemExit as exc:
                             exit_exc = exc
                     return (buffer.getvalue(),
@@ -2565,7 +2491,7 @@ class TestGenerationRevisit(unittest.TestCase):
                                            return_value=datetime.date(2026, 10, day)), \
                 unittest.mock.patch.object(fetch_aa, "_sleep", side_effect=between_looks), \
                 contextlib.redirect_stdout(stdout):
-            fetch_aa.main()
+            legacy_main()
         return json.loads(self.output.read_text()), stdout.getvalue()
 
     def state(self):

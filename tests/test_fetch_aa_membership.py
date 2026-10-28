@@ -321,6 +321,7 @@ def test_three_generation_window_uses_leaderboard_provenance(
     record_window = fetch_aa.record_cost_window
     monkeypatch.setattr(fetch_aa, "record_cost_window", lambda priced, dropped, **kwargs:
                         record_window(priced, dropped, data / "cost-breakdown-window.txt", **kwargs))
+    monkeypatch.setattr(fetch_aa.fetch_gdpval, "fetch", lambda *_args: None)
     fetch_aa.main()
     assert "3 generation(s) observed in-run" in capsys.readouterr().out
     if outcome == "hold":

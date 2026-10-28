@@ -381,6 +381,11 @@ the other: an inconsistency between the generations, Overseer ruling,
 `genVariants`: one flat map per generation whose fields are that generation's
 own published values.
 
+During a disputed run, the GDPval evaluation route matches each look on shared
+slugs and fields present in both routes, excluding never-red fields; only matching
+looks receive its costs. A quiet run uses the plain join, and an empty comparison
+field set refuses.
+
 **`genVariants` encoding: canonical order, canonical-first silence.**
 - Variants are ordered by ascending `generation_key`, so the corpus bytes do not
   depend on which look a run read first. A record's plain fields are the first
