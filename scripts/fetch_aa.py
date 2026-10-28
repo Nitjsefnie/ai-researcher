@@ -397,13 +397,14 @@ def check_cost_breakdown(models: list[dict]) -> tuple[int, list[str]]:
 
     Returns (models carrying a usable breakdown, models whose breakdown
     merge_captures DROPPED). The second is not an error: a detail-route
-    breakdown that does not sum to the leaderboard's total is not that
-    total's breakdown, so the merge leaves the leaderboard's number alone
-    until the routes converge (issue #200). When the merge dropped EVERY
-    breakdown, the hour is a cross-generation window the merge is holding
-    honest through, not a schema change: it is reported and returned as
-    (0, dropped). These are whole-union validation counts; main() separately counts leaderboard members for the
-    window marker, so detail-only prices cannot erase the window (issue #266).
+    breakdown that does not sum to the leaderboard's total is not that total's
+    breakdown, so the merge leaves the leaderboard's number alone until the
+    routes converge (issue #200). When the merge dropped EVERY breakdown, the
+    hour is a cross-generation window the merge is holding honest through, not
+    a schema change: it is reported and returned as (0, dropped). These are
+    whole-union validation counts; main() separately counts leaderboard
+    members for the window marker, so detail-only prices cannot erase the
+    window (issue #266).
     """
     checked = 0
     dropped: list[str] = []

@@ -150,7 +150,8 @@ class CheckCommittedPageTests(unittest.TestCase):
         fresh = json.loads(
             (build.ROOT / "data" / "aa-raw-models.json")
             .read_text(encoding="utf-8"))
-        fresh[0]["intelligenceIndex"] += 0.5
+        next(m for m in fresh if isinstance(m.get("intelligenceIndex"), (int, float))
+             )["intelligenceIndex"] += 0.5
         with tempfile.TemporaryDirectory(prefix=".refresh-shape-") as tmp:
             staged = pathlib.Path(tmp)
             (staged / "aa-raw-models.json").write_text(

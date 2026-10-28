@@ -2389,7 +2389,7 @@ class CrossRunLookbackFlagTests(unittest.TestCase):
 
     DETAIL_URL = fetch_aa.MODEL_DETAIL_URL.format(slug="detail-host-model")
 
-    def run_main(self, argv, prev_text=None, detail_overrides=None):
+    def run_main(self, argv, prev_text=None, detail_overrides=None, detail_extra=()):
         """fetch_aa.main() over a stubbed urlopen, with an optional
         previous capture staged at OUT. -> (stdout, OUT text after the
         run, the SystemExit or None)."""
@@ -2400,7 +2400,8 @@ class CrossRunLookbackFlagTests(unittest.TestCase):
             fetch_aa.URL: lambda: _FakeResponse(
                 flight_html(leaderboard_payload())),
             self.DETAIL_URL: lambda: _FakeResponse(
-                flight_html(detail_payload(**(detail_overrides or {})))),
+                flight_html(json.dumps({"models": [detail_record(**(detail_overrides or {})),
+                                                   *detail_extra]}, separators=(",", ":")))),
             fetch_aa.AGENTS_URL: lambda: _FakeResponse(agents),
         })
         old = (fetch_aa.ROOT, fetch_aa.OUT, fetch_aa.AGENTS_OUT,
