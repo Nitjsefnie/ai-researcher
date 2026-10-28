@@ -340,6 +340,21 @@ class CarriedBreakdownSlugTests(unittest.TestCase):
         self.assertIn("fixture-model: cost breakdown slugs left", str(exit_exc))
         self.assertEqual(out_text, prev)
 
+    def test_a_detail_only_breakdown_off_the_pinned_slugs_still_exits(self):
+        # A model only the detail route lists is part of this run's fetch.
+        stale = {"slug": "detail-only-model", "intelligenceIndex": 40,
+                 "intelligenceIndexCostPerTask": {"cost": {"total": 0.75}, "evaluations": [
+                     {"slug": "scicode", "weightedCostPerTask": 0.75}]}}
+        prev = json.dumps([{"slug": "detail-host-model",
+                            "intelligenceIndexCostPerTask": "$undefined"},
+                           detail_record()], indent=1)
+
+        _stdout, out_text, exit_exc = self.run_main(
+            ["fetch_aa.py", "--cross-run-lookback"], prev_text=prev, detail_extra=[stale])
+
+        self.assertIn("detail-only-model: cost breakdown slugs left", str(exit_exc))
+        self.assertEqual(out_text, prev)
+
 
 class TestGenerationRevisit(unittest.TestCase):
     root: pathlib.Path
