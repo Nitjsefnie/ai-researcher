@@ -78,11 +78,16 @@ class ArtifactParser(HTMLParser):
             self._in_th = False
 
 
+def v5_evaluations(total):
+    """A cost breakdown in v5.0's exact slug set, each part its index weight
+    applied to `total`, so the parts sum to it."""
+    return [{"slug": slug, "weightedCostPerTask": total * weight}
+            for slug, weight in build.INDEX_EVAL_WEIGHTS.items()]
+
+
 def model_fixture(
     *,
     intelligence: float | None = 51,
-    gdpval: float | None = 0.47,
-    evaluations: list | None = None,
     parameters: float | None = 27,
     slug: str = "fixture-model",
     open_weights: bool = False,
@@ -93,18 +98,9 @@ def model_fixture(
         "modelCreatorName": "Fixture Lab",
         "isOpenWeights": open_weights,
         "intelligenceIndex": intelligence,
-        # AA reports GDPval as a 0-1 fraction; the page shows it out of 100.
-        "gdpvalNormalized": gdpval,
         "parameters": parameters,
         "intelligenceIndexCostPerTask": {
-            "cost": {"total": 0.75},
-            "evaluations": evaluations
-            if evaluations is not None
-            else [
-                {"slug": "gdpval-aa", "weightedCostPerTask": 0.80},
-                {"slug": "scicode", "weightedCostPerTask": 0.24},
-            ],
-        },
+            "cost": {"total": 0.75}, "evaluations": v5_evaluations(0.75)},
     }
 
 
@@ -149,7 +145,7 @@ def route_pair() -> tuple[dict, dict]:
             "intelligenceIndex": 51,
             "intelligenceIndexCostPerTask": 0.75,
             "contextWindowTokens": "$undefined",
-            "intelligenceIndexEvaluations": ["gdpval-aa", "scicode"],
+            "intelligenceIndexEvaluations": ["aa-briefcase", "hle-diamond"],
         },
         {
             "slug": "fixture-model",
@@ -157,14 +153,9 @@ def route_pair() -> tuple[dict, dict]:
             "isOpenWeights": False,
             "intelligenceIndex": 51,
             "intelligenceIndexCostPerTask": {
-                "cost": {"total": 0.75},
-                "evaluations": [
-                    {"slug": "gdpval-aa", "weightedCostPerTask": 0.30},
-                    {"slug": "scicode", "weightedCostPerTask": 0.45},
-                ],
-            },
+                "cost": {"total": 0.75}, "evaluations": v5_evaluations(0.75)},
             "contextWindowTokens": 400000,
-            "intelligenceIndexEvaluations": ["gdpval-aa", "scicode"],
+            "intelligenceIndexEvaluations": ["aa-briefcase", "hle-diamond"],
         },
     )
 
@@ -182,14 +173,8 @@ def measured_cost(model, metric) -> float:
 
 
 class CapabilityCostTests(unittest.TestCase):
-    def test_gdpval_cost_divides_out_the_index_weight_aa_applied(self):
-        # AA reports each component's task cost with its Intelligence Index
-        # weight already multiplied in, and the components sum to cost.total.
-        # 0.80 at a 10% weight is $8.00 of actual measured spend per task.
-        model = model_fixture()
-
-        self.assertAlmostEqual(measured_cost(model, "agentic"), 8.0)
-        self.assertAlmostEqual(measured_cost(model, "intelligence"), 0.75)
+    def test_the_intelligence_cost_is_the_published_total(self):
+        self.assertAlmostEqual(measured_cost(model_fixture(), "intelligence"), 0.75)
 
     def test_a_bare_numeric_cost_is_the_total(self):
         # The leaderboard's flattened shape, which the one model the detail
@@ -204,21 +189,6 @@ class CapabilityCostTests(unittest.TestCase):
         # leaderboard's codingIndex, so a model row must not claim one.
         self.assertIsNone(build.capability_cost_per_task(model_fixture(), "coding"))
         self.assertIsNone(build.capability_score(model_fixture(), "coding"))
-
-    def test_gdpval_score_is_scaled_to_the_shared_hundred_point_axis(self):
-        rows = build.build_rows([model_fixture(gdpval=0.4712)])
-
-        self.assertEqual(rows[0]["metrics"]["agentic"], {"score": 47.12, "cost": 8.0})
-
-    def test_a_missing_gdpval_cost_excludes_only_that_metric(self):
-        model = model_fixture(
-            evaluations=[{"slug": "scicode", "weightedCostPerTask": 0.24}])
-
-        rows = build.build_rows([model])
-
-        self.assertEqual(len(rows), 1)
-        self.assertIsNone(rows[0]["metrics"]["agentic"])
-        self.assertEqual(rows[0]["metrics"]["intelligence"], {"score": 51, "cost": 0.75})
 
     def test_an_unknown_metric_is_a_programming_error_not_a_silent_none(self):
         with self.assertRaises(ValueError):
@@ -248,7 +218,6 @@ class AgentRowTests(unittest.TestCase):
         rows = build.build_agent_rows([agent_fixture()], [model_fixture()])
 
         self.assertIsNone(rows[0]["metrics"]["intelligence"])
-        self.assertIsNone(rows[0]["metrics"]["agentic"])
         self.assertIsNone(rows[0]["params"])
 
     def test_the_lab_is_the_model_maker_not_the_harness_vendor(self):
@@ -295,19 +264,17 @@ class GeneratedArtifactTests(unittest.TestCase):
     def test_dispute_capable_charts_explain_the_mark_in_their_own_legends(self):
         html = _build_in_temp_dir()
 
-        for metric in ("intelligence", "agentic"):
-            with self.subTest(metric=metric):
-                section = re.search(
-                    rf'<section id="{metric}">(.*?)</section>', html, re.S)
-                assert section is not None
-                legend = re.search(
-                    r'<div class="legend">(.*?)</div>', section.group(1), re.S)
-                assert legend is not None
-                self.assertRegex(
-                    legend.group(1),
-                    r'<span class="item">\s*<span class="dswatch" '
-                    r'aria-hidden="true"></span>\s*Disputed value</span>',
-                )
+        section = re.search(
+            r'<section id="intelligence">(.*?)</section>', html, re.S)
+        assert section is not None
+        legend = re.search(
+            r'<div class="legend">(.*?)</div>', section.group(1), re.S)
+        assert legend is not None
+        self.assertRegex(
+            legend.group(1),
+            r'<span class="item">\s*<span class="dswatch" '
+            r'aria-hidden="true"></span>\s*Disputed value</span>',
+        )
 
     def test_charts_without_dispute_marks_keep_their_existing_legends(self):
         html = _build_in_temp_dir()
@@ -331,20 +298,16 @@ class GeneratedArtifactTests(unittest.TestCase):
         parser = ArtifactParser()
         parser.feed(html)
 
-        # The three cost-axis scatters group first and read against each other;
+        # The two cost-axis scatters group first and read against each other;
         # the parameter scatter swaps that axis for model size, so it sits last.
         self.assertEqual(
-            parser.svg_ids,
-            ["svg-coding", "svg-intelligence", "svg-agentic", "svg-parameters"],
-        )
+            parser.svg_ids, ["svg-coding", "svg-intelligence", "svg-parameters"])
         self.assertEqual(parser.scroll_tables, ["fTable", "tbl"])
         for header in (
             "Coding Agent Index",
             "Coding Agent $ / task",
             "Intelligence Index",
             "Intelligence $ / task",
-            "GDPval-AA v2",
-            "GDPval $ / task",
             "Parameters",
         ):
             self.assertIn(header, parser.headers)
@@ -353,9 +316,8 @@ class GeneratedArtifactTests(unittest.TestCase):
         start = html.index(marker) + len(marker)
         end = html.index(";\n(function(){", start)
         payload = json.loads(html[start:end])
-        self.assertEqual(set(payload["stats"]["metricCounts"]), {"coding", "intelligence", "agentic"})
+        self.assertEqual(set(payload["stats"]["metricCounts"]), {"coding", "intelligence"})
         self.assertTrue(any(row["metrics"]["coding"] for row in payload["rows"]))
-        self.assertTrue(any(row["metrics"]["agentic"] for row in payload["rows"]))
         self.assertTrue(any(row["params"] for row in payload["rows"]))
 
         # The two captures are different universes sharing one table: coding
@@ -365,7 +327,6 @@ class GeneratedArtifactTests(unittest.TestCase):
         for row in payload["rows"]:
             if row["kind"] == "agent":
                 self.assertIsNone(row["metrics"]["intelligence"])
-                self.assertIsNone(row["metrics"]["agentic"])
             else:
                 self.assertIsNone(row["metrics"]["coding"])
         self.assertEqual(
@@ -479,10 +440,6 @@ class StaticTableRenderTests(unittest.TestCase):
             '<td class="n">51.0</td><td class="n">$0.750</td>'
             '<td class="n">$0.0147</td>'
             '<td><span class="tag">proprietary</span></td></tr>'
-            '<tr><td>GDPval-AA v2</td><td class="name">Fixture Model (high)</td>'
-            '<td>Fixture Lab</td><td class="n">47.0</td><td class="n">$8.00</td>'
-            '<td class="n">$0.1702</td>'
-            '<td><span class="tag">proprietary</span></td></tr>'
         ))
         self.assertEqual(main, (
             '<tr><td class="name">Fixture Model (high) </td><td>Fixture Lab</td>'
@@ -490,8 +447,6 @@ class StaticTableRenderTests(unittest.TestCase):
             '<td class="n">51.0 <span class="tag f">frontier</span></td>'
             '<td class="n">$0.750</td>'
             '<td class="n">27B <span class="tag f">parameter frontier</span></td>'
-            '<td class="n">47.0 <span class="tag f">frontier</span></td>'
-            '<td class="n">$8.00</td>'
             '<td class="n">—</td><td class="n">—</td><td class="n">—</td>'
             '<td class="n">—</td><td>—</td><td>proprietary</td></tr>'
         ))
@@ -514,27 +469,23 @@ class StaticTableRenderTests(unittest.TestCase):
             '<td class="n">$2.50</td>'
             '<td class="n">—</td><td class="n">—</td>'
             '<td class="n">—</td>'
-            '<td class="n">—</td><td class="n">—</td>'
             '<td class="n">—</td><td class="n">—</td><td class="n">—</td>'
             '<td class="n">—</td><td>—</td><td>proprietary</td></tr>'
         ))
 
     def test_missing_values_render_as_the_em_dash(self):
         # A model with no parameters, prices, speed, context or release date:
-        # every absent column renders the page's em dash -- never blank, and
-        # the parameters cell is fmtParams(params) regardless of the
-        # intelligence pair, so only a truly absent count renders the dash.
-        model = model_fixture(intelligence=None, gdpval=0.9, parameters=None)
+        # every absent column renders the page's em dash -- never blank.
+        model = model_fixture(parameters=None)
         rows = build.build_rows([model])
         _, main = build.render_static_tbodies(rows)
 
         self.assertEqual(main, (
             '<tr><td class="name">Fixture Model (high) </td><td>Fixture Lab</td>'
             '<td class="n">—</td><td class="n">—</td>'
-            '<td class="n">—</td><td class="n">—</td>'
+            '<td class="n">51.0 <span class="tag f">frontier</span></td>'
+            '<td class="n">$0.750</td>'
             '<td class="n">—</td>'
-            '<td class="n">90.0 <span class="tag f">frontier</span></td>'
-            '<td class="n">$8.00</td>'
             '<td class="n">—</td><td class="n">—</td><td class="n">—</td>'
             '<td class="n">—</td><td>—</td><td>proprietary</td></tr>'
         ))
@@ -604,19 +555,19 @@ class StaticTableRenderTests(unittest.TestCase):
         twin["name"] = "Twin Model (high)"
         mid = model_fixture(intelligence=50, slug="mid")
         mid["name"] = "Mid Model (high)"
-        gap = model_fixture(intelligence=None, gdpval=0.9, slug="gap")
-        gap["name"] = "Gap Model"
-        rows = build.build_rows([top, twin, mid, gap])
+        rows = build.build_rows([top, twin, mid])
         rows.reverse()  # tie order now CONTRADICTS the name order
-        rows = [build.build_agent_rows([agent_fixture()], [])[0]] + rows
+        agents = build.build_agent_rows(
+            [agent_fixture(), agent_fixture(label="Alpha Agent - Fixture Model (high)", score=0.5)], [])
+        rows = agents + rows
         _, main = build.render_static_tbodies(rows)
 
         names = re.findall(r'<td class="name">(.*?)</td>', main)
         self.assertEqual(names, [
             "Twin Model (high) ", "Top Model (high) ",  # the preserved tie
             "Mid Model (high) ",                        # 50 below 70
-            "Fixture Agent - Fixture Model (high) ",    # no ii: union order
-            "Gap Model ",                               # ...payload order
+            "Fixture Agent - Fixture Model (high) ",    # no ii: union order,
+            "Alpha Agent - Fixture Model (high) ",      # ...not name order
         ])
 
     def test_a_template_marker_in_a_captured_string_refuses_the_build(self):
@@ -857,8 +808,7 @@ class CostBreakdownWindowReaderTests(unittest.TestCase):
     fetch_aa.py writes data/cost-breakdown-window.txt when the merge dropped
     EVERY model's cost breakdown -- a two-generation window, not a schema
     change. The reader answers EXISTENCE and nothing else: the file's content
-    is a git-history note for a human, and the page renders build.py's own
-    fixed wording, so no marker text is ever interpolated into the page.
+    is a git-history note for a human, and nothing from it reaches the page.
     """
 
     def test_the_reader_answers_existence_only(self):
@@ -898,8 +848,8 @@ class EmptyAxisGuardTests(unittest.TestCase):
     """Issues #54 + #60: the guard refusing a capture that leaves a rendered
     axis with nothing on it.
 
-    The page renders FOUR axes -- coding, intelligence and agentic against
-    their measured cost per task, plus parameters against the Intelligence
+    The page renders THREE axes -- coding and intelligence against their
+    measured cost per task, plus parameters against the Intelligence
     Index -- and an emptied scatter reads as "nothing qualifies" rather than
     "the pipeline broke" (the guard's own comment in build.py). One pin per
     axis: a capture whose rows carry no pair for that axis is refused naming
@@ -954,8 +904,8 @@ class EmptyAxisGuardTests(unittest.TestCase):
     def test_a_capture_with_no_coding_pair_is_refused_naming_coding(self):
         # The agent record lost its cost half: `indexScore` without
         # `mean.costUsd` is dropped by the extractor, so no row renders on the
-        # coding chart. The three metric axes are enumerated from the model
-        # side too, but coding comes only from agent rows.
+        # coding chart. The metric axes are enumerated from the model side
+        # too, but coding comes only from agent rows.
         with self.capture([model_fixture()], [agent_fixture(cost=None)]) as output:
             with self.assertRaises(SystemExit) as raised:
                 self.run_build()
@@ -965,10 +915,9 @@ class EmptyAxisGuardTests(unittest.TestCase):
 
     def test_a_capture_with_no_intelligence_pair_is_refused_naming_intelligence(self):
         # A model record with no intelligenceIndex. The refusal also names
-        # parameters once the guard enumerates all four axes -- the parameters
-        # chart plots the Intelligence Index, so an intelligence-less capture
-        # empties that axis too -- but the pin holds the guard only to naming
-        # THIS axis, the behavior that predates the four-axis enumeration.
+        # parameters -- the parameters chart plots the Intelligence Index, so
+        # an intelligence-less capture empties that axis too -- but the pin
+        # holds the guard only to naming THIS axis.
         with self.capture([model_fixture(intelligence=None)], [agent_fixture()]) as output:
             with self.assertRaises(SystemExit) as raised:
                 self.run_build()
@@ -977,20 +926,10 @@ class EmptyAxisGuardTests(unittest.TestCase):
             self.assertIn("no rows carry a score/cost pair for: intelligence", message)
             self.assertFalse(output.exists(), "refusal still wrote the page")
 
-    def test_a_capture_with_no_agentic_pair_is_refused_naming_agentic(self):
-        # A model record with no GDPval measurement. Intelligence and the
-        # parameter count survive, so agentic is the only axis named.
-        with self.capture([model_fixture(gdpval=None)], [agent_fixture()]) as output:
-            with self.assertRaises(SystemExit) as raised:
-                self.run_build()
-
-            self.assertIn("no rows carry a score/cost pair for: agentic", str(raised.exception))
-            self.assertFalse(output.exists(), "refusal still wrote the page")
-
     def test_a_capture_with_no_parameters_is_refused_naming_parameters(self):
         # Issue #60, in the exact shape it was reproduced: a stale capture in
         # AA's pre-rename shape, where the parameter count rode `totalParameters`.
-        # The row is otherwise fully measured, so the three metric axes stay
+        # The row is otherwise fully measured, so the metric axes stay
         # alive and parameters is the only axis named -- the refusal must come
         # from the guard, not from a reader quietly falling back to the old
         # field, which would publish a chart that looks fine and is empty.
@@ -1009,34 +948,12 @@ class EmptyAxisGuardTests(unittest.TestCase):
             self.assertIn("changed shape", str(raised.exception))
             self.assertFalse(output.exists(), "refusal still wrote the page")
 
-    def test_a_window_hour_publishes_with_the_agentic_axis_empty_and_named(self):
-        # Issue #217: a two-generation AA window can drop EVERY model's cost
-        # breakdown, which leaves the agentic (GDPval) axis legitimately
-        # empty. fetch_aa.py marks the hour with
-        # data/cost-breakdown-window.txt and the guard publishes through it
-        # -- naming the window and letting the page say so -- instead of
-        # refusing at a state the page recovers from on its own once AA's
-        # routes converge.
-        with self.capture([model_fixture(gdpval=None)], [agent_fixture()]) as output:
-            (output.parent / "cost-breakdown-window.txt").write_text(
-                "every cost breakdown dropped as another generation's: "
-                "1 model(s), first fixture-model\n", encoding="utf-8")
-            self.run_build()
-
-            stats = self.payload_of(output)["stats"]
-            self.assertTrue(stats["costBreakdownWindow"])
-            self.assertEqual(stats["metricCounts"]["agentic"], 0)
-            self.assertIn("Empty during a capture window",
-                          output.read_text(encoding="utf-8"))
-
-    def test_a_production_window_row_is_the_dropped_cost_not_the_score(self):
-        # The production window shape is the INVERSE of the fixture above:
-        # the merge dropped every breakdown, so each model keeps its GDPval
-        # SCORE but loses its decomposable COST -- the leaderboard's bare
-        # scalar with no evaluations beside it (exactly what
-        # check_cost_breakdown counts as dropped). Composed through the
-        # build with the marker present, the hour publishes: flag true,
-        # agentic count zero, intelligence alive, note on the page.
+    def test_a_window_hour_with_every_axis_plotted_publishes(self):
+        # Issue #217's production window shape: the merge dropped every
+        # breakdown, leaving the leaderboard's bare scalar (exactly what
+        # check_cost_breakdown counts as dropped). Every axis still plots on
+        # that total, so the marker beside it changes nothing: the hour
+        # publishes like any other.
         window_model = model_fixture()
         window_model["intelligenceIndexCostPerTask"] = 0.75
         with self.capture([window_model], [agent_fixture()]) as output:
@@ -1046,16 +963,12 @@ class EmptyAxisGuardTests(unittest.TestCase):
             self.run_build()
 
             stats = self.payload_of(output)["stats"]
-            self.assertTrue(stats["costBreakdownWindow"])
-            self.assertEqual(stats["metricCounts"]["agentic"], 0)
-            self.assertEqual(stats["metricCounts"]["intelligence"], 1)
-            self.assertIn("Empty during a capture window",
-                          output.read_text(encoding="utf-8"))
+            self.assertEqual(stats["metricCounts"], {"coding": 1, "intelligence": 1})
+            self.assertEqual(stats["parameterCount"], 1)
 
-    def test_a_window_marker_covers_the_agentic_axis_only(self):
-        # The marker marks the all-dropped cost breakdown, whose ONLY empty
-        # axis is agentic. An hour that also empties another axis is a shape
-        # change the marker does not cover: still refused.
+    def test_a_window_marker_does_not_exempt_an_empty_axis(self):
+        # Outside the #232 hold, a marker hour that empties an axis is
+        # refused, naming the window rather than a shape change.
         with self.capture([model_fixture(intelligence=None)], [agent_fixture()]) as output:
             (output.parent / "cost-breakdown-window.txt").write_text(
                 "every cost breakdown dropped as another generation's: "
@@ -1066,29 +979,7 @@ class EmptyAxisGuardTests(unittest.TestCase):
             message = str(raised.exception)
             self.assertIn("no rows carry a score/cost pair for: intelligence", message)
             self.assertIn("parameters", message)
-            self.assertFalse(output.exists(), "refusal still wrote the page")
-
-    def test_a_window_marker_does_not_cover_a_second_empty_axis(self):
-        # The separating case of the exemption predicate: a marker hour whose
-        # agentic AND intelligence axes are BOTH empty must refuse. The
-        # shipped reading -- agentic is the SINGLE empty axis -- refuses;
-        # the cheaper reading, "agentic is among the empty axes", would
-        # publish a page with two empty charts justified by one marker.
-        # This row is what keeps that simplification from going silent.
-        with self.capture(
-                [model_fixture(intelligence=None, gdpval=None)],
-                [agent_fixture()]) as output:
-            (output.parent / "cost-breakdown-window.txt").write_text(
-                "every cost breakdown dropped as another generation's: "
-                "1 model(s), first fixture-model\n", encoding="utf-8")
-            with self.assertRaises(SystemExit) as raised:
-                self.run_build()
-
-            message = str(raised.exception)
-            self.assertIn(
-                "no rows carry a score/cost pair for: agentic, intelligence",
-                message)
-            self.assertIn("parameters", message)
+            self.assertIn("records a cross-generation AA window", message)
             self.assertFalse(output.exists(), "refusal still wrote the page")
 
     def test_a_countless_window_marker_names_the_window_generically(self):
@@ -1096,7 +987,7 @@ class EmptyAxisGuardTests(unittest.TestCase):
         # count (this repo shipped those before #223). The refusal still
         # names the window -- generically -- and still never blames a shape
         # change.
-        corner = model_fixture(gdpval=None)
+        corner = model_fixture()
         del corner["parameters"]
         with self.capture([corner], [agent_fixture()]) as output:
             (output.parent / "cost-breakdown-window.txt").write_text(
@@ -1111,37 +1002,18 @@ class EmptyAxisGuardTests(unittest.TestCase):
             self.assertNotIn("changed shape", message)
             self.assertFalse(output.exists(), "refusal still wrote the page")
 
-    def test_a_stale_marker_with_a_healthy_capture_renders_no_note(self):
-        # The flag rides the payload only when the page is actually IN the
-        # window state -- agentic empty -- so a marker that outlived its hour
-        # beside a healthy capture renders no note and sets no flag.
-        with self.capture([model_fixture()], [agent_fixture()]) as output:
-            (output.parent / "cost-breakdown-window.txt").write_text(
-                "every cost breakdown dropped as another generation's: "
-                "1 model(s), first fixture-model\n", encoding="utf-8")
-            self.run_build()
-
-            stats = self.payload_of(output)["stats"]
-            self.assertNotIn("costBreakdownWindow", stats)
-            self.assertNotIn("Empty during a capture window",
-                             output.read_text(encoding="utf-8"))
-
-    def test_a_fully_measured_capture_builds_and_names_all_four_axes_nonzero(self):
+    def test_a_fully_measured_capture_builds_and_names_all_three_axes_nonzero(self):
         # The healthy control: the guard enumerates the same stats the page
         # renders, so a fully measured capture must build -- and its payload
         # must show every rendered axis nonzero, the exact numbers the guard
-        # reads. (One model row carrying intelligence + gdpval + parameters,
-        # one agent row carrying the coding pair.) A healthy page carries no
-        # window note: the note is a build-time conditional, not page chrome.
+        # reads. (One model row carrying intelligence + parameters, one agent
+        # row carrying the coding pair.)
         with self.capture([model_fixture()], [agent_fixture()]) as output:
             self.run_build()
 
             stats = self.payload_of(output)["stats"]
-            self.assertEqual(
-                stats["metricCounts"], {"coding": 1, "intelligence": 1, "agentic": 1})
+            self.assertEqual(stats["metricCounts"], {"coding": 1, "intelligence": 1})
             self.assertEqual(stats["parameterCount"], 1)
-            self.assertNotIn("Empty during a capture window",
-                             output.read_text(encoding="utf-8"))
 
 
 class WindowHoldTests(unittest.TestCase):
@@ -1149,12 +1021,11 @@ class WindowHoldTests(unittest.TestCase):
     failing red.
 
     The hold predicate and its evidence: the window marker records >= 3
-    generations observed in-run AND the emptied axes are only the
-    window-droppable ones (agentic, parameters). One row per direction of
-    that conjunction -- the 2/3 boundary pair, a 4-generation marker still
-    holds, a non-droppable axis still refuses -- plus the #217 precedence
-    pin at a counted marker, and the real command line proving the typed
-    exception never escapes the wrapper as a traceback.
+    generations observed in-run AND parameters is the only emptied axis.
+    One row per direction of that conjunction -- the 2/3 boundary pair, a
+    4-generation marker still holds, a second emptied axis still refuses, a
+    fully measured capture still builds -- and the real command line proving
+    the typed exception never escapes the wrapper as a traceback.
     """
 
     # The stamp fetch_aa.py writes, so a refusal below can only come from the
@@ -1201,13 +1072,13 @@ class WindowHoldTests(unittest.TestCase):
     def test_the_three_generation_corner_holds_the_page(self):
         # Issue #232: the designed three-generation corner (the looks
         # disagree AND the detail route matches neither fingerprint) empties
-        # agentic AND parameters -- run 37676392811 is the reproduction. The
+        # parameters -- run 37676392811 is the reproduction. The
         # capture records the window and the page self-heals when AA's
         # routes converge, so the hour is not a shape change: main() raises
         # WindowHold and writes nothing -- the capture gate catches it on
         # the fresh side and reports the hour unchanged -- instead of the
         # refusal's nonzero exit that went red although nothing was broken.
-        corner = model_fixture(gdpval=None)
+        corner = model_fixture()
         del corner["parameters"]
         with self.capture([corner], [agent_fixture()]) as output:
             (output.parent / "cost-breakdown-window.txt").write_text(
@@ -1219,8 +1090,7 @@ class WindowHoldTests(unittest.TestCase):
 
             message = str(raised.exception)
             self.assertIn(
-                "no rows carry a score/cost pair for: agentic, parameters",
-                message)
+                "no rows carry a score/cost pair for: parameters -- ", message)
             self.assertIn("3 generation(s) observed in-run", message)
             self.assertIn("unchanged / window", message)
             self.assertIn("holding the page", message)
@@ -1235,7 +1105,7 @@ class WindowHoldTests(unittest.TestCase):
         # the hold fires. Dropping the `>= 3` condition from the hold
         # predicate turns the first assertion red -- this pair is the
         # mutation check the issue ruling mandates.
-        corner = model_fixture(gdpval=None)
+        corner = model_fixture()
         del corner["parameters"]
         marker = ("every cost breakdown dropped as another generation's: "
                   "185 model(s), first apodex-1-1; {n} generation(s) observed "
@@ -1265,7 +1135,7 @@ class WindowHoldTests(unittest.TestCase):
         # is "three OR MORE generations observed in-run", so the same corner
         # fixture under a 4-generation marker holds exactly like the 3 --
         # same axes, same typed exception, same no-page outcome.
-        corner = model_fixture(gdpval=None)
+        corner = model_fixture()
         del corner["parameters"]
         with self.capture([corner], [agent_fixture()]) as output:
             (output.parent / "cost-breakdown-window.txt").write_text(
@@ -1280,14 +1150,14 @@ class WindowHoldTests(unittest.TestCase):
             self.assertIn("holding the page", message)
             self.assertFalse(output.exists(), "hold still wrote the page")
 
-    def test_a_non_droppable_axis_emptied_at_three_generations_still_refuses(self):
-        # Kills a widened-subset mutant (the emptied-axes check loosened to
-        # hold every counted marker hour): intelligence is not
-        # window-droppable, so its emptying at a 3-generation marker must
-        # still refuse -- naming the window -- never hold. The hold is only
-        # for the one state that self-heals; a dropped intelligence axis is
-        # a real shape change and stays the go-re-read-AA-by-hand red.
-        corner = model_fixture(intelligence=None, gdpval=None)
+    def test_a_second_axis_emptied_at_three_generations_still_refuses(self):
+        # Kills a widened mutant (the emptied-axes check loosened to "parameters
+        # is among the empty axes"): intelligence is not window-droppable, so
+        # its emptying beside parameters at a 3-generation marker must still
+        # refuse -- naming the window -- never hold. The hold is only for the
+        # one state that self-heals; a dropped intelligence axis is a real
+        # shape change and stays the go-re-read-AA-by-hand red.
+        corner = model_fixture(intelligence=None)
         del corner["parameters"]
         with self.capture([corner], [agent_fixture()]) as output:
             (output.parent / "cost-breakdown-window.txt").write_text(
@@ -1299,43 +1169,19 @@ class WindowHoldTests(unittest.TestCase):
 
             message = str(raised.exception)
             self.assertIn(
-                "no rows carry a score/cost pair for: "
-                "agentic, intelligence, parameters",
+                "no rows carry a score/cost pair for: intelligence, parameters",
                 message)
             self.assertIn("3 generation(s) observed in-run", message)
             self.assertIn("records a cross-generation AA window", message)
             self.assertNotIn("holding the page", message)
             self.assertFalse(output.exists(), "refusal still wrote the page")
 
-    def test_a_three_generation_hour_with_only_agentic_empty_still_publishes(self):
-        # Precedence pin: #217's branch fires before the corner hold at ANY
-        # generation count -- a marker hour whose agentic axis is the SINGLE
-        # empty one publishes with the note even when the marker records 3
-        # generations, because the hold requires the emptied axes to be a
-        # subset of the window-droppable pair and MORE than agentic to be
-        # gone.
-        with self.capture([model_fixture(gdpval=None)], [agent_fixture()]) as output:
-            (output.parent / "cost-breakdown-window.txt").write_text(
-                "every cost breakdown dropped as another generation's: "
-                "185 model(s), first apodex-1-1; 3 generation(s) observed "
-                "in-run\n", encoding="utf-8")
-            self.run_build()
-
-            stats = self.payload_of(output)["stats"]
-            self.assertTrue(stats["costBreakdownWindow"])
-            self.assertEqual(stats["metricCounts"]["agentic"], 0)
-            self.assertIn("Empty during a capture window",
-                          output.read_text(encoding="utf-8"))
-
     def test_a_counted_marker_with_a_fully_measured_capture_still_builds(self):
-        # Kills the missing-conjunct mutant of the hold predicate (issue
-        # #234): deleting `empty and ` from the elif leaves
-        # set([]) <= {"agentic", "parameters"} vacuously true, so a FULLY
-        # measured capture beside a >= 3-generation marker would hold instead
-        # of building -- this row is what goes red under that mutant.
-        # Mirrors EmptyAxisGuardTests' stale-marker control at a counted
-        # marker: the healthy pair builds, all four axes nonzero, no window
-        # flag, no note on the page.
+        # Kills a vacuous-subset mutant of the hold predicate (issue #234):
+        # set([]) <= {"parameters"} is true, so a check written that way
+        # would hold a FULLY measured capture beside a >= 3-generation marker
+        # instead of building it -- this row is what goes red under that
+        # mutant: the healthy pair builds, every axis nonzero.
         with self.capture([model_fixture()], [agent_fixture()]) as output:
             (output.parent / "cost-breakdown-window.txt").write_text(
                 "every cost breakdown dropped as another generation's: "
@@ -1346,12 +1192,8 @@ class WindowHoldTests(unittest.TestCase):
             self.assertTrue(output.exists(), "hold swallowed a healthy hour")
             stats = self.payload_of(output)["stats"]
             self.assertEqual(
-                stats["metricCounts"],
-                {"coding": 1, "intelligence": 1, "agentic": 1})
+                stats["metricCounts"], {"coding": 1, "intelligence": 1})
             self.assertEqual(stats["parameterCount"], 1)
-            self.assertNotIn("costBreakdownWindow", stats)
-            self.assertNotIn("Empty during a capture window",
-                             output.read_text(encoding="utf-8"))
 
     def run_cli_with_corner(self) -> tuple[subprocess.CompletedProcess,
                                            pathlib.Path]:
@@ -1373,8 +1215,8 @@ class WindowHoldTests(unittest.TestCase):
                     encoding="utf-8")
             # The corner shape the gate's corner_capture produces: every
             # decomposable cost replaced by the bare scalar the merge leaves
-            # and every parameter count gone -- agentic and parameters empty
-            # together, intelligence alive on the scalar total.
+            # and every parameter count gone -- parameters empty,
+            # intelligence alive on the scalar total.
             models = json.loads(
                 (PIPELINE_FIXTURES / "aa-raw-models.json").read_text(
                     encoding="utf-8"))
@@ -1444,29 +1286,21 @@ class MergeCapturesTests(unittest.TestCase):
         # ...and the breakdown rides along, since it still decomposes that
         # number -- the shape this key really ships.
         self.assertEqual(
-            [e["slug"] for e in pair["evaluations"]],
-            ["gdpval-aa", "scicode"])
+            [e["slug"] for e in pair["evaluations"]], list(build.INDEX_EVAL_WEIGHTS))
 
     def test_a_breakdown_that_does_not_sum_drops_whole_and_leaves_the_scalar(self):
         # The detail route is the STALE one, so its breakdown can belong to the
         # previous generation's total: it decomposes a number that is not the
         # one being published. A breakdown that does not sum to the
         # leaderboard's is not that total's breakdown, so it is dropped whole
-        # rather than hung under it -- and the GDPval axis, the only reader of
-        # the breakdown, goes absent for this model instead of decomposing
-        # someone else's spend.
+        # rather than hung under it.
         leaderboard, detail_route = route_pair()
-        detail_route["intelligenceIndexCostPerTask"]["evaluations"] = [
-            {"slug": "gdpval-aa", "weightedCostPerTask": 0.30},
-            {"slug": "scicode", "weightedCostPerTask": 0.90},
-        ]
+        detail_route["intelligenceIndexCostPerTask"]["evaluations"] = v5_evaluations(1.2)
 
         merged = build.merge_captures([leaderboard], [detail_route])[0]
 
         # The plain scalar survives, and it is the LEADERBOARD's number.
         self.assertEqual(merged["intelligenceIndexCostPerTask"], 0.75)
-        self.assertIsNone(
-            build.capability_cost_per_task(merged, "agentic"))
         # The intelligence axis, which reads the scalar, is untouched: the
         # LEADERBOARD's number, carried through untouched rather than
         # recomputed, so equality is the exact claim here.
@@ -2099,8 +1933,7 @@ if __name__ == "__main__":
 
 
 class FrontierZeroScoreTests(unittest.TestCase):
-    """Issue #146: zero is a legal AA-published score -- the current capture
-    carries gdpvalNormalized: 0 on 75 models -- and a score-0 row is
+    """Issue #146: zero is a legal AA-published score, and a score-0 row is
     frontier-eligible on an axis exactly when it holds that axis's minimum
     cost: strictly, or tied only with other zero-score rows (an exact tie
     survives dominance, and any cheaper row would dominate it). The hourly
@@ -2114,17 +1947,16 @@ class FrontierZeroScoreTests(unittest.TestCase):
     """
 
     def _rows(self):
-        """Two hand-built rows; the cheap one scores 0.0 on agentic, making
-        it the strictly cheapest row on that axis and therefore frontier-
-        eligible. Coding and intelligence pairs stay positive on both."""
+        """Two hand-built rows; the cheap one scores 0.0 on intelligence,
+        making it the strictly cheapest row on that axis and therefore
+        frontier-eligible. Coding pairs stay positive on both."""
         return [
             {
                 "name": "Cheap Zero", "creator": "Zero Lab", "open": False,
                 "lic": None,
                 "metrics": {
                     "coding": {"score": 40.0, "cost": 0.5},
-                    "intelligence": {"score": 30.0, "cost": 1.0},
-                    "agentic": {"score": 0.0, "cost": 0.3},
+                    "intelligence": {"score": 0.0, "cost": 0.3},
                 },
             },
             {
@@ -2132,18 +1964,17 @@ class FrontierZeroScoreTests(unittest.TestCase):
                 "lic": "mit",
                 "metrics": {
                     "coding": {"score": 60.0, "cost": 2.0},
-                    "intelligence": {"score": 51.0, "cost": 1.5},
-                    "agentic": {"score": 50.0, "cost": 2.0},
+                    "intelligence": {"score": 50.0, "cost": 2.0},
                 },
             },
         ]
 
     def test_the_frontier_table_renders_zero_score_rows(self):
-        # The agentic row: score 0.0, cost $0.300, and the $/point cell is
-        # the em dash -- not a crash, not "$Infinity".
+        # The intelligence row: score 0.0, cost $0.300, and the $/point cell
+        # is the em dash -- not a crash, not "$Infinity".
         tbody = build.render_frontier_tbody(self._rows())
         self.assertIn(
-            '<tr><td>GDPval-AA v2</td><td class="name">Cheap Zero</td>'
+            '<tr><td>Intelligence Index</td><td class="name">Cheap Zero</td>'
             "<td>Zero Lab</td>"
             '<td class="n">0.0</td><td class="n">$0.300</td>'
             '<td class="n">—</td>'
@@ -2154,19 +1985,18 @@ class FrontierZeroScoreTests(unittest.TestCase):
 
     def test_zero_score_capture_builds_through_main(self):
         # The fixture capture with one model turned into the zero-score
-        # shape: gdpvalNormalized zeroed and its gdpval eval cost set to the
+        # shape: intelligenceIndex zeroed and its cost total set to the
         # positive minimum halved, so it holds the axis's minimum cost and
-        # lands on the agentic frontier with a zero score.
+        # lands on the intelligence frontier with a zero score.
         models = json.loads(
             (PIPELINE_FIXTURES / "aa-raw-models.json").read_bytes())
         floor = None
         target = None
         for m in models:
-            weighted = gdpval_weighted_cost(m)
-            if (weighted is not None and weighted > 0
-                    and (floor is None or weighted < floor)):
-                floor = weighted
-            if target is None and weighted is not None and weighted > 0 and "(" not in (
+            cost = build.cost_per_task(m)
+            if cost is not None and cost > 0 and (floor is None or cost < floor):
+                floor = cost
+            if target is None and cost is not None and cost > 0 and "(" not in (
                     m.get("shortName") or m.get("name") or ""):
                 target = m
         self.assertIsNotNone(target)
@@ -2174,10 +2004,8 @@ class FrontierZeroScoreTests(unittest.TestCase):
         # asserts are the type narrowing (and double as fixture guards).
         assert target is not None
         assert floor is not None
-        target["gdpvalNormalized"] = 0
-        for e in target["intelligenceIndexCostPerTask"]["evaluations"]:
-            if e.get("slug") == "gdpval-aa":
-                e["weightedCostPerTask"] = floor / 2
+        target["intelligenceIndex"] = 0
+        target["intelligenceIndexCostPerTask"] = floor / 2
         # The rendered row name is build's own cleaning over name-first,
         # shortName-fallback -- "(Reasoning)" survives the cleaning, so the
         # assertion derives it through the same function rather than guessing.
@@ -2203,11 +2031,11 @@ class FrontierZeroScoreTests(unittest.TestCase):
 
         ftable = page[page.index('id="fTable"'):page.index("</table>", page.index('id="fTable"'))]
         row_re = re.compile(
-            r'<tr><td>GDPval-AA v2</td><td class="name">'
+            r'<tr><td>Intelligence Index</td><td class="name">'
             + re.escape(html_escape(name)) + r"</td>(.*?)</tr>")
         match = row_re.search(ftable)
         self.assertIsNotNone(
-            match, f"no agentic frontier row for the mutated model {name}")
+            match, f"no intelligence frontier row for the mutated model {name}")
         assert match is not None
         self.assertIn('<td class="n">0.0</td>', match.group(1))
         self.assertIn('<td class="n">—</td>', match.group(1))
@@ -2225,18 +2053,17 @@ class RetiredMismatchSummaryTests(unittest.TestCase):
     """
 
     @staticmethod
-    def _row(name, *, ii, icost, agentic, params=None, dep=False):
+    def _row(name, *, ii, icost, params=None, dep=False):
         """A minimal model row carrying exactly what metric_of() and
-        undominated() read: the intelligence and agentic pairs, the
-        parameter pair's inputs, and the retired flag. No coding pair --
-        model rows get none."""
+        undominated() read: the intelligence pair, the parameter pair's
+        inputs, and the retired flag. No coding pair -- model rows get
+        none."""
         return {
             "name": name, "dep": dep, "params": params,
             "ii": ii, "cost": icost,
             "metrics": {
                 "coding": None,
                 "intelligence": {"score": ii, "cost": icost},
-                "agentic": {"score": agentic, "cost": icost},
             },
         }
 
@@ -2247,34 +2074,34 @@ class RetiredMismatchSummaryTests(unittest.TestCase):
 
     def test_the_mismatch_names_the_model_and_every_frontier_it_sits_on(self):
         rows = [
-            self._row("Retired Champ", ii=51, icost=0.75, agentic=47, dep=True),
-            self._row("Pricey Also-ran", ii=40, icost=5.0, agentic=30),
+            self._row("Retired Champ", ii=51, icost=0.75, params=10, dep=True),
+            self._row("Pricey Also-ran", ii=40, icost=5.0, params=100),
         ]
-        # Retired Champ is undominated on the intelligence and agentic
-        # frontiers and carries no coding or parameter pair, so both axes
-        # are named, in page order.
+        # Retired Champ is undominated on the intelligence and parameter
+        # frontiers and carries no coding pair, so both axes are named, in
+        # page order.
         self.assertEqual(
             build.retired_summary(rows, self._front_of(rows)),
             "MISMATCH -- still undominated: Retired Champ "
-            "[frontiers: intelligence, agentic]")
+            "[frontiers: intelligence, parameters]")
 
     def test_exact_ties_between_retired_models_name_each_one(self):
         # Exact ties survive together on the frontier: neither strictly
         # beats the other, so both are named.
         rows = [
-            self._row("Twin A", ii=51, icost=0.75, agentic=47, dep=True),
-            self._row("Twin B", ii=51, icost=0.75, agentic=47, dep=True),
+            self._row("Twin A", ii=51, icost=0.75, params=10, dep=True),
+            self._row("Twin B", ii=51, icost=0.75, params=10, dep=True),
         ]
         self.assertEqual(
             build.retired_summary(rows, self._front_of(rows)),
             "MISMATCH -- still undominated: Twin A "
-            "[frontiers: intelligence, agentic]; "
-            "Twin B [frontiers: intelligence, agentic]")
+            "[frontiers: intelligence, parameters]; "
+            "Twin B [frontiers: intelligence, parameters]")
 
     def test_when_the_numbers_beat_every_retired_model_the_text_says_so(self):
         rows = [
-            self._row("Retired Also-ran", ii=40, icost=5.0, agentic=30, dep=True),
-            self._row("Cheaper Champ", ii=51, icost=0.75, agentic=47),
+            self._row("Retired Also-ran", ii=40, icost=5.0, dep=True),
+            self._row("Cheaper Champ", ii=51, icost=0.75),
         ]
         self.assertEqual(
             build.retired_summary(rows, self._front_of(rows)),
@@ -2287,21 +2114,20 @@ class RetiredMismatchSummaryTests(unittest.TestCase):
         # would claim a coding frontier the model never earned. The second
         # assertion is the live-oracle half: the agent row IS the coding
         # frontier point, so the fixture can carry the collision.
-        model = self._row("Retired Champ", ii=51, icost=0.75, agentic=47, dep=True)
+        model = self._row("Retired Champ", ii=51, icost=0.75, params=10, dep=True)
         agent = {
             "name": "Retired Champ", "dep": False, "params": None,
             "ii": None, "cost": None,
             "metrics": {
                 "coding": {"score": 40.0, "cost": 0.5},
                 "intelligence": None,
-                "agentic": None,
             },
         }
         rows = [model, agent]
         self.assertEqual(
             build.retired_summary(rows, self._front_of([model])),
             "MISMATCH -- still undominated: Retired Champ "
-            "[frontiers: intelligence, agentic]")
+            "[frontiers: intelligence, parameters]")
         self.assertEqual(
             build.retired_frontier_axes(rows, agent), ["coding"])
 
@@ -2348,22 +2174,6 @@ class RetiredMismatchSummaryTests(unittest.TestCase):
             f"MISMATCH -- still undominated: {name} [frontiers: ", line)
 
 
-def gdpval_weighted_cost(m):
-    """The model's gdpval-aa weightedCostPerTask, or None when it has no
-    parseable one. Test-side mirror of build.evaluation_cost_per_task's
-    value sourcing."""
-    outer = m.get("intelligenceIndexCostPerTask")
-    evals = outer.get("evaluations") if isinstance(outer, dict) else None
-    if not isinstance(evals, list):
-        return None
-    for e in evals:
-        if (isinstance(e, dict) and e.get("slug") == "gdpval-aa"
-                and isinstance(e.get("weightedCostPerTask"), (int, float))
-                and not isinstance(e.get("weightedCostPerTask"), bool)):
-            return e["weightedCostPerTask"]
-    return None
-
-
 DISPUTE_LEGEND_MARK = "two inconsistent generations"
 PROVENANCE_DISPUTE_NOTE = "dispute-bearing"
 
@@ -2380,7 +2190,7 @@ def disputed_model_fixture():
     record's `medianOutputTokensPerSecond` is the never-red speed family:
     no variant carries it, and no cell of it may go red.
     """
-    m = model_fixture()  # ii 51, cost 0.75, gdpval 0.47, gdpvalCost 8.0
+    m = model_fixture()  # ii 51, cost 0.75
     m.update({
         "contextWindowTokens": 400000,
         "price1mInputTokens": 0.5,
@@ -2388,10 +2198,8 @@ def disputed_model_fixture():
         "medianOutputTokensPerSecond": 120.0,
     })
     m["genVariants"] = [
-        {"ii": 51, "cost": 0.75, "gdpval": 0.47, "gdpvalCost": 8.0,
-         "pin": 0.5, "pout": 1.5, "ctx": 400000},
-        {"ii": 50.5, "cost": 0.82, "gdpval": 0.46, "gdpvalCost": 8.4,
-         "pout": 1.6, "ctx": 300000},
+        {"ii": 51, "cost": 0.75, "pin": 0.5, "pout": 1.5, "ctx": 400000},
+        {"ii": 50.5, "cost": 0.82, "pout": 1.6, "ctx": 300000},
     ]
     return m
 
@@ -2402,14 +2210,13 @@ def presence_disputed_model_fixture(carrier_first=True):
     all -- and the other variant is the carried generation's full map, which
     is never `{}` by construction. `carrier_first` orders the padding so
     both render directions are reachable from one fixture."""
-    m = model_fixture()  # ii 51, cost 0.75, gdpval 0.47, gdpvalCost 8.0
+    m = model_fixture()  # ii 51, cost 0.75
     m.update({
         "contextWindowTokens": 400000,
         "price1mInputTokens": 0.5,
         "price1mOutputTokens": 1.5,
     })
-    carrier = {"ii": 51, "cost": 0.75, "gdpval": 0.47, "gdpvalCost": 8.0,
-               "pin": 0.5, "pout": 1.5, "ctx": 400000}
+    carrier = {"ii": 51, "cost": 0.75, "pin": 0.5, "pout": 1.5, "ctx": 400000}
     m["genVariants"] = [carrier, {}] if carrier_first else [{}, carrier]
     return m
 
@@ -2467,12 +2274,6 @@ class DisputeRenderTests(unittest.TestCase):
             '<td class="n dispute">$0.750 / $0.820</td>'
             '<td class="n">$0.0147</td>'
             '<td><span class="tag">proprietary</span></td></tr>'
-            '<tr><td>GDPval-AA v2</td><td class="name">Fixture Model (high)</td>'
-            '<td>Fixture Lab</td>'
-            '<td class="n dispute">47.0 / 46.0</td>'
-            '<td class="n dispute">$8.00 / $8.40</td>'
-            '<td class="n">$0.1702</td>'
-            '<td><span class="tag">proprietary</span></td></tr>'
         ))
         self.assertEqual(main, (
             '<tr><td class="name">Fixture Model (high) </td><td>Fixture Lab</td>'
@@ -2481,9 +2282,6 @@ class DisputeRenderTests(unittest.TestCase):
             '<span class="tag f">frontier</span></td>'
             '<td class="n dispute">$0.750 / $0.820</td>'
             '<td class="n">27B <span class="tag f">parameter frontier</span></td>'
-            '<td class="n dispute">47.0 / 46.0 '
-            '<span class="tag f">frontier</span></td>'
-            '<td class="n dispute">$8.00 / $8.40</td>'
             '<td class="n">$0.5</td>'
             '<td class="n dispute">$1.5 / $1.6</td>'
             '<td class="n">120</td>'
@@ -2512,10 +2310,7 @@ class DisputeRenderTests(unittest.TestCase):
 
         self.assertIn('<td class="n dispute">51.0 / —</td>', frontier)
         self.assertIn('<td class="n dispute">$0.750 / —</td>', frontier)
-        self.assertIn('<td class="n dispute">47.0 / —</td>', frontier)
-        self.assertIn('<td class="n dispute">$8.00 / —</td>', frontier)
         self.assertIn('51.0 / —', main)
-        self.assertIn('47.0 / —', main)
         self.assertIn('$0.750 / —', main)
         self.assertIn('$0.5 / —', main)
         self.assertIn('$1.5 / —', main)
@@ -2654,27 +2449,6 @@ class DisputeRenderTests(unittest.TestCase):
 
         self.assertIn(PROVENANCE_DISPUTE_NOTE, page)
         self.assertIn("merged", page)
-
-    def test_a_disputed_score_renders_its_pair_without_a_canonical_cost(self):
-        # Edge parity with the JS: variant one published the score but no
-        # cost for the axis (the canonical pair is absent), variant two
-        # published both and the score conflicts. The score cell shows the
-        # disputed pair -- the disagreement IS published -- while the cost
-        # cell stays the em dash; the JS disputedOf/pairText path renders
-        # exactly these cells, and the drift test holds them equal.
-        model = model_fixture(
-            evaluations=[{"slug": "scicode", "weightedCostPerTask": 0.24}])
-        model["genVariants"] = [
-            {"ii": 51, "cost": 0.75, "gdpval": 0.47},
-            {"ii": 51, "cost": 0.75, "gdpval": 0.46, "gdpvalCost": 8.4},
-        ]
-        rows = build.build_rows([model])
-        _, main = build.render_static_tbodies(rows)
-
-        self.assertIn('<td class="n dispute">47.0 / 46.0</td>', main)
-        self.assertIn('<td class="n">—</td>', main)
-        # the canonical intelligence pair next to it renders as ever
-        self.assertIn('<td class="n">51.0', main)
 
     def test_agent_rows_never_carry_gv(self):
         # The agents capture has a single in-run source for every rendered

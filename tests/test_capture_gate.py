@@ -415,17 +415,14 @@ class GenerationStateStagingTests(unittest.TestCase):
         return subprocess.run(["git", *args], cwd=self.repo, check=True,
                               capture_output=True, text=True).stdout
 
-    def stage_hour(self, ii, *, speed=150, day=1, gdp_cost=0.3):
+    def stage_hour(self, ii, *, speed=150, day=1):
         # A published missing marker wins; an omitted detail key can carry.
         extra: dict = {
             "medianOutputTokensPerSecond": speed,
             "intelligenceIndexTimePerTask": speed}
         detail = {"parameters": 1000000000, "intelligenceIndexCostPerTask": {
-            "cost": {"total": 0.75}, "evaluations": [
-                {"slug": "gdpval-aa", "weightedCostPerTask": gdp_cost},
-                {"slug": "scicode", "weightedCostPerTask": 0.75 - gdp_cost}]}}
-        self.harness.run_hour(ii, day=day, gdpvalNormalized=0.4,
-                              detail_fields=detail, **extra)
+            "cost": {"total": 0.75}, "evaluations": test_fetch_aa.v5_evaluations(0.75)}}
+        self.harness.run_hour(ii, day=day, detail_fields=detail, **extra)
         for source, dest in (
                 ("aa-raw-models.json", "aa-raw-models.json"),
                 ("agents.json", "aa-raw-coding-agents.json"),
@@ -453,7 +450,7 @@ class GenerationStateStagingTests(unittest.TestCase):
 
     def establish_hold(self, first_speed=150, second_speed=100):
         self.stage_hour(40, speed=first_speed)
-        self.stage_hour(50, speed=second_speed, day=2, gdp_cost=0.15)
+        self.stage_hour(50, speed=second_speed, day=2)
         self.commit_hour()
         self.stage_hour(40, speed=first_speed, day=3)
 
@@ -463,12 +460,10 @@ class GenerationStateStagingTests(unittest.TestCase):
         row = build.build_rows(json.loads(self.harness.output.read_bytes()))[0]
         self.assertEqual((row["tps"], row["secs"]), (100, 100))
         self.assertEqual([v["ii"] for v in row["gv"]], [50, 40])
-        self.assertAlmostEqual(row["gv"][0]["gdpvalCost"], 1.5)
-        self.assertAlmostEqual(row["gv"][1]["gdpvalCost"], 3)
         self.commit_hour()
-        for ii, speed, cost in ((40, 150, 0.6), (50, 100, 0.45)):
+        for ii, speed in ((40, 150), (50, 100)):
             with self.subTest(ii=ii):
-                self.stage_hour(ii, speed=speed, day=4, gdp_cost=cost)
+                self.stage_hour(ii, speed=speed, day=4)
                 self.assertEqual(run_gate(), (0, "false\n"))
         self.stage_hour(60, day=5)
         self.assertEqual(run_gate(), (0, "true\n"))
@@ -537,15 +532,18 @@ class GenerationBootstrapTests(unittest.TestCase):
         state = json.loads(raw)
         self.assertEqual(raw, json.dumps(state, sort_keys=True, indent=1) + "\n")
         self.assertIn(state["last"], state["remembered"])
-        if state["held"] is not None:
+        held = state["held"]
+        if held is not None and all(fetcher.revisit_key(records) == key
+                                    for key, records in held["generations"].items()):
             # Later refreshes legitimately commit holds; the seed pin must not block them.
-            for key, records in state["held"]["generations"].items():
+            for key in held["generations"]:
                 self.assertIn(key, state["remembered"])
-                self.assertEqual(fetcher.revisit_key(records), key)
-        elif state["remembered"] == expected["remembered"]:
+        elif held is None and state["remembered"] == expected["remembered"]:
             self.assertEqual(state, expected)
         else:
-            # A later capture can outlive its last key; the real clean-run path repairs it.
+            # A later capture can outlive its last key, and a change to the
+            # fingerprint's field set (DISPUTE_CAPABLE) leaves a committed
+            # hold's keys unreproducible; the real clean-run path repairs both.
             fetcher.revisit_merge(models, models, [models], state)
             self.assertIsNone(state["held"])
             self.assertEqual(state["last"], expected["last"])
@@ -704,39 +702,27 @@ class OscillationTests(unittest.TestCase):
 
 def zero_score_capture(models: bytes) -> bytes:
     """The capture with one model turned into issue #146's crash shape: its
-    gdpvalNormalized zeroed and its gdpval eval cost set strictly cheapest,
-    so the model lands on the agentic frontier carrying a zero score. The
+    intelligenceIndex zeroed and its cost total set strictly cheapest, so the
+    model lands on the intelligence frontier carrying a zero score. The
     mutation lives in memory only -- never a data/ write. Self-contained by
     this file's convention: no import from the build tests."""
     parsed = json.loads(models)
     floor = None
     target = None
     for m in parsed:
-        outer = m.get("intelligenceIndexCostPerTask")
-        evals = outer.get("evaluations") if isinstance(outer, dict) else None
-        if not isinstance(evals, list):
+        cost = build.cost_per_task(m)
+        if cost is None or cost <= 0:
             continue
-        weighted = None
-        for e in evals:
-            if (isinstance(e, dict) and e.get("slug") == "gdpval-aa"
-                    and isinstance(e.get("weightedCostPerTask"), (int, float))
-                    and not isinstance(e.get("weightedCostPerTask"), bool)):
-                weighted = e["weightedCostPerTask"]
-                break
-        if weighted is None or weighted <= 0:
-            continue
-        if floor is None or weighted < floor:
-            floor = weighted
+        if floor is None or cost < floor:
+            floor = cost
         if target is None and "(" not in (
                 m.get("shortName") or m.get("name") or ""):
             target = m
     if target is None:
-        raise AssertionError("no model with a gdpval eval in the capture")
+        raise AssertionError("no priced model in the capture")
     assert floor is not None
-    target["gdpvalNormalized"] = 0
-    for e in target["intelligenceIndexCostPerTask"]["evaluations"]:
-        if e.get("slug") == "gdpval-aa":
-            e["weightedCostPerTask"] = floor / 2
+    target["intelligenceIndex"] = 0
+    target["intelligenceIndexCostPerTask"] = floor / 2
     return json.dumps(parsed, indent=1).encode("utf-8")
 
 
@@ -793,10 +779,10 @@ def window_capture(models: bytes) -> bytes:
     """The capture in the production window shape (issue #217): every model
     that carried a decomposable cost breakdown now carries the bare scalar
     the merge leaves when it drops every breakdown as another generation's.
-    The agentic axis empties; intelligence (the scalar IS the measured total,
-    build.cost_per_task) and parameters survive -- the two-generation
-    window's exact shape. Self-contained by this file's convention: no
-    import from the build tests."""
+    Intelligence (the scalar IS the measured total, build.cost_per_task) and
+    parameters survive -- the two-generation window's exact shape.
+    Self-contained by this file's convention: no import from the build
+    tests."""
     parsed = json.loads(models)
     for m in parsed:
         if isinstance(m.get("intelligenceIndexCostPerTask"), dict):
@@ -807,8 +793,8 @@ def window_capture(models: bytes) -> bytes:
 def corner_capture(models: bytes) -> bytes:
     """window_capture with every parameter count deleted too: the designed
     three-generation corner -- the detail route fills nothing, so the
-    parameters axis empties beside agentic. #223's refusal shape, and run
-    37691148949's failure exactly."""
+    parameters axis empties. #223's refusal shape, and run 37691148949's
+    failure exactly."""
     parsed = json.loads(window_capture(models))
     for m in parsed:
         m.pop("parameters", None)
@@ -826,11 +812,10 @@ CONVERGED_WINDOW_MARKER = ("every cost breakdown dropped as another "
 
 class WindowMarkerStagingTests(unittest.TestCase):
     """Issue #227: the marker staged into the temp data dirs is what makes
-    the #217 exemption and the #223 refusal wording reachable on the GATE
-    path -- the gap that let #223's fix ship half-landed, its tests calling
-    build.py directly and never the gate. Each side stages its OWN source's
-    marker (HEAD's from git, the hour's from data/), because a committed
-    window hour must rebuild its published note-page on the old side too."""
+    the #232 hold and the #223 refusal wording reachable on the GATE path --
+    the gap that let #223's fix ship half-landed, its tests calling build.py
+    directly and never the gate. Each side stages its OWN source's marker
+    (HEAD's from git, the hour's from data/)."""
 
     def test_the_corner_holds_through_the_gate(self):
         # Issue #232, run 37691148949's state pinned at the gate: HEAD
@@ -919,10 +904,9 @@ class WindowMarkerStagingTests(unittest.TestCase):
         self.assertIn("changed shape", err.getvalue())
 
     def test_a_two_generation_window_publishes_through_the_gate(self):
-        # The #217 exemption, killed on the gate path by the same staging
-        # drop: marker staged, fresh in the two-generation shape -- agentic
-        # empty, everything else alive -- and the gate answers true (the
-        # window hour's note-page differs from HEAD's healthy page).
+        # Marker staged, fresh in the two-generation shape -- every axis
+        # alive on the bare totals -- and the gate answers true (the window
+        # hour's page differs from HEAD's).
         with head_serving(FIXTURE_MODELS, FIXTURE_AGENTS), \
              mock.patch.object(capture_gate, "read_head_window_marker",
                                return_value=None), \
@@ -935,27 +919,11 @@ class WindowMarkerStagingTests(unittest.TestCase):
 
         self.assertEqual((code, out), (0, "true\n"))
 
-    def test_the_window_note_rides_the_gate_built_pages(self):
-        # The exemption's page half: the note renders on the fresh side's
-        # page and on no other -- through the gate's own build, not a
-        # build.py call.
-        with head_serving(FIXTURE_MODELS, FIXTURE_AGENTS), \
-             mock.patch.object(capture_gate, "read_head_window_marker",
-                               return_value=None), \
-             mock.patch.object(capture_gate, "read_fresh_window_marker",
-                               return_value=WINDOW_MARKER):
-            old_page, new_page = capture_gate.build_page_pair(
-                (FIXTURE_MODELS, FIXTURE_AGENTS),
-                (window_capture(FIXTURE_MODELS), FIXTURE_AGENTS))
-
-        self.assertNotIn("Empty during a capture window", old_page)
-        self.assertIn("Empty during a capture window", new_page)
-
     def test_a_committed_window_hour_rebuilds_from_heads_marker(self):
-        # A window hour's commit carries the capture AND its marker, so the
-        # NEXT hour's old side rebuilds the published note-page instead of
-        # refusing -- and the hour answers on the data's own movement (here:
-        # a rendered move past tolerance, so true).
+        # A window hour's commit carries the capture AND its marker; the
+        # NEXT hour's old side rebuilds the published page, and the hour
+        # answers on the data's own movement (here: a rendered move past
+        # tolerance, so true).
         head = window_capture(FIXTURE_MODELS)
         fresh = rendered_field_changed(head)
         with head_serving(head, FIXTURE_AGENTS), \
@@ -971,8 +939,8 @@ class WindowMarkerStagingTests(unittest.TestCase):
 
     def test_an_unchanged_window_hour_stays_silent(self):
         # The same state with no movement: two window captures, both sides
-        # carrying their own marker, build equal note-pages and the gate
-        # answers false -- a quiet window hour commits nothing.
+        # carrying their own marker, build equal pages and the gate answers
+        # false -- a quiet window hour commits nothing.
         head = window_capture(FIXTURE_MODELS)
         with head_serving(head, FIXTURE_AGENTS), \
              mock.patch.object(capture_gate, "read_head_window_marker",
@@ -987,7 +955,7 @@ class WindowMarkerStagingTests(unittest.TestCase):
 
     def test_the_first_healthy_hour_after_a_window_heals(self):
         # Window ended: fetch cleared the marker, HEAD still tracks it, the
-        # fresh capture is healthy. Old note-page vs new healthy page
+        # fresh capture is healthy. The old window page vs the new page
         # differs, so the hour commits -- and its payload leaves the marker
         # out, which is what the workflow's `git rm` branch removes (pinned
         # in test_refresh_workflow.py).
@@ -1002,25 +970,6 @@ class WindowMarkerStagingTests(unittest.TestCase):
             code, out = run_gate()
 
         self.assertEqual((code, out), (0, "true\n"))
-
-    def test_a_window_capture_at_HEAD_without_its_marker_refuses(self):
-        # The workflow half of the fix, pinned from the gate side: if
-        # refresh.yml ever stops committing the marker, HEAD holds a window
-        # capture whose note-page the old side cannot rebuild -- this exact
-        # red is the symptom to expect, not a gate bug to chase.
-        err = io.StringIO()
-        with head_serving(window_capture(FIXTURE_MODELS), FIXTURE_AGENTS), \
-             mock.patch.object(capture_gate, "read_head_window_marker",
-                               return_value=None), \
-             mock.patch.object(capture_gate, "read_fresh_captures",
-                               return_value=(FIXTURE_MODELS, FIXTURE_AGENTS)), \
-             mock.patch.object(capture_gate, "read_fresh_window_marker",
-                               return_value=None), \
-             contextlib.redirect_stderr(err):
-            code = capture_gate.main()
-
-        self.assertNotEqual(code, 0)
-        self.assertIn("changed shape", err.getvalue())
 
     def test_the_fresh_marker_reader_converts_only_absence(self):
         # The None conversion against the real substrate, not a mock: a
@@ -1108,10 +1057,9 @@ class FreshHoldProbeTests(unittest.TestCase):
         self.assertEqual(err, "")
 
     def test_a_two_generation_window_is_not_held(self):
-        # The #217 exemption is a page, not a hold: the two-generation
-        # window's note-page BUILDS, so the probe must answer no and leave
-        # the hour to its ordinary verdicts -- a hold here would swallow
-        # the #217 note-page hour too.
+        # A two-generation window hour with every axis plotted BUILDS, so
+        # the probe must answer no and leave the hour to its ordinary
+        # verdicts -- a hold here would swallow a publishable hour.
         with mock.patch.object(capture_gate, "read_fresh_captures",
                                return_value=(window_capture(FIXTURE_MODELS),
                                              FIXTURE_AGENTS)), \

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Build out/frontier-models.html from data/aa-raw-models.json.
 
-Single deliverable: AA's Coding Agent, Intelligence and GDPval-AA indices against their
+Single deliverable: AA's Coding Agent and Intelligence indices against their
 matched measured cost per task, plus total parameter count against Intelligence
 Index, sourced exclusively from artificialanalysis.ai.
 
@@ -39,12 +39,17 @@ OUT = ROOT / "out" / "frontier-models.html"
 # page's live headline (issue #220); point releases (v4.3.2) do not rebalance and pass.
 INDEX_VERSION = "5.0"
 
-# AA Intelligence Index v5.0 component evals, as listed on the source site.
+# v5.0's evaluations as AA names them, then each cost-breakdown slug's index
+# weight; fetch_aa.py refuses a breakdown whose slugs are not exactly these.
 INDEX_EVALS = [
     "AA-Briefcase v1.1", "AutomationBench-AA", "GDP.pdf", "FrontierCode 2.0", "Terminal-Bench 4.0",
     "AA-Omniscience v1.1", "HLE-Diamond", "CritPt v2 (Hard Subset)", "Terminal-Bench-Science 0.1"]
+INDEX_EVAL_WEIGHTS = {
+    "aa-briefcase": 0.15, "automationbench-aa": 0.05, "gdp-pdf": 0.05, "frontiercode-2-0": 0.15,
+    "terminalbench-4-0": 0.10, "terminal-bench-science": 0.15, "critpt-v2-hard": 0.10,
+    "omniscience": 0.15, "hle-diamond": 0.10}
 
-METRIC_ORDER = ("coding", "intelligence", "agentic")
+METRIC_ORDER = ("coding", "intelligence")
 
 # Every axis is now a score and a cost AA measured on the same run, and each
 # comes from the source that publishes them together:
@@ -54,18 +59,11 @@ METRIC_ORDER = ("coding", "intelligence", "agentic")
 #                 is an agent+model+harness combination, not a bare model.
 #   intelligence  the model corpus's intelligenceIndex against its own
 #                 measured intelligenceIndexCostPerTask.cost.total.
-#   agentic       GDPval-AA v2 -- gdpvalNormalized against the cost AA measured
-#                 running it, recovered from the weighted breakdown below.
 #
 # The leaderboard's `codingIndex` and `agenticIndex` fields are deliberately NOT
 # used: AA scores both from Terminal-Bench v2.1 and tau3-banking, whose per-task
 # cost it stopped publishing in v4.3. A score with no cost cannot go on a
 # cost axis, and estimating the missing half is off the table.
-GDPVAL_SLUG = "gdpval-aa"
-# GDPval-AA v2's weight inside Intelligence Index v4.3. AA reports each eval's
-# task cost with this already applied; dividing it back out recovers the
-# evaluation's own measured cost per task.
-GDPVAL_INDEX_WEIGHT = 0.10
 
 
 # AA encodes the effort knob in the model name; there is no field for it. The
@@ -245,8 +243,7 @@ def cost_per_task(m):
     detail route describes; a bare number is what the one model it cannot
     describe (the detail host) is left with, and what a model whose stale
     breakdown was dropped under the leaderboard's newer total is left with
-    (merge_captures: that model's GDPval cost renders absent until the routes
-    converge, but its measured total is the fresh one and still plots).
+    (merge_captures: its measured total is the fresh one and still plots).
     """
     outer = m.get("intelligenceIndexCostPerTask")
     if isinstance(outer, (int, float)):
@@ -259,31 +256,10 @@ def cost_per_task(m):
     return num(inner.get("total"))
 
 
-def evaluation_cost_per_task(m, slug, index_weight):
-    """One evaluation's own measured cost per task, in USD.
-
-    AA reports `weightedCostPerTask` with the evaluation's Intelligence Index
-    weight already multiplied in -- the per-eval figures sum exactly to
-    `cost.total`. Dividing the weight back out recovers what AA actually spent
-    per task on that evaluation.
-    """
-    outer = m.get("intelligenceIndexCostPerTask")
-    evaluations = outer.get("evaluations") if isinstance(outer, dict) else None
-    if not isinstance(evaluations, list):
-        return None
-    for e in evaluations:
-        if isinstance(e, dict) and e.get("slug") == slug:
-            weighted = num(e.get("weightedCostPerTask"))
-            return None if weighted is None else weighted / index_weight
-    return None
-
-
 def capability_cost_per_task(m, metric):
     """AA's measured average task cost for one displayed axis of a model row."""
     if metric == "intelligence":
         return cost_per_task(m)
-    if metric == "agentic":
-        return evaluation_cost_per_task(m, GDPVAL_SLUG, GDPVAL_INDEX_WEIGHT)
     if metric == "coding":
         # Model rows have no coding pair; coding lives on the agent capture.
         return None
@@ -291,15 +267,9 @@ def capability_cost_per_task(m, metric):
 
 
 def capability_score(m, metric):
-    """The score AA publishes for one axis, on a 0-100 scale.
-
-    intelligenceIndex already is; gdpvalNormalized is a 0-1 fraction.
-    """
+    """The score AA publishes for one axis, on a 0-100 scale."""
     if metric == "intelligence":
         return num(m.get("intelligenceIndex"))
-    if metric == "agentic":
-        raw = num(m.get("gdpvalNormalized"))
-        return None if raw is None else raw * 100
     if metric == "coding":
         return None
     raise ValueError(f"unknown metric: {metric}")
@@ -341,8 +311,7 @@ def build_rows(models):
             # distinguishable under the page's 34-character chart cap.
             "label": display_label(label),
             # Which capture the row came from. Model rows carry the
-            # intelligence, agentic and parameter axes; agent rows carry
-            # coding. Neither universe has the other's columns, and the page
+            # intelligence and parameter axes; agent rows carry coding. Neither universe has the other's columns, and the page
             # renders an absent column as an em-dash, not a blank.
             "kind": "model",
             "agent": None,
@@ -454,7 +423,6 @@ def build_agent_rows(agents, models):
             "metrics": {
                 "coding": {"score": round(score * 100, 2), "cost": round(cost, 4)},
                 "intelligence": None,
-                "agentic": None,
             },
             "params": None,
             "open": open_weights(a.get("hostModelSlug")),
@@ -497,19 +465,16 @@ def metric_of(row, metric):
 # variant-capable and can never reach these helpers.
 VARIANT_PAIR_FIELDS = {
     # metric -> (score field, cost field, per-variant score formatter).
-    # gdpvalNormalized is a 0-1 fraction; the score axis renders *100, so a
-    # disputed score scales the same way the single value does.
     "intelligence": ("ii", "cost", lambda v: js_to_fixed(v, 1)),
-    "agentic": ("gdpval", "gdpvalCost", lambda v: js_to_fixed(v * 100, 1)),
 }
 
 # The fields a variant map carries, in fetch_aa.variant_fields' own
 # emission order -- restated here so a disputed row's `gv` reaches the
 # page with every map's keys in ONE order regardless of how the capture's
 # bytes happened to lay them out (issue #226). Anything outside the list
-# (nothing today) is appended sorted, so nothing is dropped.
-GV_FIELD_ORDER = ("ii", "cost", "gdpval", "gdpvalCost", "ctx", "pin",
-                  "pout")
+# (a field an older capture still carries) is appended sorted, so nothing is
+# dropped.
+GV_FIELD_ORDER = ("ii", "cost", "ctx", "pin", "pout")
 
 
 def canonical_variant_maps(gen_variants):
@@ -703,8 +668,7 @@ def merge_captures(base: list, detail: list) -> list:
 
         One level deep, because the split runs THROUGH the cost object: the
         leaderboard drops its .evaluations, so a key-level fill would let a
-        surviving stub shadow the complete breakdown and leave the GDPval axis
-        with no cost.
+        surviving stub shadow the complete breakdown.
         """
         out = dict(into)
         for k, v in extra.items():
@@ -738,9 +702,8 @@ def merge_captures(base: list, detail: list) -> list:
                 }
             if k == COST_KEY and not breakdown_matches_total(out[k]):
                 # The breakdown is not this total's breakdown, whatever route
-                # it came from, so it is dropped whole and the axis that
-                # decomposes it (GDPval) renders absent for this model until
-                # the routes converge. Dropping is the honest outcome -- the
+                # it came from, so it is dropped whole, leaving the total
+                # until the routes converge. Dropping is the honest outcome -- the
                 # alternatives are publishing another generation's total or
                 # failing the refresh red for hours. Reached on BOTH shape
                 # arms: the flattened scalar above, and the nested stub AA
@@ -847,9 +810,8 @@ def cost_breakdown_window(data_dir: pathlib.Path) -> bool:
     fetch_aa.py writes data/cost-breakdown-window.txt when the merge
     dropped the leaderboard models' cost breakdowns -- an AA window, not a
     schema change. EXISTENCE is the whole signal: the file's one-line content
-    is a git-history note for a human, and the page renders build.py's own
-    fixed wording, so no marker text is ever interpolated into the page. (The
-    stamp is validated exactly because it IS rendered; nothing here is.)
+    is a git-history note for a human, and nothing from it reaches the page.
+    (The stamp is validated exactly because it IS rendered; nothing here is.)
     """
     return (data_dir / "cost-breakdown-window.txt").exists()
 
@@ -857,10 +819,9 @@ def cost_breakdown_window(data_dir: pathlib.Path) -> bool:
 def window_generations(data_dir: pathlib.Path) -> int | None:
     """The in-run generation count the window marker records, or None.
 
-    Issue #223: a window hour that empties an axis the #217 exemption does
-    not cover (the designed three-generation parameters corner among them)
-    is refused, but the refusal must name the window it is instead of
-    blaming a capture shape change. The count rides the marker's one line as
+    Issue #223: a window hour that empties an axis is refused unless it is
+    the #232 parameters hold, and the refusal must name the window it is
+    instead of blaming a capture shape change. The count rides the marker's one line as
     "; N generation(s) observed in-run" -- record_cost_window writes it, and
     this reads the ONE integer back by its own literal; a marker without it
     (an older fetch_aa.py wrote those) reads as None and the refusal names
@@ -880,9 +841,8 @@ class WindowHold(Exception):
     """A window hour that holds the page instead of building one.
 
     Issue #232: when the window marker records three or more generations
-    observed in-run and parameters remain empty after detail-only rows join,
-    the page holds. If only agentic is empty it publishes with a note; if
-    neither is empty it publishes fully. Other empty axes still refuse.
+    observed in-run and parameters is the only empty axis after detail-only
+    rows join, the page holds. Other empty axes still refuse.
     For a hold, main() raises
     instead of writing: the capture gate catches it on the fresh side and
     reports the hour unchanged, so the last good page stays live and
@@ -920,12 +880,11 @@ def read_capture(path):
 METRIC_LABELS = {
     "coding": "Coding Agent Index",
     "intelligence": "Intelligence Index",
-    "agentic": "GDPval-AA v2",
 }
 
 # The metric views the page unions for the full table, in Object.keys()
 # order -- the order the script's Set-union preserves for ties.
-VIEW_ORDER = ("coding", "intelligence", "parameters", "agentic")
+VIEW_ORDER = ("coding", "intelligence", "parameters")
 
 # A marker in a rendered tbody would be spliced by a substitution that runs
 # after the tbody replacements -- "__DATA__" in a name would have the JSON
@@ -933,16 +892,6 @@ VIEW_ORDER = ("coding", "intelligence", "parameters", "agentic")
 # the marker, the same fail-red culture as the stamp and commit-shape
 # validations.
 TEMPLATE_MARKERS = ("__DATA__", "__PROVENANCE__", "__CAPTURED__", "__TBODY_")
-
-# The window hour's on-page note (issue #217): the copy the build renders for
-# the empty agentic chart, verbatim, when costBreakdownWindow rides the
-# payload. A literal here -- never marker-file content -- because the marker
-# file is pipeline state for a human, and page copy is build.py's own.
-AGENTIC_WINDOW_NOTE = (
-    '<div class="empty-state">Empty during a capture window &mdash; '
-    "AA's leaderboard models lack matching cost breakdowns; "
-    "GDPval costs return when they converge.</div>"
-)
 
 
 def frontier_layer(rows, metric):
@@ -1016,8 +965,7 @@ def render_frontier_tbody(rows):
                 + f'<td class="{score_cls}">{score}</td>'
                 + f'<td class="{cost_cls}">{cost}</td>'
                 + '<td class="n">'
-                # A zero score is a legal AA publication (gdpvalNormalized
-                # carries literal zeros in the capture), and a score-0 row
+                # A zero score is a legal AA publication, and a score-0 row
                 # sits on this layer exactly when it holds the axis's
                 # minimum cost -- strictly, or tied only with other
                 # zero-score rows. $/point at zero capability is not a
@@ -1055,21 +1003,15 @@ def render_main_tbody(rows):
         for metric in METRIC_ORDER:
             pair = metric_of(row, metric)
             score, cost, score_disp, cost_disp = _variant_cells(row, metric)
-            # A disputed value renders its pair even when the row's
-            # canonical pair is absent (variant one published the score but
-            # no cost, say): the disagreement is published on that field.
-            # Only a non-disputed missing pair renders the em dash.
+            # A missing pair renders the em dash. It never disputes: a model
+            # row always carries its intelligence pair, and only model rows
+            # carry variants.
             if pair:
                 score = js_to_fixed(pair["score"], 1) if score is None else score
                 cost = fmt_cost(pair["cost"]) if cost is None else cost
             else:
-                score = score if score_disp else EM_DASH
-                cost = cost if cost_disp else EM_DASH
+                score = cost = EM_DASH
             if pair and id(row) in front_sets[metric]:
-                # Neither path above can leave None: the pair branch fills it
-                # from the canonical pair, and a true score_disp means the
-                # dispute text by _variant_cells' contract.
-                assert score is not None
                 score += " " + _tag("frontier", "tag f")
             cells.append(f'<td class="n{" dispute" if score_disp else ""}">{score}</td>')
             cells.append(f'<td class="n{" dispute" if cost_disp else ""}">{cost}</td>')
@@ -1195,31 +1137,22 @@ def main(*, generation_state: bytes | None | EllipsisType = ...):
         ),
     }
     # Issue #217: fetch_aa.py leaves data/cost-breakdown-window.txt when the
-    # merge dropped the leaderboard models' cost breakdowns -- an AA
-    # window, whose one legitimately-empty axis is agentic (GDPval). The flag
-    # rides the payload only when the page is actually IN that state --
-    # marker present AND the agentic count zero -- so a stale marker beside a
-    # healthy capture renders no note.
+    # merge dropped the leaderboard models' cost breakdowns -- an AA window.
     window = cost_breakdown_window(RAW.parent)
-    if window and not stats["metricCounts"]["agentic"]:
-        stats["costBreakdownWindow"] = True
     # A rendered axis with nothing on it means the capture moved under us --
     # a renamed field, a dropped cost slug. The page must not be published in
     # that state: an empty scatter reads as "nothing qualifies" rather than
     # "the pipeline broke", and the browser tests can only report it as an
-    # opaque locator timeout. The page renders FOUR axes: metricCounts
-    # quantifies the three score/cost ones, parameterCount the fourth, which
+    # opaque locator timeout. The page renders THREE axes: metricCounts
+    # quantifies the two score/cost ones, parameterCount the third, which
     # pairs the Intelligence Index with model size rather than with a cost
     # (issue #60) -- so the enumeration here covers both stats, and a stale
     # capture (AA's totalParameters rename) fails red instead of publishing
     # an empty parameters chart.
     #
-    # The guard's arms, narrowest first. A marker hour whose agentic axis is
-    # the SINGLE empty one is #217's window branch: the hour publishes with
-    # the note, the page naming the window. The next arm is the designed
-    # three-generation corner (issue #232): the marker records >= 3
-    # generations AND the emptied axes are only the window-droppable pair
-    # (agentic, parameters) -- the hour HOLDS rather than refuses:
+    # The guard's arms, narrowest first. The designed three-generation
+    # corner (issue #232): the marker records >= 3 generations AND
+    # parameters is the only emptied axis -- the hour HOLDS rather than refuses:
     # WindowHold, which scripts/capture_gate.py reports as the hour
     # unchanged -- the last good page stays live, nothing commits or
     # publishes -- until AA's routes converge. Every other emptied axis
@@ -1230,13 +1163,8 @@ def main(*, generation_state: bytes | None | EllipsisType = ...):
     # the honest cause (issue #223).
     rendered = {**stats["metricCounts"], "parameters": stats["parameterCount"]}
     empty = [axis for axis, n in rendered.items() if not n]
-    if empty and window and set(empty) == {"agentic"}:
-        print("cost-breakdown window: leaderboard GDPval costs are unavailable "
-              "-- publishing with the agentic axis empty "
-              "and a note on the page instead of refusing; the axis returns "
-              "when AA's routes converge")
-    elif (empty and window and set(empty) <= {"agentic", "parameters"}
-          and (window_generations(RAW.parent) or 0) >= 3):
+    if (window and empty == ["parameters"]
+            and (window_generations(RAW.parent) or 0) >= 3):
         raise WindowHold(
             "unchanged / window: no rows carry a score/cost pair for: "
             + ", ".join(sorted(empty))
@@ -1247,7 +1175,7 @@ def main(*, generation_state: bytes | None | EllipsisType = ...):
             "page exists to build -- holding the page: the last good page "
             "stays live, nothing commits or publishes this hour, and the "
             "axes return when AA's routes converge")
-    elif empty and window:
+    if empty and window:
         generations = window_generations(RAW.parent)
         count_phrase = (f"{generations} generation(s) observed in-run"
                         if generations is not None
@@ -1259,7 +1187,7 @@ def main(*, generation_state: bytes | None | EllipsisType = ...):
             "are unavailable for these axes -- re-read the AA leaderboard "
             "by hand; the page recovers when AA's routes converge"
         )
-    elif empty:
+    if empty:
         raise SystemExit(
             "no rows carry a score/cost pair for: " + ", ".join(sorted(empty))
             + " -- the AA capture changed shape; re-read the leaderboard rather "
@@ -1269,17 +1197,6 @@ def main(*, generation_state: bytes | None | EllipsisType = ...):
     payload = json.dumps({"rows": rows, "stats": stats}, separators=(",", ":")).replace(
         "<", "\\u003c"
     )
-
-    # The window note (issue #217): the guard's own rationale is that an empty
-    # scatter reads as "nothing qualifies", so a window hour's empty agentic
-    # chart carries the cause on the page instead of sitting silently blank.
-    # A build.py literal -- no captured content -- keyed on the same flag the
-    # guard tolerated the axis by, and substituted FIRST in the template
-    # chain: the placeholder is gone before any captured string reaches the
-    # template, so a captured marker can never splice it and the marker needs
-    # no TEMPLATE_MARKERS entry.
-    window_note = (AGENTIC_WINDOW_NOTE
-                   if stats.get("costBreakdownWindow") else "")
 
     OUT.parent.mkdir(parents=True, exist_ok=True)
     # Provenance. The content hash is a sha256 over the two capture files,
@@ -1318,8 +1235,7 @@ def main(*, generation_state: bytes | None | EllipsisType = ...):
     # Resolve the adjacent state/provenance slots in one pass over the page.
     footer_note = (generation_hold_note(RAW.parent, generation_state)
                    + "</p>\n    <p>" + provenance)
-    OUT.write_text(TEMPLATE.replace("__AGENTIC_WINDOW_NOTE__", window_note)
-                   .replace("__GENERATION_HOLD__</p>\n    <p>__PROVENANCE__", footer_note)
+    OUT.write_text(TEMPLATE.replace("__GENERATION_HOLD__</p>\n    <p>__PROVENANCE__", footer_note)
                    .replace("__CAPTURED__", captured)
                    .replace("__TBODY_FRONTIER__", frontier_tbody)
                    .replace("__TBODY_MAIN__", main_tbody)
@@ -1501,8 +1417,8 @@ TEMPLATE = r"""<!DOCTYPE html>
       <a href="https://artificialanalysis.ai/leaderboards/models">artificialanalysis.ai</a> and nowhere else &mdash;
       the <a href="https://artificialanalysis.ai/leaderboards/models">model leaderboard</a> and the
       <a href="https://artificialanalysis.ai/agents/coding-agents">Coding Agent Index</a>.
-      The first three charts pair an AA capability index with AA's measured cost to complete one task in
-      that same index, so they share an axis and read against each other; the fourth swaps that axis for
+      The first two charts pair an AA capability index with AA's measured cost to complete one task in
+      that same index, so they share an axis and read against each other; the third swaps that axis for
       AA's reported total parameter count and so sits apart, last. Together they show both economic and
       parameter efficiency without stitching numbers from different sources.</p>
   </header>
@@ -1511,7 +1427,7 @@ TEMPLATE = r"""<!DOCTYPE html>
     <div class="label">Method</div>
     <div class="mgrid">
       <div><div class="k">Source</div><div class="v">Artificial Analysis</div></div>
-      <div><div class="k">Metric &middot; y</div><div class="v">Coding Agent &middot; Intelligence &middot; GDPval-AA</div></div>
+      <div><div class="k">Metric &middot; y</div><div class="v">Coding Agent &middot; Intelligence</div></div>
       <div><div class="k">Metric &middot; x</div><div class="v">Matched $ / task &middot; total parameters</div></div>
       <div><div class="k">Models plotted</div><div class="v" id="mStat">&mdash;</div></div>
       <div><div class="k">Captured</div><div class="v">__CAPTURED__</div></div>
@@ -1523,8 +1439,8 @@ TEMPLATE = r"""<!DOCTYPE html>
     model through each index &mdash; input, cached reads, output and reasoning tokens included &mdash; so a
     verbose reasoning model costs more than its per-token price suggests. That is also why the plot is
     smaller than the full catalogue: AA lists <span id="cTotal">&mdash;</span> models, while complete
-    score-and-cost pairs cover <span id="cCoding">&mdash;</span> agent runs for Coding, <span id="cPlot">&mdash;</span>
-    models for Intelligence and <span id="cAgentic">&mdash;</span> for GDPval-AA; <span id="cParams">&mdash;</span>
+    score-and-cost pairs cover <span id="cCoding">&mdash;</span> agent runs for Coding and <span id="cPlot">&mdash;</span>
+    models for Intelligence; <span id="cParams">&mdash;</span>
     models have both Intelligence Index and total parameters. Everything else is absent rather than estimated.
   </div>
 
@@ -1534,16 +1450,15 @@ TEMPLATE = r"""<!DOCTYPE html>
     against whatever else you have filtered to. <em>Dump effort levels</em> collapses each model's effort
     settings to a single row at its highest score for each chart, applied before that chart's superseded
     test so every frontier is drawn between models rather than knobs. Because a configuration can peak on
-    one capability but not another, all four charts collapse and judge dominance independently.
+    one capability but not another, all three charts collapse and judge dominance independently.
   </div>
 
   <nav class="toc">
     <a href="#coding">1 &middot; Coding agents</a>
     <a href="#intelligence">2 &middot; Intelligence</a>
-    <a href="#agentic">3 &middot; GDPval-AA</a>
-    <a href="#parameters">4 &middot; Parameter efficiency</a>
-    <a href="#frontier">5 &middot; Efficient frontiers</a>
-    <a href="#table">6 &middot; Full table</a>
+    <a href="#parameters">3 &middot; Parameter efficiency</a>
+    <a href="#frontier">4 &middot; Efficient frontiers</a>
+    <a href="#table">5 &middot; Full table</a>
   </nav>
 
   <div class="filters" role="group" aria-label="Filters">
@@ -1619,31 +1534,8 @@ TEMPLATE = r"""<!DOCTYPE html>
     </div>
   </section>
 
-  <section id="agentic">
-    <h2>3 &middot; GDPval-AA v2</h2>
-    <p class="sub">Agentic real-world work tasks, scored by a judge panel against human experts and
-      anchored at an Elo of 1000. A single evaluation rather than a composite: AA publishes its score and
-      the cost it measured running it, and both come off the same run.</p>
-    <div class="card">
-      <div class="cap">GDPval-AA v2 vs its measured cost per task &middot; log cost axis &middot; up-and-left is better
-        &middot; click any point to pin its name</div>__AGENTIC_WINDOW_NOTE__
-      <div class="plotwrap">
-        <svg id="svg-agentic" viewBox="0 0 980 560" role="img"
-             aria-label="Scatter plot of GDPval-AA v2 against its measured cost per task in US dollars"></svg>
-        <div class="tip" id="tip-agentic" role="status"></div>
-      </div>
-      <div class="legend">
-        <span class="item"><span class="swatch" style="background:var(--series-prop)"></span>Proprietary</span>
-        <span class="item"><span class="swatch" style="background:var(--series-open)"></span>Open-weights</span>
-        <span class="item"><span class="swatch" style="background:var(--muted)"></span>Superseded</span>
-        <span class="item"><span class="line"></span>Efficient frontier</span>
-        <span class="item"><span class="dswatch" aria-hidden="true"></span>Disputed value</span>
-      </div>
-    </div>
-  </section>
-
   <section id="parameters">
-    <h2>4 &middot; Parameter efficiency</h2>
+    <h2>3 &middot; Parameter efficiency</h2>
     <p class="sub">AA Intelligence Index against AA's reported total parameter count. The logarithmic
       x-axis measures model size, not active parameters or inference compute; models missing either value
       are absent rather than estimated.</p>
@@ -1665,7 +1557,7 @@ TEMPLATE = r"""<!DOCTYPE html>
   </section>
 
   <section id="frontier">
-    <h2>5 &middot; The cost-efficient frontiers</h2>
+    <h2>4 &middot; The cost-efficient frontiers</h2>
     <p class="sub">The models nothing else beats on both axes at once for each capability &mdash; no other model is
       simultaneously at least as smart <em>and</em> at least as cheap. Anything missing from this list is
       <b>superseded on that metric</b>. Each layer recomputes against the filters above.</p>
@@ -1678,9 +1570,9 @@ TEMPLATE = r"""<!DOCTYPE html>
   </section>
 
   <section id="table">
-    <h2>6 &middot; Full table</h2>
-    <p class="sub">The union of the four filtered slices, as numbers &mdash; click any header to sort.
-      This is the accessible twin of all four plots: nothing is reachable only by hovering.</p>
+    <h2>5 &middot; Full table</h2>
+    <p class="sub">The union of the three filtered slices, as numbers &mdash; click any header to sort.
+      This is the accessible twin of all three plots: nothing is reachable only by hovering.</p>
     <div style="margin-bottom:12px">
       <button class="action" id="copyMd">Copy as Markdown</button>
       <button class="action" id="copyJson"
@@ -1696,8 +1588,6 @@ TEMPLATE = r"""<!DOCTYPE html>
         <th data-k="ii" style="text-align:right">Intelligence Index <span class="ar" aria-hidden="true">&#8597;</span></th>
         <th data-k="cost" style="text-align:right">Intelligence $ / task <span class="ar" aria-hidden="true">&#8597;</span></th>
         <th data-k="params" style="text-align:right">Parameters <span class="ar" aria-hidden="true">&#8597;</span></th>
-        <th data-k="agenticScore" style="text-align:right">GDPval-AA v2 <span class="ar" aria-hidden="true">&#8597;</span></th>
-        <th data-k="agenticCost" style="text-align:right">GDPval $ / task <span class="ar" aria-hidden="true">&#8597;</span></th>
         <th data-k="pin" style="text-align:right">$ / 1M in <span class="ar" aria-hidden="true">&#8597;</span></th>
         <th data-k="pout" style="text-align:right">$ / 1M out <span class="ar" aria-hidden="true">&#8597;</span></th>
         <th data-k="tps" style="text-align:right">tok/s <span class="ar" aria-hidden="true">&#8597;</span></th>
@@ -1714,9 +1604,7 @@ TEMPLATE = r"""<!DOCTYPE html>
       <span id="evals"></span>. The Coding Agent Index carries its own measured cost per task, and the
       Intelligence Index cost is AA's own total. Model rows combine the leaderboard and detail corpus;
       shared models use leaderboard values, with detail fills. Detail-only models can lag a generation
-      and lack leaderboard-only speed measurements. GDPval-AA's cost is AA's figure for that evaluation with
-      its 10% index weight divided back out &mdash; AA reports each component's task cost pre-weighted, and
-      the components sum exactly to the published total. No score, token price or task measurement is
+      and lack leaderboard-only speed measurements. No score, token price or task measurement is
       estimated, and nothing is filled in from another source. Rebuild with
       <code>python3 scripts/fetch_aa.py &amp;&amp; python3 build.py</code>.</p>
     <p id="dispute-legend"><span class="dswatch" aria-hidden="true"></span>
@@ -1759,7 +1647,6 @@ const DATA = __DATA__;
   $("cTotal").textContent = S.total;
   $("cPlot").textContent  = S.plotted;
   $("cCoding").textContent = S.metricCounts.coding;
-  $("cAgentic").textContent = S.metricCounts.agentic;
   $("cParams").textContent = S.parameterCount;
   $("evals").textContent  = S.evals.join(", ");
 
@@ -1802,12 +1689,10 @@ const DATA = __DATA__;
   const METRICS={
     coding:{label:"Coding Agent Index",svg:"svg-coding",tip:"tip-coding"},
     intelligence:{label:"Intelligence Index",svg:"svg-intelligence",tip:"tip-intelligence"},
-    agentic:{label:"GDPval-AA v2",svg:"svg-agentic",tip:"tip-agentic"},
   };
   const PLOTS={
     coding:METRICS.coding,
     parameters:{label:"Parameter efficiency",svg:"svg-parameters",tip:"tip-parameters"},
-    agentic:METRICS.agentic,
   };
   const metricOf=(r,key)=>key==="parameters"
     ? (r.params!=null && r.ii!=null ? {score:r.ii,cost:r.params} : null)
@@ -1823,10 +1708,8 @@ const DATA = __DATA__;
   // parameters never dispute -- both have a single in-run source.
   const variantPair=(r,key)=>{
     const vs=variantsOf(r);
-    if(!vs||key==="parameters"||key==="coding") return null;
-    return vs.map(v=>key==="intelligence"
-      ?(v.ii!=null&&v.cost!=null?{score:v.ii,cost:v.cost}:null)
-      :(v.gdpval!=null&&v.gdpvalCost!=null?{score:v.gdpval*100,cost:v.gdpvalCost}:null));
+    if(!vs||key!=="intelligence") return null;
+    return vs.map(v=>v.ii!=null&&v.cost!=null?{score:v.ii,cost:v.cost}:null);
   };
   // The per-variant values of one rendered field, or null when the cell
   // shows today's single value: no two PRESENT variant values differ and
@@ -1843,11 +1726,9 @@ const DATA = __DATA__;
   };
   const pairText=(vals,fmt)=>vals.map(v=>v==null?"—":fmt(v)).join(" / ");
   // The variant fields a metric's score/cost cells render -- [score field,
-  // cost field, score scale] -- or null for a metric that never disputes
-  // (coding, parameters). Mirrors build.py's VARIANT_PAIR_FIELDS one for
-  // one; the scale is gdpval's 0-1 fraction rendered *100.
-  const metricVariantFields=key=>key==="agentic"?["gdpval","gdpvalCost",100]
-    :key==="intelligence"?["ii","cost",1]:null;
+  // cost field] -- or null for a metric that never disputes (coding,
+  // parameters). Mirrors build.py's VARIANT_PAIR_FIELDS one for one.
+  const metricVariantFields=key=>key==="intelligence"?["ii","cost"]:null;
   // The dispute marks for one row: a red ring on the canonical anchor, a
   // red point per FURTHER generation, a thin solid red connector. Extra
   // points join `pts`, so hover resolves every variant to its row.
@@ -2327,7 +2208,7 @@ const DATA = __DATA__;
     render();
   });
 
-  /* ---------- coding, parameter-efficiency + agentic scatters ---------- */
+  /* ---------- coding + parameter-efficiency scatters ---------- */
   const extraPlots={};
   function drawCapability(key,rows,frontier){
     const cfg=PLOTS[key], chart=$(cfg.svg), NS="http://www.w3.org/2000/svg";
@@ -2343,15 +2224,9 @@ const DATA = __DATA__;
       msg.textContent="No models match these filters."; chart.appendChild(msg);
       extraPlots[key]={w,h,pts:[],front:new Set()}; return;
     }
-    // The domain spans every variant point too, or a second generation
-    // outside the canonical range would plot off-chart.
-    const costs=[], scores=[];
-    for(const r of rows){
-      const m=metricOf(r,key);
-      costs.push(m.cost); scores.push(m.score);
-      const vp=variantPair(r,key);
-      if(vp) for(const p of vp) if(p){costs.push(p.cost); scores.push(p.score);}
-    }
+    // Coding and parameters never dispute, so the domain is the rows' own
+    // points: no variant point can sit outside it.
+    const costs=rows.map(r=>metricOf(r,key).cost), scores=rows.map(r=>metricOf(r,key).score);
     const lo=Math.log10(Math.min(...costs)), hi=Math.log10(Math.max(...costs));
     const pad=(hi-lo)*.06||.3, x0=lo-pad, x1=hi+pad;
     const yMax=Math.min(100,Math.ceil((Math.max(...scores)+4)/10)*10);
@@ -2401,7 +2276,7 @@ const DATA = __DATA__;
     for(const r of rows){
       const m=metricOf(r,key), x=X(m.cost), y=Y(m.score), on=front.has(r);
       // the de-emphasis gray is page-wide: a point off THIS chart's frontier
-      // draws var(--muted) here and on the other three charts alike, while a
+      // draws var(--muted) here and on the other two charts alike, while a
       // frontier point keeps its weights fill.
       const fill=on?fillOf(r):"var(--muted)";
       const mark=el("circle",{cx:x,cy:y,r:on?6:5,fill:fill,
@@ -2410,7 +2285,6 @@ const DATA = __DATA__;
         "aria-label":"Pin "+r.name+" on the "+cfg.label+" chart",
         "aria-pressed":String(pins.has(r.name))});
       chart.appendChild(mark); pts.push({r,x,y,el:mark});
-      addDisputeMarks(mark,r,key,(x,y)=>[X(x),Y(y)],chart,el,pts,x,y);
     }
 
     // Pinned names get first claim on space, followed by frontier names. A pin
@@ -2493,25 +2367,16 @@ const DATA = __DATA__;
     const hit=nearestCapability(key,ev), cfg=PLOTS[key], chart=$(cfg.svg), box=chart.getBoundingClientRect();
     if(!hit){hideCapabilityTip(key);return;}
     const plot=extraPlots[key], m=metricOf(hit.r,key), popup=$(cfg.tip);
-    // Hover resolves to the ROW: hovering either of a disputed row's
-    // variant points keeps the whole variant set lit and fades the others.
+    // Hover keeps the hovered row's point lit and fades the others.
     for(const p of plot.pts) p.el.classList.toggle("fade",p.r!==hit.r);
     if(lastHovered[key]!==hit.r){
       lastHovered[key]=hit.r;
       popup.innerHTML="";
       const name=document.createElement("div"); name.className="tname"; name.textContent=hit.r.name; popup.appendChild(name);
-      const fields=metricVariantFields(key);
-      const dv=fields?disputedOf(hit.r,fields[0]):null;
-      const dc=fields?disputedOf(hit.r,fields[1]):null;
       const lines=key==="parameters"
         ? [["Intelligence Index",m.score.toFixed(1)],["Parameters",fmtParams(m.cost)],
            ...secondaryRows(hit.r)]
-        : [[cfg.label,
-            dv?pairText(dv,v=>(v*fields[2]).toFixed(1)):m.score.toFixed(1),
-            dv?"dispute":null],
-           ["Cost per task",
-            dc?pairText(dc,fmtCost):fmtCost(m.cost),
-            dc?"dispute":null],
+        : [[cfg.label,m.score.toFixed(1)],["Cost per task",fmtCost(m.cost)],
            ...secondaryRows(hit.r)];
       lines.push([key==="parameters" ? "On parameter frontier" : "On frontier",
                   plot.front.has(hit.r) ? "yes" : "no — superseded"]);
@@ -2530,7 +2395,7 @@ const DATA = __DATA__;
     popup.style.top=(down?box.height-popup.offsetHeight-margin:margin)+"px";
   }
 
-  for(const key of ["coding","agentic","parameters"]){
+  for(const key of ["coding","parameters"]){
     const chart=$(PLOTS[key].svg);
     chart.addEventListener("pointermove",ev=>moveCapabilityTip(key,ev));
     chart.addEventListener("pointerleave",()=>hideCapabilityTip(key));
@@ -2562,12 +2427,10 @@ const DATA = __DATA__;
         add(METRICS[key].label); add(r.name,"name"); add(show(r.creator));
         // Disputed cells show both generations red, "a / b" -- the same
         // cells the static render emits (the drift test holds them equal).
-        // The gdpval scale is per-variant: the raw 0-1 fraction renders *100
-        // exactly as the single value does.
         const fields=metricVariantFields(key);
         const dv=fields?disputedOf(r,fields[0]):null;
         const dc=fields?disputedOf(r,fields[1]):null;
-        add(dv?pairText(dv,v=>(v*fields[2]).toFixed(1))
+        add(dv?pairText(dv,v=>v.toFixed(1))
               :m.score.toFixed(1), dv?"n dispute":"n");
         add(dc?pairText(dc,fmtCost):fmtCost(m.cost), dc?"n dispute":"n");
         // Zero is a legal AA score (#146); $/point at 0 capability is not
@@ -2586,7 +2449,6 @@ const DATA = __DATA__;
     const fields={
       codingScore:["coding","score"],codingCost:["coding","cost"],
       ii:["intelligence","score"],cost:["intelligence","cost"],
-      agenticScore:["agentic","score"],agenticCost:["agentic","cost"],
     };
     if(fields[key]){
       const [metric,field]=fields[key], m=metricOf(r,metric);
@@ -2598,9 +2460,9 @@ const DATA = __DATA__;
 
   function fillTable(metricRows,fronts){
     // The pass's frontier arrives already computed (#109); one Set per metric
-    // over the threaded arrays replaces fillTable's own four recomputations
-    // (coding, intelligence and agentic in the METRICS loop, parameters
-    // spelled out after it).
+    // over the threaded arrays replaces fillTable's own three recomputations
+    // (coding and intelligence in the METRICS loop, parameters spelled out
+    // after it).
     const frontSets={};
     for(const key of Object.keys(fronts)) frontSets[key]=new Set(fronts[key]);
     const rows=[...new Set(Object.values(metricRows).flat())];
@@ -2643,7 +2505,7 @@ const DATA = __DATA__;
         const dv=fields?disputedOf(r,fields[0]):null;
         const dc=fields?disputedOf(r,fields[1]):null;
         score.className="n"; cost.className="n";
-        score.textContent = dv?pairText(dv,v=>(v*fields[2]).toFixed(1))
+        score.textContent = dv?pairText(dv,v=>v.toFixed(1))
                               :(m?m.score.toFixed(1):"—");
         cost.textContent = dc?pairText(dc,fmtCost):(m?fmtCost(m.cost):"—");
         if(dv) score.classList.add("dispute");
@@ -2686,7 +2548,7 @@ const DATA = __DATA__;
       const k=th.dataset.k;
       if(st.sortK===k) st.sortDir*=-1;
       else { st.sortK=k; st.sortDir = (k==="name"||k==="creator"||k==="rel") ? 1 : -1; }
-      // A sort reorders rows, not points: the four charts are a pure function
+      // A sort reorders rows, not points: the three charts are a pure function
       // of the filter state, which a sort never touches, so their DOM is
       // provably identical and redrawing it is pure loss (#84's no-op pin --
       // labels must not move -- holds trivially). Only the tables refill
@@ -2698,7 +2560,7 @@ const DATA = __DATA__;
       // only place charts are drawn.
       const {views,fronts}=computePass();
       fillFrontiers(views,fronts); fillTable(views,fronts);
-      hideTip(); hideCapabilityTip("coding"); hideCapabilityTip("parameters"); hideCapabilityTip("agentic");
+      hideTip(); hideCapabilityTip("coding"); hideCapabilityTip("parameters");
     };
     th.addEventListener("click",activate);
     th.addEventListener("keydown",ev=>{
@@ -2728,8 +2590,8 @@ const DATA = __DATA__;
     // text the table cell shows; an agreeing field exports its single value.
     const disp=(r,f,fmt,single)=>{const dv=disputedOf(r,f);
       return dv?pairText(dv,fmt):single;};
-    const head="| Model | Lab | Coding Agent | Coding Agent $/task | Intelligence | Intelligence $/task | Parameters | GDPval-AA | GDPval $/task | $/1M in | $/1M out | Context | Weights |\n"
-              +"|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|\n";
+    const head="| Model | Lab | Coding Agent | Coding Agent $/task | Intelligence | Intelligence $/task | Parameters | $/1M in | $/1M out | Context | Weights |\n"
+              +"|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---|\n";
     // Every cell goes through mdCell, so a captured name or lab carrying a
     // pipe, backtick or newline round-trips as text instead of restructuring
     // the pasted row.
@@ -2738,8 +2600,6 @@ const DATA = __DATA__;
       disp(r,"ii",v=>v.toFixed(1),val(r,"intelligence","score")),
       disp(r,"cost",fmtCost,val(r,"intelligence","cost")),
       fmtParams(r.params),
-      disp(r,"gdpval",v=>(v*100).toFixed(1),val(r,"agentic","score")),
-      disp(r,"gdpvalCost",fmtCost,val(r,"agentic","cost")),
       disp(r,"pin",v=>"$"+v,r.pin==null?"—":"$"+r.pin),
       disp(r,"pout",v=>"$"+v,r.pout==null?"—":"$"+r.pout),
       disp(r,"ctx",fmtCtx,fmtCtx(r.ctx)),
@@ -2761,7 +2621,6 @@ const DATA = __DATA__;
       coding:metricSlice("coding"),
       intelligence:metricSlice("intelligence"),
       parameters:metricSlice("parameters"),
-      agentic:metricSlice("agentic"),
     };
   }
 
@@ -2791,7 +2650,7 @@ const DATA = __DATA__;
     }
     const {views,fronts}=computePass(), union=[...new Set(Object.values(views).flat())];
     const bits=[views.coding.length+" coding",views.intelligence.length+" intelligence",
-      views.parameters.length+" parameter",views.agentic.length+" agentic"];
+      views.parameters.length+" parameter"];
     if(st.eff) bits.push("effort levels dumped per metric");
     if(st.sup) bits.push("frontiers only");
     // Pins are never cleared by filtering or searching -- they are keyed by
@@ -2807,9 +2666,8 @@ const DATA = __DATA__;
     drawCapability("coding",views.coding,fronts.coding);
     draw(views.intelligence,fronts.intelligence);
     drawCapability("parameters",views.parameters,fronts.parameters);
-    drawCapability("agentic",views.agentic,fronts.agentic);
     fillFrontiers(views,fronts); fillTable(views,fronts); hideTip();
-    hideCapabilityTip("coding"); hideCapabilityTip("parameters"); hideCapabilityTip("agentic");
+    hideCapabilityTip("coding"); hideCapabilityTip("parameters");
     if(focusAfterRender){
       const request=focusAfterRender;
       focusAfterRender=null;
@@ -2829,7 +2687,7 @@ const DATA = __DATA__;
   // re-render on resize so the plot re-fits and labels re-place for the new width
   let rzT=null;
   window.addEventListener("resize",()=>{
-    hideTip(); hideCapabilityTip("coding"); hideCapabilityTip("parameters"); hideCapabilityTip("agentic");
+    hideTip(); hideCapabilityTip("coding"); hideCapabilityTip("parameters");
     clearTimeout(rzT); rzT=setTimeout(render,150);
   });
   render();

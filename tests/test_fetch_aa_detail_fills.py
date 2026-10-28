@@ -66,10 +66,10 @@ def assert_same_pages(previous, current):
 
 
 @pytest.mark.parametrize("second_total", [0.75, 1.5])
-def test_real_price_and_gdpval_conflicts_remain_paired(tmp_path, monkeypatch, second_total):
+def test_real_price_conflicts_remain_paired(tmp_path, monkeypatch, second_total):
     first, second = leaderboard(), leaderboard()
     second[1].update(price1mInputTokens=2, price1mOutputTokens=6,
-                     gdpvalNormalized=0.60, intelligenceIndexCostPerTask=second_total)
+                     intelligenceIndexCostPerTask=second_total)
     prior = rich_detail()
     expected_fills = {key: prior[key] for key in (
         "creator", "intelligenceIndexCost", "intelligenceIndexTimePerTask",
@@ -93,16 +93,14 @@ def test_real_price_and_gdpval_conflicts_remain_paired(tmp_path, monkeypatch, se
     assert current["genVariants"] == baseline["genVariants"]
     assert sorted(v["pin"] for v in current["genVariants"]) == [1, 2]
     assert sorted(v["pout"] for v in current["genVariants"]) == [3, 6]
-    assert sorted(v["gdpval"] for v in current["genVariants"]) == [0.47, 0.60]
     assert sorted(v["cost"] for v in current["genVariants"]) == [0.75, second_total]
-    assert all("gdpvalCost" not in v for v in current["genVariants"])
     assert current[cost_key] == expected_cost
     assert current["carriedDetailFills"] == sorted(expected_fills)
     assert build.cost_per_task(current) == second_total
     for field, expected in expected_fills.items():
         assert current[field] == expected
     row = build.build_rows([current])[0]
-    for field in ("pin", "pout", "gdpval"):
+    for field in ("pin", "pout"):
         values = build.disputed_field_values(row, field)
         assert values is not None and len(values) == 2
     if second_total != 0.75:
@@ -161,8 +159,7 @@ def test_carried_breakdown_uses_the_current_total_guard(total, restored, nested)
     assert isinstance(got[cost], dict) == restored
     assert got.get("carriedDetailFills") == ([cost] if restored else None)
     if restored:
-        assert build.evaluation_cost_per_task(
-            got, build.GDPVAL_SLUG, build.GDPVAL_INDEX_WEIGHT) == pytest.approx(3)
+        assert build.breakdown_matches_total(got[cost])
     else:
         assert got[cost] == total
     assert (current, previous) == before
@@ -267,7 +264,6 @@ def test_historical_parameter_time_and_frontier_loss_is_restored():
     # sides inline so CI needs neither historical git objects nor AA access.
     previous = {"slug": "glm-5-3-flash", "name": "GLM-5.3-Flash",
                 "intelligenceIndex": 41.807466113455,
-                "gdpvalNormalized": 0.57109,
                 "intelligenceIndexCostPerTask": {
                     "cost": {"total": 0.2835948232103717},
                     "evaluations": [
@@ -288,7 +284,6 @@ def test_historical_parameter_time_and_frontier_loss_is_restored():
                 "intelligenceIndexTimePerTask": 682.013767232941}
     degraded = {"slug": "glm-5-3-flash", "name": "GLM-5.3-Flash",
                 "intelligenceIndex": 41.807466113455,
-                "gdpvalNormalized": 0.57109,
                 "intelligenceIndexCostPerTask": 0.2835948232103717,
                 "price1mInputTokens": 0.15, "price1mOutputTokens": 0.5,
                 "contextWindowTokens": 1000000}
@@ -338,28 +333,6 @@ class TestGenerationRevisit(unittest.TestCase):
                 self.assertEqual(enriched[cost_key], plain[cost_key])
                 self.assertNotIn("carriedDetailFills", enriched)
 
-    def test_gdpval_breakdowns_are_frozen_per_generation_and_not_re_filled(self):
-        self.run_hour(40, gdpvalNormalized=0.4)
-        self.run_hour(50, gdpvalNormalized=0.5,
-                      intelligenceIndexCostPerTask=1.5,
-                      detail_fields={"intelligenceIndexCostPerTask": 0.75})
-        models, _ = self.run_hour(40, gdpvalNormalized=0.4)
-        fixture = next(m for m in models if m["slug"] == "fixture-model")
-        variants = {v["ii"]: v for v in fixture["genVariants"]}
-        self.assertAlmostEqual(variants[40]["gdpvalCost"], 3)
-        self.assertNotIn("gdpvalCost", variants[50])
-        frozen = self.state_path.read_bytes()
-        changed_detail = {"intelligenceIndexCostPerTask": {
-            "cost": {"total": 0.75}, "evaluations": [
-                {"slug": "gdpval-aa", "weightedCostPerTask": 0.15},
-                {"slug": "scicode", "weightedCostPerTask": 0.6}]}}
-        for ii in (50, 40):
-            current, _ = self.run_hour(
-                ii, gdpvalNormalized=ii / 100, detail_fields=changed_detail,
-                intelligenceIndexCostPerTask=1.5 if ii == 50 else 0.75)
-            self.assertEqual(build.build_rows(current), build.build_rows(models))
-            self.assertEqual(self.state_path.read_bytes(), frozen)
-
 
 class TestGenerationRevisitSpeeds(unittest.TestCase):
     def setUp(self):
@@ -367,17 +340,21 @@ class TestGenerationRevisitSpeeds(unittest.TestCase):
         self.harness.setUp()
         self.addCleanup(self.harness.doCleanups)
 
+    # The canonical generation (the lower generation_key) is ii 50's for
+    # these looks, so `first` -- the canonical side -- runs at ii 50.
+    FIRST, SECOND = 50, 40
+
     def assert_held_speeds(self, first, second):
         rendered = {"medianOutputTokensPerSecond", "intelligenceIndexTimePerTask"}
         unused: dict = {key: 777 for key in fetch_aa.NEVER_RED_FIELDS - rendered}
-        self.harness.run_hour(40, **first, **unused)
-        self.harness.run_hour(50, **second, **unused)
-        models, _ = self.harness.run_hour(40, **first, **unused)
+        self.harness.run_hour(self.FIRST, **first, **unused)
+        self.harness.run_hour(self.SECOND, **second, **unused)
+        models, _ = self.harness.run_hour(self.FIRST, **first, **unused)
         state_bytes = self.harness.state_path.read_bytes()
         rows = build.build_rows(models)
         self.assertEqual(rows[0]["tps"], first.get("medianOutputTokensPerSecond"))
         self.assertEqual(rows[0]["secs"], first.get("intelligenceIndexTimePerTask"))
-        for ii, speed in [(40, first), (50, second), (40, first), (50, second)]:
+        for ii, speed in [(self.FIRST, first), (self.SECOND, second)] * 2:
             current, _ = self.harness.run_hour(ii, **speed, **unused)
             self.assertEqual(build.build_rows(current), rows)
             self.assertEqual(self.harness.state_path.read_bytes(), state_bytes)
@@ -385,7 +362,7 @@ class TestGenerationRevisitSpeeds(unittest.TestCase):
             record = next(m for m in corpus if m["slug"] == "fixture-model")
             # Before hold entry, an ordinary hour carries missing detail
             # speeds from its predecessor; the hold freezes that result.
-            expected = first if record["intelligenceIndex"] == 40 else {**first, **second}
+            expected = first if record["intelligenceIndex"] == self.FIRST else {**first, **second}
             self.assertEqual({k: v for k, v in record.items()
                               if k in fetch_aa.NEVER_RED_FIELDS}, expected)
         captured = fetch_aa.capture(str(self.harness.root / "base.html"),

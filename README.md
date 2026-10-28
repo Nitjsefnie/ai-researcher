@@ -19,7 +19,7 @@ from their git history. Neither tracker feeds the frontier page.
 
 ## What the page plots
 
-Four scatters. **x** is always cost per task in USD on a log scale — AA's
+Three scatters. **x** is always cost per task in USD on a log scale — AA's
 *measured* spend, not a quoted per-token price, so a verbose reasoning model
 costs more than its sticker price implies. **y** differs per chart, and every
 pair is a score and a cost AA measured on the same run:
@@ -28,7 +28,6 @@ pair is a score and a cost AA measured on the same run:
 |---|---|---|---|
 | Coding agents | Coding Agent Index v1.4 | `/agents/coding-agents` | an agent + a model |
 | Intelligence | Intelligence Index v5.0 | leaderboard + model detail | a model |
-| GDPval-AA | GDPval-AA v2 | leaderboard + model detail | a model |
 | Parameter efficiency | Intelligence Index vs parameters | leaderboard + model detail | a model |
 
 The coding chart measures an agent *with* a model, because that is what AA
@@ -68,12 +67,12 @@ python3 ~/.agent-bundle/scripts/docs_hub.py publish ./out/frontier-models.html \
 
 `fetch_aa.py` exits nonzero when the flight payload or the model schema changes
 shape, when AA bumps the Intelligence Index version `build.py` is pinned to,
-when the cost breakdown drops a slug the build reads or stops summing to the
-published total — except an all-dropped window hour, which is reported and
-returned (issue #217) — or when the Coding Agent Index table collapses. `build.py`
-refuses to write a page with an empty chart on it — except an all-dropped
-two-generation window hour, which publishes with the agentic axis empty and a
-note on the page (issue #217). All of those are signals to
+when the cost breakdown's slugs stop matching that version's exactly or its
+costs stop summing to the published total — except an all-dropped window hour,
+which is reported and returned (issue #217) — or when the Coding Agent Index
+table collapses. `build.py` refuses to write a page with an empty chart on it —
+except a three-generation window hour whose only empty chart is parameters,
+which holds the last good page instead (issue #232). All of those are signals to
 re-read AA by hand, not to retry or to hand-fix JSON — never hand-edit either
 capture.
 

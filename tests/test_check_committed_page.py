@@ -100,20 +100,18 @@ class CommittedStateRebuildTests(unittest.TestCase):
         self.assertNotIn("held since", rebuilt)
         self.assertEqual(check_committed_page.verify(committed, rebuilt), [])
 
-    def test_window_page_rebuild_uses_committed_window_marker(self):
+    def test_rebuild_stages_the_committed_window_marker(self):
         self.harness.stage_hour(40)
         data = self.harness.repo / "data"
         models = data / "aa-raw-models.json"
-        models.write_bytes(test_capture_gate.window_capture(models.read_bytes()))
+        models.write_bytes(test_capture_gate.corner_capture(models.read_bytes()))
         marker = data / "cost-breakdown-window.txt"
-        marker.write_text("2 generations observed in-run\n", encoding="utf-8")
+        marker.write_bytes(test_capture_gate.WINDOW_MARKER)
         self.harness.git("add", "data/cost-breakdown-window.txt")
         self.harness.commit_hour()
-        committed = self.render_working_page()
         marker.unlink()
-        rebuilt = check_committed_page.rebuild_page()
-        self.assertTrue("Empty during a capture window" in rebuilt)
-        self.assertEqual(check_committed_page.verify(committed, rebuilt), [])
+        with self.assertRaises(build.WindowHold):
+            check_committed_page.rebuild_page()
 
 
 class CheckCommittedPageTests(unittest.TestCase):

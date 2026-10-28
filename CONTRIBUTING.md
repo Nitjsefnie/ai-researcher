@@ -303,10 +303,9 @@ values can lag a generation.
 
 The window marker counts leaderboard models after validating the whole union,
 so a detail-only breakdown cannot erase a route window (issue #266). In the
-marked three-generation corner, empty parameters (alone or with agentic) hold the
-last good page. Detail-only rows that rescue parameters leave an agentic-only
-gap, which publishes with a window note; rescuing both axes publishes fully.
-Unplottable extras leave the original hold intact. Other empty axes still refuse.
+marked three-generation corner, empty parameters hold the last good page.
+Detail-only rows that rescue parameters publish fully. Unplottable extras leave
+the original hold intact. Other empty axes still refuse.
 
 **Actions are hash-pinned**, with the version in a trailing comment. Do not
 "tidy" one back to `@v4`: a tag is a moving pointer, and these jobs hold a
@@ -402,7 +401,7 @@ own published values.
   canonical-first rule): identity and flag fields (`name`, `shortName`, `slug`,
   `creator`, `modelCreatorName`, `isOpenWeights`, `deprecated`, `isReasoning`,
   `intelligenceIndexIsEstimated`) and everything outside the variant map's
-  fields (`ii`, `cost`, `gdpval`, `gdpvalCost`, `ctx`, `pin`, `pout`).
+  fields (`ii`, `cost`, `ctx`, `pin`, `pout`).
   Parameters, licence and release date are detail-fills with a single in-run
   source, so they cannot dispute either.
 - The never-red family (`NEVER_RED_FIELDS`, hardcoded, never widened silently:
@@ -410,9 +409,6 @@ own published values.
   speed/latency set. It re-samples every hour, so two looks of the SAME
   generation routinely disagree on it and a dispute there would hold the page
   red permanently.
-- `gdpvalCost` is recovered from each variant's own cost breakdown and is absent
-  when that breakdown does not sum to its own total; never supplied from another
-  generation's parts.
 
 **Cross-run generation layer** (`--cross-run-lookback`):
 - Remembers the newest 1000 distinct fingerprints in

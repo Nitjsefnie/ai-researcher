@@ -40,7 +40,6 @@ reasoning model costs more than its sticker price — the point of using it.
 |---|---|---|---|
 | coding | Coding Agent Index v1.4 | `/agents/coding-agents` | agent + model |
 | intelligence | Intelligence Index v5.0 | leaderboard + model detail | model |
-| agentic | GDPval-AA v2 | leaderboard + model detail | model |
 | parameters | Intelligence Index vs parameters | leaderboard + model detail | model |
 
 - **Coding Agent Index**: DeepSWE, Terminal-Bench v2.1, SWE-Atlas-QnA at equal
@@ -51,9 +50,8 @@ reasoning model costs more than its sticker price — the point of using it.
   FrontierCode 2.0, Terminal-Bench 4.0, Terminal-Bench-Science 0.1, CritPt v2
   (Hard Subset), AA-Omniscience v1.1, HLE-Diamond, in four categories at 25%
   each. Cost is AA's `cost.total`.
-- **GDPval-AA v2**: one evaluation, not a composite. Cost is AA's figure for it
-  with its 10% index weight divided back out; per-evaluation costs sum exactly
-  to the published total, so the recovery is checkable.
+
+GDPval-AA left the Intelligence Index in v5.0; AA's cost breakdown no longer carries it, and its evaluation page publishes only token counts for a subset of models, so no AA-published same-run cost exists for the axis. The axis returns only if AA publishes a GDPval cost.
 
 **Never use `codingIndex` or `agenticIndex`**: AA scores them from
 Terminal-Bench v2.1 and τ³-Banking, whose costs v4.3 removed from the
@@ -80,9 +78,9 @@ drops is a *fill*, not a disagreement.
 flattened `cost.total`) on the leaderboard and the full **object** on the
 detail route. The number wins; the object fills under it only while its
 per-evaluation breakdown sums to that number. A breakdown that does not sum is not
-this total's breakdown and is dropped whole, whatever its route, leaving the scalar; that model's GDPval cost
-renders absent until the routes converge (the alternatives are a stale total or
-hours of red).
+this total's breakdown and is dropped whole, whatever its route, leaving the
+scalar until the routes converge (the alternatives are a stale total or hours
+of red).
 
 **Membership** is leaderboard ∪ detail corpus (issue #266, 2026-10-17). Shared
 models keep the precedence and cost guards; detail-only models use their detail
@@ -135,7 +133,7 @@ included. `coding_agent_rows` takes every object carrying `indexScore` and
 `mean.costUsd`, wherever it sits, deduped by id.
 
 **Two row universes, one table.** Rows carry a `kind`: `model` rows have the
-intelligence, agentic and parameter axes, `agent` rows have coding, and neither
+intelligence and parameter axes, `agent` rows have coding, and neither
 has the other's columns. An agent row inherits weights status by matching
 `hostModelSlug` to the captured model's `slug`; runs on models AA has no row for
 (unreleased codenames) are **unknown**, drawn hollow, never defaulted to
@@ -175,29 +173,27 @@ or hand-fix JSON — when:
   pin. This matters most: AA publishes per-evaluation weights only on its
   methodology page, so a rebalance leaves every payload field well-formed (v4.2
   silently shipped costs wrong by 2–3×); the pin is the only catch;
-- the cost breakdown drops a slug `build.py` reads, or per-evaluation costs stop
-  summing to the published total — except an all-dropped window hour, which is
-  reported and returned (issue #217);
+- the cost breakdown's slug set is not exactly `build.py`'s `INDEX_EVAL_WEIGHTS`
+  keys, or per-evaluation costs stop summing to the published total — except an
+  all-dropped window hour, which is reported and returned (issue #217);
 - the Coding Agent Index falls below `CODING_ROW_FLOOR` paired rows.
 
 A route disagreement is never one of these: precedence resolves it, silently and
 always.
 
 `build.py` refuses to write a page where a rendered axis has no rows (a build
-failure, not a published blank), except:
-- a leaderboard all-dropped window hour (marker `data/cost-breakdown-window.txt`,
-  written by `fetch_aa.py`) publishes with the agentic axis empty and a named
-  on-page note;
-- a three-generation window hour (the marker records ≥ 3 generations observed
-  in-run): when parameters stay empty after detail-only rows join, with or
-  without agentic, the page HOLDS (the gate reports unchanged, the last good page
-  stays live). Detail-only rows rescuing parameters leave an agentic-only gap,
-  which publishes with the window note; rescuing both publishes a full page.
-  Unplottable extras rescue neither axis and keep the HOLD.
+failure, not a published blank), except a three-generation window hour: the
+marker `data/cost-breakdown-window.txt` (written by `fetch_aa.py` on a
+leaderboard all-dropped hour) records ≥ 3 generations observed in-run, and
+parameters is the only axis still empty after detail-only rows join. That page
+HOLDS (the gate reports unchanged, the last good page stays live). Detail-only
+rows that rescue parameters publish a full page; unplottable extras rescue
+nothing and keep the HOLD.
 
 Window evidence counts leaderboard models after validating the whole union;
 detail-only breakdowns cannot clear it, even on models that render no rows.
-Every other empty axis refuses: the go-re-read-AA-by-hand signal for a real
+Every other empty axis refuses: with a marker, naming the window and its
+generation count; without one, as the go-re-read-AA-by-hand signal for a real
 shape change.
 
 Never hand-edit either capture. Re-publishing a slug adds a version and never

@@ -1,6 +1,5 @@
 [
  {
-  "gdpvalNormalized": 0.58,
   "intelligenceIndex": 62.1,
   "intelligenceIndexCostPerTask": {
    "cost": {
@@ -8,12 +7,40 @@
    },
    "evaluations": [
     {
-     "slug": "gdpval-aa",
-     "weightedCostPerTask": 0.42
+     "slug": "aa-briefcase",
+     "weightedCostPerTask": 0.18
     },
     {
-     "slug": "scicode",
-     "weightedCostPerTask": 0.3
+     "slug": "automationbench-aa",
+     "weightedCostPerTask": 0.06
+    },
+    {
+     "slug": "gdp-pdf",
+     "weightedCostPerTask": 0.06
+    },
+    {
+     "slug": "frontiercode-2-0",
+     "weightedCostPerTask": 0.18
+    },
+    {
+     "slug": "terminalbench-4-0",
+     "weightedCostPerTask": 0.12
+    },
+    {
+     "slug": "terminal-bench-science",
+     "weightedCostPerTask": 0.18
+    },
+    {
+     "slug": "critpt-v2-hard",
+     "weightedCostPerTask": 0.12
+    },
+    {
+     "slug": "omniscience",
+     "weightedCostPerTask": 0.18
+    },
+    {
+     "slug": "hle-diamond",
+     "weightedCostPerTask": 0.12
     }
    ]
   },
@@ -24,7 +51,6 @@
   "slug": "alpha-1"
  },
  {
-  "gdpvalNormalized": 0.51,
   "intelligenceIndex": 55.4,
   "intelligenceIndexCostPerTask": {
    "cost": {
@@ -32,12 +58,40 @@
    },
    "evaluations": [
     {
-     "slug": "gdpval-aa",
-     "weightedCostPerTask": 0.38
+     "slug": "aa-briefcase",
+     "weightedCostPerTask": 0.12
     },
     {
-     "slug": "scicode",
-     "weightedCostPerTask": 0.22
+     "slug": "automationbench-aa",
+     "weightedCostPerTask": 0.04
+    },
+    {
+     "slug": "gdp-pdf",
+     "weightedCostPerTask": 0.04
+    },
+    {
+     "slug": "frontiercode-2-0",
+     "weightedCostPerTask": 0.12
+    },
+    {
+     "slug": "terminalbench-4-0",
+     "weightedCostPerTask": 0.08
+    },
+    {
+     "slug": "terminal-bench-science",
+     "weightedCostPerTask": 0.12
+    },
+    {
+     "slug": "critpt-v2-hard",
+     "weightedCostPerTask": 0.08
+    },
+    {
+     "slug": "omniscience",
+     "weightedCostPerTask": 0.12
+    },
+    {
+     "slug": "hle-diamond",
+     "weightedCostPerTask": 0.08
     }
    ]
   },
@@ -48,7 +102,6 @@
   "slug": "beta-2"
  },
  {
-  "gdpvalNormalized": 0.44,
   "intelligenceIndex": 48.9,
   "intelligenceIndexCostPerTask": {
    "cost": {
@@ -56,12 +109,40 @@
    },
    "evaluations": [
     {
-     "slug": "gdpval-aa",
-     "weightedCostPerTask": 0.31
+     "slug": "aa-briefcase",
+     "weightedCostPerTask": 0.075
     },
     {
-     "slug": "scicode",
-     "weightedCostPerTask": 0.18
+     "slug": "automationbench-aa",
+     "weightedCostPerTask": 0.025
+    },
+    {
+     "slug": "gdp-pdf",
+     "weightedCostPerTask": 0.025
+    },
+    {
+     "slug": "frontiercode-2-0",
+     "weightedCostPerTask": 0.075
+    },
+    {
+     "slug": "terminalbench-4-0",
+     "weightedCostPerTask": 0.05
+    },
+    {
+     "slug": "terminal-bench-science",
+     "weightedCostPerTask": 0.075
+    },
+    {
+     "slug": "critpt-v2-hard",
+     "weightedCostPerTask": 0.05
+    },
+    {
+     "slug": "omniscience",
+     "weightedCostPerTask": 0.075
+    },
+    {
+     "slug": "hle-diamond",
+     "weightedCostPerTask": 0.05
     }
    ]
   },
@@ -72,7 +153,6 @@
   "slug": "gamma-3"
  },
  {
-  "gdpvalNormalized": 0.39,
   "intelligenceIndex": 43.2,
   "intelligenceIndexCostPerTask": {
    "cost": {
@@ -80,12 +160,40 @@
    },
    "evaluations": [
     {
-     "slug": "gdpval-aa",
-     "weightedCostPerTask": 0.25
+     "slug": "aa-briefcase",
+     "weightedCostPerTask": 0.042
     },
     {
-     "slug": "scicode",
-     "weightedCostPerTask": 0.12
+     "slug": "automationbench-aa",
+     "weightedCostPerTask": 0.014
+    },
+    {
+     "slug": "gdp-pdf",
+     "weightedCostPerTask": 0.014
+    },
+    {
+     "slug": "frontiercode-2-0",
+     "weightedCostPerTask": 0.042
+    },
+    {
+     "slug": "terminalbench-4-0",
+     "weightedCostPerTask": 0.028
+    },
+    {
+     "slug": "terminal-bench-science",
+     "weightedCostPerTask": 0.042
+    },
+    {
+     "slug": "critpt-v2-hard",
+     "weightedCostPerTask": 0.028
+    },
+    {
+     "slug": "omniscience",
+     "weightedCostPerTask": 0.042
+    },
+    {
+     "slug": "hle-diamond",
+     "weightedCostPerTask": 0.028
     }
    ]
   },
@@ -96,7 +204,6 @@
   "slug": "delta-4"
  },
  {
-  "gdpvalNormalized": 0.3,
   "intelligenceIndex": 38.6,
   "intelligenceIndexCostPerTask": {
    "cost": {
@@ -104,12 +211,40 @@
    },
    "evaluations": [
     {
-     "slug": "gdpval-aa",
-     "weightedCostPerTask": 0.19
+     "slug": "aa-briefcase",
+     "weightedCostPerTask": 0.021
     },
     {
-     "slug": "scicode",
-     "weightedCostPerTask": 0.07
+     "slug": "automationbench-aa",
+     "weightedCostPerTask": 0.007
+    },
+    {
+     "slug": "gdp-pdf",
+     "weightedCostPerTask": 0.007
+    },
+    {
+     "slug": "frontiercode-2-0",
+     "weightedCostPerTask": 0.021
+    },
+    {
+     "slug": "terminalbench-4-0",
+     "weightedCostPerTask": 0.014
+    },
+    {
+     "slug": "terminal-bench-science",
+     "weightedCostPerTask": 0.021
+    },
+    {
+     "slug": "critpt-v2-hard",
+     "weightedCostPerTask": 0.014
+    },
+    {
+     "slug": "omniscience",
+     "weightedCostPerTask": 0.021
+    },
+    {
+     "slug": "hle-diamond",
+     "weightedCostPerTask": 0.014
     }
    ]
   },
@@ -120,7 +255,6 @@
   "slug": "epsilon-5"
  },
  {
-  "gdpvalNormalized": 0.21,
   "intelligenceIndex": 33.0,
   "intelligenceIndexCostPerTask": {
    "cost": {
@@ -128,12 +262,40 @@
    },
    "evaluations": [
     {
-     "slug": "gdpval-aa",
-     "weightedCostPerTask": 0.14
+     "slug": "aa-briefcase",
+     "weightedCostPerTask": 0.009
     },
     {
-     "slug": "scicode",
-     "weightedCostPerTask": 0.04
+     "slug": "automationbench-aa",
+     "weightedCostPerTask": 0.003
+    },
+    {
+     "slug": "gdp-pdf",
+     "weightedCostPerTask": 0.003
+    },
+    {
+     "slug": "frontiercode-2-0",
+     "weightedCostPerTask": 0.009
+    },
+    {
+     "slug": "terminalbench-4-0",
+     "weightedCostPerTask": 0.006
+    },
+    {
+     "slug": "terminal-bench-science",
+     "weightedCostPerTask": 0.009
+    },
+    {
+     "slug": "critpt-v2-hard",
+     "weightedCostPerTask": 0.006
+    },
+    {
+     "slug": "omniscience",
+     "weightedCostPerTask": 0.009
+    },
+    {
+     "slug": "hle-diamond",
+     "weightedCostPerTask": 0.006
     }
    ]
   },

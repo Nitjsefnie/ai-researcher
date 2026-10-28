@@ -308,8 +308,8 @@ jobs:
           # could set proceed=true on its force or hub_stale arm, and while
           # the fresh captures are still on disk. The probe answers from
           # build.WindowHold, which build.py raises only on the #232
-          # predicate (>= 3 generations in-run, emptied axes within agentic
-          # and parameters), so a held hour drops proceed to false on EVERY
+          # predicate (>= 3 generations in-run, parameters the only emptied
+          # axis), so a held hour drops proceed to false on EVERY
           # path: the last good page stays live, and nothing commits or
           # publishes. The hold dispatches through `case`, so any token the
           # probe does not define -- an empty answer from a swallowed

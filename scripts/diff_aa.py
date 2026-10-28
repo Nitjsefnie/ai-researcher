@@ -16,7 +16,7 @@ what the page says:
                --speed-tol; every other percentile/TTFT/e2e field is discarded
                outright because nothing downstream reads it
   derived      breakdowns strictly beneath a headline already reported -- token
-               counts, per-eval cost splits, blended prices, gdpval CIs.
+               counts, per-eval cost splits, blended prices, Elo CIs.
                Discarded unless --derived
   cosmetic     lab branding (colour, logo) -- always discarded, counted only
   disputes     the capture's generation layer (issues #208/#211):
@@ -28,14 +28,10 @@ what the page says:
                counted in one summary clause rather than as field news
 
 It also recomputes every Pareto layer the page draws -- one per scatter, in page order:
-coding-agent, intelligence, GDPval-AA and parameter-efficiency -- on either side, using build.py's
+coding-agent, intelligence and parameter-efficiency -- on either side, using build.py's
 own `undominated`, so "who entered / left the frontier" is answered by the same
-function the page uses rather than a second implementation of the rule. The four
+function the page uses rather than a second implementation of the rule. The three
 move independently: a model can join one while sitting dominated on the rest.
-A model the merge held absent (its cost breakdown dropped as another
-generation's, issue #244) is dropped from BOTH sides of the GDPval-AA
-comparison -- the hold, not any move, took it off that chart -- and gets its
-own `== GDPval cost hold` section instead, naming which models are held and why.
 
 Usage:
     python3 scripts/diff_aa.py                    # HEAD's capture vs the working tree
@@ -62,7 +58,7 @@ from page_format import SPEED_TOL  # noqa: E402  # pylint: disable=wrong-import-
 RAW = ROOT / "data" / "aa-raw-models.json"
 
 # Relative move below which a significant numeric field is not reported.
-# gdpvalNormalized is an Elo renormalised over the whole field, so every
+# An Elo-scored component is renormalised over the whole field, so every
 # newcomer nudges every incumbent by a hundredth of a percent; at 0 that is a
 # dozen +0.01% lines per refresh. 0.5% is below anything the page renders
 # to one decimal, so a move that clears it can change what the page says.
@@ -91,7 +87,7 @@ COSMETIC = {
 # (issue #244): the leaderboard ships the bare number (its flattened total),
 # the detail route the whole object, and a model whose breakdown the merge
 # dropped as another generation's flips between the two with its value
-# unchanged -- so comparing them as two paths reported the hold as two field
+# unchanged -- so comparing them as two paths reported the drop as two field
 # changes.
 COST_BARE_PATH = "intelligenceIndexCostPerTask"
 COST_TOTAL_PATH = "intelligenceIndexCostPerTask.cost.total"
@@ -112,14 +108,15 @@ DERIVED_ROOTS = {
     "evalTokenCounts",                    # per-eval token tallies -> cost
     "intelligenceIndexTokenCounts",       # their sum
     "intelligenceIndexOutputTokensPerTask",
-    "gdpvalBreakdown",                    # elo + CIs behind gdpvalNormalized
+    "gdpvalBreakdown",                    # AA's GDPval Elo CIs; the page reads none
 }
 DERIVED_EXACT = {
     # Whole-run cost, in dollars-per-index-run; cost.total per task is the headline.
     "intelligenceIndexCostTotal", "intelligenceIndexCostInput",
     "intelligenceIndexCostOutput", "intelligenceIndexCostReasoning",
     "intelligenceIndexCostAnswer", "intelligenceIndexCost",
-    # Raw Elo and token tallies behind headlines the page renders normalised.
+    # Raw Elo (GDPval's included, which the page no longer reads) and token
+    # tallies behind headlines the page renders normalised.
     "gdpval", "briefcaseTotalCost", "canonicalIntelligenceIndexTokenCount",
     "reasoningTokens",
 }
@@ -166,8 +163,8 @@ def normalize_cost_shape(flat):
     `cost.total` path, in place; return the flat map.
 
     The bare number IS the flattened cost.total (AGENTS.md, the cost shape
-    split), so a record switching shape with its total unchanged -- the
-    cross-generation hold, issue #244 -- must diff as no change rather than
+    split), so a record switching shape with its total unchanged -- a
+    cross-generation breakdown drop, issue #244 -- must diff as no change rather than
     as the value "appearing" at the bare path and "disappearing" from
     cost.total. One quantity compares under one path; a total that really
     moved still reports, once, at the headline path.
@@ -175,24 +172,6 @@ def normalize_cost_shape(flat):
     if COST_BARE_PATH in flat:
         flat[COST_TOTAL_PATH] = flat.pop(COST_BARE_PATH)
     return flat
-
-
-def held_slugs(by_id):
-    """Slugs whose cost breakdown this capture holds absent (issue #244).
-
-    Same predicate as fetch_aa.py's check_cost_breakdown `dropped`: the
-    leaderboard's bare measured total with no breakdown to decompose it,
-    because the merge dropped the detail route's as another generation's.
-    Such a model's GDPval cost then renders absent (build.py recovers
-    gdpvalCost only from a breakdown), so it is off the GDPval-AA frontier
-    until the routes converge -- by the hold, not by any score or cost move.
-    """
-    held = set()
-    for slug, m in by_id.items():
-        outer = m.get(COST_BARE_PATH)
-        if isinstance(outer, (int, float)) and not isinstance(outer, bool):
-            held.add(slug)
-    return held
 
 
 def key(m):
@@ -384,49 +363,39 @@ def fmt_params(b):
     return f"{b / 1000:.1f}T".replace(".0T", "T") if b >= 1000 else f"{b:g}B"
 
 
-# The page draws four scatters (sections 1-4), each with its own Pareto layer,
+# The page draws three scatters (sections 1-3), each with its own Pareto layer,
 # and they move independently -- a model can join one while sitting dominated on
-# the others. Diffing only the headline left three of the four unreviewed.
+# the others. Diffing only the headline left two of the three unreviewed.
 # label -> (metric key, x-axis formatter)
 CHART_FRONTIERS = (
     ("coding agent", "coding", lambda v: f"${v:.2f}/task"),
-    ("GDPval-AA", "agentic", lambda v: f"${v:.2f}/task"),
     ("parameter-efficiency", "parameters", fmt_params),
 )
 
 
 def chart_frontier(models, agents, metric):
-    """One chart's Pareto layer, via build.py's own `undominated`.
+    """One CHART_FRONTIERS chart's Pareto layer, via build.py's own `undominated`.
 
-    build_rows() seats metrics entries for the three cost-based scatters but not
-    for the parameter one, so size stands in for cost there. Either way the
-    dominance rule itself is never spelled a second time. Eligibility differs per
-    chart -- the parameter layer only sees models AA discloses a size for, so it
-    is drawn over a much smaller set than the cost layers.
+    Coding is drawn over the agent capture's rows; parameters over the model
+    rows AA discloses a size for, with size standing in for cost (build_rows()
+    seats no metrics entry for it). Either way the dominance rule itself is
+    never spelled a second time.
     """
-    # Coding is the only axis drawn over the agent capture; the rest are model
-    # rows. Both go through build.py's own row builders so the eligibility rule
-    # is never spelled a second time here.
     if metric == "coding":
         rows = build_agent_rows(agents, models)
         return {r["name"]: r for r in undominated(rows, metric)}, rows
-    rows = build_rows(models)
-    if metric == "parameters":
-        rows = [r for r in rows if r.get("params") and r.get("ii") is not None]
-        for r in rows:
-            r["metrics"]["parameters"] = {"score": r["ii"], "cost": r["params"]}
-    else:
-        rows = [r for r in rows if r["metrics"].get(metric)]
+    rows = [r for r in build_rows(models) if r.get("params") and r.get("ii") is not None]
+    for r in rows:
+        r["metrics"]["parameters"] = {"score": r["ii"], "cost": r["params"]}
     return {r["name"]: r for r in undominated(rows, metric)}, rows
 
 
 # Report section header -> the short name a subject line uses for it. The
 # effort-collapsed frontier is a SECOND VIEW of the intelligence chart rather
-# than a fifth chart, so it stays in the body and never double-counts here.
+# than a fourth chart, so it stays in the body and never double-counts here.
 SUBJECT_FRONTIERS = {
     "efficient frontier (expanded)": "intelligence",
     "coding agent frontier": "coding",
-    "GDPval-AA frontier": "GDPval-AA",
     "parameter-efficiency frontier": "parameters",
 }
 
@@ -488,15 +457,14 @@ def as_commit_message(report: str) -> str:
     sections never reach it (print_report omits them), so whatever survived
     the report's own filters is news the commit carries in full.
 
-    The subject names what moved — models, the frontier, the cross-generation
-    cost hold, the already-thresholded rendered-speed section — rather than
+    The subject names what moved — models, the frontier, the
+    already-thresholded rendered-speed section — rather than
     just the model total, which reads the same on a busy day and a dead one.
     """
     lines = report.splitlines()
 
     models = added = removed = speed = 0
     disputes = multi = 0
-    holds = returned = 0
     carried = ""
     frontier = ""
     for line in lines:
@@ -510,10 +478,6 @@ def as_commit_message(report: str) -> str:
             speed = int(line.split(": ")[1].split()[0])
         elif line.startswith("== efficient frontier (expanded): ") and not frontier:
             frontier = line.split(": ", 1)[1].split(" of ")[0].strip()
-        elif line.startswith("  held absent: "):
-            holds = int(line.split(": ")[1].split()[0])
-        elif line.startswith("  returned as the routes converged: "):
-            returned = int(line.split(": ")[1].split()[0])
         elif line.startswith("== detail fills carried: "):
             carried = line.split(": ", 1)[1]
         elif line.startswith("  genVariants appeared on "):
@@ -536,10 +500,7 @@ def as_commit_message(report: str) -> str:
         Who is on the efficient frontier is the analytical payload, so it
         outranks the model count; a moved dispute layer is rarer than an
         add or a remove and names real published disagreement, so it sits
-        between the counts and the speed noise; the cross-generation cost
-        hold is that same rare class of state -- it decides who is plotted
-        on the GDPval chart at all -- so it sits with the disputes;
-        re-sampled throughput is the noisiest thing that still clears the
+        between the counts and the speed noise; re-sampled throughput is the noisiest thing that still clears the
         tolerance, so it goes last and is the first to be dropped. Nothing
         is lost by dropping it: the body carries every section in full, and
         the subject is a headline, not a summary.
@@ -561,14 +522,6 @@ def as_commit_message(report: str) -> str:
             across = f" across {multi} models" if multi and multi != disputes else ""
             out.append(f"{disputes} disputed value"
                        + ("" if disputes == 1 else "s") + across)
-        if holds:
-            # print_holds' count lines, read back: models held absent this
-            # hour, and models back once the routes converged.
-            out.append(f"{holds} GDPval cost" + ("" if holds == 1 else "s")
-                       + " held absent")
-        if returned:
-            out.append(f"{returned} GDPval cost" + ("" if returned == 1 else "s")
-                       + " restored")
         if carried:
             out.append(carried)
         if speed:
@@ -682,84 +635,17 @@ def print_disputes(old_by_id, new_by_id):
         print(f"  {multi} model(s) carry more than one variant (one per generation)")
 
 
-def print_holds(old_by_id, new_by_id):
-    """The GDPval cost hold section (issue #244): which models the merge
-    held absent this capture, why, and which returned as the routes
-    converged.
-
-    The frontier comparisons already drop a held model from BOTH sides, so
-    the membership churn the hold causes on the GDPval-AA chart is never
-    reported as frontier moves -- this section is where that state is news,
-    in the same one-line-per-shape shape the Disputes section uses. Printed
-    while any model is held (the standing state of the published page that
-    hour), plus a returned line on a convergence hour, which would otherwise
-    re-plot models in silence. A model ABSENT from the new capture entirely
-    is models-removed news and takes neither line -- without that presence
-    test it would land here as "restored" while the same report lists it
-    under models removed, one message saying both. Prints nothing when
-    nothing is held and nothing came back: a quiet hour gains no section.
-    """
-    held_old = held_slugs(old_by_id)
-    held_new = held_slugs(new_by_id)
-    returned = (held_old - held_new) & new_by_id.keys()
-    if not held_new and not returned:
-        return
-
-    records = {**old_by_id, **new_by_id}
-
-    def names(slugs):
-        # Ordered like models added/removed -- most intelligent first --
-        # through shown_name() like every other captured value on a line.
-        return ", ".join(
-            shown_name(records[i]) for i in sorted(
-                slugs, key=lambda i: -(records[i].get("intelligenceIndex") or 0)))
-
-    print("\n== GDPval cost hold (cross-generation breakdown)")
-    if held_new:
-        print(f"  held absent: {len(held_new)} model(s): {names(held_new)}")
-        print("  another generation's cost breakdown was dropped, so their "
-              "GDPval cost renders absent until the routes converge")
-    if returned:
-        print(f"  returned as the routes converged: {len(returned)} "
-              f"model(s): {names(returned)}")
-
-
-def print_chart_frontiers(old, new, old_agents, new_agents, held):
-    """The three scatter-specific Pareto sections -- coding agent, GDPval-AA
-    and parameter-efficiency, in page order -- one per CHART_FRONTIERS entry.
-
-    `held` (issue #244) is the union of the two captures' held_slugs. The
-    hold unplots a model on the GDPval-AA chart ONLY (its cost comes from
-    the dropped breakdown; the bare total still plots the other charts), so
-    a held model is dropped from BOTH sides of that chart's comparison and
-    from no other. Comparing membership while one side holds it reports the
-    HOLD as frontier moves: the model "leaves" the hour it is held and
-    "enters" back the hour the routes converge, and the models it dominated
-    appear to join both times -- while no score or cost moved. The hold
-    section in print_report is where that state is news instead.
+def print_chart_frontiers(old, new, old_agents, new_agents):
+    """The two scatter-specific Pareto sections -- coding agent and
+    parameter-efficiency, in page order -- one per CHART_FRONTIERS entry.
     """
     for label, metric, fmt_x in CHART_FRONTIERS:
-        drop = held if metric == "agentic" else frozenset()
-        old_side = [m for m in old if key(m) not in drop] if drop else old
-        new_side = [m for m in new if key(m) not in drop] if drop else new
-        fo, rows_o = chart_frontier(old_side, old_agents, metric)
-        fn, rows_n = chart_frontier(new_side, new_agents, metric)
+        fo, rows_o = chart_frontier(old, old_agents, metric)
+        fn, rows_n = chart_frontier(new, new_agents, metric)
         entered = [n for n in fn if n not in fo]
         left = [n for n in fo if n not in fn]
         if not entered and not left:
             continue
-        if drop:
-            # The header's "of N -> M plotted" counts describe each
-            # CAPTURE -- what it actually drew -- not the comparison
-            # universe: the union filter also removes the model the OLD
-            # side still plotted (hold onset), and counting the filtered
-            # sides would understate it. Only the two denominators are
-            # re-read off the full captures; the comparison above stays
-            # filtered and the +/- lines follow it. (Re-read here, after
-            # the no-news guard, so a section that does not print pays
-            # nothing for the correction.)
-            rows_o = chart_frontier(old, old_agents, metric)[1]
-            rows_n = chart_frontier(new, new_agents, metric)[1]
         print(f"\n== {label} frontier: {len(fo)} -> {len(fn)} "
               f"of {len(rows_o)} -> {len(rows_n)} plotted")
         for sign, names, side in (("+", entered, fn), ("-", left, fo)):
@@ -863,7 +749,6 @@ def print_report(args):
         print("  (none)")
 
     print_disputes(old_by_id, new_by_id)
-    print_holds(old_by_id, new_by_id)
 
     carries = [m[CARRIED_DETAIL_KEY] for m in new if m.get(CARRIED_DETAIL_KEY)]
     if carries:
@@ -899,13 +784,7 @@ def print_report(args):
             r = fo[n]
             print(f"  - {one_line(n)}  II {r['ii']:.1f}  ${r['cost']:.2f}/task")
 
-    # The hold unplots a model on the GDPval-AA chart only (its cost comes
-    # from the dropped breakdown; the bare total still plots the other
-    # charts), so that chart alone must forget it -- see
-    # print_chart_frontiers. The hold section above is where that state is
-    # news.
-    held = held_slugs(old_by_id) | held_slugs(new_by_id)
-    print_chart_frontiers(old, new, old_agents, new_agents, held)
+    print_chart_frontiers(old, new, old_agents, new_agents)
 
     if not args.all:
         print(f"\ndiscarded: {suppressed['jitter-unused']} re-sampled speed/latency "

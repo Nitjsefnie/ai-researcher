@@ -37,8 +37,8 @@ on stdout with the reason on stderr -- still exit 0, still one word of stdout.
 One second mode, the hold probe (`--fresh-held`, issue #236): answers whether
 the FRESH capture is in the #232 hold state -- `build.WindowHold` raised by a
 render of the fresh side alone. That exception fires only on the #232
-predicate (the marker records >= 3 generations in-run AND the emptied axes
-are a subset of {agentic, parameters}), so the answer keys on exactly the
+predicate (the marker records >= 3 generations in-run AND parameters is the
+only emptied axis), so the answer keys on exactly the
 evidence the hold mandates. `yes` (held) or `no` (a page built) on stdout,
 exit 0 both ways; a refused capture (build's SystemExit), a missing fresh
 capture, or anything unexpected is broken, not held -- exit 1, the reason on
@@ -253,10 +253,10 @@ def read_head_window_marker() -> bytes | None:
     refresh.yml commits the marker beside the captures in a window hour, and
     the first healthy hour's commit removes it again -- so None is the normal
     hour's answer, and presence at HEAD means exactly that the committed
-    capture is a window capture, which is exactly when the old side's rebuild
-    needs it: without it the note-page that WAS published from those captures
-    cannot be rebuilt and the old side refuses with the shape-change wording
-    (issue #227). Any _git_show failure reads as None -- the captures were
+    capture is a window capture. The old side stages it because build.py
+    reads it beside the capture (issue #227); a committed capture plots every
+    axis, so it decides only a refusal's wording on a broken HEAD. Any
+    _git_show failure reads as None -- the captures were
     already read from the same tree by the time this runs, so a plumbing
     failure here is unheard-of rather than a state to distinguish.
     """
