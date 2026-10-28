@@ -10,7 +10,7 @@
     "scripts/ci/install_chromium.py": 664,
     "scripts/ci/perf_budgets.py": 723,
     "scripts/diff_aa.py": 800,
-    "scripts/fetch_aa.py": 1384,
+    "scripts/fetch_aa.py": 1343,
     "tests/test_browser.py": 2843,
     "tests/test_build.py": 2458,
     "tests/test_build_rankings.py": 778,
@@ -26,6 +26,6 @@
     "tests/test_fetch_aa.py": 2789,
     "tests/test_gate_base_freshness.py": 987,
     "tests/test_ratchet_push_workflow.py": 823,
-    "tests/test_refresh_workflow.py": 2897
+    "tests/test_refresh_workflow.py": 2896
   }
 }
