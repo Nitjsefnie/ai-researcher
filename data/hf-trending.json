@@ -2,10 +2,10 @@
   "source": "https://huggingface.co/api/models?sort=trendingScore&limit=10",
   "models": [
     {
-      "id": "RecursiveSI/flint"
+      "id": "deepseek-ai/DeepSeek-V4.1-Flash-1017"
     },
     {
-      "id": "deepseek-ai/DeepSeek-V4.1-Flash-1017"
+      "id": "RecursiveSI/flint"
     },
     {
       "id": "Nanbeige/Nanbeige4.3-33B"
@@ -26,10 +26,10 @@
       "id": "Lightricks/LTX-2.5"
     },
     {
-      "id": "Qwen/Qwen3.8-27B"
+      "id": "LiquidAI/LFM3-1.7B"
     },
     {
-      "id": "LiquidAI/LFM3-1.7B"
+      "id": "Qwen/Qwen3.8-27B"
     }
   ]
 }
