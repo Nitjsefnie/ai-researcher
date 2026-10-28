@@ -17,19 +17,19 @@
       "id": "black-forest-labs/flux-3-image-klein-comfy"
     },
     {
-      "id": "Lightricks/LTX-2.5"
+      "id": "MiniMaxAI/MiniMax-M3.1-Flash"
     },
     {
-      "id": "MiniMaxAI/MiniMax-M3.1-Flash"
+      "id": "Lightricks/LTX-2.5"
     },
     {
       "id": "ISTA-DASLab/DeepSeek-V4.1-Flash-1017-GSQ-RCO-GGUF"
     },
     {
-      "id": "Qwen/Qwen3.8-27B"
+      "id": "InternScience/Sage-A1.5"
     },
     {
-      "id": "InternScience/Sage-A1.5"
+      "id": "Qwen/Qwen3.8-27B"
     }
   ]
 }
