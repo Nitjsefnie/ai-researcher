@@ -258,6 +258,7 @@ CORE_PIN = (
     'tests/test_fetch_aa_membership.py',
     'tests/test_fetch_hf_trending.py',
     'tests/test_fetch_openrouter_trending.py',
+    'tests/test_fetch_retry.py',
     'tests/test_gate_base_freshness.py',
     'tests/test_gitignore.py',
     'tests/test_workflow_ci_gate.py',
