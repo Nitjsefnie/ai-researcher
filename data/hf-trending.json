@@ -2,10 +2,10 @@
   "source": "https://huggingface.co/api/models?sort=trendingScore&limit=10",
   "models": [
     {
-      "id": "deepseek-ai/DeepSeek-V4.1-Flash-1017"
+      "id": "RecursiveSI/flint"
     },
     {
-      "id": "RecursiveSI/flint"
+      "id": "deepseek-ai/DeepSeek-V4.1-Flash-1017"
     },
     {
       "id": "Nanbeige/Nanbeige4.3-33B"
