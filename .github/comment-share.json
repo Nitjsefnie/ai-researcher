@@ -56,16 +56,16 @@
     1643
   ],
   "build.py": [
-    25878,
-    113753
+    23475,
+    107173
   ],
   "page_format.py": [
     1954,
     3035
   ],
   "scripts/capture_gate.py": [
-    9907,
-    16801
+    9865,
+    16759
   ],
   "scripts/ci/aggregate_gate.py": [
     3297,
@@ -124,12 +124,12 @@
     8670
   ],
   "scripts/diff_aa.py": [
-    16218,
-    32409
+    13089,
+    27599
   ],
   "scripts/fetch_aa.py": [
-    24616,
-    48986
+    24567,
+    48915
   ],
   "scripts/fetch_hf_trending.py": [
     661,
@@ -188,8 +188,8 @@
     14508
   ],
   "tests/test_ci_instruction_budgets.py": [
-    5646,
-    20299
+    5461,
+    19932
   ],
   "tests/test_ci_perf_budgets.py": [
     5071,
@@ -208,8 +208,8 @@
     18780
   ],
   "tests/test_diff_aa.py": [
-    13251,
-    51387
+    11086,
+    43214
   ],
   "tests/test_diff_coverage.py": [
     3651,
