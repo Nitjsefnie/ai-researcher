@@ -39,7 +39,7 @@ reasoning model costs more than its sticker price — the point of using it.
 | axis | y | source | unit |
 |---|---|---|---|
 | coding | Coding Agent Index v1.4 | `/agents/coding-agents` | agent + model |
-| intelligence | Intelligence Index v4.3 | leaderboard + model detail | model |
+| intelligence | Intelligence Index v5.0 | leaderboard + model detail | model |
 | agentic | GDPval-AA v2 | leaderboard + model detail | model |
 | parameters | Intelligence Index vs parameters | leaderboard + model detail | model |
 
@@ -47,9 +47,10 @@ reasoning model costs more than its sticker price — the point of using it.
   weight. `indexScore` and `mean.costUsd` sit on ONE record, so nothing is
   reweighted. The unit is agent+model+harness (Claude Code on Opus 5 (xhigh) ≠
   Codex on the same model): AA measured the harness too.
-- **Intelligence Index v4.3**: AA-Briefcase, GDPval-AA v2, AutomationBench-AA,
-  Terminal-Bench v4.0, SciCode, AA-Omniscience, GDP.pdf, AA-LCR v1.1,
-  Humanity's Last Exam, CritPt. Cost is AA's `cost.total`.
+- **Intelligence Index v5.0**: AA-Briefcase v1.1, AutomationBench-AA, GDP.pdf,
+  FrontierCode 2.0, Terminal-Bench 4.0, Terminal-Bench-Science 0.1, CritPt v2
+  (Hard Subset), AA-Omniscience v1.1, HLE-Diamond, in four categories at 25%
+  each. Cost is AA's `cost.total`.
 - **GDPval-AA v2**: one evaluation, not a composite. Cost is AA's figure for it
   with its 10% index weight divided back out; per-evaluation costs sum exactly
   to the published total, so the recovery is checkable.

@@ -30,24 +30,19 @@ RAW = ROOT / "data" / "aa-raw-models.json"
 AGENTS_RAW = ROOT / "data" / "aa-raw-coding-agents.json"
 OUT = ROOT / "out" / "frontier-models.html"
 
-# The AA Intelligence Index version this file's weights and field names are
-# written against. AA bumps it every few weeks and a bump can rename or drop a
-# cost-breakdown slug -- v4.3 replaced tau3-banking with automationbench-aa and
-# Terminal-Bench v2.1 with v4.0. The weights are published on AA's methodology
-# page and are NOT in the payload, so nothing can detect a rebalance for us;
-# fetch_aa.py refuses a version this file was not written against instead,
-# checked against the methodology page's LIVE version at MAJOR.MINOR
-# granularity (issue #220 -- the version string left the leaderboard payload).
-# AA ships point releases (v4.3.2) within a generation without rebalancing,
-# so those pass the pin unchanged.
-INDEX_VERSION = "4.3"
+# The AA Intelligence Index version this file is written against. A bump can
+# rename, add or drop cost-breakdown slugs and rebalance weights that live on
+# AA's methodology page, never in the payload -- v5.0 added FrontierCode 2.0,
+# Terminal-Bench-Science and HLE-Diamond, swapped CritPt for CritPt v2 (Hard
+# Subset), cut GDP.pdf to 5% and removed GDPval-AA, SciCode, AA-LCR and
+# Humanity's Last Exam -- so fetch_aa.py refuses any other MAJOR.MINOR on that
+# page's live headline (issue #220); point releases (v4.3.2) do not rebalance and pass.
+INDEX_VERSION = "5.0"
 
-# AA Intelligence Index v4.3 component evals, as listed on the source site.
+# AA Intelligence Index v5.0 component evals, as listed on the source site.
 INDEX_EVALS = [
-    "AA-Briefcase", "GDPval-AA v2", "AutomationBench-AA", "Terminal-Bench v4.0",
-    "SciCode", "AA-Omniscience", "GDP.pdf", "AA-LCR v1.1",
-    "Humanity's Last Exam", "CritPt",
-]
+    "AA-Briefcase v1.1", "AutomationBench-AA", "GDP.pdf", "FrontierCode 2.0", "Terminal-Bench 4.0",
+    "AA-Omniscience v1.1", "HLE-Diamond", "CritPt v2 (Hard Subset)", "Terminal-Bench-Science 0.1"]
 
 METRIC_ORDER = ("coding", "intelligence", "agentic")
 
@@ -1605,7 +1600,7 @@ TEMPLATE = r"""<!DOCTYPE html>
 
   <section id="intelligence">
     <h2>2 &middot; Intelligence Index</h2>
-    <p class="sub">AA's broad v4.3 synthesis across agentic work, coding, scientific reasoning and general capability.</p>
+    <p class="sub">AA's broad v5.0 synthesis across knowledge work, coding, science and general capability.</p>
     <div class="card">
       <div class="cap">Intelligence Index vs cost per task &middot; log cost axis &middot; up-and-left is better
         &middot; click any point to pin its name</div>
@@ -1715,7 +1710,7 @@ TEMPLATE = r"""<!DOCTYPE html>
   </section>
 
   <div class="foot">
-    <p>Sourced entirely from Artificial Analysis. Intelligence Index v4.3 comprises
+    <p>Sourced entirely from Artificial Analysis. Intelligence Index v5.0 comprises
       <span id="evals"></span>. The Coding Agent Index carries its own measured cost per task, and the
       Intelligence Index cost is AA's own total. Model rows combine the leaderboard and detail corpus;
       shared models use leaderboard values, with detail fills. Detail-only models can lag a generation
