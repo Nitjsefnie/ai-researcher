@@ -35,6 +35,13 @@ import time
 import typing
 
 import fetch_http
+import fetch_aa_parse
+import fetch_gdpval
+
+CODING_ROW_FLOOR = fetch_aa_parse.CODING_ROW_FLOOR
+balanced_array = fetch_aa_parse.balanced_array
+coding_agent_rows = fetch_aa_parse.coding_agent_rows
+richest_models_array = fetch_aa_parse.richest_models_array
 
 ROOT_FOR_IMPORT = pathlib.Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT_FOR_IMPORT))
@@ -152,7 +159,7 @@ NEVER_RED_FIELDS = frozenset({
 # are not a dispute (the canonical generation's value simply wins).
 DISPUTE_CAPABLE = ("intelligenceIndex", "intelligenceIndexCostPerTask",
                    "contextWindowTokens", "price1mInputTokens",
-                   "price1mOutputTokens")
+                   "price1mOutputTokens", fetch_gdpval.COST_FIELD)
 
 
 def _sleep(seconds: float) -> None:
@@ -160,12 +167,6 @@ def _sleep(seconds: float) -> None:
     waits without sleeping."""
     time.sleep(seconds)
 
-
-# AA no longer server-renders the full coding table it once did; what remains
-# is a smaller set split across two arrays, currently thirteen rows. The floor
-# only has to catch that set vanishing outright rather than shrinking, since
-# AA is free to feature fewer runs without anything being broken.
-CODING_ROW_FLOOR = 5
 
 # The methodology page stamps the live index version in its headline, and its
 # historical prose cites older generations WITHOUT the "Artificial Analysis"
@@ -205,77 +206,6 @@ def flight_payload(html: str) -> str:
     if not chunks:
         sys.exit("no flight chunks found -- page structure changed")
     return "".join(json.loads(c) for c in chunks)
-
-
-def balanced_array(text: str, start: int) -> str | None:
-    """Return the JSON array literal beginning at text[start] == '['."""
-    depth = 0
-    in_str = False
-    esc = False
-    for j in range(start, len(text)):
-        c = text[j]
-        if esc:
-            esc = False
-            continue
-        if c == "\\":
-            esc = True
-            continue
-        if c == '"':
-            in_str = not in_str
-            continue
-        if in_str:
-            continue
-        if c == "[":
-            depth += 1
-        elif c == "]":
-            depth -= 1
-            if depth == 0:
-                return text[start : j + 1]
-    return None
-
-
-def richest_models_array(payload: str) -> list[dict]:
-    """Take the richest records from models or initialModels (issue #266)."""
-    best: list[dict] = []
-    best_fields: set[str] = set()
-    names: set[str] = set()
-    for m in re.finditer(r'"(models|initialModels)"\s*:\s*\[', payload):
-        names.add(m.group(1))
-        raw = balanced_array(payload, m.end() - 1)
-        if not raw:
-            continue
-        try:
-            arr = json.loads(raw)
-        except json.JSONDecodeError:
-            continue
-        richest = max((x for x in arr if isinstance(x, dict)), key=len, default={})
-        if len(richest) > len(best_fields):
-            best, best_fields = arr, set(richest)
-    if len(best_fields) < 20:
-        sys.exit(
-            f"no full scored model records found in arrays: {', '.join(sorted(names)) or 'none'}; "
-            f"richest record had {len(best_fields)} fields "
-            f"({', '.join(sorted(best_fields)) or 'none'}); expected scored records "
-            "with at least 20 fields, including intelligenceIndex, "
-            "intelligenceIndexCostPerTask and contextWindowTokens")
-    # RSC splices marker strings ("$L1c") in among the records; they are
-    # references to other payload nodes, not models, and every consumer
-    # downstream treats an entry as a mapping.
-    records = [m for m in best if isinstance(m, dict)]
-    # AA has shipped the same record twice in one array -- identical id, name
-    # and scores. Everything downstream keys on slug, so a duplicate would
-    # either collapse silently in a dict or trip the uniqueness check and stop
-    # the run over a row that carries no new information. Keep the first.
-    seen: set[str] = set()
-    unique = []
-    for m in records:
-        slug = m.get("slug")
-        if isinstance(slug, str):
-            if slug in seen:
-                continue
-            seen.add(slug)
-        unique.append(m)
-    return unique
 
 
 def check_index_version(methodology_text: str) -> str | None:
@@ -448,56 +378,6 @@ def record_cost_window(priced: int, dropped: list[str],
     path.unlink(missing_ok=True)
 
 
-def balanced_object(text: str, start: int) -> str | None:
-    """Return the JSON object literal beginning at text[start] == '{'."""
-    depth = 0
-    in_str = False
-    esc = False
-    for j in range(start, len(text)):
-        c = text[j]
-        if esc:
-            esc = False
-            continue
-        if c == "\\":
-            esc = True
-            continue
-        if c == '"':
-            in_str = not in_str
-            continue
-        if in_str:
-            continue
-        if c == "{":
-            depth += 1
-        elif c == "}":
-            depth -= 1
-            if depth == 0:
-                return text[start : j + 1]
-    return None
-
-
-def enclosing_object(payload: str, offset: int, window: int = 40000) -> dict | None:
-    """The smallest JSON object containing `offset`, parsed.
-
-    Walks back to successive '{' candidates until one both parses and actually
-    spans the offset. `window` bounds that walk: a row is a few KB, so a search
-    that runs further has lost the thread and should give up rather than crawl
-    the whole payload.
-    """
-    i = offset
-    floor = max(0, offset - window)
-    while i > floor:
-        i = payload.rfind("{", floor, i)
-        if i < 0:
-            return None
-        raw = balanced_object(payload, i)
-        if raw and i + len(raw) > offset:
-            try:
-                return json.loads(raw)
-            except json.JSONDecodeError:
-                continue
-    return None
-
-
 def detail_host_slug(models: list[dict]) -> str:
     """Which model's page to pull the corpus from.
 
@@ -619,8 +499,7 @@ def _cost_total(record):
 
 def variant_fields(record) -> dict:
     """The per-generation flat map the page renders from: {"ii", "cost",
-    "ctx", "pin", "pout"}, absent keys absent. Each variant carries exactly
-    what its generation published.
+    "ctx", "pin", "pout", "gdpvalCost"}, absent keys absent.
     """
     fields: dict = {}
     ii = _number(record.get("intelligenceIndex"))
@@ -629,6 +508,9 @@ def variant_fields(record) -> dict:
     total = _cost_total(record)
     if total is not None:
         fields["cost"] = total
+    gdpval_cost = _number(record.get(fetch_gdpval.COST_FIELD))
+    if gdpval_cost is not None:
+        fields["gdpvalCost"] = gdpval_cost
     ctx = _number(record.get("contextWindowTokens"))
     if ctx is not None:
         fields["ctx"] = ctx
@@ -663,7 +545,7 @@ def _conflicting(values) -> bool:
     return False
 
 
-def cross_generation_merge(corpora: list[list[dict]]) -> list[dict]:
+def cross_generation_merge(corpora: list[list[dict]], universe: set[str] | None = None) -> list[dict]:
     """Union the per-generation corpora by slug and hold every generation.
 
     The corpora arrive in any order; canonical order is ASCENDING
@@ -688,7 +570,8 @@ def cross_generation_merge(corpora: list[list[dict]]) -> list[dict]:
     Identity/flag fields and every field outside DISPUTE_CAPABLE are
     never disputed: they render the canonical generation's value, silent.
     """
-    universe = leaderboard_universe(corpora)
+    if universe is None:
+        universe = leaderboard_universe(corpora)
     ranked = sorted(corpora, key=lambda c: generation_key(c, universe))
     by_slug = [{m["slug"]: m for m in corpus if isinstance(m.get("slug"), str)}
                for corpus in ranked]
@@ -974,45 +857,6 @@ def carry_detail_fills(models, prev_records, universe):
     return out
 
 
-def coding_agent_rows(payload: str) -> list[dict]:
-    """Every agent+model row in the Coding Agent Index, wherever it is nested.
-
-    AA splits these across at least two arrays: `rows`, holding the highlighted
-    selection, and `benchmarkRows`, which begins with an RSC BACK-REFERENCE
-    STRING pointing at a row in the first array and then carries the remainder
-    inline. Anchoring on an array that starts with an object missed the second
-    array completely and published 10 of 13 rows without a word.
-
-    So this anchors on the PAIR ITSELF -- every object carrying a score and a
-    cost, wherever it sits -- and dedupes. A future reshuffle between arrays,
-    or a third array, costs nothing.
-    """
-    seen: dict[str, dict] = {}
-    for m in re.finditer(r'"indexScore"', payload):
-        row = enclosing_object(payload, m.start())
-        if not isinstance(row, dict):
-            continue
-        mean = row.get("mean")
-        if not (isinstance(row.get("indexScore"), (int, float))
-                and isinstance(mean, dict)
-                and isinstance(mean.get("costUsd"), (int, float))):
-            continue
-        # Back-references mean one row can be reachable twice.
-        key = row.get("id") or row.get("displayLabel")
-        if isinstance(key, str):
-            seen.setdefault(key, row)
-    priced = list(seen.values())
-    # A collapse below the highlighted selection means the page moved its data
-    # or renamed the pair -- a hand-read signal, not something to publish a
-    # half-empty chart from.
-    if len(priced) < CODING_ROW_FLOOR:
-        sys.exit(
-            f"coding agent index: only {len(priced)} rows carry indexScore and "
-            f"mean.costUsd -- schema changed"
-        )
-    return priced
-
-
 def write_atomic(path: pathlib.Path, text: str) -> None:
     """Stage `text` in a temp file beside `path`, then os.replace it in.
 
@@ -1066,12 +910,12 @@ class Capture(typing.NamedTuple):
 def capture(cached_base: str | None, cached_detail: str | None,
             cached_methodology: str | None,
             prev_records: list | None = None,
-            revisit_state: dict | None = None) -> Capture:
+            revisit_state: dict | None = None, *,
+            gdpval_loader: typing.Callable[[], fetch_gdpval.Evaluation | None] | None = None) -> Capture:
     """Fetch the routes fresh, parse each from its own bytes, and merge.
 
-    The methodology page is read FIRST and the version pin runs on it before
-    anything else is fetched (issue #220): a bumped index fails the capture
-    without spending the other page reads.
+    The methodology page is read FIRST and the version pin runs before the
+    GDPval route or leaderboard reads (issue #220).
 
     detail_host_slug is computed from THIS leaderboard's own rows: the detail
     page is chosen for what its page excludes, so the corpus must never be
@@ -1114,9 +958,8 @@ def capture(cached_base: str | None, cached_detail: str | None,
     """
     version = check_index_version(
         fetch_html(cached_methodology, METHODOLOGY_URL))
-    base_text = fetch_html(cached_base)
-    payload = flight_payload(base_text)
-    look1 = richest_models_array(payload)
+    evaluation = gdpval_loader() if gdpval_loader is not None else None
+    look1 = richest_models_array(flight_payload(fetch_html(cached_base)))
 
     host = detail_host_slug(look1)
     detail = richest_models_array(
@@ -1129,9 +972,8 @@ def capture(cached_base: str | None, cached_detail: str | None,
     slugs = [
         {m.get("slug") for m in look if isinstance(m.get("slug"), str)}
         for look in (look1, look2)]
-    shared = slugs[0] & slugs[1]
 
-    def keyed(records, keep):
+    def keyed(records, keep, fields=universe):
         """generation_key over the records whose slug is in `keep` -- the
         structural restriction that makes two reads comparable: the detail
         page omits exactly one model (its own host). A model AA added or
@@ -1141,19 +983,24 @@ def capture(cached_base: str | None, cached_detail: str | None,
         return generation_key(
             [r for r in records
              if isinstance(r.get("slug"), str) and r.get("slug") in keep],
-            universe)
+            fields)
 
-    look1_key = keyed(look1, shared)
-    look2_key = keyed(look2, shared)
+    look1_key, look2_key = [keyed(look, slugs[0] & slugs[1]) for look in (look1, look2)]
 
     detail_slugs = {m.get("slug") for m in detail
                     if isinstance(m.get("slug"), str)}
 
-    def same_generation(look, look_slugs) -> bool:
-        """Whether the detail corpus IS this look's generation, compared on
-        the slugs both reads carry."""
-        with_detail = look_slugs & detail_slugs
-        return keyed(look, with_detail) == keyed(detail, with_detail)
+    def same_generation(look, look_slugs, source, source_slugs, fields) -> bool:
+        """Compare the two reads on their common slugs and supplied fields."""
+        shared_slugs = look_slugs & source_slugs
+        return keyed(look, shared_slugs, fields) == keyed(source, shared_slugs, fields)
+
+    # The evaluation route uses the same match on shared slugs and shared fields.
+    if evaluation is not None:
+        eval_fields = universe & leaderboard_universe([evaluation.records])
+        if not eval_fields - NEVER_RED_FIELDS - {CARRIED_DETAIL_KEY}:
+            sys.exit(f"{evaluation.path}: no shared comparison fields -- schema changed")
+        eval_slugs = {r["slug"] for r in evaluation.records if isinstance(r.get("slug"), str)}
 
     run_corpora: list[list[dict]]
     if look1_key == look2_key and slugs[0] == slugs[1]:
@@ -1162,8 +1009,9 @@ def capture(cached_base: str | None, cached_detail: str | None,
         # generation the detail corpus itself is (issue #200).
         models = merge_captures(look1, detail)
         disputed = False
-        generations = 1 + (0 if same_generation(look1, slugs[0]) else 1)
+        generations = 1 + (0 if same_generation(look1, slugs[0], detail, detail_slugs, universe) else 1)
         run_corpora = [models]
+        eval_matches = [True]
     else:
         # The looks disagree on a published value, or on WHICH SLUGS the
         # generation carries (issue #211): a model present in one look and
@@ -1175,13 +1023,20 @@ def capture(cached_base: str | None, cached_detail: str | None,
         # matches both" is reachable, and both corpora then take the fill
         # -- gap-only either way, merge_captures precedence keeping each
         # look's own values.
-        matches1 = same_generation(look1, slugs[0])
-        matches2 = same_generation(look2, slugs[1])
+        matches1 = same_generation(look1, slugs[0], detail, detail_slugs, universe)
+        matches2 = same_generation(look2, slugs[1], detail, detail_slugs, universe)
         corpora = [
             merge_captures(look1, detail) if matches1 else look1,
             merge_captures(look2, detail) if matches2 else look2,
         ]
-        models = cross_generation_merge(corpora)
+        rank_universe = leaderboard_universe(corpora)
+        eval_matches = ([same_generation(look, look_slugs, evaluation.records, eval_slugs, eval_fields)
+                         for look, look_slugs in zip((look1, look2), slugs)]
+                        if evaluation is not None else [False, False])
+        if evaluation is not None:
+            corpora = [fetch_gdpval.join(corpus, evaluation.costs) if matched else corpus
+                       for corpus, matched in zip(corpora, eval_matches)]
+        models = cross_generation_merge(corpora, rank_universe)
         disputed = any("genVariants" in m for m in models)
         generations = 2 + (0 if matches1 or matches2 else 1)
         run_corpora = corpora
@@ -1199,8 +1054,18 @@ def capture(cached_base: str | None, cached_detail: str | None,
         if ("modelCreatorName" not in rec and isinstance(creator, dict)
                 and isinstance(creator.get("name"), str)):
             rec["modelCreatorName"] = creator["name"]
-    models = models + detail_only
-    run_corpora = [corpus + detail_only for corpus in run_corpora]
+    if evaluation is not None:
+        enriched_detail = fetch_gdpval.join(detail_only, evaluation.costs)
+        models = models + (enriched_detail if any(eval_matches) else detail_only)
+        run_corpora = [corpus + (enriched_detail if matched else detail_only)
+                       for corpus, matched in zip(run_corpora, eval_matches)]
+        if len(run_corpora) == 1:
+            models = fetch_gdpval.join(models, evaluation.costs)
+            run_corpora = [fetch_gdpval.join(run_corpora[0], evaluation.costs)]
+        universe.add(fetch_gdpval.COST_FIELD)
+    else:
+        models = models + detail_only
+        run_corpora = [corpus + detail_only for corpus in run_corpora]
     fetched = tuple(models)
 
     cross_run = CrossRun([], [])
@@ -1258,6 +1123,8 @@ def main() -> None:
     ap.add_argument("--methodology-html",
                     help="use a cached copy of the methodology page HTML")
     ap.add_argument("--agents-html", help="use a cached copy of the coding-agents HTML")
+    ap.add_argument("--gdpval-html", help="use a cached copy of the GDPval-AA HTML")
+    ap.add_argument("--gdpval-data", help="use a cached copy of the GDPval-AA data file")
     ap.add_argument("--cross-run-lookback", action="store_true",
                     help="hold a slug-set diff against the previous "
                          "committed capture as a cross-run presence "
@@ -1272,7 +1139,10 @@ def main() -> None:
     revisit_state = (load_generation_state(prev_records)
                      if args.cross_run_lookback else None)
     captured = capture(args.html, args.detail_html, args.methodology_html,
-                       prev_records, revisit_state)
+                       prev_records, revisit_state,
+                       gdpval_loader=lambda: fetch_gdpval.fetch(
+                           args.gdpval_html, args.gdpval_data, fetch_html,
+                           flight_payload, UA, FETCH_TIMEOUT_SECONDS, _sleep))
     models = captured.models
     priced, dropped = check_cost_breakdown(models)
     check_breakdown_slugs(list(captured.fetched))

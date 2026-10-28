@@ -1,14 +1,6 @@
-"""The base-freshness gate: scripts/ci/gate_base_freshness.py.
+"""Test the gate against a local bare origin, never this worktree's history.
 
-The fixtures are real git repositories with a local bare origin, so the
-fetch the gate performs is exercised against a filesystem remote — never
-the network, and never against this repository or any of its worktrees:
-their shared ``.git`` must never be made shallow or have its history move.
-
-The fixture helpers deliberately mirror upstream pr-gate's suite, so a
-finding in an unchanged port dedupes against the upstream tracker rather
-than filed twice; the duplicated helper lines that mirror is made of are
-kept as written, and duplicate-code stays scoped to this file.
+Fixture helpers mirror upstream pr-gate's suite to keep findings comparable.
 """
 # pylint: disable=duplicate-code
 import contextlib
@@ -27,16 +19,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 @pytest.fixture(autouse=True)
 def _local_event_by_default(monkeypatch):
-    """Run the gate as a LOCAL run unless a test names its event.
-
-    The gate's verdict reads GITHUB_EVENT_NAME, and the suite runs inside CI
-    where the runner sets it for real — push on a main push, pull_request on
-    a PR. Left inherited, every fixture's expectation would depend on which
-    workflow happened to run the suite: a red fixture asserted on a push run
-    goes green there. Deleted by default, the whole suite judges every head
-    as a local run — the strict comparison — and only the event tests below
-    set the variable again.
-    """
+    """Default to the strict local verdict regardless of CI's event."""
     monkeypatch.delenv('GITHUB_EVENT_NAME', raising=False)
 
 
@@ -226,6 +209,7 @@ CORE_PIN = (
     'tests/fixtures/pipeline/aa-raw-coding-agents.json',
     'tests/fixtures/pipeline/aa-raw-models.json',
     'tests/fixtures/pipeline/captured-at.txt',
+    'tests/test_aa_aes_gcm.py',
     'tests/test_browser.py',
     'tests/test_browser_temp.py',
     'tests/test_build.py',
@@ -255,6 +239,10 @@ CORE_PIN = (
     'tests/test_fetch_aa.py',
     'tests/test_fetch_aa_detail_fills.py',
     'tests/test_fetch_aa_membership.py',
+    'tests/test_fetch_aa_parse.py',
+    'tests/test_fetch_gdpval.py',
+    'tests/test_fetch_gdpval_capture.py',
+    'tests/test_fetch_gdpval_route.py',
     'tests/test_fetch_hf_trending.py',
     'tests/test_fetch_openrouter_trending.py',
     'tests/test_fetch_retry.py',
