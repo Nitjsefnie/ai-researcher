@@ -1030,11 +1030,9 @@ class BrowserInteractionTests(unittest.TestCase):
                 page.close()
 
     def test_tooltip_secondary_rows_identical_across_charts(self):
-        # #29: one record must read the same wherever it is hovered. The
-        # intelligence tooltip used to carry "Output speed" and "Context"
-        # rows the capability tooltips omitted. Every tooltip now
-        # share one secondary-row builder; the chart's own metric rows stay
-        # chart-specific and first.
+        # #29: one record must read the same wherever it is hovered. Every
+        # tooltip shares one secondary-row builder; the chart's own metric
+        # rows stay chart-specific and first.
         # Issue #226: pinned against the in-run disputed fixture capture
         # too -- a disputed hour publishes, and a disputed row's circles
         # (the canonical anchor plus any second-generation point) must all
