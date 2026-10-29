@@ -14,13 +14,13 @@
       "id": "XHToken/Spark-X2.6-4B"
     },
     {
-      "id": "MiniMaxAI/MiniMax-M3.1-Flash"
-    },
-    {
       "id": "tencent/Hy-SimulMT-30B-A3B-FP8"
     },
     {
       "id": "LiquidAI/LFM3-1.7B"
+    },
+    {
+      "id": "MiniMaxAI/MiniMax-M3.1-Flash"
     },
     {
       "id": "ISTA-DASLab/DeepSeek-V4.1-Flash-1017-GSQ-RCO-GGUF"
