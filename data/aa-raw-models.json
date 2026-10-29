@@ -12206,17 +12206,7 @@
   "outputModalityText": true,
   "outputModalityImage": false,
   "outputModalitySpeech": false,
-  "outputModalityVideo": false,
-  "genVariants": [
-   {},
-   {
-    "ii": 23.0777321742266,
-    "cost": 1.4119376739255958,
-    "ctx": 1000000,
-    "pin": 0.7,
-    "pout": 2.1
-   }
-  ]
+  "outputModalityVideo": false
  },
  {
   "slug": "nemotron-3-5-lightning",
@@ -23036,6 +23026,13 @@
     "costPerTask": 10.290517508746758
    }
   ],
+  "openness": {
+   "opennessIndex": 38.888888888888886,
+   "modelAvailability": 6,
+   "transparencyMethodology": 1,
+   "transparencyPostTrainingData": 0,
+   "transparencyPreTrainingData": 0
+  },
   "briefcaseBreakdown": {
    "overall": {
     "elo": 1521.13,
@@ -26632,6 +26629,13 @@
   "price1mBlended100To1To1": null,
   "price1mBlended0To100To1": null,
   "intelligenceIndexEvaluations": [],
+  "openness": {
+   "opennessIndex": 55.55555555555556,
+   "modelAvailability": 6,
+   "transparencyMethodology": 3,
+   "transparencyPostTrainingData": 1,
+   "transparencyPreTrainingData": 0
+  },
   "timescaleData": {},
   "performanceByPromptType": {},
   "performanceDataSource": {
@@ -61682,17 +61686,7 @@
   "outputModalityText": true,
   "outputModalityImage": false,
   "outputModalitySpeech": false,
-  "outputModalityVideo": false,
-  "genVariants": [
-   {},
-   {
-    "ii": 26.0249946754784,
-    "cost": 2.061496607384404,
-    "ctx": 1000000,
-    "pin": 0.7,
-    "pout": 2.1
-   }
-  ]
+  "outputModalityVideo": false
  },
  {
   "slug": "cogito-v2-1-reasoning",
