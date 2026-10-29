@@ -26,10 +26,10 @@
       "id": "ISTA-DASLab/DeepSeek-V4.1-Flash-1017-GSQ-RCO-GGUF"
     },
     {
-      "id": "black-forest-labs/flux-3-image-klein-comfy"
+      "id": "tencent/Hy-SimulMT-30B-A3B-FP8"
     },
     {
-      "id": "tencent/Hy-SimulMT-30B-A3B-FP8"
+      "id": "black-forest-labs/flux-3-image-klein-comfy"
     }
   ]
 }
