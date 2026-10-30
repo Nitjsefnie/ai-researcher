@@ -3546,9 +3546,11 @@
   "contextWindowTokens": 131072,
   "intelligenceIndex": null,
   "intelligenceIndexIsEstimated": false,
-  "omniscience": null,
+  "omniscience": -18.333333333333332,
   "scores": {
    "aa-briefcase": 98.82,
+   "omniscience-accuracy": 0.092,
+   "omniscience-non-hallucination": 0.6967694566813509,
    "automationbench-aa": 0.003767979122295127,
    "hle-diamond": 0.029,
    "gdp-pdf": 0.002,
@@ -3589,12 +3591,14 @@
   "modelWeightsSourceUrl": "https://huggingface.co/ibm-granite/granite-4.2-3b",
   "microevalsEnabled": false,
   "capabilities": {
-   "financeAndAccounting": 8.55036320336049,
-   "strategyAndOps": 3.33163290223545,
-   "legal": 12.3562156579008,
-   "engineering": 16.0964759036145,
-   "economics": 19.4434437751004
+   "financeAndAccounting": 14.9347518878101,
+   "strategyAndOps": 6.40867420039659,
+   "legal": 14.6848017728887,
+   "economics": 14.6116666666667,
+   "engineering": 16.0964759036145
   },
+  "omniscienceAccuracy": 0.092,
+  "omniscienceHallucinationRate": 0.30323054331864907,
   "gdpPdfAllPass": 0.002,
   "gdpval": 209.24,
   "gdpvalInterval": {
@@ -3737,8 +3741,6 @@
   },
   "briefcaseTotalCost": 1.4261623800862497,
   "intelligenceIndexTimePerTask": 349.32883919154705,
-  "omniscienceAccuracy": 0.092,
-  "omniscienceHallucinationRate": 0.26339941262848754,
   "intelligenceIndexCost": {
    "total": 14.911346765831249,
    "input": 3.86205120583125,
@@ -3773,8 +3775,6 @@
    "intelligenceIndexOutputTokensPerTask",
    "intelligenceIndexTimePerTask",
    "itbenchSre",
-   "omniscienceAccuracy",
-   "omniscienceHallucinationRate",
    "omniscienceNonHallucination",
    "outputSpeedVariance",
    "performanceByPromptType",
