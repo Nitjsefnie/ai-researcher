@@ -8,10 +8,10 @@
       "id": "Nanbeige/Nanbeige4.3-33B"
     },
     {
-      "id": "RecursiveSI/flint"
+      "id": "LiquidAI/LFM3-1.7B"
     },
     {
-      "id": "LiquidAI/LFM3-1.7B"
+      "id": "RecursiveSI/flint"
     },
     {
       "id": "XHToken/Spark-X2.6-4B"
@@ -29,7 +29,7 @@
       "id": "baidu/Unlimited-OCR-2"
     },
     {
-      "id": "MiniMaxAI/MiniMax-M3.1-Flash"
+      "id": "black-forest-labs/flux-3-image-klein-comfy"
     }
   ]
 }
