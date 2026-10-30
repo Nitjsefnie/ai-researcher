@@ -20,9 +20,6 @@
       "id": "ISTA-DASLab/DeepSeek-V4.1-Flash-1017-GSQ-RCO-GGUF"
     },
     {
-      "id": "MiniMaxAI/MiniMax-M3.1-Flash"
-    },
-    {
       "id": "nvidia/NVIDIA-Nemotron-3.5-Transcribe-30B-A4B"
     },
     {
@@ -30,6 +27,9 @@
     },
     {
       "id": "baidu/Unlimited-OCR-2"
+    },
+    {
+      "id": "MiniMaxAI/MiniMax-M3.1-Flash"
     }
   ]
 }
