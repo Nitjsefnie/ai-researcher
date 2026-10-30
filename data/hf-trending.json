@@ -23,13 +23,13 @@
       "id": "mistralai/Mistral-Large-4-1T-A52B"
     },
     {
-      "id": "RecursiveSI/flint"
-    },
-    {
       "id": "Lightricks/LTX-2.5"
     },
     {
-      "id": "black-forest-labs/flux-3-image-klein-comfy"
+      "id": "RecursiveSI/flint"
+    },
+    {
+      "id": "XHToken/Spark-X2.6-4B"
     }
   ]
 }
