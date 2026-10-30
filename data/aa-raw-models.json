@@ -5164,13 +5164,14 @@
   "intelligenceIndexIsEstimated": false,
   "omniscience": -12.433333333333334,
   "scores": {
-   "aa-briefcase": 394.77,
+   "aa-briefcase": 394.71,
    "omniscience-accuracy": 0.11233333333333333,
    "omniscience-non-hallucination": 0.7333834021779948,
    "automationbench-aa": 0.015132727566596104,
    "hle-diamond": 0.043,
    "gdp-pdf": 0.018,
    "terminalbench-4-0": 0,
+   "critpt-v2-hard": 0.015,
    "gdpval-aa-normalized": 582.87,
    "humanitys-last-exam": 0.111677479147359,
    "artificial-analysis-long-context-reasoning": 0.49,
@@ -5232,7 +5233,7 @@
   "healthbench": null,
   "healthbenchProfessional": null,
   "hleDiamond": 0.043,
-  "critptAgenticHard": null,
+  "critptAgenticHard": 0.015,
   "scicode": 0.378472222222222,
   "lcr": 0.49,
   "ifbench": null,
@@ -5262,20 +5263,20 @@
   },
   "briefcaseBreakdown": {
    "overall": {
-    "elo": 394.77,
-    "lower95ci": 383.48,
-    "upper95ci": 406.91
+    "elo": 394.71,
+    "lower95ci": 382.49,
+    "upper95ci": 405.87
    },
    "rubricPassRate": 0.09785202863961814,
    "analyticalQuality": {
-    "elo": 272.26,
-    "lower95ci": 251.95,
-    "upper95ci": 294.64
+    "elo": 272.16,
+    "lower95ci": 248.41,
+    "upper95ci": 293.42
    },
    "presentation": {
-    "elo": 226.5,
-    "lower95ci": 204.48,
-    "upper95ci": 250.69
+    "elo": 226.61,
+    "lower95ci": 202.3,
+    "upper95ci": 248.35
    }
   },
   "timescaleData": {
@@ -24147,16 +24148,7 @@
   "outputModalityText": true,
   "outputModalityImage": false,
   "outputModalitySpeech": false,
-  "outputModalityVideo": false,
-  "genVariants": [
-   {},
-   {
-    "ii": 18.5131594039446,
-    "ctx": 1000000,
-    "pin": 0.44999999999999996,
-    "pout": 1.7999999999999998
-   }
-  ]
+  "outputModalityVideo": false
  },
  {
   "slug": "muse-glimmer",
