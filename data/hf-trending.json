@@ -26,10 +26,10 @@
       "id": "RecursiveSI/flint"
     },
     {
-      "id": "ISTA-DASLab/DeepSeek-V4.1-Flash-1017-GSQ-RCO-GGUF"
+      "id": "ccore/Qwen3.5-4B-3D-Coder"
     },
     {
-      "id": "ccore/Qwen3.5-4B-3D-Coder"
+      "id": "XHToken/Spark-X2.6-4B"
     }
   ]
 }
