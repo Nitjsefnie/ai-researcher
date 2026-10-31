@@ -14,10 +14,10 @@
       "id": "nvidia/NVIDIA-Nemotron-3.5-Transcribe-30B-A4B"
     },
     {
-      "id": "baidu/Unlimited-OCR-2"
+      "id": "mistralai/Mistral-Large-4-1T-A52B"
     },
     {
-      "id": "mistralai/Mistral-Large-4-1T-A52B"
+      "id": "baidu/Unlimited-OCR-2"
     },
     {
       "id": "Lightricks/LTX-2.5"
