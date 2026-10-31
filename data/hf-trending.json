@@ -14,10 +14,10 @@
       "id": "nvidia/NVIDIA-Nemotron-3.5-Transcribe-30B-A4B"
     },
     {
-      "id": "ISTA-DASLab/DeepSeek-V4.1-Flash-1017-GSQ-RCO-GGUF"
+      "id": "baidu/Unlimited-OCR-2"
     },
     {
-      "id": "baidu/Unlimited-OCR-2"
+      "id": "ISTA-DASLab/DeepSeek-V4.1-Flash-1017-GSQ-RCO-GGUF"
     },
     {
       "id": "mistralai/Mistral-Large-4-1T-A52B"
