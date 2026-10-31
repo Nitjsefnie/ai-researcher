@@ -20,16 +20,16 @@
       "id": "mistralai/Mistral-Large-4-1T-A52B"
     },
     {
-      "id": "ISTA-DASLab/DeepSeek-V4.1-Flash-1017-GSQ-RCO-GGUF"
+      "id": "Lightricks/LTX-2.5"
     },
     {
-      "id": "Lightricks/LTX-2.5"
+      "id": "ISTA-DASLab/DeepSeek-V4.1-Flash-1017-GSQ-RCO-GGUF"
     },
     {
       "id": "RecursiveSI/flint"
     },
     {
-      "id": "black-forest-labs/flux-3-image-klein-comfy"
+      "id": "XHToken/Spark-X2.6-4B"
     }
   ]
 }
