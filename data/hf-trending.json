@@ -5,10 +5,10 @@
       "id": "deepseek-ai/DeepSeek-V4.1-Flash-1017"
     },
     {
-      "id": "Nanbeige/Nanbeige4.3-33B"
+      "id": "LiquidAI/LFM3-1.7B"
     },
     {
-      "id": "LiquidAI/LFM3-1.7B"
+      "id": "Nanbeige/Nanbeige4.3-33B"
     },
     {
       "id": "nvidia/NVIDIA-Nemotron-3.5-Transcribe-30B-A4B"
@@ -29,7 +29,7 @@
       "id": "abenzerps/Qwen-Image-2.1-Uncensored-Quantized"
     },
     {
-      "id": "black-forest-labs/flux-3-image-klein-comfy"
+      "id": "Pika-Labs/Pika-H3-Flex"
     }
   ]
 }
