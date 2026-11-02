@@ -20,16 +20,16 @@
       "id": "Nanbeige/Nanbeige4.3-33B"
     },
     {
-      "id": "Lightricks/LTX-2.5"
-    },
-    {
       "id": "ccore/Qwen3.5-4B-3D-Coder"
     },
     {
-      "id": "Pika-Labs/Pika-H3-Flex"
+      "id": "Lightricks/LTX-2.5"
     },
     {
       "id": "speridlabs/idol"
+    },
+    {
+      "id": "Pika-Labs/Pika-H3-Flex"
     }
   ]
 }
