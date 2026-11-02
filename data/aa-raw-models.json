@@ -5361,7 +5361,7 @@
    "type": "firstParty",
    "providerName": "Alibaba"
   },
-  "hostModelCount": 6,
+  "hostModelCount": 5,
   "creator": {
    "id": "d874d370-74d3-4fa0-ba00-5272f92f946b",
    "slug": "alibaba",
@@ -15564,7 +15564,7 @@
    "type": "firstParty",
    "providerName": "Alibaba"
   },
-  "hostModelCount": 5,
+  "hostModelCount": 4,
   "creator": {
    "id": "d874d370-74d3-4fa0-ba00-5272f92f946b",
    "slug": "alibaba",
@@ -40112,7 +40112,7 @@
    "type": "firstParty",
    "providerName": "Kimi"
   },
-  "hostModelCount": 6,
+  "hostModelCount": 5,
   "creator": {
    "id": "0a177021-87dd-4250-9a37-f01df196bfe0",
    "slug": "kimi",
@@ -78130,7 +78130,7 @@
     "upper95ci": 1347.41
    }
   },
-  "briefcaseTotalCost": 61.854780631550526,
+  "briefcaseTotalCost": 61.02957912694103,
   "code2videoElo": 1053.11,
   "code2videoEloInterval": {
    "lower": 1033,
@@ -78295,7 +78295,7 @@
   "performanceDataSource": {
    "type": "median"
   },
-  "hostModelCount": 20,
+  "hostModelCount": 19,
   "creator": {
    "id": "58b835bf-4c87-4f87-a846-df4b692c6e7d",
    "slug": "deepseek",
@@ -78313,7 +78313,7 @@
   "outputModalitySpeech": false,
   "outputModalityVideo": false,
   "modelCreatorName": "DeepSeek",
-  "gdpvalCostPerTask": 0.34702537774261427,
+  "gdpvalCostPerTask": 0.3433106128954104,
   "intelligenceIndexTimePerTask": 374.76824623824405,
   "omniscienceAccuracy": 0.464,
   "omniscienceHallucinationRate": 0.9645522388059702,
@@ -78680,7 +78680,7 @@
     "upper95ci": 1215.22
    }
   },
-  "briefcaseTotalCost": 30.68673256782394,
+  "briefcaseTotalCost": 30.944926264983202,
   "timescaleData": {
    "medianOutputSpeed": 149.390579313846,
    "medianTimeToFirstChunk": 1.54872575800005
@@ -78721,7 +78721,7 @@
   "performanceDataSource": {
    "type": "median"
   },
-  "hostModelCount": 15,
+  "hostModelCount": 14,
   "creator": {
    "id": "58b835bf-4c87-4f87-a846-df4b692c6e7d",
    "slug": "deepseek",
@@ -78739,7 +78739,7 @@
   "outputModalitySpeech": false,
   "outputModalityVideo": false,
   "modelCreatorName": "DeepSeek",
-  "gdpvalCostPerTask": 0.20135743108603635,
+  "gdpvalCostPerTask": 0.20295287280945742,
   "intelligenceIndexTimePerTask": 424.28066893942247,
   "omniscienceAccuracy": 0.4038333333333333,
   "omniscienceHallucinationRate": 0.9169695275370422,
@@ -79333,17 +79333,17 @@
   "analystAgent": 0.1875,
   "automationBenchPartialScore": 0.5628968557434271,
   "enterpriseOpsGym": 0.40435690838555655,
-  "price1mInputTokens": 1.40581,
-  "price1mOutputTokens": 3.1675,
-  "cacheHitPrice": 0.11750000000000001,
+  "price1mInputTokens": 1.31,
+  "price1mOutputTokens": 3.135,
+  "cacheHitPrice": 0.1,
   "cacheHitDiscountPercent": 0.9166666666666666,
   "cacheWritePrice": null,
   "pricePer1k1mpImages": null,
-  "price1mBlended0To3To1": 1.8462325000000002,
-  "price1mBlended7To2To1": 0.6801619999999999,
-  "price1mBlended0To1To1": 2.286655,
-  "price1mBlended100To1To1": 0.16003245098039215,
-  "price1mBlended0To100To1": 1.4232524752475246,
+  "price1mBlended0To3To1": 1.7662499999999999,
+  "price1mBlended7To2To1": 0.6455,
+  "price1mBlended0To1To1": 2.2225,
+  "price1mBlended100To1To1": 0.14161764705882354,
+  "price1mBlended0To100To1": 1.328069306930693,
   "intelligenceIndexEvaluations": [],
   "openness": {
    "opennessIndex": 50,
@@ -79370,7 +79370,7 @@
     "upper95ci": 945.66
    }
   },
-  "briefcaseTotalCost": 90.19110067139152,
+  "briefcaseTotalCost": 76.23865166981396,
   "timescaleData": {
    "medianOutputSpeed": 122.077737364917,
    "medianTimeToFirstChunk": 1.31672443799999
@@ -79412,7 +79412,7 @@
    "type": "median",
    "providerName": "DeepSeek"
   },
-  "hostModelCount": 10,
+  "hostModelCount": 9,
   "creator": {
    "id": "58b835bf-4c87-4f87-a846-df4b692c6e7d",
    "slug": "deepseek",
@@ -79430,7 +79430,7 @@
   "outputModalitySpeech": false,
   "outputModalityVideo": false,
   "modelCreatorName": "DeepSeek",
-  "gdpvalCostPerTask": 0.5695796263770713,
+  "gdpvalCostPerTask": 0.48498216529864996,
   "intelligenceIndexTimePerTask": 346.675251343344,
   "omniscienceAccuracy": 0.4295,
   "omniscienceHallucinationRate": 0.9409874379199532,
@@ -79532,17 +79532,17 @@
   "livecodebench": null,
   "aime25": null,
   "analystAgent": null,
-  "price1mInputTokens": 1.67,
-  "price1mOutputTokens": 3.34,
-  "cacheHitPrice": 0.14,
+  "price1mInputTokens": 1.6,
+  "price1mOutputTokens": 3.2,
+  "cacheHitPrice": 0.135,
   "cacheHitDiscountPercent": 0.9161458333333333,
   "cacheWritePrice": null,
   "pricePer1k1mpImages": null,
-  "price1mBlended0To3To1": 2.0875,
-  "price1mBlended7To2To1": 0.766,
-  "price1mBlended0To1To1": 2.505,
-  "price1mBlended100To1To1": 0.18637254901960787,
-  "price1mBlended0To100To1": 1.6865346534653465,
+  "price1mBlended0To3To1": 2,
+  "price1mBlended7To2To1": 0.7345,
+  "price1mBlended0To1To1": 2.4000000000000004,
+  "price1mBlended100To1To1": 0.17941176470588235,
+  "price1mBlended0To100To1": 1.6158415841584157,
   "intelligenceIndexEvaluations": [],
   "openness": {
    "opennessIndex": 50,
@@ -79567,7 +79567,7 @@
    "type": "median",
    "providerName": "DeepSeek"
   },
-  "hostModelCount": 6,
+  "hostModelCount": 5,
   "creator": {
    "id": "58b835bf-4c87-4f87-a846-df4b692c6e7d",
    "slug": "deepseek",
@@ -79585,7 +79585,7 @@
   "outputModalitySpeech": false,
   "outputModalityVideo": false,
   "modelCreatorName": "DeepSeek",
-  "gdpvalCostPerTask": 0.4189130972572278,
+  "gdpvalCostPerTask": 0.3344027373433018,
   "outputSpeedVariance": {
    "p05": 47.1774707662506,
    "q25": 56.2927081968009,
@@ -79683,16 +79683,16 @@
   "aime25": null,
   "analystAgent": null,
   "price1mInputTokens": 1.74,
-  "price1mOutputTokens": 3.49,
-  "cacheHitPrice": 0.9425,
+  "price1mOutputTokens": 3.48,
+  "cacheHitPrice": 0.145,
   "cacheHitDiscountPercent": 0.9415394402035624,
   "cacheWritePrice": null,
   "pricePer1k1mpImages": null,
-  "price1mBlended0To3To1": 2.1775,
-  "price1mBlended7To2To1": 1.3567500000000001,
-  "price1mBlended0To1To1": 2.615,
-  "price1mBlended100To1To1": 0.9752941176470588,
-  "price1mBlended0To100To1": 1.7573267326732673,
+  "price1mBlended0To3To1": 2.175,
+  "price1mBlended7To2To1": 0.7975,
+  "price1mBlended0To1To1": 2.61,
+  "price1mBlended100To1To1": 0.19333333333333333,
+  "price1mBlended0To100To1": 1.7572277227722772,
   "intelligenceIndexEvaluations": [],
   "openness": {
    "opennessIndex": 50,
@@ -79742,7 +79742,7 @@
    "type": "median",
    "providerName": "DeepSeek"
   },
-  "hostModelCount": 4,
+  "hostModelCount": 3,
   "creator": {
    "id": "58b835bf-4c87-4f87-a846-df4b692c6e7d",
    "slug": "deepseek",
@@ -87703,17 +87703,17 @@
   "aime25": null,
   "analystAgent": null,
   "automationBenchPartialScore": 0.20308354687857075,
-  "price1mInputTokens": 1.285,
-  "price1mOutputTokens": 4.07,
+  "price1mInputTokens": 1.19,
+  "price1mOutputTokens": 3.74,
   "cacheHitPrice": 0.26,
   "cacheHitDiscountPercent": 0.8115942028985507,
   "cacheWritePrice": null,
   "pricePer1k1mpImages": null,
-  "price1mBlended0To3To1": 1.98125,
-  "price1mBlended7To2To1": 0.8460000000000001,
-  "price1mBlended0To1To1": 2.6775,
-  "price1mBlended100To1To1": 0.30740196078431375,
-  "price1mBlended0To100To1": 1.3125742574257424,
+  "price1mBlended0To3To1": 1.8275000000000001,
+  "price1mBlended7To2To1": 0.794,
+  "price1mBlended0To1To1": 2.465,
+  "price1mBlended100To1To1": 0.30323529411764705,
+  "price1mBlended0To100To1": 1.2152475247524752,
   "intelligenceIndexEvaluations": [],
   "openness": {
    "opennessIndex": 44.44444444444444,
@@ -87740,7 +87740,7 @@
     "upper95ci": 979.34
    }
   },
-  "briefcaseTotalCost": 59.32093863804308,
+  "briefcaseTotalCost": 56.159699946732715,
   "timescaleData": {
    "medianOutputSpeed": 79.2507817139046,
    "medianTimeToFirstChunk": 1.62449157
@@ -87781,7 +87781,7 @@
   "performanceDataSource": {
    "type": "median"
   },
-  "hostModelCount": 6,
+  "hostModelCount": 5,
   "creator": {
    "id": "67437eb6-7dc1-4e93-befd-22c8b8ec2065",
    "slug": "zai",
@@ -87799,7 +87799,7 @@
   "outputModalitySpeech": false,
   "outputModalityVideo": false,
   "modelCreatorName": "Z AI",
-  "gdpvalCostPerTask": 0.3777584411441785,
+  "gdpvalCostPerTask": 0.3567983771001993,
   "intelligenceIndexTimePerTask": 463.2090348720435,
   "omniscienceAccuracy": 0.237,
   "omniscienceHallucinationRate": 0.299475753604194,
@@ -87891,17 +87891,17 @@
   "livecodebench": null,
   "aime25": null,
   "analystAgent": null,
-  "price1mInputTokens": 1.38,
-  "price1mOutputTokens": 4.4,
+  "price1mInputTokens": 1.285,
+  "price1mOutputTokens": 4.07,
   "cacheHitPrice": 0.26,
   "cacheHitDiscountPercent": 0.8081780538302277,
   "cacheWritePrice": null,
   "pricePer1k1mpImages": null,
-  "price1mBlended0To3To1": 2.135,
-  "price1mBlended7To2To1": 0.898,
-  "price1mBlended0To1To1": 2.89,
-  "price1mBlended100To1To1": 0.3115686274509804,
-  "price1mBlended0To100To1": 1.40990099009901,
+  "price1mBlended0To3To1": 1.98125,
+  "price1mBlended7To2To1": 0.8460000000000001,
+  "price1mBlended0To1To1": 2.6775,
+  "price1mBlended100To1To1": 0.30740196078431375,
+  "price1mBlended0To100To1": 1.3125742574257424,
   "intelligenceIndexEvaluations": [],
   "openness": {
    "opennessIndex": 44.44444444444444,
@@ -87950,7 +87950,7 @@
   "performanceDataSource": {
    "type": "median"
   },
-  "hostModelCount": 5,
+  "hostModelCount": 4,
   "creator": {
    "id": "67437eb6-7dc1-4e93-befd-22c8b8ec2065",
    "slug": "zai",
@@ -107331,7 +107331,7 @@
    "type": "firstParty",
    "providerName": "Kimi"
   },
-  "hostModelCount": 11,
+  "hostModelCount": 10,
   "creator": {
    "id": "0a177021-87dd-4250-9a37-f01df196bfe0",
    "slug": "kimi",
@@ -107501,7 +107501,7 @@
    "type": "firstParty",
    "providerName": "Kimi"
   },
-  "hostModelCount": 10,
+  "hostModelCount": 9,
   "creator": {
    "id": "0a177021-87dd-4250-9a37-f01df196bfe0",
    "slug": "kimi",
@@ -121373,17 +121373,17 @@
   "livecodebench": 0.523809523809524,
   "aime25": 0.716666666666667,
   "analystAgent": null,
-  "price1mInputTokens": 0.21000000000000002,
-  "price1mOutputTokens": 0.8400000000000001,
-  "cacheHitPrice": 0.21000000000000002,
+  "price1mInputTokens": 0.22,
+  "price1mOutputTokens": 0.88,
+  "cacheHitPrice": 0.22,
   "cacheHitDiscountPercent": 0.6428571428571428,
   "cacheWritePrice": null,
   "pricePer1k1mpImages": null,
-  "price1mBlended0To3To1": 0.36750000000000005,
-  "price1mBlended7To2To1": 0.273,
-  "price1mBlended0To1To1": 0.525,
-  "price1mBlended100To1To1": 0.21617647058823533,
-  "price1mBlended0To100To1": 0.21623762376237626,
+  "price1mBlended0To3To1": 0.385,
+  "price1mBlended7To2To1": 0.286,
+  "price1mBlended0To1To1": 0.55,
+  "price1mBlended100To1To1": 0.2264705882352941,
+  "price1mBlended0To100To1": 0.2265346534653465,
   "intelligenceIndexEvaluations": [],
   "openness": {
    "opennessIndex": 44.44444444444444,
@@ -121432,7 +121432,7 @@
   "performanceDataSource": {
    "type": "median"
   },
-  "hostModelCount": 6,
+  "hostModelCount": 5,
   "creator": {
    "id": "d874d370-74d3-4fa0-ba00-5272f92f946b",
    "slug": "alibaba",
