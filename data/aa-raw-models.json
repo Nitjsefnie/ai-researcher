@@ -4452,17 +4452,7 @@
   "outputModalityText": true,
   "outputModalityImage": false,
   "outputModalitySpeech": false,
-  "outputModalityVideo": false,
-  "genVariants": [
-   {
-    "ii": 57.7087824022788,
-    "cost": 6.585776867225546,
-    "ctx": 1000000,
-    "pin": 4,
-    "pout": 20
-   },
-   {}
-  ]
+  "outputModalityVideo": false
  },
  {
   "slug": "nova-2-0-pro-reasoning-medium",
