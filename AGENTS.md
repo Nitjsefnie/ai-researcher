@@ -43,15 +43,15 @@ reasoning model costs more than its sticker price — the point of using it.
 
 | axis | y | source | unit |
 |---|---|---|---|
-| coding | Coding Agent Index v1.4 | `/agents/coding-agents` | agent + model |
+| coding | Coding Agent Index v2.0 | `/agents/coding-agents` | agent + model |
 | intelligence | Intelligence Index v5.0 | leaderboard + model detail | model |
 | agentic | GDPval-AA v2.1 (Elo) | Elo: leaderboard + model detail; cost: `/evaluations/gdpval-aa` + the data file it loads | model |
 | parameters | Intelligence Index vs parameters | leaderboard + model detail | model |
 
-- **Coding Agent Index**: DeepSWE, Terminal-Bench v2.1, SWE-Atlas-QnA at equal
-  weight. `indexScore` and `mean.costUsd` sit on ONE record, so nothing is
-  reweighted. The unit is agent+model+harness (Claude Code on Opus 5 (xhigh) ≠
-  Codex on the same model): AA measured the harness too.
+- **Coding Agent Index**: FrontierCode v1.1, Terminal-Bench 4.0,
+  SWE-Atlas-QnA-AA at equal weight. `indexScore` and `mean.costUsd` sit on ONE
+  record, so nothing is reweighted. The unit is agent+model+harness (Claude Code
+  on Opus 5 (xhigh) ≠ Codex on the same model): AA measured the harness too.
 - **Intelligence Index v5.0**: AA-Briefcase v1.1, AutomationBench-AA, GDP.pdf,
   FrontierCode 2.0, Terminal-Bench 4.0, Terminal-Bench-Science 0.1, CritPt v2
   (Hard Subset), AA-Omniscience v1.1, HLE-Diamond, in four categories at 25%
