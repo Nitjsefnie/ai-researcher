@@ -1,4 +1,4 @@
-"""Exercise the validate step's downward-only records gate (issue #340).
+"""Exercise the coverage validate step's direction boundary (issue #340).
 
 Helpers are copied: importing the sibling module collects its TestCase twice.
 """
@@ -39,9 +39,8 @@ def _git(workdir, *args):
 # suite.
 DIRECTORIES = {
     "ci-thresholds.json": "ratchet-data",
-    "comment-share.json": "comment-share-data",
 }
-TAGS = {"ratchet-data": "ratchet", "comment-share-data": "comment"}
+TAGS = {"ratchet-data": "ratchet"}
 
 
 def staged_flags(directory, truth):
@@ -51,9 +50,7 @@ def staged_flags(directory, truth):
             for tag, value in flags.items()}
 
 
-COMMENT = "comment-share.json"
 THRESHOLDS = "ci-thresholds.json"
-COMMENT_BASE = {"x.yml": [10, 100]}
 THRESHOLDS_BASE = {
     "coverage": {"javascript": {"floor": 95.3, "measured": 96.8},
                  "python": {"floor": 92.8, "measured": 94.3}},
@@ -62,7 +59,6 @@ THRESHOLDS_BASE = {
 
 
 def _records_repo(tmp_path, documents):
-    """The fetch seam: each record committed at a known SHA on main."""
     repo = tmp_path / "base-records"
     _git(tmp_path, "init", "-q", "-b", "main", str(repo))
     _git(repo, "config", "user.name", "fixture")
@@ -91,130 +87,6 @@ def _validate(tmp_path, document, payload, base, remote, **extra):
         env["AI_RESEARCHER_BASE_FETCH_REMOTE"] = remote
     return _workflowrun.run_step(
         tmp_path, step(load(), "Validate the staged data"), env)
-
-
-def _direction_case(tmp_path, document, staged, base_payload):
-    """Build a base repo holding `base_payload` for `document` and run
-    the step against a staged `staged` payload of the same document."""
-    payload = json.dumps(base_payload).encode("utf-8")
-    remote, tip = _records_repo(tmp_path, {document: payload})
-    return _validate(tmp_path, document,
-                     json.dumps(staged).encode("utf-8"), tip, remote)
-
-
-@POSIX
-def test_a_raised_comment_share_is_refused(tmp_path):
-    done = _direction_case(
-        tmp_path, COMMENT, {"x.yml": [11, 100]}, COMMENT_BASE)
-    assert done.returncode != 0, done.stdout
-    assert "raises a share recorded at its base commit" in done.stderr
-
-
-@POSIX
-def test_a_byte_rise_with_a_share_rise_is_refused(tmp_path):
-    done = _direction_case(
-        tmp_path, COMMENT, {"x.yml": [20, 150]}, COMMENT_BASE)
-    assert done.returncode != 0, done.stdout
-    assert "raises a share" in done.stderr
-
-
-@POSIX
-def test_the_comment_ratchets_real_tightening_lands(tmp_path):
-    # A real tighten: test_ci_ratchets.py [10483, 60320] ->
-    # [10545, 62002] raised both leaves as the share fell.
-    done = _direction_case(
-        tmp_path, COMMENT, {"x.yml": [5536, 14438]}, {"x.yml": [4623, 10811]})
-    assert done.returncode == 0, done.stderr
-
-
-@POSIX
-def test_an_unchanged_comment_share_lands(tmp_path):
-    done = _direction_case(
-        tmp_path, COMMENT, {"x.yml": [20, 200]}, COMMENT_BASE)
-    assert done.returncode == 0, done.stderr
-
-
-@POSIX
-def test_a_first_comment_entry_lands(tmp_path):
-    done = _direction_case(
-        tmp_path, COMMENT, {"x.yml": [1, 5], "y.yml": [2, 10]}, {})
-    assert done.returncode == 0, done.stderr
-
-
-@POSIX
-def test_a_removed_comment_entry_lands(tmp_path):
-    done = _direction_case(
-        tmp_path, COMMENT, {"x.yml": [10, 100]},
-        {"x.yml": [10, 100], "y.yml": [5, 50]})
-    assert done.returncode == 0, done.stderr
-
-
-@POSIX
-@pytest.mark.parametrize("document,payload", [
-    (COMMENT, {"x.yml": [9999, 10000]}),
-    # The sibling suite's schema-lands rows, moved here.
-    (COMMENT, {}),
-    (COMMENT, {"x.py": [0, 10], "y.py": [12, 100]}),
-])
-def test_a_record_absent_at_its_base_lands(tmp_path, document, payload):
-    # Absent at the base commit: a first landing — everything lands.
-    remote, tip = _records_repo(tmp_path, {})
-    done = _validate(tmp_path, document, json.dumps(payload).encode("utf-8"),
-                     tip, remote)
-    assert done.returncode == 0, done.stderr
-
-
-@POSIX
-def test_a_base_commit_outside_main_fails_loudly(tmp_path):
-    # An orphan commit off main is a loud error, never "absent at base".
-    remote, _tip = _records_repo(tmp_path, {})
-    repo = tmp_path / "base-records"
-    _git(repo, "checkout", "-q", "--orphan", "island")
-    _git(repo, "commit", "--allow-empty", "-q", "-m", "island")
-    island = _git(repo, "rev-parse", "HEAD")
-    done = _validate(tmp_path, COMMENT, b'{"x.yml": [1, 2]}\n', island,
-                     remote)
-    assert done.returncode != 0, done.stdout
-    assert "not reachable from main" in done.stderr
-
-
-@POSIX
-def test_a_failed_base_fetch_fails_loudly(tmp_path):
-    _remote, tip = _records_repo(tmp_path, {COMMENT: b'{"x.yml": [1, 2]}\n'})
-    done = _validate(tmp_path, COMMENT, b'{"x.yml": [2, 2]}\n', tip,
-                     str(tmp_path / "not-a-repo"))
-    assert done.returncode != 0, done.stdout
-
-
-@POSIX
-def test_the_default_remote_is_the_runner_repository(tmp_path):
-    # No seam: the loud failure must name the GITHUB_REPOSITORY default URL.
-    done = _validate(tmp_path, COMMENT, b'{"x.yml": [1, 2]}\n',
-                     "b" * 40, None,
-                     GITHUB_REPOSITORY="nonexistent-owner/nonexistent-repo",
-                     GIT_TRACE="1",
-                     GIT_CONFIG_COUNT="1",
-                     GIT_CONFIG_KEY_0="url.file:///nonexistent-repo.insteadOf",
-                     GIT_CONFIG_VALUE_0="https://github.com/")
-    assert done.returncode != 0, done.stdout
-    assert ("https://github.com/nonexistent-owner/"
-            "nonexistent-repo.git") in done.stderr
-
-
-@POSIX
-def test_the_base_compare_reads_the_staged_base_not_mains_tip(tmp_path):
-    # Main advanced past the base and raised it there: a tip-compare lands.
-    remote, base = _records_repo(
-        tmp_path,
-        {COMMENT: b'{"a.py": [10, 100]}\n'})
-    repo = tmp_path / "base-records"
-    (repo / ".github/comment-share.json").write_bytes(b'{"a.py": [20, 100]}\n')
-    _git(repo, "add", ".github/comment-share.json")
-    _git(repo, "commit", "-q", "-m", "records raise")
-    done = _validate(
-        tmp_path, COMMENT, b'{"a.py": [15, 100]}\n', base, remote)
-    assert done.returncode != 0, done.stdout
-    assert "raises a share recorded at its base commit" in done.stderr
 
 
 @POSIX
