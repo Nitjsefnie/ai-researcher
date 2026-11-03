@@ -11,25 +11,25 @@
       "slug": "deepseek/deepseek-v4.1-flash"
     },
     {
-      "slug": "openai/gpt-6-luna"
+      "slug": "tencent/hy4-preview"
     },
     {
-      "slug": "tencent/hy4-preview"
+      "slug": "openai/gpt-6-luna"
     },
     {
       "slug": "anthropic/claude-opus-5.5"
     },
     {
-      "slug": "stepfun/step-5-preview"
+      "slug": "minimax/minimax-m3.1-flash"
     },
     {
-      "slug": "minimax/minimax-m3.1-flash"
+      "slug": "stepfun/step-5-preview"
     },
     {
       "slug": "openai/gpt-5.6-luna"
     },
     {
-      "slug": "z-ai/glm-5.3"
+      "slug": "openai/gpt-6.1-sol"
     }
   ]
 }
