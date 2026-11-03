@@ -26,7 +26,7 @@ pair is a score and a cost AA measured on the same run:
 
 | chart | y | AA source | one row is |
 |---|---|---|---|
-| Coding agents | Coding Agent Index v1.4 | `/agents/coding-agents` | an agent + a model |
+| Coding agents | Coding Agent Index v2.0 | `/agents/coding-agents` | an agent + a model |
 | Intelligence | Intelligence Index v5.0 | leaderboard + model detail | a model |
 | GDPval-AA | GDPval-AA v2.1 (Elo) | Elo: leaderboard + model detail; cost: `/evaluations/gdpval-aa` and its data file | a model |
 | Parameter efficiency | Intelligence Index vs parameters | leaderboard + model detail | a model |

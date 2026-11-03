@@ -62,12 +62,12 @@ URL = "https://artificialanalysis.ai/leaderboards/models"
 # detail route fills omitted fields. capture also keeps detail-only models
 # (issue #266); their values can lag. See merge_captures in build.py.
 MODEL_DETAIL_URL = "https://artificialanalysis.ai/models/{slug}"
-# The Coding Agent Index. This is a DIFFERENT AA product from the leaderboard's
-# `codingIndex` field: it scores agent+model+harness combinations (Claude Code -
-# Opus 5 (xhigh), Codex - GPT-6 Astra (max)) rather than bare models, and it is
-# the index AA means when the methodology page says Terminal-Bench v2.1 "remains
-# part of the Coding Index". It is the only /agents/* route carrying a benchmark;
-# the other six are marketing comparison pages with no index and no cost.
+# The Coding Agent Index. This is a DIFFERENT AA product from the
+# leaderboard's `codingIndex` field: it scores agent+model+harness
+# combinations (Claude Code - Opus 5 (xhigh), Codex - GPT-6 Astra (max))
+# rather than bare models. It is the only /agents/* route carrying a
+# benchmark; the other six are marketing comparison pages with no index
+# and no cost.
 AGENTS_URL = "https://artificialanalysis.ai/agents/coding-agents"
 # The Intelligence Index version pin reads THIS page (issue #220): the version
 # string left the leaderboard payload, and the methodology page headlines its

@@ -1357,7 +1357,7 @@ TEMPLATE = r"""<!DOCTYPE html>
 
   <section id="coding">
     <h2>1 &middot; Coding Agent Index</h2>
-    <p class="sub">DeepSWE, Terminal-Bench v2.1 and SWE-Atlas-QnA, equally weighted. The unit here is an
+    <p class="sub">FrontierCode v1.1, Terminal-Bench 4.0 and SWE-Atlas-QnA-AA, equally weighted. The unit here is an
       <b>agent plus a model</b> &mdash; Claude Code on Opus 5 (xhigh) is a different row from Codex on the
       same model &mdash; because the harness is part of what is being measured. Score and cost are both
       AA's, read off one run, so nothing is reweighted to put them on the same axis.
