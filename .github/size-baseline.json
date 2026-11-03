@@ -19,13 +19,13 @@
     "tests/test_ci_install_chromium.py": 1079,
     "tests/test_ci_instruction_budgets.py": 630,
     "tests/test_ci_perf_budgets.py": 780,
-    "tests/test_ci_ratchets.py": 1863,
+    "tests/test_ci_ratchets.py": 1844,
     "tests/test_ci_thresholds.py": 548,
     "tests/test_diff_aa.py": 1253,
     "tests/test_diff_coverage.py": 754,
     "tests/test_fetch_aa.py": 2722,
     "tests/test_gate_base_freshness.py": 976,
-    "tests/test_ratchet_push_workflow.py": 823,
+    "tests/test_ratchet_push_workflow.py": 723,
     "tests/test_refresh_workflow.py": 2896
   }
 }

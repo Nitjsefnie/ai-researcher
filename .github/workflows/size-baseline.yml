@@ -1,57 +1,35 @@
 name: size baseline
-
-# workflow_call-only: mode: auto fails closed on any other event; ci-gate
-# owns the trigger surface (issue #333).
-
 on:
+  pull_request:
+  push:
+    branches: [main, master]
   workflow_call:
-
 permissions:
   contents: read
-
 concurrency:
-  group: size-baseline-${{ github.event.pull_request.number || (github.event_name == 'push' && github.sha) || github.ref }}
+  group: ${{ github.workflow == 'size baseline' && format('size-baseline-{0}', github.ref) || format('size-baseline-called-{0}', github.run_id) }}
   cancel-in-progress: true
-
 jobs:
   size-baseline:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - if: github.event_name == 'pull_request' || (github.event_name == 'push' && github.ref_type == 'branch' && github.ref_name == github.event.repository.default_branch)
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
           fetch-depth: 0
           persist-credentials: false
-      - uses: Nitjsefnie-Actions/size-ratchet@0c9790acfe6bec19f1310a6e17428332185ea3ec # v1.1.0
+      - if: github.event_name == 'pull_request' || (github.event_name == 'push' && github.ref_type == 'branch' && github.ref_name == github.event.repository.default_branch)
+        uses: Nitjsefnie-Actions/size-ratchet@cb0deb632f24962ed3aee44811c576b7b8e9ba29 # v2.0.4
         with:
+          ceilings: ''
+          overrides: ''
+          exclude: ''
+          unclassified: 'ignore'
           records: '.github/size-baseline.json'
+          member: ''
           mode: 'auto'
           base-ref: ${{ github.event.pull_request.base.sha }}
-      - name: Stage tightened records
-        id: stage
-        if: github.event_name == 'push'
-        env:
-          AI_RESEARCHER_HEAD_SHA: ${{ github.sha }}
-        run: |
-          set -euo pipefail
-          original="${RUNNER_TEMP}/size-baseline-original.json"
-          git show "${AI_RESEARCHER_HEAD_SHA}:.github/size-baseline.json" > "$original"
-          if cmp -s "$original" .github/size-baseline.json; then
-            echo 'changed=false' >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-          data="${RUNNER_TEMP}/size-baseline-data"
-          mkdir -p "$data"
-          cp .github/size-baseline.json "$data/size-baseline.json"
-          printf '%s\n' "$AI_RESEARCHER_HEAD_SHA" > "$data/base.txt"
-          echo 'changed=true' >> "$GITHUB_OUTPUT"
-      - name: Upload tightened records
-        if: github.event_name == 'push' && steps.stage.outputs.changed == 'true'
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: size-baseline-data
-          path: ${{ runner.temp }}/size-baseline-data
-          include-hidden-files: false
-          if-no-files-found: error
-          retention-days: 1
+          stale: 'warn'
+          require-tight: 'true'

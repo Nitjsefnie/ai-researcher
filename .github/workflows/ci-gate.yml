@@ -22,22 +22,21 @@ name: ci gate
 # ruleset requires.
 #
 # TRIGGER OWNERSHIP. The seven gate workflows below are called as
-# reusable workflows; they keep `workflow_call`, their crons (audit
-# daily, codeql weekly) and `workflow_dispatch` — except the
-# size-baseline callee, which declares `workflow_call` alone (issue
-# #333: its mode: auto fails closed on a dispatch event) — and they
-# carry no `push` or `pull_request` trigger any more — this file owns
-# that surface. Each callee keeps its own `permissions:` blocks and its
-# concurrency group (the latter governs its standalone dispatch runs).
+# reusable workflows. The other callees keep `workflow_call`, their crons
+# (audit daily, codeql weekly) and, where configured, `workflow_dispatch`.
+# The size-baseline callee also runs independently on pull requests and
+# main/master pushes; the other callees have no `push` or `pull_request`
+# trigger. Each callee keeps its own `permissions:` blocks and concurrency group.
 # refresh.yml, secrets.yml, scorecard.yml, claim.yml and
 # coverage-comment.yml are outside the aggregate.
 #
 # SUPERSESSION AND CANCELLATION. The concurrency group is one per pull
-# request, or per pushed SHA. Each leg's callee mirrors that keying:
+# request, or per pushed SHA. The other callees mirror that keying:
 # one group per pull request, per pushed SHA on push, or per ref for
 # standalone schedule/dispatch runs. A later push's legs run in their
-# own per-SHA groups and never cancel an earlier push's legs, at any
-# stage. Pull-request supersession still cancels the older run. A
+# own groups and never cancel an earlier push's legs, at any
+# stage. The size callee separates called runs by run ID and standalone
+# runs by ref. Pull-request supersession still cancels the older run. A
 # run-level cancel remains DELIBERATE: the aggregate carries
 # `if: always()` and aggregate_gate.py folds a cancelled result as a
 # failure, so a required-check ruleset reads it never-green.
@@ -175,8 +174,7 @@ jobs:
     if: needs.classify.outputs.docs_only != 'true' && needs.classify.outputs.data_only != 'true'
     # Skipped on a docs-only or bot-data-only change like the other
     # conditioned legs: neither class moves a measured file. The callee
-    # stages its tightened records as an artifact on a main push; the
-    # top-level ratchet-push workflow is its only writer.
+    # checks records in pull requests and verifies them on main pushes.
     # The local reusable-workflow syntax GitHub documents; nothing else
     # resolves in-repo (suppressed at the line below).
     uses: ./.github/workflows/size-baseline.yml  # zizmor: ignore[self-repository]
