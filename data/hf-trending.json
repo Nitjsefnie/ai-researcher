@@ -17,19 +17,19 @@
       "id": "speridlabs/idol"
     },
     {
-      "id": "baidu/Unlimited-OCR-2"
-    },
-    {
       "id": "Lightricks/LTX-2.5"
     },
     {
       "id": "ccore/Qwen3.5-4B-3D-Coder"
     },
     {
+      "id": "baidu/Unlimited-OCR-2"
+    },
+    {
       "id": "Pika-Labs/Pika-H3-Flex"
     },
     {
-      "id": "Qwen/Qwen3.8-27B"
+      "id": "LiquidAI/LFM3-Omni-2B"
     }
   ]
 }
