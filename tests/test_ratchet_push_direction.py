@@ -1,10 +1,6 @@
-"""The validate step's downward-only records gate, EXECUTED (issue #340).
+"""Exercise the validate step's downward-only records gate (issue #340).
 
-A staged record raising a value recorded at its base dies here, before
-the deploy key; lowerings, removals and first entries land. The cases
-run the step's own run block with the seam at a local fixture repo.
-Helpers are copied, not imported: a sibling test module import
-re-collects its TestCase here and runs every case twice.
+Helpers are copied: importing the sibling module collects its TestCase twice.
 """
 import json
 import os
@@ -43,11 +39,9 @@ def _git(workdir, *args):
 # suite.
 DIRECTORIES = {
     "ci-thresholds.json": "ratchet-data",
-    "size-baseline.json": "size-baseline-data",
     "comment-share.json": "comment-share-data",
 }
-TAGS = {"ratchet-data": "ratchet", "size-baseline-data": "size",
-        "comment-share-data": "comment"}
+TAGS = {"ratchet-data": "ratchet", "comment-share-data": "comment"}
 
 
 def staged_flags(directory, truth):
@@ -57,10 +51,8 @@ def staged_flags(directory, truth):
             for tag, value in flags.items()}
 
 
-SIZE = "size-baseline.json"
 COMMENT = "comment-share.json"
 THRESHOLDS = "ci-thresholds.json"
-SIZE_BASE = {"schema_version": 1, "baseline": {"a.py": 100, "b.py": 50}}
 COMMENT_BASE = {"x.yml": [10, 100]}
 THRESHOLDS_BASE = {
     "coverage": {"javascript": {"floor": 95.3, "measured": 96.8},
@@ -108,49 +100,6 @@ def _direction_case(tmp_path, document, staged, base_payload):
     remote, tip = _records_repo(tmp_path, {document: payload})
     return _validate(tmp_path, document,
                      json.dumps(staged).encode("utf-8"), tip, remote)
-
-
-@POSIX
-def test_a_raised_size_record_is_refused(tmp_path):
-    done = _direction_case(
-        tmp_path, SIZE, {"schema_version": 1, "baseline": {"a.py": 101}},
-        SIZE_BASE)
-    assert done.returncode != 0, done.stdout
-    # The refusal is the direction gate's, not the schema check's.
-    assert "raises a value recorded at its base commit" in done.stderr
-
-
-@POSIX
-def test_a_lowered_size_record_lands(tmp_path):
-    done = _direction_case(
-        tmp_path, SIZE, {"schema_version": 1, "baseline": {"a.py": 99}},
-        SIZE_BASE)
-    assert done.returncode == 0, done.stderr
-
-
-@POSIX
-def test_an_unchanged_size_record_lands(tmp_path):
-    done = _direction_case(
-        tmp_path, SIZE, {"schema_version": 1, "baseline": {"a.py": 100}},
-        SIZE_BASE)
-    assert done.returncode == 0, done.stderr
-
-
-@POSIX
-def test_a_first_size_entry_lands(tmp_path):
-    done = _direction_case(
-        tmp_path, SIZE,
-        {"schema_version": 1, "baseline": {"a.py": 100, "c.py": 7}},
-        SIZE_BASE)
-    assert done.returncode == 0, done.stderr
-
-
-@POSIX
-def test_a_removed_size_entry_lands(tmp_path):
-    done = _direction_case(
-        tmp_path, SIZE, {"schema_version": 1, "baseline": {"a.py": 100}},
-        {"schema_version": 1, "baseline": {"a.py": 100, "b.py": 50}})
-    assert done.returncode == 0, done.stderr
 
 
 @POSIX
@@ -202,14 +151,10 @@ def test_a_removed_comment_entry_lands(tmp_path):
 
 @POSIX
 @pytest.mark.parametrize("document,payload", [
-    (SIZE, {"schema_version": 1, "baseline": {"huge.py": 999999}}),
     (COMMENT, {"x.yml": [9999, 10000]}),
     # The sibling suite's schema-lands rows, moved here.
     (COMMENT, {}),
     (COMMENT, {"x.py": [0, 10], "y.py": [12, 100]}),
-    (SIZE, {"schema_version": 1, "baseline": {}}),
-    (SIZE, {"schema_version": 1, "baseline": {"build.py": 2890}}),
-    (SIZE, {"schema_version": 1, "baseline": {"a b/c.py": 0}}),
 ])
 def test_a_record_absent_at_its_base_lands(tmp_path, document, payload):
     # Absent at the base commit: a first landing — everything lands.
@@ -261,17 +206,15 @@ def test_the_base_compare_reads_the_staged_base_not_mains_tip(tmp_path):
     # Main advanced past the base and raised it there: a tip-compare lands.
     remote, base = _records_repo(
         tmp_path,
-        {SIZE: b'{"schema_version": 1, "baseline": {"a.py": 100}}\n'})
+        {COMMENT: b'{"a.py": [10, 100]}\n'})
     repo = tmp_path / "base-records"
-    (repo / ".github/size-baseline.json").write_bytes(
-        b'{"schema_version": 1, "baseline": {"a.py": 200}}\n')
-    _git(repo, "add", ".github/size-baseline.json")
+    (repo / ".github/comment-share.json").write_bytes(b'{"a.py": [20, 100]}\n')
+    _git(repo, "add", ".github/comment-share.json")
     _git(repo, "commit", "-q", "-m", "records raise")
     done = _validate(
-        tmp_path, SIZE,
-        b'{"schema_version": 1, "baseline": {"a.py": 150}}\n', base, remote)
+        tmp_path, COMMENT, b'{"a.py": [15, 100]}\n', base, remote)
     assert done.returncode != 0, done.stdout
-    assert "raises a value recorded at its base commit" in done.stderr
+    assert "raises a share recorded at its base commit" in done.stderr
 
 
 @POSIX
