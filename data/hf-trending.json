@@ -5,10 +5,10 @@
       "id": "LiquidAI/LFM3-1.7B"
     },
     {
-      "id": "deepseek-ai/DeepSeek-V4.1-Flash-1017"
+      "id": "nvidia/NVIDIA-Nemotron-3.5-Transcribe-30B-A4B"
     },
     {
-      "id": "nvidia/NVIDIA-Nemotron-3.5-Transcribe-30B-A4B"
+      "id": "deepseek-ai/DeepSeek-V4.1-Flash-1017"
     },
     {
       "id": "mistralai/Mistral-Large-4-1T-A52B"
@@ -29,7 +29,7 @@
       "id": "baidu/Unlimited-OCR-2"
     },
     {
-      "id": "LiquidAI/LFM3-Omni-2B"
+      "id": "abenzerps/Qwen-Image-2.1-Uncensored-Quantized"
     }
   ]
 }
