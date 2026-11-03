@@ -53,9 +53,9 @@ class TriggerGateTests(unittest.TestCase):
         self.wf = load()
         self.push = self.wf["jobs"]["push"]
 
-    def test_the_trigger_names_both_ratchet_producers(self):
+    def test_the_trigger_names_the_coverage_ratchet_producer(self):
         wr = (self.wf.get("on") or self.wf.get(True) or {})["workflow_run"]
-        assert wr["workflows"] == ["ci gate", "comment share"], wr
+        assert wr["workflows"] == ["ci gate"], wr
         assert wr["types"] == ["completed"], wr
 
     def test_the_job_admits_only_this_repos_main_push_success(self):
@@ -111,7 +111,7 @@ class ArtifactDataTests(unittest.TestCase):
         downloads = [entry for entry in self.wf["jobs"]["push"]["steps"]
                      if entry.get("uses", "").startswith(
                          "actions/download-artifact@")]
-        assert len(downloads) == 2, downloads
+        assert len(downloads) == 1, downloads
         run_text = flattened(list_step["run"])
         for download in downloads:
             gate = re.fullmatch(
@@ -130,9 +130,9 @@ class ArtifactDataTests(unittest.TestCase):
                 assert f'"${{tag}}_{emitted}=$' in run_text or (
                     f'"${{tag}}_{emitted}"' in run_text), (tag, emitted)
 
-    def test_the_loops_walk_exactly_the_downloaded_candidates(self):
-        # The fixed candidate order the validate and push loops walk
-        # must cover exactly the artifacts a download step can land:
+    def test_validate_and_push_select_exactly_the_downloaded_candidates(self):
+        # The candidates the validate and push steps select must cover
+        # exactly the artifacts a download step can land:
         # nothing validated is not downloaded, nothing downloaded is
         # never validated (issue #333).
         loop_text = " ".join(
@@ -142,7 +142,6 @@ class ArtifactDataTests(unittest.TestCase):
             r"'([a-z0-9-]+) ([a-z0-9.-]+\.json)'", loop_text))
         assert walked == {
             ("ratchet-data", "ci-thresholds.json"),
-            ("comment-share-data", "comment-share.json"),
         }
 
     def test_the_validation_step_runs_before_the_push_step(self):
@@ -150,7 +149,6 @@ class ArtifactDataTests(unittest.TestCase):
         assert names == [
             "List the triggering run's artifacts",
             "Download the ratchet data",
-            "Download the comment records",
             "Validate the staged data",
             "Push the ratchet commit",
         ], names
@@ -192,14 +190,7 @@ class DeployKeyTests(unittest.TestCase):
 
 
 class ExecutedValidationTests(unittest.TestCase):
-    """The validate step EXECUTED against forged artifacts, not read.
-
-    Text pins survive shapes the executed step would reject: the round-1
-    review drove wrong-leaf keys, a garbage-suffixed base and a float
-    schema_version through the flattened text and all three passed. Each
-    case below runs the step's own run block under bash -e against a
-    staged artifact and pins the verdict the push depends on.
-    """
+    """Execute the validate step against forged coverage artifacts."""
     VALID = {
         "coverage": {
             "javascript": {"floor": 95.3, "measured": 96.8},
@@ -236,8 +227,7 @@ class ExecutedValidationTests(unittest.TestCase):
                                       **staged_flags(data.name, "true")})
 
     def _run_with(self, tmp_path, document, base):
-        payloads = {"ci-thresholds.json": self.VALID,
-                    "comment-share.json": {}}
+        payloads = {"ci-thresholds.json": self.VALID}
         return self._validate(
             tmp_path, document,
             json.dumps(payloads[document]).encode("utf-8"),
@@ -260,7 +250,7 @@ class ExecutedValidationTests(unittest.TestCase):
         assert done.returncode != 0, done.stdout
 
     def test_a_garbage_suffixed_base_is_refused(self):
-        for document in ("ci-thresholds.json", "comment-share.json"):
+        for document in ("ci-thresholds.json",):
             done = self._run_with(self.enterContext(_dir()), document,
                                   self.BASE_COMMIT + "\nrm -rf /\n")
             assert done.returncode != 0, (document, done.stdout)
@@ -284,11 +274,9 @@ class ExecutedValidationTests(unittest.TestCase):
         assert done.returncode != 0, done.stdout
 
     def test_a_sibling_document_in_the_wrong_staging_directory_is_refused(self):
-        # The staging directory selects the schema: a sibling document in
-        # another arm's directory is an unexpected file there, and a
-        # wrong-arm download must not pass as the right arm's document
-        # (issue #333).
-        for sibling in ("comment-share.json",):
+        # A different document in the staging directory must not pass as
+        # the coverage artifact (issue #333).
+        for sibling in ("unrelated.json",):
             done = self._validate(
                 self.enterContext(_dir()), sibling,
                 json.dumps({}).encode("utf-8"),
@@ -305,20 +293,16 @@ def _dir():
 
 POSIX = pytest.mark.skipif(os.name == "nt", reason="Ubuntu workflow shell")
 BASE_COMMIT = "a" * 40
-COMMENT_WORKFLOW = ROOT / ".github/workflows/comment-share.yml"
-# Each candidate's staging directory, as the validate and push loops walk it.
+# Each candidate's staging directory, as the validate and push steps use it.
 DIRECTORIES = {
     "ci-thresholds.json": "ratchet-data",
-    "comment-share.json": "comment-share-data",
 }
 MESSAGES = {
     "ci-thresholds.json":
         "Ratchet ci-thresholds: raise the coverage floor (automated)",
-    "comment-share.json":
-        "Ratchet comment-share: tighten the records (automated)",
 }
 # Each staging directory's list-step tag, as the steps' env reads it.
-TAGS = {"ratchet-data": "ratchet", "comment-share-data": "comment"}
+TAGS = {"ratchet-data": "ratchet"}
 
 
 def staged_flags(directory=None, truth="true"):
@@ -339,12 +323,6 @@ EXPECTED_OUTPUTS = {
         "ratchet_staged": str("ratchet-data" in staged).lower(),
         "staged": str(bool(staged)).lower(),
     },
-    "comment share": lambda staged: {
-        "comment_artifact": "comment-share-data",
-        "comment_document": "comment-share.json",
-        "comment_staged": str(bool(staged)).lower(),
-        "staged": str(bool(staged)).lower(),
-    },
 }
 
 
@@ -352,20 +330,15 @@ EXPECTED_OUTPUTS = {
 @pytest.mark.parametrize("workflow,staged", [
     ("ci gate", []),
     ("ci gate", ["ratchet-data"]),
-    ("comment share", []),
-    ("comment share", ["comment-share-data"]),
 ])
 def test_artifact_selection_and_absent_noop(tmp_path, workflow, staged):
-    """A producer can only consume its own unexpired artifacts (issues
-    #281 and #333): the arm's candidates are selected by the triggering
-    workflow's name, each staged independently."""
+    """The producer consumes only its own unexpired artifact (issues
+    #281 and #333)."""
     state, calls = tmp_path / "state.json", tmp_path / "calls.jsonl"
     bin_dir = tmp_path / "bin"
     _workflowrun.write_gh_stub(bin_dir, state, calls)
-    sibling = ("comment-share-data" if workflow == "ci gate"
-               else "ratchet-data")
     artifacts = [{"name": "unrelated", "expired": False},
-                 {"name": sibling, "expired": False}]
+                 {"name": "another-data", "expired": False}]
     for name in staged:
         artifacts.append({"name": name, "expired": True})
         artifacts.append({"name": name, "expired": False})
@@ -378,15 +351,17 @@ def test_artifact_selection_and_absent_noop(tmp_path, workflow, staged):
         "GH_TOKEN": "test", "AI_RESEARCHER_REPO": "Nitjsefnie/ai-researcher", "AI_RESEARCHER_RUN_ID": "281",
     })
     assert done.returncode == 0, done.stderr
-    outputs = dict(line.split("=", 1) for line in output.read_text().splitlines())
+    outputs = dict(line.split("=", 1)
+                   for line in output.read_text(encoding="utf-8").splitlines())
     assert outputs == EXPECTED_OUTPUTS[workflow](staged)
-    [call] = [json.loads(line) for line in calls.read_text().splitlines()]
+    [call] = [json.loads(line)
+              for line in calls.read_text(encoding="utf-8").splitlines()]
     assert "repos/Nitjsefnie/ai-researcher/actions/runs/281/artifacts" in call
 
 
 def test_ratchet_artifact_names_have_exclusive_producers():
     """A same-name upload anywhere else could substitute another data path."""
-    producers = {"ratchet-data": [], "comment-share-data": []}
+    producers = {"ratchet-data": []}
     for path in (ROOT / ".github/workflows").glob("*.y*ml"):
         wf = yaml.safe_load(path.read_text(encoding="utf-8"))
         for job in wf["jobs"].values():
@@ -396,91 +371,13 @@ def test_ratchet_artifact_names_have_exclusive_producers():
                     assert "${{" not in name, "dynamic names cannot prove isolation"
                     if name in producers:
                         producers[name].append(path.name)
-    assert producers == {"ratchet-data": ["tests.yml"],
-                         "comment-share-data": ["comment-share.yml"]}
-
-
-def test_comment_staging_is_push_only_and_uploads_only_when_changed():
-    wf = yaml.load(COMMENT_WORKFLOW.read_text(), Loader=yaml.BaseLoader)
-    steps = wf["jobs"]["comment-share"]["steps"]
-    stage = next(s for s in steps if s.get("id") == "stage")
-    upload = next(s for s in steps if s.get("uses", "").startswith("actions/upload-artifact@"))
-    assert steps.index(stage) > next(
-        i for i, s in enumerate(steps)
-        if s.get("uses", "").startswith("Nitjsefnie-Actions/comment-ratchet@"))
-    assert stage["if"] == "github.event_name == 'push'"
-    assert stage["env"]["AI_RESEARCHER_HEAD_SHA"] == "${{ github.sha }}"
-    assert upload["if"] == "github.event_name == 'push' && steps.stage.outputs.changed == 'true'"
-    assert wf["permissions"] == {"contents": "read"}
-
-
-@POSIX
-@pytest.mark.parametrize("changed", [False, True])
-def test_comment_staging_bytes_and_measured_base(tmp_path, changed):
-    """The stage compares the pushed SHA's bytes and copies the tightened bytes."""
-    original = b'{"module.py": [10, 100]}\n'
-    current = b'{"module.py": [9, 100]}\n' if changed else original
-    (tmp_path / ".github").mkdir()
-    (tmp_path / ".github/comment-share.json").write_bytes(current)
-    (tmp_path / "original").write_bytes(original)
-    bin_dir = tmp_path / "bin"
-    bin_dir.mkdir()
-    git = bin_dir / "git"
-    git.write_text('#!/bin/sh\nset -eu\n'
-                   f'[ "$*" = "show {BASE_COMMIT}:.github/comment-share.json" ]\n'
-                   'cat "$ORIGINAL"\n', encoding="utf-8")
-    git.chmod(0o755)
-    runner = tmp_path / "runner"
-    runner.mkdir()
-    output = tmp_path / "output"
-    stage = _workflowrun.step_by_name(COMMENT_WORKFLOW, "comment-share", "Stage tightened records")
-    done = _workflowrun.run_step(tmp_path, stage, {
-        **os.environ, "PATH": str(bin_dir) + os.pathsep + os.environ["PATH"],
-        "AI_RESEARCHER_HEAD_SHA": BASE_COMMIT, "ORIGINAL": str(tmp_path / "original"),
-        "RUNNER_TEMP": str(runner), "GITHUB_OUTPUT": str(output),
-    })
-    assert done.returncode == 0, done.stderr
-    assert output.read_text().strip() == f"changed={str(changed).lower()}"
-    data = runner / "comment-share-data"
-    if changed:
-        assert sorted(p.name for p in data.iterdir()) == ["base.txt", "comment-share.json"]
-        assert (data / "base.txt").read_text() == BASE_COMMIT + "\n"
-        assert (data / "comment-share.json").read_bytes() == current
-    else:
-        assert not data.exists()
-
-
-@POSIX
-@pytest.mark.parametrize("payload", [
-    '[]', 'null', '{"x": [1.5, 2]}',
-    '{"x": [-1, 2]}', '{"x": [1, -2]}',
-    '{"x": [1, 2.5]}', '{"x": [1]}',
-    '{"x": [1, 2, 3]}', '{"x": []}',
-    '{"x": {"a": 1, "b": 2}}', '{"x": [true, 2]}',
-    '{"x": ["1", 2]}', '{"x": [null, 2]}',
-    '{"x": [NaN, 2]}', '{"x": [1, NaN]}',
-    '{"x": [Infinity, 2]}', '{"x": [1, Infinity]}',
-    '{"x": [1e999, 2]}', '{"x": [1, -Infinity]}',
-    '[] {}', '{} {}', '',
-])
-def test_comment_schema_executed(tmp_path, payload):
-    data = tmp_path / "comment-share-data"
-    data.mkdir()
-    (data / "base.txt").write_text(BASE_COMMIT, encoding="utf-8")
-    (data / "comment-share.json").write_text(payload, encoding="utf-8")
-    done = _workflowrun.run_step(tmp_path, step(load(), "Validate the staged data"), {
-        **os.environ, "RUNNER_TEMP": str(tmp_path),
-        **staged_flags("comment-share-data", "true"),
-    })
-    assert done.returncode != 0, (payload, done.stdout, done.stderr)
-    assert "does not match the records schema" in done.stderr
+    assert producers == {"ratchet-data": ["tests.yml"]}
 
 
 @POSIX
 @pytest.mark.parametrize("directory,document,payload,sibling", [
     ("ratchet-data", "ci-thresholds.json",
-     json.dumps(ExecutedValidationTests.VALID), "comment-share.json"),
-    ("comment-share-data", "comment-share.json", "{}", "ci-thresholds.json"),
+     json.dumps(ExecutedValidationTests.VALID), "unrelated.json"),
 ])
 @pytest.mark.parametrize("base,extra", [
     ("a" * 39, None), ("g" * 40, None), (BASE_COMMIT + "\nextra", None),
@@ -489,9 +386,7 @@ def test_comment_schema_executed(tmp_path, payload):
 ])
 def test_artifact_shape_executed(tmp_path, directory, document, payload,
                                  sibling, base, extra):
-    """Every arm's two-file shape: base.txt plus only that arm's
-    document; the sibling document planted in the directory is refused
-    in every arm (issue #333)."""
+    """The artifact's two-file shape refuses any extra file (issue #333)."""
     data = tmp_path / directory
     data.mkdir()
     (data / "base.txt").write_text(base, encoding="utf-8")
@@ -536,7 +431,6 @@ def _push_fixture(tmp_path, outcome, staged):
     (remote / "objects/info/alternates").write_text(objects + "\n", encoding="utf-8")
     _git(tmp_path, "--git-dir", str(remote), "update-ref", "refs/heads/main", base)
     payloads = {
-        "comment-share.json": b'{}\n',
         "ci-thresholds.json": json.dumps(
             ExecutedValidationTests.VALID).encode("utf-8") + b"\n",
     }
@@ -580,7 +474,7 @@ def _push_fixture(tmp_path, outcome, staged):
 
 
 @POSIX
-@pytest.mark.parametrize("document", ["comment-share.json", "ci-thresholds.json"])
+@pytest.mark.parametrize("document", ["ci-thresholds.json"])
 @pytest.mark.parametrize("outcome", [
     "landed", "stale", "moved-before-fetch", "rejected", "moved", "no-key", "transport",
 ])
@@ -595,8 +489,7 @@ def test_records_only_push_and_race_classification(tmp_path, document, outcome):
                 (tmp_path / "calls.jsonl").read_text().splitlines()] if (
         tmp_path / "calls.jsonl").exists() else []
     if outcome == "landed":
-        payload = (b'{}\n' if document == "comment-share.json" else
-                   json.dumps(ExecutedValidationTests.VALID).encode("utf-8") + b"\n")
+        payload = json.dumps(ExecutedValidationTests.VALID).encode("utf-8") + b"\n"
         assert _git(tmp_path, "--git-dir", str(remote), "rev-parse", tip + "^") == base
         assert _git(tmp_path, "--git-dir", str(remote), "diff-tree", "--no-commit-id",
                     "--name-only", "-r", tip) == f".github/{document}"
@@ -626,28 +519,7 @@ def test_records_only_push_and_race_classification(tmp_path, document, outcome):
 
 
 @POSIX
-def test_two_staged_documents_land_one_per_tip_generation(tmp_path):
-    """One document lands per main-tip generation, executed: with both
-    remaining candidates staged at one base, thresholds lands first and
-    the comment records drop green when main moves (issue #333)."""
-    env, base, _moved, remote = _push_fixture(
-        tmp_path, "landed", ["ci-thresholds.json", "comment-share.json"])
-    done = _workflowrun.run_step(tmp_path, step(load(), "Push the ratchet commit"), env)
-    assert done.returncode == 0, (done.stdout, done.stderr)
-    tip = _git(tmp_path, "--git-dir", str(remote), "rev-parse", "refs/heads/main")
-    assert _git(tmp_path, "--git-dir", str(remote), "rev-parse", tip + "^") == base
-    assert _git(tmp_path, "--git-dir", str(remote), "show", "-s", "--format=%s",
-                tip) == MESSAGES["ci-thresholds.json"]
-    # Exactly one landing: the thresholds document's commit is the only
-    # one past the measured base.
-    assert _git(tmp_path, "--git-dir", str(remote), "log", "--format=%s",
-                f"{base}..{tip}").splitlines() == [MESSAGES["ci-thresholds.json"]]
-    summary = (tmp_path / "summary").read_text(encoding="utf-8")
-    assert "main moved while this run measured" in summary.lower()
-
-
-@POSIX
-@pytest.mark.parametrize("document", ["ci-thresholds.json", "comment-share.json"])
+@pytest.mark.parametrize("document", ["ci-thresholds.json"])
 def test_a_staged_artifact_without_its_directory_is_a_loud_failure(
         tmp_path, document):
     """A staged artifact with no staging directory is a loud failure,
@@ -661,7 +533,7 @@ def test_a_staged_artifact_without_its_directory_is_a_loud_failure(
 
 
 @POSIX
-@pytest.mark.parametrize("directory", ["ratchet-data", "comment-share-data"])
+@pytest.mark.parametrize("directory", ["ratchet-data"])
 def test_an_unstaged_candidate_without_a_directory_stays_a_no_op(
         tmp_path, directory):
     """With the staged output false, an absent directory stays a
