@@ -20,13 +20,13 @@
       "id": "Lightricks/LTX-2.5"
     },
     {
-      "id": "ccore/Qwen3.5-4B-3D-Coder"
-    },
-    {
       "id": "Pika-Labs/Pika-H3-Flex"
     },
     {
-      "id": "baidu/Unlimited-OCR-2"
+      "id": "ccore/Qwen3.5-4B-3D-Coder"
+    },
+    {
+      "id": "Qwen/Qwen3.8-27B"
     },
     {
       "id": "burner22/numbat"
