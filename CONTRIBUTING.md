@@ -134,7 +134,7 @@ reachable through those tests, so a change to the emitted JavaScript needs one.
 
 ## CI
 
-Sixteen workflows run. Five of them you can run locally:
+Seventeen workflows run. Five of them you can run locally:
 
 ```sh
 python3 -m pytest -q                                             # tests
