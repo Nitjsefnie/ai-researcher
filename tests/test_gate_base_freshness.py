@@ -174,7 +174,7 @@ CORE_PIN = (
     '.github/workflows/comment-share.yml',
     '.github/workflows/coverage-comment.yml',
     '.github/workflows/lint.yml',
-    '.github/workflows/pr-gate.yml',
+    '.github/workflows/pin-guard.yml', '.github/workflows/pr-gate.yml',
     '.github/workflows/ratchet-push.yml',
     '.github/workflows/refresh.yml',
     '.github/workflows/scorecard.yml',

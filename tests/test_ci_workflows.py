@@ -312,7 +312,7 @@ def test_diff_coverage_job_is_pull_request_only_and_read_only():
 
 def test_no_job_that_checks_out_the_tree_holds_conversation_write():
     # Issue #126: a job that checks out the tree never carries a
-    # conversation-write token. The only writers are the coverage poster,
+    # conversation-write token. Writers include the coverage poster,
     # the claim action (issue #161; Nitjsefnie-Actions/claim#153 — a /claim on
     # a pull request 403s without the grant), and the pr-gate admission
     # action (issue #166 — it comments on, closes and reopens pull requests
@@ -334,11 +334,11 @@ def test_no_job_that_checks_out_the_tree_holds_conversation_write():
                     "holds pull-requests: write")
             elif pull_write:
                 assert path.name in (
-                    "claim.yml", "coverage-comment.yml", "pr-gate.yml",
+                    "claim.yml", "coverage-comment.yml", "pin-guard.yml", "pr-gate.yml",
                 ), (
                     f"{path.name}: job {name!r} holds pull-requests: write "
-                    "but only the coverage poster, the claim action and the "
-                    "pr-gate action may")
+                    "but only the coverage poster, claim, pin-guard and "
+                    "pr-gate actions may")
 
 
 def test_coverage_comment_workflow_never_executes_the_tree():
