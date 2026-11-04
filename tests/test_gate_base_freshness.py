@@ -137,64 +137,19 @@ def test_required_jobs_name_the_merge_gate_contexts(tmp_path):
         assert name in jobs, f'{path} must define the merge-gate job {name!r}'
 
 
-# The pinned HEAD set expands directory tokens to tracked files: refresh.yml
-# names data/ and tests.yml names tests/ through its coverage omit glob.
-# Any gate-named tracked file moves this pin in the same commit.
-def test_gate_paths_on_this_repository(tmp_path):
-    del tmp_path
-    done = subprocess.run(
-        [sys.executable, str(ROOT / 'scripts/ci/gate_base_freshness.py'),
-         '--print-paths'], cwd=str(ROOT), check=True, capture_output=True,
-        text=True)
-    derived = done.stdout.splitlines()
-    assert derived == sorted(CORE_PIN), (
-        'the derived gate-path set moved against its pin:\n' + done.stdout)
+# Directory tokens the gate jobs name; the derivation expands each to every
+# tracked file beneath it, so a new file there needs no pin edit (issue #376).
+GATE_DIRECTORIES = ('.github/workflows', 'data', 'out', 'tests')
 
-
-def test_the_pin_refuses_a_tracked_file_the_pipeline_cannot_commit():
-    """The negative half of the real-repo pin, as its own test.
-
-    A gate job naming a new tracked file the refresh cannot commit joins the
-    derivation, and the pin must refuse it: nothing but a same-commit pin
-    change admits a new path. With the disagreement window gone (issue #200)
-    every candidate is that same case, so there is no wider set to admit.
-    """
-    assert 'scripts/ci/not-a-bot-data-file.py' not in CORE_PIN
-
-
-# The derived set is pinned; a required job naming a new file forces a same-commit pin change.
+# The gate-named files outside GATE_DIRECTORIES; a job naming another moves the pin.
 CORE_PIN = (
     '.github/ci-thresholds.json',
-    '.github/workflows/actionlint.yml',
-    '.github/workflows/audit.yml',
-    '.github/workflows/claim.yml',
-    '.github/workflows/codeql.yml',
-    '.github/workflows/ci-gate.yml',
-    '.github/workflows/comment-share.yml',
-    '.github/workflows/coverage-comment.yml',
-    '.github/workflows/lint.yml',
-    '.github/workflows/pin-guard.yml', '.github/workflows/pr-gate.yml',
-    '.github/workflows/ratchet-push.yml',
-    '.github/workflows/refresh.yml',
-    '.github/workflows/scorecard.yml',
-    '.github/workflows/secrets.yml',
-    '.github/workflows/size-baseline.yml',
-    '.github/workflows/tests.yml',
-    '.github/workflows/types.yml',
-    'data/aa-generation-state.json',
-    'data/aa-raw-coding-agents.json',
-    'data/aa-raw-models.json',
-    'data/captured-at.txt', 'data/github-stars.json',
-    'data/hf-trending.json',
-    'data/openrouter-trending.json',
-    'out/frontier-models.html',
-    'out/trending-rankings.html',
     'requirements-dev.txt',
     'requirements-pip-audit.txt',
     'requirements-test.txt',
     'requirements-zizmor.txt',
-    'scripts/ci/check_committed_page.py',
     'scripts/ci/aggregate_gate.py',
+    'scripts/ci/check_committed_page.py',
     'scripts/ci/check_ratchets.py',
     'scripts/ci/classify_changes.py',
     'scripts/ci/commit_scopes.py',
@@ -205,69 +160,34 @@ CORE_PIN = (
     'scripts/ci/js_coverage.py',
     'scripts/ci/ratchet.py',
     'scripts/ci/thresholds.py',
-    'tests/fixtures/pipeline/aa-raw-coding-agents.json',
-    'tests/fixtures/pipeline/aa-raw-models.json',
-    'tests/fixtures/pipeline/captured-at.txt',
-    'tests/test_aa_aes_gcm.py',
-    'tests/test_agentic_axis.py',
-    'tests/test_browser.py',
-    'tests/test_browser_temp.py',
-    'tests/test_build.py',
-    'tests/test_build_rankings.py',
-    'tests/test_capture_gate.py',
-    'tests/test_check_committed_page.py',
-    'tests/test_check_committed_rankings_page.py',
-    'tests/test_ci_apt_deb_cache.py',
-    'tests/test_ci_classify_verified_base.py',
-    'tests/test_ci_gate_botdata.py',
-    'tests/test_ci_gate_modules.py',
-    'tests/test_ci_gate_output_wiring.py',
-    'tests/test_checkout_clean.py',
-    'tests/test_ci_context_separation.py',
-    'tests/test_ci_install_chromium.py',
-    'tests/test_ci_install_valgrind.py',
-    'tests/test_ci_instruction_budgets.py',
-    'tests/test_ci_perf_budgets.py',
-    'tests/test_ci_ratchets.py',
-    'tests/test_ci_thresholds.py',
-    'tests/test_ci_workflows.py',
-    'tests/test_commit_scopes.py',
-    'tests/test_coverage_comment.py',
-    'tests/test_diff_aa.py',
-    'tests/test_diff_coverage.py',
-    'tests/test_environment_prefix.py',
-    'tests/test_fetch_aa.py',
-    'tests/test_fetch_aa_detail_fills.py',
-    'tests/test_fetch_aa_membership.py',
-    'tests/test_fetch_aa_parse.py',
-    'tests/test_fetch_gdpval.py',
-    'tests/test_fetch_gdpval_capture.py',
-    'tests/test_fetch_gdpval_route.py',
-    'tests/test_fetch_hf_trending.py',
-    'tests/test_fetch_openrouter_trending.py',
-    'tests/test_fetch_retry.py',
-    'tests/test_gate_base_freshness.py',
-    'tests/test_gitignore.py',
-    'tests/test_workflow_ci_gate.py',
-    'tests/test_workflowrun.py',
-    'tests/test_js_coverage.py',
-    'tests/test_publish_docs.py',
-    'tests/test_ratchet_push_direction.py',
-    'tests/test_ratchet_push_workflow.py',
-    'tests/test_refresh_capture_overlap.py',
-    'tests/test_refresh_workflow.py',
-    'tests/_workflowrun.py',
 )
+
+
+def test_gate_paths_on_this_repository():
+    done = subprocess.run(
+        [sys.executable, str(ROOT / 'scripts/ci/gate_base_freshness.py'),
+         '--print-paths'], cwd=str(ROOT), check=True, capture_output=True,
+        text=True)
+    # Listed by git, not by the module, so the expectation is independent of it.
+    under = _git(ROOT, 'ls-tree', '-r', '--name-only', '--full-tree', 'HEAD',
+                 '--', *GATE_DIRECTORIES).splitlines()
+    assert all(any(f.startswith(d + '/') for f in under) for d in GATE_DIRECTORIES), 'a pinned directory holds no file'
+    assert done.stdout.splitlines() == sorted({*CORE_PIN, *under}), (
+        'the derived gate-path set moved against its pin:\n' + done.stdout)
+
+
+def test_the_pin_refuses_a_tracked_file_the_pipeline_cannot_commit():
+    """A path outside GATE_DIRECTORIES is admitted only by a CORE_PIN change."""
+    path = 'scripts/ci/not-a-bot-data-file.py'
+    assert path not in CORE_PIN
+    assert not path.startswith(tuple(d + '/' for d in GATE_DIRECTORIES))
 
 
 def test_the_pin_fails_when_a_gate_names_a_file_the_pipeline_cannot_commit(tmp_path):
     """The pin's teeth (issue #198).
 
-    The pin is the whole derived set now that the disagreement window is gone
-    (issue #200), so every path a gate job names must be one the pin already
-    holds. A gate job naming a new tracked file the refresh cannot commit grows
-    the derivation without growing the expectation: the pin fails, naming the
-    movement.
+    A gate job naming a new tracked file outside GATE_DIRECTORIES moves the
+    derived set, so the pin's unchanged expectation fails.
     """
     module = _load()
     repo = tmp_path / 'repo'
