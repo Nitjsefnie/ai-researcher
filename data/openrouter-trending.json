@@ -11,16 +11,16 @@
       "slug": "deepseek/deepseek-v4.1-flash"
     },
     {
-      "slug": "tencent/hy4-preview"
-    },
-    {
       "slug": "openai/gpt-6-luna"
     },
     {
-      "slug": "anthropic/claude-opus-5.5"
+      "slug": "tencent/hy4-preview"
     },
     {
       "slug": "stepfun/step-5-preview"
+    },
+    {
+      "slug": "anthropic/claude-opus-5.5"
     },
     {
       "slug": "minimax/minimax-m3.1-flash"
