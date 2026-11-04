@@ -33049,7 +33049,7 @@
   "shortName": "Kimi K3.1 Pro",
   "deprecated": false,
   "isReasoning": true,
-  "isOpenWeights": true,
+  "isOpenWeights": false,
   "paramClass": "large",
   "priceClass": "high",
   "modelCreatorName": "Kimi",
@@ -33154,7 +33154,7 @@
    "name": "Kimi K3.1 Pro",
    "deprecatedTo": null
   },
-  "openSourceCategorization": "commercial-license",
+  "openSourceCategorization": "proprietary",
   "parameters": 2800,
   "inferenceParametersActiveBillions": 104,
   "sizeClass": "large",
@@ -74266,7 +74266,7 @@
   "isReasoning": true,
   "isOpenWeights": false,
   "paramClass": null,
-  "priceClass": "low",
+  "priceClass": null,
   "modelCreatorName": "Sapiens AI",
   "modelCreatorColor": "#1521a9",
   "modelCreatorLogo": "/img/logos/sapiens.svg",
@@ -74284,9 +74284,9 @@
    "gpqa-diamond": 0.905050505050505,
    "tau3-banking": 0.356701030927835
   },
-  "price1mInputTokens": 0.1,
-  "price1mOutputTokens": 0.3,
-  "cacheHitPrice": 0.01,
+  "price1mInputTokens": null,
+  "price1mOutputTokens": null,
+  "cacheHitPrice": null,
   "cacheWritePrice": null,
   "id": "f3a0e101-086f-44b3-a1b2-d23498f9716b",
   "suffix": null,
@@ -74302,7 +74302,7 @@
   "openSourceCategorization": "proprietary",
   "parameters": null,
   "inferenceParametersActiveBillions": null,
-  "sizeClass": "medium",
+  "sizeClass": null,
   "licenseName": null,
   "licenseUrl": null,
   "modelWeightsSourceUrl": null,
@@ -74337,13 +74337,13 @@
   "livecodebench": null,
   "aime25": null,
   "analystAgent": null,
-  "cacheHitDiscountPercent": 0.9,
+  "cacheHitDiscountPercent": null,
   "pricePer1k1mpImages": null,
-  "price1mBlended0To3To1": 0.15000000000000002,
-  "price1mBlended7To2To1": 0.05700000000000001,
-  "price1mBlended0To1To1": 0.2,
-  "price1mBlended100To1To1": 0.013725490196078433,
-  "price1mBlended0To100To1": 0.10198019801980199,
+  "price1mBlended0To3To1": null,
+  "price1mBlended7To2To1": null,
+  "price1mBlended0To1To1": null,
+  "price1mBlended100To1To1": null,
+  "price1mBlended0To100To1": null,
   "intelligenceIndexEvaluations": [],
   "headline": null,
   "multiTurn": null,
@@ -74353,10 +74353,10 @@
    "providerName": "Sapiens AI"
   },
   "priceDataSource": {
-   "type": "firstParty",
+   "type": "median",
    "providerName": "Sapiens AI"
   },
-  "hostModelCount": 1,
+  "hostModelCount": 0,
   "creator": {
    "id": "5db3af1a-e372-4c62-98bd-f6027eeaf990",
    "slug": "agnes-ai",
@@ -74373,7 +74373,6 @@
   "outputModalityImage": false,
   "outputModalitySpeech": false,
   "outputModalityVideo": false,
-  "gdpvalCostPerTask": 0.1274299868562515,
   "medianReasoningTimeSeconds": null,
   "reasoningTokens": 2000,
   "timescaleData": {
@@ -74444,6 +74443,7 @@
    "outputSpeedVariance",
    "performanceByPromptType",
    "performanceDataSource",
+   "priceDataSource",
    "reasoningTokens",
    "timeToFirstChunkVariance",
    "timescaleData"
@@ -107063,14 +107063,14 @@
   "licenseUrl": null,
   "modelWeightsSourceUrl": null,
   "microevalsEnabled": true,
-  "intelligenceIndex": null,
+  "intelligenceIndex": 23.7902433286348,
   "capabilities": {
+   "financeAndAccounting": 31.8313823319709,
    "strategyAndOps": 40.7042501294702,
-   "financeAndAccounting": 40.1003889846017,
-   "legal": 36.8752003910491,
-   "healthcareAndMedical": 35.8237780924543,
-   "engineering": 36.1631386671561,
-   "economics": 42.7458711577078
+   "legal": 27.7367940131492,
+   "healthcareAndMedical": 32.3617093248471,
+   "engineering": 29.3731761363636,
+   "economics": 33.6984166666667
   },
   "omniscience": -17.066666666666666,
   "omniscienceAccuracy": 0.3913333333333333,
@@ -107093,7 +107093,7 @@
   "terminalBenchScience": 0.0333333333333333,
   "healthbench": null,
   "healthbenchProfessional": null,
-  "hleDiamond": null,
+  "hleDiamond": 0.209,
   "critptAgenticHard": 0.305,
   "scicode": 0.53587962962963,
   "lcr": 0.836666666666667,
@@ -107119,7 +107119,143 @@
   "price1mBlended0To1To1": 0.7,
   "price1mBlended100To1To1": 0.03333333333333334,
   "price1mBlended0To100To1": 0.2099009900990099,
-  "intelligenceIndexEvaluations": [],
+  "intelligenceIndexTimePerTask": 554.541008260357,
+  "intelligenceIndexCost": {
+   "total": 334.347841910495,
+   "input": 203.676438710495,
+   "nonCacheInput": 3.428702,
+   "cacheRead": 152.62324880778306,
+   "cacheWrite": 47.62448790271198,
+   "output": 130.6714032,
+   "reasoning": 107.2060884,
+   "answer": 23.465314799999998
+  },
+  "intelligenceIndexCostPerTask": {
+   "cost": {
+    "total": 0.3312633263840317,
+    "input": 0.2604592625050492,
+    "nonCacheInput": 0.0016299513999999998,
+    "cacheRead": 0.20712242936954822,
+    "cacheWrite": 0.051706881735501,
+    "output": 0.07080406387898258,
+    "reasoning": 0.045373067688139895,
+    "answer": 0.025430996190842676
+   },
+   "evaluations": [
+    {
+     "slug": "aa-briefcase",
+     "weightedCostPerTask": 0.05925961270752338
+    },
+    {
+     "slug": "automationbench-aa",
+     "weightedCostPerTask": 0.004559162854250227
+    },
+    {
+     "slug": "terminalbench-4-0",
+     "weightedCostPerTask": 0.08493287460827653
+    },
+    {
+     "slug": "frontiercode-2-0",
+     "weightedCostPerTask": 0.05647101630402513
+    },
+    {
+     "slug": "omniscience",
+     "weightedCostPerTask": 0.0015519627599999996
+    },
+    {
+     "slug": "gdp-pdf",
+     "weightedCostPerTask": 0.002839762
+    },
+    {
+     "slug": "hle-diamond",
+     "weightedCostPerTask": 0.004170930359999999
+    },
+    {
+     "slug": "critpt-v2-hard",
+     "weightedCostPerTask": 0.007675994918521975
+    },
+    {
+     "slug": "terminal-bench-science",
+     "weightedCostPerTask": 0.1098020098714345
+    }
+   ]
+  },
+  "canonicalIntelligenceIndexTokenCount": {
+   "input": 7838803902,
+   "output": 108892836,
+   "answer": 19554429,
+   "reasoning": 89338407
+  },
+  "intelligenceIndexOutputTokensPerTask": {
+   "reasoning": 37810.88974011659,
+   "answer": 21192.496825702226,
+   "output": 59003.386565818815
+  },
+  "intelligenceIndexEvaluations": [
+   {
+    "slug": "aa-briefcase",
+    "score": 1338.61,
+    "outputTokensPerTask": 77903.1978021978,
+    "costPerTask": 0.3950640847168226,
+    "timePerTask": 732.1701409078652
+   },
+   {
+    "slug": "automationbench-aa",
+    "score": 0.5020861763756194,
+    "outputTokensPerTask": 23185.700152207002,
+    "costPerTask": 0.09118325708500453,
+    "timePerTask": 217.90989107522861
+   },
+   {
+    "slug": "terminalbench-4-0",
+    "score": 0.116161616161616,
+    "outputTokensPerTask": 133852.69696969696,
+    "costPerTask": 0.8493287460827653,
+    "timePerTask": 1258.0093085528763
+   },
+   {
+    "slug": "frontiercode-2-0",
+    "score": 0.175717424242424,
+    "outputTokensPerTask": 47524.31060606061,
+    "costPerTask": 0.37647344202683425,
+    "timePerTask": 446.6553642809113
+   },
+   {
+    "slug": "omniscience",
+    "score": -17.066666666666666,
+    "outputTokensPerTask": 8601.59,
+    "costPerTask": 0.010346418399999998,
+    "timePerTask": 80.84170534722273
+   },
+   {
+    "slug": "gdp-pdf",
+    "score": 0.24,
+    "outputTokensPerTask": 20438.58,
+    "costPerTask": 0.05679524,
+    "timePerTask": 192.09119035848485
+   },
+   {
+    "slug": "hle-diamond",
+    "score": 0.209,
+    "outputTokensPerTask": 34650.856,
+    "costPerTask": 0.04170930359999999,
+    "timePerTask": 325.66470742979436
+   },
+   {
+    "slug": "critpt-v2-hard",
+    "score": 0.305,
+    "outputTokensPerTask": 46171.325,
+    "costPerTask": 0.07675994918521975,
+    "timePerTask": 433.93938227012194
+   },
+   {
+    "slug": "terminal-bench-science",
+    "score": 0.0333333333333333,
+    "outputTokensPerTask": 101668.8,
+    "costPerTask": 0.7320133991428966,
+    "timePerTask": 955.5302185532812
+   }
+  ],
   "briefcaseBreakdown": {
    "overall": {
     "elo": 1338.61,
@@ -107220,34 +107356,9 @@
    "total": 161.43648255850275
   },
   "intelligenceIndexIsEstimated": false,
-  "intelligenceIndexCost": {
-   "total": 319.92851141699316,
-   "input": 135.5404426169932,
-   "nonCacheInput": 5.8352326,
-   "cacheRead": 94.19413986808753,
-   "cacheWrite": 35.51107014890568,
-   "output": 184.38806879999999,
-   "reasoning": 162.3706872,
-   "answer": 22.0173816
-  },
-  "canonicalIntelligenceIndexTokenCount": {
-   "input": 4880927437,
-   "output": 153656724,
-   "answer": 18347818,
-   "reasoning": 135308906
-  },
-  "intelligenceIndexOutputTokensPerTask": {
-   "reasoning": 28098.251960992493,
-   "answer": 13136.33788999603,
-   "output": 41234.58985098852
-  },
   "carriedDetailFills": [
-   "canonicalIntelligenceIndexTokenCount",
-   "capabilities",
    "endToEndResponseTime",
-   "intelligenceIndexCost",
    "intelligenceIndexIsEstimated",
-   "intelligenceIndexOutputTokensPerTask",
    "outputSpeedVariance",
    "performanceByPromptType",
    "reasoningTokens",
