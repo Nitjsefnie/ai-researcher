@@ -320,6 +320,10 @@ def test_no_job_that_checks_out_the_tree_holds_conversation_write():
     # template at the base SHA; no checkout).
     # Every job with an actions/checkout step is scanned, so a future job
     # cannot quietly grow the grant.
+    allowed_writers = {
+        "claim.yml", "coverage-comment.yml", "pin-guard.yml", "pr-gate.yml",
+    }
+    writers = set()
     for path in WORKFLOWS:
         workflow = yaml.safe_load(path.read_text(encoding="utf-8"))
         for name, job in (workflow.get("jobs") or {}).items():
@@ -334,12 +338,13 @@ def test_no_job_that_checks_out_the_tree_holds_conversation_write():
                     f"{path.name}: job {name!r} checks out the tree and "
                     "holds pull-requests: write")
             elif pull_write:
-                assert path.name in (
-                    "claim.yml", "coverage-comment.yml", "pin-guard.yml", "pr-gate.yml",
-                ), (
+                writers.add(path.name)
+                assert path.name in allowed_writers, (
                     f"{path.name}: job {name!r} holds pull-requests: write "
                     "but only the coverage poster, claim, pin-guard and "
                     "pr-gate actions may")
+    assert writers == allowed_writers, (
+        f"missing conversation-write workflows: {sorted(allowed_writers - writers)}")
 
 
 def test_coverage_comment_workflow_never_executes_the_tree():
