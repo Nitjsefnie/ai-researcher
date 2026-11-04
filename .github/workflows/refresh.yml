@@ -178,7 +178,6 @@ jobs:
 
       # The stdlib capture overlaps the installs during its spaced reads (issue #371).
       - name: Start the leaderboard capture
-        id: start_capture
         run: |
           # Isolate the capture so a failed PID write can stop its process group.
           trap 'rc=$?; if [ "$rc" -ne 0 ] && [ -n "${capture_pid:-}" ]; then
@@ -199,7 +198,6 @@ jobs:
           ) < /dev/null > "$RUNNER_TEMP/aa-capture.stdout" 2> "$RUNNER_TEMP/aa-capture.stderr" &
           capture_pid=$!
           echo "$capture_pid" > "$RUNNER_TEMP/aa-capture.pid"
-          echo "pid=$capture_pid" >> "$GITHUB_OUTPUT"
 
       - name: Install the test toolchain
         env:
@@ -263,27 +261,9 @@ jobs:
       - name: Capture the leaderboard
         id: fetch
         if: ${{ !cancelled() }}
-        env:
-          AI_RESEARCHER_CAPTURE_PID: ${{ steps.start_capture.outputs.pid }}
         run: |
-          cleanup_files=true
-          trap 'if [ "$cleanup_files" = true ]; then rm -f "$RUNNER_TEMP/aa-capture.pid" "$RUNNER_TEMP/aa-capture.status" "$RUNNER_TEMP/aa-capture.stdout" "$RUNNER_TEMP/aa-capture.stderr"; fi' EXIT
-          stop_capture() {
-            kill -KILL -- "-$1" 2>/dev/null || :
-            # A zombie has stopped even if its new parent has not reaped it.
-            for _ in {1..50}; do
-              states="$(ps -e -o pgid= -o stat=)" || break
-              if ! awk -v pgid="$1" '$1 == pgid && $2 !~ /^Z/ { alive=1 } END { exit !alive }' <<< "$states"; then return 0; fi
-              sleep 0.1
-            done
-            echo "Could not stop capture process group $1" >&2
-            cleanup_files=false
-            return 1
-          }
+          trap 'rm -f "$RUNNER_TEMP/aa-capture.pid" "$RUNNER_TEMP/aa-capture.status" "$RUNNER_TEMP/aa-capture.stdout" "$RUNNER_TEMP/aa-capture.stderr"' EXIT
           if [ ! -s "$RUNNER_TEMP/aa-capture.pid" ]; then
-            if [ -n "$AI_RESEARCHER_CAPTURE_PID" ] && [ ! -s "$RUNNER_TEMP/aa-capture.status" ]; then
-              stop_capture "$AI_RESEARCHER_CAPTURE_PID" || :
-            fi
             echo "Capture start did not record a PID" >&2
             exit 1
           fi
@@ -291,11 +271,10 @@ jobs:
           while [ ! -s "$RUNNER_TEMP/aa-capture.status" ]; do
             if ! kill -0 "$pid" 2>/dev/null; then
               if [ ! -s "$RUNNER_TEMP/aa-capture.status" ]; then
-                stop_capture "$pid" || :
-                if [ ! -s "$RUNNER_TEMP/aa-capture.status" ]; then
-                  echo "Capture process $pid ended without an exit status" >&2
-                  exit 1
-                fi
+                # The wrapper is gone, but its process group may still hold the capture.
+                kill -KILL -- "-$pid" 2>/dev/null || :
+                echo "Capture process $pid ended without an exit status" >&2
+                exit 1
               fi
               break
             fi
