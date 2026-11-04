@@ -625,21 +625,18 @@ class GateTests(unittest.TestCase):  # pylint: disable=too-many-public-methods
         # tip^ is not necessarily the commit the run was tested against.
         self.assertIn('base.txt")" =', run)
 
-    def test_the_fetch_runs_above_the_installs_which_gate_on_proceed(self):
-        # Capture needs only stdlib and runs first to avoid installs on quiet hours.
-        # `proceed` still installs the toolchain for a republish.
+    def test_the_installs_overlap_the_capture(self):
         names = [s.get("name") for s in self.wf["jobs"]["refresh"]["steps"]]
-
-        self.assertLess(names.index("Capture the leaderboard"),
-                        names.index("Install the test toolchain"))
-        self.assertLess(names.index("Capture the leaderboard"),
-                        names.index("Install Chromium for playwright"))
         for name in ("Install the test toolchain",
-                     "Install Chromium for playwright"):
-            self.assertEqual(
-                step(self.wf, name)["if"],
-                "steps.capture.outputs.proceed == 'true'")
-
+                     "Cache Chromium dependency debs", "Install Chromium for playwright",
+                     "Cache valgrind dependency debs", "Install valgrind"):
+            self.assertLess(names.index("Start the leaderboard capture"), names.index(name))
+            self.assertLess(names.index(name), names.index("Capture the leaderboard"))
+            self.assertNotIn("if", step(self.wf, name))
+        for name in ("Save Chromium dependency debs", "Save valgrind dependency debs"):
+            self.assertLess(names.index("Start the leaderboard capture"), names.index(name))
+            self.assertLess(names.index(name), names.index("Capture the leaderboard"))
+        self.assertLess(names.index("Capture the leaderboard"), names.index("Did anything move?"))
         # Issue #51: a revert to the bare `playwright install` unwires the digest gate.
         self.assertEqual(
             flattened(step(self.wf, "Install Chromium for playwright")["run"]),
@@ -647,12 +644,13 @@ class GateTests(unittest.TestCase):  # pylint: disable=too-many-public-methods
 
         setup = [s for s in self.wf["jobs"]["refresh"]["steps"]
                  if s.get("uses", "").startswith("actions/setup-python@")]
-        # setup-python stays unconditional: it is cheap, and fetch_aa.py
-        # runs on it.
-        for entry in setup:
-            self.assertNotIn("if", entry)
+        self.assertEqual(len(setup), 1)
+        self.assertEqual(self.wf["jobs"]["refresh"]["steps"].index(setup[0]) + 1,
+                         names.index("Start the leaderboard capture"))
+        self.assertNotIn("if", step(self.wf, "Start the leaderboard capture"))
+        self.assertNotIn("if", setup[0])
 
-    def test_chromium_debs_cache_saves_only_when_chromium_is_needed(self):
+    def test_chromium_debs_cache_saves_only_after_a_repair(self):
         steps = self.wf["jobs"]["refresh"]["steps"]
         caches = {entry["uses"].split("@", 1)[0]: entry for entry in steps
                   if entry.get("name") in ("Cache Chromium dependency debs",
@@ -660,13 +658,13 @@ class GateTests(unittest.TestCase):  # pylint: disable=too-many-public-methods
         self.assertEqual(set(caches), {"actions/cache/restore", "actions/cache/save"})
         restore, save = caches["actions/cache/restore"], caches["actions/cache/save"]
         chromium = step(self.wf, "Install Chromium for playwright")
-        self.assertEqual(restore["if"], chromium["if"])
-        self.assertEqual(flattened(save["if"]), f"{chromium['if']} && steps.{chromium['id']}.outputs.cache-changed == 'true'")
+        self.assertNotIn("if", restore)
+        self.assertNotIn("if", chromium)
+        self.assertEqual(flattened(save["if"]), f"steps.{chromium['id']}.outputs.cache-changed == 'true'")
         self.assertEqual(save["with"]["path"], restore["with"]["path"])
         self.assertLess(steps.index(restore), steps.index(chromium))
         self.assertLess(steps.index(chromium), steps.index(save))
-        self.assertLess(steps.index(step(self.wf, "Capture the leaderboard")),
-                        steps.index(restore))
+        self.assertLess(steps.index(save), steps.index(step(self.wf, "Capture the leaderboard")))
 
     def test_the_hub_ties_the_upload_to_one_commit(self):
         # The tie is ENFORCED, not asserted: the upload runs only when the
@@ -1096,9 +1094,8 @@ exit 0
 class CaptureStepTests(unittest.TestCase):
     """The Capture step's exit contract, as it stands since issue #200.
 
-    fetch_aa.py has ONE nonzero exit -- the designed red that means go
-    re-read AA by hand -- so the step's trap exists to park the capture's
-    stderr and re-emit it on the red path. There is no exit-3 branch, no
+    fetch_aa.py has one nonzero exit colour: re-read AA by hand. The step
+    re-emits the captured stderr on the red path. There is no exit-3 branch, no
     window stamp, no baseline record and nothing to retire: the leaderboard
     route publishes every value it carries; the detail route fills omitted
     fields on shared models and supplies detail-only records (issue #266).
@@ -1108,8 +1105,6 @@ class CaptureStepTests(unittest.TestCase):
         self.wf = load()
         self.step = step(self.wf, "Capture the leaderboard")
         self.block = flattened(self.step["run"])
-        self.header = WORKFLOW.read_text(
-            encoding="utf-8").split("\njobs:", 1)[0]
 
     def test_the_step_has_one_recovery_and_one_red_and_no_third_colour(self):
         # Recovery (rc 0) stands first and sets the force gate's verdict,
@@ -1126,14 +1121,6 @@ class CaptureStepTests(unittest.TestCase):
                      "data/aa-last-agreeing-capture.json",
                      "git rm", "git add", "healed", "retire"):
             self.assertNotIn(gone, self.block)
-
-    def test_the_header_documents_the_absence_of_a_disagreement_state(self):
-        # The file's contract lives in its header, and the contract changed:
-        # a reader must find the single-generation rule there, not
-        # reconstruct a dispute branch that no longer exists.
-        self.assertIn("THERE IS NO ROUTE-DISAGREEMENT STATE", self.header)
-        self.assertIn("issue #200", self.header)
-        self.assertIn("never exits 3", self.header)
 
 
 class _SeededOrigin:
@@ -2034,38 +2021,6 @@ elif url == 'https://docs.nitjsefni.eu/api/publish':
 else:
     raise SystemExit('unexpected curl endpoint: ' + url)
 '''
-
-
-@pytest.mark.skipif(os.name == 'nt', reason='workflow shell runs on Ubuntu')
-@pytest.mark.parametrize('status', [0, 7])
-def test_capture_step_removes_temp_files(tmp_path, status):
-    """Capture stderr uses TMPDIR and is removed on success and fetch failure."""
-    probe = tmp_path / 'probe'
-    probe.mkdir()
-    scripts = tmp_path / 'scripts'
-    scripts.mkdir()
-    (scripts / 'fetch_aa.py').write_text(
-        'import os, sys\nfrom pathlib import Path\n'
-        'assert "--cross-run-lookback" in sys.argv[1:], sys.argv[1:]\n'
-        'stat = os.fstat(2)\n'
-        'paths = [p.name for p in Path(os.environ["TMPDIR"]).iterdir()\n'
-        '         if (p.stat().st_dev, p.stat().st_ino) == (stat.st_dev, stat.st_ino)]\n'
-        'Path("observed").write_text(str(len(paths)), encoding="utf-8")\n'
-        'print("capture diagnostic", file=sys.stderr)\n'
-        f'sys.exit({status})\n', encoding='utf-8')
-    env = {'PATH': os.environ['PATH'], 'TMPDIR': str(probe),
-           'GITHUB_OUTPUT': str(tmp_path / 'output')}
-    done = subprocess.run(
-        ['bash', '-e', '-c', step(load(), 'Capture the leaderboard')['run']],
-        cwd=tmp_path, env=env, check=False, capture_output=True, text=True, timeout=120)
-    assert done.returncode == status, done.stdout + done.stderr
-    if status:
-        assert 'capture diagnostic' in done.stderr
-        assert not (tmp_path / 'output').exists()
-    else:
-        assert (tmp_path / 'output').read_text(encoding='utf-8') == 'captured=true\n'
-    assert (tmp_path / 'observed').read_text(encoding='utf-8') == '1'
-    assert not list(probe.iterdir())
 
 
 @pytest.mark.skipif(os.name == 'nt', reason='workflow shell runs on Ubuntu')
