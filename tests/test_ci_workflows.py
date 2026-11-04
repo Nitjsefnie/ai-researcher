@@ -312,13 +312,14 @@ def test_diff_coverage_job_is_pull_request_only_and_read_only():
 
 def test_no_job_that_checks_out_the_tree_holds_conversation_write():
     # Issue #126: a job that checks out the tree never carries a
-    # conversation-write token. Writers include the coverage poster,
-    # the claim action (issue #161; Nitjsefnie-Actions/claim#153 — a /claim on
-    # a pull request 403s without the grant), and the pr-gate admission
-    # action (issue #166 — it comments on, closes and reopens pull requests
-    # through the API and reads the template at the base SHA; no checkout).
-    # Every job in the catalogue with an actions/checkout step is
-    # scanned, so a future job cannot quietly grow pull-requests: write.
+    # conversation-write token. The only writers are the coverage poster,
+    # claim (issue #161; Nitjsefnie-Actions/claim#153 — a /claim on a pull
+    # request 403s without the grant), pin-guard (issue #367 — comments
+    # through the API; no checkout) and pr-gate (issue #166 — comments on,
+    # closes and reopens pull requests through the API and reads the
+    # template at the base SHA; no checkout).
+    # Every job with an actions/checkout step is scanned, so a future job
+    # cannot quietly grow the grant.
     for path in WORKFLOWS:
         workflow = yaml.safe_load(path.read_text(encoding="utf-8"))
         for name, job in (workflow.get("jobs") or {}).items():
