@@ -186,6 +186,7 @@ CORE_PIN = (
     'data/aa-raw-coding-agents.json',
     'data/aa-raw-models.json',
     'data/captured-at.txt',
+    'data/github-stars.json',
     'data/hf-trending.json',
     'data/openrouter-trending.json',
     'out/frontier-models.html',
