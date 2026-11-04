@@ -31728,8 +31728,9 @@
   "intelligenceIndex": null,
   "omniscience": null,
   "scores": {
-   "aa-briefcase": 315.72,
+   "aa-briefcase": 315.65,
    "automationbench-aa": 0.019430215909597492,
+   "hle-diamond": 0.062,
    "gdpval-aa-normalized": 572.9,
    "itbench-aa": 0.236346516007533,
    "mmmu-pro": 0.692485549132948,
@@ -31800,7 +31801,7 @@
   "terminalBenchScience": null,
   "healthbench": null,
   "healthbenchProfessional": null,
-  "hleDiamond": null,
+  "hleDiamond": 0.062,
   "critptAgenticHard": null,
   "scicode": 0.400462962962963,
   "lcr": 0.656666666666667,
@@ -31831,20 +31832,20 @@
   },
   "briefcaseBreakdown": {
    "overall": {
-    "elo": 315.72,
-    "lower95ci": 304.74,
-    "upper95ci": 325.28
+    "elo": 315.65,
+    "lower95ci": 304.11,
+    "upper95ci": 326.23
    },
    "rubricPassRate": 0.07329842931937172,
    "analyticalQuality": {
-    "elo": 29.88,
-    "lower95ci": 6.99,
-    "upper95ci": 50.81
+    "elo": 29.3,
+    "lower95ci": 5.36,
+    "upper95ci": 50.06
    },
    "presentation": {
-    "elo": 276.13,
-    "lower95ci": 254.61,
-    "upper95ci": 299
+    "elo": 276.78,
+    "lower95ci": 254.71,
+    "upper95ci": 297.46
    }
   },
   "briefcaseTotalCost": 10.119760252010376,
@@ -59033,10 +59034,11 @@
   "intelligenceIndex": null,
   "omniscience": -19.066666666666666,
   "scores": {
-   "aa-briefcase": 927.99,
+   "aa-briefcase": 927.77,
    "omniscience-accuracy": 0.386,
    "omniscience-non-hallucination": 0.06080347448425627,
    "automationbench-aa": 0.3490865332353694,
+   "frontiercode-2-0": 0.103058585858586,
    "hle-diamond": 0.072,
    "gdp-pdf": 0.036,
    "terminalbench-4-0": 0.0151515151515152,
@@ -59105,7 +59107,7 @@
   "terminalBench21": null,
   "terminalBench40": 0.0151515151515152,
   "frontierCode": null,
-  "frontierCode20": null,
+  "frontierCode20": 0.103058585858586,
   "terminalBenchScience": null,
   "healthbench": null,
   "healthbenchProfessional": null,
@@ -59140,20 +59142,20 @@
   },
   "briefcaseBreakdown": {
    "overall": {
-    "elo": 927.99,
-    "lower95ci": 918.21,
-    "upper95ci": 938.43
+    "elo": 927.77,
+    "lower95ci": 917.57,
+    "upper95ci": 937.14
    },
    "rubricPassRate": 0.27639751552795033,
    "analyticalQuality": {
-    "elo": 808.32,
-    "lower95ci": 790.15,
-    "upper95ci": 826.92
+    "elo": 807.5,
+    "lower95ci": 788.22,
+    "upper95ci": 826.15
    },
    "presentation": {
-    "elo": 973.84,
-    "lower95ci": 955.54,
-    "upper95ci": 992.13
+    "elo": 975.5,
+    "lower95ci": 956.34,
+    "upper95ci": 994.27
    }
   },
   "briefcaseTotalCost": 32.871859558140116,
@@ -78907,20 +78909,20 @@
   },
   "briefcaseBreakdown": {
    "overall": {
-    "elo": 1416.94,
-    "lower95ci": 1407.94,
-    "upper95ci": 1425.84
+    "elo": 1416.44,
+    "lower95ci": 1408.68,
+    "upper95ci": 1425.51
    },
    "rubricPassRate": 0.45194274028629855,
    "analyticalQuality": {
-    "elo": 1614.74,
-    "lower95ci": 1600.02,
-    "upper95ci": 1630.22
+    "elo": 1614.13,
+    "lower95ci": 1599.65,
+    "upper95ci": 1629.64
    },
    "presentation": {
-    "elo": 1331.83,
-    "lower95ci": 1315.65,
-    "upper95ci": 1347.41
+    "elo": 1332.1,
+    "lower95ci": 1316.19,
+    "upper95ci": 1348.71
    }
   },
   "briefcaseTotalCost": 61.02957912694103,
@@ -84147,7 +84149,7 @@
   "terminalBench40": 0.00505050505050505,
   "frontierCode": null,
   "frontierCode20": null,
-  "terminalBenchScience": null,
+  "terminalBenchScience": 0,
   "healthbench": null,
   "healthbenchProfessional": null,
   "hleDiamond": 0.09,
@@ -97905,13 +97907,13 @@
   "licenseUrl": null,
   "modelWeightsSourceUrl": null,
   "microevalsEnabled": true,
-  "intelligenceIndex": 32.1933563656461,
+  "intelligenceIndex": 32.3433563656461,
   "capabilities": {
    "financeAndAccounting": 34.6328176645031,
    "strategyAndOps": 45.1323352265705,
    "legal": 32.0436420756957,
    "healthcareAndMedical": 37.0060292797986,
-   "engineering": 36.4886008658009,
+   "engineering": 36.6386008658009,
    "economics": 36.6192416666667
   },
   "omniscience": -9.266666666666667,
@@ -97936,7 +97938,7 @@
   "healthbench": null,
   "healthbenchProfessional": null,
   "hleDiamond": 0.288,
-  "critptAgenticHard": 0.49,
+  "critptAgenticHard": 0.505,
   "scicode": 0.549768518518518,
   "lcr": 0.83,
   "ifbench": 0.712244897959184,
@@ -97961,27 +97963,27 @@
   "price1mBlended0To1To1": 7,
   "price1mBlended100To1To1": 0.3333333333333333,
   "price1mBlended0To100To1": 2.099009900990099,
-  "intelligenceIndexTimePerTask": 508.43390707673257,
+  "intelligenceIndexTimePerTask": 508.80018965027045,
   "intelligenceIndexCost": {
-   "total": 3249.837915374119,
-   "input": 2025.314931374119,
+   "total": 3250.1398812896296,
+   "input": 2025.3879732896294,
    "nonCacheInput": 34.297196,
-   "cacheRead": 1497.774847793555,
-   "cacheWrite": 493.242887580564,
-   "output": 1224.522984,
-   "reasoning": 979.373844,
-   "answer": 245.14914
+   "cacheRead": 1497.800461974815,
+   "cacheWrite": 493.2903153148143,
+   "output": 1224.751908,
+   "reasoning": 979.558752,
+   "answer": 245.19315600000002
   },
   "intelligenceIndexCostPerTask": {
    "cost": {
-    "total": 3.734146984625977,
-    "input": 2.9397280567787507,
+    "total": 3.734901899414753,
+    "input": 2.9399106615675263,
     "nonCacheInput": 0.016300531700000002,
-    "cacheRead": 2.35218567315941,
-    "cacheWrite": 0.5712418519193403,
-    "output": 0.7944189278472269,
-    "reasoning": 0.49427246061571395,
-    "answer": 0.30014646723151284
+    "cacheRead": 2.3522497086125598,
+    "cacheWrite": 0.5713604212549661,
+    "output": 0.7949912378472268,
+    "reasoning": 0.49473473061571394,
+    "answer": 0.3002565072315128
    },
    "evaluations": [
     {
@@ -98014,7 +98016,7 @@
     },
     {
      "slug": "critpt-v2-hard",
-     "weightedCostPerTask": 0.06160562721738153
+     "weightedCostPerTask": 0.06236054200615733
     },
     {
      "slug": "terminal-bench-science",
@@ -98023,15 +98025,15 @@
    ]
   },
   "canonicalIntelligenceIndexTokenCount": {
-   "input": 7703319992,
-   "output": 102043582,
-   "answer": 20429095,
-   "reasoning": 81614487
+   "input": 7703467034,
+   "output": 102062659,
+   "answer": 20432763,
+   "reasoning": 81629896
   },
   "intelligenceIndexOutputTokensPerTask": {
-   "reasoning": 41189.371717976166,
-   "answer": 25012.20560262606,
-   "output": 66201.57732060223
+   "reasoning": 41227.894217976165,
+   "answer": 25021.37560262606,
+   "output": 66249.26982060223
   },
   "intelligenceIndexEvaluations": [
    {
@@ -98085,10 +98087,10 @@
    },
    {
     "slug": "critpt-v2-hard",
-    "score": 0.49,
-    "outputTokensPerTask": 37830.475,
-    "costPerTask": 0.6160562721738154,
-    "timePerTask": 290.5413585188529
+    "score": 0.505,
+    "outputTokensPerTask": 38307.4,
+    "costPerTask": 0.6236054200615734,
+    "timePerTask": 294.20418425423173
    },
    {
     "slug": "terminal-bench-science",
