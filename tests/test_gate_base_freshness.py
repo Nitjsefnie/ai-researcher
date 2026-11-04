@@ -137,10 +137,9 @@ def test_required_jobs_name_the_merge_gate_contexts(tmp_path):
         assert name in jobs, f'{path} must define the merge-gate job {name!r}'
 
 
-# The derived set on this repository's HEAD, pinned: a tracked file named by a
-# gate workflow moves this pin in the same commit. `refresh.yml` names `data/`
-# in checkout commands, and `tests.yml` names `tests/` through its coverage
-# omit glob; `resolve()` expands those directory tokens to tracked files.
+# The pinned HEAD set expands directory tokens to tracked files: refresh.yml
+# names data/ and tests.yml names tests/ through its coverage omit glob.
+# Any gate-named tracked file moves this pin in the same commit.
 def test_gate_paths_on_this_repository(tmp_path):
     del tmp_path
     done = subprocess.run(
@@ -255,6 +254,7 @@ CORE_PIN = (
     'tests/test_publish_docs.py',
     'tests/test_ratchet_push_direction.py',
     'tests/test_ratchet_push_workflow.py',
+    'tests/test_refresh_capture_overlap.py',
     'tests/test_refresh_workflow.py',
     'tests/_workflowrun.py',
 )

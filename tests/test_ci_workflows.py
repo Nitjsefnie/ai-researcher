@@ -1,20 +1,7 @@
-"""Tripwires for the workflow catalogue.
+"""Tripwires for contracts across the workflow catalogue.
 
-The codeql-action coupling (issue #45) and the job-ceiling invariant
-(issue #52) live here: contracts that span the workflows directory, not one
-file's step gating. github/codeql-action/init and
-github/codeql-action/analyze must run the same
-version inside one workflow run: the action records its version at init and
-refuses a later step at a different one — "Loaded a configuration file for
-version 'X', but running version 'Y'" — which fails every CodeQL run of the
-tree at SARIF processing. Dependabot names the two subpaths as separate
-dependencies, so ungrouped it files one half-bump per pin and every
-action-pin bump went red (12 of 13 failed codeql push runs were on
-dependabot/* branches). The dependabot.yml groups block keeps the pins in one
-atomic PR; these tests are the in-tree layer that fails if a single-pin bump
-ever lands, and that fails loudly if the group is ever removed. The ceiling
-tripwire pins that every job across .github/workflows/*.yml declares
-timeout-minutes, so a new job cannot silently hold GitHub's 6-hour default.
+CodeQL init and analyze must use matching versions, and every job needs a
+timeout (issues #45 and #52). Dependabot groups the action bumps together.
 """
 from __future__ import annotations
 
@@ -227,14 +214,14 @@ def test_coverage_job_installs_chromium_through_the_digest_gate():
 
 def test_chromium_debs_cache_is_restore_only_in_coverage_and_shared():
     tests = yaml.safe_load(TESTS_WORKFLOW.read_text(encoding="utf-8"))
-    refresh = yaml.safe_load((REPO_ROOT / ".github" / "workflows" /
-                              "refresh.yml").read_text(encoding="utf-8"))
+    refresh = yaml.safe_load((REPO_ROOT / ".github/workflows/refresh.yml").read_text(encoding="utf-8"))
     steps = tests["jobs"]["coverage"]["steps"]
     [cache] = [entry for entry in steps
                if entry.get("name") == "Cache Chromium dependency debs"]
     assert cache["uses"].split("@", 1)[0] == "actions/cache/restore"
-    [producer] = [entry for entry in refresh["jobs"]["refresh"]["steps"]
-                  if entry.get("name") == cache["name"]]
+    assert not [entry for entry in steps
+                if entry.get("uses", "").split("@", 1)[0] == "actions/cache/save"]
+    [producer] = [entry for entry in refresh["jobs"]["refresh"]["steps"] if entry.get("name") == cache["name"]]
     for field in ("path", "key", "restore-keys"):
         assert cache["with"][field] == producer["with"][field]
     chromium = next(entry for entry in steps
@@ -478,21 +465,3 @@ def test_valgrind_cache_is_restore_only_before_the_instruction_gate():
     lines = gate["run"].splitlines()
     assert lines == ["python3 scripts/ci/install_valgrind.py", "set -o pipefail",
                      'python3 scripts/ci/instruction_budgets.py | tee -a "$GITHUB_STEP_SUMMARY"']
-
-
-def test_refresh_valgrind_cache_saves_only_after_a_gated_repair():
-    workflow = yaml.safe_load((REPO_ROOT / '.github' / 'workflows' /
-                               'refresh.yml').read_text(encoding='utf-8'))
-    steps = workflow['jobs']['refresh']['steps']
-    [restore] = [entry for entry in steps if entry.get('name') == 'Cache valgrind dependency debs']
-    [install] = [entry for entry in steps if entry.get('name') == 'Install valgrind']
-    [save] = [entry for entry in steps if entry.get('name') == 'Save valgrind dependency debs']
-    assert restore['uses'].split('@', 1)[0] == 'actions/cache/restore'
-    assert save['uses'].split('@', 1)[0] == 'actions/cache/save'
-    assert install['id'] == 'valgrind'
-    assert install['run'] == 'python3 scripts/ci/install_valgrind.py'
-    assert install['if'] == "steps.capture.outputs.proceed == 'true'"
-    assert restore['if'] == install['if']
-    assert save['if'] == f"{install['if']} && steps.valgrind.outputs.cache-changed == 'true'"
-    capture = next(entry for entry in steps if entry.get('name') == 'Capture the leaderboard')
-    assert steps.index(capture) < steps.index(restore) < steps.index(install) < steps.index(save)

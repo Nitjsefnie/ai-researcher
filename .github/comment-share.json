@@ -36,8 +36,8 @@
     11135
   ],
   ".github/workflows/refresh.yml": [
-    33889,
-    66676
+    25311,
+    51506
   ],
   ".github/workflows/scorecard.yml": [
     593,
@@ -204,8 +204,8 @@
     18694
   ],
   "tests/test_ci_workflows.py": [
-    5958,
-    18780
+    5267,
+    18044
   ],
   "tests/test_diff_aa.py": [
     11086,
@@ -232,8 +232,8 @@
     10113
   ],
   "tests/test_refresh_workflow.py": [
-    23915,
-    114370
+    23502,
+    113265
   ],
   "tests/test_workflow_ci_gate.py": [
     3391,

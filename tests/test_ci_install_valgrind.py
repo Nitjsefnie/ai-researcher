@@ -8,6 +8,7 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
+import yaml
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'scripts' / 'ci'))
 
@@ -317,3 +318,23 @@ def test_version_mismatch_in_backfill_is_loud_and_never_published(
     assert not (env.cache / 'cache-key').exists()
     assert 'cache-changed' not in env.output.read_text(encoding='utf-8')
     assert 'backfill' in capsys.readouterr().err
+
+
+def test_refresh_valgrind_cache_saves_only_after_a_repair():
+    workflow = yaml.safe_load((Path(__file__).resolve().parents[1] / '.github' /
+                               'workflows' / 'refresh.yml').read_text(encoding='utf-8'))
+    steps = workflow['jobs']['refresh']['steps']
+    [restore] = [entry for entry in steps if entry.get('name') == 'Cache valgrind dependency debs']
+    [install] = [entry for entry in steps if entry.get('name') == 'Install valgrind']
+    [save] = [entry for entry in steps if entry.get('name') == 'Save valgrind dependency debs']
+    assert restore['uses'].split('@', 1)[0] == 'actions/cache/restore'
+    assert save['uses'].split('@', 1)[0] == 'actions/cache/save'
+    assert install['id'] == 'valgrind'
+    assert install['run'] == 'python3 scripts/ci/install_valgrind.py'
+    assert 'if' not in install
+    assert 'if' not in restore
+    assert save['if'] == "steps.valgrind.outputs.cache-changed == 'true'"
+    start = next(entry for entry in steps if entry.get('name') == 'Start the leaderboard capture')
+    capture = next(entry for entry in steps if entry.get('name') == 'Capture the leaderboard')
+    assert steps.index(start) < steps.index(restore) < steps.index(install)
+    assert steps.index(install) < steps.index(save) < steps.index(capture)

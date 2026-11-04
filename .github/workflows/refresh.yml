@@ -6,55 +6,28 @@ name: refresh
 # source. Failed sources stay red and contribute nothing; survivors still
 # land. A quiet run has no commit or push (issues #143 and #133).
 #
-# The producers run repository code with read-only tokens. `publish` uses
-# git plumbing in a scratch tree, without executing repository code or
-# holding a key. One `push` job loads the deploy key in main-push and
-# delivers the joined bundle. Deploy-key delivery starts CI on the landed
-# commit (issue #133). Both hub publications follow that landing, verify
-# their artifacts against main, and skip identical live pages (issue #206).
+# Producers run repository code with read-only tokens. `publish` joins with
+# git plumbing without executing repository code or holding a key; `push`
+# loads the main-push deploy key and starts CI on its commit (issue #133).
+# Both hub publications verify against main and skip identical pages (issue #206).
 #
-# WHAT COUNTS AS "MOVED" IS THE RENDERED PAGE, NOT THE RAW CAPTURE BYTES
-# (issue #94). The gate (scripts/capture_gate.py) builds the page twice --
-# once from HEAD's two captures, once from the fresh ones -- and compares the
-# two files with build-machine provenance normalized out, because none of it
-# is rendered data: the source-commit stamp (both gate builds run stamp-less),
-# the capture date (both temp data dirs carry one synthetic captured-at.txt),
-# and the raw-byte digest over the capture files (masked from both pages
-# before comparing -- it moves with every sub-render byte AA wobbles).
-# "Moved" means the masked pages differ. The old raw-byte comparison let AA's
-# hourly sub-render churn commit and publish content the page never renders:
-# 23 of the last 30 refresh commits carried "nothing the page renders".
+# The rendered gate (issue #94) compares builds from HEAD's captures and the
+# fresh captures. It normalizes the source-commit stamp, capture date and raw
+# digest so invisible provenance churn does not trigger a publish.
 #
-# Rendered speed columns get one refinement, so the gate agrees with
-# diff_aa.py's own definition of news for the two speed fields the differ
-# thresholds (SPEED_SHOWN: medianOutputTokensPerSecond,
-# intelligenceIndexTimePerTask): each fresh cell is tested directly against
-# the last COMMITTED value at the differ's news threshold (SPEED_TOL,
-# --speed-tol's default) -- within it, the cell is jitter and carries the
-# committed value; past it (or missing on either side) it stands and
-# commits. agentWallTimeSec (build.py:443-444) is reconciled under the same
-# threshold even though the differ's report never carries it (its classifier
-# files it as derived and drops it): the page renders it, so gate-side
-# strictness covers it -- intentional, not tool agreement. The cost is
-# stated in the gate: outside a generation hold, speed columns can lag AA's live
-# re-sampling by just under the threshold -- and no further, because each
-# hour compares against the last committed value, so a sustained crawl
-# crosses the threshold cumulatively and commits. During a generation hold,
-# the model's rendered speeds stay frozen for the length of that hold.
+# The gate compares each fresh speed cell against the last committed value at
+# diff_aa.py's SPEED_TOL threshold. Jitter carries the committed value; a
+# missing value or larger movement commits. It also reconciles the rendered
+# agentWallTimeSec, which the differ classifies as derived. Small changes can
+# lag until their cumulative movement crosses the threshold; generation holds
+# freeze a model's rendered speeds for their duration.
 #
-# There are two captures because the page draws two AA products: the model
-# leaderboard and the Coding Agent Index. The OR survives inside the rendered
-# gate -- it builds from both files, so either one moving is news.
+# Both the model leaderboard and Coding Agent Index feed each gate build, so
+# a rendered change from either capture is news.
 #
-# THE GATE ANSWERS "WOULD THE RENDERED PAGE MOVE", WHICH IS NOT THE SAME
-# QUESTION AS "IS THE LIVE PAGE STALE". A change to build.py changes the page
-# while the capture stays byte-identical -- and the gate builds BOTH sides
-# with the new code, so it still reports no change -- and every step here
-# would skip, leaving docs-hub serving the old render until AA happened to
-# move on its own, indefinitely, on a quiet weekend. Two paths bring a
-# build-only change to the hub: the `force` dispatch input, which rebuilds
-# and publishes in one run, and the republish gate below, which republishes
-# whenever the live page is behind main.
+# A build.py change can leave the capture unchanged and both gate builds equal
+# while the live page is stale. The `force` input rebuilds and publishes; the
+# republish gate also republishes when the live page is behind main.
 #
 # THE LIVE PAGE IS THE REPUBLISH GATE'S MEMORY (issue #206). The page HTML
 # embeds its own provenance: the source-commit stamp, rendered from
@@ -99,24 +72,12 @@ name: refresh
 # publishing it is that run's job. Nothing loops: a dropped hour is
 # re-fetched, re-tested and landed by the next hourly run.
 #
-# THE PAYLOAD AND THE TREE MUST BE ONE GENERATION (issue #202). The committer
-# replays this run's payload -- staged by the workflow at GITHUB_SHA -- over
-# whatever main's tip is by the time it fetches. While nothing lands, those
-# are the same commit. When a merge does land mid-run, the payload is shaped
-# by one generation of the workflow and main's tree by a newer one, and
-# copying one over the other stages paths the newer .gitignore refuses: run
-# 37291766447 replayed a6d74a6's payload onto 2e7f6bc and died on `git add
-# data/aa-disagreement-snapshot.json`, a path #200 had just retired. So the
-# committer TIES its payload to its own generation before it copies anything
-# and concedes the hour green when the two disagree -- no commit, no push, no
-# publish, next hour lands it. That is the push job's "main moved under the
-# run" outcome, at the point where the generations actually meet; nothing
-# loops either way. The concession's wording is true for every run that can
-# reach it: a run DISPATCHED off main never gets this far (the off-main gate
-# below drops it in the capture step, under its own truthful heading), and a
-# run QUEUED behind a predecessor that landed mid-queue IS a run main moved
-# under -- GITHUB_SHA is the creation-time tip, the checkout built the stale
-# tree, and the next hourly run lands the hour on the new tip.
+# THE PAYLOAD AND TREE MUST BE ONE GENERATION (issue #202): copying a payload
+# onto a newer main can stage paths its .gitignore no longer permits. Before
+# copying, the committer compares its tested base to fetched main and concedes
+# green without commit, push or publish when they differ; the next run retries.
+# Off-main dispatches drop earlier. A run queued behind a main update retains
+# its creation-time GITHUB_SHA and correctly concedes as a moved-base run.
 #
 # fetch_aa.py exits nonzero when the flight payload or the model schema changes
 # shape, when AA bumps the Intelligence Index version build.py is written
@@ -198,10 +159,7 @@ jobs:
       # the publish job's `if` reads through needs.refresh.outputs.
       proceed: ${{ steps.capture.outputs.proceed }}
 
-    # Sized for a FULL run -- pip + Chromium installs, the full suite with the
-    # browser -- not the 13-second unchanged-capture skip that most hours are.
-    # A hung run fails in 30 minutes instead of holding GitHub's 6-hour
-    # default.
+    # Bounds the capture, overlapping installs and full suite to 30 minutes.
     timeout-minutes: 30
 
     steps:
@@ -218,38 +176,138 @@ jobs:
           cache: pip
           cache-dependency-path: requirements-*.txt
 
-      # fetch_aa.py is pure stdlib (build.py, whose pins it reads, is too),
-      # so the capture runs before the toolchain exists: on the quiet
-      # majority of runs the capture is unchanged and `proceed` is false,
-      # and the two installs below are skipped entirely -- the gate decides
-      # whether the toolchain is needed at all, instead of paying 40-50 s of
-      # pip + Chromium on every no-op hour.
-      #
-      # One exit code, one colour: nonzero is the designed red -- schema
-      # change, index bump, fetch failure -- the signal to go re-read AA by
-      # hand. There is no route-disagreement exit (issue #200).
-      - name: Capture the leaderboard
-        # The id is the force gate's handle: "Did anything move?" reads this
-        # step's `captured` verdict through it (issue #103).
-        id: fetch
+      # The stdlib capture overlaps the installs during its spaced reads (issue #371).
+      - name: Start the leaderboard capture
+        id: start_capture
         run: |
-          # Explicit templates keep macOS mktemp inside TMPDIR too.
-          fetch_err="$(mktemp "${TMPDIR:-/tmp}/tmp.XXXXXXXXXX")"
-          trap 'rm -f "$fetch_err"' EXIT
-          set +e
-          python3 scripts/fetch_aa.py --cross-run-lookback 2> "$fetch_err"
-          rc=$?
-          set -e
+          # Isolate the capture so a failed PID write can stop its process group.
+          trap 'rc=$?; if [ "$rc" -ne 0 ] && [ -n "${capture_pid:-}" ]; then
+            kill -TERM -- "-$capture_pid" 2>/dev/null || :
+            wait "$capture_pid" 2>/dev/null || :
+          fi; exit "$rc"' EXIT
+          set -m
+          (
+            set +m
+            set +e
+            trap 'wait "${capture_child:-$!}" 2>/dev/null || :; exit 1' TERM
+            python3 scripts/fetch_aa.py --cross-run-lookback &
+            capture_child=$!
+            wait "$capture_child"
+            rc=$?
+            trap - TERM
+            printf '%s\n' "$rc" > "$RUNNER_TEMP/aa-capture.status"
+          ) < /dev/null > "$RUNNER_TEMP/aa-capture.stdout" 2> "$RUNNER_TEMP/aa-capture.stderr" &
+          capture_pid=$!
+          echo "$capture_pid" > "$RUNNER_TEMP/aa-capture.pid"
+          echo "pid=$capture_pid" >> "$GITHUB_OUTPUT"
 
+      - name: Install the test toolchain
+        env:
+          # No cp315 wheel exists and the C loader is unused.
+          PYYAML_FORCE_LIBYAML: "0"
+        # There is deliberately no `pip install --upgrade pip` here: the
+        # runner's stock pip installs the pinned manifest, so the unreviewed
+        # upgrade would be the one unpinned install in the job (issue #141).
+        run: |
+          python3 -m pip install -r requirements-test.txt
+
+      # Restore the newest snapshot; save by the install's resolved environment below.
+      - name: Cache Chromium dependency debs
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/ai-researcher-playwright-debs
+          key: chromium-debs-${{ runner.os }}-${{ github.run_id }}
+          restore-keys: chromium-debs-${{ runner.os }}-
+
+      - name: Install Chromium for playwright
+        id: chromium
+        # The browser binary is not a pip package, and playwright's own
+        # installer performs no integrity check: browsers.json publishes no
+        # digest and the installer never hashes a byte, so a bare install
+        # executes whatever the CDN hands over. scripts/ci/install_chromium.py
+        # verifies every archive against a committed sha256 first, pre-seeds
+        # the browsers directory so playwright's install has nothing left to
+        # download, and fails the run if anything was re-downloaded anyway.
+        # The verification keeps its point under the artifact split (issue
+        # #143): the browser produces the V8 coverage dump in tests.yml, and
+        # here it produces the page the suite verifies -- nothing a read-only
+        # job builds can touch main or the hub.
+        run: python3 scripts/ci/install_chromium.py
+
+      - name: Save Chromium dependency debs
+        if: steps.chromium.outputs.cache-changed == 'true'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/ai-researcher-playwright-debs
+          key: chromium-debs-${{ runner.os }}-${{ steps.chromium.outputs.cache-key }}-${{ github.run_id }}-${{ github.run_attempt }}
+
+      - name: Cache valgrind dependency debs
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/ai-researcher-valgrind-debs
+          key: valgrind-debs-${{ runner.os }}-${{ github.run_id }}
+          restore-keys: valgrind-debs-${{ runner.os }}-
+
+      - name: Install valgrind
+        id: valgrind
+        run: python3 scripts/ci/install_valgrind.py
+
+      - name: Save valgrind dependency debs
+        if: steps.valgrind.outputs.cache-changed == 'true'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/ai-researcher-valgrind-debs
+          key: valgrind-debs-${{ runner.os }}-${{ steps.valgrind.outputs.cache-key }}-${{ github.run_id }}-${{ github.run_attempt }}
+
+      # A failed capture is the signal to re-read AA; no route-disagreement exit exists (issue #200).
+      - name: Capture the leaderboard
+        id: fetch
+        if: ${{ !cancelled() }}
+        env:
+          AI_RESEARCHER_CAPTURE_PID: ${{ steps.start_capture.outputs.pid }}
+        run: |
+          cleanup_files=true
+          trap 'if [ "$cleanup_files" = true ]; then rm -f "$RUNNER_TEMP/aa-capture.pid" "$RUNNER_TEMP/aa-capture.status" "$RUNNER_TEMP/aa-capture.stdout" "$RUNNER_TEMP/aa-capture.stderr"; fi' EXIT
+          stop_capture() {
+            kill -KILL -- "-$1" 2>/dev/null || :
+            # A zombie has stopped even if its new parent has not reaped it.
+            for _ in {1..50}; do
+              states="$(ps -e -o pgid= -o stat=)" || break
+              if ! awk -v pgid="$1" '$1 == pgid && $2 !~ /^Z/ { alive=1 } END { exit !alive }' <<< "$states"; then return 0; fi
+              sleep 0.1
+            done
+            echo "Could not stop capture process group $1" >&2
+            cleanup_files=false
+            return 1
+          }
+          if [ ! -s "$RUNNER_TEMP/aa-capture.pid" ]; then
+            if [ -n "$AI_RESEARCHER_CAPTURE_PID" ] && [ ! -s "$RUNNER_TEMP/aa-capture.status" ]; then
+              stop_capture "$AI_RESEARCHER_CAPTURE_PID" || :
+            fi
+            echo "Capture start did not record a PID" >&2
+            exit 1
+          fi
+          pid="$(cat "$RUNNER_TEMP/aa-capture.pid")"
+          while [ ! -s "$RUNNER_TEMP/aa-capture.status" ]; do
+            if ! kill -0 "$pid" 2>/dev/null; then
+              if [ ! -s "$RUNNER_TEMP/aa-capture.status" ]; then
+                stop_capture "$pid" || :
+                if [ ! -s "$RUNNER_TEMP/aa-capture.status" ]; then
+                  echo "Capture process $pid ended without an exit status" >&2
+                  exit 1
+                fi
+              fi
+              break
+            fi
+            sleep 1
+          done
+          rc="$(cat "$RUNNER_TEMP/aa-capture.status")"
+          cat "$RUNNER_TEMP/aa-capture.stdout"
           if [ "$rc" -eq 0 ]; then
-            # captured=true is this step's verdict for the force gate in
-            # "Did anything move?" (issue #103): only a capture that ran
-            # may honor a forced rebuild.
             echo "captured=true" >> "$GITHUB_OUTPUT"
             exit 0
           fi
-
-          cat "$fetch_err" >&2
+          cat "$RUNNER_TEMP/aa-capture.stderr" >&2
           exit "$rc"
 
       - name: Did anything move?
@@ -271,12 +329,11 @@ jobs:
           # THE OFF-MAIN DISPATCH GATE (issue #206). workflow_dispatch can
           # target any branch, and a payload built from a non-main tree must
           # not land on main: the write half's generation tie would concede
-          # it anyway, but only after a full capture + pip + Chromium + suite
-          # had been paid, and under "main moved under the run" wording that
-          # blames main for a move that never happened. Scheduled runs always
+          # it only after the suite, and under wording that blames main for a
+          # move that never happened. Scheduled runs always
           # fire on the default branch, so a ref that is not
           # refs/heads/main IS an off-main dispatch by construction, and the
-          # hour is dropped green here, before anything expensive, under its
+          # hour is dropped green here, before rebuild and suite, under its
           # own truthful heading. (The ref reaches this shell as the env var
           # $AI_RESEARCHER_REF, not an inline template expression -- zizmor's
           # template-injection audit fails those in run text, and the env
@@ -431,69 +488,6 @@ jobs:
             fi
           fi
 
-      # Both installs gate on `proceed`, not `changed`: a republish run has
-      # an unchanged capture but still rebuilds and runs the suite, so it needs
-      # the toolchain exactly when a moved-capture run does.
-      - name: Install the test toolchain
-        if: steps.capture.outputs.proceed == 'true'
-        # There is deliberately no `pip install --upgrade pip` here: the
-        # runner's stock pip installs the pinned manifest, so the unreviewed
-        # upgrade would be the one unpinned install in the job (issue #141).
-        run: |
-          python3 -m pip install -r requirements-test.txt
-
-      # Restore the newest snapshot; save by the install's resolved environment below.
-      - name: Cache Chromium dependency debs
-        if: steps.capture.outputs.proceed == 'true'
-        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: ~/.cache/ai-researcher-playwright-debs
-          key: chromium-debs-${{ runner.os }}-${{ github.run_id }}
-          restore-keys: chromium-debs-${{ runner.os }}-
-
-      - name: Install Chromium for playwright
-        id: chromium
-        if: steps.capture.outputs.proceed == 'true'
-        # The browser binary is not a pip package, and playwright's own
-        # installer performs no integrity check: browsers.json publishes no
-        # digest and the installer never hashes a byte, so a bare install
-        # executes whatever the CDN hands over. scripts/ci/install_chromium.py
-        # verifies every archive against a committed sha256 first, pre-seeds
-        # the browsers directory so playwright's install has nothing left to
-        # download, and fails the run if anything was re-downloaded anyway.
-        # The verification keeps its point under the artifact split (issue
-        # #143): the browser produces the V8 coverage dump in tests.yml, and
-        # here it produces the page the suite verifies -- nothing a read-only
-        # job builds can touch main or the hub.
-        run: python3 scripts/ci/install_chromium.py
-
-      - name: Save Chromium dependency debs
-        if: steps.capture.outputs.proceed == 'true' && steps.chromium.outputs.cache-changed == 'true'
-        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: ~/.cache/ai-researcher-playwright-debs
-          key: chromium-debs-${{ runner.os }}-${{ steps.chromium.outputs.cache-key }}-${{ github.run_id }}-${{ github.run_attempt }}
-
-      - name: Cache valgrind dependency debs
-        if: steps.capture.outputs.proceed == 'true'
-        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: ~/.cache/ai-researcher-valgrind-debs
-          key: valgrind-debs-${{ runner.os }}-${{ github.run_id }}
-          restore-keys: valgrind-debs-${{ runner.os }}-
-
-      - name: Install valgrind
-        id: valgrind
-        if: steps.capture.outputs.proceed == 'true'
-        run: python3 scripts/ci/install_valgrind.py
-
-      - name: Save valgrind dependency debs
-        if: steps.capture.outputs.proceed == 'true' && steps.valgrind.outputs.cache-changed == 'true'
-        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: ~/.cache/ai-researcher-valgrind-debs
-          key: valgrind-debs-${{ runner.os }}-${{ steps.valgrind.outputs.cache-key }}-${{ github.run_id }}-${{ github.run_attempt }}
-
       - name: Summarise what changed
         # Runs on `proceed`, not `changed`: this is the ONLY step that executes
         # diff_aa.py, so gating it on the data moving meant a forced run could
@@ -604,20 +598,10 @@ jobs:
           if-no-files-found: error
 
       - name: Upload the capture on failure
-        # Issue #230: a run that fails AFTER the capture -- the gate, the
-        # rebuild or the suite -- used to leave that hour's capture files
-        # unretrievable, so a suite-vs-capture failure had to be reproduced
-        # from log lines instead of the exact capture that triggered it (the
-        # three red runs with zero artifacts). `failure()` fires on any
-        # failed step; the `captured` guard keeps the artifact honest: it is
-        # true only when fetch_aa.py exited 0, so the files on disk are this
-        # hour's capture (or HEAD's, when the gate restored an unchanged
-        # capture -- the bytes the failing steps actually ran against). A red
-        # CAPTURE (fetch_aa.py nonzero) uploads
-        # nothing -- the files under data/ would be HEAD's, or half-written,
-        # and naming them this hour's would mislead the reproduction. The
-        # write half stays down either way: a failed refresh job never
-        # reaches the publish job, so this artifact is diagnosability only.
+        # A successful capture can be uploaded after an install, gate, rebuild
+        # or suite failure (issue #230). The captured guard excludes partial
+        # captures; a quiet gate may have restored HEAD's data. A failed job
+        # cannot publish, so this artifact is for diagnosis only.
         if: failure() && steps.fetch.outputs.captured == 'true'
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
