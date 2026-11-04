@@ -11,10 +11,10 @@
       "id": "LiquidAI/LFM3-1.7B"
     },
     {
-      "id": "mistralai/Mistral-Large-4-1T-A52B"
+      "id": "speridlabs/idol"
     },
     {
-      "id": "speridlabs/idol"
+      "id": "mistralai/Mistral-Large-4-1T-A52B"
     },
     {
       "id": "Pika-Labs/Pika-H3-Flex"
@@ -26,10 +26,10 @@
       "id": "ccore/Qwen3.5-4B-3D-Coder"
     },
     {
-      "id": "burner22/numbat"
+      "id": "moonshotai/Kimi-K3.1-Pro"
     },
     {
-      "id": "FusionCow/Sulphur-3"
+      "id": "burner22/numbat"
     }
   ]
 }
