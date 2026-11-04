@@ -2,10 +2,10 @@
   "source": "https://huggingface.co/api/models?sort=trendingScore&limit=10",
   "models": [
     {
-      "id": "LiquidAI/LFM3-1.7B"
+      "id": "nvidia/NVIDIA-Nemotron-3.5-Transcribe-30B-A4B"
     },
     {
-      "id": "nvidia/NVIDIA-Nemotron-3.5-Transcribe-30B-A4B"
+      "id": "LiquidAI/LFM3-1.7B"
     },
     {
       "id": "deepseek-ai/DeepSeek-V4.1-Flash-1017"
@@ -17,10 +17,10 @@
       "id": "speridlabs/idol"
     },
     {
-      "id": "Lightricks/LTX-2.5"
+      "id": "Pika-Labs/Pika-H3-Flex"
     },
     {
-      "id": "Pika-Labs/Pika-H3-Flex"
+      "id": "Lightricks/LTX-2.5"
     },
     {
       "id": "ccore/Qwen3.5-4B-3D-Coder"
