@@ -17,7 +17,7 @@
     "shortName": "Claude Opus 5.5"
    },
    "suffix": "Max, Default Fallback",
-   "shortSuffix": "max with fallback",
+   "shortSuffix": "max",
    "isReasoning": true,
    "effort": {
     "slug": "max",
@@ -25,9 +25,9 @@
     "level": 60
    },
    "name": "Claude Opus 5.5 (Max, Default Fallback)",
-   "shortName": "Claude Opus 5.5 (max with fallback)"
+   "shortName": "Claude Opus 5.5 (max)"
   },
-  "shortLabel": "Claude Code - Claude Opus 5.5 (max with fallback)",
+  "shortLabel": "Claude Code - Claude Opus 5.5 (max)",
   "agentRelease": {
    "key": "Claude Code:claude-opus-5-5",
    "name": "Claude Code - Claude Opus 5.5"
@@ -1910,7 +1910,7 @@
     "shortName": "Claude Sonnet 5.5"
    },
    "suffix": "Max, Default Fallback",
-   "shortSuffix": "max with fallback",
+   "shortSuffix": "max",
    "isReasoning": true,
    "effort": {
     "slug": "max",
@@ -1918,9 +1918,9 @@
     "level": 60
    },
    "name": "Claude Sonnet 5.5 (Max, Default Fallback)",
-   "shortName": "Claude Sonnet 5.5 (max with fallback)"
+   "shortName": "Claude Sonnet 5.5 (max)"
   },
-  "shortLabel": "Claude Code - Claude Sonnet 5.5 (max with fallback)",
+  "shortLabel": "Claude Code - Claude Sonnet 5.5 (max)",
   "agentRelease": {
    "key": "Claude Code:claude-sonnet-5-5",
    "name": "Claude Code - Claude Sonnet 5.5"
@@ -12783,7 +12783,7 @@
     "shortName": "Claude Fable 5.1"
    },
    "suffix": "Max, Default Fallback",
-   "shortSuffix": "max with fallback",
+   "shortSuffix": "max",
    "isReasoning": true,
    "effort": {
     "slug": "max",
@@ -12791,9 +12791,9 @@
     "level": 60
    },
    "name": "Claude Fable 5.1 (Max, Default Fallback)",
-   "shortName": "Claude Fable 5.1 (max with fallback)"
+   "shortName": "Claude Fable 5.1 (max)"
   },
-  "shortLabel": "Claude Code - Claude Fable 5.1 (max with fallback)",
+  "shortLabel": "Claude Code - Claude Fable 5.1 (max)",
   "agentRelease": {
    "key": "Claude Code:claude-fable-5-1",
    "name": "Claude Code - Claude Fable 5.1"
