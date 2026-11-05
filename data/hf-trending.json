@@ -2,22 +2,13 @@
   "source": "https://huggingface.co/api/models?sort=trendingScore&limit=10",
   "models": [
     {
-      "id": "nvidia/NVIDIA-Nemotron-3.5-Transcribe-30B-A4B"
-    },
-    {
       "id": "moonshotai/Kimi-K3.1-Pro"
     },
     {
       "id": "speridlabs/idol"
     },
     {
-      "id": "deepseek-ai/DeepSeek-V4.1-Flash-1017"
-    },
-    {
       "id": "mistralai/Mistral-Large-4-1T-A52B"
-    },
-    {
-      "id": "LiquidAI/LFM3-1.7B"
     },
     {
       "id": "Pika-Labs/Pika-H3-Flex"
@@ -26,10 +17,19 @@
       "id": "Lightricks/LTX-2.5"
     },
     {
+      "id": "nvidia/NVIDIA-Nemotron-3.5-Transcribe-30B-A4B"
+    },
+    {
       "id": "ccore/Qwen3.5-4B-3D-Coder"
     },
     {
       "id": "burner22/numbat"
+    },
+    {
+      "id": "FusionCow/Sulphur-3"
+    },
+    {
+      "id": "deepseek-ai/DeepSeek-V4.1-Flash-1017"
     }
   ]
 }
