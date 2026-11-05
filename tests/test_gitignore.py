@@ -114,7 +114,7 @@ class GitignoreTrackableTests(unittest.TestCase):
     def test_the_paths_the_trending_workflow_commits_are_git_trackable(self):
         paths = added_paths()
         for path in ('data/hf-trending.json', 'data/openrouter-trending.json',
-                     'out/trending-rankings.html'):
+                     'data/github-stars.json', 'out/trending-rankings.html'):
             with self.subTest(path=path):
                 self.assertIn(path, paths)
                 verdict = check_ignore(["--no-index", "-q"], path)
@@ -150,7 +150,7 @@ def check_ignore(flags, path):
 
 
 # Synthetic probe paths: no real artifact would ever carry them. The data
-# block names the AA captures, both trending lists, `captured-at.txt`
+# block names the AA captures, the trending lists, `captured-at.txt`
 # and the optional cost-window marker; out/ names exactly one page. A future
 # legitimate negation names a concrete path, so it cannot match a synthetic
 # name and turn these probes falsely red. Any edit broad enough to un-deny a

@@ -17,6 +17,7 @@ import json
 import pathlib
 
 import fetch_http
+import trending_message
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 URL = "https://huggingface.co/api/models?sort=trendingScore&limit=10"
@@ -32,26 +33,7 @@ def fetch() -> list[dict[str, str]]:
 
 def message(old: list[dict[str, str]], new: list[dict[str, str]]) -> str:
     """Describe entries, departures and rank changes in upstream spelling."""
-    before = {model["id"]: rank for rank, model in enumerate(old, 1)}
-    after = {model["id"]: rank for rank, model in enumerate(new, 1)}
-    entered = [model for model in new if model["id"] not in before]
-    left = [model for model in old if model["id"] not in after]
-    moved = [model for model in new
-             if model["id"] in before
-             and before[model["id"]] != after[model["id"]]]
-    if entered:
-        subject = (f"Trending: {len(entered)} new in the top 10: "
-                   + ", ".join(model["id"] for model in entered))
-    elif moved:
-        subject = f"Trending: {len(moved)} rank change(s)"
-    else:
-        subject = "Trending: order updated"
-    # Ranks never carry "#": GitHub links "#N" in a commit message to issue N.
-    body = [f"NEW  rank {after[model['id']]} {model['id']}" for model in entered]
-    body += [f"OUT  {model['id']} (was rank {before[model['id']]})" for model in left]
-    body += [f"MOVE {model['id']} rank {before[model['id']]} -> "
-             f"{after[model['id']]}" for model in moved]
-    return subject + ("\n\n" + "\n".join(body) if body else "") + "\n"
+    return trending_message.message(old, new, "id", "Trending:", "new in the top 10")
 
 
 def main(argv: list[str] | None = None) -> None:

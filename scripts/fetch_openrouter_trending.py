@@ -17,6 +17,7 @@ import json
 import pathlib
 
 import fetch_http
+import trending_message
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 URL = "https://openrouter.ai/api/frontend/v1/models/find?order=top-weekly"
@@ -34,26 +35,7 @@ def fetch() -> list[dict[str, str]]:
 
 def message(old: list[dict[str, str]], new: list[dict[str, str]]) -> str:
     """Describe entries, departures and rank changes with explicit rank labels."""
-    before = {model["slug"]: rank for rank, model in enumerate(old, 1)}
-    after = {model["slug"]: rank for rank, model in enumerate(new, 1)}
-    entered = [model for model in new if model["slug"] not in before]
-    left = [model for model in old if model["slug"] not in after]
-    moved = [model for model in new
-             if model["slug"] in before
-             and before[model["slug"]] != after[model["slug"]]]
-    if entered:
-        subject = (f"Top 10: {len(entered)} new: "
-                   + ", ".join(model["slug"] for model in entered))
-    elif moved:
-        subject = f"Top 10: {len(moved)} rank change(s)"
-    else:
-        subject = "Top 10: order updated"
-    # Ranks never carry "#": GitHub links "#N" in a commit message to issue N.
-    body = [f"NEW  rank {after[model['slug']]} {model['slug']}" for model in entered]
-    body += [f"OUT  {model['slug']} (was rank {before[model['slug']]})" for model in left]
-    body += [f"MOVE {model['slug']} rank {before[model['slug']]} -> "
-             f"{after[model['slug']]}" for model in moved]
-    return subject + ("\n\n" + "\n".join(body) if body else "") + "\n"
+    return trending_message.message(old, new, "slug", "Top 10:", "new")
 
 
 def main(argv: list[str] | None = None) -> None:

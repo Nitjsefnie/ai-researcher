@@ -13,11 +13,10 @@ suite until something parses the YAML, so this file does -- structurally, on
 step shape and on substrings that name the mechanism, never on line numbers
 or whole-run-block equality that any reflow would break.
 
-There is NO route-disagreement state (issue #200): AA's two routes are
-independently cached, the leaderboard is the authority and the detail route
-fills shared-model gaps and adds detail-only models, so the workflow has one capture exit colour and one
-commit message for a moved capture. The pins below cover the recovery and the
-re-raise the Capture step keeps, not a dispute branch.
+There is NO route-disagreement state (issue #200): the leaderboard is the
+authority and the detail route fills gaps and adds detail-only models, so a
+moved capture has one exit colour and one commit message. The pins below cover
+the Capture step's recovery and re-raise, not a dispute branch.
 """
 from datetime import datetime, timezone
 import json
@@ -92,6 +91,7 @@ class GateTests(unittest.TestCase):  # pylint: disable=too-many-public-methods
             ('refresh', 'proceed', 'publish'),
             ('hf-fetch', 'changed', 'Hugging Face'),
             ('or-fetch', 'changed', 'OpenRouter'),
+            ('github-fetch', 'changed', 'GitHub'),
             ('rankings', 'changed', 'rankings page'),
         )
         self.assertEqual(job['needs'], [source[0] for source in sources])
@@ -103,15 +103,14 @@ class GateTests(unittest.TestCase):  # pylint: disable=too-many-public-methods
                     else 'Download the rankings page')
             self.assertEqual(pub_step(self.wf, name)['if'], term)
         self.assertIn('!cancelled()', job['if'])
-        self.assertEqual(job['if'].count('||'), 3)
+        self.assertEqual(job['if'].count('||'), 4)
 
     def test_one_push_environment_and_bounded_keyless_producers(self):
         jobs = self.wf['jobs']
-        self.assertEqual([name for name, job in jobs.items()
-                          if job.get('environment') == 'main-push'], ['push'])
+        self.assertEqual([name for name, job in jobs.items() if job.get('environment') == 'main-push'], ['push'])
         for name, job in jobs.items():
             self.assertGreater(job['timeout-minutes'], 0, name)
-        for name in ('hf-fetch', 'or-fetch', 'rankings'):
+        for name in ('hf-fetch', 'or-fetch', 'github-fetch', 'rankings'):
             self.assertNotIn('environment', jobs[name])
             self.assertNotIn('secrets.', json.dumps(jobs[name]))
 
@@ -515,8 +514,8 @@ class GateTests(unittest.TestCase):  # pylint: disable=too-many-public-methods
     def test_no_refs_api_call_remains(self):
         # Issue #206: the published ref and its refs-API move are retired --
         # the live page's embedded stamp is the publish record. No step in
-        # any job calls the refs API, names the branch, or maps the job
-        # token: nothing in this workflow writes to GitHub.
+        # any job calls the refs API, names the branch, or maps GH_TOKEN for
+        # gh: nothing in this workflow writes to GitHub.
         for job_name, job in self.wf["jobs"].items():
             for s in job["steps"]:
                 run = flattened(s.get("run", ""))
@@ -1589,9 +1588,9 @@ class DeployKeyPushTests(unittest.TestCase):
 
     def test_no_step_before_the_hub_job_holds_a_credential(self):
         # #143 and #133: the capture step pushes nothing, and the commit
-        # step's fetches went anonymous, so NO step before the hub job
-        # holds a credential at all. The deploy key lives only in the push
-        # job; the docs-hub key and the job token live only in the hub.
+        # step's fetches went anonymous, so NO step of the AA chain before
+        # the hub job holds a credential. The deploy key lives only in the
+        # push job, the docs-hub key only in the hubs.
         capture = step(self.wf, "Capture the leaderboard")
         commit = pub_step(self.wf, "Commit the refresh")
         push_step = step_in(self.wf, "push", "Push the tested tree to main")
@@ -1650,21 +1649,22 @@ def _marker_conditional() -> str:
 
 
 @pytest.mark.parametrize('states,expected', [
-    (('failure', 'true', 'success', 'true', 'failure', '', 'failure', ''), True),
-    (('success', 'true', 'failure', '', 'failure', '', 'failure', ''), True),
-    (('success', 'false', 'success', 'false', 'success', 'false', 'success', 'false'), False),
-    (('failure', '', 'failure', '', 'success', 'true', 'failure', ''), True),
-    (('failure', '', 'failure', '', 'failure', '', 'success', 'true'), True),
-    (('failure', 'true', 'failure', 'true', 'failure', 'true', 'failure', 'true'), False),
-    (('skipped', '', 'skipped', '', 'skipped', '', 'skipped', ''), False),
+    (('failure', 'true', 'success', 'true', 'failure', '', 'failure', '', 'failure', ''), True),
+    (('success', 'true', 'failure', '', 'failure', '', 'failure', '', 'failure', ''), True),
+    (('success', 'false', 'success', 'false', 'success', 'false', 'success', 'false', 'success', 'false'), False),
+    (('failure', '', 'failure', '', 'success', 'true', 'failure', '', 'failure', ''), True),
+    (('failure', '', 'failure', '', 'failure', '', 'success', 'true', 'failure', ''), True),
+    (('failure', '', 'failure', '', 'failure', '', 'failure', '', 'success', 'true'), True),
+    (('failure', 'true', 'failure', 'true', 'failure', 'true', 'failure', 'true', 'failure', 'true'), False),
+    (('skipped', '', 'skipped', '', 'skipped', '', 'skipped', '', 'skipped', ''), False),
 ])
 @pytest.mark.parametrize('cancelled', [False, True])
 def test_publish_condition_isolates_failures_and_quiet_hours(states, expected, cancelled):
     """Only a successful source with its participation output can open the join."""
     condition = load()['jobs']['publish']['if']
     condition = condition.replace('!cancelled()', str(not cancelled))
-    for offset, (source, output) in enumerate((('refresh', 'proceed'), ('hf-fetch', 'changed'),
-                                              ('or-fetch', 'changed'), ('rankings', 'changed'))):
+    for offset, (source, output) in enumerate((('refresh', 'proceed'), ('hf-fetch', 'changed'), ('or-fetch', 'changed'),
+                                              ('github-fetch', 'changed'), ('rankings', 'changed'))):
         result, changed = states[offset * 2:offset * 2 + 2]
         condition = condition.replace(f"needs.{source}.result == 'success'",
                                       str(result == 'success'))
@@ -1830,7 +1830,7 @@ class HFTrackerStructureTests(unittest.TestCase):
     """Trackers stage isolated snapshots without a commit or credential."""
 
     tracker = 'hf'
-    fetcher = 'hf'
+    script = 'fetch_hf_trending.py'
 
     def tracker_step(self, job, name):
         return step_in(load(), f'{self.tracker}-{job}', name)
@@ -1854,7 +1854,7 @@ class HFTrackerStructureTests(unittest.TestCase):
 
     def test_capture_and_payload_are_keyless_and_never_commit(self):
         self.assertEqual(self.tracker_step('fetch', 'Fetch the top 10')['run'],
-                         f'python3 scripts/fetch_{self.fetcher}_trending.py --message "$RUNNER_TEMP/message"')
+                         f'python3 scripts/{self.script} --message "$RUNNER_TEMP/message"')
         for entry in load()['jobs'][f'{self.tracker}-fetch']['steps']:
             run = commands(entry.get('run', ''))
             self.assertNotRegex(run, r'git (commit|bundle|push|branch)')
@@ -1863,7 +1863,7 @@ class HFTrackerStructureTests(unittest.TestCase):
     def test_payload_upload_and_download_agree(self):
         wf = load()
         upload = self.tracker_step('fetch', 'Upload the payload')
-        name = 'Hugging Face' if self.tracker == 'hf' else 'OpenRouter'
+        name = {'hf': 'Hugging Face', 'or': 'OpenRouter', 'github': 'GitHub'}[self.tracker]
         for job in ('rankings', 'publish'):
             download = step_in(wf, job, f'Download the {name} payload')
             self.assertEqual(upload['with']['name'], download['with']['name'])
@@ -1873,7 +1873,7 @@ class HFTrackerStructureTests(unittest.TestCase):
 
 class ORTrackerStructureTests(HFTrackerStructureTests):
     tracker = 'or'
-    fetcher = 'openrouter'
+    script = 'fetch_openrouter_trending.py'
 
 
 class RankingsStructureTests(unittest.TestCase):
@@ -1884,10 +1884,10 @@ class RankingsStructureTests(unittest.TestCase):
 
     def test_rankings_waits_for_fetches_and_runs_every_hour_on_main(self):
         job = self.wf['jobs']['rankings']
-        self.assertEqual(job['needs'], ['hf-fetch', 'or-fetch'])
+        self.assertEqual(job['needs'], ['hf-fetch', 'or-fetch', 'github-fetch'])
         self.assertEqual(job['if'], "!cancelled() && github.ref == 'refs/heads/main'")
         self.assertEqual(job['outputs'], {'changed': '${{ steps.commit.outputs.changed }}'})
-        for tracker, name in (('hf', 'Hugging Face'), ('or', 'OpenRouter')):
+        for tracker, name in (('hf', 'Hugging Face'), ('or', 'OpenRouter'), ('github', 'GitHub')):
             download = step_in(self.wf, 'rankings', f'Download the {name} payload')
             self.assertEqual(download['if'],
                              f"needs.{tracker}-fetch.result == 'success' && "
@@ -1952,7 +1952,7 @@ class RankingsStructureTests(unittest.TestCase):
     def test_rankings_upload_mirrors_the_hub_wire_format(self):
         run = commands(step_in(self.wf, 'rankings-hub', 'Publish to docs-hub')['run'])
         for piece in ("-F 'slug=ai-researcher/trending-rankings'",
-                      "-F 'title=Trending rankings — Hugging Face & OpenRouter top 10 over time'",
+                      "-F 'title=Trending rankings — Hugging Face, OpenRouter & GitHub top 10 over time'",
                       "-F 'tags=trending,rankings,ai'",
                       "-F 'project=ai-researcher'", "-F 'from=ai-researcher'",
                       "-F 'file=@out/trending-rankings.html;type=text/html'",
@@ -2140,8 +2140,8 @@ def test_rankings_quiet_hour_recovers_a_failed_upload(tmp_path):
     assert page.read_bytes() == original
     assert (quiet / 'output.txt').read_text() == 'changed=false\n'
     publish = load()['jobs']['publish']['if'].replace('!cancelled()', 'True')
-    for source, output in (('refresh', 'proceed'), ('hf-fetch', 'changed'),
-                           ('or-fetch', 'changed'), ('rankings', 'changed')):
+    for source, output in (('refresh', 'proceed'), ('hf-fetch', 'changed'), ('or-fetch', 'changed'),
+                           ('github-fetch', 'changed'), ('rankings', 'changed')):
         publish = publish.replace(f'needs.{source}.result', repr('success'))
         publish = publish.replace(f'needs.{source}.outputs.{output}', repr('false'))
     assert not eval(publish.replace('&&', 'and').replace('||', 'or'),  # pylint: disable=eval-used
@@ -2440,7 +2440,7 @@ def test_rankings_hub_upload_verdicts(tmp_path, main, live, code, body, expected
     assert request[request.index('-H') + 1] == 'x-docs-key: fixture'
     assert [request[i + 1] for i, arg in enumerate(request) if arg == '-F'] == [
         'slug=ai-researcher/trending-rankings',
-        'title=Trending rankings — Hugging Face & OpenRouter top 10 over time',
+        'title=Trending rankings — Hugging Face, OpenRouter & GitHub top 10 over time',
         'tags=trending,rankings,ai', 'project=ai-researcher', 'from=ai-researcher',
         'file=@out/trending-rankings.html;type=text/html']
     assert (runner / 'page/out/trending-rankings.html').read_bytes() == page.read_bytes()
@@ -2539,7 +2539,7 @@ class HFTrackerExecutedStepsTests(unittest.TestCase):
     def test_fetch_script_is_invoked_with_message_and_failure_propagates(self):
         scripts = self.repo / 'scripts'
         scripts.mkdir()
-        for script in (f'fetch_{self.fetcher}_trending.py', 'fetch_http.py'):
+        for script in (f'fetch_{self.fetcher}_trending.py', 'fetch_http.py', 'trending_message.py'):
             shutil.copyfile(ROOT / 'scripts' / script, scripts / script)
         # A sitecustomize stub answers the fetcher's network boundary only.
         stub = self.root / 'stub'

@@ -10,12 +10,14 @@ model AA has not measured is absent from the page, not
 estimated from a lab blog or a pricing page. That is a standing decision, and
 `AGENTS.md` carries the reasoning; read it before changing what the page shows.
 
-The Hugging Face trending and OpenRouter weekly top-10 lists are separate
-tracked outputs: `scripts/fetch_hf_trending.py` writes `data/hf-trending.json`,
-and `scripts/fetch_openrouter_trending.py` writes `data/openrouter-trending.json`.
-The joined `.github/workflows/refresh.yml` updates both hourly and publishes
+The Hugging Face trending, OpenRouter weekly and GitHub most-starred top-10
+lists are separate tracked outputs: `scripts/fetch_hf_trending.py` writes
+`data/hf-trending.json`, `scripts/fetch_openrouter_trending.py` writes
+`data/openrouter-trending.json`, and `scripts/fetch_github_stars.py` writes
+`data/github-stars.json`. The joined `.github/workflows/refresh.yml` updates
+all three hourly and publishes
 [trending rankings over time](https://docs.nitjsefni.eu/d/ai-researcher/trending-rankings)
-from their git history. Neither tracker feeds the frontier page.
+from their git history. No tracker feeds the frontier page.
 
 ## What the page plots
 
