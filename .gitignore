@@ -99,8 +99,7 @@
 # ---- tests/fixtures/ — the committed pipeline fixture -----------------------
 # The fixed captures scripts/ci/instruction_budgets.py measures (issue #110):
 # pinned bytes so the instruction budgets stay invariant to live-capture
-# growth. Regenerated only via the generator in
-# tests/test_ci_instruction_budgets.py, never hand-edited.
+# growth.
 !/tests/fixtures/
 /tests/fixtures/*
 !/tests/fixtures/pipeline/

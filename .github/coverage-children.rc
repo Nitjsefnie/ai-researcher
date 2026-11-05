@@ -19,9 +19,9 @@
 #
 # include: the only file a child should ever measure is the reporter
 # itself. Every other Python child of the suite (the gh test double, the
-# nested pytest of the checkout-clean pin, the fixtures) is deliberately
-# NOT measured — their files live under tests/ and in temp trees, and
-# measuring them would put non-shipped files into the ratchet's totals.
+# fixtures) is deliberately NOT measured — their files live under tests/
+# and in temp trees, and measuring them would put non-shipped files into
+# the ratchet's totals.
 [run]
 parallel = True
 include = */scripts/ci/diff_coverage.py

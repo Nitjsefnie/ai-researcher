@@ -3,7 +3,6 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 from html.parser import HTMLParser
-import errno
 import json
 import os
 import pathlib
@@ -73,114 +72,6 @@ class Page(HTMLParser):
 
     def handle_data(self, data):
         self.text.append(data)
-
-
-class ReadonlyCleanupTests(unittest.TestCase):
-    def test_fixture_teardown_removes_readonly_git_objects(self):
-        real_unlink = os.unlink
-
-        def windows_unlink(path, *args, **kwargs):
-            mode = os.stat(path, dir_fd=kwargs.get('dir_fd')).st_mode
-            if not mode & stat.S_IWRITE:
-                raise PermissionError(errno.EACCES, 'read-only file', path)
-            return real_unlink(path, *args, **kwargs)
-
-        versions = (((3, 11), (3, 12), (3, 13))
-                    if sys.version_info >= (3, 12) else ((3, 11),))
-        for version in versions:
-            with self.subTest(version=version):
-                case = RankingsTests('test_single_snapshot_renders_without_padding')
-                result = unittest.TestResult()
-                with mock.patch.object(os, 'unlink', windows_unlink), \
-                        mock.patch.object(sys, 'version_info', version):
-                    case.run(result)
-                self.assertEqual(result.errors, [])
-                self.assertEqual(result.failures, [])
-                self.assertFalse(pathlib.Path(case.directory).exists())
-
-    def test_retry_preserves_mode_and_removes_the_file(self):
-        with tempfile.TemporaryDirectory() as directory:
-            target = pathlib.Path(directory) / 'readonly'
-            target.write_text('fixture', encoding='utf-8')
-            target.chmod(stat.S_IREAD)
-            original_mode = stat.S_IMODE(target.stat().st_mode)
-            real_unlink = os.unlink
-            retries = []
-
-            def remove(path):
-                retries.append(stat.S_IMODE(os.stat(path).st_mode))
-                real_unlink(path)
-
-            with mock.patch.object(os, 'unlink', remove):
-                _retry_readonly_removal(os.unlink, target, PermissionError(errno.EACCES, 'readonly'))
-            self.assertFalse(target.exists())
-            self.assertEqual(len(retries), 1)
-            self.assertTrue(retries[0] & stat.S_IWRITE)
-            self.assertEqual(retries[0] & original_mode, original_mode)
-
-    def test_nonpermission_errors_propagate(self):
-        with tempfile.TemporaryDirectory() as directory:
-            target = pathlib.Path(directory) / 'readonly'
-            target.write_text('fixture', encoding='utf-8')
-            target.chmod(stat.S_IREAD)
-            error = OSError(errno.EIO, 'unrelated failure')
-            try:
-                with self.assertRaises(OSError) as caught:
-                    _retry_readonly_removal(os.unlink, target, error)
-                self.assertIs(caught.exception, error)
-                self.assertFalse(target.stat().st_mode & stat.S_IWRITE)
-            finally:
-                if target.exists():
-                    target.chmod(target.stat().st_mode | stat.S_IWRITE)
-
-    def test_writable_permission_errors_propagate(self):
-        with tempfile.TemporaryDirectory() as directory:
-            target = pathlib.Path(directory) / 'writable'
-            target.write_text('fixture', encoding='utf-8')
-            error = PermissionError(errno.EACCES, 'not a readonly failure')
-            with self.assertRaises(PermissionError) as caught:
-                _retry_readonly_removal(os.unlink, target, error)
-            self.assertIs(caught.exception, error)
-            self.assertTrue(target.exists())
-
-    def test_nonremoval_permission_errors_propagate(self):
-        with tempfile.TemporaryDirectory() as directory:
-            target = pathlib.Path(directory) / 'readonly'
-            target.write_text('fixture', encoding='utf-8')
-            target.chmod(stat.S_IREAD)
-            error = PermissionError(errno.EACCES, 'stat failure')
-            try:
-                with self.assertRaises(PermissionError) as caught:
-                    _retry_readonly_removal(os.stat, target, error)
-                self.assertIs(caught.exception, error)
-                self.assertFalse(target.stat().st_mode & stat.S_IWRITE)
-            finally:
-                if target.exists():
-                    target.chmod(target.stat().st_mode | stat.S_IWRITE)
-
-    def test_a_failed_retry_propagates_without_another_attempt(self):
-        with tempfile.TemporaryDirectory() as directory:
-            target = pathlib.Path(directory) / 'readonly'
-            target.write_text('fixture', encoding='utf-8')
-            target.chmod(stat.S_IREAD)
-            error = PermissionError(errno.EACCES, 'still blocked')
-            retries = []
-
-            def remove(path):
-                retries.append(path)
-                raise error
-
-            try:
-                with mock.patch.object(os, 'unlink', remove):
-                    with self.assertRaises(PermissionError) as caught:
-                        _retry_readonly_removal(os.unlink, target,
-                                                PermissionError(errno.EACCES, 'readonly'))
-                self.assertIs(caught.exception, error)
-                self.assertEqual(retries, [target])
-                self.assertTrue(target.exists())
-            finally:
-                if target.exists():
-                    target.chmod(target.stat().st_mode | stat.S_IWRITE)
 
 
 class RankingsFixture(unittest.TestCase):

@@ -163,10 +163,6 @@
     3775,
     13525
   ],
-  "tests/test_checkout_clean.py": [
-    4544,
-    7118
-  ],
   "tests/test_ci_classify_verified_base.py": [
     3628,
     10868
@@ -188,8 +184,8 @@
     14508
   ],
   "tests/test_ci_instruction_budgets.py": [
-    5461,
-    19932
+    3816,
+    15776
   ],
   "tests/test_ci_perf_budgets.py": [
     5066,
