@@ -14,10 +14,10 @@
       "id": "Lightricks/LTX-2.5"
     },
     {
-      "id": "mistralai/Mistral-Large-4-1T-A52B"
+      "id": "ccore/Qwen3.5-4B-3D-Coder"
     },
     {
-      "id": "ccore/Qwen3.5-4B-3D-Coder"
+      "id": "mistralai/Mistral-Large-4-1T-A52B"
     },
     {
       "id": "nvidia/NVIDIA-Nemotron-3.5-Transcribe-30B-A4B"
