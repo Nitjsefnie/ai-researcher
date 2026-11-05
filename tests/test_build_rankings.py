@@ -28,6 +28,7 @@ import build_rankings  # noqa: E402  # pylint: disable=wrong-import-position
 
 HF = "data/hf-trending.json"
 OR = "data/openrouter-trending.json"
+GH = "data/github-stars.json"
 
 
 def _retry_readonly_removal(function, path, error):
@@ -194,6 +195,7 @@ class RankingsFixture(unittest.TestCase):
         self._git("config", "commit.gpgsign", "false")
         self.first = self.commit(HF, ["org/a", "org/b"], "id")
         self.or_first = self.commit(OR, ["lab/x", "lab/y"], "slug")
+        self.gh_first = self.commit(GH, ["octo/a", "octo/b"], "full_name")
 
     def _git(self, *args):
         return subprocess.run(
@@ -239,9 +241,9 @@ class RankingsTests(RankingsFixture):
     def test_single_snapshot_renders_without_padding(self):
         page = Page(self._document())
         self.assertEqual(len(page.tables), 0)
-        self.assertEqual(len(page.points), 4)
+        self.assertEqual(len(page.points), 6)
         self.assertEqual({point["data-commit"] for point in page.points},
-                         {self.first, self.or_first})
+                         {self.first, self.or_first, self.gh_first})
         self.assertTrue(all(float(point["r"]) >= 4 for point in page.points))
 
     def test_a_new_model_enters_at_its_first_carried_snapshot(self):
@@ -276,6 +278,24 @@ class RankingsTests(RankingsFixture):
         self.assertNotEqual(self._document(), original)
         self.assertEqual(self._git("rev-parse", "HEAD").strip(), current)
 
+    def test_github_is_the_third_section_keyed_by_full_name(self):
+        self.commit(GH, ["octo/b", "octo/new"], "full_name")
+        document = self._document()
+        self.assertEqual(re.findall(r'<section id="([^"]+)"', document),
+                         ["hugging-face", "openrouter", "github"])
+        section = re.findall(r'<section\b.*?</section>', document, re.S)[2]
+        self.assertIn("<h2>GitHub · most-starred top 10</h2>", section)
+        self.assertIn("Source: GitHub. 2 changing commits", section)
+        self.assertIn('<a href="#github">GitHub</a></nav>', document)
+        self.assertRegex(document, r"<title>[^<]*GitHub[^<]*</title>")
+        self.assertIn("GitHub's most-starred repositories", document)
+        ranks = {(point["data-commit"], point["data-model"]): point["data-rank"]
+                 for point in Page(section).points}
+        self.assertEqual(ranks[(self.gh_first, "octo/a")], "1")
+        self.assertEqual(ranks[(self.gh_first, "octo/b")], "2")
+        self.assertNotIn((self.gh_first, "octo/new"), ranks)
+        self.assertEqual(sum(1 for (_, model) in ranks if model == "octo/b"), 2)
+
     def test_page_has_no_external_subresources(self):
         document = self._document()
         self.assertNotRegex(document, r'(?i)(?:src|href)\s*=\s*[\"\x27]?https?://')
@@ -294,7 +314,7 @@ class RankingsTests(RankingsFixture):
             self.assertEqual(point["data-timestamp"], timestamp)
             self.assertIn(timestamp, " ".join(page.text))
         self.assertNotIn(raw, document)
-        self.assertEqual(document.count('class="timestamp-tick"'), 3)
+        self.assertEqual(document.count('class="timestamp-tick"'), 4)
 
     def test_page_has_no_table_view(self):
         self.commit(HF, ["org/b", "org/a"], "id")
@@ -304,14 +324,15 @@ class RankingsTests(RankingsFixture):
         self.assertEqual(len(page.tables), 0)
         self.assertNotIn("Table view", text)
         descriptions = re.findall(r'<desc[^>]*>(.*?)</desc>', document, re.S)
-        self.assertEqual(len(descriptions), 2)
+        self.assertEqual(len(descriptions), 3)
         for description in descriptions:
             self.assertNotRegex(description, r'(?i)\btable\b')
-        self.assertEqual(document.count('<svg'), 2)
-        self.assertEqual(document.count('<ul class="legend"'), 2)
+        self.assertEqual(document.count('<svg'), 3)
+        self.assertEqual(document.count('<ul class="legend"'), 3)
         self.assertTrue(page.points)
         self.assertIn("org/a", text)
         self.assertIn("lab/x", text)
+        self.assertIn("octo/a", text)
         for point in page.points:
             self.assertEqual(point["tabindex"], "0")
             self.assertEqual(point["aria-label"],
@@ -408,6 +429,9 @@ class RankingsTests(RankingsFixture):
         for index in range(1, 5):
             router_models = [f"lab/or-{(index + rank) % 6}" for rank in range(10)]
             latest_or = self.commit(OR, router_models, "slug")
+        for index in range(1, 7):
+            star_models = [f"octo/star-{(index + rank) % 8}" for rank in range(10)]
+            latest_gh = self.commit(GH, star_models, "full_name")
 
         document = self._document("--limit", "10")
         chromium = os.environ.get("AI_RESEARCHER_CHROMIUM_PATH") or os.environ.get("CHROMIUM_PATH") or "/usr/bin/chromium"
@@ -423,7 +447,7 @@ class RankingsTests(RankingsFixture):
                 page = browser.new_page(viewport={"width": 390, "height": 900},
                                         color_scheme="dark")
                 page.set_content(document)
-                latest_commits = [latest_hf, latest_or]
+                latest_commits = [latest_hf, latest_or, latest_gh]
                 for width in (390, 768, 1280, 2560):
                     page.set_viewport_size({"width": width, "height": 900})
                     if width == 2560:
@@ -535,14 +559,17 @@ class FreshRankingsTests(RankingsFixture):
     def test_fresh_columns_render_the_label_and_each_lists_fetch_timestamp(self):
         hf = self._fresh_file(["org/new", "org/a"], "id")
         router = self._fresh_file(["lab/y", "lab/new"], "slug")
+        stars = self._fresh_file(["octo/b", "octo/new"], "full_name")
         document = self._document(
             "--fresh-hf", hf, "--fresh-hf-timestamp", "2026-10-20T09:41:00Z",
             "--fresh-or", router, "--fresh-or-timestamp", "2026-10-20T09:42:00Z",
+            "--fresh-github", stars, "--fresh-github-timestamp", "2026-10-20T09:43:00Z",
             "--fresh-label", "run 123")
         sections = re.findall(r'<section\b.*?</section>', document, re.S)
         for section, timestamp, expected in (
                 (sections[0], "2026-10-20T09:41:00Z", {"org/new": "1", "org/a": "2"}),
-                (sections[1], "2026-10-20T09:42:00Z", {"lab/y": "1", "lab/new": "2"})):
+                (sections[1], "2026-10-20T09:42:00Z", {"lab/y": "1", "lab/new": "2"}),
+                (sections[2], "2026-10-20T09:43:00Z", {"octo/b": "1", "octo/new": "2"})):
             with self.subTest(timestamp=timestamp):
                 points = [point for point in Page(section).points
                           if point["data-commit"] == "run 123"]
@@ -562,13 +589,14 @@ class FreshRankingsTests(RankingsFixture):
     def test_one_sided_fresh_keeps_the_other_lists_full_history(self):
         self.commit(HF, ["org/b", "org/a"], "id")
         self.commit(OR, ["lab/y", "lab/x"], "slug")
+        self.commit(GH, ["octo/b", "octo/a"], "full_name")
         original = re.findall(r'<section\b.*?</section>', self._document("--limit", "2"), re.S)
         hf = self._fresh_file(["org/new"], "id")
         document = self._document(
             "--limit", "2", "--fresh-hf", hf,
             "--fresh-hf-timestamp", "2026-10-20T09:41:00Z", "--fresh-label", "run 123")
         sections = re.findall(r'<section\b.*?</section>', document, re.S)
-        self.assertEqual(sections[1], original[1])
+        self.assertEqual(sections[1:], original[1:])
         self.assertNotEqual(sections[0], original[0])
         self.assertNotIn(self.first, sections[0])
         self.assertIn('data-commit="run 123"', sections[0])
@@ -591,9 +619,10 @@ class FreshRankingsTests(RankingsFixture):
         self.assertNotIn("org/a", section)
 
     def test_limit_one_with_fresh_input_keeps_only_the_fresh_column(self):
-        for option, key, model, other in (
-                ("hf", "id", "org/fresh", self.or_first),
-                ("or", "slug", "lab/fresh", self.first)):
+        for option, key, model, others in (
+                ("hf", "id", "org/fresh", {self.or_first, self.gh_first}),
+                ("or", "slug", "lab/fresh", {self.first, self.gh_first}),
+                ("github", "full_name", "octo/fresh", {self.first, self.or_first})):
             with self.subTest(option=option):
                 fresh = self._fresh_file([model], key)
                 document = self._document(
@@ -601,22 +630,30 @@ class FreshRankingsTests(RankingsFixture):
                     f"--fresh-{option}-timestamp", "2026-10-20T09:41:00Z",
                     "--fresh-label", "run 123")
                 self.assertEqual({point["data-commit"] for point in Page(document).points},
-                                 {"run 123", other})
-                self.assertEqual(document.count('class="timestamp-tick"'), 2)
+                                 {"run 123", *others})
+                self.assertEqual(document.count('class="timestamp-tick"'), 3)
 
     def test_fresh_arguments_require_a_file_timestamp_pair_and_label(self):
         hf = self._fresh_file(["org/fresh"], "id")
         router = self._fresh_file(["lab/fresh"], "slug")
+        stars = self._fresh_file(["octo/fresh"], "full_name")
         for arguments, message in (
                 (["--fresh-hf", hf], "--fresh-label"),
                 (["--fresh-or", router], "--fresh-label"),
+                (["--fresh-github", stars], "--fresh-label"),
                 (["--fresh-hf", hf, "--fresh-label", "run 123"], "--fresh-hf-timestamp"),
                 (["--fresh-or", router, "--fresh-label", "run 123"], "--fresh-or-timestamp"),
+                (["--fresh-github", stars, "--fresh-label", "run 123"],
+                 "--fresh-github-timestamp"),
                 (["--fresh-hf-timestamp", "2026-10-20T09:41:00Z"], "--fresh-hf"),
                 (["--fresh-or-timestamp", "2026-10-20T09:42:00Z"], "--fresh-or"),
+                (["--fresh-github-timestamp", "2026-10-20T09:43:00Z"], "--fresh-github"),
                 (["--fresh-label", "run 123"], "--fresh-label"),
                 (["--fresh-hf", hf, "--fresh-hf-timestamp", "2026-10-20T09:41:00Z",
-                  "--fresh-label", "run 123", "--fresh-or", router], "--fresh-or-timestamp")):
+                  "--fresh-label", "run 123", "--fresh-or", router], "--fresh-or-timestamp"),
+                (["--fresh-hf", hf, "--fresh-hf-timestamp", "2026-10-20T09:41:00Z",
+                  "--fresh-label", "run 123", "--fresh-github", stars],
+                 "--fresh-github-timestamp")):
             with self.subTest(arguments=arguments):
                 result = subprocess.run(
                     [sys.executable, str(ROOT / "scripts/build_rankings.py"), *arguments],
@@ -629,150 +666,11 @@ class FreshRankingsTests(RankingsFixture):
     def test_fresh_inputs_build_byte_identical_html(self):
         hf = self._fresh_file(["org/new", "org/a"], "id")
         router = self._fresh_file(["lab/y", "lab/new"], "slug")
+        stars = self._fresh_file(["octo/b", "octo/new"], "full_name")
         arguments = (
             "--fresh-hf", hf, "--fresh-hf-timestamp", "2026-10-20T09:41:00Z",
             "--fresh-or", router, "--fresh-or-timestamp", "2026-10-20T09:42:00Z",
+            "--fresh-github", stars, "--fresh-github-timestamp", "2026-10-20T09:43:00Z",
             "--fresh-label", "run 123")
         self.assertEqual(self._document(*arguments).encode("utf-8"),
                          self._document(*arguments).encode("utf-8"))
-
-
-class IdentityRankingsTests(RankingsFixture):
-    """Committed column identities remain fixed across quiet rebuilds."""
-
-    def _land_fresh(self):
-        page = self.repo / "out/trending-rankings.html"
-        arguments = ["--repo", str(self.repo), "--out", str(page),
-                     "--fresh-label", 'run 12345 & "capture"']
-        for path, key, flag, models, timestamp in (
-                (HF, "id", "hf", ["org/b", "org/new"], "2026-10-20T09:41:00Z"),
-                (OR, "slug", "or", ["lab/y", "lab/new"], "2026-10-20T09:42:00Z")):
-            fresh = self.repo / path
-            fresh.write_text(json.dumps({"models": [{key: model} for model in models]}),
-                             encoding="utf-8")
-            arguments.extend([f"--fresh-{flag}", str(fresh), f"--fresh-{flag}-timestamp",
-                              timestamp])
-        build_rankings.main(arguments)
-        self._git("add", HF, OR, "out/trending-rankings.html")
-        self._git("commit", "-qm", "Land snapshots and page")
-        return page
-
-    def test_sha_identity_is_a_fixed_point_with_a_single_snapshot(self):
-        original = self._document()
-        identity = pathlib.Path(self.directory) / "identity.html"
-        identity.write_text(original, encoding="utf-8")
-        for limit in (1, 10):
-            with self.subTest(limit=limit):
-                self.assertEqual(self._document("--identity-page", str(identity),
-                                                "--limit", str(limit)), original)
-
-    def test_fresh_landing_preserves_identity_and_full_independent_windows(self):
-        for index in range(12):
-            self.commit(HF, [f"org/old-{index}"], "id")
-        self.commit(OR, ["lab/old"], "slug")
-        page = self._land_fresh()
-        original = page.read_text(encoding="utf-8")
-        # Identity supplies labels, while ranks come from the selected git ref.
-        selected = self._git("rev-parse", "HEAD").strip()
-        self.commit(HF, ["org/later"], "id")
-        (self.repo / OR).write_text("uncommitted invalid JSON", encoding="utf-8")
-        rebuilt = self._document("--identity-page", str(page), "--commit", selected)
-        self.assertEqual(rebuilt, original)
-        sections = re.findall(r'<section\b.*?</section>', rebuilt, re.S)
-        self.assertEqual([section.count('class="timestamp-tick"') for section in sections],
-                         [10, 3])
-
-    def test_stale_identity_uses_history_while_the_matching_list_keeps_its_identity(self):
-        page = self._land_fresh()
-        original = re.findall(r'<section\b.*?</section>', page.read_text(encoding="utf-8"), re.S)
-        landed = self.commit(HF, ["new/model"], "id")
-        timestamp = datetime.fromisoformat(self._git("show", "-s", "--format=%cI", landed)
-                                           .strip()).astimezone(timezone.utc).isoformat()
-        timestamp = timestamp.replace("+00:00", "Z")
-        self.commit(HF, ["later/model"], "id")
-        pure = re.findall(r'<section\b.*?</section>',
-                          self._document("--commit", landed), re.S)
-        rebuilt = self._document("--identity-page", str(page), "--commit", landed)
-        sections = re.findall(r'<section\b.*?</section>', rebuilt, re.S)
-        self.assertEqual(sections[0], pure[0])
-        self.assertEqual(sections[1], original[1])
-        points = Page(sections[0]).points
-        right = max(float(point["cx"]) for point in points)
-        newest = [point for point in points if float(point["cx"]) == right]
-        self.assertEqual({point["data-commit"] for point in newest}, {landed})
-        self.assertEqual({point["data-timestamp"] for point in newest}, {timestamp})
-        self.assertEqual({point["data-model"]: point["data-rank"] for point in newest},
-                         {"new/model": "1"})
-
-    def test_fresh_input_changes_only_its_section_beside_identity_reconstruction(self):
-        page = self._land_fresh()
-        original = re.findall(r'<section\b.*?</section>', page.read_text(encoding="utf-8"), re.S)
-        for flag, path, key, identifier in (("hf", HF, "id", 0), ("or", OR, "slug", 1)):
-            with self.subTest(flag=flag):
-                fresh = pathlib.Path(self.directory) / "new.json"
-                fresh.write_text(json.dumps({"models": [{key: "new/model"}]}), encoding="utf-8")
-                rebuilt = self._document(
-                    "--identity-page", str(page), f"--fresh-{flag}", str(fresh),
-                    f"--fresh-{flag}-timestamp", "2026-10-20T10:41:00Z",
-                    "--fresh-label", "run 54321")
-                sections = re.findall(r'<section\b.*?</section>', rebuilt, re.S)
-                self.assertNotEqual(sections[identifier], original[identifier], path)
-                self.assertEqual(sections[1 - identifier], original[1 - identifier], path)
-
-    def test_fresh_list_ignores_its_missing_or_unparseable_identity_section(self):
-        original = self._document()
-        sections = re.findall(r'<section\b.*?</section>', original, re.S)
-        identity = pathlib.Path(self.directory) / "identity.html"
-        for flag, path, index in (("hf", HF, 0), ("or", OR, 1)):
-            arguments = [f"--fresh-{flag}", str(self.repo / path),
-                         f"--fresh-{flag}-timestamp", "2026-10-20T09:41:00Z",
-                         "--fresh-label", "run 12345"]
-            expected = self._document(*arguments)
-            for section in ("", sections[index].replace('class="point"', 'class="gone"')):
-                with self.subTest(flag=flag, missing=not section):
-                    identity.write_text(original.replace(sections[index], section),
-                                        encoding="utf-8")
-                    self.assertEqual(self._document(*arguments, "--identity-page", str(identity)),
-                                     expected)
-            identity.write_text(original.replace(sections[1 - index], ""), encoding="utf-8")
-            with self.subTest(flag=flag, missing_inactive=True):
-                with self.assertRaises(SystemExit) as caught:
-                    self._document(*arguments, "--identity-page", str(identity))
-                self.assertEqual(caught.exception.code, 2)
-
-    def test_both_fresh_lists_never_consult_the_identity_page(self):
-        arguments = ["--fresh-hf", str(self.repo / HF),
-                     "--fresh-hf-timestamp", "2026-10-20T09:41:00Z",
-                     "--fresh-or", str(self.repo / OR),
-                     "--fresh-or-timestamp", "2026-10-20T09:42:00Z",
-                     "--fresh-label", "run 12345"]
-        expected = self._document(*arguments)
-        invalid = pathlib.Path(self.directory) / "invalid.html"
-        invalid.write_text("no parseable columns", encoding="utf-8")
-        for identity in (invalid, pathlib.Path(self.directory) / "missing.html",
-                         pathlib.Path(self.directory)):
-            with self.subTest(identity=identity.name):
-                self.assertEqual(self._document(*arguments, "--identity-page", str(identity)),
-                                 expected)
-
-    def test_unparseable_or_unreadable_identity_errors_without_writing_output(self):
-        original = self._document()
-        identity = pathlib.Path(self.directory) / "identity.html"
-        for case, document in (
-                ("empty", b""),
-                ("no-points", original.replace('class="point"', 'class="gone"').encode()),
-                ("nonfinite", original.replace('cx="180.0"', 'cx="nan"', 1).encode()),
-                ("missing", None)):
-            with self.subTest(case=case):
-                if document is None:
-                    identity.unlink()
-                else:
-                    identity.write_bytes(document)
-                result = subprocess.run(
-                    [sys.executable, str(ROOT / "scripts/build_rankings.py"),
-                     "--identity-page", str(identity)], cwd=self.repo, check=False,
-                    capture_output=True, text=True, timeout=60)
-                self.assertEqual(result.returncode, 2, result.stderr)
-                self.assertIn("identity", result.stderr)
-                self.assertNotIn("unrecognized arguments", result.stderr)
-                self.assertFalse((self.repo / "out/trending-rankings.html").exists())

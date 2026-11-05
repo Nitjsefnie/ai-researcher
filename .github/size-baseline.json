@@ -13,7 +13,7 @@
     "scripts/fetch_aa.py": 1247,
     "tests/test_browser.py": 2787,
     "tests/test_build.py": 2376,
-    "tests/test_build_rankings.py": 778,
+    "tests/test_build_rankings.py": 676,
     "tests/test_capture_gate.py": 1181,
     "tests/test_ci_gate_modules.py": 583,
     "tests/test_ci_install_chromium.py": 1079,
