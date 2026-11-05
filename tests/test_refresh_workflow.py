@@ -2083,7 +2083,7 @@ def test_rankings_quiet_hour_recovers_a_failed_upload(tmp_path):
     config, base, origin, repo, seed_env = harness._seed_origin(tmp_path, {
         'data/hf-trending.json': '{"models": [{"id": "old/hf"}]}',
         'data/openrouter-trending.json': '{"models": [{"slug": "old/or"}]}',
-    })
+        'data/github-stars.json': '{"models": [{"full_name": "old/gh"}]}'})
     (repo / 'scripts').mkdir()
     shutil.copyfile(ROOT / 'scripts/build_rankings.py', repo / 'scripts/build_rankings.py')
     landing = tmp_path / 'landing'
@@ -2231,10 +2231,10 @@ def test_rankings_fresh_landing_is_stable_on_quiet_and_mixed_hours(tmp_path, nex
     git(tmp_path, 'config', 'user.email', 'fixture@example.com')
     trackers = [('hf', 'hf', 'id'), ('or', 'openrouter', 'slug')]
     (tmp_path / 'data').mkdir()
-    for _, filename, key in trackers:
-        (tmp_path / f'data/{filename}-trending.json').write_text(
+    for name, key in (('hf-trending', 'id'), ('openrouter-trending', 'slug'), ('github-stars', 'full_name')):
+        (tmp_path / f'data/{name}.json').write_text(
             json.dumps({'models': [{key: 'old/a'}, {key: 'old/b'}]}), encoding='utf-8')
-    git(tmp_path, 'add', 'data/hf-trending.json', 'data/openrouter-trending.json')
+    git(tmp_path, 'add', 'data/hf-trending.json', 'data/openrouter-trending.json', 'data/github-stars.json')
     git(tmp_path, 'commit', '-qm', 'Seed snapshots')
     (tmp_path / 'scripts').mkdir()
     shutil.copyfile(ROOT / 'scripts/build_rankings.py', tmp_path / 'scripts/build_rankings.py')

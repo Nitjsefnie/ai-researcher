@@ -76,16 +76,16 @@
     8337
   ],
   "scripts/ci/check_committed_rankings_page.py": [
-    1326,
-    5308
+    1293,
+    5198
   ],
   "scripts/ci/check_ratchets.py": [
     8755,
     21494
   ],
   "scripts/ci/classify_changes.py": [
-    6548,
-    11227
+    6545,
+    11334
   ],
   "scripts/ci/commit_scopes.py": [
     6375,

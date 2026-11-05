@@ -50,8 +50,8 @@ CODE = [
 # ---------------------------------------------------------------------------
 
 
-def test_bot_signature_is_exactly_the_refresh_bots_nine_files():
-    # AA, the two trackers and the rankings builder commit generated artifacts.
+def test_bot_signature_is_exactly_the_refresh_bots_ten_files():
+    # AA, three trackers and the rankings builder commit generated artifacts.
     # Only the AA producer runs the suite before handing its data to delivery.
     assert classify.BOT_SIGNATURE == frozenset({
         "data/aa-raw-models.json",
@@ -62,6 +62,7 @@ def test_bot_signature_is_exactly_the_refresh_bots_nine_files():
         "out/frontier-models.html",
         "data/hf-trending.json",
         "data/openrouter-trending.json",
+        "data/github-stars.json",
         "out/trending-rankings.html",
     })
 
@@ -126,9 +127,9 @@ def test_data_only_refuses_a_fifth_path():
 
 def test_generated_trending_pushes_get_the_data_only_class():
     for paths in (['data/hf-trending.json'], ['data/openrouter-trending.json'],
-                  ['out/trending-rankings.html'],
+                  ['data/github-stars.json'], ['out/trending-rankings.html'],
                   ['data/hf-trending.json', 'data/openrouter-trending.json',
-                   'out/trending-rankings.html'], sorted(classify.BOT_SIGNATURE)):
+                   'data/github-stars.json', 'out/trending-rankings.html'], sorted(classify.BOT_SIGNATURE)):
         with mock.patch.object(classify, "_verified_base", return_value="a" * 40):
             docs_only, data_only, reason = classify.classify(
                 {"name": "push", "repository": "o/r", "before": "a" * 40,
@@ -143,6 +144,7 @@ def test_rankings_builder_alone_or_beside_generated_artifacts_runs_everything():
     builder = "scripts/build_rankings.py"
     for paths in ([builder], ["data/hf-trending.json", builder],
                   ["data/openrouter-trending.json", builder],
+                  ["data/github-stars.json", builder],
                   ["out/trending-rankings.html", builder],
                   [*classify.BOT_SIGNATURE, builder]):
         docs_only, data_only, reason = classify.classify(
@@ -154,7 +156,7 @@ def test_rankings_builder_alone_or_beside_generated_artifacts_runs_everything():
 
 
 def test_data_only_accepts_any_proper_subset():
-    # Any non-empty subset of the nine is a shape the bot's pushes take:
+    # Any non-empty subset of the ten is a shape the bot's pushes take:
     # an hour's commit carries only the files whose bytes moved, so a
     # dropped file is an hour with one byte-identical artifact, not a
     # hand-staged change to run the full matrix over. Dropping the window
@@ -163,7 +165,7 @@ def test_data_only_accepts_any_proper_subset():
             "data/captured-at.txt", "out/frontier-models.html",
             "data/cost-breakdown-window.txt", "data/aa-generation-state.json",
             "data/hf-trending.json", "data/openrouter-trending.json",
-            "out/trending-rankings.html"]
+            "data/github-stars.json", "out/trending-rankings.html"]
     for dropped in full:
         assert classify.data_only(
             [path for path in full if path != dropped]), dropped

@@ -50,7 +50,8 @@ class CheckCommittedRankingsPageTests(unittest.TestCase):  # pylint: disable=too
 
     def test_identical_page_passes(self):
         for path, key in (("data/hf-trending.json", "id"),
-                          ("data/openrouter-trending.json", "slug")):
+                          ("data/openrouter-trending.json", "slug"),
+                          ("data/github-stars.json", "full_name")):
             self.assertEqual(len(build_rankings.read_history(self.repo, path, key, 10)), 1)
         before = self.page.read_bytes()
         code, output, error = self.run_check()
@@ -62,7 +63,10 @@ class CheckCommittedRankingsPageTests(unittest.TestCase):  # pylint: disable=too
     def test_empty_tracker_histories_refuse_even_matching_pages(self):
         real_git = build_rankings.git
         cases = (("data/hf-trending.json",), ("data/openrouter-trending.json",),
-                 ("data/hf-trending.json", "data/openrouter-trending.json"))
+                 ("data/github-stars.json",),
+                 ("data/hf-trending.json", "data/openrouter-trending.json"),
+                 ("data/hf-trending.json", "data/openrouter-trending.json",
+                  "data/github-stars.json"))
         for empty_paths in cases:
             with self.subTest(empty_paths=empty_paths):
                 def git(repo, *args, empty=empty_paths):
@@ -93,9 +97,10 @@ class CheckCommittedRankingsPageTests(unittest.TestCase):  # pylint: disable=too
         with mock.patch.object(build_rankings, "git", side_effect=git):
             code, _, error = self.run_check_in_process()
         self.assertEqual(code, 1)
-        self.assertEqual(len(error.splitlines()), 3)
+        self.assertEqual(len(error.splitlines()), 4)
         self.assertIn("data/hf-trending.json history is empty", error)
         self.assertIn("data/openrouter-trending.json history is empty", error)
+        self.assertIn("data/github-stars.json history is empty", error)
         self.assertIn("committed page is missing or unreadable", error)
 
     def test_changed_page_reports_first_differing_region(self):
@@ -138,14 +143,19 @@ class CheckCommittedRankingsPageTests(unittest.TestCase):  # pylint: disable=too
         self.assertEqual(code, 1)
         self.assertIn("data/hf-trending.json newest column ranks differ", error)
 
-    def build_fresh_page(self, *, router=True):
+    def build_fresh_page(self, *, hf=True, router=True, github=True):
         arguments = ["--repo", str(self.repo), "--out", str(self.page),
                      "--fresh-label", 'run 42 & "capture"']
-        paths = [(test_build_rankings.HF, "id", ["org/b", "org/a"],
-                  "hf", "2026-10-20T09:41:00Z")]
-        if router:
-            paths.append((test_build_rankings.OR, "slug", ["lab/y", "lab/x"],
-                          "or", "2026-10-20T09:42:00Z"))
+        paths = []
+        for enabled, path, key, models, flag, timestamp in (
+                (hf, test_build_rankings.HF, "id", ["org/b", "org/a"],
+                 "hf", "2026-10-20T09:41:00Z"),
+                (router, test_build_rankings.OR, "slug", ["lab/y", "lab/x"],
+                 "or", "2026-10-20T09:42:00Z"),
+                (github, test_build_rankings.GH, "full_name", ["octo/b", "octo/a"],
+                 "github", "2026-10-20T09:43:00Z")):
+            if enabled:
+                paths.append((path, key, models, flag, timestamp))
         for path, key, models, flag, timestamp in paths:
             (self.repo / path).write_text(json.dumps({"models": [
                 {key: model} for model in models]}), encoding="utf-8")
@@ -171,6 +181,24 @@ class CheckCommittedRankingsPageTests(unittest.TestCase):  # pylint: disable=too
         self.assertEqual(code, 0, error)
         self.assertEqual(error, "")
 
+    def test_each_lone_fresh_column_keeps_the_other_lists_commit_identity(self):
+        for fresh in ("hf", "router", "github"):
+            with self.subTest(fresh=fresh):
+                self.build_fresh_page(hf=fresh == "hf", router=fresh == "router",
+                                      github=fresh == "github")
+                code, _, error = self.run_check()
+                self.assertEqual(code, 0, error)
+                self.assertEqual(error, "")
+
+    def test_fresh_github_page_with_newer_landed_ranks_refuses(self):
+        self.build_fresh_page()
+        self.harness.commit(test_build_rankings.GH, ["octo/a", "octo/b"], "full_name")
+        code, _, error = self.run_check()
+        self.assertEqual(code, 1)
+        self.assertIn("data/github-stars.json newest column ranks differ from landed JSON", error)
+        self.assertNotIn("data/hf-trending.json newest column ranks differ", error)
+        self.assertNotIn("data/openrouter-trending.json newest column ranks differ", error)
+
     def test_fresh_page_with_newer_landed_ranks_refuses(self):
         self.build_fresh_page()
         self.harness.commit(test_build_rankings.HF, ["org/a", "org/b"], "id")
@@ -178,6 +206,7 @@ class CheckCommittedRankingsPageTests(unittest.TestCase):  # pylint: disable=too
         self.assertEqual(code, 1)
         self.assertIn("data/hf-trending.json newest column ranks differ", error)
         self.assertNotIn("data/openrouter-trending.json newest column ranks differ", error)
+        self.assertNotIn("data/github-stars.json newest column ranks differ", error)
 
     def test_sha_columns_reconstruct_with_independent_history_windows(self):
         for index in range(12):
@@ -185,6 +214,10 @@ class CheckCommittedRankingsPageTests(unittest.TestCase):  # pylint: disable=too
                                 ["org/a", "org/b"] if index % 2 else ["org/b", "org/a"],
                                 "id")
         self.harness.commit(test_build_rankings.OR, ["lab/y", "lab/x"], "slug")
+        for index in range(11):
+            self.harness.commit(test_build_rankings.GH,
+                                ["octo/a", "octo/b"] if index % 2 else ["octo/b", "octo/a"],
+                                "full_name")
         build_rankings.main(["--repo", str(self.repo), "--out", str(self.page)])
         code, _, error = self.run_check()
         self.assertEqual(code, 0, error)
@@ -203,6 +236,7 @@ class CheckCommittedRankingsPageTests(unittest.TestCase):  # pylint: disable=too
         git("rm", "-rf", "--cached", ".")
         self.harness.commit(test_build_rankings.HF, ['org/a & "quoted"'], "id")
         self.harness.commit(test_build_rankings.OR, ["lab/x"], "slug")
+        self.harness.commit(test_build_rankings.GH, ["octo/x"], "full_name")
         build_rankings.main(["--repo", str(self.repo), "--out", str(self.page)])
         code, _, error = self.run_check()
         self.assertEqual(code, 0, error)
@@ -214,6 +248,7 @@ class CheckCommittedRankingsPageTests(unittest.TestCase):  # pylint: disable=too
         self.assertIn("data/hf-trending.json newest column is missing or unparseable", error)
         self.assertIn("data/openrouter-trending.json newest column is missing or unparseable",
                       error)
+        self.assertIn("data/github-stars.json newest column is missing or unparseable", error)
 
     def test_newest_column_with_mixed_identity_is_unparseable(self):
         self.build_fresh_page()
@@ -238,6 +273,7 @@ class CheckCommittedRankingsPageTests(unittest.TestCase):  # pylint: disable=too
         git("checkout", "-q", "-b", "updated-main", branch + "^")
         self.harness.commit(test_build_rankings.HF, ["org/b", "org/new"], "id")
         self.harness.commit(test_build_rankings.OR, ["lab/y", "lab/new"], "slug")
+        self.harness.commit(test_build_rankings.GH, ["octo/b", "octo/new"], "full_name")
         updated_main = git("rev-parse", "HEAD").strip()
         git("merge", "--no-ff", "-qm", "Simulate the PR merge ref", branch)
         parents = git("rev-list", "--parents", "-n", "1", "HEAD").split()
@@ -299,6 +335,7 @@ class CheckCommittedRankingsPageTests(unittest.TestCase):  # pylint: disable=too
         self.assertEqual(code, 1, error)
         self.assertIn("data/hf-trending.json newest column ranks differ from landed JSON", error)
         self.assertNotIn("data/openrouter-trending.json newest column ranks differ", error)
+        self.assertNotIn("data/github-stars.json newest column ranks differ", error)
 
     def test_pr_merge_with_only_page_edit_refuses_changed_page(self):
         git = self.harness._git  # pylint: disable=protected-access

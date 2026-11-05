@@ -11,9 +11,9 @@ simplification checks the merged result: untouched pages and trackers use
 main's newer state; page or tracker edits use their joined lineage.
 Every byte is compared; each tracker needs a committed snapshot.
 
-Exit 0 when both histories are non-empty and the page is present and
+Exit 0 when every list's history is non-empty and the page is present and
 identical; 1 with one line per violated invariant otherwise -- an empty
-history for either tracker, a missing or unreadable committed page, a
+history for any tracker, a missing or unreadable committed page, a
 failed rebuild, missing or unreadable rebuild output, or a content difference.
 A build failure is red, never a silent pass.
 """
@@ -36,7 +36,8 @@ CONTEXT = 80
 _CHECK = "committed-rankings-page check"
 LIMIT = 10
 TRACKERS = (("data/hf-trending.json", "id", "hugging-face", "hf"),
-            ("data/openrouter-trending.json", "slug", "openrouter", "or"))
+            ("data/openrouter-trending.json", "slug", "openrouter", "or"),
+            ("data/github-stars.json", "full_name", "github", "github"))
 
 
 def _section(document: bytes, identifier: str) -> bytes:

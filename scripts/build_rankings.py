@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
-"""Build a standalone Hugging Face and OpenRouter rankings page from git history.
+"""Build a standalone Hugging Face, OpenRouter and GitHub rankings page from git history.
 
     build_rankings.py [--limit 10] [--repo .] [--commit HEAD] [--out out/trending-rankings.html]
 
-Each list has its own window of changing commits. An explicit --fresh-hf or
---fresh-or file replaces its list's oldest column with a labelled snapshot
-at the supplied fetch timestamp. --identity-page preserves landed labels and
-fetch timestamps for lists without fresh inputs. With neither flag, only git
-history is read.
+Each list has its own window of changing commits. An explicit --fresh-hf,
+--fresh-or or --fresh-github file replaces its list's oldest column with a
+labelled snapshot at the supplied fetch timestamp. --identity-page preserves
+landed labels and fetch timestamps for lists without fresh inputs. With none
+of these flags, only git history is read.
 """
 from __future__ import annotations
 
@@ -375,6 +375,9 @@ def section_html(identifier: str, title: str, source: str, history: list[Snapsho
     return "\n".join(parts)
 
 
+SOURCES = ("hf", "or", "github")
+
+
 def main(argv: list[str] | None = None) -> None:
     """Write each list from fresh input, a preserved identity, or git history."""
     parser = argparse.ArgumentParser(description=__doc__)
@@ -386,17 +389,19 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument("--fresh-hf-timestamp")
     parser.add_argument("--fresh-or", type=pathlib.Path)
     parser.add_argument("--fresh-or-timestamp")
+    parser.add_argument("--fresh-github", type=pathlib.Path)
+    parser.add_argument("--fresh-github-timestamp")
     parser.add_argument("--fresh-label")
     parser.add_argument("--identity-page", type=pathlib.Path)
     args = parser.parse_args(argv)
     if not 1 <= args.limit <= 10:
         parser.error("--limit must be between 1 and 10")
-    has_fresh = args.fresh_hf is not None or args.fresh_or is not None
+    has_fresh = any(getattr(args, f"fresh_{source}") is not None for source in SOURCES)
     if has_fresh and args.fresh_label is None:
         parser.error("--fresh-label is required with a fresh file")
     if args.fresh_label is not None and not has_fresh:
-        parser.error("--fresh-label requires --fresh-hf or --fresh-or")
-    for source in ("hf", "or"):
+        parser.error("--fresh-label requires --fresh-hf, --fresh-or or --fresh-github")
+    for source in SOURCES:
         fresh = getattr(args, f"fresh_{source}")
         timestamp = getattr(args, f"fresh_{source}_timestamp")
         if fresh is not None and timestamp is None:
@@ -404,7 +409,8 @@ def main(argv: list[str] | None = None) -> None:
         if timestamp is not None and fresh is None:
             parser.error(f"--fresh-{source}-timestamp requires --fresh-{source}")
     columns = None
-    if args.identity_page is not None and (args.fresh_hf is None or args.fresh_or is None):
+    if args.identity_page is not None and any(
+            getattr(args, f"fresh_{source}") is None for source in SOURCES):
         try:
             columns = SnapshotColumns(args.identity_page.read_bytes())
         except OSError as exc:
@@ -413,7 +419,9 @@ def main(argv: list[str] | None = None) -> None:
     for path, key, section, fresh, timestamp in (
             ("data/hf-trending.json", "id", "hugging-face", args.fresh_hf, args.fresh_hf_timestamp),
             ("data/openrouter-trending.json", "slug", "openrouter",
-             args.fresh_or, args.fresh_or_timestamp)):
+             args.fresh_or, args.fresh_or_timestamp),
+            ("data/github-stars.json", "full_name", "github",
+             args.fresh_github, args.fresh_github_timestamp)):
         if fresh is None and columns is not None:
             try:
                 histories.append(identity_history(args.repo, path, key, section,
@@ -436,21 +444,23 @@ def main(argv: list[str] | None = None) -> None:
              f':root[data-theme="dark"] .viz-root {{{DARK}}}\n' + CSS)
     document = ('<!doctype html>\n<html lang="en"><head><meta charset="utf-8">'
                 '<meta name="viewport" content="width=device-width, initial-scale=1">'
-                '<title>Trending rankings — Hugging Face &amp; OpenRouter top 10 over time</title>'
+                '<title>Trending rankings — Hugging Face, OpenRouter &amp; GitHub top 10 over time</title>'
                 f'<style>{style}</style></head><body><div class="viz-root"><main>'
                 '<h1>Trending rankings</h1>'
-                '<p>Hugging Face trending models and OpenRouter weekly leaders by tokens. '
+                '<p>Hugging Face trending models, OpenRouter weekly leaders by tokens and '
+                'GitHub\'s most-starred repositories. '
                 'Each chart shows its most recent changing commits, oldest to newest. '
                 'Rank 1 is highest; commit positions are equally spaced, not elapsed time. '
                 'Gaps mean a model was absent. Dashed lines reuse the eight-color palette. '
                 'Hover near a point or focus it with the keyboard for every rank at that commit.</p>'
                 '<button id="theme" type="button">Toggle light / dark theme</button>'
                 '<nav aria-label="Contents"><a href="#hugging-face">Hugging Face</a>'
-                '<a href="#openrouter">OpenRouter</a></nav>'
+                '<a href="#openrouter">OpenRouter</a><a href="#github">GitHub</a></nav>'
                 + section_html("hugging-face", "Hugging Face · trending top 10", "Hugging Face",
                                histories[0])
                 + section_html("openrouter", "OpenRouter · weekly top 10 by tokens", "OpenRouter",
                                histories[1])
+                + section_html("github", "GitHub · most-starred top 10", "GitHub", histories[2])
                 + f'</main></div><script>{JS}</script></body></html>\n')
     args.out.parent.mkdir(parents=True, exist_ok=True)
     args.out.write_text(document, encoding="utf-8", newline="\n")

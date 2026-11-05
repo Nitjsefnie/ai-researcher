@@ -18,7 +18,7 @@ list it cannot read, or a list that may be truncated all classify as a
 full change and run every leg. An API failure that under-runs would
 skip gates over code; one that over-runs only wastes minutes.
 
-A second class narrows refresh.yml's generated artifacts to nine supported
+A second class narrows refresh.yml's generated artifacts to ten supported
 paths. The keyless publish job makes at most one bot commit per run,
 carrying every changed source. The AA payload includes data/aa-raw-models.json,
 data/aa-raw-coding-agents.json, data/aa-generation-state.json,
@@ -27,19 +27,19 @@ add/removal of data/cost-breakdown-window.txt. The refresh job runs the full
 suite against the fresh capture before handing it to publish, so the heavy
 matrix would only repeat that verification for the AA artifacts.
 
-The independent hf-fetch and or-fetch producers stage data/hf-trending.json
-and data/openrouter-trending.json for the joined commit. They do NOT run the
-suite: this classification rests on generated data with no code, not a
-pre-test. Rankings normally joins its page to the same commit. If the
-rankings source fails, the tracker data can land without its page; the next
-hour's build heals that lag. Data-only classification skips the heavy legs,
-page-rankings included, so this retained lag does not reject the surviving
-sources (issue #277). The ninth path, out/trending-rankings.html, joins
-out/frontier-models.html as a bot-generated page committed by the run that
-built it. Its dedicated tests/page-rankings check re-verifies it on full gate
-runs (outside both narrowing classes).
+The tracker producers stage data/hf-trending.json,
+data/openrouter-trending.json and data/github-stars.json for the joined
+commit. They do NOT run the suite: this classification rests on generated
+data with no code, not a pre-test. Rankings normally joins its page to the
+same commit. If the rankings source fails, the tracker data can land without
+its page; the next hour's build heals that lag. Data-only classification skips
+the heavy legs, page-rankings included, so this retained lag does not reject
+the surviving sources (issue #277). The tenth path,
+out/trending-rankings.html, joins out/frontier-models.html as a bot-generated
+page committed by the run that built it. Its dedicated tests/page-rankings
+check re-verifies it on full gate runs (outside both narrowing classes).
 
-The class matches any non-empty SUBSET of these nine paths: the joined
+The class matches any non-empty SUBSET of these ten paths: the joined
 commit carries only changed artifacts, and git omits byte-identical paths.
 Lint and actionlint still run. An outside path keeps the full gate set;
 scripts/build_rankings.py, alone or mixed with generated data, is outside
@@ -75,7 +75,7 @@ import subprocess
 # re-homed as classifier patterns.
 DOC_PATTERNS = ('**/*.md', 'LICENSE', '.gitignore')
 
-# Generated artifacts from the AA refresh, both trackers, and the rankings
+# Generated artifacts from the AA refresh, all trackers, and the rankings
 # builder; the docstring owns the narrowing rationale and its trade-offs.
 BOT_SIGNATURE = frozenset({
     'data/aa-raw-models.json',
@@ -86,6 +86,7 @@ BOT_SIGNATURE = frozenset({
     'out/frontier-models.html',
     'data/hf-trending.json',
     'data/openrouter-trending.json',
+    'data/github-stars.json',
     'out/trending-rankings.html',
 })
 
