@@ -241,10 +241,7 @@ without the first, a .pyc compile-then-load pair was measured swinging
 1.6%) was under 0.002%; the 3% margin covers that jitter. CI's coverage
 job still prints its own measured counts in the step summary, so a
 tighten-only PR calibrates against fresh CI numbers. Re-measure with
-`python3 scripts/ci/instruction_budgets.py --measure`. The fixture is
-regenerated only through the generator functions in
-`tests/test_ci_instruction_budgets.py` (a test pins its exact bytes) and
-is never hand-edited.
+`python3 scripts/ci/instruction_budgets.py --measure`.
 
 Four run only on GitHub. `ci gate` aggregates every merge gate into one
 `aggregate` verdict (issue #133): it starts on every push and pull request,

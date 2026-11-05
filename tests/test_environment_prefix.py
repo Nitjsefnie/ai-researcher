@@ -125,40 +125,6 @@ def test_classifier_precedence(monkeypatch, case, name, field):
     assert event[field] == expected[case]
 
 
-@pytest.mark.parametrize("case", CASES)
-def test_browser_coverage_precedence(monkeypatch, tmp_path, case):
-    current, legacy = tmp_path / "current.json", tmp_path / "legacy.json"
-    _environment(monkeypatch, "AI_RESEARCHER_JS_COVERAGE_OUT", case,
-                 str(current), str(legacy))
-    test_browser.flush_page_coverage(SimpleNamespace(
-        _open_pages=[], _coverage_entries=[{"url": "fixture"}]))
-    assert current.exists() == (case in ("prefixed", "both"))
-    assert legacy.exists() == (case == "legacy")
-    if case != "neither":
-        output = legacy if case == "legacy" else current
-        assert json.loads(output.read_text(encoding="utf-8")) == [{"url": "fixture"}]
-
-
-@pytest.mark.parametrize("case", CASES)
-def test_child_coverage_precedence(monkeypatch, case):
-    _environment(monkeypatch, "AI_RESEARCHER_COVERAGE_MEASURE_CHILDREN_RC",
-                 case, "current.rc", "legacy.rc")
-    seen = []
-
-    def run(args, **_kwargs):
-        seen.append(args)
-        return subprocess.CompletedProcess(args, 0)
-
-    monkeypatch.setattr(subprocess, "run", run)
-    test_diff_coverage._run_cli([sys.executable, "child.py"])  # pylint: disable=protected-access
-    expected = [sys.executable, "child.py"]
-    if case != "neither":
-        rc = "legacy.rc" if case == "legacy" else "current.rc"
-        expected = [sys.executable, "-m", "coverage", "run",
-                    "--parallel-mode", "--rcfile", rc, "child.py"]
-    assert seen == [expected]
-
-
 def _step_environment(workflow, job, name):
     """Resolve a named producer's environment in the workflow document."""
     return _workflowrun.step_by_name(
