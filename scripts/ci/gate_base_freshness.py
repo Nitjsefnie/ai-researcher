@@ -26,25 +26,25 @@ caller's event context supplies (a re-run keeps the original event);
 absent — a local run — the strict comparison stands, so nothing relaxes
 by accident.
 
-The set of such files is DERIVED from the workflows under .github/workflows,
-not kept in a list here. A remembered list is only as current as the last time
-somebody remembered to add to it, which is this defect wearing different
-clothes: a gate whose own inputs are enumerated by hand goes stale exactly the
-way this check exists to prevent.
+The set of such files is DERIVED from the workflows' text, not kept here:
+a hand-kept list goes stale exactly the way this check exists to prevent. The
+one hand-kept addition is SCRIPT_READ_DIRECTORIES, what gate scripts read from
+inside, which no run text shows. The pin test fails when data/ or out/ holds
+no tracked file; a gate script reading a new, unlisted directory goes unseen.
 
-The only hand-held entry is REQUIRED_JOBS. Upstream (Nitjsefnie-Actions/pr-gate)
-derives nothing either: the ruleset that makes a status context required lives
-in repository settings, which are not in the repository. Here there is no
-ruleset, so REQUIRED_JOBS holds the de facto merge-gate jobs — the checks a
-pull request waits for green before it merges. Every name there must still be
-FOUND in a workflow below or the run refuses: a job renamed out of every
-workflow would otherwise shrink the set in silence, and a narrower set reports
-green over a wider gate.
+The hand-held entries are REQUIRED_JOBS and SCRIPT_READ_DIRECTORIES. Upstream
+(Nitjsefnie-Actions/pr-gate) derives nothing either: the ruleset that makes a
+status context required lives in repository settings, which are not in the
+repository. Here there is no ruleset, so REQUIRED_JOBS holds the de facto
+merge-gate jobs — the checks a pull request waits for green before it merges.
+Every name there must still be FOUND in a workflow below or the run refuses: a
+job renamed out of every workflow would otherwise shrink the set in silence,
+and a narrower set reports green over a wider gate.
 
-WHAT IT CANNOT SEE. The derivation reads text, so a file a gate reads without
-any `run:` block naming it is outside it. Named here rather than left for a
-reader to infer, because each of these makes the gate NARROWER and a narrower
-gate looks the same as a correct one:
+WHAT IT CANNOT SEE. The derivation reads text, so a file a gate reads that no
+`run:` block names, and no SCRIPT_READ_DIRECTORIES entry holds, is outside it.
+Named here rather than left for a reader to infer, because each of these makes
+the gate NARROWER and a narrower gate looks the same as a correct one:
 
   - A tool reading a configuration file no `run:` names. actionlint reads
     `.github/actionlint.yaml`; zizmor reads `zizmor.yml` at the root of the
@@ -64,6 +64,8 @@ gate looks the same as a correct one:
     the value this parser keeps is the first line's (see
     `plain_continuation_end`), and the wrapped shapes in this repository
     carry no paths.
+  - A directory a gate reads but no `run:` names with a `/` (a bare word is
+    English as often as a directory) and SCRIPT_READ_DIRECTORIES does not list.
 
 Runs on the standard library alone. The workflows are read with a parser for
 the block layout this repository uses rather than a YAML dependency, for the
@@ -96,6 +98,9 @@ from pathlib import Path
 # derived set.
 REQUIRED_JOBS = ("actionlint", "aggregate", "analyze", "classify", "coverage",
                  "lint", "page", "pip-audit", "pyright", "suites")
+
+# Directories the `page` and `suites` scripts read from inside; no `run:` names them.
+SCRIPT_READ_DIRECTORIES = ("data/", "out/")
 
 # The branch a gate's head is compared against. Not configurable: a second
 # branch here would be a second base, and this question has one.
@@ -323,9 +328,7 @@ def plain_continuation_end(lines, at, end, key_indent=8):
     colon-space, so the line is left for the caller's indent refusal to
     name. The continuation's text is stepped over, not stored — a step's
     value stays the first line's — so a path spelled only on a continuation
-    line is outside the derived set; the shapes that motivate this reader (a
-    wrapped `if:` expression) never carry one, and the limit is named rather
-    than left for a reader to infer.
+    line is outside the derived set, a limit the module docstring names.
     """
     index = at + 1
     while index < end:
@@ -420,29 +423,24 @@ def resolve(candidate, files):
     """The tracked files a candidate names, or nothing.
 
     Resolution against the tree IS the filter: a token that names nothing here
-    is not a path this check needs to watch, and a token that names a file or a
-    directory is one. There is no shape rule on top of that, because a shape
-    rule is a second remembered list — it is what left `tests/identity.response`
-    out of a hand-written enumeration upstream.
+    is not a path this check needs to watch. Any token may name a tracked file
+    exactly; only one containing `/` (`tests/`, `./data`, `a/b`) expands to the
+    files beneath a directory, because a bare word ("the data" in a comment)
+    is English as often as a directory name (issue #378).
 
-    There is no glob arm, and its absence is deliberate: `candidates()` cannot
-    produce a glob metacharacter, so an arm reading one would be a branch that
-    looks like coverage and reaches nothing. The spelling it would have served
-    is already covered — `.github/workflows/*.yml` breaks at the `*` and the
-    `.github/workflows/` that precedes it is a directory, so every workflow is
-    taken whole, which is what that glob meant.
-
-    `.` resolves to nothing, and that is a named reach limit rather than an
-    oversight: `.` and `--` are how these tools spell "every tracked file", so
-    the actionlint job's merge-marker step really does read all of them. See
-    the module docstring for why the whole-tree arm stays out.
+    There is no glob arm: `candidates()` cannot produce a glob metacharacter,
+    so one would reach nothing. `.github/workflows/*.yml` breaks at the `*`,
+    and the directory `.github/workflows/` before it takes every workflow
+    whole, which is what that glob meant. `.` resolves to nothing: the
+    whole-tree spelling is a named reach limit (see the module docstring).
     """
+    path_shaped = "/" in candidate
     candidate = candidate[2:] if candidate.startswith("./") else candidate
     candidate = candidate.rstrip("/")
-    if not candidate:
-        return ()
     if candidate in files:
         return (candidate,)
+    if not candidate or not path_shaped:
+        return ()
     prefix = candidate + "/"
     return tuple(f for f in files if f.startswith(prefix))
 
@@ -460,7 +458,7 @@ def workflow_names(files):
 
 
 def gate_paths(root):
-    """Every tracked file a merge-gate job reads, derived from the workflows.
+    """Every tracked file a merge-gate job reads: named in a workflow or listed.
 
     Every workflow is parsed, not only the ones a required job turns out to be
     in: a workflow this cannot read is a workflow whose steps it cannot account
@@ -512,6 +510,8 @@ def gate_paths(root):
         raise GateError(
             "the merge-gate jobs name no file in this tree, so there is nothing "
             "to compare and this run can vouch for nothing")
+    # After that refusal, so the list never stands in for workflows naming none.
+    derived.update(f for d in SCRIPT_READ_DIRECTORIES for f in resolve(d, files))
     return sorted(derived)
 
 
