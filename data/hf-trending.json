@@ -17,10 +17,10 @@
       "id": "Lightricks/LTX-2.5"
     },
     {
-      "id": "nvidia/NVIDIA-Nemotron-3.5-Transcribe-30B-A4B"
+      "id": "ccore/Qwen3.5-4B-3D-Coder"
     },
     {
-      "id": "ccore/Qwen3.5-4B-3D-Coder"
+      "id": "nvidia/NVIDIA-Nemotron-3.5-Transcribe-30B-A4B"
     },
     {
       "id": "burner22/numbat"
