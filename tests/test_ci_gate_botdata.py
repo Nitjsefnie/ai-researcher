@@ -78,7 +78,7 @@ def test_bot_signature_names_every_file_the_refresh_committers_add():
             "data/captured-at.txt out/frontier-models.html"
     assert " ".join(fixed.split()) in " ".join(raw.split())
     adds = re.findall(r"^\s*git add(?:[^\n\\]|\\\n)*", raw, re.MULTILINE)
-    assert len(adds) == 5, adds
+    assert len(adds) == 6, adds
     staged = {path for add in adds for path in add.replace("\\\n", " ").split()
               if path.startswith(("data/", "out/"))}
     assert staged == set(classify.BOT_SIGNATURE)

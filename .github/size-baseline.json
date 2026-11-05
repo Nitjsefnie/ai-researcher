@@ -2,7 +2,7 @@
   "schema_version": 1,
   "baseline": {
     ".github/workflows/coverage-comment.yml": 517,
-    ".github/workflows/refresh.yml": 1365,
+    ".github/workflows/refresh.yml": 1360,
     ".github/workflows/tests.yml": 639,
     "build.py": 2632,
     "scripts/ci/check_ratchets.py": 690,

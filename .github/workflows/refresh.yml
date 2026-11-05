@@ -1,7 +1,7 @@
 name: refresh
 
 # The hourly refresh stages one payload per successful, changed source: AA,
-# Hugging Face, OpenRouter and the rankings page. The keyless `publish` job
+# Hugging Face, OpenRouter, GitHub and the rankings page. The keyless `publish` job
 # joins those payloads into at most one commit, with one message line per
 # source. Failed sources stay red and contribute nothing; survivors still
 # land. A quiet run has no commit or push (issues #143 and #133).
@@ -29,29 +29,23 @@ name: refresh
 # while the live page is stale. The `force` input rebuilds and publishes; the
 # republish gate also republishes when the live page is behind main.
 #
-# THE LIVE PAGE IS THE REPUBLISH GATE'S MEMORY (issue #206). The page HTML
-# embeds its own provenance: the source-commit stamp, rendered from
-# AI_RESEARCHER_AA_SOURCE_COMMIT, names the main commit the page was built from. A branch
-# can be deleted; a stamp inside the page the hub serves cannot -- and it
-# needs no ref, no ref move, and no write permission anywhere in the
-# workflow to keep working. When a run's capture is unchanged, it fetches
-# the live page and compares it byte-for-byte against HEAD's (the stamp is
-# one of those bytes), and the hub job reads the stamp before it uploads:
-# the hub behind, a publish that failed or never ran, an unstamped page, or
-# a failed fetch all set proceed, so the stale page is republished by the
-# next run instead of being skipped forever. A green no-op means "the live
-# page is current", not merely "the data did not move".
+# THE LIVE PAGE IS THE REPUBLISH GATE'S MEMORY (issue #206). Its source-commit
+# stamp (from AI_RESEARCHER_AA_SOURCE_COMMIT) names the main commit it was built
+# from; unlike a branch it cannot be deleted, and it needs no ref, ref move or
+# write permission. An unchanged-capture run compares the live page with HEAD's
+# byte for byte, stamp included, and the hub job reads the stamp before it
+# uploads: a hub behind, a failed or missed publish, an unstamped page or a
+# failed fetch sets proceed, so the next run republishes instead of skipping
+# forever. A green no-op means "the live page is current", not merely "the
+# data did not move".
 #
-# TWO OVERLAPPING RUNS CAN STILL INVERT THE UPLOAD ORDER (issue #74). The
-# concurrency group serializes runs, but an OLDER run can still reach the
-# publish step after a newer one and land its upload LAST, leaving the hub
-# serving the older page. The hub step's tie closes it: the payload page
-# uploads only while its own commit (`tip`, the publish job's record) is
-# still main's tip, freshly fetched in the hub job -- a newer run has
-# necessarily LANDED before it can publish anything, so a tie that stands
-# means no newer page exists to lose to, and the unchanged path's byte
-# comparison against the live page repairs any residual seconds-wide
-# inversion on the next unchanged-capture run.
+# TWO OVERLAPPING RUNS CAN STILL INVERT THE UPLOAD ORDER (issue #74): an OLDER
+# run can land its upload LAST, leaving the hub serving the older page. The
+# hub step's tie closes it: the page uploads only while its commit (`tip`, the
+# publish job's record) is still main's freshly fetched tip. A newer run has
+# LANDED before it can publish, so a standing tie has no newer page to lose
+# to; the unchanged path's live-page comparison repairs any residual
+# seconds-wide inversion on the next unchanged-capture run.
 #
 # THE SUITE RUNS before THE COMMIT JOB, NOT AFTER. A capture can break the
 # page — a new field shape, a model with a null AA never emitted before —
@@ -87,19 +81,14 @@ name: refresh
 # hand; a red run here means read them, not retry.
 #
 # THERE IS NO ROUTE-DISAGREEMENT STATE (issue #200). AA's two routes are
-# independently cached Vercel pages whose data lands at different times, and a
-# capture can straddle an update -- but the detail route's embedded corpus is
-# MEASURED to be the stale one, and the per-route generation timestamps do not
-# identify it (a detail page regenerated later still embeds the older corpus).
-# So there is nothing to dispute, nothing to retry and nothing to heal: the
+# independently cached and a capture can straddle an update, but the detail
+# route's embedded corpus is MEASURED to be the stale one (its regeneration
+# timestamps do not identify it). Nothing to dispute, retry or heal: the
 # leaderboard publishes every value it carries, the detail route fills only
-# what it omits. A moved AA capture contributes its "Refresh capture: ..."
-# subject to the joined scheduled commit.
-# A field the leaderboard drops is a FILL from the detail route, not a
-# disagreement, and fetch_aa.py never exits 3.
-
+# what it omits (a FILL, not a disagreement; fetch_aa.py never exits 3). A
+# moved AA capture contributes its "Refresh capture: ..." subject.
 #
-# Both trending trackers stage their own changed snapshots independently of
+# The three trending trackers stage their own changed snapshots independently of
 # AA and each other. Rankings builds from the run's base history plus those
 # fresh snapshots before anything lands. Each successful, changed source
 # participates independently in the joined commit; a fetch or build failure
@@ -129,15 +118,12 @@ concurrency:
   group: refresh
   cancel-in-progress: false
 
-# Least-privilege floor (issue #52 review): every job here declares its own
-# permissions block -- and since issue #206 every block is read: the capture,
-# the installs, the suite, and the keyless commit need nothing more, the push
-# authenticates with the deploy key rather than any token, and the docs-hub
-# upload authenticates with its own API key. The last contents:write holder
-# was the published-ref move; the live page's embedded stamp is the publish
-# record now. The floor caps what the inheritance can leak: a job
-# added later WITHOUT its own block inherits read, not the repository
-# default.
+# Least-privilege floor (issue #52 review): every job declares its own block,
+# and since issue #206 every block is read: the push authenticates with the
+# deploy key and the docs-hub upload with its own API key. The last
+# contents:write holder was the published-ref move; the live page's stamp is
+# the publish record now. A job added later WITHOUT its own block inherits
+# read, not the repository default.
 permissions:
   contents: read
 
@@ -146,11 +132,9 @@ jobs:
     name: Capture, gate, rebuild, verify
     runs-on: ubuntu-latest
 
-    # Job-level rather than workflow-level (issue #52), and READ-ONLY since
-    # #143: this job runs the capture, third-party installs, a downloaded
-    # browser and the suite, so nothing in it may ride a write token. The
-    # hour's commit payload leaves as an artifact for the publish job; no
-    # job in this workflow holds a write permission (issue #206).
+    # Job-level rather than workflow-level (issue #52), READ-ONLY since #143:
+    # this job runs the capture, third-party installs, a downloaded browser
+    # and the suite.
     permissions:
       contents: read
 
@@ -219,17 +203,12 @@ jobs:
 
       - name: Install Chromium for playwright
         id: chromium
-        # The browser binary is not a pip package, and playwright's own
-        # installer performs no integrity check: browsers.json publishes no
-        # digest and the installer never hashes a byte, so a bare install
-        # executes whatever the CDN hands over. scripts/ci/install_chromium.py
-        # verifies every archive against a committed sha256 first, pre-seeds
-        # the browsers directory so playwright's install has nothing left to
-        # download, and fails the run if anything was re-downloaded anyway.
-        # The verification keeps its point under the artifact split (issue
-        # #143): the browser produces the V8 coverage dump in tests.yml, and
-        # here it produces the page the suite verifies -- nothing a read-only
-        # job builds can touch main or the hub.
+        # playwright's installer performs no integrity check (browsers.json
+        # publishes no digest), so a bare install executes whatever the CDN
+        # hands over. scripts/ci/install_chromium.py verifies every archive
+        # against a committed sha256, pre-seeds the browsers directory, and
+        # fails the run if anything was re-downloaded anyway. Here the browser
+        # produces the page the suite verifies (issue #143).
         run: python3 scripts/ci/install_chromium.py
 
       - name: Save Chromium dependency debs
@@ -291,18 +270,12 @@ jobs:
 
       - name: Did anything move?
         id: capture
-        # The Capture step's verdict travels through env, not an inline
-        # template: zizmor's template-injection audit fails any direct
-        # `${{ }}` into `run:` text (issue #103's gate), and the env
-        # mapping is its sanctioned route. The value is our own step
-        # output, not attacker-controlled -- the env form is still the
-        # convention.
+        # Values reach the shell through env, not inline templates: zizmor's
+        # template-injection audit fails any direct `${{ }}` in `run:` text
+        # (issue #103's gate), and the env mapping is its sanctioned route.
         env:
           AI_RESEARCHER_CAPTURED: ${{ steps.fetch.outputs.captured }}
           AI_RESEARCHER_REF: ${{ github.ref }}
-          # Same convention as AI_RESEARCHER_CAPTURED and AI_RESEARCHER_REF: zizmor's template-injection
-          # audit fails direct ${{ }} in run text, and the env mapping is
-          # its sanctioned route. The value is the dispatch's own input.
           AI_RESEARCHER_FORCE: ${{ inputs.force }}
         run: |
           # THE OFF-MAIN DISPATCH GATE (issue #206). workflow_dispatch can
@@ -313,10 +286,7 @@ jobs:
           # fire on the default branch, so a ref that is not
           # refs/heads/main IS an off-main dispatch by construction, and the
           # hour is dropped green here, before rebuild and suite, under its
-          # own truthful heading. (The ref reaches this shell as the env var
-          # $AI_RESEARCHER_REF, not an inline template expression -- zizmor's
-          # template-injection audit fails those in run text, and the env
-          # mapping is its sanctioned route.)
+          # own truthful heading.
           if [ "$AI_RESEARCHER_REF" != "refs/heads/main" ]; then
             {
               echo "### Dropped: dispatched off main"
@@ -338,25 +308,18 @@ jobs:
           # ever) fails OPEN as changed, so the first run publishes.
           changed="$(python3 scripts/capture_gate.py)"
           echo "changed=$changed" >> "$GITHUB_OUTPUT"
-          # THE HOLD PROBE (issue #236). A forced or hub-stale run must be
-          # held by a three-generation window hour exactly as an ordinary
-          # one is, so the hold is decided here -- before the verdict below
-          # could set proceed=true on its force or hub_stale arm, and while
-          # the fresh captures are still on disk. The probe answers from
-          # build.WindowHold, which build.py raises only on the #232
-          # predicate (>= 3 generations in-run, parameters the only emptied
-          # axis), so a held hour drops proceed to false on EVERY
-          # path: the last good page stays live, and nothing commits or
-          # publishes. The hold dispatches through `case`, so any token the
-          # probe does not define -- an empty answer from a swallowed
-          # failure, a typo'd word -- is a broken probe: red, never a fall
-          # through to the verdict. The converged hour with an emptied axis
-          # is NOT this probe's to answer: the no-argument GATE above
-          # refuses it (exit 1, red under bash -e) before the probe runs.
-          # That red is the gate's -- it is what keeps a forced dispatch on
-          # a refused capture off the write half -- and the probe's own
-          # exit 1 is a probe-shaped failure (a missing fresh capture,
-          # anything unexpected), red the same way.
+          # THE HOLD PROBE (issue #236). A forced or hub-stale run is held by
+          # a three-generation window hour exactly as an ordinary one, so the
+          # hold is decided here, before the verdict below could set
+          # proceed=true and while the fresh captures are on disk. The probe
+          # answers from build.WindowHold, raised only on the #232 predicate
+          # (>= 3 generations in-run, parameters the only emptied axis), so a
+          # held hour drops proceed on EVERY path. `case` makes any undefined
+          # token (an empty answer, a typo) a broken probe: red, never a fall
+          # through. The converged hour with an emptied axis is the GATE's to
+          # refuse above (exit 1 under bash -e, which keeps a forced dispatch
+          # on a refused capture off the write half); the probe's own exit 1
+          # (a missing fresh capture, anything unexpected) is red the same way.
           held="$(python3 scripts/capture_gate.py --fresh-held)"
           case "$held" in
             yes)
@@ -365,14 +328,9 @@ jobs:
                 echo '### Held: three-generation AA window'
                 echo
                 echo 'The three-generation AA window holds the hour: the last good page stays live, nothing commits or publishes.'
-                # A dispatch that asked for force gets its own line: the hold
-                # outranks it, and without this the forced run would read as
-                # if it had rebuilt. One line on purpose -- the held branch
-                # exits before the live-page check runs, so no second cause
-                # can be named here. (inputs.force reaches the shell as the
-                # env var $AI_RESEARCHER_FORCE, the same env route as AI_RESEARCHER_CAPTURED and AI_RESEARCHER_REF
-                # above -- zizmor's template-injection audit fails inline
-                # template expressions in run text.)
+                # A forced dispatch gets its own line, or it would read as if
+                # it had rebuilt. One line on purpose: the held branch exits
+                # before the live-page check, so no second cause exists here.
                 if [ "$AI_RESEARCHER_FORCE" = 'true' ]; then echo 'Force was requested; the hold outranks it, so nothing was rebuilt.'; fi
               } >> "$GITHUB_STEP_SUMMARY"
               git checkout -- data/
@@ -391,25 +349,16 @@ jobs:
             # bump it.
             git checkout -- data/
           fi
-          # The republish gate (issue #206): a run whose publish failed or
-          # never ran left the hub stale while every later capture stayed
-          # identical, and plain "nothing moved" silence would never repair
-          # it. The live page is the gate's whole memory now: the page HTML
-          # embeds the source-commit stamp naming the commit it was built
-          # from, so the served bytes are their own record of what is live
-          # and no ref has to agree with them. On the unchanged path this
-          # run fetches the hub's live page -- the public /d/ route serves
-          # the stored bytes verbatim, proven byte-identical to the
-          # committed page (2026-09-29) -- and compares it byte-for-byte
-          # against HEAD's page, the stamp and every other byte with it.
-          # Divergence sets hub_stale, as does a failed fetch:
-          # republishing a page that was already current costs one hub
-          # version, while a real outage fails red at the write job's
-          # publish step. hub_cause records WHICH of the two set it --
-          # the summary names its cause (issue #239), because a failed
-          # fetch compared no page and must not report a comparison
-          # result. The republish decision reads hub_stale alone and is
-          # the same for both.
+          # The republish gate (issue #206): a failed or missed publish leaves
+          # the hub stale while later captures stay identical, and "nothing
+          # moved" would never repair it. On the unchanged path this run
+          # fetches the live page (the public /d/ route serves the stored
+          # bytes verbatim, proven 2026-09-29) and compares it byte for byte
+          # with HEAD's, stamp included. Divergence or a failed fetch sets
+          # hub_stale: a needless republish costs one hub version, while a
+          # real outage fails red at the publish step. hub_cause records
+          # WHICH set it, for the summary (issue #239): a failed fetch
+          # compared no page. The republish decision reads hub_stale alone.
           hub_stale=false
           hub_cause='diverged'
           if [ "$changed" = false ] && [ "${{ inputs.force }}" != 'true' ]; then
@@ -435,10 +384,7 @@ jobs:
           # `inputs.force` is the empty
           # string on a schedule run, and `$AI_RESEARCHER_CAPTURED` is empty only for run
           # shapes older than the output, so both defaults keep the scheduled
-          # path unchanged. (The verdict reaches this shell as the env var
-          # $AI_RESEARCHER_CAPTURED, not an inline template expression -- zizmor's
-          # template-injection audit fails those in run text, and the env
-          # mapping is its sanctioned route.)
+          # path unchanged.
           if [ "$changed" = true ] \
              || { [ "$AI_RESEARCHER_CAPTURED" != "false" ] && [ "${{ inputs.force }}" = 'true' ]; } \
              || [ "$hub_stale" = true ]; then
@@ -599,17 +545,9 @@ jobs:
   # (issue #206). Failed producers stay red without blocking survivors.
   # No repository code executes in the committer, push or hub jobs.
   #
-  # THE PUSH CAN STILL RACE. The concurrency group serializes runs, but two
-  # of them can still pass each other between their checks and their pushes
-  # (observed 2026-09-28: runs 287/288, seven seconds apart). The push job
-  # handles it the claudit way: a base check before anything is built drops
-  # the run green when main moved under the tested base, and a rejected
-  # push distinguishes "main stood still" (a real error) from "main moved
-  # before the push landed" (dropped green; the next hourly run re-fetches,
-  # re-tests and lands it). The committer takes that outcome EARLIER, on the
-  # one race no base check can see: main landing a newer generation of this
-  # workflow mid-run, so the payload it replays is not this generation's
-  # shape (issue #202).
+  # The push race and its outcomes are in the header; the committer concedes
+  # the one race no base check sees, main landing a newer workflow
+  # generation mid-run (issue #202), before it copies a payload.
   publish:
     name: Commit and stage the joined refresh
     runs-on: ubuntu-latest
@@ -618,18 +556,20 @@ jobs:
     # in 15 minutes instead of holding GitHub's 6-hour default.
     timeout-minutes: 15
 
-    needs: [refresh, hf-fetch, or-fetch, rankings]
+    needs: [refresh, hf-fetch, or-fetch, github-fetch, rankings]
 
     # Each source's success and change verdict admits only its own payload.
     if: >-
       !cancelled() && ((needs.refresh.result == 'success' && needs.refresh.outputs.proceed == 'true') ||
       (needs.hf-fetch.result == 'success' && needs.hf-fetch.outputs.changed == 'true') ||
       (needs.or-fetch.result == 'success' && needs.or-fetch.outputs.changed == 'true') ||
+      (needs.github-fetch.result == 'success' && needs.github-fetch.outputs.changed == 'true') ||
       (needs.rankings.result == 'success' && needs.rankings.outputs.changed == 'true'))
 
     permissions:
-      # Read-only: every fetch here is anonymous, and since issue #206 no
-      # job in this workflow holds a write permission at all. Everything
+      # Read-only: this job's fetches are anonymous; the workflow's only
+      # token-bearing call is github-fetch's read-only search. Since issue
+      # #206 no job holds a write permission. Everything
       # this job commits or stages comes from successful producers in its
       # own run; the AA producer also verified its payload with the suite.
       contents: read
@@ -665,6 +605,13 @@ jobs:
         with:
           name: or-payload
           path: ${{ runner.temp }}/or-payload
+
+      - name: Download the GitHub payload
+        if: needs.github-fetch.result == 'success' && needs.github-fetch.outputs.changed == 'true'
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: github-payload
+          path: ${{ runner.temp }}/github-payload
 
       - name: Download the rankings page
         if: needs.rankings.result == 'success' && needs.rankings.outputs.changed == 'true'
@@ -774,6 +721,11 @@ jobs:
             cp "${RUNNER_TEMP}/or-payload/data/openrouter-trending.json" data/
             git add data/openrouter-trending.json
           fi
+          if [ -f "${RUNNER_TEMP}/github-payload/data/github-stars.json" ]; then
+            mkdir -p data
+            cp "${RUNNER_TEMP}/github-payload/data/github-stars.json" data/
+            git add data/github-stars.json
+          fi
           if [ -f "${RUNNER_TEMP}/rankings-page/trending-rankings.html" ]; then
             mkdir -p out
             cp "${RUNNER_TEMP}/rankings-page/trending-rankings.html" out/
@@ -793,6 +745,9 @@ jobs:
           fi
           if [ -f "${RUNNER_TEMP}/or-payload/message.txt" ]; then
             blocks+=("$(cat "${RUNNER_TEMP}/or-payload/message.txt")")
+          fi
+          if [ -f "${RUNNER_TEMP}/github-payload/message.txt" ]; then
+            blocks+=("$(cat "${RUNNER_TEMP}/github-payload/message.txt")")
           fi
           if [ -f "${RUNNER_TEMP}/rankings-page/trending-rankings.html" ]; then
             blocks+=("Rebuild the rankings page from this run's snapshots.")
@@ -855,9 +810,8 @@ jobs:
     # republish hour has nothing to land.
     if: "!cancelled() && needs.publish.result == 'success' && needs.publish.outputs.commits == 'true'"
 
-    # Only push jobs enter main-push: the main-push
-    # environment's deployment-branch policy admits main alone, so the
-    # deploy key it holds is reachable from nowhere else.
+    # Only push jobs enter main-push: its deployment-branch policy admits
+    # main alone, so the deploy key it holds is reachable from nowhere else.
     environment: main-push
 
     permissions:
@@ -960,10 +914,8 @@ jobs:
       (needs.push.result == 'skipped' || needs.push.result == 'success')
 
     permissions:
-      # Read-only like every other job since issue #206: the docs-hub
-      # upload authenticates with its own API key, and the published-ref
-      # move is gone -- the live page's embedded stamp is the publish
-      # record, so the workflow holds no write permission anywhere.
+      # Read-only like every job since issue #206: the docs-hub upload
+      # authenticates with its own API key.
       contents: read
 
     steps:
@@ -999,18 +951,13 @@ jobs:
           git -C "${scratch}" remote add origin "https://github.com/${GITHUB_REPOSITORY}"
           git -C "${scratch}" fetch --quiet origin main
           target="$(git -C "${scratch}" rev-parse FETCH_HEAD)"
-          # THE PAGE-TIP TIE. The payload page belongs to the commit the
-          # publish job recorded as `tip` -- the bundle tip when the hour
-          # committed, its own base when not. The upload runs only when
-          # that commit IS main's tip now: a landing whose tip still
-          # stands, or a quiet or republish hour nobody has superseded.
-          # When main has moved past `tip`, a newer run owns the tip, and
-          # its own hub job publishes its page -- this run uploads
-          # nothing, exits 0. This is also what retired the published
-          # ref's compare-API gate (issue #206) without losing its
-          # guarantee: a newer run has necessarily LANDED before it can
-          # publish anything this run could overwrite, so a tie that
-          # stands means no newer page exists to lose to.
+          # THE PAGE-TIP TIE. The payload page belongs to the publish job's
+          # `tip` (the bundle tip when the hour committed, its base when
+          # not), and uploads only while that commit IS main's tip. When main
+          # has moved past it, the newer run's hub job publishes; this one
+          # uploads nothing and exits 0. It retired the published ref's
+          # compare-API gate (issue #206) without losing its guarantee (see
+          # the header's upload-order paragraph).
           mine="$(cat "${RUNNER_TEMP}/push-data/tip.txt")"
           if [ "$mine" != "$target" ]; then
             echo "Lost the race: main's tip moved past this run's page, and the newer run's hub job publishes it." \
@@ -1018,20 +965,13 @@ jobs:
             echo "Nothing published by this run."
             exit 0
           fi
-          # THE LIVE-PAGE GATE (issue #206). What the published ref's
-          # compare-API ranking guarded -- never spending a version, and
-          # never regressing the hub, when nothing needs publishing -- the
-          # page proves for itself: the live page's HTML embeds its
-          # source-commit stamp, so the served bytes carry their own
-          # record. The page is fetched and read before the upload, and
-          # the hub already serving EXACTLY this run's page -- stamp and
-          # every other byte -- is a green skip: a hub version is not
-          # spent re-storing the same bytes. Any difference (the hub
-          # behind main, a failed or missed publish, an unstamped page)
-          # or a failed fetch publishes: same availability stance as
-          # before, an extra version costs less than a stale page. The
-          # summary names both stamps, so a republish hour says which
-          # commit the hub was behind to.
+          # THE LIVE-PAGE GATE (issue #206): never spend a version when
+          # nothing needs publishing. The hub already serving EXACTLY this
+          # run's page, stamp and every other byte, is a green skip. Any
+          # difference (hub behind main, a failed or missed publish, an
+          # unstamped page) or a failed fetch publishes: an extra version
+          # costs less than a stale page. The summary names both stamps, so
+          # a republish hour says which commit the hub was behind to.
           live_page="$(mktemp "${TMPDIR:-/tmp}/tmp.XXXXXXXXXX")"
           # Later scratch files may not exist when an early exit runs cleanup.
           trap 'rm -f "$live_page" "${publish_response:-}"' EXIT
@@ -1053,15 +993,12 @@ jobs:
           fi
           echo "Publishing: the hub serves ${live_stamp}; this run's page names ${mine}." \
             >> "$GITHUB_STEP_SUMMARY"
-          # THE UPLOAD. The write job runs no repository code, so this is
-          # the endpoint's wire format inlined -- scripts/publish_docs.py is
-          # the canonical client and the mirror source: keep the two in
-          # sync. The key travels in a header, never an argument; the URL
-          # is a literal on the pinned hub host -- the same host-pinning
-          # rule publish_docs.py enforces in code -- so the credential can
-          # only ever be sent there. The page travels from the payload
-          # artifact via a staging dir, so the relative path the canonical
-          # client pins is the one used here.
+          # THE UPLOAD. No repository code runs here, so this inlines the
+          # wire format of scripts/publish_docs.py, the canonical client:
+          # keep the two in sync. The key travels in a header, never an
+          # argument; the URL is a literal on the pinned hub host, as
+          # publish_docs.py enforces, so the credential goes nowhere else. A
+          # staging dir keeps the relative page path the canonical client pins.
           page_dir="${RUNNER_TEMP}/page"
           mkdir -p "${page_dir}/out"
           cp "${RUNNER_TEMP}/publish-payload/tree/out/frontier-models.html" \
@@ -1147,7 +1084,7 @@ jobs:
 
   rankings:
     name: Build the trending rankings
-    needs: [hf-fetch, or-fetch]
+    needs: [hf-fetch, or-fetch, github-fetch]
     if: >-
       !cancelled() && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
@@ -1177,6 +1114,13 @@ jobs:
           name: or-payload
           path: ${{ runner.temp }}/or-payload
 
+      - name: Download the GitHub payload
+        if: needs.github-fetch.result == 'success' && needs.github-fetch.outputs.changed == 'true'
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: github-payload
+          path: ${{ runner.temp }}/github-payload
+
       - name: Build the rankings page
         run: |
           args=()
@@ -1193,6 +1137,11 @@ jobs:
           if [ -f "${RUNNER_TEMP}/or-payload/data/openrouter-trending.json" ]; then
             args+=(--fresh-or "${RUNNER_TEMP}/or-payload/data/openrouter-trending.json"
                    --fresh-or-timestamp "$(cat "${RUNNER_TEMP}/or-payload/fetched-at.txt")")
+            has_fresh=true
+          fi
+          if [ -f "${RUNNER_TEMP}/github-payload/data/github-stars.json" ]; then
+            args+=(--fresh-github "${RUNNER_TEMP}/github-payload/data/github-stars.json"
+                   --fresh-github-timestamp "$(cat "${RUNNER_TEMP}/github-payload/fetched-at.txt")")
             has_fresh=true
           fi
           if [ "$has_fresh" = true ]; then
@@ -1301,7 +1250,7 @@ jobs:
             -o "$publish_response" -w '%{http_code}' \
             -H "x-docs-key: ${DOCS_HUB_API_KEY}" \
             -F 'slug=ai-researcher/trending-rankings' \
-            -F 'title=Trending rankings — Hugging Face & OpenRouter top 10 over time' \
+            -F 'title=Trending rankings — Hugging Face, OpenRouter & GitHub top 10 over time' \
             -F 'tags=trending,rankings,ai' \
             -F 'project=ai-researcher' \
             -F 'from=ai-researcher' \
@@ -1361,5 +1310,51 @@ jobs:
         with:
           name: or-payload
           path: ${{ runner.temp }}/or-payload
+          if-no-files-found: error
+          retention-days: 1
+
+  github-fetch:
+    name: Fetch and stage the GitHub most-starred top 10
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    outputs:
+      changed: ${{ steps.stage.outputs.changed }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Fetch the top 10
+        # The search API call authenticates with this job's read-only token.
+        env:
+          AI_RESEARCHER_GITHUB_TOKEN: ${{ github.token }}
+        run: python3 scripts/fetch_github_stars.py --message "$RUNNER_TEMP/message"
+
+      - name: Stage the payload
+        id: stage
+        run: |
+          changed=false
+          if ! git diff --quiet -- data/github-stars.json; then
+            changed=true
+          fi
+          if [ "$changed" = "true" ]; then
+            payload="${RUNNER_TEMP}/github-payload"
+            mkdir -p "${payload}/data"
+            cp data/github-stars.json "${payload}/data/"
+            cp "$RUNNER_TEMP/message" "${payload}/message.txt"
+            date -u +%Y-%m-%dT%H:%M:%SZ > "${payload}/fetched-at.txt"
+          fi
+          echo "changed=$changed" >> "$GITHUB_OUTPUT"
+
+      - name: Upload the payload
+        if: success() && steps.stage.outputs.changed == 'true'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: github-payload
+          path: ${{ runner.temp }}/github-payload
           if-no-files-found: error
           retention-days: 1

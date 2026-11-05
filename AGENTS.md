@@ -28,10 +28,11 @@ re-litigate.
   nothing estimated; a model the page gives no own cost, fallback-blended ones
   included, is absent from that axis.
 
-The Hugging Face trending and OpenRouter weekly top-10 lists are separate
-outputs (`scripts/fetch_hf_trending.py` → `data/hf-trending.json`,
-`scripts/fetch_openrouter_trending.py` → `data/openrouter-trending.json`);
-neither feeds the frontier page.
+The Hugging Face trending, OpenRouter weekly and GitHub most-starred top-10
+lists are separate outputs (`scripts/fetch_hf_trending.py` →
+`data/hf-trending.json`, `scripts/fetch_openrouter_trending.py` →
+`data/openrouter-trending.json`, `scripts/fetch_github_stars.py` →
+`data/github-stars.json`); none feeds the frontier page.
 
 ## The metric
 
@@ -309,8 +310,8 @@ without jitter; deliberately unclamped, so it may hang outside the plot.
 ## Update cadence
 
 `.github/workflows/refresh.yml` refreshes the frontier page, the Hugging Face
-trending list and the OpenRouter weekly top 10 hourly (requested at `:11`;
-GitHub delivers best-effort) and publishes the
+trending list, the OpenRouter weekly top 10 and GitHub's most-starred top 10
+hourly (requested at `:11`; GitHub delivers best-effort) and publishes the
 [trending rankings page](https://docs.nitjsefni.eu/d/ai-researcher/trending-rankings)
 from git history. Its single-commit, per-source isolation, rankings and publish
 mechanics are in CONTRIBUTING.md "CI". The standalone `openrouter-top` tracker

@@ -42,12 +42,14 @@ That is fine in both directions.
   that cannot be compared on one axis, which is the only thing the frontier
   page does.
 
-  The Hugging Face trending and OpenRouter weekly top-10 lists are separate
-  tracked outputs: `scripts/fetch_hf_trending.py` writes `data/hf-trending.json`,
-  and `scripts/fetch_openrouter_trending.py` writes `data/openrouter-trending.json`.
-  The joined `.github/workflows/refresh.yml` updates both hourly and publishes
+  The Hugging Face trending, OpenRouter weekly and GitHub most-starred top-10
+  lists are separate tracked outputs: `scripts/fetch_hf_trending.py` writes
+  `data/hf-trending.json`, `scripts/fetch_openrouter_trending.py` writes
+  `data/openrouter-trending.json`, and `scripts/fetch_github_stars.py` writes
+  `data/github-stars.json`. The joined `.github/workflows/refresh.yml` updates
+  all three hourly and publishes
   [rankings over time](https://docs.nitjsefni.eu/d/ai-researcher/trending-rankings)
-  from their git history. Neither tracker feeds the frontier page.
+  from their git history. No tracker feeds the frontier page.
 
 - **`data/aa-raw-models.json` is a captured artifact — never hand-edit it.**
   `scripts/fetch_aa.py` reassembles it from AA's Next.js RSC flight payloads
@@ -257,14 +259,15 @@ unassigned open issue, and `/unclaim` and `/release` remove the commenter's own
 assignment — self-service issue claiming for contributors without write access.
 
 The joined `.github/workflows/refresh.yml` captures, commits and publishes the
-frontier page and refreshes both trending trackers. Its `schedule` requests
+frontier page and refreshes the three trending trackers. Its `schedule` requests
 hourly runs (`11 * * * *`); GitHub delivers schedules best-effort. Each run
-captures AA and fetches both trackers, then pushes at most one bot commit
-carrying every changed source: the AA capture with its rebuilt
-`out/frontier-models.html`, the two trending lists, and
+captures AA and fetches the three trackers (the GitHub search call
+authenticates with the job's read-only token), then pushes at most one bot
+commit carrying every changed source: the AA capture with its rebuilt
+`out/frontier-models.html`, the three trending lists, and
 `out/trending-rankings.html`. The commit keeps one subject line; each changed
 source contributes its full message as a block under its own subject line:
-AA's `diff_aa.py` report and HF/OR's MOVE lines under each tracker's own line.
+AA's `diff_aa.py` report and each tracker's NEW/OUT/MOVE lines under its own line.
 A failed source fetch, or a red AA gate or suite, leaves that source out while
 the sources that succeeded still commit. A run in which nothing changed
 pushes nothing. The single push job uses its write deploy key (the `main-push`
