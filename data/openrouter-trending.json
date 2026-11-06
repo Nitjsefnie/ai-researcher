@@ -20,10 +20,10 @@
       "slug": "anthropic/claude-opus-5.5"
     },
     {
-      "slug": "tencent/hy4-preview"
+      "slug": "tencent/hy4"
     },
     {
-      "slug": "tencent/hy4"
+      "slug": "tencent/hy4-preview"
     },
     {
       "slug": "minimax/minimax-m3.1-flash"
