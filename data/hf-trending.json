@@ -17,19 +17,19 @@
       "id": "nvidia/NVIDIA-Nemotron-3.5-Transcribe-30B-A4B"
     },
     {
-      "id": "mistralai/Mistral-Large-4-1T-A52B"
+      "id": "FusionCow/Sulphur-3"
     },
     {
       "id": "burner22/numbat"
     },
     {
-      "id": "FusionCow/Sulphur-3"
+      "id": "mistralai/Mistral-Large-4-1T-A52B"
     },
     {
       "id": "Pika-Labs/Pika-H3-Flex"
     },
     {
-      "id": "Qwen/Qwen3.8-27B"
+      "id": "ricursiveAI/Ripple-65B-Preview"
     }
   ]
 }

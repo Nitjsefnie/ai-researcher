@@ -1,5 +1,1408 @@
 [
  {
+  "id": "34e0f78892fac8fd39aff6595d04610e",
+  "isDefault": true,
+  "isHighlighted": true,
+  "agentName": "Codex",
+  "provider": "openai",
+  "display": {
+   "agent": "Codex",
+   "model": "GPT-6 Astra (Max)"
+  },
+  "displayLabel": "Codex - GPT-6 Astra (Max)",
+  "model": {
+   "release": {
+    "slug": "gpt-6-astra",
+    "name": "GPT-6 Astra",
+    "shortName": "GPT-6 Astra"
+   },
+   "suffix": "Max",
+   "shortSuffix": "max",
+   "isReasoning": true,
+   "effort": {
+    "slug": "max",
+    "label": "max",
+    "level": 60
+   },
+   "name": "GPT-6 Astra (Max)",
+   "shortName": "GPT-6 Astra (max)",
+   "scoreCaveat": null
+  },
+  "shortLabel": "Codex - GPT-6 Astra (max)",
+  "agentRelease": {
+   "key": "Codex:gpt-6-astra",
+   "name": "Codex - GPT-6 Astra"
+  },
+  "agentCreator": {
+   "slug": "openai",
+   "name": "OpenAI",
+   "color": "#1f1f1f",
+   "logo": "/img/logos/openai.svg"
+  },
+  "modelCreators": [
+   {
+    "slug": "openai",
+    "name": "OpenAI",
+    "color": "#1f1f1f",
+    "logo": "/img/logos/openai.svg"
+   }
+  ],
+  "hasTieredPricing": false,
+  "isRouter": false,
+  "variantOf": null,
+  "isUnavailable": false,
+  "indexComponentCount": 3,
+  "evalCount": 3,
+  "evals": [
+   {
+    "datasetIndexName": "frontiercode-v1.1-main",
+    "evaluationDatasetSlug": "FrontierCode v1.1 Main",
+    "refDatasetName": "frontiercode-v1.1",
+    "weight": 0.333333333333333,
+    "safety": {
+     "attemptCount": 300,
+     "refusedAttemptCount": 0,
+     "hardStopAttemptCount": 0,
+     "recoveredAttemptCount": 0,
+     "fallbackAttemptCount": 0,
+     "refusals": [],
+     "rate": 0
+    },
+    "rewardHacking": {
+     "attemptCount": 300,
+     "retainedAttemptCount": 300,
+     "passingAttemptCount": 164,
+     "reviewedAttemptCount": 164,
+     "flaggedAttemptCount": 0,
+     "notApplicableAttemptCount": 0,
+     "missingAuditAttemptCount": 0,
+     "skippedAuditAttemptCount": 0,
+     "unavailableAuditAttemptCount": 0,
+     "gradingErrorAttemptCount": 0,
+     "invalidAuditAttemptCount": 0,
+     "snapshotMismatchAttemptCount": 0,
+     "materializedAt": "2026-11-06T07:37:34.331081+00:00",
+     "gradingVersion": "v2",
+     "graderConfigHash": "e424bdeaa5e64a0e",
+     "reviewSources": [],
+     "rate": 0
+    },
+    "mean": {
+     "reward": 0.492953666666667,
+     "inputTokens": 2399033.58,
+     "outputTokens": 28121.5
+    }
+   },
+   {
+    "datasetIndexName": "swe-atlas-qna",
+    "evaluationDatasetSlug": "SWE-Atlas-QnA",
+    "refDatasetName": "datasets/swe-atlas-qna",
+    "weight": 0.333333333333333,
+    "safety": {
+     "attemptCount": 372,
+     "refusedAttemptCount": 13,
+     "hardStopAttemptCount": 13,
+     "recoveredAttemptCount": 0,
+     "fallbackAttemptCount": 0,
+     "refusals": [
+      {
+       "turn": 0,
+       "attemptCount": 6,
+       "outcome": "hard_stop",
+       "chain": [],
+       "rate": 0.016129032258064516
+      },
+      {
+       "turn": 19,
+       "attemptCount": 2,
+       "outcome": "hard_stop",
+       "chain": [],
+       "rate": 0.005376344086021506
+      },
+      {
+       "turn": 8,
+       "attemptCount": 1,
+       "outcome": "hard_stop",
+       "chain": [],
+       "rate": 0.002688172043010753
+      },
+      {
+       "turn": 9,
+       "attemptCount": 1,
+       "outcome": "hard_stop",
+       "chain": [],
+       "rate": 0.002688172043010753
+      },
+      {
+       "turn": 14,
+       "attemptCount": 1,
+       "outcome": "hard_stop",
+       "chain": [],
+       "rate": 0.002688172043010753
+      },
+      {
+       "turn": 16,
+       "attemptCount": 1,
+       "outcome": "hard_stop",
+       "chain": [],
+       "rate": 0.002688172043010753
+      },
+      {
+       "turn": 17,
+       "attemptCount": 1,
+       "outcome": "hard_stop",
+       "chain": [],
+       "rate": 0.002688172043010753
+      }
+     ],
+     "rate": 0.03494623655913978
+    },
+    "rewardHacking": null,
+    "mean": {
+     "reward": 0.591397849462366,
+     "inputTokens": 2626465.707650273,
+     "outputTokens": 28575.948087431694
+    }
+   },
+   {
+    "datasetIndexName": "terminal-bench-v4",
+    "evaluationDatasetSlug": "Terminal-Bench v4",
+    "refDatasetName": "terminal-bench/terminal-bench@sha256:39d9f44b40420cde8fdcc087579c0d72a7e14fa3656d603c3f0d22fb35e27732",
+    "weight": 0.333333333333333,
+    "safety": {
+     "attemptCount": 198,
+     "refusedAttemptCount": 0,
+     "hardStopAttemptCount": 0,
+     "recoveredAttemptCount": 0,
+     "fallbackAttemptCount": 0,
+     "refusals": [],
+     "rate": 0
+    },
+    "rewardHacking": {
+     "attemptCount": 198,
+     "retainedAttemptCount": 198,
+     "passingAttemptCount": 110,
+     "reviewedAttemptCount": 110,
+     "flaggedAttemptCount": 0,
+     "notApplicableAttemptCount": 0,
+     "missingAuditAttemptCount": 0,
+     "skippedAuditAttemptCount": 0,
+     "unavailableAuditAttemptCount": 0,
+     "gradingErrorAttemptCount": 0,
+     "invalidAuditAttemptCount": 0,
+     "snapshotMismatchAttemptCount": 0,
+     "materializedAt": "2026-11-06T07:37:34.331081+00:00",
+     "gradingVersion": "v1",
+     "graderConfigHash": "e3e86c5c130946ce",
+     "reviewSources": [
+      {
+       "judgeModel": "sonnet",
+       "rubricId": "ca-bench-reward-hacking-v1",
+       "auditSchemaVersion": 1,
+       "attemptCount": 110
+      }
+     ],
+     "rate": 0
+    },
+    "mean": {
+     "reward": 0.555555555555555,
+     "inputTokens": 4536624.2727272725,
+     "outputTokens": 66712.96464646465
+    }
+   }
+  ],
+  "safety": {
+   "attemptCount": 870,
+   "refusedAttemptCount": 13,
+   "hardStopAttemptCount": 13,
+   "recoveredAttemptCount": 0,
+   "fallbackAttemptCount": 0,
+   "refusals": [
+    {
+     "turn": 0,
+     "attemptCount": 6,
+     "outcome": "hard_stop",
+     "chain": [],
+     "rate": 0.005376344086021505
+    },
+    {
+     "turn": 19,
+     "attemptCount": 2,
+     "outcome": "hard_stop",
+     "chain": [],
+     "rate": 0.001792114695340502
+    },
+    {
+     "turn": 8,
+     "attemptCount": 1,
+     "outcome": "hard_stop",
+     "chain": [],
+     "rate": 0.000896057347670251
+    },
+    {
+     "turn": 9,
+     "attemptCount": 1,
+     "outcome": "hard_stop",
+     "chain": [],
+     "rate": 0.000896057347670251
+    },
+    {
+     "turn": 14,
+     "attemptCount": 1,
+     "outcome": "hard_stop",
+     "chain": [],
+     "rate": 0.000896057347670251
+    },
+    {
+     "turn": 16,
+     "attemptCount": 1,
+     "outcome": "hard_stop",
+     "chain": [],
+     "rate": 0.000896057347670251
+    },
+    {
+     "turn": 17,
+     "attemptCount": 1,
+     "outcome": "hard_stop",
+     "chain": [],
+     "rate": 0.000896057347670251
+    }
+   ],
+   "rate": 0.01164874551971326
+  },
+  "indexScore": 0.546635690561529,
+  "mean": {
+   "reward": 0.546635690561529,
+   "costUsd": 7.03615822479963,
+   "agentWallTimeSec": 1486.68747959053,
+   "steps": 39.3501020962311,
+   "inputTokens": 3187374.52012585,
+   "outputTokens": 41136.8042446321,
+   "cacheTokens": 3031295.09325606,
+   "cacheHitRate": 0.928466255516988,
+   "totalTokens": 3228511.32437048
+  },
+  "sums": {
+   "costUsd": 1889.96355383333
+  },
+  "percentiles": {
+   "costUsd": {
+    "p05": 1.79340665833333,
+    "p25": 3.14552633333333,
+    "p50": 5.23164133333333,
+    "p75": 7.73760425,
+    "p95": 11.8593084
+   },
+   "totalTokens": {
+    "p05": 458967.416666667,
+    "p25": 1096475.58333333,
+    "p50": 2168265,
+    "p75": 3598700.66666667,
+    "p95": 6220041.26666666
+   }
+  },
+  "versions": {
+   "frontiercode-v1.1-main": {
+    "min": {
+     "version": "0.153.4",
+     "dateReleased": "2026-09-04"
+    },
+    "max": {
+     "version": "0.153.4",
+     "dateReleased": "2026-09-04"
+    }
+   },
+   "swe-atlas-qna": {
+    "min": {
+     "version": "0.151.0",
+     "dateReleased": "2026-08-29"
+    },
+    "max": {
+     "version": "0.151.0",
+     "dateReleased": "2026-08-29"
+    }
+   },
+   "terminal-bench-v4": {
+    "min": {
+     "version": "0.153.4",
+     "dateReleased": "2026-09-04"
+    },
+    "max": {
+     "version": "0.153.4",
+     "dateReleased": "2026-09-04"
+    }
+   }
+  }
+ },
+ {
+  "id": "9fcf1e000a8ac75cca614977bcac25da",
+  "isDefault": true,
+  "isHighlighted": true,
+  "agentName": "Mistral Vibe",
+  "provider": "mistral",
+  "display": {
+   "agent": "Mistral Vibe",
+   "model": "Mistral Large 4 (High)"
+  },
+  "displayLabel": "Mistral Vibe - Mistral Large 4 (High)",
+  "model": {
+   "release": {
+    "slug": "mistral-large-4",
+    "name": "Mistral Large 4",
+    "shortName": "Mistral Large 4"
+   },
+   "suffix": "High",
+   "shortSuffix": "high",
+   "isReasoning": true,
+   "effort": {
+    "slug": "high",
+    "label": "high",
+    "level": 40
+   },
+   "name": "Mistral Large 4 (High)",
+   "shortName": "Mistral Large 4 (high)",
+   "scoreCaveat": null
+  },
+  "shortLabel": "Mistral Vibe - Mistral Large 4 (high)",
+  "agentRelease": {
+   "key": "Mistral Vibe:mistral-large-4",
+   "name": "Mistral Vibe - Mistral Large 4"
+  },
+  "agentCreator": {
+   "slug": "mistral",
+   "name": "Mistral",
+   "color": "#f32e02",
+   "logo": "/img/logos/mistral.svg"
+  },
+  "modelCreators": [
+   {
+    "slug": "mistral",
+    "name": "Mistral",
+    "color": "#f32e02",
+    "logo": "/img/logos/mistral.svg"
+   }
+  ],
+  "hasTieredPricing": false,
+  "isRouter": false,
+  "variantOf": null,
+  "isUnavailable": false,
+  "indexComponentCount": 3,
+  "evalCount": 3,
+  "evals": [
+   {
+    "datasetIndexName": "frontiercode-v1.1-main",
+    "evaluationDatasetSlug": "FrontierCode v1.1 Main",
+    "refDatasetName": "frontiercode-v1.1",
+    "weight": 0.333333333333333,
+    "safety": {
+     "attemptCount": 300,
+     "refusedAttemptCount": 0,
+     "hardStopAttemptCount": 0,
+     "recoveredAttemptCount": 0,
+     "fallbackAttemptCount": 0,
+     "refusals": [],
+     "rate": 0
+    },
+    "rewardHacking": {
+     "attemptCount": 300,
+     "retainedAttemptCount": 300,
+     "passingAttemptCount": 150,
+     "reviewedAttemptCount": 150,
+     "flaggedAttemptCount": 1,
+     "notApplicableAttemptCount": 0,
+     "missingAuditAttemptCount": 0,
+     "skippedAuditAttemptCount": 0,
+     "unavailableAuditAttemptCount": 0,
+     "gradingErrorAttemptCount": 0,
+     "invalidAuditAttemptCount": 0,
+     "snapshotMismatchAttemptCount": 2,
+     "materializedAt": "2026-11-06T07:37:34.331081+00:00",
+     "gradingVersion": "v2",
+     "graderConfigHash": "e424bdeaa5e64a0e",
+     "reviewSources": [],
+     "rate": 0.0033333333333333335
+    },
+    "mean": {
+     "reward": 0.445473666666667,
+     "inputTokens": 6590650.31,
+     "outputTokens": 48359.56
+    }
+   },
+   {
+    "datasetIndexName": "swe-atlas-qna",
+    "evaluationDatasetSlug": "SWE-Atlas-QnA",
+    "refDatasetName": "datasets/swe-atlas-qna",
+    "weight": 0.333333333333333,
+    "safety": {
+     "attemptCount": 372,
+     "refusedAttemptCount": 0,
+     "hardStopAttemptCount": 0,
+     "recoveredAttemptCount": 0,
+     "fallbackAttemptCount": 0,
+     "refusals": [],
+     "rate": 0
+    },
+    "rewardHacking": null,
+    "mean": {
+     "reward": 0.588709677419355,
+     "inputTokens": 2855366.85483871,
+     "outputTokens": 27802.333333333332
+    }
+   },
+   {
+    "datasetIndexName": "terminal-bench-v4",
+    "evaluationDatasetSlug": "Terminal-Bench v4",
+    "refDatasetName": "terminal-bench/terminal-bench@sha256:39d9f44b40420cde8fdcc087579c0d72a7e14fa3656d603c3f0d22fb35e27732",
+    "weight": 0.333333333333333,
+    "safety": {
+     "attemptCount": 198,
+     "refusedAttemptCount": 0,
+     "hardStopAttemptCount": 0,
+     "recoveredAttemptCount": 0,
+     "fallbackAttemptCount": 0,
+     "refusals": [],
+     "rate": 0
+    },
+    "rewardHacking": {
+     "attemptCount": 198,
+     "retainedAttemptCount": 198,
+     "passingAttemptCount": 85,
+     "reviewedAttemptCount": 85,
+     "flaggedAttemptCount": 3,
+     "notApplicableAttemptCount": 0,
+     "missingAuditAttemptCount": 0,
+     "skippedAuditAttemptCount": 0,
+     "unavailableAuditAttemptCount": 0,
+     "gradingErrorAttemptCount": 0,
+     "invalidAuditAttemptCount": 0,
+     "snapshotMismatchAttemptCount": 1,
+     "materializedAt": "2026-11-06T07:37:34.331081+00:00",
+     "gradingVersion": "v1",
+     "graderConfigHash": "e3e86c5c130946ce",
+     "reviewSources": [
+      {
+       "judgeModel": "sonnet",
+       "rubricId": "ca-bench-reward-hacking-v1",
+       "auditSchemaVersion": 1,
+       "attemptCount": 85
+      }
+     ],
+     "rate": 0.015151515151515152
+    },
+    "mean": {
+     "reward": 0.414141414141414,
+     "inputTokens": 15545773.297979798,
+     "outputTokens": 293637.2525252525
+    }
+   }
+  ],
+  "safety": {
+   "attemptCount": 870,
+   "refusedAttemptCount": 0,
+   "hardStopAttemptCount": 0,
+   "recoveredAttemptCount": 0,
+   "fallbackAttemptCount": 0,
+   "refusals": [],
+   "rate": 0
+  },
+  "indexScore": 0.482774919409145,
+  "mean": {
+   "reward": 0.482774919409145,
+   "costUsd": 1.25944220793442,
+   "agentWallTimeSec": 2903.91483346258,
+   "steps": 100.100451830129,
+   "inputTokens": 8330596.8209395,
+   "outputTokens": 123266.381952862,
+   "cacheTokens": 7667992.01400673,
+   "cacheHitRate": 0.911751306302099,
+   "totalTokens": 8453863.20289236
+  },
+  "sums": {
+   "costUsd": 299.228063866667
+  },
+  "percentiles": {
+   "costUsd": {
+    "p05": 0.122543493333333,
+    "p25": 0.297769745,
+    "p50": 0.546025783333333,
+    "p75": 1.14946097,
+    "p95": 3.43297607566667
+   },
+   "totalTokens": {
+    "p05": 673528.583333333,
+    "p25": 1870533.75,
+    "p50": 3893794,
+    "p75": 8554444.66666667,
+    "p95": 21851169.35
+   }
+  },
+  "versions": {
+   "frontiercode-v1.1-main": {
+    "min": {
+     "version": "3.0.0-v14",
+     "dateReleased": null
+    },
+    "max": {
+     "version": "3.0.0-v14",
+     "dateReleased": null
+    }
+   },
+   "swe-atlas-qna": {
+    "min": {
+     "version": "3.0.0-v14",
+     "dateReleased": null
+    },
+    "max": {
+     "version": "3.0.0-v14",
+     "dateReleased": null
+    }
+   },
+   "terminal-bench-v4": {
+    "min": {
+     "version": "3.0.0-v14",
+     "dateReleased": null
+    },
+    "max": {
+     "version": "3.0.0-v14",
+     "dateReleased": null
+    }
+   }
+  }
+ },
+ {
+  "id": "615aa2e21916e4843210a552131d95b7",
+  "isDefault": true,
+  "isHighlighted": true,
+  "agentName": "Antigravity CLI",
+  "provider": "google",
+  "display": {
+   "agent": "Antigravity CLI",
+   "model": "Gemini 4 Carbon (High)"
+  },
+  "displayLabel": "Antigravity CLI - Gemini 4 Carbon (High)",
+  "model": {
+   "release": {
+    "slug": "gemini-4-carbon",
+    "name": "Gemini 4 Carbon",
+    "shortName": "Gemini 4 Carbon"
+   },
+   "suffix": "High",
+   "shortSuffix": "high",
+   "isReasoning": true,
+   "effort": {
+    "slug": "high",
+    "label": "high",
+    "level": 40
+   },
+   "name": "Gemini 4 Carbon (High)",
+   "shortName": "Gemini 4 Carbon (high)",
+   "scoreCaveat": null
+  },
+  "shortLabel": "Antigravity CLI - Gemini 4 Carbon (high)",
+  "agentRelease": {
+   "key": "Antigravity CLI:gemini-4-carbon",
+   "name": "Antigravity CLI - Gemini 4 Carbon"
+  },
+  "agentCreator": {
+   "slug": "google",
+   "name": "Google",
+   "color": "#34A853",
+   "logo": "/img/logos/google.svg"
+  },
+  "modelCreators": [
+   {
+    "slug": "google",
+    "name": "Google",
+    "color": "#34A853",
+    "logo": "/img/logos/google.svg"
+   }
+  ],
+  "hasTieredPricing": false,
+  "isRouter": false,
+  "variantOf": null,
+  "isUnavailable": true,
+  "indexComponentCount": 3,
+  "evalCount": 3,
+  "evals": [
+   {
+    "datasetIndexName": "frontiercode-v1.1-main",
+    "evaluationDatasetSlug": "FrontierCode v1.1 Main",
+    "refDatasetName": "frontiercode-v1.1",
+    "weight": 0.333333333333333,
+    "safety": {
+     "attemptCount": 295,
+     "refusedAttemptCount": 0,
+     "hardStopAttemptCount": 0,
+     "recoveredAttemptCount": 0,
+     "fallbackAttemptCount": 0,
+     "refusals": [],
+     "rate": 0
+    },
+    "rewardHacking": {
+     "attemptCount": 300,
+     "retainedAttemptCount": 295,
+     "passingAttemptCount": 170,
+     "reviewedAttemptCount": 170,
+     "flaggedAttemptCount": 0,
+     "notApplicableAttemptCount": 0,
+     "missingAuditAttemptCount": 0,
+     "skippedAuditAttemptCount": 0,
+     "unavailableAuditAttemptCount": 0,
+     "gradingErrorAttemptCount": 0,
+     "invalidAuditAttemptCount": 0,
+     "snapshotMismatchAttemptCount": 0,
+     "materializedAt": "2026-11-06T07:37:34.331081+00:00",
+     "gradingVersion": "v2",
+     "graderConfigHash": "e424bdeaa5e64a0e",
+     "reviewSources": [],
+     "rate": 0
+    },
+    "mean": {
+     "reward": 0.508686666666667,
+     "inputTokens": 16157360.511784513,
+     "outputTokens": 94814.12794612795
+    }
+   },
+   {
+    "datasetIndexName": "swe-atlas-qna",
+    "evaluationDatasetSlug": "SWE-Atlas-QnA",
+    "refDatasetName": "datasets/swe-atlas-qna",
+    "weight": 0.333333333333333,
+    "safety": {
+     "attemptCount": 372,
+     "refusedAttemptCount": 0,
+     "hardStopAttemptCount": 0,
+     "recoveredAttemptCount": 0,
+     "fallbackAttemptCount": 0,
+     "refusals": [],
+     "rate": 0
+    },
+    "rewardHacking": null,
+    "mean": {
+     "reward": 0.637096774193548,
+     "inputTokens": 9217926.663978495,
+     "outputTokens": 64966.20430107527
+    }
+   },
+   {
+    "datasetIndexName": "terminal-bench-v4",
+    "evaluationDatasetSlug": "Terminal-Bench v4",
+    "refDatasetName": "terminal-bench/terminal-bench@sha256:39d9f44b40420cde8fdcc087579c0d72a7e14fa3656d603c3f0d22fb35e27732",
+    "weight": 0.333333333333333,
+    "safety": {
+     "attemptCount": 198,
+     "refusedAttemptCount": 0,
+     "hardStopAttemptCount": 0,
+     "recoveredAttemptCount": 0,
+     "fallbackAttemptCount": 0,
+     "refusals": [],
+     "rate": 0
+    },
+    "rewardHacking": {
+     "attemptCount": 198,
+     "retainedAttemptCount": 198,
+     "passingAttemptCount": 127,
+     "reviewedAttemptCount": 127,
+     "flaggedAttemptCount": 1,
+     "notApplicableAttemptCount": 0,
+     "missingAuditAttemptCount": 0,
+     "skippedAuditAttemptCount": 0,
+     "unavailableAuditAttemptCount": 0,
+     "gradingErrorAttemptCount": 0,
+     "invalidAuditAttemptCount": 0,
+     "snapshotMismatchAttemptCount": 0,
+     "materializedAt": "2026-11-06T07:37:34.331081+00:00",
+     "gradingVersion": "v1",
+     "graderConfigHash": "e3e86c5c130946ce",
+     "reviewSources": [
+      {
+       "judgeModel": "sonnet",
+       "rubricId": "ca-bench-reward-hacking-v1",
+       "auditSchemaVersion": 1,
+       "attemptCount": 127
+      }
+     ],
+     "rate": 0.005050505050505051
+    },
+    "mean": {
+     "reward": 0.636363636363636,
+     "inputTokens": 11943170.782828283,
+     "outputTokens": 167312.601010101
+    }
+   }
+  ],
+  "safety": {
+   "attemptCount": 865,
+   "refusedAttemptCount": 0,
+   "hardStopAttemptCount": 0,
+   "recoveredAttemptCount": 0,
+   "fallbackAttemptCount": 0,
+   "refusals": [],
+   "rate": 0
+  },
+  "indexScore": 0.594049025741284,
+  "mean": {
+   "reward": 0.594049025741284,
+   "costUsd": 7.7432202900257,
+   "agentWallTimeSec": 1789.89670714312,
+   "steps": 177.827079034068,
+   "inputTokens": 12439485.9861971,
+   "outputTokens": 109030.977752435,
+   "cacheTokens": 11998764.5754679,
+   "cacheHitRate": 0.951903021414925,
+   "totalTokens": 12548516.9639495
+  },
+  "sums": {
+   "costUsd": 2114.56552926667
+  },
+  "percentiles": {
+   "costUsd": {
+    "p05": 2.79588154666667,
+    "p25": 4.26565593333333,
+    "p50": 6.23861773333333,
+    "p75": 9.06298013333334,
+    "p95": 15.08098036
+   },
+   "totalTokens": {
+    "p05": 2257696.2,
+    "p25": 5756772.33333333,
+    "p50": 9161469.66666667,
+    "p75": 15712799.3333333,
+    "p95": 31095590.4
+   }
+  },
+  "versions": {
+   "frontiercode-v1.1-main": {
+    "min": {
+     "version": "1.4.3",
+     "dateReleased": null
+    },
+    "max": {
+     "version": "1.4.3",
+     "dateReleased": null
+    }
+   },
+   "swe-atlas-qna": {
+    "min": {
+     "version": "1.4.3",
+     "dateReleased": null
+    },
+    "max": {
+     "version": "1.4.3",
+     "dateReleased": null
+    }
+   },
+   "terminal-bench-v4": {
+    "min": {
+     "version": "1.4.3",
+     "dateReleased": null
+    },
+    "max": {
+     "version": "1.4.3",
+     "dateReleased": null
+    }
+   }
+  }
+ },
+ {
+  "id": "3897d72a57138fd2e2353367570b4b37",
+  "isDefault": true,
+  "isHighlighted": true,
+  "agentName": "Codex",
+  "provider": "openai",
+  "display": {
+   "agent": "Codex",
+   "model": "GPT-6.1 Sol (Max)"
+  },
+  "displayLabel": "Codex - GPT-6.1 Sol (Max)",
+  "model": {
+   "release": {
+    "slug": "gpt-6-1-sol",
+    "name": "GPT-6.1 Sol",
+    "shortName": "GPT-6.1 Sol"
+   },
+   "suffix": "Max",
+   "shortSuffix": "max",
+   "isReasoning": true,
+   "effort": {
+    "slug": "max",
+    "label": "max",
+    "level": 60
+   },
+   "name": "GPT-6.1 Sol (Max)",
+   "shortName": "GPT-6.1 Sol (max)",
+   "scoreCaveat": null
+  },
+  "shortLabel": "Codex - GPT-6.1 Sol (max)",
+  "agentRelease": {
+   "key": "Codex:gpt-6-1-sol",
+   "name": "Codex - GPT-6.1 Sol"
+  },
+  "agentCreator": {
+   "slug": "openai",
+   "name": "OpenAI",
+   "color": "#1f1f1f",
+   "logo": "/img/logos/openai.svg"
+  },
+  "modelCreators": [
+   {
+    "slug": "openai",
+    "name": "OpenAI",
+    "color": "#1f1f1f",
+    "logo": "/img/logos/openai.svg"
+   }
+  ],
+  "hasTieredPricing": false,
+  "isRouter": false,
+  "variantOf": null,
+  "isUnavailable": false,
+  "indexComponentCount": 3,
+  "evalCount": 3,
+  "evals": [
+   {
+    "datasetIndexName": "frontiercode-v1.1-main",
+    "evaluationDatasetSlug": "FrontierCode v1.1 Main",
+    "refDatasetName": "frontiercode-v1.1",
+    "weight": 0.333333333333333,
+    "safety": {
+     "attemptCount": 300,
+     "refusedAttemptCount": 0,
+     "hardStopAttemptCount": 0,
+     "recoveredAttemptCount": 0,
+     "fallbackAttemptCount": 0,
+     "refusals": [],
+     "rate": 0
+    },
+    "rewardHacking": {
+     "attemptCount": 300,
+     "retainedAttemptCount": 300,
+     "passingAttemptCount": 164,
+     "reviewedAttemptCount": 164,
+     "flaggedAttemptCount": 0,
+     "notApplicableAttemptCount": 0,
+     "missingAuditAttemptCount": 0,
+     "skippedAuditAttemptCount": 0,
+     "unavailableAuditAttemptCount": 0,
+     "gradingErrorAttemptCount": 0,
+     "invalidAuditAttemptCount": 0,
+     "snapshotMismatchAttemptCount": 0,
+     "materializedAt": "2026-11-06T07:37:34.331081+00:00",
+     "gradingVersion": "v2",
+     "graderConfigHash": "e424bdeaa5e64a0e",
+     "reviewSources": [],
+     "rate": 0
+    },
+    "mean": {
+     "reward": 0.494074,
+     "inputTokens": 2609468.38,
+     "outputTokens": 33868.636666666665
+    }
+   },
+   {
+    "datasetIndexName": "swe-atlas-qna",
+    "evaluationDatasetSlug": "SWE-Atlas-QnA",
+    "refDatasetName": "datasets/swe-atlas-qna",
+    "weight": 0.333333333333333,
+    "safety": {
+     "attemptCount": 372,
+     "refusedAttemptCount": 15,
+     "hardStopAttemptCount": 15,
+     "recoveredAttemptCount": 0,
+     "fallbackAttemptCount": 0,
+     "refusals": [
+      {
+       "turn": 0,
+       "attemptCount": 6,
+       "outcome": "hard_stop",
+       "chain": [],
+       "rate": 0.016129032258064516
+      },
+      {
+       "turn": 25,
+       "attemptCount": 2,
+       "outcome": "hard_stop",
+       "chain": [],
+       "rate": 0.005376344086021506
+      },
+      {
+       "turn": 1,
+       "attemptCount": 1,
+       "outcome": "hard_stop",
+       "chain": [],
+       "rate": 0.002688172043010753
+      },
+      {
+       "turn": 2,
+       "attemptCount": 1,
+       "outcome": "hard_stop",
+       "chain": [],
+       "rate": 0.002688172043010753
+      },
+      {
+       "turn": 13,
+       "attemptCount": 1,
+       "outcome": "hard_stop",
+       "chain": [],
+       "rate": 0.002688172043010753
+      },
+      {
+       "turn": 17,
+       "attemptCount": 1,
+       "outcome": "hard_stop",
+       "chain": [],
+       "rate": 0.002688172043010753
+      },
+      {
+       "turn": 23,
+       "attemptCount": 1,
+       "outcome": "hard_stop",
+       "chain": [],
+       "rate": 0.002688172043010753
+      },
+      {
+       "turn": 32,
+       "attemptCount": 1,
+       "outcome": "hard_stop",
+       "chain": [],
+       "rate": 0.002688172043010753
+      },
+      {
+       "turn": 65,
+       "attemptCount": 1,
+       "outcome": "hard_stop",
+       "chain": [],
+       "rate": 0.002688172043010753
+      }
+     ],
+     "rate": 0.04032258064516129
+    },
+    "rewardHacking": null,
+    "mean": {
+     "reward": 0.599462365591398,
+     "inputTokens": 3174248.106557377,
+     "outputTokens": 35732.352459016394
+    }
+   },
+   {
+    "datasetIndexName": "terminal-bench-v4",
+    "evaluationDatasetSlug": "Terminal-Bench v4",
+    "refDatasetName": "terminal-bench/terminal-bench@sha256:39d9f44b40420cde8fdcc087579c0d72a7e14fa3656d603c3f0d22fb35e27732",
+    "weight": 0.333333333333333,
+    "safety": {
+     "attemptCount": 198,
+     "refusedAttemptCount": 0,
+     "hardStopAttemptCount": 0,
+     "recoveredAttemptCount": 0,
+     "fallbackAttemptCount": 0,
+     "refusals": [],
+     "rate": 0
+    },
+    "rewardHacking": {
+     "attemptCount": 198,
+     "retainedAttemptCount": 198,
+     "passingAttemptCount": 105,
+     "reviewedAttemptCount": 105,
+     "flaggedAttemptCount": 0,
+     "notApplicableAttemptCount": 0,
+     "missingAuditAttemptCount": 0,
+     "skippedAuditAttemptCount": 0,
+     "unavailableAuditAttemptCount": 0,
+     "gradingErrorAttemptCount": 0,
+     "invalidAuditAttemptCount": 0,
+     "snapshotMismatchAttemptCount": 0,
+     "materializedAt": "2026-11-06T07:37:34.331081+00:00",
+     "gradingVersion": "v1",
+     "graderConfigHash": "e3e86c5c130946ce",
+     "reviewSources": [
+      {
+       "judgeModel": "sonnet",
+       "rubricId": "ca-bench-reward-hacking-v1",
+       "auditSchemaVersion": 1,
+       "attemptCount": 105
+      }
+     ],
+     "rate": 0
+    },
+    "mean": {
+     "reward": 0.53030303030303,
+     "inputTokens": 5883278.52020202,
+     "outputTokens": 96071.93939393939
+    }
+   }
+  ],
+  "safety": {
+   "attemptCount": 870,
+   "refusedAttemptCount": 15,
+   "hardStopAttemptCount": 15,
+   "recoveredAttemptCount": 0,
+   "fallbackAttemptCount": 0,
+   "refusals": [
+    {
+     "turn": 0,
+     "attemptCount": 6,
+     "outcome": "hard_stop",
+     "chain": [],
+     "rate": 0.005376344086021505
+    },
+    {
+     "turn": 25,
+     "attemptCount": 2,
+     "outcome": "hard_stop",
+     "chain": [],
+     "rate": 0.001792114695340502
+    },
+    {
+     "turn": 1,
+     "attemptCount": 1,
+     "outcome": "hard_stop",
+     "chain": [],
+     "rate": 0.000896057347670251
+    },
+    {
+     "turn": 2,
+     "attemptCount": 1,
+     "outcome": "hard_stop",
+     "chain": [],
+     "rate": 0.000896057347670251
+    },
+    {
+     "turn": 13,
+     "attemptCount": 1,
+     "outcome": "hard_stop",
+     "chain": [],
+     "rate": 0.000896057347670251
+    },
+    {
+     "turn": 17,
+     "attemptCount": 1,
+     "outcome": "hard_stop",
+     "chain": [],
+     "rate": 0.000896057347670251
+    },
+    {
+     "turn": 23,
+     "attemptCount": 1,
+     "outcome": "hard_stop",
+     "chain": [],
+     "rate": 0.000896057347670251
+    },
+    {
+     "turn": 32,
+     "attemptCount": 1,
+     "outcome": "hard_stop",
+     "chain": [],
+     "rate": 0.000896057347670251
+    },
+    {
+     "turn": 65,
+     "attemptCount": 1,
+     "outcome": "hard_stop",
+     "chain": [],
+     "rate": 0.000896057347670251
+    }
+   ],
+   "rate": 0.013440860215053764
+  },
+  "indexScore": 0.541279798631476,
+  "mean": {
+   "reward": 0.541279798631476,
+   "costUsd": 1.5046389983744,
+   "agentWallTimeSec": 1421.42885321603,
+   "steps": 40.6271304442272,
+   "inputTokens": 3888998.33558647,
+   "outputTokens": 55224.3095065408,
+   "cacheTokens": 3681178.93235801,
+   "cacheHitRate": 0.921352278288341,
+   "totalTokens": 3944222.64509301
+  },
+  "sums": {
+   "costUsd": 391.598093616667
+  },
+  "percentiles": {
+   "costUsd": {
+    "p05": 0.32259094,
+    "p25": 0.593144425,
+    "p50": 0.95482085,
+    "p75": 1.47574635833333,
+    "p95": 3.14896659666666
+   },
+   "totalTokens": {
+    "p05": 472030.666666667,
+    "p25": 1233653.16666667,
+    "p50": 2495829.66666667,
+    "p75": 4278318.91666667,
+    "p95": 8468908.93333331
+   }
+  },
+  "versions": {
+   "frontiercode-v1.1-main": {
+    "min": {
+     "version": "0.154.0",
+     "dateReleased": null
+    },
+    "max": {
+     "version": "0.154.0",
+     "dateReleased": null
+    }
+   },
+   "swe-atlas-qna": {
+    "min": {
+     "version": "0.154.0",
+     "dateReleased": null
+    },
+    "max": {
+     "version": "0.154.0",
+     "dateReleased": null
+    }
+   },
+   "terminal-bench-v4": {
+    "min": {
+     "version": "0.154.0",
+     "dateReleased": null
+    },
+    "max": {
+     "version": "0.154.0",
+     "dateReleased": null
+    }
+   }
+  }
+ },
+ {
+  "id": "52f72f7f3393c5edf92b32326e7a678d",
+  "isDefault": true,
+  "isHighlighted": true,
+  "agentName": "Muse Code",
+  "provider": "meta",
+  "display": {
+   "agent": "Muse Code",
+   "model": "Muse Wonder (Max)"
+  },
+  "displayLabel": "Muse Code - Muse Wonder (Max)",
+  "model": {
+   "release": {
+    "slug": "muse-wonder",
+    "name": "Muse Wonder",
+    "shortName": "Muse Wonder"
+   },
+   "suffix": "Max",
+   "shortSuffix": "max",
+   "isReasoning": true,
+   "effort": {
+    "slug": "max",
+    "label": "max",
+    "level": 60
+   },
+   "name": "Muse Wonder (Max)",
+   "shortName": "Muse Wonder (max)",
+   "scoreCaveat": null
+  },
+  "shortLabel": "Muse Code - Muse Wonder (max)",
+  "agentRelease": {
+   "key": "Muse Code:muse-wonder",
+   "name": "Muse Code - Muse Wonder"
+  },
+  "agentCreator": {
+   "slug": "meta",
+   "name": "Meta",
+   "color": "#0089f4",
+   "logo": "/img/logos/meta.svg"
+  },
+  "modelCreators": [
+   {
+    "slug": "meta",
+    "name": "Meta",
+    "color": "#0089f4",
+    "logo": "/img/logos/meta.svg"
+   }
+  ],
+  "hasTieredPricing": false,
+  "isRouter": false,
+  "variantOf": null,
+  "isUnavailable": false,
+  "indexComponentCount": 3,
+  "evalCount": 3,
+  "evals": [
+   {
+    "datasetIndexName": "frontiercode-v1.1-main",
+    "evaluationDatasetSlug": "FrontierCode v1.1 Main",
+    "refDatasetName": "frontiercode-v1.1",
+    "weight": 0.333333333333333,
+    "safety": {
+     "attemptCount": 300,
+     "refusedAttemptCount": 0,
+     "hardStopAttemptCount": 0,
+     "recoveredAttemptCount": 0,
+     "fallbackAttemptCount": 0,
+     "refusals": [],
+     "rate": 0
+    },
+    "rewardHacking": {
+     "attemptCount": 300,
+     "retainedAttemptCount": 300,
+     "passingAttemptCount": 155,
+     "reviewedAttemptCount": 155,
+     "flaggedAttemptCount": 0,
+     "notApplicableAttemptCount": 0,
+     "missingAuditAttemptCount": 0,
+     "skippedAuditAttemptCount": 0,
+     "unavailableAuditAttemptCount": 0,
+     "gradingErrorAttemptCount": 0,
+     "invalidAuditAttemptCount": 0,
+     "snapshotMismatchAttemptCount": 0,
+     "materializedAt": "2026-11-06T07:37:34.331081+00:00",
+     "gradingVersion": "v2",
+     "graderConfigHash": "e424bdeaa5e64a0e",
+     "reviewSources": [],
+     "rate": 0
+    },
+    "mean": {
+     "reward": 0.463915333333333,
+     "inputTokens": 14936221.55,
+     "outputTokens": 65571.56
+    }
+   },
+   {
+    "datasetIndexName": "swe-atlas-qna",
+    "evaluationDatasetSlug": "SWE-Atlas-QnA",
+    "refDatasetName": "datasets/swe-atlas-qna",
+    "weight": 0.333333333333333,
+    "safety": {
+     "attemptCount": 372,
+     "refusedAttemptCount": 0,
+     "hardStopAttemptCount": 0,
+     "recoveredAttemptCount": 0,
+     "fallbackAttemptCount": 0,
+     "refusals": [],
+     "rate": 0
+    },
+    "rewardHacking": null,
+    "mean": {
+     "reward": 0.615591397849462,
+     "inputTokens": 5962254.639784946,
+     "outputTokens": 36859.57526881721
+    }
+   },
+   {
+    "datasetIndexName": "terminal-bench-v4",
+    "evaluationDatasetSlug": "Terminal-Bench v4",
+    "refDatasetName": "terminal-bench/terminal-bench@sha256:39d9f44b40420cde8fdcc087579c0d72a7e14fa3656d603c3f0d22fb35e27732",
+    "weight": 0.333333333333333,
+    "safety": {
+     "attemptCount": 198,
+     "refusedAttemptCount": 0,
+     "hardStopAttemptCount": 0,
+     "recoveredAttemptCount": 0,
+     "fallbackAttemptCount": 0,
+     "refusals": [],
+     "rate": 0
+    },
+    "rewardHacking": {
+     "attemptCount": 198,
+     "retainedAttemptCount": 198,
+     "passingAttemptCount": 96,
+     "reviewedAttemptCount": 96,
+     "flaggedAttemptCount": 1,
+     "notApplicableAttemptCount": 0,
+     "missingAuditAttemptCount": 0,
+     "skippedAuditAttemptCount": 0,
+     "unavailableAuditAttemptCount": 0,
+     "gradingErrorAttemptCount": 0,
+     "invalidAuditAttemptCount": 0,
+     "snapshotMismatchAttemptCount": 0,
+     "materializedAt": "2026-11-06T07:37:34.331081+00:00",
+     "gradingVersion": "v1",
+     "graderConfigHash": "e3e86c5c130946ce",
+     "reviewSources": [
+      {
+       "judgeModel": "sonnet",
+       "rubricId": "ca-bench-reward-hacking-v1",
+       "auditSchemaVersion": 1,
+       "attemptCount": 96
+      }
+     ],
+     "rate": 0.005050505050505051
+    },
+    "mean": {
+     "reward": 0.47979797979798,
+     "inputTokens": 22254074.07070707,
+     "outputTokens": 184134.5101010101
+    }
+   }
+  ],
+  "safety": {
+   "attemptCount": 870,
+   "refusedAttemptCount": 0,
+   "hardStopAttemptCount": 0,
+   "recoveredAttemptCount": 0,
+   "fallbackAttemptCount": 0,
+   "refusals": [],
+   "rate": 0
+  },
+  "indexScore": 0.519768236993592,
+  "mean": {
+   "reward": 0.519768236993592,
+   "costUsd": 8.04811220428196,
+   "agentWallTimeSec": 1472.5084254817,
+   "steps": 200.877049903502,
+   "inputTokens": 14384183.420164,
+   "outputTokens": 95521.8817899424,
+   "cacheTokens": 13526068.1874139,
+   "cacheHitRate": 0.939000029822895,
+   "totalTokens": 14479705.3019539
+  },
+  "sums": {
+   "costUsd": 1969.91115066667
+  },
+  "percentiles": {
+   "costUsd": {
+    "p05": 1.31912929333333,
+    "p25": 2.7226498,
+    "p50": 4.21125933333333,
+    "p75": 6.67109313333333,
+    "p95": 18.06034512
+   },
+   "totalTokens": {
+    "p05": 1649932.55,
+    "p25": 4768954.25,
+    "p50": 8560157.33333333,
+    "p75": 14661218.3333333,
+    "p95": 35735776.8666667
+   }
+  },
+  "versions": {
+   "frontiercode-v1.1-main": {
+    "min": {
+     "version": "1.4.5-R5426.1",
+     "dateReleased": null
+    },
+    "max": {
+     "version": "1.4.5-R5426.1",
+     "dateReleased": null
+    }
+   },
+   "swe-atlas-qna": {
+    "min": {
+     "version": "1.4.5-R5426.1",
+     "dateReleased": null
+    },
+    "max": {
+     "version": "1.4.5-R5426.1",
+     "dateReleased": null
+    }
+   },
+   "terminal-bench-v4": {
+    "min": {
+     "version": "1.4.5-R5426.1",
+     "dateReleased": null
+    },
+    "max": {
+     "version": "1.4.5-R5426.1",
+     "dateReleased": null
+    }
+   }
+  }
+ },
+ {
   "id": "9983e10d68576074ad63407d0ca81e4b",
   "isDefault": true,
   "isHighlighted": true,
@@ -25,7 +1428,8 @@
     "level": 60
    },
    "name": "Claude Sonnet 5.5 (Max, Default Fallback)",
-   "shortName": "Claude Sonnet 5.5 (max)"
+   "shortName": "Claude Sonnet 5.5 (max)",
+   "scoreCaveat": null
   },
   "shortLabel": "Claude Code - Claude Sonnet 5.5 (max)",
   "agentRelease": {
@@ -80,7 +1484,7 @@
      "gradingErrorAttemptCount": 0,
      "invalidAuditAttemptCount": 0,
      "snapshotMismatchAttemptCount": 0,
-     "materializedAt": "2026-11-05T23:19:00.793293+00:00",
+     "materializedAt": "2026-11-06T07:37:34.331081+00:00",
      "gradingVersion": "v2",
      "graderConfigHash": "e424bdeaa5e64a0e",
      "reviewSources": [],
@@ -862,7 +2266,7 @@
      "gradingErrorAttemptCount": 0,
      "invalidAuditAttemptCount": 0,
      "snapshotMismatchAttemptCount": 0,
-     "materializedAt": "2026-11-05T23:19:00.793293+00:00",
+     "materializedAt": "2026-11-06T07:37:34.331081+00:00",
      "gradingVersion": "v1",
      "graderConfigHash": "e3e86c5c130946ce",
      "reviewSources": [
@@ -1677,1404 +3081,6 @@
   }
  },
  {
-  "id": "52f72f7f3393c5edf92b32326e7a678d",
-  "isDefault": true,
-  "isHighlighted": true,
-  "agentName": "Muse Code",
-  "provider": "meta",
-  "display": {
-   "agent": "Muse Code",
-   "model": "Muse Wonder (Max)"
-  },
-  "displayLabel": "Muse Code - Muse Wonder (Max)",
-  "model": {
-   "release": {
-    "slug": "muse-wonder",
-    "name": "Muse Wonder",
-    "shortName": "Muse Wonder"
-   },
-   "suffix": "Max",
-   "shortSuffix": "max",
-   "isReasoning": true,
-   "effort": {
-    "slug": "max",
-    "label": "max",
-    "level": 60
-   },
-   "name": "Muse Wonder (Max)",
-   "shortName": "Muse Wonder (max)"
-  },
-  "shortLabel": "Muse Code - Muse Wonder (max)",
-  "agentRelease": {
-   "key": "Muse Code:muse-wonder",
-   "name": "Muse Code - Muse Wonder"
-  },
-  "agentCreator": {
-   "slug": "meta",
-   "name": "Meta",
-   "color": "#0089f4",
-   "logo": "/img/logos/meta.svg"
-  },
-  "modelCreators": [
-   {
-    "slug": "meta",
-    "name": "Meta",
-    "color": "#0089f4",
-    "logo": "/img/logos/meta.svg"
-   }
-  ],
-  "hasTieredPricing": false,
-  "isRouter": false,
-  "variantOf": null,
-  "isUnavailable": false,
-  "indexComponentCount": 3,
-  "evalCount": 3,
-  "evals": [
-   {
-    "datasetIndexName": "frontiercode-v1.1-main",
-    "evaluationDatasetSlug": "FrontierCode v1.1 Main",
-    "refDatasetName": "frontiercode-v1.1",
-    "weight": 0.333333333333333,
-    "safety": {
-     "attemptCount": 300,
-     "refusedAttemptCount": 0,
-     "hardStopAttemptCount": 0,
-     "recoveredAttemptCount": 0,
-     "fallbackAttemptCount": 0,
-     "refusals": [],
-     "rate": 0
-    },
-    "rewardHacking": {
-     "attemptCount": 300,
-     "retainedAttemptCount": 300,
-     "passingAttemptCount": 155,
-     "reviewedAttemptCount": 155,
-     "flaggedAttemptCount": 0,
-     "notApplicableAttemptCount": 0,
-     "missingAuditAttemptCount": 0,
-     "skippedAuditAttemptCount": 0,
-     "unavailableAuditAttemptCount": 0,
-     "gradingErrorAttemptCount": 0,
-     "invalidAuditAttemptCount": 0,
-     "snapshotMismatchAttemptCount": 0,
-     "materializedAt": "2026-11-05T23:19:00.793293+00:00",
-     "gradingVersion": "v2",
-     "graderConfigHash": "e424bdeaa5e64a0e",
-     "reviewSources": [],
-     "rate": 0
-    },
-    "mean": {
-     "reward": 0.463915333333333,
-     "inputTokens": 14936221.55,
-     "outputTokens": 65571.56
-    }
-   },
-   {
-    "datasetIndexName": "swe-atlas-qna",
-    "evaluationDatasetSlug": "SWE-Atlas-QnA",
-    "refDatasetName": "datasets/swe-atlas-qna",
-    "weight": 0.333333333333333,
-    "safety": {
-     "attemptCount": 372,
-     "refusedAttemptCount": 0,
-     "hardStopAttemptCount": 0,
-     "recoveredAttemptCount": 0,
-     "fallbackAttemptCount": 0,
-     "refusals": [],
-     "rate": 0
-    },
-    "rewardHacking": null,
-    "mean": {
-     "reward": 0.615591397849462,
-     "inputTokens": 5962254.639784946,
-     "outputTokens": 36859.57526881721
-    }
-   },
-   {
-    "datasetIndexName": "terminal-bench-v4",
-    "evaluationDatasetSlug": "Terminal-Bench v4",
-    "refDatasetName": "terminal-bench/terminal-bench@sha256:39d9f44b40420cde8fdcc087579c0d72a7e14fa3656d603c3f0d22fb35e27732",
-    "weight": 0.333333333333333,
-    "safety": {
-     "attemptCount": 198,
-     "refusedAttemptCount": 0,
-     "hardStopAttemptCount": 0,
-     "recoveredAttemptCount": 0,
-     "fallbackAttemptCount": 0,
-     "refusals": [],
-     "rate": 0
-    },
-    "rewardHacking": {
-     "attemptCount": 198,
-     "retainedAttemptCount": 198,
-     "passingAttemptCount": 96,
-     "reviewedAttemptCount": 96,
-     "flaggedAttemptCount": 1,
-     "notApplicableAttemptCount": 0,
-     "missingAuditAttemptCount": 0,
-     "skippedAuditAttemptCount": 0,
-     "unavailableAuditAttemptCount": 0,
-     "gradingErrorAttemptCount": 0,
-     "invalidAuditAttemptCount": 0,
-     "snapshotMismatchAttemptCount": 0,
-     "materializedAt": "2026-11-05T23:19:00.793293+00:00",
-     "gradingVersion": "v1",
-     "graderConfigHash": "e3e86c5c130946ce",
-     "reviewSources": [
-      {
-       "judgeModel": "sonnet",
-       "rubricId": "ca-bench-reward-hacking-v1",
-       "auditSchemaVersion": 1,
-       "attemptCount": 96
-      }
-     ],
-     "rate": 0.005050505050505051
-    },
-    "mean": {
-     "reward": 0.47979797979798,
-     "inputTokens": 22254074.07070707,
-     "outputTokens": 184134.5101010101
-    }
-   }
-  ],
-  "safety": {
-   "attemptCount": 870,
-   "refusedAttemptCount": 0,
-   "hardStopAttemptCount": 0,
-   "recoveredAttemptCount": 0,
-   "fallbackAttemptCount": 0,
-   "refusals": [],
-   "rate": 0
-  },
-  "indexScore": 0.519768236993592,
-  "mean": {
-   "reward": 0.519768236993592,
-   "costUsd": 8.04811220428196,
-   "agentWallTimeSec": 1472.5084254817,
-   "steps": 200.877049903502,
-   "inputTokens": 14384183.420164,
-   "outputTokens": 95521.8817899424,
-   "cacheTokens": 13526068.1874139,
-   "cacheHitRate": 0.939000029822895,
-   "totalTokens": 14479705.3019539
-  },
-  "sums": {
-   "costUsd": 1969.91115066667
-  },
-  "percentiles": {
-   "costUsd": {
-    "p05": 1.31912929333333,
-    "p25": 2.7226498,
-    "p50": 4.21125933333333,
-    "p75": 6.67109313333333,
-    "p95": 18.06034512
-   },
-   "totalTokens": {
-    "p05": 1649932.55,
-    "p25": 4768954.25,
-    "p50": 8560157.33333333,
-    "p75": 14661218.3333333,
-    "p95": 35735776.8666667
-   }
-  },
-  "versions": {
-   "frontiercode-v1.1-main": {
-    "min": {
-     "version": "1.4.5-R5426.1",
-     "dateReleased": null
-    },
-    "max": {
-     "version": "1.4.5-R5426.1",
-     "dateReleased": null
-    }
-   },
-   "swe-atlas-qna": {
-    "min": {
-     "version": "1.4.5-R5426.1",
-     "dateReleased": null
-    },
-    "max": {
-     "version": "1.4.5-R5426.1",
-     "dateReleased": null
-    }
-   },
-   "terminal-bench-v4": {
-    "min": {
-     "version": "1.4.5-R5426.1",
-     "dateReleased": null
-    },
-    "max": {
-     "version": "1.4.5-R5426.1",
-     "dateReleased": null
-    }
-   }
-  }
- },
- {
-  "id": "3897d72a57138fd2e2353367570b4b37",
-  "isDefault": true,
-  "isHighlighted": true,
-  "agentName": "Codex",
-  "provider": "openai",
-  "display": {
-   "agent": "Codex",
-   "model": "GPT-6.1 Sol (Max)"
-  },
-  "displayLabel": "Codex - GPT-6.1 Sol (Max)",
-  "model": {
-   "release": {
-    "slug": "gpt-6-1-sol",
-    "name": "GPT-6.1 Sol",
-    "shortName": "GPT-6.1 Sol"
-   },
-   "suffix": "Max",
-   "shortSuffix": "max",
-   "isReasoning": true,
-   "effort": {
-    "slug": "max",
-    "label": "max",
-    "level": 60
-   },
-   "name": "GPT-6.1 Sol (Max)",
-   "shortName": "GPT-6.1 Sol (max)"
-  },
-  "shortLabel": "Codex - GPT-6.1 Sol (max)",
-  "agentRelease": {
-   "key": "Codex:gpt-6-1-sol",
-   "name": "Codex - GPT-6.1 Sol"
-  },
-  "agentCreator": {
-   "slug": "openai",
-   "name": "OpenAI",
-   "color": "#1f1f1f",
-   "logo": "/img/logos/openai.svg"
-  },
-  "modelCreators": [
-   {
-    "slug": "openai",
-    "name": "OpenAI",
-    "color": "#1f1f1f",
-    "logo": "/img/logos/openai.svg"
-   }
-  ],
-  "hasTieredPricing": false,
-  "isRouter": false,
-  "variantOf": null,
-  "isUnavailable": false,
-  "indexComponentCount": 3,
-  "evalCount": 3,
-  "evals": [
-   {
-    "datasetIndexName": "frontiercode-v1.1-main",
-    "evaluationDatasetSlug": "FrontierCode v1.1 Main",
-    "refDatasetName": "frontiercode-v1.1",
-    "weight": 0.333333333333333,
-    "safety": {
-     "attemptCount": 300,
-     "refusedAttemptCount": 0,
-     "hardStopAttemptCount": 0,
-     "recoveredAttemptCount": 0,
-     "fallbackAttemptCount": 0,
-     "refusals": [],
-     "rate": 0
-    },
-    "rewardHacking": {
-     "attemptCount": 300,
-     "retainedAttemptCount": 300,
-     "passingAttemptCount": 164,
-     "reviewedAttemptCount": 164,
-     "flaggedAttemptCount": 0,
-     "notApplicableAttemptCount": 0,
-     "missingAuditAttemptCount": 0,
-     "skippedAuditAttemptCount": 0,
-     "unavailableAuditAttemptCount": 0,
-     "gradingErrorAttemptCount": 0,
-     "invalidAuditAttemptCount": 0,
-     "snapshotMismatchAttemptCount": 0,
-     "materializedAt": "2026-11-05T23:19:00.793293+00:00",
-     "gradingVersion": "v2",
-     "graderConfigHash": "e424bdeaa5e64a0e",
-     "reviewSources": [],
-     "rate": 0
-    },
-    "mean": {
-     "reward": 0.494074,
-     "inputTokens": 2609468.38,
-     "outputTokens": 33868.636666666665
-    }
-   },
-   {
-    "datasetIndexName": "swe-atlas-qna",
-    "evaluationDatasetSlug": "SWE-Atlas-QnA",
-    "refDatasetName": "datasets/swe-atlas-qna",
-    "weight": 0.333333333333333,
-    "safety": {
-     "attemptCount": 372,
-     "refusedAttemptCount": 15,
-     "hardStopAttemptCount": 15,
-     "recoveredAttemptCount": 0,
-     "fallbackAttemptCount": 0,
-     "refusals": [
-      {
-       "turn": 0,
-       "attemptCount": 6,
-       "outcome": "hard_stop",
-       "chain": [],
-       "rate": 0.016129032258064516
-      },
-      {
-       "turn": 25,
-       "attemptCount": 2,
-       "outcome": "hard_stop",
-       "chain": [],
-       "rate": 0.005376344086021506
-      },
-      {
-       "turn": 1,
-       "attemptCount": 1,
-       "outcome": "hard_stop",
-       "chain": [],
-       "rate": 0.002688172043010753
-      },
-      {
-       "turn": 2,
-       "attemptCount": 1,
-       "outcome": "hard_stop",
-       "chain": [],
-       "rate": 0.002688172043010753
-      },
-      {
-       "turn": 13,
-       "attemptCount": 1,
-       "outcome": "hard_stop",
-       "chain": [],
-       "rate": 0.002688172043010753
-      },
-      {
-       "turn": 17,
-       "attemptCount": 1,
-       "outcome": "hard_stop",
-       "chain": [],
-       "rate": 0.002688172043010753
-      },
-      {
-       "turn": 23,
-       "attemptCount": 1,
-       "outcome": "hard_stop",
-       "chain": [],
-       "rate": 0.002688172043010753
-      },
-      {
-       "turn": 32,
-       "attemptCount": 1,
-       "outcome": "hard_stop",
-       "chain": [],
-       "rate": 0.002688172043010753
-      },
-      {
-       "turn": 65,
-       "attemptCount": 1,
-       "outcome": "hard_stop",
-       "chain": [],
-       "rate": 0.002688172043010753
-      }
-     ],
-     "rate": 0.04032258064516129
-    },
-    "rewardHacking": null,
-    "mean": {
-     "reward": 0.599462365591398,
-     "inputTokens": 3174248.106557377,
-     "outputTokens": 35732.352459016394
-    }
-   },
-   {
-    "datasetIndexName": "terminal-bench-v4",
-    "evaluationDatasetSlug": "Terminal-Bench v4",
-    "refDatasetName": "terminal-bench/terminal-bench@sha256:39d9f44b40420cde8fdcc087579c0d72a7e14fa3656d603c3f0d22fb35e27732",
-    "weight": 0.333333333333333,
-    "safety": {
-     "attemptCount": 198,
-     "refusedAttemptCount": 0,
-     "hardStopAttemptCount": 0,
-     "recoveredAttemptCount": 0,
-     "fallbackAttemptCount": 0,
-     "refusals": [],
-     "rate": 0
-    },
-    "rewardHacking": {
-     "attemptCount": 198,
-     "retainedAttemptCount": 198,
-     "passingAttemptCount": 105,
-     "reviewedAttemptCount": 105,
-     "flaggedAttemptCount": 0,
-     "notApplicableAttemptCount": 0,
-     "missingAuditAttemptCount": 0,
-     "skippedAuditAttemptCount": 0,
-     "unavailableAuditAttemptCount": 0,
-     "gradingErrorAttemptCount": 0,
-     "invalidAuditAttemptCount": 0,
-     "snapshotMismatchAttemptCount": 0,
-     "materializedAt": "2026-11-05T23:19:00.793293+00:00",
-     "gradingVersion": "v1",
-     "graderConfigHash": "e3e86c5c130946ce",
-     "reviewSources": [
-      {
-       "judgeModel": "sonnet",
-       "rubricId": "ca-bench-reward-hacking-v1",
-       "auditSchemaVersion": 1,
-       "attemptCount": 105
-      }
-     ],
-     "rate": 0
-    },
-    "mean": {
-     "reward": 0.53030303030303,
-     "inputTokens": 5883278.52020202,
-     "outputTokens": 96071.93939393939
-    }
-   }
-  ],
-  "safety": {
-   "attemptCount": 870,
-   "refusedAttemptCount": 15,
-   "hardStopAttemptCount": 15,
-   "recoveredAttemptCount": 0,
-   "fallbackAttemptCount": 0,
-   "refusals": [
-    {
-     "turn": 0,
-     "attemptCount": 6,
-     "outcome": "hard_stop",
-     "chain": [],
-     "rate": 0.005376344086021505
-    },
-    {
-     "turn": 25,
-     "attemptCount": 2,
-     "outcome": "hard_stop",
-     "chain": [],
-     "rate": 0.001792114695340502
-    },
-    {
-     "turn": 1,
-     "attemptCount": 1,
-     "outcome": "hard_stop",
-     "chain": [],
-     "rate": 0.000896057347670251
-    },
-    {
-     "turn": 2,
-     "attemptCount": 1,
-     "outcome": "hard_stop",
-     "chain": [],
-     "rate": 0.000896057347670251
-    },
-    {
-     "turn": 13,
-     "attemptCount": 1,
-     "outcome": "hard_stop",
-     "chain": [],
-     "rate": 0.000896057347670251
-    },
-    {
-     "turn": 17,
-     "attemptCount": 1,
-     "outcome": "hard_stop",
-     "chain": [],
-     "rate": 0.000896057347670251
-    },
-    {
-     "turn": 23,
-     "attemptCount": 1,
-     "outcome": "hard_stop",
-     "chain": [],
-     "rate": 0.000896057347670251
-    },
-    {
-     "turn": 32,
-     "attemptCount": 1,
-     "outcome": "hard_stop",
-     "chain": [],
-     "rate": 0.000896057347670251
-    },
-    {
-     "turn": 65,
-     "attemptCount": 1,
-     "outcome": "hard_stop",
-     "chain": [],
-     "rate": 0.000896057347670251
-    }
-   ],
-   "rate": 0.013440860215053764
-  },
-  "indexScore": 0.541279798631476,
-  "mean": {
-   "reward": 0.541279798631476,
-   "costUsd": 1.5046389983744,
-   "agentWallTimeSec": 1421.42885321603,
-   "steps": 40.6271304442272,
-   "inputTokens": 3888998.33558647,
-   "outputTokens": 55224.3095065408,
-   "cacheTokens": 3681178.93235801,
-   "cacheHitRate": 0.921352278288341,
-   "totalTokens": 3944222.64509301
-  },
-  "sums": {
-   "costUsd": 391.598093616667
-  },
-  "percentiles": {
-   "costUsd": {
-    "p05": 0.32259094,
-    "p25": 0.593144425,
-    "p50": 0.95482085,
-    "p75": 1.47574635833333,
-    "p95": 3.14896659666666
-   },
-   "totalTokens": {
-    "p05": 472030.666666667,
-    "p25": 1233653.16666667,
-    "p50": 2495829.66666667,
-    "p75": 4278318.91666667,
-    "p95": 8468908.93333331
-   }
-  },
-  "versions": {
-   "frontiercode-v1.1-main": {
-    "min": {
-     "version": "0.154.0",
-     "dateReleased": null
-    },
-    "max": {
-     "version": "0.154.0",
-     "dateReleased": null
-    }
-   },
-   "swe-atlas-qna": {
-    "min": {
-     "version": "0.154.0",
-     "dateReleased": null
-    },
-    "max": {
-     "version": "0.154.0",
-     "dateReleased": null
-    }
-   },
-   "terminal-bench-v4": {
-    "min": {
-     "version": "0.154.0",
-     "dateReleased": null
-    },
-    "max": {
-     "version": "0.154.0",
-     "dateReleased": null
-    }
-   }
-  }
- },
- {
-  "id": "615aa2e21916e4843210a552131d95b7",
-  "isDefault": true,
-  "isHighlighted": true,
-  "agentName": "Antigravity CLI",
-  "provider": "google",
-  "display": {
-   "agent": "Antigravity CLI",
-   "model": "Gemini 4 Carbon (High)"
-  },
-  "displayLabel": "Antigravity CLI - Gemini 4 Carbon (High)",
-  "model": {
-   "release": {
-    "slug": "gemini-4-carbon",
-    "name": "Gemini 4 Carbon",
-    "shortName": "Gemini 4 Carbon"
-   },
-   "suffix": "High",
-   "shortSuffix": "high",
-   "isReasoning": true,
-   "effort": {
-    "slug": "high",
-    "label": "high",
-    "level": 40
-   },
-   "name": "Gemini 4 Carbon (High)",
-   "shortName": "Gemini 4 Carbon (high)"
-  },
-  "shortLabel": "Antigravity CLI - Gemini 4 Carbon (high)",
-  "agentRelease": {
-   "key": "Antigravity CLI:gemini-4-carbon",
-   "name": "Antigravity CLI - Gemini 4 Carbon"
-  },
-  "agentCreator": {
-   "slug": "google",
-   "name": "Google",
-   "color": "#34A853",
-   "logo": "/img/logos/google.svg"
-  },
-  "modelCreators": [
-   {
-    "slug": "google",
-    "name": "Google",
-    "color": "#34A853",
-    "logo": "/img/logos/google.svg"
-   }
-  ],
-  "hasTieredPricing": false,
-  "isRouter": false,
-  "variantOf": null,
-  "isUnavailable": true,
-  "indexComponentCount": 3,
-  "evalCount": 3,
-  "evals": [
-   {
-    "datasetIndexName": "frontiercode-v1.1-main",
-    "evaluationDatasetSlug": "FrontierCode v1.1 Main",
-    "refDatasetName": "frontiercode-v1.1",
-    "weight": 0.333333333333333,
-    "safety": {
-     "attemptCount": 295,
-     "refusedAttemptCount": 0,
-     "hardStopAttemptCount": 0,
-     "recoveredAttemptCount": 0,
-     "fallbackAttemptCount": 0,
-     "refusals": [],
-     "rate": 0
-    },
-    "rewardHacking": {
-     "attemptCount": 300,
-     "retainedAttemptCount": 295,
-     "passingAttemptCount": 170,
-     "reviewedAttemptCount": 170,
-     "flaggedAttemptCount": 0,
-     "notApplicableAttemptCount": 0,
-     "missingAuditAttemptCount": 0,
-     "skippedAuditAttemptCount": 0,
-     "unavailableAuditAttemptCount": 0,
-     "gradingErrorAttemptCount": 0,
-     "invalidAuditAttemptCount": 0,
-     "snapshotMismatchAttemptCount": 0,
-     "materializedAt": "2026-11-05T23:19:00.793293+00:00",
-     "gradingVersion": "v2",
-     "graderConfigHash": "e424bdeaa5e64a0e",
-     "reviewSources": [],
-     "rate": 0
-    },
-    "mean": {
-     "reward": 0.508686666666667,
-     "inputTokens": 16157360.511784513,
-     "outputTokens": 94814.12794612795
-    }
-   },
-   {
-    "datasetIndexName": "swe-atlas-qna",
-    "evaluationDatasetSlug": "SWE-Atlas-QnA",
-    "refDatasetName": "datasets/swe-atlas-qna",
-    "weight": 0.333333333333333,
-    "safety": {
-     "attemptCount": 372,
-     "refusedAttemptCount": 0,
-     "hardStopAttemptCount": 0,
-     "recoveredAttemptCount": 0,
-     "fallbackAttemptCount": 0,
-     "refusals": [],
-     "rate": 0
-    },
-    "rewardHacking": null,
-    "mean": {
-     "reward": 0.637096774193548,
-     "inputTokens": 9217926.663978495,
-     "outputTokens": 64966.20430107527
-    }
-   },
-   {
-    "datasetIndexName": "terminal-bench-v4",
-    "evaluationDatasetSlug": "Terminal-Bench v4",
-    "refDatasetName": "terminal-bench/terminal-bench@sha256:39d9f44b40420cde8fdcc087579c0d72a7e14fa3656d603c3f0d22fb35e27732",
-    "weight": 0.333333333333333,
-    "safety": {
-     "attemptCount": 198,
-     "refusedAttemptCount": 0,
-     "hardStopAttemptCount": 0,
-     "recoveredAttemptCount": 0,
-     "fallbackAttemptCount": 0,
-     "refusals": [],
-     "rate": 0
-    },
-    "rewardHacking": {
-     "attemptCount": 198,
-     "retainedAttemptCount": 198,
-     "passingAttemptCount": 127,
-     "reviewedAttemptCount": 127,
-     "flaggedAttemptCount": 1,
-     "notApplicableAttemptCount": 0,
-     "missingAuditAttemptCount": 0,
-     "skippedAuditAttemptCount": 0,
-     "unavailableAuditAttemptCount": 0,
-     "gradingErrorAttemptCount": 0,
-     "invalidAuditAttemptCount": 0,
-     "snapshotMismatchAttemptCount": 0,
-     "materializedAt": "2026-11-05T23:19:00.793293+00:00",
-     "gradingVersion": "v1",
-     "graderConfigHash": "e3e86c5c130946ce",
-     "reviewSources": [
-      {
-       "judgeModel": "sonnet",
-       "rubricId": "ca-bench-reward-hacking-v1",
-       "auditSchemaVersion": 1,
-       "attemptCount": 127
-      }
-     ],
-     "rate": 0.005050505050505051
-    },
-    "mean": {
-     "reward": 0.636363636363636,
-     "inputTokens": 11943170.782828283,
-     "outputTokens": 167312.601010101
-    }
-   }
-  ],
-  "safety": {
-   "attemptCount": 865,
-   "refusedAttemptCount": 0,
-   "hardStopAttemptCount": 0,
-   "recoveredAttemptCount": 0,
-   "fallbackAttemptCount": 0,
-   "refusals": [],
-   "rate": 0
-  },
-  "indexScore": 0.594049025741284,
-  "mean": {
-   "reward": 0.594049025741284,
-   "costUsd": 7.7432202900257,
-   "agentWallTimeSec": 1789.89670714312,
-   "steps": 177.827079034068,
-   "inputTokens": 12439485.9861971,
-   "outputTokens": 109030.977752435,
-   "cacheTokens": 11998764.5754679,
-   "cacheHitRate": 0.951903021414925,
-   "totalTokens": 12548516.9639495
-  },
-  "sums": {
-   "costUsd": 2114.56552926667
-  },
-  "percentiles": {
-   "costUsd": {
-    "p05": 2.79588154666667,
-    "p25": 4.26565593333333,
-    "p50": 6.23861773333333,
-    "p75": 9.06298013333334,
-    "p95": 15.08098036
-   },
-   "totalTokens": {
-    "p05": 2257696.2,
-    "p25": 5756772.33333333,
-    "p50": 9161469.66666667,
-    "p75": 15712799.3333333,
-    "p95": 31095590.4
-   }
-  },
-  "versions": {
-   "frontiercode-v1.1-main": {
-    "min": {
-     "version": "1.4.3",
-     "dateReleased": null
-    },
-    "max": {
-     "version": "1.4.3",
-     "dateReleased": null
-    }
-   },
-   "swe-atlas-qna": {
-    "min": {
-     "version": "1.4.3",
-     "dateReleased": null
-    },
-    "max": {
-     "version": "1.4.3",
-     "dateReleased": null
-    }
-   },
-   "terminal-bench-v4": {
-    "min": {
-     "version": "1.4.3",
-     "dateReleased": null
-    },
-    "max": {
-     "version": "1.4.3",
-     "dateReleased": null
-    }
-   }
-  }
- },
- {
-  "id": "9fcf1e000a8ac75cca614977bcac25da",
-  "isDefault": true,
-  "isHighlighted": true,
-  "agentName": "Mistral Vibe",
-  "provider": "mistral",
-  "display": {
-   "agent": "Mistral Vibe",
-   "model": "Mistral Large 4 (High)"
-  },
-  "displayLabel": "Mistral Vibe - Mistral Large 4 (High)",
-  "model": {
-   "release": {
-    "slug": "mistral-large-4",
-    "name": "Mistral Large 4",
-    "shortName": "Mistral Large 4"
-   },
-   "suffix": "High",
-   "shortSuffix": "high",
-   "isReasoning": true,
-   "effort": {
-    "slug": "high",
-    "label": "high",
-    "level": 40
-   },
-   "name": "Mistral Large 4 (High)",
-   "shortName": "Mistral Large 4 (high)"
-  },
-  "shortLabel": "Mistral Vibe - Mistral Large 4 (high)",
-  "agentRelease": {
-   "key": "Mistral Vibe:mistral-large-4",
-   "name": "Mistral Vibe - Mistral Large 4"
-  },
-  "agentCreator": {
-   "slug": "mistral",
-   "name": "Mistral",
-   "color": "#f32e02",
-   "logo": "/img/logos/mistral.svg"
-  },
-  "modelCreators": [
-   {
-    "slug": "mistral",
-    "name": "Mistral",
-    "color": "#f32e02",
-    "logo": "/img/logos/mistral.svg"
-   }
-  ],
-  "hasTieredPricing": false,
-  "isRouter": false,
-  "variantOf": null,
-  "isUnavailable": false,
-  "indexComponentCount": 3,
-  "evalCount": 3,
-  "evals": [
-   {
-    "datasetIndexName": "frontiercode-v1.1-main",
-    "evaluationDatasetSlug": "FrontierCode v1.1 Main",
-    "refDatasetName": "frontiercode-v1.1",
-    "weight": 0.333333333333333,
-    "safety": {
-     "attemptCount": 300,
-     "refusedAttemptCount": 0,
-     "hardStopAttemptCount": 0,
-     "recoveredAttemptCount": 0,
-     "fallbackAttemptCount": 0,
-     "refusals": [],
-     "rate": 0
-    },
-    "rewardHacking": {
-     "attemptCount": 300,
-     "retainedAttemptCount": 300,
-     "passingAttemptCount": 150,
-     "reviewedAttemptCount": 150,
-     "flaggedAttemptCount": 1,
-     "notApplicableAttemptCount": 0,
-     "missingAuditAttemptCount": 0,
-     "skippedAuditAttemptCount": 0,
-     "unavailableAuditAttemptCount": 0,
-     "gradingErrorAttemptCount": 0,
-     "invalidAuditAttemptCount": 0,
-     "snapshotMismatchAttemptCount": 2,
-     "materializedAt": "2026-11-05T23:19:00.793293+00:00",
-     "gradingVersion": "v2",
-     "graderConfigHash": "e424bdeaa5e64a0e",
-     "reviewSources": [],
-     "rate": 0.0033333333333333335
-    },
-    "mean": {
-     "reward": 0.445473666666667,
-     "inputTokens": 6590650.31,
-     "outputTokens": 48359.56
-    }
-   },
-   {
-    "datasetIndexName": "swe-atlas-qna",
-    "evaluationDatasetSlug": "SWE-Atlas-QnA",
-    "refDatasetName": "datasets/swe-atlas-qna",
-    "weight": 0.333333333333333,
-    "safety": {
-     "attemptCount": 372,
-     "refusedAttemptCount": 0,
-     "hardStopAttemptCount": 0,
-     "recoveredAttemptCount": 0,
-     "fallbackAttemptCount": 0,
-     "refusals": [],
-     "rate": 0
-    },
-    "rewardHacking": null,
-    "mean": {
-     "reward": 0.588709677419355,
-     "inputTokens": 2855366.85483871,
-     "outputTokens": 27802.333333333332
-    }
-   },
-   {
-    "datasetIndexName": "terminal-bench-v4",
-    "evaluationDatasetSlug": "Terminal-Bench v4",
-    "refDatasetName": "terminal-bench/terminal-bench@sha256:39d9f44b40420cde8fdcc087579c0d72a7e14fa3656d603c3f0d22fb35e27732",
-    "weight": 0.333333333333333,
-    "safety": {
-     "attemptCount": 198,
-     "refusedAttemptCount": 0,
-     "hardStopAttemptCount": 0,
-     "recoveredAttemptCount": 0,
-     "fallbackAttemptCount": 0,
-     "refusals": [],
-     "rate": 0
-    },
-    "rewardHacking": {
-     "attemptCount": 198,
-     "retainedAttemptCount": 198,
-     "passingAttemptCount": 85,
-     "reviewedAttemptCount": 85,
-     "flaggedAttemptCount": 3,
-     "notApplicableAttemptCount": 0,
-     "missingAuditAttemptCount": 0,
-     "skippedAuditAttemptCount": 0,
-     "unavailableAuditAttemptCount": 0,
-     "gradingErrorAttemptCount": 0,
-     "invalidAuditAttemptCount": 0,
-     "snapshotMismatchAttemptCount": 1,
-     "materializedAt": "2026-11-05T23:19:00.793293+00:00",
-     "gradingVersion": "v1",
-     "graderConfigHash": "e3e86c5c130946ce",
-     "reviewSources": [
-      {
-       "judgeModel": "sonnet",
-       "rubricId": "ca-bench-reward-hacking-v1",
-       "auditSchemaVersion": 1,
-       "attemptCount": 85
-      }
-     ],
-     "rate": 0.015151515151515152
-    },
-    "mean": {
-     "reward": 0.414141414141414,
-     "inputTokens": 15545773.297979798,
-     "outputTokens": 293637.2525252525
-    }
-   }
-  ],
-  "safety": {
-   "attemptCount": 870,
-   "refusedAttemptCount": 0,
-   "hardStopAttemptCount": 0,
-   "recoveredAttemptCount": 0,
-   "fallbackAttemptCount": 0,
-   "refusals": [],
-   "rate": 0
-  },
-  "indexScore": 0.482774919409145,
-  "mean": {
-   "reward": 0.482774919409145,
-   "costUsd": 1.25944220793442,
-   "agentWallTimeSec": 2903.91483346258,
-   "steps": 100.100451830129,
-   "inputTokens": 8330596.8209395,
-   "outputTokens": 123266.381952862,
-   "cacheTokens": 7667992.01400673,
-   "cacheHitRate": 0.911751306302099,
-   "totalTokens": 8453863.20289236
-  },
-  "sums": {
-   "costUsd": 299.228063866667
-  },
-  "percentiles": {
-   "costUsd": {
-    "p05": 0.122543493333333,
-    "p25": 0.297769745,
-    "p50": 0.546025783333333,
-    "p75": 1.14946097,
-    "p95": 3.43297607566667
-   },
-   "totalTokens": {
-    "p05": 673528.583333333,
-    "p25": 1870533.75,
-    "p50": 3893794,
-    "p75": 8554444.66666667,
-    "p95": 21851169.35
-   }
-  },
-  "versions": {
-   "frontiercode-v1.1-main": {
-    "min": {
-     "version": "3.0.0-v14",
-     "dateReleased": null
-    },
-    "max": {
-     "version": "3.0.0-v14",
-     "dateReleased": null
-    }
-   },
-   "swe-atlas-qna": {
-    "min": {
-     "version": "3.0.0-v14",
-     "dateReleased": null
-    },
-    "max": {
-     "version": "3.0.0-v14",
-     "dateReleased": null
-    }
-   },
-   "terminal-bench-v4": {
-    "min": {
-     "version": "3.0.0-v14",
-     "dateReleased": null
-    },
-    "max": {
-     "version": "3.0.0-v14",
-     "dateReleased": null
-    }
-   }
-  }
- },
- {
-  "id": "34e0f78892fac8fd39aff6595d04610e",
-  "isDefault": true,
-  "isHighlighted": true,
-  "agentName": "Codex",
-  "provider": "openai",
-  "display": {
-   "agent": "Codex",
-   "model": "GPT-6 Astra (Max)"
-  },
-  "displayLabel": "Codex - GPT-6 Astra (Max)",
-  "model": {
-   "release": {
-    "slug": "gpt-6-astra",
-    "name": "GPT-6 Astra",
-    "shortName": "GPT-6 Astra"
-   },
-   "suffix": "Max",
-   "shortSuffix": "max",
-   "isReasoning": true,
-   "effort": {
-    "slug": "max",
-    "label": "max",
-    "level": 60
-   },
-   "name": "GPT-6 Astra (Max)",
-   "shortName": "GPT-6 Astra (max)"
-  },
-  "shortLabel": "Codex - GPT-6 Astra (max)",
-  "agentRelease": {
-   "key": "Codex:gpt-6-astra",
-   "name": "Codex - GPT-6 Astra"
-  },
-  "agentCreator": {
-   "slug": "openai",
-   "name": "OpenAI",
-   "color": "#1f1f1f",
-   "logo": "/img/logos/openai.svg"
-  },
-  "modelCreators": [
-   {
-    "slug": "openai",
-    "name": "OpenAI",
-    "color": "#1f1f1f",
-    "logo": "/img/logos/openai.svg"
-   }
-  ],
-  "hasTieredPricing": false,
-  "isRouter": false,
-  "variantOf": null,
-  "isUnavailable": false,
-  "indexComponentCount": 3,
-  "evalCount": 3,
-  "evals": [
-   {
-    "datasetIndexName": "frontiercode-v1.1-main",
-    "evaluationDatasetSlug": "FrontierCode v1.1 Main",
-    "refDatasetName": "frontiercode-v1.1",
-    "weight": 0.333333333333333,
-    "safety": {
-     "attemptCount": 300,
-     "refusedAttemptCount": 0,
-     "hardStopAttemptCount": 0,
-     "recoveredAttemptCount": 0,
-     "fallbackAttemptCount": 0,
-     "refusals": [],
-     "rate": 0
-    },
-    "rewardHacking": {
-     "attemptCount": 300,
-     "retainedAttemptCount": 300,
-     "passingAttemptCount": 164,
-     "reviewedAttemptCount": 164,
-     "flaggedAttemptCount": 0,
-     "notApplicableAttemptCount": 0,
-     "missingAuditAttemptCount": 0,
-     "skippedAuditAttemptCount": 0,
-     "unavailableAuditAttemptCount": 0,
-     "gradingErrorAttemptCount": 0,
-     "invalidAuditAttemptCount": 0,
-     "snapshotMismatchAttemptCount": 0,
-     "materializedAt": "2026-11-05T23:19:00.793293+00:00",
-     "gradingVersion": "v2",
-     "graderConfigHash": "e424bdeaa5e64a0e",
-     "reviewSources": [],
-     "rate": 0
-    },
-    "mean": {
-     "reward": 0.492953666666667,
-     "inputTokens": 2399033.58,
-     "outputTokens": 28121.5
-    }
-   },
-   {
-    "datasetIndexName": "swe-atlas-qna",
-    "evaluationDatasetSlug": "SWE-Atlas-QnA",
-    "refDatasetName": "datasets/swe-atlas-qna",
-    "weight": 0.333333333333333,
-    "safety": {
-     "attemptCount": 372,
-     "refusedAttemptCount": 13,
-     "hardStopAttemptCount": 13,
-     "recoveredAttemptCount": 0,
-     "fallbackAttemptCount": 0,
-     "refusals": [
-      {
-       "turn": 0,
-       "attemptCount": 6,
-       "outcome": "hard_stop",
-       "chain": [],
-       "rate": 0.016129032258064516
-      },
-      {
-       "turn": 19,
-       "attemptCount": 2,
-       "outcome": "hard_stop",
-       "chain": [],
-       "rate": 0.005376344086021506
-      },
-      {
-       "turn": 8,
-       "attemptCount": 1,
-       "outcome": "hard_stop",
-       "chain": [],
-       "rate": 0.002688172043010753
-      },
-      {
-       "turn": 9,
-       "attemptCount": 1,
-       "outcome": "hard_stop",
-       "chain": [],
-       "rate": 0.002688172043010753
-      },
-      {
-       "turn": 14,
-       "attemptCount": 1,
-       "outcome": "hard_stop",
-       "chain": [],
-       "rate": 0.002688172043010753
-      },
-      {
-       "turn": 16,
-       "attemptCount": 1,
-       "outcome": "hard_stop",
-       "chain": [],
-       "rate": 0.002688172043010753
-      },
-      {
-       "turn": 17,
-       "attemptCount": 1,
-       "outcome": "hard_stop",
-       "chain": [],
-       "rate": 0.002688172043010753
-      }
-     ],
-     "rate": 0.03494623655913978
-    },
-    "rewardHacking": null,
-    "mean": {
-     "reward": 0.591397849462366,
-     "inputTokens": 2626465.707650273,
-     "outputTokens": 28575.948087431694
-    }
-   },
-   {
-    "datasetIndexName": "terminal-bench-v4",
-    "evaluationDatasetSlug": "Terminal-Bench v4",
-    "refDatasetName": "terminal-bench/terminal-bench@sha256:39d9f44b40420cde8fdcc087579c0d72a7e14fa3656d603c3f0d22fb35e27732",
-    "weight": 0.333333333333333,
-    "safety": {
-     "attemptCount": 198,
-     "refusedAttemptCount": 0,
-     "hardStopAttemptCount": 0,
-     "recoveredAttemptCount": 0,
-     "fallbackAttemptCount": 0,
-     "refusals": [],
-     "rate": 0
-    },
-    "rewardHacking": {
-     "attemptCount": 198,
-     "retainedAttemptCount": 198,
-     "passingAttemptCount": 110,
-     "reviewedAttemptCount": 110,
-     "flaggedAttemptCount": 0,
-     "notApplicableAttemptCount": 0,
-     "missingAuditAttemptCount": 0,
-     "skippedAuditAttemptCount": 0,
-     "unavailableAuditAttemptCount": 0,
-     "gradingErrorAttemptCount": 0,
-     "invalidAuditAttemptCount": 0,
-     "snapshotMismatchAttemptCount": 0,
-     "materializedAt": "2026-11-05T23:19:00.793293+00:00",
-     "gradingVersion": "v1",
-     "graderConfigHash": "e3e86c5c130946ce",
-     "reviewSources": [
-      {
-       "judgeModel": "sonnet",
-       "rubricId": "ca-bench-reward-hacking-v1",
-       "auditSchemaVersion": 1,
-       "attemptCount": 110
-      }
-     ],
-     "rate": 0
-    },
-    "mean": {
-     "reward": 0.555555555555555,
-     "inputTokens": 4536624.2727272725,
-     "outputTokens": 66712.96464646465
-    }
-   }
-  ],
-  "safety": {
-   "attemptCount": 870,
-   "refusedAttemptCount": 13,
-   "hardStopAttemptCount": 13,
-   "recoveredAttemptCount": 0,
-   "fallbackAttemptCount": 0,
-   "refusals": [
-    {
-     "turn": 0,
-     "attemptCount": 6,
-     "outcome": "hard_stop",
-     "chain": [],
-     "rate": 0.005376344086021505
-    },
-    {
-     "turn": 19,
-     "attemptCount": 2,
-     "outcome": "hard_stop",
-     "chain": [],
-     "rate": 0.001792114695340502
-    },
-    {
-     "turn": 8,
-     "attemptCount": 1,
-     "outcome": "hard_stop",
-     "chain": [],
-     "rate": 0.000896057347670251
-    },
-    {
-     "turn": 9,
-     "attemptCount": 1,
-     "outcome": "hard_stop",
-     "chain": [],
-     "rate": 0.000896057347670251
-    },
-    {
-     "turn": 14,
-     "attemptCount": 1,
-     "outcome": "hard_stop",
-     "chain": [],
-     "rate": 0.000896057347670251
-    },
-    {
-     "turn": 16,
-     "attemptCount": 1,
-     "outcome": "hard_stop",
-     "chain": [],
-     "rate": 0.000896057347670251
-    },
-    {
-     "turn": 17,
-     "attemptCount": 1,
-     "outcome": "hard_stop",
-     "chain": [],
-     "rate": 0.000896057347670251
-    }
-   ],
-   "rate": 0.01164874551971326
-  },
-  "indexScore": 0.546635690561529,
-  "mean": {
-   "reward": 0.546635690561529,
-   "costUsd": 7.03615822479963,
-   "agentWallTimeSec": 1486.68747959053,
-   "steps": 39.3501020962311,
-   "inputTokens": 3187374.52012585,
-   "outputTokens": 41136.8042446321,
-   "cacheTokens": 3031295.09325606,
-   "cacheHitRate": 0.928466255516988,
-   "totalTokens": 3228511.32437048
-  },
-  "sums": {
-   "costUsd": 1889.96355383333
-  },
-  "percentiles": {
-   "costUsd": {
-    "p05": 1.79340665833333,
-    "p25": 3.14552633333333,
-    "p50": 5.23164133333333,
-    "p75": 7.73760425,
-    "p95": 11.8593084
-   },
-   "totalTokens": {
-    "p05": 458967.416666667,
-    "p25": 1096475.58333333,
-    "p50": 2168265,
-    "p75": 3598700.66666667,
-    "p95": 6220041.26666666
-   }
-  },
-  "versions": {
-   "frontiercode-v1.1-main": {
-    "min": {
-     "version": "0.153.4",
-     "dateReleased": "2026-09-04"
-    },
-    "max": {
-     "version": "0.153.4",
-     "dateReleased": "2026-09-04"
-    }
-   },
-   "swe-atlas-qna": {
-    "min": {
-     "version": "0.151.0",
-     "dateReleased": "2026-08-29"
-    },
-    "max": {
-     "version": "0.151.0",
-     "dateReleased": "2026-08-29"
-    }
-   },
-   "terminal-bench-v4": {
-    "min": {
-     "version": "0.153.4",
-     "dateReleased": "2026-09-04"
-    },
-    "max": {
-     "version": "0.153.4",
-     "dateReleased": "2026-09-04"
-    }
-   }
-  }
- },
- {
   "id": "a92c8b68f37df782f0e978e0e302b023",
   "isDefault": true,
   "isHighlighted": true,
@@ -3100,7 +3106,8 @@
     "level": 50
    },
    "name": "Grok 4.7 (Xhigh)",
-   "shortName": "Grok 4.7 (xhigh)"
+   "shortName": "Grok 4.7 (xhigh)",
+   "scoreCaveat": null
   },
   "shortLabel": "Grok Build - Grok 4.7 (xhigh)",
   "agentRelease": {
@@ -3155,7 +3162,7 @@
      "gradingErrorAttemptCount": 0,
      "invalidAuditAttemptCount": 0,
      "snapshotMismatchAttemptCount": 0,
-     "materializedAt": "2026-11-05T23:19:00.793293+00:00",
+     "materializedAt": "2026-11-06T07:37:34.331081+00:00",
      "gradingVersion": "v2",
      "graderConfigHash": "e424bdeaa5e64a0e",
      "reviewSources": [],
@@ -3215,7 +3222,7 @@
      "gradingErrorAttemptCount": 0,
      "invalidAuditAttemptCount": 0,
      "snapshotMismatchAttemptCount": 0,
-     "materializedAt": "2026-11-05T23:19:00.793293+00:00",
+     "materializedAt": "2026-11-06T07:37:34.331081+00:00",
      "gradingVersion": "v1",
      "graderConfigHash": "e3e86c5c130946ce",
      "reviewSources": [
@@ -3334,7 +3341,8 @@
     "level": 60
    },
    "name": "Claude Opus 5.5 (Max, Default Fallback)",
-   "shortName": "Claude Opus 5.5 (max)"
+   "shortName": "Claude Opus 5.5 (max)",
+   "scoreCaveat": null
   },
   "shortLabel": "Claude Code - Claude Opus 5.5 (max)",
   "agentRelease": {
@@ -3389,7 +3397,7 @@
      "gradingErrorAttemptCount": 0,
      "invalidAuditAttemptCount": 0,
      "snapshotMismatchAttemptCount": 0,
-     "materializedAt": "2026-11-05T23:19:00.793293+00:00",
+     "materializedAt": "2026-11-06T07:37:34.331081+00:00",
      "gradingVersion": "v2",
      "graderConfigHash": "e424bdeaa5e64a0e",
      "reviewSources": [],
@@ -4279,7 +4287,7 @@
      "gradingErrorAttemptCount": 0,
      "invalidAuditAttemptCount": 0,
      "snapshotMismatchAttemptCount": 0,
-     "materializedAt": "2026-11-05T23:19:00.793293+00:00",
+     "materializedAt": "2026-11-06T07:37:34.331081+00:00",
      "gradingVersion": "v1",
      "graderConfigHash": "e3e86c5c130946ce",
      "reviewSources": [
@@ -5202,711 +5210,6 @@
   }
  },
  {
-  "id": "b54e883be1cff7a6a43a737ee106011c",
-  "isDefault": false,
-  "isHighlighted": false,
-  "agentName": "Codex",
-  "provider": "openai",
-  "display": {
-   "agent": "Codex",
-   "model": "GPT-6.1 Terra (Low)"
-  },
-  "displayLabel": "Codex - GPT-6.1 Terra (Low)",
-  "model": {
-   "release": {
-    "slug": "gpt-6-1-terra",
-    "name": "GPT-6.1 Terra",
-    "shortName": "GPT-6.1 Terra"
-   },
-   "suffix": "Low",
-   "shortSuffix": "low",
-   "isReasoning": true,
-   "effort": {
-    "slug": "low",
-    "label": "low",
-    "level": 20
-   },
-   "name": "GPT-6.1 Terra (Low)",
-   "shortName": "GPT-6.1 Terra (low)"
-  },
-  "shortLabel": "Codex - GPT-6.1 Terra (low)",
-  "agentRelease": {
-   "key": "Codex:gpt-6-1-terra",
-   "name": "Codex - GPT-6.1 Terra"
-  },
-  "agentCreator": {
-   "slug": "openai",
-   "name": "OpenAI",
-   "color": "#1f1f1f",
-   "logo": "/img/logos/openai.svg"
-  },
-  "modelCreators": [
-   {
-    "slug": "openai",
-    "name": "OpenAI",
-    "color": "#1f1f1f",
-    "logo": "/img/logos/openai.svg"
-   }
-  ],
-  "hasTieredPricing": false,
-  "isRouter": false,
-  "variantOf": null,
-  "isUnavailable": false,
-  "indexComponentCount": 3,
-  "evalCount": 3,
-  "evals": [
-   {
-    "datasetIndexName": "frontiercode-v1.1-main",
-    "evaluationDatasetSlug": "FrontierCode v1.1 Main",
-    "refDatasetName": "frontiercode-v1.1",
-    "weight": 0.333333333333333,
-    "safety": {
-     "attemptCount": 300,
-     "refusedAttemptCount": 0,
-     "hardStopAttemptCount": 0,
-     "recoveredAttemptCount": 0,
-     "fallbackAttemptCount": 0,
-     "refusals": [],
-     "rate": 0
-    },
-    "rewardHacking": {
-     "attemptCount": 300,
-     "retainedAttemptCount": 300,
-     "passingAttemptCount": 135,
-     "reviewedAttemptCount": 135,
-     "flaggedAttemptCount": 0,
-     "notApplicableAttemptCount": 0,
-     "missingAuditAttemptCount": 0,
-     "skippedAuditAttemptCount": 0,
-     "unavailableAuditAttemptCount": 0,
-     "gradingErrorAttemptCount": 0,
-     "invalidAuditAttemptCount": 0,
-     "snapshotMismatchAttemptCount": 0,
-     "materializedAt": "2026-11-05T23:19:00.793293+00:00",
-     "gradingVersion": "v2",
-     "graderConfigHash": "e424bdeaa5e64a0e",
-     "reviewSources": [],
-     "rate": 0
-    },
-    "mean": {
-     "reward": 0.406083,
-     "inputTokens": 1392698.4533333334,
-     "outputTokens": 6819.86
-    }
-   },
-   {
-    "datasetIndexName": "swe-atlas-qna",
-    "evaluationDatasetSlug": "SWE-Atlas-QnA",
-    "refDatasetName": "datasets/swe-atlas-qna",
-    "weight": 0.333333333333333,
-    "safety": {
-     "attemptCount": 372,
-     "refusedAttemptCount": 0,
-     "hardStopAttemptCount": 0,
-     "recoveredAttemptCount": 0,
-     "fallbackAttemptCount": 0,
-     "refusals": [],
-     "rate": 0
-    },
-    "rewardHacking": null,
-    "mean": {
-     "reward": 0.387096774193548,
-     "inputTokens": 1131737.4166666667,
-     "outputTokens": 5915.682795698925
-    }
-   },
-   {
-    "datasetIndexName": "terminal-bench-v4",
-    "evaluationDatasetSlug": "Terminal-Bench v4",
-    "refDatasetName": "terminal-bench/terminal-bench@sha256:39d9f44b40420cde8fdcc087579c0d72a7e14fa3656d603c3f0d22fb35e27732",
-    "weight": 0.333333333333333,
-    "safety": {
-     "attemptCount": 198,
-     "refusedAttemptCount": 1,
-     "hardStopAttemptCount": 1,
-     "recoveredAttemptCount": 0,
-     "fallbackAttemptCount": 0,
-     "refusals": [
-      {
-       "turn": 27,
-       "attemptCount": 1,
-       "outcome": "hard_stop",
-       "chain": [],
-       "rate": 0.005050505050505051
-      }
-     ],
-     "rate": 0.005050505050505051
-    },
-    "rewardHacking": {
-     "attemptCount": 198,
-     "retainedAttemptCount": 198,
-     "passingAttemptCount": 50,
-     "reviewedAttemptCount": 50,
-     "flaggedAttemptCount": 0,
-     "notApplicableAttemptCount": 0,
-     "missingAuditAttemptCount": 0,
-     "skippedAuditAttemptCount": 0,
-     "unavailableAuditAttemptCount": 0,
-     "gradingErrorAttemptCount": 0,
-     "invalidAuditAttemptCount": 0,
-     "snapshotMismatchAttemptCount": 0,
-     "materializedAt": "2026-11-05T23:19:00.793293+00:00",
-     "gradingVersion": "v1",
-     "graderConfigHash": "e3e86c5c130946ce",
-     "reviewSources": [
-      {
-       "judgeModel": "sonnet",
-       "rubricId": "ca-bench-reward-hacking-v1",
-       "auditSchemaVersion": 1,
-       "attemptCount": 50
-      }
-     ],
-     "rate": 0
-    },
-    "mean": {
-     "reward": 0.252525252525253,
-     "inputTokens": 3107789.02020202,
-     "outputTokens": 13300.18686868687
-    }
-   }
-  ],
-  "safety": {
-   "attemptCount": 870,
-   "refusedAttemptCount": 1,
-   "hardStopAttemptCount": 1,
-   "recoveredAttemptCount": 0,
-   "fallbackAttemptCount": 0,
-   "refusals": [
-    {
-     "turn": 27,
-     "attemptCount": 1,
-     "outcome": "hard_stop",
-     "chain": [],
-     "rate": 0.0016835016835016836
-    }
-   ],
-   "rate": 0.0016835016835016836
-  },
-  "indexScore": 0.3485683422396,
-  "mean": {
-   "reward": 0.3485683422396,
-   "costUsd": 0.198820047696481,
-   "agentWallTimeSec": 379.469317133703,
-   "steps": 42.7471271858369,
-   "inputTokens": 1877408.29673401,
-   "outputTokens": 8678.57655479527,
-   "cacheTokens": 1826086.85212664,
-   "cacheHitRate": 0.925808219461337,
-   "totalTokens": 1886086.8732888
-  },
-  "sums": {
-   "costUsd": 53.3256242
-  },
-  "percentiles": {
-   "costUsd": {
-    "p05": 0.0561471491666667,
-    "p25": 0.0836410833333333,
-    "p50": 0.133640266666667,
-    "p75": 0.203088383333333,
-    "p95": 0.3958518625
-   },
-   "totalTokens": {
-    "p05": 161473.15,
-    "p25": 388026,
-    "p50": 887460,
-    "p75": 1673926.75,
-    "p95": 4295921.6
-   }
-  },
-  "versions": {
-   "frontiercode-v1.1-main": {
-    "min": {
-     "version": "0.163.0",
-     "dateReleased": null
-    },
-    "max": {
-     "version": "0.163.0",
-     "dateReleased": null
-    }
-   },
-   "swe-atlas-qna": {
-    "min": {
-     "version": "0.163.0",
-     "dateReleased": null
-    },
-    "max": {
-     "version": "0.163.0",
-     "dateReleased": null
-    }
-   },
-   "terminal-bench-v4": {
-    "min": {
-     "version": "0.163.0",
-     "dateReleased": null
-    },
-    "max": {
-     "version": "0.163.0",
-     "dateReleased": null
-    }
-   }
-  }
- },
- {
-  "id": "d843fce803ff4f84ababc47040306116",
-  "isDefault": false,
-  "isHighlighted": false,
-  "agentName": "Muse Code",
-  "provider": "meta",
-  "display": {
-   "agent": "Muse Code",
-   "model": "Muse Spark Open (Xhigh)"
-  },
-  "displayLabel": "Muse Code - Muse Spark Open (Xhigh)",
-  "model": {
-   "release": {
-    "slug": "muse-spark-open",
-    "name": "Muse Spark Open",
-    "shortName": "Muse Spark Open"
-   },
-   "suffix": "Xhigh",
-   "shortSuffix": "xhigh",
-   "isReasoning": true,
-   "effort": {
-    "slug": "xhigh",
-    "label": "xhigh",
-    "level": 50
-   },
-   "name": "Muse Spark Open (Xhigh)",
-   "shortName": "Muse Spark Open (xhigh)"
-  },
-  "shortLabel": "Muse Code - Muse Spark Open (xhigh)",
-  "agentRelease": {
-   "key": "Muse Code:muse-spark-open",
-   "name": "Muse Code - Muse Spark Open"
-  },
-  "agentCreator": {
-   "slug": "meta",
-   "name": "Meta",
-   "color": "#0089f4",
-   "logo": "/img/logos/meta.svg"
-  },
-  "modelCreators": [
-   {
-    "slug": "meta",
-    "name": "Meta",
-    "color": "#0089f4",
-    "logo": "/img/logos/meta.svg"
-   }
-  ],
-  "hasTieredPricing": false,
-  "isRouter": false,
-  "variantOf": null,
-  "isUnavailable": false,
-  "indexComponentCount": 3,
-  "evalCount": 3,
-  "evals": [
-   {
-    "datasetIndexName": "frontiercode-v1.1-main",
-    "evaluationDatasetSlug": "FrontierCode v1.1 Main",
-    "refDatasetName": "frontiercode-v1.1",
-    "weight": 0.333333333333333,
-    "safety": {
-     "attemptCount": 299,
-     "refusedAttemptCount": 0,
-     "hardStopAttemptCount": 0,
-     "recoveredAttemptCount": 0,
-     "fallbackAttemptCount": 0,
-     "refusals": [],
-     "rate": 0
-    },
-    "rewardHacking": {
-     "attemptCount": 300,
-     "retainedAttemptCount": 299,
-     "passingAttemptCount": 78,
-     "reviewedAttemptCount": 78,
-     "flaggedAttemptCount": 1,
-     "notApplicableAttemptCount": 0,
-     "missingAuditAttemptCount": 0,
-     "skippedAuditAttemptCount": 0,
-     "unavailableAuditAttemptCount": 0,
-     "gradingErrorAttemptCount": 0,
-     "invalidAuditAttemptCount": 0,
-     "snapshotMismatchAttemptCount": 0,
-     "materializedAt": "2026-11-05T23:19:00.793293+00:00",
-     "gradingVersion": "v2",
-     "graderConfigHash": "e424bdeaa5e64a0e",
-     "reviewSources": [],
-     "rate": 0.0033333333333333335
-    },
-    "mean": {
-     "reward": 0.225401,
-     "inputTokens": 7487567.45,
-     "outputTokens": 44662.496666666666
-    }
-   },
-   {
-    "datasetIndexName": "swe-atlas-qna",
-    "evaluationDatasetSlug": "SWE-Atlas-QnA",
-    "refDatasetName": "datasets/swe-atlas-qna",
-    "weight": 0.333333333333333,
-    "safety": {
-     "attemptCount": 372,
-     "refusedAttemptCount": 0,
-     "hardStopAttemptCount": 0,
-     "recoveredAttemptCount": 0,
-     "fallbackAttemptCount": 0,
-     "refusals": [],
-     "rate": 0
-    },
-    "rewardHacking": null,
-    "mean": {
-     "reward": 0.508064516129032,
-     "inputTokens": 7062881.54032258,
-     "outputTokens": 40736.37903225807
-    }
-   },
-   {
-    "datasetIndexName": "terminal-bench-v4",
-    "evaluationDatasetSlug": "Terminal-Bench v4",
-    "refDatasetName": "terminal-bench/terminal-bench@sha256:39d9f44b40420cde8fdcc087579c0d72a7e14fa3656d603c3f0d22fb35e27732",
-    "weight": 0.333333333333333,
-    "safety": {
-     "attemptCount": 198,
-     "refusedAttemptCount": 0,
-     "hardStopAttemptCount": 0,
-     "recoveredAttemptCount": 0,
-     "fallbackAttemptCount": 0,
-     "refusals": [],
-     "rate": 0
-    },
-    "rewardHacking": {
-     "attemptCount": 198,
-     "retainedAttemptCount": 198,
-     "passingAttemptCount": 15,
-     "reviewedAttemptCount": 15,
-     "flaggedAttemptCount": 4,
-     "notApplicableAttemptCount": 0,
-     "missingAuditAttemptCount": 0,
-     "skippedAuditAttemptCount": 0,
-     "unavailableAuditAttemptCount": 0,
-     "gradingErrorAttemptCount": 0,
-     "invalidAuditAttemptCount": 0,
-     "snapshotMismatchAttemptCount": 0,
-     "materializedAt": "2026-11-05T23:19:00.793293+00:00",
-     "gradingVersion": "v1",
-     "graderConfigHash": "e3e86c5c130946ce",
-     "reviewSources": [
-      {
-       "judgeModel": "sonnet",
-       "rubricId": "ca-bench-reward-hacking-v1",
-       "auditSchemaVersion": 1,
-       "attemptCount": 15
-      }
-     ],
-     "rate": 0.020202020202020204
-    },
-    "mean": {
-     "reward": 0.0555555555555556,
-     "inputTokens": 25168118.439393938,
-     "outputTokens": 206070.1717171717
-    }
-   }
-  ],
-  "safety": {
-   "attemptCount": 869,
-   "refusedAttemptCount": 0,
-   "hardStopAttemptCount": 0,
-   "recoveredAttemptCount": 0,
-   "fallbackAttemptCount": 0,
-   "refusals": [],
-   "rate": 0
-  },
-  "indexScore": 0.263007023894863,
-  "mean": {
-   "reward": 0.263007023894863,
-   "costUsd": 3.54324946048794,
-   "agentWallTimeSec": 1558.86632482568,
-   "steps": 161.39889866406,
-   "inputTokens": 13239522.4765722,
-   "outputTokens": 97156.3491386988,
-   "cacheTokens": 12711076.2128348,
-   "cacheHitRate": 0.951550733530632,
-   "totalTokens": 13336678.8257109
-  },
-  "sums": {
-   "costUsd": 552.135411283333
-  },
-  "percentiles": {
-   "costUsd": {
-    "p05": 0.489874289166667,
-    "p25": 0.801027916666667,
-    "p50": 1.50236314166667,
-    "p75": 3.17637376666667,
-    "p95": 12.5387881783333
-   },
-   "totalTokens": {
-    "p05": 1998526.15,
-    "p25": 3962611.16666667,
-    "p50": 6559137.66666667,
-    "p75": 12126905,
-    "p95": 40008910.3666667
-   }
-  },
-  "versions": {
-   "frontiercode-v1.1-main": {
-    "min": {
-     "version": "1.4.2-R4684.1",
-     "dateReleased": null
-    },
-    "max": {
-     "version": "1.4.2-R4684.1",
-     "dateReleased": null
-    }
-   },
-   "swe-atlas-qna": {
-    "min": {
-     "version": "1.4.2-R4684.1",
-     "dateReleased": null
-    },
-    "max": {
-     "version": "1.4.2-R4684.1",
-     "dateReleased": null
-    }
-   },
-   "terminal-bench-v4": {
-    "min": {
-     "version": "1.4.2-R4684.1",
-     "dateReleased": null
-    },
-    "max": {
-     "version": "1.4.2-R4684.1",
-     "dateReleased": null
-    }
-   }
-  }
- },
- {
-  "id": "24cd2ab21d1cf5161ddd831f0949bff4",
-  "isDefault": true,
-  "isHighlighted": false,
-  "agentName": "GitHub Copilot",
-  "provider": "github",
-  "display": {
-   "agent": "GitHub Copilot",
-   "model": "Copilot Fusion (max)"
-  },
-  "displayLabel": "GitHub Copilot - Copilot Fusion (max)",
-  "model": null,
-  "shortLabel": "GitHub Copilot - Copilot Fusion (max)",
-  "agentRelease": null,
-  "agentCreator": {
-   "slug": "github",
-   "name": "GitHub",
-   "color": "#181717",
-   "logo": "/img/logos/github.svg"
-  },
-  "modelCreators": [
-   {
-    "slug": "anthropic",
-    "name": "Anthropic",
-    "color": "#cc785c",
-    "logo": "/img/logos/anthropic.svg"
-   },
-   {
-    "slug": "openai",
-    "name": "OpenAI",
-    "color": "#1f1f1f",
-    "logo": "/img/logos/openai.svg"
-   }
-  ],
-  "hasTieredPricing": false,
-  "isRouter": true,
-  "variantOf": null,
-  "isUnavailable": false,
-  "indexComponentCount": 3,
-  "evalCount": 3,
-  "evals": [
-   {
-    "datasetIndexName": "frontiercode-v1.1-main",
-    "evaluationDatasetSlug": "FrontierCode v1.1 Main",
-    "refDatasetName": "frontiercode-v1.1",
-    "weight": 0.333333333333333,
-    "safety": {
-     "attemptCount": 300,
-     "refusedAttemptCount": 0,
-     "hardStopAttemptCount": 0,
-     "recoveredAttemptCount": 0,
-     "fallbackAttemptCount": 0,
-     "refusals": [],
-     "rate": 0
-    },
-    "rewardHacking": {
-     "attemptCount": 300,
-     "retainedAttemptCount": 300,
-     "passingAttemptCount": 170,
-     "reviewedAttemptCount": 170,
-     "flaggedAttemptCount": 0,
-     "notApplicableAttemptCount": 0,
-     "missingAuditAttemptCount": 0,
-     "skippedAuditAttemptCount": 0,
-     "unavailableAuditAttemptCount": 0,
-     "gradingErrorAttemptCount": 0,
-     "invalidAuditAttemptCount": 0,
-     "snapshotMismatchAttemptCount": 0,
-     "materializedAt": "2026-11-05T23:19:00.793293+00:00",
-     "gradingVersion": "v2",
-     "graderConfigHash": "e424bdeaa5e64a0e",
-     "reviewSources": [],
-     "rate": 0
-    },
-    "mean": {
-     "reward": 0.513698333333333,
-     "inputTokens": 6390890.4,
-     "outputTokens": 80173.86333333333
-    }
-   },
-   {
-    "datasetIndexName": "swe-atlas-qna",
-    "evaluationDatasetSlug": "SWE-Atlas-QnA",
-    "refDatasetName": "datasets/swe-atlas-qna",
-    "weight": 0.333333333333333,
-    "safety": {
-     "attemptCount": 372,
-     "refusedAttemptCount": 0,
-     "hardStopAttemptCount": 0,
-     "recoveredAttemptCount": 0,
-     "fallbackAttemptCount": 0,
-     "refusals": [],
-     "rate": 0
-    },
-    "rewardHacking": null,
-    "mean": {
-     "reward": 0.56989247311828,
-     "inputTokens": 4283877.26344086,
-     "outputTokens": 52340.95161290323
-    }
-   },
-   {
-    "datasetIndexName": "terminal-bench-v4",
-    "evaluationDatasetSlug": "Terminal-Bench v4",
-    "refDatasetName": "terminal-bench/terminal-bench@sha256:39d9f44b40420cde8fdcc087579c0d72a7e14fa3656d603c3f0d22fb35e27732",
-    "weight": 0.333333333333333,
-    "safety": {
-     "attemptCount": 198,
-     "refusedAttemptCount": 0,
-     "hardStopAttemptCount": 0,
-     "recoveredAttemptCount": 0,
-     "fallbackAttemptCount": 0,
-     "refusals": [],
-     "rate": 0
-    },
-    "rewardHacking": {
-     "attemptCount": 198,
-     "retainedAttemptCount": 198,
-     "passingAttemptCount": 141,
-     "reviewedAttemptCount": 141,
-     "flaggedAttemptCount": 0,
-     "notApplicableAttemptCount": 0,
-     "missingAuditAttemptCount": 0,
-     "skippedAuditAttemptCount": 0,
-     "unavailableAuditAttemptCount": 0,
-     "gradingErrorAttemptCount": 0,
-     "invalidAuditAttemptCount": 0,
-     "snapshotMismatchAttemptCount": 1,
-     "materializedAt": "2026-11-05T23:19:00.793293+00:00",
-     "gradingVersion": "v1",
-     "graderConfigHash": "e3e86c5c130946ce",
-     "reviewSources": [
-      {
-       "judgeModel": "sonnet",
-       "rubricId": "ca-bench-reward-hacking-v1",
-       "auditSchemaVersion": 1,
-       "attemptCount": 141
-      }
-     ],
-     "rate": 0
-    },
-    "mean": {
-     "reward": 0.712121212121212,
-     "inputTokens": 10458998.143939395,
-     "outputTokens": 255914.44696969696
-    }
-   }
-  ],
-  "safety": {
-   "attemptCount": 870,
-   "refusedAttemptCount": 0,
-   "hardStopAttemptCount": 0,
-   "recoveredAttemptCount": 0,
-   "fallbackAttemptCount": 0,
-   "refusals": [],
-   "rate": 0
-  },
-  "indexScore": 0.598570672857608,
-  "mean": {
-   "reward": 0.598570672857608,
-   "costUsd": 5.58738499550885,
-   "agentWallTimeSec": 2167.26806006408,
-   "steps": 171.026594982079,
-   "inputTokens": 7044588.60246008,
-   "outputTokens": 129476.420638645,
-   "cacheTokens": 6923518.24405344,
-   "cacheHitRate": 0.972717072404472,
-   "totalTokens": 7339450.14544803
-  },
-  "sums": {
-   "costUsd": 1484.48217116667
-  },
-  "percentiles": {
-   "costUsd": {
-    "p05": 0.675840066666667,
-    "p25": 2.229329,
-    "p50": 3.899995,
-    "p75": 6.23096816666667,
-    "p95": 12.7817138666667
-   },
-   "totalTokens": {
-    "p05": 484240.366666667,
-    "p25": 1231674,
-    "p50": 3249774.83333333,
-    "p75": 8618697.16666667,
-    "p95": 24254727.2333333
-   }
-  },
-  "versions": {
-   "frontiercode-v1.1-main": {
-    "min": {
-     "version": "1.0.101",
-     "dateReleased": null
-    },
-    "max": {
-     "version": "1.0.101",
-     "dateReleased": null
-    }
-   },
-   "swe-atlas-qna": {
-    "min": {
-     "version": "1.0.101",
-     "dateReleased": null
-    },
-    "max": {
-     "version": "1.0.101",
-     "dateReleased": null
-    }
-   },
-   "terminal-bench-v4": {
-    "min": {
-     "version": "1.0.101",
-     "dateReleased": null
-    },
-    "max": {
-     "version": "1.0.101",
-     "dateReleased": null
-    }
-   }
-  }
- },
- {
   "id": "5bc9ed9064c8cd589bfd3aaad4bbebf8",
   "isDefault": false,
   "isHighlighted": false,
@@ -5932,7 +5235,8 @@
     "level": 60
    },
    "name": "GPT-6.1 Terra (Max)",
-   "shortName": "GPT-6.1 Terra (max)"
+   "shortName": "GPT-6.1 Terra (max)",
+   "scoreCaveat": null
   },
   "shortLabel": "Codex - GPT-6.1 Terra (max)",
   "agentRelease": {
@@ -5987,7 +5291,7 @@
      "gradingErrorAttemptCount": 0,
      "invalidAuditAttemptCount": 0,
      "snapshotMismatchAttemptCount": 0,
-     "materializedAt": "2026-11-05T23:19:00.793293+00:00",
+     "materializedAt": "2026-11-06T07:37:34.331081+00:00",
      "gradingVersion": "v2",
      "graderConfigHash": "e424bdeaa5e64a0e",
      "reviewSources": [],
@@ -6047,7 +5351,7 @@
      "gradingErrorAttemptCount": 0,
      "invalidAuditAttemptCount": 0,
      "snapshotMismatchAttemptCount": 0,
-     "materializedAt": "2026-11-05T23:19:00.793293+00:00",
+     "materializedAt": "2026-11-06T07:37:34.331081+00:00",
      "gradingVersion": "v1",
      "graderConfigHash": "e3e86c5c130946ce",
      "reviewSources": [
@@ -6141,32 +5445,38 @@
   }
  },
  {
-  "id": "1630d319b5e4dc5183cb88a2b2af1646",
+  "id": "2a2fed494e0d1343b14efe96e6bc3669",
   "isDefault": false,
   "isHighlighted": false,
   "agentName": "Claude Code",
-  "provider": "alibaba_cloud",
+  "provider": "anthropic",
   "display": {
    "agent": "Claude Code",
-   "model": "Qwen3.8 Max"
+   "model": "Claude Haiku 5.5 (Max)"
   },
-  "displayLabel": "Claude Code - Qwen3.8 Max",
+  "displayLabel": "Claude Code - Claude Haiku 5.5 (Max)",
   "model": {
    "release": {
-    "slug": "qwen3-8-max",
-    "name": "Qwen3.8 Max",
-    "shortName": "Qwen3.8 Max"
+    "slug": "claude-haiku-5-5",
+    "name": "Claude Haiku 5.5",
+    "shortName": "Claude Haiku 5.5"
    },
-   "suffix": null,
-   "shortSuffix": null,
+   "suffix": "Max",
+   "shortSuffix": "max",
    "isReasoning": true,
-   "name": "Qwen3.8 Max",
-   "shortName": "Qwen3.8 Max"
+   "effort": {
+    "slug": "max",
+    "label": "max",
+    "level": 60
+   },
+   "name": "Claude Haiku 5.5 (Max)",
+   "shortName": "Claude Haiku 5.5 (max)",
+   "scoreCaveat": null
   },
-  "shortLabel": "Claude Code - Qwen3.8 Max",
+  "shortLabel": "Claude Code - Claude Haiku 5.5 (max)",
   "agentRelease": {
-   "key": "Claude Code:qwen3-8-max",
-   "name": "Claude Code - Qwen3.8 Max"
+   "key": "Claude Code:claude-haiku-5-5",
+   "name": "Claude Code - Claude Haiku 5.5"
   },
   "agentCreator": {
    "slug": "anthropic",
@@ -6176,13 +5486,13 @@
   },
   "modelCreators": [
    {
-    "slug": "alibaba",
-    "name": "Alibaba",
-    "color": "#ff7018",
-    "logo": "/img/logos/alibaba.svg"
+    "slug": "anthropic",
+    "name": "Anthropic",
+    "color": "#cc785c",
+    "logo": "/img/logos/anthropic.svg"
    }
   ],
-  "hasTieredPricing": false,
+  "hasTieredPricing": true,
   "isRouter": false,
   "variantOf": null,
   "isUnavailable": false,
@@ -6206,8 +5516,8 @@
     "rewardHacking": {
      "attemptCount": 300,
      "retainedAttemptCount": 300,
-     "passingAttemptCount": 149,
-     "reviewedAttemptCount": 149,
+     "passingAttemptCount": 158,
+     "reviewedAttemptCount": 158,
      "flaggedAttemptCount": 0,
      "notApplicableAttemptCount": 0,
      "missingAuditAttemptCount": 0,
@@ -6216,16 +5526,16 @@
      "gradingErrorAttemptCount": 0,
      "invalidAuditAttemptCount": 0,
      "snapshotMismatchAttemptCount": 0,
-     "materializedAt": "2026-11-05T23:19:00.793293+00:00",
+     "materializedAt": "2026-11-06T07:37:34.331081+00:00",
      "gradingVersion": "v2",
      "graderConfigHash": "e424bdeaa5e64a0e",
      "reviewSources": [],
      "rate": 0
     },
     "mean": {
-     "reward": 0.448103,
-     "inputTokens": 9795717.333333334,
-     "outputTokens": 93028.87
+     "reward": 0.473697666666667,
+     "inputTokens": 19939784.64,
+     "outputTokens": 183738.13666666666
     }
    },
    {
@@ -6244,9 +5554,9 @@
     },
     "rewardHacking": null,
     "mean": {
-     "reward": 0.561827956989248,
-     "inputTokens": 5159227.653225807,
-     "outputTokens": 45811.73655913978
+     "reward": 0.338709677419355,
+     "inputTokens": 16533520.357526882,
+     "outputTokens": 1315079.9650537635
     }
    },
    {
@@ -6256,18 +5566,73 @@
     "weight": 0.333333333333333,
     "safety": {
      "attemptCount": 198,
-     "refusedAttemptCount": 0,
+     "refusedAttemptCount": 3,
      "hardStopAttemptCount": 0,
-     "recoveredAttemptCount": 0,
-     "fallbackAttemptCount": 0,
-     "refusals": [],
-     "rate": 0
+     "recoveredAttemptCount": 3,
+     "fallbackAttemptCount": 3,
+     "refusals": [
+      {
+       "turn": 34,
+       "attemptCount": 1,
+       "outcome": "fallback",
+       "chain": [
+        {
+         "model": "claude-opus-5",
+         "releaseSlug": "claude-opus-5",
+         "releaseName": "Claude Opus 5",
+         "releaseDate": "2026-07-24",
+         "creator": {
+          "slug": "anthropic",
+          "color": "#cc785c"
+         }
+        }
+       ],
+       "rate": 0.005050505050505051
+      },
+      {
+       "turn": 42,
+       "attemptCount": 1,
+       "outcome": "fallback",
+       "chain": [
+        {
+         "model": "claude-opus-5",
+         "releaseSlug": "claude-opus-5",
+         "releaseName": "Claude Opus 5",
+         "releaseDate": "2026-07-24",
+         "creator": {
+          "slug": "anthropic",
+          "color": "#cc785c"
+         }
+        }
+       ],
+       "rate": 0.005050505050505051
+      },
+      {
+       "turn": 45,
+       "attemptCount": 1,
+       "outcome": "fallback",
+       "chain": [
+        {
+         "model": "claude-opus-5",
+         "releaseSlug": "claude-opus-5",
+         "releaseName": "Claude Opus 5",
+         "releaseDate": "2026-07-24",
+         "creator": {
+          "slug": "anthropic",
+          "color": "#cc785c"
+         }
+        }
+       ],
+       "rate": 0.005050505050505051
+      }
+     ],
+     "rate": 0.015151515151515152
     },
     "rewardHacking": {
      "attemptCount": 198,
      "retainedAttemptCount": 198,
-     "passingAttemptCount": 33,
-     "reviewedAttemptCount": 33,
+     "passingAttemptCount": 61,
+     "reviewedAttemptCount": 61,
      "flaggedAttemptCount": 0,
      "notApplicableAttemptCount": 0,
      "missingAuditAttemptCount": 0,
@@ -6276,7 +5641,7 @@
      "gradingErrorAttemptCount": 0,
      "invalidAuditAttemptCount": 0,
      "snapshotMismatchAttemptCount": 0,
-     "materializedAt": "2026-11-05T23:19:00.793293+00:00",
+     "materializedAt": "2026-11-06T07:37:34.331081+00:00",
      "gradingVersion": "v1",
      "graderConfigHash": "e3e86c5c130946ce",
      "reviewSources": [
@@ -6284,336 +5649,176 @@
        "judgeModel": "sonnet",
        "rubricId": "ca-bench-reward-hacking-v1",
        "auditSchemaVersion": 1,
-       "attemptCount": 33
+       "attemptCount": 61
       }
      ],
      "rate": 0
     },
     "mean": {
-     "reward": 0.166666666666667,
-     "inputTokens": 12143161.925641026,
-     "outputTokens": 223315.56923076924
+     "reward": 0.308080808080808,
+     "inputTokens": 9471437.262626262,
+     "outputTokens": 716141.0555555555
     }
    }
   ],
   "safety": {
    "attemptCount": 870,
-   "refusedAttemptCount": 0,
+   "refusedAttemptCount": 3,
    "hardStopAttemptCount": 0,
-   "recoveredAttemptCount": 0,
-   "fallbackAttemptCount": 0,
-   "refusals": [],
-   "rate": 0
+   "recoveredAttemptCount": 3,
+   "fallbackAttemptCount": 3,
+   "refusals": [
+    {
+     "turn": 34,
+     "attemptCount": 1,
+     "outcome": "fallback",
+     "chain": [
+      {
+       "model": "claude-opus-5",
+       "releaseSlug": "claude-opus-5",
+       "releaseName": "Claude Opus 5",
+       "releaseDate": "2026-07-24",
+       "creator": {
+        "slug": "anthropic",
+        "color": "#cc785c"
+       }
+      }
+     ],
+     "rate": 0.0016835016835016836
+    },
+    {
+     "turn": 42,
+     "attemptCount": 1,
+     "outcome": "fallback",
+     "chain": [
+      {
+       "model": "claude-opus-5",
+       "releaseSlug": "claude-opus-5",
+       "releaseName": "Claude Opus 5",
+       "releaseDate": "2026-07-24",
+       "creator": {
+        "slug": "anthropic",
+        "color": "#cc785c"
+       }
+      }
+     ],
+     "rate": 0.0016835016835016836
+    },
+    {
+     "turn": 45,
+     "attemptCount": 1,
+     "outcome": "fallback",
+     "chain": [
+      {
+       "model": "claude-opus-5",
+       "releaseSlug": "claude-opus-5",
+       "releaseName": "Claude Opus 5",
+       "releaseDate": "2026-07-24",
+       "creator": {
+        "slug": "anthropic",
+        "color": "#cc785c"
+       }
+      }
+     ],
+     "rate": 0.0016835016835016836
+    }
+   ],
+   "rate": 0.005050505050505051
   },
-  "indexScore": 0.392199207885305,
+  "indexScore": 0.373496050722277,
   "mean": {
-   "reward": 0.392199207885305,
-   "costUsd": 3.79584401482699,
-   "agentWallTimeSec": 4568.4135207125,
-   "steps": 114.796515026192,
-   "inputTokens": 9032702.30406672,
-   "outputTokens": 120718.725263303,
-   "cacheTokens": 8665141.79932451,
-   "cacheHitRate": 0.947205701820927,
-   "totalTokens": 9153421.02933002
+   "reward": 0.373496050722276,
+   "costUsd": 2.67388407176395,
+   "agentWallTimeSec": 4255.92477550559,
+   "steps": 114.307695231889,
+   "inputTokens": 15314914.0867177,
+   "outputTokens": 738319.719091995,
+   "cacheTokens": 14287591.6808836,
+   "cacheHitRate": 0.918420370906708,
+   "totalTokens": 16053233.8058097
   },
   "sums": {
-   "costUsd": 978.07253625
+   "costUsd": 794.65870438
   },
   "percentiles": {
    "costUsd": {
-    "p05": 0.582222916666667,
-    "p25": 1.30195925,
-    "p50": 2.5953255,
-    "p75": 4.23308241666667,
-    "p95": 10.057504475
+    "p05": 0.34670434325,
+    "p25": 1.01866639333333,
+    "p50": 2.150492865,
+    "p75": 3.82754479,
+    "p95": 6.008574229625
    },
    "totalTokens": {
-    "p05": 1169842.2,
-    "p25": 3262460.66666667,
-    "p50": 6770471.33333333,
-    "p75": 11351030.3333333,
-    "p95": 21390570.6666666
+    "p05": 3366808.93333333,
+    "p25": 8905364.91666667,
+    "p50": 15321932.1666667,
+    "p75": 22442098.5,
+    "p95": 35414438.0666667
    }
   },
   "versions": {
    "frontiercode-v1.1-main": {
     "min": {
-     "version": "2.1.266",
+     "version": "2.1.296",
      "dateReleased": null
     },
     "max": {
-     "version": "2.1.266",
+     "version": "2.1.296",
      "dateReleased": null
     }
    },
    "swe-atlas-qna": {
     "min": {
-     "version": "2.1.224",
-     "dateReleased": "2026-08-07"
+     "version": "2.1.289",
+     "dateReleased": null
     },
     "max": {
-     "version": "2.1.236",
-     "dateReleased": "2026-08-19"
+     "version": "2.1.289",
+     "dateReleased": null
     }
    },
    "terminal-bench-v4": {
     "min": {
-     "version": "2.1.261",
-     "dateReleased": "2026-09-04"
+     "version": "2.1.289",
+     "dateReleased": null
     },
     "max": {
-     "version": "2.1.261",
-     "dateReleased": "2026-09-04"
+     "version": "2.1.289",
+     "dateReleased": null
     }
    }
   }
  },
  {
-  "id": "736e1c6006fd243c9cc384b61c478e97",
+  "id": "9b52f0eb016964fb4421a352b9c9518c",
   "isDefault": true,
-  "isHighlighted": false,
-  "agentName": "Devin Fusion CLI",
-  "provider": "cognition",
-  "display": {
-   "agent": "Devin Fusion CLI",
-   "model": "Claude Opus 5.5 Max + GPT-6 Luna High"
-  },
-  "displayLabel": "Devin Fusion CLI - Claude Opus 5.5 Max + GPT-6 Luna High",
-  "model": null,
-  "shortLabel": "Devin Fusion CLI - Claude Opus 5.5 Max + GPT-6 Luna High",
-  "agentRelease": null,
-  "agentCreator": {
-   "slug": "cognition",
-   "name": "Cognition",
-   "color": "#2200FF",
-   "logo": "/img/logos/devin.svg"
-  },
-  "modelCreators": [
-   {
-    "slug": "anthropic",
-    "name": "Anthropic",
-    "color": "#cc785c",
-    "logo": "/img/logos/anthropic.svg"
-   },
-   {
-    "slug": "openai",
-    "name": "OpenAI",
-    "color": "#1f1f1f",
-    "logo": "/img/logos/openai.svg"
-   }
-  ],
-  "hasTieredPricing": false,
-  "isRouter": true,
-  "variantOf": null,
-  "isUnavailable": false,
-  "indexComponentCount": 3,
-  "evalCount": 3,
-  "evals": [
-   {
-    "datasetIndexName": "frontiercode-v1.1-main",
-    "evaluationDatasetSlug": "FrontierCode v1.1 Main",
-    "refDatasetName": "frontiercode-v1.1",
-    "weight": 0.333333333333333,
-    "safety": {
-     "attemptCount": 300,
-     "refusedAttemptCount": 0,
-     "hardStopAttemptCount": 0,
-     "recoveredAttemptCount": 0,
-     "fallbackAttemptCount": 0,
-     "refusals": [],
-     "rate": 0
-    },
-    "rewardHacking": {
-     "attemptCount": 300,
-     "retainedAttemptCount": 300,
-     "passingAttemptCount": 178,
-     "reviewedAttemptCount": 178,
-     "flaggedAttemptCount": 0,
-     "notApplicableAttemptCount": 0,
-     "missingAuditAttemptCount": 0,
-     "skippedAuditAttemptCount": 0,
-     "unavailableAuditAttemptCount": 0,
-     "gradingErrorAttemptCount": 0,
-     "invalidAuditAttemptCount": 0,
-     "snapshotMismatchAttemptCount": 0,
-     "materializedAt": "2026-11-05T23:19:00.793293+00:00",
-     "gradingVersion": "v2",
-     "graderConfigHash": "e424bdeaa5e64a0e",
-     "reviewSources": [],
-     "rate": 0
-    },
-    "mean": {
-     "reward": 0.536293333333333,
-     "inputTokens": 8218340.166666667,
-     "outputTokens": 179412.1
-    }
-   },
-   {
-    "datasetIndexName": "swe-atlas-qna",
-    "evaluationDatasetSlug": "SWE-Atlas-QnA",
-    "refDatasetName": "datasets/swe-atlas-qna",
-    "weight": 0.333333333333333,
-    "safety": {
-     "attemptCount": 372,
-     "refusedAttemptCount": 0,
-     "hardStopAttemptCount": 0,
-     "recoveredAttemptCount": 0,
-     "fallbackAttemptCount": 0,
-     "refusals": [],
-     "rate": 0
-    },
-    "rewardHacking": null,
-    "mean": {
-     "reward": 0.682795698924731,
-     "inputTokens": 5653512.913978495,
-     "outputTokens": 238136.82795698923
-    }
-   },
-   {
-    "datasetIndexName": "terminal-bench-v4",
-    "evaluationDatasetSlug": "Terminal-Bench v4",
-    "refDatasetName": "terminal-bench/terminal-bench@sha256:39d9f44b40420cde8fdcc087579c0d72a7e14fa3656d603c3f0d22fb35e27732",
-    "weight": 0.333333333333333,
-    "safety": {
-     "attemptCount": 198,
-     "refusedAttemptCount": 0,
-     "hardStopAttemptCount": 0,
-     "recoveredAttemptCount": 0,
-     "fallbackAttemptCount": 0,
-     "refusals": [],
-     "rate": 0
-    },
-    "rewardHacking": {
-     "attemptCount": 198,
-     "retainedAttemptCount": 198,
-     "passingAttemptCount": 124,
-     "reviewedAttemptCount": 124,
-     "flaggedAttemptCount": 0,
-     "notApplicableAttemptCount": 0,
-     "missingAuditAttemptCount": 0,
-     "skippedAuditAttemptCount": 0,
-     "unavailableAuditAttemptCount": 0,
-     "gradingErrorAttemptCount": 0,
-     "invalidAuditAttemptCount": 0,
-     "snapshotMismatchAttemptCount": 0,
-     "materializedAt": "2026-11-05T23:19:00.793293+00:00",
-     "gradingVersion": "v1",
-     "graderConfigHash": "e3e86c5c130946ce",
-     "reviewSources": [
-      {
-       "judgeModel": "sonnet",
-       "rubricId": "ca-bench-reward-hacking-v1",
-       "auditSchemaVersion": 1,
-       "attemptCount": 124
-      }
-     ],
-     "rate": 0
-    },
-    "mean": {
-     "reward": 0.626262626262626,
-     "inputTokens": 16735840.893939395,
-     "outputTokens": 364556.1414141414
-    }
-   }
-  ],
-  "safety": {
-   "attemptCount": 870,
-   "refusedAttemptCount": 0,
-   "hardStopAttemptCount": 0,
-   "recoveredAttemptCount": 0,
-   "fallbackAttemptCount": 0,
-   "refusals": [],
-   "rate": 0
-  },
-  "indexScore": 0.615117219506897,
-  "mean": {
-   "reward": 0.615117219506897,
-   "costUsd": 7.99768820548534,
-   "agentWallTimeSec": 3067.08119502552,
-   "steps": 99.4643553817747,
-   "inputTokens": 10202564.6581949,
-   "outputTokens": 260701.689790377,
-   "cacheTokens": 9293312.28558705,
-   "cacheHitRate": 0.870466942043008,
-   "totalTokens": 10463266.3479852
-  },
-  "sums": {
-   "costUsd": 2236.37703522834
-  },
-  "percentiles": {
-   "costUsd": {
-    "p05": 2.55995243558333,
-    "p25": 4.52299492041667,
-    "p50": 6.39283098583333,
-    "p75": 9.33019056166667,
-    "p95": 16.3319391064167
-   },
-   "totalTokens": {
-    "p05": 1678907.36666667,
-    "p25": 3340266.66666667,
-    "p50": 5393698.16666667,
-    "p75": 9532642.91666667,
-    "p95": 30057806.6833334
-   }
-  },
-  "versions": {
-   "frontiercode-v1.1-main": {
-    "min": {
-     "version": "3000.11.34",
-     "dateReleased": null
-    },
-    "max": {
-     "version": "3000.11.34",
-     "dateReleased": null
-    }
-   },
-   "swe-atlas-qna": {
-    "min": {
-     "version": "3000.11.31",
-     "dateReleased": null
-    },
-    "max": {
-     "version": "3000.11.31",
-     "dateReleased": null
-    }
-   },
-   "terminal-bench-v4": {
-    "min": {
-     "version": "3000.11.31",
-     "dateReleased": null
-    },
-    "max": {
-     "version": "3000.11.31",
-     "dateReleased": null
-    }
-   }
-  }
- },
- {
-  "id": "ee13e548b65eeee544cd5b0c6068a4f5",
-  "isDefault": false,
   "isHighlighted": false,
   "agentName": "Codex",
   "provider": "openai",
   "display": {
    "agent": "Codex",
-   "model": "GPT-6.1 Terra (Non-reasoning)"
+   "model": "GPT-6.1 Terra (Xhigh)"
   },
-  "displayLabel": "Codex - GPT-6.1 Terra (Non-reasoning)",
+  "displayLabel": "Codex - GPT-6.1 Terra (Xhigh)",
   "model": {
    "release": {
     "slug": "gpt-6-1-terra",
     "name": "GPT-6.1 Terra",
     "shortName": "GPT-6.1 Terra"
    },
-   "suffix": "Non-reasoning",
-   "shortSuffix": "non-reasoning",
-   "isReasoning": false,
-   "name": "GPT-6.1 Terra (Non-reasoning)",
-   "shortName": "GPT-6.1 Terra (non-reasoning)"
+   "suffix": "Xhigh",
+   "shortSuffix": "xhigh",
+   "isReasoning": true,
+   "effort": {
+    "slug": "xhigh",
+    "label": "xhigh",
+    "level": 50
+   },
+   "name": "GPT-6.1 Terra (Xhigh)",
+   "shortName": "GPT-6.1 Terra (xhigh)",
+   "scoreCaveat": null
   },
-  "shortLabel": "Codex - GPT-6.1 Terra (non-reasoning)",
+  "shortLabel": "Codex - GPT-6.1 Terra (xhigh)",
   "agentRelease": {
    "key": "Codex:gpt-6-1-terra",
    "name": "Codex - GPT-6.1 Terra"
@@ -6656,8 +5861,8 @@
     "rewardHacking": {
      "attemptCount": 300,
      "retainedAttemptCount": 300,
-     "passingAttemptCount": 155,
-     "reviewedAttemptCount": 155,
+     "passingAttemptCount": 151,
+     "reviewedAttemptCount": 151,
      "flaggedAttemptCount": 0,
      "notApplicableAttemptCount": 0,
      "missingAuditAttemptCount": 0,
@@ -6666,16 +5871,16 @@
      "gradingErrorAttemptCount": 0,
      "invalidAuditAttemptCount": 0,
      "snapshotMismatchAttemptCount": 0,
-     "materializedAt": "2026-11-05T23:19:00.793293+00:00",
+     "materializedAt": "2026-11-06T07:37:34.331081+00:00",
      "gradingVersion": "v2",
      "graderConfigHash": "e424bdeaa5e64a0e",
      "reviewSources": [],
      "rate": 0
     },
     "mean": {
-     "reward": 0.461564,
-     "inputTokens": 3735386.966666667,
-     "outputTokens": 10574.293333333333
+     "reward": 0.449484666666666,
+     "inputTokens": 5311371.203333333,
+     "outputTokens": 25352.24
     }
    },
    {
@@ -6694,9 +5899,9 @@
     },
     "rewardHacking": null,
     "mean": {
-     "reward": 0.462365591397849,
-     "inputTokens": 2078436.5564516129,
-     "outputTokens": 7624.5
+     "reward": 0.53763440860215,
+     "inputTokens": 3662580.553763441,
+     "outputTokens": 19296.266129032258
     }
    },
    {
@@ -6705,7 +5910,7 @@
     "refDatasetName": "terminal-bench/terminal-bench@sha256:39d9f44b40420cde8fdcc087579c0d72a7e14fa3656d603c3f0d22fb35e27732",
     "weight": 0.333333333333333,
     "safety": {
-     "attemptCount": 198,
+     "attemptCount": 197,
      "refusedAttemptCount": 0,
      "hardStopAttemptCount": 0,
      "recoveredAttemptCount": 0,
@@ -6715,10 +5920,10 @@
     },
     "rewardHacking": {
      "attemptCount": 198,
-     "retainedAttemptCount": 198,
-     "passingAttemptCount": 50,
-     "reviewedAttemptCount": 50,
-     "flaggedAttemptCount": 0,
+     "retainedAttemptCount": 197,
+     "passingAttemptCount": 92,
+     "reviewedAttemptCount": 92,
+     "flaggedAttemptCount": 1,
      "notApplicableAttemptCount": 0,
      "missingAuditAttemptCount": 0,
      "skippedAuditAttemptCount": 0,
@@ -6726,7 +5931,7 @@
      "gradingErrorAttemptCount": 0,
      "invalidAuditAttemptCount": 0,
      "snapshotMismatchAttemptCount": 0,
-     "materializedAt": "2026-11-05T23:19:00.793293+00:00",
+     "materializedAt": "2026-11-06T07:37:34.331081+00:00",
      "gradingVersion": "v1",
      "graderConfigHash": "e3e86c5c130946ce",
      "reviewSources": [
@@ -6734,20 +5939,20 @@
        "judgeModel": "sonnet",
        "rubricId": "ca-bench-reward-hacking-v1",
        "auditSchemaVersion": 1,
-       "attemptCount": 50
+       "attemptCount": 92
       }
      ],
-     "rate": 0
+     "rate": 0.005050505050505051
     },
     "mean": {
-     "reward": 0.252525252525252,
-     "inputTokens": 11473520.515151516,
-     "outputTokens": 23519.88888888889
+     "reward": 0.45959595959596,
+     "inputTokens": 11575182.868686868,
+     "outputTokens": 64933.982323232325
     }
    }
   ],
   "safety": {
-   "attemptCount": 870,
+   "attemptCount": 869,
    "refusedAttemptCount": 0,
    "hardStopAttemptCount": 0,
    "recoveredAttemptCount": 0,
@@ -6755,35 +5960,35 @@
    "refusals": [],
    "rate": 0
   },
-  "indexScore": 0.392151614641034,
+  "indexScore": 0.482238344954925,
   "mean": {
-   "reward": 0.392151614641034,
-   "costUsd": 0.454255643441512,
-   "agentWallTimeSec": 572.437023079179,
-   "steps": 81.5091973498425,
-   "inputTokens": 5762448.0127566,
-   "outputTokens": 13906.2274074074,
-   "cacheTokens": 5681890.41593027,
-   "cacheHitRate": 0.947531776215516,
-   "totalTokens": 5776354.240164
+   "reward": 0.482238344954925,
+   "costUsd": 0.690844449567775,
+   "agentWallTimeSec": 981.713951073096,
+   "steps": 71.9594569349408,
+   "inputTokens": 6849711.54192788,
+   "outputTokens": 36527.4961507549,
+   "cacheTokens": 6711521.42321169,
+   "cacheHitRate": 0.956934601768947,
+   "totalTokens": 6886239.03807863
   },
   "sums": {
-   "costUsd": 114.244986216667
+   "costUsd": 180.319600975
   },
   "percentiles": {
    "costUsd": {
-    "p05": 0.0781752416666667,
-    "p25": 0.129135983333333,
-    "p50": 0.246047841666667,
-    "p75": 0.410028275,
-    "p95": 1.25045928
+    "p05": 0.17458831,
+    "p25": 0.301827629166667,
+    "p50": 0.441727341666667,
+    "p75": 0.654624429166667,
+    "p95": 1.381091055
    },
    "totalTokens": {
-    "p05": 252616.45,
-    "p25": 781315.583333333,
-    "p50": 2199917.5,
-    "p75": 4654439.5,
-    "p95": 18920386.5000001
+    "p05": 780831.233333333,
+    "p25": 1833600.08333333,
+    "p50": 3466573.16666667,
+    "p75": 6304138.25,
+    "p95": 15443378.45
    }
   },
   "versions": {
@@ -6814,6 +6019,236 @@
     },
     "max": {
      "version": "0.163.0",
+     "dateReleased": null
+    }
+   }
+  }
+ },
+ {
+  "id": "accfbb12d349c0f2c93547ce814534b2",
+  "isDefault": true,
+  "isHighlighted": false,
+  "agentName": "Mirror",
+  "provider": "reflection",
+  "display": {
+   "agent": "Mirror",
+   "model": "Beam 1.0"
+  },
+  "displayLabel": "Mirror - Beam 1.0",
+  "model": {
+   "release": {
+    "slug": "reflection-beam",
+    "name": "Beam 1.0",
+    "shortName": "Beam 1.0"
+   },
+   "suffix": null,
+   "shortSuffix": null,
+   "isReasoning": true,
+   "name": "Beam 1.0",
+   "shortName": "Beam 1.0",
+   "scoreCaveat": null
+  },
+  "shortLabel": "Mirror - Beam 1.0",
+  "agentRelease": {
+   "key": "Mirror:reflection-beam",
+   "name": "Mirror - Beam 1.0"
+  },
+  "agentCreator": {
+   "slug": "reflection",
+   "name": "Reflection",
+   "color": "#195428",
+   "logo": "/img/logos/reflection.svg"
+  },
+  "modelCreators": [
+   {
+    "slug": "reflection",
+    "name": "Reflection",
+    "color": "#195428",
+    "logo": "/img/logos/reflection.svg"
+   }
+  ],
+  "hasTieredPricing": false,
+  "isRouter": false,
+  "variantOf": null,
+  "isUnavailable": false,
+  "indexComponentCount": 3,
+  "evalCount": 3,
+  "evals": [
+   {
+    "datasetIndexName": "frontiercode-v1.1-main",
+    "evaluationDatasetSlug": "FrontierCode v1.1 Main",
+    "refDatasetName": "frontiercode-v1.1",
+    "weight": 0.333333333333333,
+    "safety": {
+     "attemptCount": 300,
+     "refusedAttemptCount": 0,
+     "hardStopAttemptCount": 0,
+     "recoveredAttemptCount": 0,
+     "fallbackAttemptCount": 0,
+     "refusals": [],
+     "rate": 0
+    },
+    "rewardHacking": {
+     "attemptCount": 300,
+     "retainedAttemptCount": 300,
+     "passingAttemptCount": 71,
+     "reviewedAttemptCount": 71,
+     "flaggedAttemptCount": 2,
+     "notApplicableAttemptCount": 0,
+     "missingAuditAttemptCount": 0,
+     "skippedAuditAttemptCount": 0,
+     "unavailableAuditAttemptCount": 0,
+     "gradingErrorAttemptCount": 0,
+     "invalidAuditAttemptCount": 0,
+     "snapshotMismatchAttemptCount": 0,
+     "materializedAt": "2026-11-06T07:37:34.331081+00:00",
+     "gradingVersion": "v2",
+     "graderConfigHash": "e424bdeaa5e64a0e",
+     "reviewSources": [],
+     "rate": 0.006666666666666667
+    },
+    "mean": {
+     "reward": 0.202672,
+     "inputTokens": 3468137.7533333334,
+     "outputTokens": 24349.176666666666
+    }
+   },
+   {
+    "datasetIndexName": "swe-atlas-qna",
+    "evaluationDatasetSlug": "SWE-Atlas-QnA",
+    "refDatasetName": "datasets/swe-atlas-qna",
+    "weight": 0.333333333333333,
+    "safety": {
+     "attemptCount": 372,
+     "refusedAttemptCount": 0,
+     "hardStopAttemptCount": 0,
+     "recoveredAttemptCount": 0,
+     "fallbackAttemptCount": 0,
+     "refusals": [],
+     "rate": 0
+    },
+    "rewardHacking": null,
+    "mean": {
+     "reward": 0.376344086021506,
+     "inputTokens": 2731021.4731182796,
+     "outputTokens": 18584.013440860213
+    }
+   },
+   {
+    "datasetIndexName": "terminal-bench-v4",
+    "evaluationDatasetSlug": "Terminal-Bench v4",
+    "refDatasetName": "terminal-bench/terminal-bench@sha256:39d9f44b40420cde8fdcc087579c0d72a7e14fa3656d603c3f0d22fb35e27732",
+    "weight": 0.333333333333333,
+    "safety": {
+     "attemptCount": 198,
+     "refusedAttemptCount": 0,
+     "hardStopAttemptCount": 0,
+     "recoveredAttemptCount": 0,
+     "fallbackAttemptCount": 0,
+     "refusals": [],
+     "rate": 0
+    },
+    "rewardHacking": {
+     "attemptCount": 198,
+     "retainedAttemptCount": 198,
+     "passingAttemptCount": 8,
+     "reviewedAttemptCount": 8,
+     "flaggedAttemptCount": 1,
+     "notApplicableAttemptCount": 0,
+     "missingAuditAttemptCount": 0,
+     "skippedAuditAttemptCount": 0,
+     "unavailableAuditAttemptCount": 0,
+     "gradingErrorAttemptCount": 0,
+     "invalidAuditAttemptCount": 0,
+     "snapshotMismatchAttemptCount": 1,
+     "materializedAt": "2026-11-06T07:37:34.331081+00:00",
+     "gradingVersion": "v1",
+     "graderConfigHash": "e3e86c5c130946ce",
+     "reviewSources": [
+      {
+       "judgeModel": "sonnet",
+       "rubricId": "ca-bench-reward-hacking-v1",
+       "auditSchemaVersion": 1,
+       "attemptCount": 8
+      }
+     ],
+     "rate": 0.005050505050505051
+    },
+    "mean": {
+     "reward": 0.0353535353535354,
+     "inputTokens": 8357930.217171717,
+     "outputTokens": 70166.59090909091
+    }
+   }
+  ],
+  "safety": {
+   "attemptCount": 870,
+   "refusedAttemptCount": 0,
+   "hardStopAttemptCount": 0,
+   "recoveredAttemptCount": 0,
+   "fallbackAttemptCount": 0,
+   "refusals": [],
+   "rate": 0
+  },
+  "indexScore": 0.20478987379168,
+  "mean": {
+   "reward": 0.20478987379168,
+   "costUsd": 0.319490234063365,
+   "agentWallTimeSec": 2321.25393509395,
+   "steps": 92.9845715216683,
+   "inputTokens": 4852363.14787444,
+   "outputTokens": 37699.9270055393,
+   "cacheTokens": 4629708.15970294,
+   "cacheHitRate": 0.95239449990423,
+   "totalTokens": 4890063.07487998
+  },
+  "sums": {
+   "costUsd": 80.8392363993334
+  },
+  "percentiles": {
+   "costUsd": {
+    "p05": 0.0459923042,
+    "p25": 0.106724186666667,
+    "p50": 0.181565053333333,
+    "p75": 0.312087186666667,
+    "p95": 0.670878831433334
+   },
+   "totalTokens": {
+    "p05": 534960.1,
+    "p25": 1456681.16666667,
+    "p50": 2719958,
+    "p75": 5160991.83333333,
+    "p95": 10588536.4166667
+   }
+  },
+  "versions": {
+   "frontiercode-v1.1-main": {
+    "min": {
+     "version": "0.1.8-aa.1",
+     "dateReleased": null
+    },
+    "max": {
+     "version": "0.1.8-aa.1",
+     "dateReleased": null
+    }
+   },
+   "swe-atlas-qna": {
+    "min": {
+     "version": "0.1.8-aa.1",
+     "dateReleased": null
+    },
+    "max": {
+     "version": "0.1.8-aa.1",
+     "dateReleased": null
+    }
+   },
+   "terminal-bench-v4": {
+    "min": {
+     "version": "0.1.8-aa.1",
+     "dateReleased": null
+    },
+    "max": {
+     "version": "0.1.8-aa.1",
      "dateReleased": null
     }
    }
@@ -6924,7 +6359,7 @@
      "gradingErrorAttemptCount": 0,
      "invalidAuditAttemptCount": 0,
      "snapshotMismatchAttemptCount": 0,
-     "materializedAt": "2026-11-05T23:19:00.793293+00:00",
+     "materializedAt": "2026-11-06T07:37:34.331081+00:00",
      "gradingVersion": "v2",
      "graderConfigHash": "e424bdeaa5e64a0e",
      "reviewSources": [],
@@ -7696,7 +7131,7 @@
      "gradingErrorAttemptCount": 0,
      "invalidAuditAttemptCount": 0,
      "snapshotMismatchAttemptCount": 0,
-     "materializedAt": "2026-11-05T23:19:00.793293+00:00",
+     "materializedAt": "2026-11-06T07:37:34.331081+00:00",
      "gradingVersion": "v1",
      "graderConfigHash": "e3e86c5c130946ce",
      "reviewSources": [
@@ -8537,263 +7972,30 @@
   }
  },
  {
-  "id": "accfbb12d349c0f2c93547ce814534b2",
-  "isDefault": true,
-  "isHighlighted": false,
-  "agentName": "Mirror",
-  "provider": "reflection",
-  "display": {
-   "agent": "Mirror",
-   "model": "Beam 1.0"
-  },
-  "displayLabel": "Mirror - Beam 1.0",
-  "model": {
-   "release": {
-    "slug": "reflection-beam",
-    "name": "Beam 1.0",
-    "shortName": "Beam 1.0"
-   },
-   "suffix": null,
-   "shortSuffix": null,
-   "isReasoning": true,
-   "name": "Beam 1.0",
-   "shortName": "Beam 1.0"
-  },
-  "shortLabel": "Mirror - Beam 1.0",
-  "agentRelease": {
-   "key": "Mirror:reflection-beam",
-   "name": "Mirror - Beam 1.0"
-  },
-  "agentCreator": {
-   "slug": "reflection",
-   "name": "Reflection",
-   "color": "#195428",
-   "logo": "/img/logos/reflection.svg"
-  },
-  "modelCreators": [
-   {
-    "slug": "reflection",
-    "name": "Reflection",
-    "color": "#195428",
-    "logo": "/img/logos/reflection.svg"
-   }
-  ],
-  "hasTieredPricing": false,
-  "isRouter": false,
-  "variantOf": null,
-  "isUnavailable": false,
-  "indexComponentCount": 3,
-  "evalCount": 3,
-  "evals": [
-   {
-    "datasetIndexName": "frontiercode-v1.1-main",
-    "evaluationDatasetSlug": "FrontierCode v1.1 Main",
-    "refDatasetName": "frontiercode-v1.1",
-    "weight": 0.333333333333333,
-    "safety": {
-     "attemptCount": 300,
-     "refusedAttemptCount": 0,
-     "hardStopAttemptCount": 0,
-     "recoveredAttemptCount": 0,
-     "fallbackAttemptCount": 0,
-     "refusals": [],
-     "rate": 0
-    },
-    "rewardHacking": {
-     "attemptCount": 300,
-     "retainedAttemptCount": 300,
-     "passingAttemptCount": 71,
-     "reviewedAttemptCount": 71,
-     "flaggedAttemptCount": 2,
-     "notApplicableAttemptCount": 0,
-     "missingAuditAttemptCount": 0,
-     "skippedAuditAttemptCount": 0,
-     "unavailableAuditAttemptCount": 0,
-     "gradingErrorAttemptCount": 0,
-     "invalidAuditAttemptCount": 0,
-     "snapshotMismatchAttemptCount": 0,
-     "materializedAt": "2026-11-05T23:19:00.793293+00:00",
-     "gradingVersion": "v2",
-     "graderConfigHash": "e424bdeaa5e64a0e",
-     "reviewSources": [],
-     "rate": 0.006666666666666667
-    },
-    "mean": {
-     "reward": 0.202672,
-     "inputTokens": 3468137.7533333334,
-     "outputTokens": 24349.176666666666
-    }
-   },
-   {
-    "datasetIndexName": "swe-atlas-qna",
-    "evaluationDatasetSlug": "SWE-Atlas-QnA",
-    "refDatasetName": "datasets/swe-atlas-qna",
-    "weight": 0.333333333333333,
-    "safety": {
-     "attemptCount": 372,
-     "refusedAttemptCount": 0,
-     "hardStopAttemptCount": 0,
-     "recoveredAttemptCount": 0,
-     "fallbackAttemptCount": 0,
-     "refusals": [],
-     "rate": 0
-    },
-    "rewardHacking": null,
-    "mean": {
-     "reward": 0.376344086021506,
-     "inputTokens": 2731021.4731182796,
-     "outputTokens": 18584.013440860213
-    }
-   },
-   {
-    "datasetIndexName": "terminal-bench-v4",
-    "evaluationDatasetSlug": "Terminal-Bench v4",
-    "refDatasetName": "terminal-bench/terminal-bench@sha256:39d9f44b40420cde8fdcc087579c0d72a7e14fa3656d603c3f0d22fb35e27732",
-    "weight": 0.333333333333333,
-    "safety": {
-     "attemptCount": 198,
-     "refusedAttemptCount": 0,
-     "hardStopAttemptCount": 0,
-     "recoveredAttemptCount": 0,
-     "fallbackAttemptCount": 0,
-     "refusals": [],
-     "rate": 0
-    },
-    "rewardHacking": {
-     "attemptCount": 198,
-     "retainedAttemptCount": 198,
-     "passingAttemptCount": 8,
-     "reviewedAttemptCount": 8,
-     "flaggedAttemptCount": 1,
-     "notApplicableAttemptCount": 0,
-     "missingAuditAttemptCount": 0,
-     "skippedAuditAttemptCount": 0,
-     "unavailableAuditAttemptCount": 0,
-     "gradingErrorAttemptCount": 0,
-     "invalidAuditAttemptCount": 0,
-     "snapshotMismatchAttemptCount": 1,
-     "materializedAt": "2026-11-05T23:19:00.793293+00:00",
-     "gradingVersion": "v1",
-     "graderConfigHash": "e3e86c5c130946ce",
-     "reviewSources": [
-      {
-       "judgeModel": "sonnet",
-       "rubricId": "ca-bench-reward-hacking-v1",
-       "auditSchemaVersion": 1,
-       "attemptCount": 8
-      }
-     ],
-     "rate": 0.005050505050505051
-    },
-    "mean": {
-     "reward": 0.0353535353535354,
-     "inputTokens": 8357930.217171717,
-     "outputTokens": 70166.59090909091
-    }
-   }
-  ],
-  "safety": {
-   "attemptCount": 870,
-   "refusedAttemptCount": 0,
-   "hardStopAttemptCount": 0,
-   "recoveredAttemptCount": 0,
-   "fallbackAttemptCount": 0,
-   "refusals": [],
-   "rate": 0
-  },
-  "indexScore": 0.20478987379168,
-  "mean": {
-   "reward": 0.20478987379168,
-   "costUsd": 0.319490234063365,
-   "agentWallTimeSec": 2321.25393509395,
-   "steps": 92.9845715216683,
-   "inputTokens": 4852363.14787444,
-   "outputTokens": 37699.9270055393,
-   "cacheTokens": 4629708.15970294,
-   "cacheHitRate": 0.95239449990423,
-   "totalTokens": 4890063.07487998
-  },
-  "sums": {
-   "costUsd": 80.8392363993334
-  },
-  "percentiles": {
-   "costUsd": {
-    "p05": 0.0459923042,
-    "p25": 0.106724186666667,
-    "p50": 0.181565053333333,
-    "p75": 0.312087186666667,
-    "p95": 0.670878831433334
-   },
-   "totalTokens": {
-    "p05": 534960.1,
-    "p25": 1456681.16666667,
-    "p50": 2719958,
-    "p75": 5160991.83333333,
-    "p95": 10588536.4166667
-   }
-  },
-  "versions": {
-   "frontiercode-v1.1-main": {
-    "min": {
-     "version": "0.1.8-aa.1",
-     "dateReleased": null
-    },
-    "max": {
-     "version": "0.1.8-aa.1",
-     "dateReleased": null
-    }
-   },
-   "swe-atlas-qna": {
-    "min": {
-     "version": "0.1.8-aa.1",
-     "dateReleased": null
-    },
-    "max": {
-     "version": "0.1.8-aa.1",
-     "dateReleased": null
-    }
-   },
-   "terminal-bench-v4": {
-    "min": {
-     "version": "0.1.8-aa.1",
-     "dateReleased": null
-    },
-    "max": {
-     "version": "0.1.8-aa.1",
-     "dateReleased": null
-    }
-   }
-  }
- },
- {
-  "id": "9b52f0eb016964fb4421a352b9c9518c",
-  "isDefault": true,
+  "id": "ee13e548b65eeee544cd5b0c6068a4f5",
+  "isDefault": false,
   "isHighlighted": false,
   "agentName": "Codex",
   "provider": "openai",
   "display": {
    "agent": "Codex",
-   "model": "GPT-6.1 Terra (Xhigh)"
+   "model": "GPT-6.1 Terra (Non-reasoning)"
   },
-  "displayLabel": "Codex - GPT-6.1 Terra (Xhigh)",
+  "displayLabel": "Codex - GPT-6.1 Terra (Non-reasoning)",
   "model": {
    "release": {
     "slug": "gpt-6-1-terra",
     "name": "GPT-6.1 Terra",
     "shortName": "GPT-6.1 Terra"
    },
-   "suffix": "Xhigh",
-   "shortSuffix": "xhigh",
-   "isReasoning": true,
-   "effort": {
-    "slug": "xhigh",
-    "label": "xhigh",
-    "level": 50
-   },
-   "name": "GPT-6.1 Terra (Xhigh)",
-   "shortName": "GPT-6.1 Terra (xhigh)"
+   "suffix": "Non-reasoning",
+   "shortSuffix": "non-reasoning",
+   "isReasoning": false,
+   "name": "GPT-6.1 Terra (Non-reasoning)",
+   "shortName": "GPT-6.1 Terra (non-reasoning)",
+   "scoreCaveat": null
   },
-  "shortLabel": "Codex - GPT-6.1 Terra (xhigh)",
+  "shortLabel": "Codex - GPT-6.1 Terra (non-reasoning)",
   "agentRelease": {
    "key": "Codex:gpt-6-1-terra",
    "name": "Codex - GPT-6.1 Terra"
@@ -8836,8 +8038,8 @@
     "rewardHacking": {
      "attemptCount": 300,
      "retainedAttemptCount": 300,
-     "passingAttemptCount": 151,
-     "reviewedAttemptCount": 151,
+     "passingAttemptCount": 155,
+     "reviewedAttemptCount": 155,
      "flaggedAttemptCount": 0,
      "notApplicableAttemptCount": 0,
      "missingAuditAttemptCount": 0,
@@ -8846,16 +8048,16 @@
      "gradingErrorAttemptCount": 0,
      "invalidAuditAttemptCount": 0,
      "snapshotMismatchAttemptCount": 0,
-     "materializedAt": "2026-11-05T23:19:00.793293+00:00",
+     "materializedAt": "2026-11-06T07:37:34.331081+00:00",
      "gradingVersion": "v2",
      "graderConfigHash": "e424bdeaa5e64a0e",
      "reviewSources": [],
      "rate": 0
     },
     "mean": {
-     "reward": 0.449484666666666,
-     "inputTokens": 5311371.203333333,
-     "outputTokens": 25352.24
+     "reward": 0.461564,
+     "inputTokens": 3735386.966666667,
+     "outputTokens": 10574.293333333333
     }
    },
    {
@@ -8874,9 +8076,9 @@
     },
     "rewardHacking": null,
     "mean": {
-     "reward": 0.53763440860215,
-     "inputTokens": 3662580.553763441,
-     "outputTokens": 19296.266129032258
+     "reward": 0.462365591397849,
+     "inputTokens": 2078436.5564516129,
+     "outputTokens": 7624.5
     }
    },
    {
@@ -8885,7 +8087,7 @@
     "refDatasetName": "terminal-bench/terminal-bench@sha256:39d9f44b40420cde8fdcc087579c0d72a7e14fa3656d603c3f0d22fb35e27732",
     "weight": 0.333333333333333,
     "safety": {
-     "attemptCount": 197,
+     "attemptCount": 198,
      "refusedAttemptCount": 0,
      "hardStopAttemptCount": 0,
      "recoveredAttemptCount": 0,
@@ -8895,10 +8097,10 @@
     },
     "rewardHacking": {
      "attemptCount": 198,
-     "retainedAttemptCount": 197,
-     "passingAttemptCount": 92,
-     "reviewedAttemptCount": 92,
-     "flaggedAttemptCount": 1,
+     "retainedAttemptCount": 198,
+     "passingAttemptCount": 50,
+     "reviewedAttemptCount": 50,
+     "flaggedAttemptCount": 0,
      "notApplicableAttemptCount": 0,
      "missingAuditAttemptCount": 0,
      "skippedAuditAttemptCount": 0,
@@ -8906,7 +8108,7 @@
      "gradingErrorAttemptCount": 0,
      "invalidAuditAttemptCount": 0,
      "snapshotMismatchAttemptCount": 0,
-     "materializedAt": "2026-11-05T23:19:00.793293+00:00",
+     "materializedAt": "2026-11-06T07:37:34.331081+00:00",
      "gradingVersion": "v1",
      "graderConfigHash": "e3e86c5c130946ce",
      "reviewSources": [
@@ -8914,20 +8116,20 @@
        "judgeModel": "sonnet",
        "rubricId": "ca-bench-reward-hacking-v1",
        "auditSchemaVersion": 1,
-       "attemptCount": 92
+       "attemptCount": 50
       }
      ],
-     "rate": 0.005050505050505051
+     "rate": 0
     },
     "mean": {
-     "reward": 0.45959595959596,
-     "inputTokens": 11575182.868686868,
-     "outputTokens": 64933.982323232325
+     "reward": 0.252525252525252,
+     "inputTokens": 11473520.515151516,
+     "outputTokens": 23519.88888888889
     }
    }
   ],
   "safety": {
-   "attemptCount": 869,
+   "attemptCount": 870,
    "refusedAttemptCount": 0,
    "hardStopAttemptCount": 0,
    "recoveredAttemptCount": 0,
@@ -8935,35 +8137,35 @@
    "refusals": [],
    "rate": 0
   },
-  "indexScore": 0.482238344954925,
+  "indexScore": 0.392151614641034,
   "mean": {
-   "reward": 0.482238344954925,
-   "costUsd": 0.690844449567775,
-   "agentWallTimeSec": 981.713951073096,
-   "steps": 71.9594569349408,
-   "inputTokens": 6849711.54192788,
-   "outputTokens": 36527.4961507549,
-   "cacheTokens": 6711521.42321169,
-   "cacheHitRate": 0.956934601768947,
-   "totalTokens": 6886239.03807863
+   "reward": 0.392151614641034,
+   "costUsd": 0.454255643441512,
+   "agentWallTimeSec": 572.437023079179,
+   "steps": 81.5091973498425,
+   "inputTokens": 5762448.0127566,
+   "outputTokens": 13906.2274074074,
+   "cacheTokens": 5681890.41593027,
+   "cacheHitRate": 0.947531776215516,
+   "totalTokens": 5776354.240164
   },
   "sums": {
-   "costUsd": 180.319600975
+   "costUsd": 114.244986216667
   },
   "percentiles": {
    "costUsd": {
-    "p05": 0.17458831,
-    "p25": 0.301827629166667,
-    "p50": 0.441727341666667,
-    "p75": 0.654624429166667,
-    "p95": 1.381091055
+    "p05": 0.0781752416666667,
+    "p25": 0.129135983333333,
+    "p50": 0.246047841666667,
+    "p75": 0.410028275,
+    "p95": 1.25045928
    },
    "totalTokens": {
-    "p05": 780831.233333333,
-    "p25": 1833600.08333333,
-    "p50": 3466573.16666667,
-    "p75": 6304138.25,
-    "p95": 15443378.45
+    "p05": 252616.45,
+    "p25": 781315.583333333,
+    "p50": 2199917.5,
+    "p75": 4654439.5,
+    "p95": 18920386.5000001
    }
   },
   "versions": {
@@ -9000,37 +8202,254 @@
   }
  },
  {
-  "id": "2a2fed494e0d1343b14efe96e6bc3669",
+  "id": "736e1c6006fd243c9cc384b61c478e97",
+  "isDefault": true,
+  "isHighlighted": false,
+  "agentName": "Devin Fusion CLI",
+  "provider": "cognition",
+  "display": {
+   "agent": "Devin Fusion CLI",
+   "model": "Claude Opus 5.5 Max + GPT-6 Luna High"
+  },
+  "displayLabel": "Devin Fusion CLI - Claude Opus 5.5 Max + GPT-6 Luna High",
+  "model": null,
+  "shortLabel": "Devin Fusion CLI - Claude Opus 5.5 Max + GPT-6 Luna High",
+  "agentRelease": null,
+  "agentCreator": {
+   "slug": "cognition",
+   "name": "Cognition",
+   "color": "#2200FF",
+   "logo": "/img/logos/devin.svg"
+  },
+  "modelCreators": [
+   {
+    "slug": "anthropic",
+    "name": "Anthropic",
+    "color": "#cc785c",
+    "logo": "/img/logos/anthropic.svg"
+   },
+   {
+    "slug": "openai",
+    "name": "OpenAI",
+    "color": "#1f1f1f",
+    "logo": "/img/logos/openai.svg"
+   }
+  ],
+  "hasTieredPricing": false,
+  "isRouter": true,
+  "variantOf": null,
+  "isUnavailable": false,
+  "indexComponentCount": 3,
+  "evalCount": 3,
+  "evals": [
+   {
+    "datasetIndexName": "frontiercode-v1.1-main",
+    "evaluationDatasetSlug": "FrontierCode v1.1 Main",
+    "refDatasetName": "frontiercode-v1.1",
+    "weight": 0.333333333333333,
+    "safety": {
+     "attemptCount": 300,
+     "refusedAttemptCount": 0,
+     "hardStopAttemptCount": 0,
+     "recoveredAttemptCount": 0,
+     "fallbackAttemptCount": 0,
+     "refusals": [],
+     "rate": 0
+    },
+    "rewardHacking": {
+     "attemptCount": 300,
+     "retainedAttemptCount": 300,
+     "passingAttemptCount": 178,
+     "reviewedAttemptCount": 178,
+     "flaggedAttemptCount": 0,
+     "notApplicableAttemptCount": 0,
+     "missingAuditAttemptCount": 0,
+     "skippedAuditAttemptCount": 0,
+     "unavailableAuditAttemptCount": 0,
+     "gradingErrorAttemptCount": 0,
+     "invalidAuditAttemptCount": 0,
+     "snapshotMismatchAttemptCount": 0,
+     "materializedAt": "2026-11-06T07:37:34.331081+00:00",
+     "gradingVersion": "v2",
+     "graderConfigHash": "e424bdeaa5e64a0e",
+     "reviewSources": [],
+     "rate": 0
+    },
+    "mean": {
+     "reward": 0.536293333333333,
+     "inputTokens": 8218340.166666667,
+     "outputTokens": 179412.1
+    }
+   },
+   {
+    "datasetIndexName": "swe-atlas-qna",
+    "evaluationDatasetSlug": "SWE-Atlas-QnA",
+    "refDatasetName": "datasets/swe-atlas-qna",
+    "weight": 0.333333333333333,
+    "safety": {
+     "attemptCount": 372,
+     "refusedAttemptCount": 0,
+     "hardStopAttemptCount": 0,
+     "recoveredAttemptCount": 0,
+     "fallbackAttemptCount": 0,
+     "refusals": [],
+     "rate": 0
+    },
+    "rewardHacking": null,
+    "mean": {
+     "reward": 0.682795698924731,
+     "inputTokens": 5653512.913978495,
+     "outputTokens": 238136.82795698923
+    }
+   },
+   {
+    "datasetIndexName": "terminal-bench-v4",
+    "evaluationDatasetSlug": "Terminal-Bench v4",
+    "refDatasetName": "terminal-bench/terminal-bench@sha256:39d9f44b40420cde8fdcc087579c0d72a7e14fa3656d603c3f0d22fb35e27732",
+    "weight": 0.333333333333333,
+    "safety": {
+     "attemptCount": 198,
+     "refusedAttemptCount": 0,
+     "hardStopAttemptCount": 0,
+     "recoveredAttemptCount": 0,
+     "fallbackAttemptCount": 0,
+     "refusals": [],
+     "rate": 0
+    },
+    "rewardHacking": {
+     "attemptCount": 198,
+     "retainedAttemptCount": 198,
+     "passingAttemptCount": 124,
+     "reviewedAttemptCount": 124,
+     "flaggedAttemptCount": 0,
+     "notApplicableAttemptCount": 0,
+     "missingAuditAttemptCount": 0,
+     "skippedAuditAttemptCount": 0,
+     "unavailableAuditAttemptCount": 0,
+     "gradingErrorAttemptCount": 0,
+     "invalidAuditAttemptCount": 0,
+     "snapshotMismatchAttemptCount": 0,
+     "materializedAt": "2026-11-06T07:37:34.331081+00:00",
+     "gradingVersion": "v1",
+     "graderConfigHash": "e3e86c5c130946ce",
+     "reviewSources": [
+      {
+       "judgeModel": "sonnet",
+       "rubricId": "ca-bench-reward-hacking-v1",
+       "auditSchemaVersion": 1,
+       "attemptCount": 124
+      }
+     ],
+     "rate": 0
+    },
+    "mean": {
+     "reward": 0.626262626262626,
+     "inputTokens": 16735840.893939395,
+     "outputTokens": 364556.1414141414
+    }
+   }
+  ],
+  "safety": {
+   "attemptCount": 870,
+   "refusedAttemptCount": 0,
+   "hardStopAttemptCount": 0,
+   "recoveredAttemptCount": 0,
+   "fallbackAttemptCount": 0,
+   "refusals": [],
+   "rate": 0
+  },
+  "indexScore": 0.615117219506897,
+  "mean": {
+   "reward": 0.615117219506897,
+   "costUsd": 7.99768820548534,
+   "agentWallTimeSec": 3067.08119502552,
+   "steps": 99.4643553817747,
+   "inputTokens": 10202564.6581949,
+   "outputTokens": 260701.689790377,
+   "cacheTokens": 9293312.28558705,
+   "cacheHitRate": 0.870466942043008,
+   "totalTokens": 10463266.3479852
+  },
+  "sums": {
+   "costUsd": 2236.37703522834
+  },
+  "percentiles": {
+   "costUsd": {
+    "p05": 2.55995243558333,
+    "p25": 4.52299492041667,
+    "p50": 6.39283098583333,
+    "p75": 9.33019056166667,
+    "p95": 16.3319391064167
+   },
+   "totalTokens": {
+    "p05": 1678907.36666667,
+    "p25": 3340266.66666667,
+    "p50": 5393698.16666667,
+    "p75": 9532642.91666667,
+    "p95": 30057806.6833334
+   }
+  },
+  "versions": {
+   "frontiercode-v1.1-main": {
+    "min": {
+     "version": "3000.11.34",
+     "dateReleased": null
+    },
+    "max": {
+     "version": "3000.11.34",
+     "dateReleased": null
+    }
+   },
+   "swe-atlas-qna": {
+    "min": {
+     "version": "3000.11.31",
+     "dateReleased": null
+    },
+    "max": {
+     "version": "3000.11.31",
+     "dateReleased": null
+    }
+   },
+   "terminal-bench-v4": {
+    "min": {
+     "version": "3000.11.31",
+     "dateReleased": null
+    },
+    "max": {
+     "version": "3000.11.31",
+     "dateReleased": null
+    }
+   }
+  }
+ },
+ {
+  "id": "1630d319b5e4dc5183cb88a2b2af1646",
   "isDefault": false,
   "isHighlighted": false,
   "agentName": "Claude Code",
-  "provider": "anthropic",
+  "provider": "alibaba_cloud",
   "display": {
    "agent": "Claude Code",
-   "model": "Claude Haiku 5.5 (Max)"
+   "model": "Qwen3.8 Max"
   },
-  "displayLabel": "Claude Code - Claude Haiku 5.5 (Max)",
+  "displayLabel": "Claude Code - Qwen3.8 Max",
   "model": {
    "release": {
-    "slug": "claude-haiku-5-5",
-    "name": "Claude Haiku 5.5",
-    "shortName": "Claude Haiku 5.5"
+    "slug": "qwen3-8-max",
+    "name": "Qwen3.8 Max",
+    "shortName": "Qwen3.8 Max"
    },
-   "suffix": "Max",
-   "shortSuffix": "max",
+   "suffix": null,
+   "shortSuffix": null,
    "isReasoning": true,
-   "effort": {
-    "slug": "max",
-    "label": "max",
-    "level": 60
-   },
-   "name": "Claude Haiku 5.5 (Max)",
-   "shortName": "Claude Haiku 5.5 (max)"
+   "name": "Qwen3.8 Max",
+   "shortName": "Qwen3.8 Max",
+   "scoreCaveat": null
   },
-  "shortLabel": "Claude Code - Claude Haiku 5.5 (max)",
+  "shortLabel": "Claude Code - Qwen3.8 Max",
   "agentRelease": {
-   "key": "Claude Code:claude-haiku-5-5",
-   "name": "Claude Code - Claude Haiku 5.5"
+   "key": "Claude Code:qwen3-8-max",
+   "name": "Claude Code - Qwen3.8 Max"
   },
   "agentCreator": {
    "slug": "anthropic",
@@ -9040,13 +8459,13 @@
   },
   "modelCreators": [
    {
-    "slug": "anthropic",
-    "name": "Anthropic",
-    "color": "#cc785c",
-    "logo": "/img/logos/anthropic.svg"
+    "slug": "alibaba",
+    "name": "Alibaba",
+    "color": "#ff7018",
+    "logo": "/img/logos/alibaba.svg"
    }
   ],
-  "hasTieredPricing": true,
+  "hasTieredPricing": false,
   "isRouter": false,
   "variantOf": null,
   "isUnavailable": false,
@@ -9070,8 +8489,8 @@
     "rewardHacking": {
      "attemptCount": 300,
      "retainedAttemptCount": 300,
-     "passingAttemptCount": 158,
-     "reviewedAttemptCount": 158,
+     "passingAttemptCount": 149,
+     "reviewedAttemptCount": 149,
      "flaggedAttemptCount": 0,
      "notApplicableAttemptCount": 0,
      "missingAuditAttemptCount": 0,
@@ -9080,16 +8499,16 @@
      "gradingErrorAttemptCount": 0,
      "invalidAuditAttemptCount": 0,
      "snapshotMismatchAttemptCount": 0,
-     "materializedAt": "2026-11-05T23:19:00.793293+00:00",
+     "materializedAt": "2026-11-06T07:37:34.331081+00:00",
      "gradingVersion": "v2",
      "graderConfigHash": "e424bdeaa5e64a0e",
      "reviewSources": [],
      "rate": 0
     },
     "mean": {
-     "reward": 0.473697666666667,
-     "inputTokens": 19939784.64,
-     "outputTokens": 183738.13666666666
+     "reward": 0.448103,
+     "inputTokens": 9795717.333333334,
+     "outputTokens": 93028.87
     }
    },
    {
@@ -9108,9 +8527,9 @@
     },
     "rewardHacking": null,
     "mean": {
-     "reward": 0.338709677419355,
-     "inputTokens": 16533520.357526882,
-     "outputTokens": 1315079.9650537635
+     "reward": 0.561827956989248,
+     "inputTokens": 5159227.653225807,
+     "outputTokens": 45811.73655913978
     }
    },
    {
@@ -9120,73 +8539,18 @@
     "weight": 0.333333333333333,
     "safety": {
      "attemptCount": 198,
-     "refusedAttemptCount": 3,
+     "refusedAttemptCount": 0,
      "hardStopAttemptCount": 0,
-     "recoveredAttemptCount": 3,
-     "fallbackAttemptCount": 3,
-     "refusals": [
-      {
-       "turn": 34,
-       "attemptCount": 1,
-       "outcome": "fallback",
-       "chain": [
-        {
-         "model": "claude-opus-5",
-         "releaseSlug": "claude-opus-5",
-         "releaseName": "Claude Opus 5",
-         "releaseDate": "2026-07-24",
-         "creator": {
-          "slug": "anthropic",
-          "color": "#cc785c"
-         }
-        }
-       ],
-       "rate": 0.005050505050505051
-      },
-      {
-       "turn": 42,
-       "attemptCount": 1,
-       "outcome": "fallback",
-       "chain": [
-        {
-         "model": "claude-opus-5",
-         "releaseSlug": "claude-opus-5",
-         "releaseName": "Claude Opus 5",
-         "releaseDate": "2026-07-24",
-         "creator": {
-          "slug": "anthropic",
-          "color": "#cc785c"
-         }
-        }
-       ],
-       "rate": 0.005050505050505051
-      },
-      {
-       "turn": 45,
-       "attemptCount": 1,
-       "outcome": "fallback",
-       "chain": [
-        {
-         "model": "claude-opus-5",
-         "releaseSlug": "claude-opus-5",
-         "releaseName": "Claude Opus 5",
-         "releaseDate": "2026-07-24",
-         "creator": {
-          "slug": "anthropic",
-          "color": "#cc785c"
-         }
-        }
-       ],
-       "rate": 0.005050505050505051
-      }
-     ],
-     "rate": 0.015151515151515152
+     "recoveredAttemptCount": 0,
+     "fallbackAttemptCount": 0,
+     "refusals": [],
+     "rate": 0
     },
     "rewardHacking": {
      "attemptCount": 198,
      "retainedAttemptCount": 198,
-     "passingAttemptCount": 61,
-     "reviewedAttemptCount": 61,
+     "passingAttemptCount": 33,
+     "reviewedAttemptCount": 33,
      "flaggedAttemptCount": 0,
      "notApplicableAttemptCount": 0,
      "missingAuditAttemptCount": 0,
@@ -9195,7 +8559,7 @@
      "gradingErrorAttemptCount": 0,
      "invalidAuditAttemptCount": 0,
      "snapshotMismatchAttemptCount": 0,
-     "materializedAt": "2026-11-05T23:19:00.793293+00:00",
+     "materializedAt": "2026-11-06T07:37:34.331081+00:00",
      "gradingVersion": "v1",
      "graderConfigHash": "e3e86c5c130946ce",
      "reviewSources": [
@@ -9203,141 +8567,793 @@
        "judgeModel": "sonnet",
        "rubricId": "ca-bench-reward-hacking-v1",
        "auditSchemaVersion": 1,
-       "attemptCount": 61
+       "attemptCount": 33
       }
      ],
      "rate": 0
     },
     "mean": {
-     "reward": 0.308080808080808,
-     "inputTokens": 9471437.262626262,
-     "outputTokens": 716141.0555555555
+     "reward": 0.166666666666667,
+     "inputTokens": 12143161.925641026,
+     "outputTokens": 223315.56923076924
     }
    }
   ],
   "safety": {
    "attemptCount": 870,
-   "refusedAttemptCount": 3,
+   "refusedAttemptCount": 0,
    "hardStopAttemptCount": 0,
-   "recoveredAttemptCount": 3,
-   "fallbackAttemptCount": 3,
-   "refusals": [
-    {
-     "turn": 34,
-     "attemptCount": 1,
-     "outcome": "fallback",
-     "chain": [
-      {
-       "model": "claude-opus-5",
-       "releaseSlug": "claude-opus-5",
-       "releaseName": "Claude Opus 5",
-       "releaseDate": "2026-07-24",
-       "creator": {
-        "slug": "anthropic",
-        "color": "#cc785c"
-       }
-      }
-     ],
-     "rate": 0.0016835016835016836
-    },
-    {
-     "turn": 42,
-     "attemptCount": 1,
-     "outcome": "fallback",
-     "chain": [
-      {
-       "model": "claude-opus-5",
-       "releaseSlug": "claude-opus-5",
-       "releaseName": "Claude Opus 5",
-       "releaseDate": "2026-07-24",
-       "creator": {
-        "slug": "anthropic",
-        "color": "#cc785c"
-       }
-      }
-     ],
-     "rate": 0.0016835016835016836
-    },
-    {
-     "turn": 45,
-     "attemptCount": 1,
-     "outcome": "fallback",
-     "chain": [
-      {
-       "model": "claude-opus-5",
-       "releaseSlug": "claude-opus-5",
-       "releaseName": "Claude Opus 5",
-       "releaseDate": "2026-07-24",
-       "creator": {
-        "slug": "anthropic",
-        "color": "#cc785c"
-       }
-      }
-     ],
-     "rate": 0.0016835016835016836
-    }
-   ],
-   "rate": 0.005050505050505051
+   "recoveredAttemptCount": 0,
+   "fallbackAttemptCount": 0,
+   "refusals": [],
+   "rate": 0
   },
-  "indexScore": 0.373496050722277,
+  "indexScore": 0.392199207885305,
   "mean": {
-   "reward": 0.373496050722276,
-   "costUsd": 2.67388407176395,
-   "agentWallTimeSec": 4255.92477550559,
-   "steps": 114.307695231889,
-   "inputTokens": 15314914.0867177,
-   "outputTokens": 738319.719091995,
-   "cacheTokens": 14287591.6808836,
-   "cacheHitRate": 0.918420370906708,
-   "totalTokens": 16053233.8058097
+   "reward": 0.392199207885305,
+   "costUsd": 3.79584401482699,
+   "agentWallTimeSec": 4568.4135207125,
+   "steps": 114.796515026192,
+   "inputTokens": 9032702.30406672,
+   "outputTokens": 120718.725263303,
+   "cacheTokens": 8665141.79932451,
+   "cacheHitRate": 0.947205701820927,
+   "totalTokens": 9153421.02933002
   },
   "sums": {
-   "costUsd": 794.65870438
+   "costUsd": 978.07253625
   },
   "percentiles": {
    "costUsd": {
-    "p05": 0.34670434325,
-    "p25": 1.01866639333333,
-    "p50": 2.150492865,
-    "p75": 3.82754479,
-    "p95": 6.008574229625
+    "p05": 0.582222916666667,
+    "p25": 1.30195925,
+    "p50": 2.5953255,
+    "p75": 4.23308241666667,
+    "p95": 10.057504475
    },
    "totalTokens": {
-    "p05": 3366808.93333333,
-    "p25": 8905364.91666667,
-    "p50": 15321932.1666667,
-    "p75": 22442098.5,
-    "p95": 35414438.0666667
+    "p05": 1169842.2,
+    "p25": 3262460.66666667,
+    "p50": 6770471.33333333,
+    "p75": 11351030.3333333,
+    "p95": 21390570.6666666
    }
   },
   "versions": {
    "frontiercode-v1.1-main": {
     "min": {
-     "version": "2.1.296",
+     "version": "2.1.266",
      "dateReleased": null
     },
     "max": {
-     "version": "2.1.296",
+     "version": "2.1.266",
      "dateReleased": null
     }
    },
    "swe-atlas-qna": {
     "min": {
-     "version": "2.1.289",
+     "version": "2.1.224",
+     "dateReleased": "2026-08-07"
+    },
+    "max": {
+     "version": "2.1.236",
+     "dateReleased": "2026-08-19"
+    }
+   },
+   "terminal-bench-v4": {
+    "min": {
+     "version": "2.1.261",
+     "dateReleased": "2026-09-04"
+    },
+    "max": {
+     "version": "2.1.261",
+     "dateReleased": "2026-09-04"
+    }
+   }
+  }
+ },
+ {
+  "id": "24cd2ab21d1cf5161ddd831f0949bff4",
+  "isDefault": true,
+  "isHighlighted": false,
+  "agentName": "GitHub Copilot",
+  "provider": "github",
+  "display": {
+   "agent": "GitHub Copilot",
+   "model": "Copilot Fusion (max)"
+  },
+  "displayLabel": "GitHub Copilot - Copilot Fusion (max)",
+  "model": null,
+  "shortLabel": "GitHub Copilot - Copilot Fusion (max)",
+  "agentRelease": null,
+  "agentCreator": {
+   "slug": "github",
+   "name": "GitHub",
+   "color": "#181717",
+   "logo": "/img/logos/github.svg"
+  },
+  "modelCreators": [
+   {
+    "slug": "anthropic",
+    "name": "Anthropic",
+    "color": "#cc785c",
+    "logo": "/img/logos/anthropic.svg"
+   },
+   {
+    "slug": "openai",
+    "name": "OpenAI",
+    "color": "#1f1f1f",
+    "logo": "/img/logos/openai.svg"
+   }
+  ],
+  "hasTieredPricing": false,
+  "isRouter": true,
+  "variantOf": null,
+  "isUnavailable": false,
+  "indexComponentCount": 3,
+  "evalCount": 3,
+  "evals": [
+   {
+    "datasetIndexName": "frontiercode-v1.1-main",
+    "evaluationDatasetSlug": "FrontierCode v1.1 Main",
+    "refDatasetName": "frontiercode-v1.1",
+    "weight": 0.333333333333333,
+    "safety": {
+     "attemptCount": 300,
+     "refusedAttemptCount": 0,
+     "hardStopAttemptCount": 0,
+     "recoveredAttemptCount": 0,
+     "fallbackAttemptCount": 0,
+     "refusals": [],
+     "rate": 0
+    },
+    "rewardHacking": {
+     "attemptCount": 300,
+     "retainedAttemptCount": 300,
+     "passingAttemptCount": 170,
+     "reviewedAttemptCount": 170,
+     "flaggedAttemptCount": 0,
+     "notApplicableAttemptCount": 0,
+     "missingAuditAttemptCount": 0,
+     "skippedAuditAttemptCount": 0,
+     "unavailableAuditAttemptCount": 0,
+     "gradingErrorAttemptCount": 0,
+     "invalidAuditAttemptCount": 0,
+     "snapshotMismatchAttemptCount": 0,
+     "materializedAt": "2026-11-06T07:37:34.331081+00:00",
+     "gradingVersion": "v2",
+     "graderConfigHash": "e424bdeaa5e64a0e",
+     "reviewSources": [],
+     "rate": 0
+    },
+    "mean": {
+     "reward": 0.513698333333333,
+     "inputTokens": 6390890.4,
+     "outputTokens": 80173.86333333333
+    }
+   },
+   {
+    "datasetIndexName": "swe-atlas-qna",
+    "evaluationDatasetSlug": "SWE-Atlas-QnA",
+    "refDatasetName": "datasets/swe-atlas-qna",
+    "weight": 0.333333333333333,
+    "safety": {
+     "attemptCount": 372,
+     "refusedAttemptCount": 0,
+     "hardStopAttemptCount": 0,
+     "recoveredAttemptCount": 0,
+     "fallbackAttemptCount": 0,
+     "refusals": [],
+     "rate": 0
+    },
+    "rewardHacking": null,
+    "mean": {
+     "reward": 0.56989247311828,
+     "inputTokens": 4283877.26344086,
+     "outputTokens": 52340.95161290323
+    }
+   },
+   {
+    "datasetIndexName": "terminal-bench-v4",
+    "evaluationDatasetSlug": "Terminal-Bench v4",
+    "refDatasetName": "terminal-bench/terminal-bench@sha256:39d9f44b40420cde8fdcc087579c0d72a7e14fa3656d603c3f0d22fb35e27732",
+    "weight": 0.333333333333333,
+    "safety": {
+     "attemptCount": 198,
+     "refusedAttemptCount": 0,
+     "hardStopAttemptCount": 0,
+     "recoveredAttemptCount": 0,
+     "fallbackAttemptCount": 0,
+     "refusals": [],
+     "rate": 0
+    },
+    "rewardHacking": {
+     "attemptCount": 198,
+     "retainedAttemptCount": 198,
+     "passingAttemptCount": 141,
+     "reviewedAttemptCount": 141,
+     "flaggedAttemptCount": 0,
+     "notApplicableAttemptCount": 0,
+     "missingAuditAttemptCount": 0,
+     "skippedAuditAttemptCount": 0,
+     "unavailableAuditAttemptCount": 0,
+     "gradingErrorAttemptCount": 0,
+     "invalidAuditAttemptCount": 0,
+     "snapshotMismatchAttemptCount": 1,
+     "materializedAt": "2026-11-06T07:37:34.331081+00:00",
+     "gradingVersion": "v1",
+     "graderConfigHash": "e3e86c5c130946ce",
+     "reviewSources": [
+      {
+       "judgeModel": "sonnet",
+       "rubricId": "ca-bench-reward-hacking-v1",
+       "auditSchemaVersion": 1,
+       "attemptCount": 141
+      }
+     ],
+     "rate": 0
+    },
+    "mean": {
+     "reward": 0.712121212121212,
+     "inputTokens": 10458998.143939395,
+     "outputTokens": 255914.44696969696
+    }
+   }
+  ],
+  "safety": {
+   "attemptCount": 870,
+   "refusedAttemptCount": 0,
+   "hardStopAttemptCount": 0,
+   "recoveredAttemptCount": 0,
+   "fallbackAttemptCount": 0,
+   "refusals": [],
+   "rate": 0
+  },
+  "indexScore": 0.598570672857608,
+  "mean": {
+   "reward": 0.598570672857608,
+   "costUsd": 5.58738499550885,
+   "agentWallTimeSec": 2167.26806006408,
+   "steps": 171.026594982079,
+   "inputTokens": 7044588.60246008,
+   "outputTokens": 129476.420638645,
+   "cacheTokens": 6923518.24405344,
+   "cacheHitRate": 0.972717072404472,
+   "totalTokens": 7339450.14544803
+  },
+  "sums": {
+   "costUsd": 1484.48217116667
+  },
+  "percentiles": {
+   "costUsd": {
+    "p05": 0.675840066666667,
+    "p25": 2.229329,
+    "p50": 3.899995,
+    "p75": 6.23096816666667,
+    "p95": 12.7817138666667
+   },
+   "totalTokens": {
+    "p05": 484240.366666667,
+    "p25": 1231674,
+    "p50": 3249774.83333333,
+    "p75": 8618697.16666667,
+    "p95": 24254727.2333333
+   }
+  },
+  "versions": {
+   "frontiercode-v1.1-main": {
+    "min": {
+     "version": "1.0.101",
      "dateReleased": null
     },
     "max": {
-     "version": "2.1.289",
+     "version": "1.0.101",
+     "dateReleased": null
+    }
+   },
+   "swe-atlas-qna": {
+    "min": {
+     "version": "1.0.101",
+     "dateReleased": null
+    },
+    "max": {
+     "version": "1.0.101",
      "dateReleased": null
     }
    },
    "terminal-bench-v4": {
     "min": {
-     "version": "2.1.289",
+     "version": "1.0.101",
      "dateReleased": null
     },
     "max": {
-     "version": "2.1.289",
+     "version": "1.0.101",
+     "dateReleased": null
+    }
+   }
+  }
+ },
+ {
+  "id": "d843fce803ff4f84ababc47040306116",
+  "isDefault": false,
+  "isHighlighted": false,
+  "agentName": "Muse Code",
+  "provider": "meta",
+  "display": {
+   "agent": "Muse Code",
+   "model": "Muse Spark Open (Xhigh)"
+  },
+  "displayLabel": "Muse Code - Muse Spark Open (Xhigh)",
+  "model": {
+   "release": {
+    "slug": "muse-spark-open",
+    "name": "Muse Spark Open",
+    "shortName": "Muse Spark Open"
+   },
+   "suffix": "Xhigh",
+   "shortSuffix": "xhigh",
+   "isReasoning": true,
+   "effort": {
+    "slug": "xhigh",
+    "label": "xhigh",
+    "level": 50
+   },
+   "name": "Muse Spark Open (Xhigh)",
+   "shortName": "Muse Spark Open (xhigh)",
+   "scoreCaveat": null
+  },
+  "shortLabel": "Muse Code - Muse Spark Open (xhigh)",
+  "agentRelease": {
+   "key": "Muse Code:muse-spark-open",
+   "name": "Muse Code - Muse Spark Open"
+  },
+  "agentCreator": {
+   "slug": "meta",
+   "name": "Meta",
+   "color": "#0089f4",
+   "logo": "/img/logos/meta.svg"
+  },
+  "modelCreators": [
+   {
+    "slug": "meta",
+    "name": "Meta",
+    "color": "#0089f4",
+    "logo": "/img/logos/meta.svg"
+   }
+  ],
+  "hasTieredPricing": false,
+  "isRouter": false,
+  "variantOf": null,
+  "isUnavailable": false,
+  "indexComponentCount": 3,
+  "evalCount": 3,
+  "evals": [
+   {
+    "datasetIndexName": "frontiercode-v1.1-main",
+    "evaluationDatasetSlug": "FrontierCode v1.1 Main",
+    "refDatasetName": "frontiercode-v1.1",
+    "weight": 0.333333333333333,
+    "safety": {
+     "attemptCount": 299,
+     "refusedAttemptCount": 0,
+     "hardStopAttemptCount": 0,
+     "recoveredAttemptCount": 0,
+     "fallbackAttemptCount": 0,
+     "refusals": [],
+     "rate": 0
+    },
+    "rewardHacking": {
+     "attemptCount": 300,
+     "retainedAttemptCount": 299,
+     "passingAttemptCount": 78,
+     "reviewedAttemptCount": 78,
+     "flaggedAttemptCount": 1,
+     "notApplicableAttemptCount": 0,
+     "missingAuditAttemptCount": 0,
+     "skippedAuditAttemptCount": 0,
+     "unavailableAuditAttemptCount": 0,
+     "gradingErrorAttemptCount": 0,
+     "invalidAuditAttemptCount": 0,
+     "snapshotMismatchAttemptCount": 0,
+     "materializedAt": "2026-11-06T07:37:34.331081+00:00",
+     "gradingVersion": "v2",
+     "graderConfigHash": "e424bdeaa5e64a0e",
+     "reviewSources": [],
+     "rate": 0.0033333333333333335
+    },
+    "mean": {
+     "reward": 0.225401,
+     "inputTokens": 7487567.45,
+     "outputTokens": 44662.496666666666
+    }
+   },
+   {
+    "datasetIndexName": "swe-atlas-qna",
+    "evaluationDatasetSlug": "SWE-Atlas-QnA",
+    "refDatasetName": "datasets/swe-atlas-qna",
+    "weight": 0.333333333333333,
+    "safety": {
+     "attemptCount": 372,
+     "refusedAttemptCount": 0,
+     "hardStopAttemptCount": 0,
+     "recoveredAttemptCount": 0,
+     "fallbackAttemptCount": 0,
+     "refusals": [],
+     "rate": 0
+    },
+    "rewardHacking": null,
+    "mean": {
+     "reward": 0.508064516129032,
+     "inputTokens": 7062881.54032258,
+     "outputTokens": 40736.37903225807
+    }
+   },
+   {
+    "datasetIndexName": "terminal-bench-v4",
+    "evaluationDatasetSlug": "Terminal-Bench v4",
+    "refDatasetName": "terminal-bench/terminal-bench@sha256:39d9f44b40420cde8fdcc087579c0d72a7e14fa3656d603c3f0d22fb35e27732",
+    "weight": 0.333333333333333,
+    "safety": {
+     "attemptCount": 198,
+     "refusedAttemptCount": 0,
+     "hardStopAttemptCount": 0,
+     "recoveredAttemptCount": 0,
+     "fallbackAttemptCount": 0,
+     "refusals": [],
+     "rate": 0
+    },
+    "rewardHacking": {
+     "attemptCount": 198,
+     "retainedAttemptCount": 198,
+     "passingAttemptCount": 15,
+     "reviewedAttemptCount": 15,
+     "flaggedAttemptCount": 4,
+     "notApplicableAttemptCount": 0,
+     "missingAuditAttemptCount": 0,
+     "skippedAuditAttemptCount": 0,
+     "unavailableAuditAttemptCount": 0,
+     "gradingErrorAttemptCount": 0,
+     "invalidAuditAttemptCount": 0,
+     "snapshotMismatchAttemptCount": 0,
+     "materializedAt": "2026-11-06T07:37:34.331081+00:00",
+     "gradingVersion": "v1",
+     "graderConfigHash": "e3e86c5c130946ce",
+     "reviewSources": [
+      {
+       "judgeModel": "sonnet",
+       "rubricId": "ca-bench-reward-hacking-v1",
+       "auditSchemaVersion": 1,
+       "attemptCount": 15
+      }
+     ],
+     "rate": 0.020202020202020204
+    },
+    "mean": {
+     "reward": 0.0555555555555556,
+     "inputTokens": 25168118.439393938,
+     "outputTokens": 206070.1717171717
+    }
+   }
+  ],
+  "safety": {
+   "attemptCount": 869,
+   "refusedAttemptCount": 0,
+   "hardStopAttemptCount": 0,
+   "recoveredAttemptCount": 0,
+   "fallbackAttemptCount": 0,
+   "refusals": [],
+   "rate": 0
+  },
+  "indexScore": 0.263007023894863,
+  "mean": {
+   "reward": 0.263007023894863,
+   "costUsd": 3.54324946048794,
+   "agentWallTimeSec": 1558.86632482568,
+   "steps": 161.39889866406,
+   "inputTokens": 13239522.4765722,
+   "outputTokens": 97156.3491386988,
+   "cacheTokens": 12711076.2128348,
+   "cacheHitRate": 0.951550733530632,
+   "totalTokens": 13336678.8257109
+  },
+  "sums": {
+   "costUsd": 552.135411283333
+  },
+  "percentiles": {
+   "costUsd": {
+    "p05": 0.489874289166667,
+    "p25": 0.801027916666667,
+    "p50": 1.50236314166667,
+    "p75": 3.17637376666667,
+    "p95": 12.5387881783333
+   },
+   "totalTokens": {
+    "p05": 1998526.15,
+    "p25": 3962611.16666667,
+    "p50": 6559137.66666667,
+    "p75": 12126905,
+    "p95": 40008910.3666667
+   }
+  },
+  "versions": {
+   "frontiercode-v1.1-main": {
+    "min": {
+     "version": "1.4.2-R4684.1",
+     "dateReleased": null
+    },
+    "max": {
+     "version": "1.4.2-R4684.1",
+     "dateReleased": null
+    }
+   },
+   "swe-atlas-qna": {
+    "min": {
+     "version": "1.4.2-R4684.1",
+     "dateReleased": null
+    },
+    "max": {
+     "version": "1.4.2-R4684.1",
+     "dateReleased": null
+    }
+   },
+   "terminal-bench-v4": {
+    "min": {
+     "version": "1.4.2-R4684.1",
+     "dateReleased": null
+    },
+    "max": {
+     "version": "1.4.2-R4684.1",
+     "dateReleased": null
+    }
+   }
+  }
+ },
+ {
+  "id": "b54e883be1cff7a6a43a737ee106011c",
+  "isDefault": false,
+  "isHighlighted": false,
+  "agentName": "Codex",
+  "provider": "openai",
+  "display": {
+   "agent": "Codex",
+   "model": "GPT-6.1 Terra (Low)"
+  },
+  "displayLabel": "Codex - GPT-6.1 Terra (Low)",
+  "model": {
+   "release": {
+    "slug": "gpt-6-1-terra",
+    "name": "GPT-6.1 Terra",
+    "shortName": "GPT-6.1 Terra"
+   },
+   "suffix": "Low",
+   "shortSuffix": "low",
+   "isReasoning": true,
+   "effort": {
+    "slug": "low",
+    "label": "low",
+    "level": 20
+   },
+   "name": "GPT-6.1 Terra (Low)",
+   "shortName": "GPT-6.1 Terra (low)",
+   "scoreCaveat": null
+  },
+  "shortLabel": "Codex - GPT-6.1 Terra (low)",
+  "agentRelease": {
+   "key": "Codex:gpt-6-1-terra",
+   "name": "Codex - GPT-6.1 Terra"
+  },
+  "agentCreator": {
+   "slug": "openai",
+   "name": "OpenAI",
+   "color": "#1f1f1f",
+   "logo": "/img/logos/openai.svg"
+  },
+  "modelCreators": [
+   {
+    "slug": "openai",
+    "name": "OpenAI",
+    "color": "#1f1f1f",
+    "logo": "/img/logos/openai.svg"
+   }
+  ],
+  "hasTieredPricing": false,
+  "isRouter": false,
+  "variantOf": null,
+  "isUnavailable": false,
+  "indexComponentCount": 3,
+  "evalCount": 3,
+  "evals": [
+   {
+    "datasetIndexName": "frontiercode-v1.1-main",
+    "evaluationDatasetSlug": "FrontierCode v1.1 Main",
+    "refDatasetName": "frontiercode-v1.1",
+    "weight": 0.333333333333333,
+    "safety": {
+     "attemptCount": 300,
+     "refusedAttemptCount": 0,
+     "hardStopAttemptCount": 0,
+     "recoveredAttemptCount": 0,
+     "fallbackAttemptCount": 0,
+     "refusals": [],
+     "rate": 0
+    },
+    "rewardHacking": {
+     "attemptCount": 300,
+     "retainedAttemptCount": 300,
+     "passingAttemptCount": 135,
+     "reviewedAttemptCount": 135,
+     "flaggedAttemptCount": 0,
+     "notApplicableAttemptCount": 0,
+     "missingAuditAttemptCount": 0,
+     "skippedAuditAttemptCount": 0,
+     "unavailableAuditAttemptCount": 0,
+     "gradingErrorAttemptCount": 0,
+     "invalidAuditAttemptCount": 0,
+     "snapshotMismatchAttemptCount": 0,
+     "materializedAt": "2026-11-06T07:37:34.331081+00:00",
+     "gradingVersion": "v2",
+     "graderConfigHash": "e424bdeaa5e64a0e",
+     "reviewSources": [],
+     "rate": 0
+    },
+    "mean": {
+     "reward": 0.406083,
+     "inputTokens": 1392698.4533333334,
+     "outputTokens": 6819.86
+    }
+   },
+   {
+    "datasetIndexName": "swe-atlas-qna",
+    "evaluationDatasetSlug": "SWE-Atlas-QnA",
+    "refDatasetName": "datasets/swe-atlas-qna",
+    "weight": 0.333333333333333,
+    "safety": {
+     "attemptCount": 372,
+     "refusedAttemptCount": 0,
+     "hardStopAttemptCount": 0,
+     "recoveredAttemptCount": 0,
+     "fallbackAttemptCount": 0,
+     "refusals": [],
+     "rate": 0
+    },
+    "rewardHacking": null,
+    "mean": {
+     "reward": 0.387096774193548,
+     "inputTokens": 1131737.4166666667,
+     "outputTokens": 5915.682795698925
+    }
+   },
+   {
+    "datasetIndexName": "terminal-bench-v4",
+    "evaluationDatasetSlug": "Terminal-Bench v4",
+    "refDatasetName": "terminal-bench/terminal-bench@sha256:39d9f44b40420cde8fdcc087579c0d72a7e14fa3656d603c3f0d22fb35e27732",
+    "weight": 0.333333333333333,
+    "safety": {
+     "attemptCount": 198,
+     "refusedAttemptCount": 1,
+     "hardStopAttemptCount": 1,
+     "recoveredAttemptCount": 0,
+     "fallbackAttemptCount": 0,
+     "refusals": [
+      {
+       "turn": 27,
+       "attemptCount": 1,
+       "outcome": "hard_stop",
+       "chain": [],
+       "rate": 0.005050505050505051
+      }
+     ],
+     "rate": 0.005050505050505051
+    },
+    "rewardHacking": {
+     "attemptCount": 198,
+     "retainedAttemptCount": 198,
+     "passingAttemptCount": 50,
+     "reviewedAttemptCount": 50,
+     "flaggedAttemptCount": 0,
+     "notApplicableAttemptCount": 0,
+     "missingAuditAttemptCount": 0,
+     "skippedAuditAttemptCount": 0,
+     "unavailableAuditAttemptCount": 0,
+     "gradingErrorAttemptCount": 0,
+     "invalidAuditAttemptCount": 0,
+     "snapshotMismatchAttemptCount": 0,
+     "materializedAt": "2026-11-06T07:37:34.331081+00:00",
+     "gradingVersion": "v1",
+     "graderConfigHash": "e3e86c5c130946ce",
+     "reviewSources": [
+      {
+       "judgeModel": "sonnet",
+       "rubricId": "ca-bench-reward-hacking-v1",
+       "auditSchemaVersion": 1,
+       "attemptCount": 50
+      }
+     ],
+     "rate": 0
+    },
+    "mean": {
+     "reward": 0.252525252525253,
+     "inputTokens": 3107789.02020202,
+     "outputTokens": 13300.18686868687
+    }
+   }
+  ],
+  "safety": {
+   "attemptCount": 870,
+   "refusedAttemptCount": 1,
+   "hardStopAttemptCount": 1,
+   "recoveredAttemptCount": 0,
+   "fallbackAttemptCount": 0,
+   "refusals": [
+    {
+     "turn": 27,
+     "attemptCount": 1,
+     "outcome": "hard_stop",
+     "chain": [],
+     "rate": 0.0016835016835016836
+    }
+   ],
+   "rate": 0.0016835016835016836
+  },
+  "indexScore": 0.3485683422396,
+  "mean": {
+   "reward": 0.3485683422396,
+   "costUsd": 0.198820047696481,
+   "agentWallTimeSec": 379.469317133703,
+   "steps": 42.7471271858369,
+   "inputTokens": 1877408.29673401,
+   "outputTokens": 8678.57655479527,
+   "cacheTokens": 1826086.85212664,
+   "cacheHitRate": 0.925808219461337,
+   "totalTokens": 1886086.8732888
+  },
+  "sums": {
+   "costUsd": 53.3256242
+  },
+  "percentiles": {
+   "costUsd": {
+    "p05": 0.0561471491666667,
+    "p25": 0.0836410833333333,
+    "p50": 0.133640266666667,
+    "p75": 0.203088383333333,
+    "p95": 0.3958518625
+   },
+   "totalTokens": {
+    "p05": 161473.15,
+    "p25": 388026,
+    "p50": 887460,
+    "p75": 1673926.75,
+    "p95": 4295921.6
+   }
+  },
+  "versions": {
+   "frontiercode-v1.1-main": {
+    "min": {
+     "version": "0.163.0",
+     "dateReleased": null
+    },
+    "max": {
+     "version": "0.163.0",
+     "dateReleased": null
+    }
+   },
+   "swe-atlas-qna": {
+    "min": {
+     "version": "0.163.0",
+     "dateReleased": null
+    },
+    "max": {
+     "version": "0.163.0",
+     "dateReleased": null
+    }
+   },
+   "terminal-bench-v4": {
+    "min": {
+     "version": "0.163.0",
+     "dateReleased": null
+    },
+    "max": {
+     "version": "0.163.0",
      "dateReleased": null
     }
    }
@@ -9411,7 +9427,7 @@
      "gradingErrorAttemptCount": 0,
      "invalidAuditAttemptCount": 0,
      "snapshotMismatchAttemptCount": 0,
-     "materializedAt": "2026-11-05T23:19:00.793293+00:00",
+     "materializedAt": "2026-11-06T07:37:34.331081+00:00",
      "gradingVersion": "v2",
      "graderConfigHash": "e424bdeaa5e64a0e",
      "reviewSources": [],
@@ -9904,7 +9920,7 @@
      "gradingErrorAttemptCount": 0,
      "invalidAuditAttemptCount": 0,
      "snapshotMismatchAttemptCount": 0,
-     "materializedAt": "2026-11-05T23:19:00.793293+00:00",
+     "materializedAt": "2026-11-06T07:37:34.331081+00:00",
      "gradingVersion": "v1",
      "graderConfigHash": "e3e86c5c130946ce",
      "reviewSources": [
@@ -10456,7 +10472,8 @@
     "level": 40
    },
    "name": "Gemini 4 Argon (High)",
-   "shortName": "Gemini 4 Argon (high)"
+   "shortName": "Gemini 4 Argon (high)",
+   "scoreCaveat": null
   },
   "shortLabel": "Antigravity CLI - Gemini 4 Argon (high)",
   "agentRelease": {
@@ -10511,7 +10528,7 @@
      "gradingErrorAttemptCount": 0,
      "invalidAuditAttemptCount": 0,
      "snapshotMismatchAttemptCount": 0,
-     "materializedAt": "2026-11-05T23:19:00.793293+00:00",
+     "materializedAt": "2026-11-06T07:37:34.331081+00:00",
      "gradingVersion": "v2",
      "graderConfigHash": "e424bdeaa5e64a0e",
      "reviewSources": [],
@@ -10571,7 +10588,7 @@
      "gradingErrorAttemptCount": 0,
      "invalidAuditAttemptCount": 0,
      "snapshotMismatchAttemptCount": 1,
-     "materializedAt": "2026-11-05T23:19:00.793293+00:00",
+     "materializedAt": "2026-11-06T07:37:34.331081+00:00",
      "gradingVersion": "v1",
      "graderConfigHash": "e3e86c5c130946ce",
      "reviewSources": [
@@ -10690,7 +10707,8 @@
     "level": 60
    },
    "name": "DeepSeek V4.1 Flash 1017 (Max)",
-   "shortName": "DeepSeek V4.1 Flash 1017 (max)"
+   "shortName": "DeepSeek V4.1 Flash 1017 (max)",
+   "scoreCaveat": null
   },
   "shortLabel": "DeepSeek Harness - DeepSeek V4.1 Flash 1017 (max)",
   "agentRelease": {
@@ -10745,7 +10763,7 @@
      "gradingErrorAttemptCount": 0,
      "invalidAuditAttemptCount": 0,
      "snapshotMismatchAttemptCount": 0,
-     "materializedAt": "2026-11-05T23:19:00.793293+00:00",
+     "materializedAt": "2026-11-06T07:37:34.331081+00:00",
      "gradingVersion": "v2",
      "graderConfigHash": "e424bdeaa5e64a0e",
      "reviewSources": [],
@@ -10805,7 +10823,7 @@
      "gradingErrorAttemptCount": 0,
      "invalidAuditAttemptCount": 0,
      "snapshotMismatchAttemptCount": 0,
-     "materializedAt": "2026-11-05T23:19:00.793293+00:00",
+     "materializedAt": "2026-11-06T07:37:34.331081+00:00",
      "gradingVersion": "v1",
      "graderConfigHash": "e3e86c5c130946ce",
      "reviewSources": [
@@ -10924,7 +10942,8 @@
     "level": 40
    },
    "name": "Gemini 3.8 Flash (High)",
-   "shortName": "Gemini 3.8 Flash (high)"
+   "shortName": "Gemini 3.8 Flash (high)",
+   "scoreCaveat": null
   },
   "shortLabel": "Antigravity SDK - Gemini 3.8 Flash (high)",
   "agentRelease": {
@@ -10979,7 +10998,7 @@
      "gradingErrorAttemptCount": 0,
      "invalidAuditAttemptCount": 0,
      "snapshotMismatchAttemptCount": 0,
-     "materializedAt": "2026-11-05T23:19:00.793293+00:00",
+     "materializedAt": "2026-11-06T07:37:34.331081+00:00",
      "gradingVersion": "v2",
      "graderConfigHash": "e424bdeaa5e64a0e",
      "reviewSources": [],
@@ -11039,7 +11058,7 @@
      "gradingErrorAttemptCount": 0,
      "invalidAuditAttemptCount": 0,
      "snapshotMismatchAttemptCount": 0,
-     "materializedAt": "2026-11-05T23:19:00.793293+00:00",
+     "materializedAt": "2026-11-06T07:37:34.331081+00:00",
      "gradingVersion": "v1",
      "graderConfigHash": "e3e86c5c130946ce",
      "reviewSources": [
@@ -11158,7 +11177,8 @@
     "level": 60
    },
    "name": "DeepSeek V4.1 Flash (Max)",
-   "shortName": "DeepSeek V4.1 Flash (max)"
+   "shortName": "DeepSeek V4.1 Flash (max)",
+   "scoreCaveat": null
   },
   "shortLabel": "Codex - DeepSeek V4.1 Flash (max)",
   "agentRelease": {
@@ -11213,7 +11233,7 @@
      "gradingErrorAttemptCount": 0,
      "invalidAuditAttemptCount": 0,
      "snapshotMismatchAttemptCount": 0,
-     "materializedAt": "2026-11-05T23:19:00.793293+00:00",
+     "materializedAt": "2026-11-06T07:37:34.331081+00:00",
      "gradingVersion": "v2",
      "graderConfigHash": "e424bdeaa5e64a0e",
      "reviewSources": [],
@@ -11273,7 +11293,7 @@
      "gradingErrorAttemptCount": 0,
      "invalidAuditAttemptCount": 0,
      "snapshotMismatchAttemptCount": 0,
-     "materializedAt": "2026-11-05T23:19:00.793293+00:00",
+     "materializedAt": "2026-11-06T07:37:34.331081+00:00",
      "gradingVersion": "v1",
      "graderConfigHash": "e3e86c5c130946ce",
      "reviewSources": [
@@ -11387,7 +11407,8 @@
    "shortSuffix": null,
    "isReasoning": true,
    "name": "Step 5 Preview",
-   "shortName": "Step 5 Preview"
+   "shortName": "Step 5 Preview",
+   "scoreCaveat": null
   },
   "shortLabel": "Claude Code - Step 5 Preview",
   "agentRelease": {
@@ -11442,7 +11463,7 @@
      "gradingErrorAttemptCount": 0,
      "invalidAuditAttemptCount": 0,
      "snapshotMismatchAttemptCount": 0,
-     "materializedAt": "2026-11-05T23:19:00.793293+00:00",
+     "materializedAt": "2026-11-06T07:37:34.331081+00:00",
      "gradingVersion": "v2",
      "graderConfigHash": "e424bdeaa5e64a0e",
      "reviewSources": [],
@@ -11502,7 +11523,7 @@
      "gradingErrorAttemptCount": 0,
      "invalidAuditAttemptCount": 0,
      "snapshotMismatchAttemptCount": 0,
-     "materializedAt": "2026-11-05T23:19:00.793293+00:00",
+     "materializedAt": "2026-11-06T07:37:34.331081+00:00",
      "gradingVersion": "v1",
      "graderConfigHash": "e3e86c5c130946ce",
      "reviewSources": [
@@ -11603,27 +11624,28 @@
   "provider": "mistral",
   "display": {
    "agent": "Mistral Vibe",
-   "model": "Mistral Large 4 (Medium)"
+   "model": "Mistral Large 4 (High)"
   },
-  "displayLabel": "Mistral Vibe - Mistral Large 4 (Medium)",
+  "displayLabel": "Mistral Vibe - Mistral Large 4 (High)",
   "model": {
    "release": {
     "slug": "mistral-large-4",
     "name": "Mistral Large 4",
     "shortName": "Mistral Large 4"
    },
-   "suffix": "Medium",
-   "shortSuffix": "medium",
+   "suffix": "High",
+   "shortSuffix": "high",
    "isReasoning": true,
    "effort": {
-    "slug": "medium",
-    "label": "medium",
-    "level": 30
+    "slug": "high",
+    "label": "high",
+    "level": 40
    },
-   "name": "Mistral Large 4 (Medium)",
-   "shortName": "Mistral Large 4 (medium)"
+   "name": "Mistral Large 4 (High)",
+   "shortName": "Mistral Large 4 (high)",
+   "scoreCaveat": null
   },
-  "shortLabel": "Mistral Vibe - Mistral Large 4 (medium)",
+  "shortLabel": "Mistral Vibe - Mistral Large 4 (high)",
   "agentRelease": {
    "key": "Mistral Vibe:mistral-large-4",
    "name": "Mistral Vibe - Mistral Large 4"
@@ -11676,7 +11698,7 @@
      "gradingErrorAttemptCount": 0,
      "invalidAuditAttemptCount": 0,
      "snapshotMismatchAttemptCount": 0,
-     "materializedAt": "2026-11-05T23:19:00.793293+00:00",
+     "materializedAt": "2026-11-06T07:37:34.331081+00:00",
      "gradingVersion": "v2",
      "graderConfigHash": "e424bdeaa5e64a0e",
      "reviewSources": [],
@@ -11736,7 +11758,7 @@
      "gradingErrorAttemptCount": 0,
      "invalidAuditAttemptCount": 0,
      "snapshotMismatchAttemptCount": 0,
-     "materializedAt": "2026-11-05T23:19:00.793293+00:00",
+     "materializedAt": "2026-11-06T07:37:34.331081+00:00",
      "gradingVersion": "v1",
      "graderConfigHash": "e3e86c5c130946ce",
      "reviewSources": [
@@ -11855,7 +11877,8 @@
     "level": 60
    },
    "name": "GPT-6 Luna (Max)",
-   "shortName": "GPT-6 Luna (max)"
+   "shortName": "GPT-6 Luna (max)",
+   "scoreCaveat": null
   },
   "shortLabel": "Codex - GPT-6 Luna (max)",
   "agentRelease": {
@@ -11910,7 +11933,7 @@
      "gradingErrorAttemptCount": 0,
      "invalidAuditAttemptCount": 0,
      "snapshotMismatchAttemptCount": 0,
-     "materializedAt": "2026-11-05T23:19:00.793293+00:00",
+     "materializedAt": "2026-11-06T07:37:34.331081+00:00",
      "gradingVersion": "v2",
      "graderConfigHash": "e424bdeaa5e64a0e",
      "reviewSources": [],
@@ -11970,7 +11993,7 @@
      "gradingErrorAttemptCount": 0,
      "invalidAuditAttemptCount": 0,
      "snapshotMismatchAttemptCount": 0,
-     "materializedAt": "2026-11-05T23:19:00.793293+00:00",
+     "materializedAt": "2026-11-06T07:37:34.331081+00:00",
      "gradingVersion": "v1",
      "graderConfigHash": "e3e86c5c130946ce",
      "reviewSources": [
@@ -12089,7 +12112,8 @@
     "level": 60
    },
    "name": "Muse Spark 1.3 (Max)",
-   "shortName": "Muse Spark 1.3 (max)"
+   "shortName": "Muse Spark 1.3 (max)",
+   "scoreCaveat": null
   },
   "shortLabel": "Muse Code - Muse Spark 1.3 (max)",
   "agentRelease": {
@@ -12144,7 +12168,7 @@
      "gradingErrorAttemptCount": 0,
      "invalidAuditAttemptCount": 0,
      "snapshotMismatchAttemptCount": 0,
-     "materializedAt": "2026-11-05T23:19:00.793293+00:00",
+     "materializedAt": "2026-11-06T07:37:34.331081+00:00",
      "gradingVersion": "v2",
      "graderConfigHash": "e424bdeaa5e64a0e",
      "reviewSources": [],
@@ -12204,7 +12228,7 @@
      "gradingErrorAttemptCount": 0,
      "invalidAuditAttemptCount": 0,
      "snapshotMismatchAttemptCount": 0,
-     "materializedAt": "2026-11-05T23:19:00.793293+00:00",
+     "materializedAt": "2026-11-06T07:37:34.331081+00:00",
      "gradingVersion": "v1",
      "graderConfigHash": "e3e86c5c130946ce",
      "reviewSources": [
@@ -12323,7 +12347,8 @@
     "level": 60
    },
    "name": "Kimi K3 (Max)",
-   "shortName": "Kimi K3 (max)"
+   "shortName": "Kimi K3 (max)",
+   "scoreCaveat": null
   },
   "shortLabel": "Kimi Code CLI - Kimi K3 (max)",
   "agentRelease": {
@@ -12378,7 +12403,7 @@
      "gradingErrorAttemptCount": 0,
      "invalidAuditAttemptCount": 0,
      "snapshotMismatchAttemptCount": 0,
-     "materializedAt": "2026-11-05T23:19:00.793293+00:00",
+     "materializedAt": "2026-11-06T07:37:34.331081+00:00",
      "gradingVersion": "v2",
      "graderConfigHash": "e424bdeaa5e64a0e",
      "reviewSources": [],
@@ -12438,7 +12463,7 @@
      "gradingErrorAttemptCount": 0,
      "invalidAuditAttemptCount": 0,
      "snapshotMismatchAttemptCount": 0,
-     "materializedAt": "2026-11-05T23:19:00.793293+00:00",
+     "materializedAt": "2026-11-06T07:37:34.331081+00:00",
      "gradingVersion": "v1",
      "graderConfigHash": "e3e86c5c130946ce",
      "reviewSources": [
@@ -12557,7 +12582,8 @@
     "level": 60
    },
    "name": "Claude Fable 5.1 (Max, Default Fallback)",
-   "shortName": "Claude Fable 5.1 (max)"
+   "shortName": "Claude Fable 5.1 (max)",
+   "scoreCaveat": null
   },
   "shortLabel": "Claude Code - Claude Fable 5.1 (max)",
   "agentRelease": {
@@ -12649,7 +12675,7 @@
      "gradingErrorAttemptCount": 0,
      "invalidAuditAttemptCount": 0,
      "snapshotMismatchAttemptCount": 0,
-     "materializedAt": "2026-11-05T23:19:00.793293+00:00",
+     "materializedAt": "2026-11-06T07:37:34.331081+00:00",
      "gradingVersion": "v2",
      "graderConfigHash": "e424bdeaa5e64a0e",
      "reviewSources": [],
@@ -13269,7 +13295,7 @@
      "gradingErrorAttemptCount": 0,
      "invalidAuditAttemptCount": 0,
      "snapshotMismatchAttemptCount": 0,
-     "materializedAt": "2026-11-05T23:19:00.793293+00:00",
+     "materializedAt": "2026-11-06T07:37:34.331081+00:00",
      "gradingVersion": "v1",
      "graderConfigHash": "e3e86c5c130946ce",
      "reviewSources": [
@@ -13983,7 +14009,8 @@
     "level": 60
    },
    "name": "GLM-5.3 (Max)",
-   "shortName": "GLM-5.3 (max)"
+   "shortName": "GLM-5.3 (max)",
+   "scoreCaveat": null
   },
   "shortLabel": "Opencode - GLM-5.3 (max)",
   "agentRelease": {
@@ -14038,7 +14065,7 @@
      "gradingErrorAttemptCount": 0,
      "invalidAuditAttemptCount": 0,
      "snapshotMismatchAttemptCount": 0,
-     "materializedAt": "2026-11-05T23:19:00.793293+00:00",
+     "materializedAt": "2026-11-06T07:37:34.331081+00:00",
      "gradingVersion": "v2",
      "graderConfigHash": "e424bdeaa5e64a0e",
      "reviewSources": [],
@@ -14098,7 +14125,7 @@
      "gradingErrorAttemptCount": 0,
      "invalidAuditAttemptCount": 0,
      "snapshotMismatchAttemptCount": 0,
-     "materializedAt": "2026-11-05T23:19:00.793293+00:00",
+     "materializedAt": "2026-11-06T07:37:34.331081+00:00",
      "gradingVersion": "v1",
      "graderConfigHash": "e3e86c5c130946ce",
      "reviewSources": [
@@ -14217,7 +14244,8 @@
     "level": 40
    },
    "name": "GPT-6.1 Terra (High)",
-   "shortName": "GPT-6.1 Terra (high)"
+   "shortName": "GPT-6.1 Terra (high)",
+   "scoreCaveat": null
   },
   "shortLabel": "Codex - GPT-6.1 Terra (high)",
   "agentRelease": {
@@ -14272,7 +14300,7 @@
      "gradingErrorAttemptCount": 0,
      "invalidAuditAttemptCount": 0,
      "snapshotMismatchAttemptCount": 0,
-     "materializedAt": "2026-11-05T23:19:00.793293+00:00",
+     "materializedAt": "2026-11-06T07:37:34.331081+00:00",
      "gradingVersion": "v2",
      "graderConfigHash": "e424bdeaa5e64a0e",
      "reviewSources": [],
@@ -14332,7 +14360,7 @@
      "gradingErrorAttemptCount": 0,
      "invalidAuditAttemptCount": 0,
      "snapshotMismatchAttemptCount": 0,
-     "materializedAt": "2026-11-05T23:19:00.793293+00:00",
+     "materializedAt": "2026-11-06T07:37:34.331081+00:00",
      "gradingVersion": "v1",
      "graderConfigHash": "e3e86c5c130946ce",
      "reviewSources": [
@@ -14451,7 +14479,8 @@
     "level": 30
    },
    "name": "GPT-6.1 Terra (Medium)",
-   "shortName": "GPT-6.1 Terra (medium)"
+   "shortName": "GPT-6.1 Terra (medium)",
+   "scoreCaveat": null
   },
   "shortLabel": "Codex - GPT-6.1 Terra (medium)",
   "agentRelease": {
@@ -14506,7 +14535,7 @@
      "gradingErrorAttemptCount": 0,
      "invalidAuditAttemptCount": 0,
      "snapshotMismatchAttemptCount": 0,
-     "materializedAt": "2026-11-05T23:19:00.793293+00:00",
+     "materializedAt": "2026-11-06T07:37:34.331081+00:00",
      "gradingVersion": "v2",
      "graderConfigHash": "e424bdeaa5e64a0e",
      "reviewSources": [],
@@ -14566,7 +14595,7 @@
      "gradingErrorAttemptCount": 0,
      "invalidAuditAttemptCount": 0,
      "snapshotMismatchAttemptCount": 0,
-     "materializedAt": "2026-11-05T23:19:00.793293+00:00",
+     "materializedAt": "2026-11-06T07:37:34.331081+00:00",
      "gradingVersion": "v1",
      "graderConfigHash": "e3e86c5c130946ce",
      "reviewSources": [
