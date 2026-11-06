@@ -70294,19 +70294,7 @@
   "outputModalityImage": false,
   "outputModalitySpeech": false,
   "outputModalityVideo": false,
-  "gdpvalCostPerTask": 0.37060024658545465,
-  "genVariants": [
-   {},
-   {
-    "ii": 30.6286781498958,
-    "cost": 1.1784281349617984,
-    "gdpval": 1630.23,
-    "gdpvalCost": 0.37060024658545465,
-    "ctx": 1024000,
-    "pin": 0.3,
-    "pout": 1
-   }
-  ]
+  "gdpvalCostPerTask": 0.37060024658545465
  },
  {
   "slug": "gpt-5-5-pro",
