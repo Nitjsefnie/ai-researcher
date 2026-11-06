@@ -14,10 +14,10 @@
       "slug": "openai/gpt-6-luna"
     },
     {
-      "slug": "tencent/hy4-preview"
+      "slug": "stepfun/step-5-preview"
     },
     {
-      "slug": "stepfun/step-5-preview"
+      "slug": "tencent/hy4-preview"
     },
     {
       "slug": "anthropic/claude-opus-5.5"
@@ -29,7 +29,7 @@
       "slug": "openai/gpt-5.6-luna"
     },
     {
-      "slug": "openai/gpt-6.1-sol"
+      "slug": "tencent/hy4"
     }
   ]
 }
