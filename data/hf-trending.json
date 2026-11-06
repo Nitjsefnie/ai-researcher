@@ -14,22 +14,22 @@
       "id": "Lightricks/LTX-2.5"
     },
     {
-      "id": "nvidia/NVIDIA-Nemotron-3.5-Transcribe-30B-A4B"
+      "id": "burner22/numbat"
     },
     {
-      "id": "burner22/numbat"
+      "id": "nvidia/NVIDIA-Nemotron-3.5-Transcribe-30B-A4B"
     },
     {
       "id": "FusionCow/Sulphur-3"
     },
     {
-      "id": "mistralai/Mistral-Large-4-1T-A52B"
-    },
-    {
       "id": "Pika-Labs/Pika-H3-Flex"
     },
     {
-      "id": "Qwen/Qwen3.8-27B"
+      "id": "mistralai/Mistral-Large-4-1T-A52B"
+    },
+    {
+      "id": "ricursiveAI/Ripple-65B-Preview"
     }
   ]
 }
