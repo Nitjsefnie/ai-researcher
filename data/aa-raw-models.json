@@ -8020,8 +8020,12 @@
   "modelCreatorLogo": "/img/logos/lg.png",
   "contextWindowTokens": 262144,
   "intelligenceIndex": null,
-  "omniscience": null,
+  "omniscience": -11.466666666666667,
   "scores": {
+   "omniscience-accuracy": 0.145,
+   "omniscience-non-hallucination": 0.6962962962962963,
+   "hle-diamond": 0.057,
+   "gdp-pdf": 0.042,
    "gdpval-aa-normalized": 815.8,
    "humanitys-last-exam": 0.185820203892493,
    "artificial-analysis-long-context-reasoning": 0.6,
@@ -8055,6 +8059,9 @@
   "modelWeightsSourceUrl": "https://huggingface.co/LGAI-EXAONE/K-EXAONE-2.0-750B-A37B",
   "microevalsEnabled": false,
   "capabilities": {},
+  "omniscienceAccuracy": 0.145,
+  "omniscienceHallucinationRate": 0.3037037037037037,
+  "gdpPdfAllPass": 0.042,
   "gdpval": 815.8,
   "gdpvalInterval": {
    "lower": 791,
@@ -8071,7 +8078,7 @@
   "terminalBenchScience": null,
   "healthbench": null,
   "healthbenchProfessional": null,
-  "hleDiamond": null,
+  "hleDiamond": 0.057,
   "critptAgenticHard": null,
   "scicode": 0.420138888888889,
   "lcr": 0.6,
@@ -8130,8 +8137,6 @@
   "timescaleData": {},
   "performanceByPromptType": {},
   "intelligenceIndexIsEstimated": false,
-  "omniscienceAccuracy": 0.1305,
-  "omniscienceHallucinationRate": 0.2259919493962047,
   "gdpvalNormalized": 0.15418,
   "omniscienceNonHallucination": 0.7740080506037953,
   "itbenchSre": null,
@@ -8140,8 +8145,6 @@
    "intelligenceIndexIsEstimated",
    "itbenchSre",
    "medianReasoningTimeSeconds",
-   "omniscienceAccuracy",
-   "omniscienceHallucinationRate",
    "omniscienceNonHallucination",
    "performanceByPromptType",
    "reasoningTokens",
@@ -28019,7 +28022,7 @@
    "type": "firstParty",
    "providerName": "DeepSeek"
   },
-  "hostModelCount": 2,
+  "hostModelCount": 4,
   "creator": {
    "id": "58b835bf-4c87-4f87-a846-df4b692c6e7d",
    "slug": "deepseek",
@@ -74667,7 +74670,7 @@
    "type": "firstParty",
    "providerName": "DeepSeek"
   },
-  "hostModelCount": 24,
+  "hostModelCount": 26,
   "creator": {
    "id": "58b835bf-4c87-4f87-a846-df4b692c6e7d",
    "slug": "deepseek",
