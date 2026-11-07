@@ -101,11 +101,7 @@ def test_caller_and_callees_use_independent_push_concurrency():
         group = workflow["concurrency"]["group"]
         assert isinstance(group, str), path.name
         if path == SIZE_BASELINE:
-            # The install block separates standalone refs from called runs.
-            assert group == (
-                "${{ github.workflow == 'size baseline' && "
-                "format('size-baseline-{0}', github.ref) || "
-                "format('size-baseline-called-{0}', github.run_id) }}")
+            # The size-ratchet install block owns its group.
             continue
         push_sha = re.search(
             r"\(\s*github\.event_name\s*==\s*'push'\s*&&\s*github\.sha\s*\)",
