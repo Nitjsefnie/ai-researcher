@@ -27,9 +27,10 @@ _PIN = re.compile(
 
 # The template contract the pinned gate enforces, mirrored for the pin below.
 # Upstream pr-gate's template_rules (scripts/ci/pr_body.py at
-# 441f855e54f4f6c98709152f2d2542031dc82f03) refuses a consumer template in
-# which any `##` section lacks a Required/Conditional/Optional-tagged
-# instruction comment between its heading and the next: every pull-request
+# 3fa0727a2c56b031c5fa42100fd831134e440e87, v3.0.1) refuses a consumer
+# template in which any `##` section lacks a
+# Required/Conditional/Optional-tagged instruction comment between its
+# heading and the next: every pull-request
 # run of the gate then dies on the refusal (exit 1) instead of gating
 # anything. The two regexes are copied from that file so this test judges
 # the same shapes the gate does, and the workflow's SHA pin freezes the
@@ -302,9 +303,9 @@ def test_no_job_that_checks_out_the_tree_holds_conversation_write():
     # conversation-write token. The only writers are the coverage poster,
     # claim (issue #161; Nitjsefnie-Actions/claim#153 — a /claim on a pull
     # request 403s without the grant), pin-guard (issue #367 — comments
-    # through the API; no checkout) and pr-gate (issue #166 — comments on,
-    # closes and reopens pull requests through the API and reads the
-    # template at the base SHA; no checkout).
+    # through the API; no checkout) and pr-gate (issue #166 — comments on
+    # pull requests through the API and reads the template at the base
+    # SHA; no checkout).
     # Every job with an actions/checkout step is scanned, so a future job
     # cannot quietly grow the grant.
     allowed_writers = {

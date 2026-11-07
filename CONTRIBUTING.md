@@ -499,14 +499,19 @@ the disputed shape above.
 
 ## Commit subjects
 
-There is no enforced commit grammar here — the merged history is written in
-plain-English subjects. A subject written in conventional-commit shape
-(`type(scope): summary`) carries one rule, enforced on every pull request by
+Every commit a pull request adds follows
+[Conventional Commits 1.0.0](https://www.conventionalcommits.org/en/v1.0.0/):
+`type(scope)!: summary`, the scope and `!` optional, the type one of `build`,
+`chore`, `ci`, `docs`, `feat`, `fix`, `perf`, `refactor`, `revert`, `style`
+or `test`. The pr gate workflow refuses a human-authored pull request carrying
+any other subject (merge commits are not checked); older history predates
+the rule.
+One more rule is enforced on every pull request by
 `scripts/ci/commit_scopes.py`: a workflow's `name:` is allowed as a scope
 only with the `ci` type. The type disambiguates shared names: `ci(refresh)`
 changes the refresh workflow, while `fix(refresh)` would be a change no
-reader can place. A subject that does not parse is listed by the check and
-is never a failure.
+reader can place. A subject that check cannot parse is listed by it, and
+left to the pr gate.
 
 ## House style
 
