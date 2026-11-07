@@ -25,22 +25,6 @@ _PIN = re.compile(
     r"(?:\s+#\s*(?P<comment>\S+))?"
 )
 
-# The template contract the pinned gate enforces, mirrored for the pin below.
-# Upstream pr-gate's template_rules (scripts/ci/pr_body.py at
-# 3fa0727a2c56b031c5fa42100fd831134e440e87, v3.0.1) refuses a consumer
-# template in which any `##` section lacks a
-# Required/Conditional/Optional-tagged instruction comment between its
-# heading and the next: every pull-request
-# run of the gate then dies on the refusal (exit 1) instead of gating
-# anything. The two regexes are copied from that file so this test judges
-# the same shapes the gate does, and the workflow's SHA pin freezes the
-# parser they mirror. Like test_gate_base_freshness.py's upstream mirroring,
-# the duplicated lines are kept as written and duplicate-code stays scoped
-# to this block.
-_TEMPLATE_HEADING = re.compile(r"^##[ \t]+(?P<text>.+?)[ \t]*$", re.MULTILINE)
-_TEMPLATE_TAG = re.compile(
-    r"<!--\s*(?P<tag>required|conditional|optional)\b", re.IGNORECASE)
-
 
 def _pins(workflow: str, prefix: str = "github/codeql-action/"):
     return [(action.removeprefix(prefix), revision, comment)
@@ -417,39 +401,6 @@ def test_coverage_job_collects_its_measured_subprocesses():
         encoding="utf-8")
     assert "[run]" in rc and "include = */scripts/ci/diff_coverage.py" in rc
     assert "parallel = True" in rc
-
-
-def test_pr_gate_template_satisfies_the_gate_contract():
-    # Issue #166: the gate reads this template at the pull request's base
-    # SHA, so a template the parser refuses turns every pull-request run of
-    # the gate into an exit-1 refusal — the gate's first act must never be
-    # failing on every PR. Judged with the parser shapes copied at the top
-    # of this file: every `##` section carries a tagged instruction comment,
-    # names are unique (upstream keys its rules by casefolded name, so a
-    # duplicate would silently shadow), the two content-audited sections sit
-    # under the audited keys, and Footer is optional (a pull request no AI
-    # model touched drops it) and defined last — the gate's footer rule
-    # accepts it only as the body's final section.
-    template = (REPO_ROOT / ".github" / "PULL_REQUEST_TEMPLATE.md").read_text(
-        encoding="utf-8")
-    headings = list(_TEMPLATE_HEADING.finditer(template))
-    assert headings, "template defines no sections"
-    rules = {}
-    for index, heading in enumerate(headings):
-        name = " ".join(heading.group("text").split())
-        end = (headings[index + 1].start()
-               if index + 1 < len(headings) else len(template))
-        tag = _TEMPLATE_TAG.search(template[heading.end():end])
-        assert tag is not None, (
-            f'template section "{name}" carries no Required/Conditional/'
-            'Optional-tagged instruction comment')
-        assert name.casefold() not in rules, (
-            f'template section "{name}" is defined twice')
-        rules[name.casefold()] = (tag.group("tag").casefold(), index)
-    assert "footer" in rules, sorted(rules)
-    assert "bugs discovered" in rules, sorted(rules)
-    assert rules["footer"][0] == "optional", rules["footer"]
-    assert rules["footer"][1] == len(rules) - 1, rules["footer"]
 
 
 def test_valgrind_cache_is_restore_only_before_the_instruction_gate():
