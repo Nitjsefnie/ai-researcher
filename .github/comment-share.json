@@ -28,8 +28,8 @@
     1845
   ],
   ".github/workflows/pr-gate.yml": [
-    615,
-    1271
+    427,
+    1095
   ],
   ".github/workflows/ratchet-push.yml": [
     4432,
@@ -200,8 +200,8 @@
     18694
   ],
   "tests/test_ci_workflows.py": [
-    5267,
-    18044
+    4054,
+    15794
   ],
   "tests/test_diff_aa.py": [
     11086,
