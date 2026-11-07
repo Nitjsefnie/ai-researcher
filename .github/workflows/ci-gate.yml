@@ -36,7 +36,8 @@ name: ci gate
 # standalone schedule/dispatch runs. A later push's legs run in their
 # own groups and never cancel an earlier push's legs, at any
 # stage. The size callee separates called runs by run ID and standalone
-# runs by ref. Pull-request supersession still cancels the older run. A
+# runs by ref, push runs by SHA too. Pull-request supersession cancels
+# the older run. A
 # run-level cancel remains DELIBERATE: the aggregate carries
 # `if: always()` and aggregate_gate.py folds a cancelled result as a
 # failure, so a required-check ruleset reads it never-green.
@@ -173,8 +174,8 @@ jobs:
     needs: classify
     if: needs.classify.outputs.docs_only != 'true' && needs.classify.outputs.data_only != 'true'
     # Skipped on a docs-only or bot-data-only change like the other
-    # conditioned legs: neither class moves a measured file. The callee
-    # checks records in pull requests and verifies them on main pushes.
+    # conditioned legs: neither class moves a measured file. It checks
+    # records; its standalone run commits them on main.
     # The local reusable-workflow syntax GitHub documents; nothing else
     # resolves in-repo (suppressed at the line below).
     uses: ./.github/workflows/size-baseline.yml  # zizmor: ignore[self-repository]
