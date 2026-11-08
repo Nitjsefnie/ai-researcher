@@ -11,25 +11,25 @@
       "id": "moonshotai/Kimi-K3.1-Pro"
     },
     {
-      "id": "ccore/Qwen3.5-4B-3D-Coder"
+      "id": "Lightricks/LTX-2.5"
     },
     {
-      "id": "Lightricks/LTX-2.5"
+      "id": "ccore/Qwen3.5-4B-3D-Coder"
     },
     {
       "id": "ricursiveAI/Ripple-65B-Preview"
     },
     {
-      "id": "FusionCow/Sulphur-3"
+      "id": "Qwen/Qwen3.8-27B"
     },
     {
-      "id": "Qwen/Qwen3.8-27B"
+      "id": "FusionCow/Sulphur-3"
     },
     {
       "id": "DavidAU/Qwen3.8-27B-TURBO-Fable-Cold-Fusion-735-882-Heretic-Uncensored-NEO-CODER-MAX-MTP-GGUF"
     },
     {
-      "id": "burner22/numbat"
+      "id": "nvidia/NVIDIA-Nemotron-3.5-Transcribe-30B-A4B"
     }
   ]
 }
