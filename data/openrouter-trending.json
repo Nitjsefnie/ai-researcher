@@ -14,10 +14,10 @@
       "slug": "z-ai/glm-5.3-flash"
     },
     {
-      "slug": "stepfun/step-5-preview"
+      "slug": "openai/gpt-6-luna"
     },
     {
-      "slug": "openai/gpt-6-luna"
+      "slug": "stepfun/step-5-preview"
     },
     {
       "slug": "anthropic/claude-opus-5.5"
@@ -26,10 +26,10 @@
       "slug": "minimax/minimax-m3.1-flash"
     },
     {
-      "slug": "stealth/crouton-alpha"
+      "slug": "moonshotai/kimi-k3.1-pro"
     },
     {
-      "slug": "moonshotai/kimi-k3.1-pro"
+      "slug": "openai/gpt-6.1-sol"
     }
   ]
 }
