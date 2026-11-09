@@ -66842,7 +66842,7 @@
   "isReasoning": true,
   "isOpenWeights": false,
   "paramClass": null,
-  "priceClass": "medium",
+  "priceClass": "low",
   "modelCreatorName": "Sapiens AI",
   "modelCreatorColor": "#1521a9",
   "modelCreatorLogo": "/img/logos/sapiens.svg",
@@ -66869,58 +66869,58 @@
   },
   "intelligenceIndexCostPerTask": {
    "cost": {
-    "total": 2.460963323540187,
-    "input": 2.2108819596551337,
-    "nonCacheInput": 0.0022152471975,
-    "cacheRead": 0.42141260833343913,
-    "cacheWrite": 1.787254104124195,
-    "output": 0.2500813638850532,
-    "reasoning": 0.2065410890393745,
-    "answer": 0.043540274845678774
+    "total": 0.5746675567739363,
+    "input": 0.49130710214558526,
+    "nonCacheInput": 0.0004922771550000001,
+    "cacheRead": 0.09364724629631982,
+    "cacheWrite": 0.39716757869426556,
+    "output": 0.08336045462835108,
+    "reasoning": 0.06884702967979149,
+    "answer": 0.014513424948559592
    },
    "evaluations": [
     {
      "slug": "aa-briefcase",
-     "weightedCostPerTask": 0.8844676708590756
+     "weightedCostPerTask": 0.20076599976355525
     },
     {
      "slug": "automationbench-aa",
-     "weightedCostPerTask": 0.007715635071736179
+     "weightedCostPerTask": 0.0019519333644954064
     },
     {
      "slug": "terminalbench-4-0",
-     "weightedCostPerTask": 0.3372306246607552
+     "weightedCostPerTask": 0.07946960366198601
     },
     {
      "slug": "frontiercode-2-0",
-     "weightedCostPerTask": 0.433504538755629
+     "weightedCostPerTask": 0.10223326319569533
     },
     {
      "slug": "omniscience",
-     "weightedCostPerTask": 0.0003055667625
+     "weightedCostPerTask": 0.00010015227999999998
     },
     {
      "slug": "gdp-pdf",
-     "weightedCostPerTask": 0.0027901383750000004
+     "weightedCostPerTask": 0.00068897195
     },
     {
      "slug": "hle-diamond",
-     "weightedCostPerTask": 0.0050726846250000015
+     "weightedCostPerTask": 0.00168753378
     },
     {
      "slug": "critpt-v2-hard",
-     "weightedCostPerTask": 0.04446803927784649
+     "weightedCostPerTask": 0.013568843006188108
     },
     {
      "slug": "terminal-bench-science",
-     "weightedCostPerTask": 0.7454084251526446
+     "weightedCostPerTask": 0.17420125577201628
     }
    ]
   },
   "intelligenceIndexTimePerTask": 1331.9623907931514,
-  "price1mInputTokens": 0.45,
-  "price1mOutputTokens": 0.9,
-  "cacheHitPrice": 0.045,
+  "price1mInputTokens": 0.1,
+  "price1mOutputTokens": 0.3,
+  "cacheHitPrice": 0.01,
   "cacheWritePrice": null,
   "outputSpeed": 208.6156366089585,
   "timeToFirstToken": 2.3758980297833623,
@@ -66932,7 +66932,7 @@
   "releaseDate": "2026-11-07",
   "knowledgeCutoffDate": null,
   "release": {
-   "slug": "agnes-3-0-pro",
+   "slug": "agnes-2-5-pro-theta",
    "name": "Agnes 2.5 Pro Theta",
    "deprecatedTo": null
   },
@@ -66987,20 +66987,20 @@
   "automationBenchPartialScore": 0.48822600284971035,
   "cacheHitDiscountPercent": 0.9,
   "pricePer1k1mpImages": null,
-  "price1mBlended0To3To1": 0.5625,
-  "price1mBlended7To2To1": 0.21150000000000002,
-  "price1mBlended0To1To1": 0.675,
-  "price1mBlended100To1To1": 0.05735294117647059,
-  "price1mBlended0To100To1": 0.4544554455445544,
+  "price1mBlended0To3To1": 0.15000000000000002,
+  "price1mBlended7To2To1": 0.05700000000000001,
+  "price1mBlended0To1To1": 0.2,
+  "price1mBlended100To1To1": 0.013725490196078433,
+  "price1mBlended0To100To1": 0.10198019801980199,
   "intelligenceIndexCost": {
-   "total": 1670.0796439105443,
-   "input": 1438.6839883105442,
-   "nonCacheInput": 4.94842905,
-   "cacheRead": 271.4824171210507,
-   "cacheWrite": 1162.2531421394935,
-   "output": 231.3956556,
-   "reasoning": 198.0856503,
-   "answer": 33.3100053
+   "total": 396.8394381578987,
+   "input": 319.7075529578987,
+   "nonCacheInput": 1.0996509,
+   "cacheRead": 60.32942602690016,
+   "cacheWrite": 258.27847603099855,
+   "output": 77.1318852,
+   "reasoning": 66.0285501,
+   "answer": 11.103335099999999
   },
   "canonicalIntelligenceIndexTokenCount": {
    "input": 8626723872,
@@ -67018,63 +67018,63 @@
     "slug": "aa-briefcase",
     "score": 1495.96,
     "outputTokensPerTask": 281175.23076923075,
-    "costPerTask": 5.896451139060505,
+    "costPerTask": 1.3384399984237019,
     "timePerTask": 1347.8147436104334
    },
    {
     "slug": "automationbench-aa",
     "score": 0.48822600284971035,
     "outputTokensPerTask": 47469.558599695585,
-    "costPerTask": 0.15431270143472356,
+    "costPerTask": 0.039038667289908124,
     "timePerTask": 227.5455443863747
    },
    {
     "slug": "terminalbench-4-0",
     "score": 0.101010101010101,
     "outputTokensPerTask": 452946.48484848486,
-    "costPerTask": 3.372306246607552,
+    "costPerTask": 0.7946960366198601,
     "timePerTask": 2171.201028892741
    },
    {
     "slug": "frontiercode-2-0",
     "score": 0.16554898989899,
     "outputTokensPerTask": 393261.4166666667,
-    "costPerTask": 2.89003025837086,
+    "costPerTask": 0.6815550879713023,
     "timePerTask": 1885.1003839363161
    },
    {
     "slug": "omniscience",
     "score": -11.233333333333333,
     "outputTokensPerTask": 2149.9036666666666,
-    "costPerTask": 0.0020371117500000003,
+    "costPerTask": 0.0006676818666666665,
     "timePerTask": 10.305572974362287
    },
    {
     "slug": "gdp-pdf",
     "score": 0.142,
     "outputTokensPerTask": 13788.24,
-    "costPerTask": 0.0558027675,
+    "costPerTask": 0.013779439000000001,
     "timePerTask": 66.09399095929464
    },
    {
     "slug": "hle-diamond",
     "score": 0.168,
     "outputTokensPerTask": 56027.053,
-    "costPerTask": 0.05072684625000001,
+    "costPerTask": 0.0168753378,
     "timePerTask": 268.56593259603267
    },
    {
     "slug": "critpt-v2-hard",
     "score": 0.26,
     "outputTokensPerTask": 368705.65,
-    "costPerTask": 0.44468039277846494,
+    "costPerTask": 0.13568843006188108,
     "timePerTask": 1767.3922050777223
    },
    {
     "slug": "terminal-bench-science",
     "score": 0.0380952380952381,
     "outputTokensPerTask": 570329.2714285714,
-    "costPerTask": 4.96938950101763,
+    "costPerTask": 1.1613417051467751,
     "timePerTask": 2733.8759486070085
    }
   ],
@@ -67096,7 +67096,7 @@
     "upper95ci": 1399.63
    }
   },
-  "briefcaseTotalCost": 536.5770536545059,
+  "briefcaseTotalCost": 121.79803985655685,
   "headline": {
    "outputSpeed": 208.6156366089585,
    "timeToFirstToken": 2.3758980297833623,
@@ -67140,7 +67140,7 @@
   "outputModalityImage": false,
   "outputModalitySpeech": false,
   "outputModalityVideo": false,
-  "gdpvalCostPerTask": 1.793164074093901
+  "gdpvalCostPerTask": 0.41393287626329106
  },
  {
   "slug": "deepseek-v4-pro-non-reasoning",
