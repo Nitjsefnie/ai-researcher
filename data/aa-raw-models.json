@@ -67140,19 +67140,7 @@
   "outputModalityImage": false,
   "outputModalitySpeech": false,
   "outputModalityVideo": false,
-  "gdpvalCostPerTask": 1.793164074093901,
-  "genVariants": [
-   {},
-   {
-    "ii": 24.029012523359,
-    "cost": 2.460963323540187,
-    "gdpval": 1507,
-    "gdpvalCost": 1.793164074093901,
-    "ctx": 1000000,
-    "pin": 0.45,
-    "pout": 0.9
-   }
-  ]
+  "gdpvalCostPerTask": 1.793164074093901
  },
  {
   "slug": "deepseek-v4-pro-non-reasoning",
