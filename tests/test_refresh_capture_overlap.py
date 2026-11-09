@@ -1,6 +1,7 @@
 """Exercise the refresh capture across its two workflow steps."""
 import os
 from pathlib import Path
+import shutil
 import signal
 import subprocess
 import sys
@@ -310,11 +311,15 @@ def test_collection_fails_loudly_without_start_record(tmp_path, pid_record):
 
 
 def test_toolchain_install_passes_pure_python_setting_to_child(tmp_path):
+    # The real retry wrapper runs; only the pip child it starts is the stub.
+    for relative in ('scripts/ci/download.py', 'scripts/fetch_http.py'):
+        (tmp_path / relative).parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(WORKFLOW.parents[2] / relative, tmp_path / relative)
     bin_dir = tmp_path / 'bin'
     bin_dir.mkdir()
     python = bin_dir / 'python3'
-    python.write_text('#!/bin/sh\nprintf "%s\\n" "$PYYAML_FORCE_LIBYAML" "$@"\n',
-                      encoding='utf-8')
+    python.write_text(f'#!/bin/sh\n[ "$1" = scripts/ci/download.py ] && exec \'{sys.executable}\' "$@"\n'
+                      'printf "%s\\n" "$PYYAML_FORCE_LIBYAML" "$@"\n', encoding='utf-8')
     python.chmod(0o755)
     env = {'PATH': str(bin_dir) + os.pathsep + os.environ['PATH']}
     done = _run(tmp_path, 'Install the test toolchain', env)

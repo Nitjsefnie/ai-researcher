@@ -28,11 +28,11 @@ by accident.
 
 The set of such files is DERIVED from the workflows' text, not kept here:
 a hand-kept list goes stale exactly the way this check exists to prevent. The
-one hand-kept addition is SCRIPT_READ_DIRECTORIES, what gate scripts read from
+one hand-kept addition is SCRIPT_READS, what gate scripts read from
 inside, which no run text shows. The pin test fails when data/ or out/ holds
 no tracked file; a gate script reading a new, unlisted directory goes unseen.
 
-The hand-held entries are REQUIRED_JOBS and SCRIPT_READ_DIRECTORIES. Upstream
+The hand-held entries are REQUIRED_JOBS and SCRIPT_READS. Upstream
 (Nitjsefnie-Actions/pr-gate) derives nothing either: the ruleset that makes a
 status context required lives in repository settings, which are not in the
 repository. Here there is no ruleset, so REQUIRED_JOBS holds the de facto
@@ -42,7 +42,7 @@ job renamed out of every workflow would otherwise shrink the set in silence,
 and a narrower set reports green over a wider gate.
 
 WHAT IT CANNOT SEE. The derivation reads text, so a file a gate reads that no
-`run:` block names, and no SCRIPT_READ_DIRECTORIES entry holds, is outside it.
+`run:` block names, and no SCRIPT_READS entry holds, is outside it.
 Named here rather than left for a reader to infer, because each of these makes
 the gate NARROWER and a narrower gate looks the same as a correct one:
 
@@ -65,7 +65,7 @@ the gate NARROWER and a narrower gate looks the same as a correct one:
     `plain_continuation_end`), and the wrapped shapes in this repository
     carry no paths.
   - A directory a gate reads but no `run:` names with a `/` (a bare word is
-    English as often as a directory) and SCRIPT_READ_DIRECTORIES does not list.
+    English as often as a directory) and SCRIPT_READS does not list.
 
 Runs on the standard library alone. The workflows are read with a parser for
 the block layout this repository uses rather than a YAML dependency, for the
@@ -99,8 +99,8 @@ from pathlib import Path
 REQUIRED_JOBS = ("actionlint", "aggregate", "analyze", "classify", "coverage",
                  "lint", "page", "pip-audit", "pyright", "suites")
 
-# Directories the `page` and `suites` scripts read from inside; no `run:` names them.
-SCRIPT_READ_DIRECTORIES = ("data/", "out/")
+# Paths gate scripts read from inside that no `run:` names: the `page` and `suites` data, and download.py's import.
+SCRIPT_READS = ("data/", "out/", "scripts/fetch_http.py")
 
 # The branch a gate's head is compared against. Not configurable: a second
 # branch here would be a second base, and this question has one.
@@ -511,7 +511,7 @@ def gate_paths(root):
             "the merge-gate jobs name no file in this tree, so there is nothing "
             "to compare and this run can vouch for nothing")
     # After that refusal, so the list never stands in for workflows naming none.
-    derived.update(f for d in SCRIPT_READ_DIRECTORIES for f in resolve(d, files))
+    derived.update(f for d in SCRIPT_READS for f in resolve(d, files))
     return sorted(derived)
 
 

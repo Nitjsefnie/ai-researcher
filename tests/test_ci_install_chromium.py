@@ -15,6 +15,7 @@ of local files or a stubbed download_archive.
 from __future__ import annotations
 
 import hashlib
+import io
 import importlib.machinery
 import json
 import os
@@ -318,34 +319,32 @@ def test_browsers_root_defaults_home(monkeypatch):
 
 # --- download -----------------------------------------------------------
 
-def test_download_archive_streams_and_hashes(tmp_path):
-    payload = b"x" * (3 * install_chromium.CHUNK + 1234)
-    source = tmp_path / "payload.bin"
-    source.write_bytes(payload)
+def test_download_archive_streams_and_hashes(tmp_path, monkeypatch, capsys):
+    payload, timeouts = b"x" * (25 * 1024 * 1024 + 1234), []  # 25 MiB is 26.2 MB
+    monkeypatch.setattr(install_chromium.download.urllib.request, "urlopen", lambda url, timeout: timeouts.append(timeout) or io.BytesIO(payload))
     digest, size = install_chromium.download_archive(
-        [source.as_uri()], tmp_path / "out.bin", "chromium")
-    assert digest == hashlib.sha256(payload).hexdigest()
-    assert size == len(payload)
+        ["https://cdn.test/a.zip"], tmp_path / "out.bin", "chromium")
+    assert (digest, size) == (hashlib.sha256(payload).hexdigest(), len(payload))
     assert (tmp_path / "out.bin").read_bytes() == payload
+    assert (capsys.readouterr().out, timeouts) == ("chromium: 25 MiB\n", [20])
 
 
-def test_download_archive_falls_back_to_the_next_mirror(tmp_path):
+def test_download_archive_retries_each_mirror_before_the_next(tmp_path, monkeypatch):
+    sleeps = []  # download.py's backoff, on a clock only those sleeps advance
+    monkeypatch.setattr(install_chromium.download.time, "sleep", sleeps.append)
+    monkeypatch.setattr(install_chromium.download.time, "monotonic", lambda: sum(sleeps))
     good = tmp_path / "good.bin"
     good.write_bytes(b"verified bytes")
-    digest, size = install_chromium.download_archive(
-        [(tmp_path / "absent.bin").as_uri(), good.as_uri()],
-        tmp_path / "out.bin", "ffmpeg")
-    assert digest == _sha256(good)
-    assert size == len(b"verified bytes")
-
-
-def test_download_archive_all_mirrors_fail(tmp_path):
+    absent = [(tmp_path / f"absent-{name}.bin").as_uri() for name in "ab"]
+    assert install_chromium.download_archive(
+        ["not a url", absent[0], good.as_uri()], tmp_path / "out.bin", "ffmpeg") \
+        == (_sha256(good), len(b"verified bytes"))
+    assert sleeps == [5, 10, 20, 40, 60, 60, 60]
     with pytest.raises(install_chromium.InstallError, match="every "
                                                             "download"):
-        install_chromium.download_archive(
-            [(tmp_path / "absent-a.bin").as_uri(),
-             (tmp_path / "absent-b.bin").as_uri()],
-            tmp_path / "out.bin", "chromium")
+        install_chromium.download_archive(absent, tmp_path / "out.bin",
+                                          "chromium")
+    assert sleeps == [5, 10, 20, 40, 60, 60, 60] * 3
 
 
 # --- extraction ---------------------------------------------------------
@@ -858,7 +857,7 @@ def test_configure_apt_acquire_writes_only_verified_options(tmp_path, fake_sudo)
         settings[match[1]] = int(match[2])
     assert settings == {"Acquire::http::Timeout": 20,
                         "Acquire::https::Timeout": 20,
-                        "Acquire::Retries": 2}
+                        "Acquire::Retries": 5}
 
 
 def test_configure_apt_acquire_defaults_use_system_fragments_and_sudo(

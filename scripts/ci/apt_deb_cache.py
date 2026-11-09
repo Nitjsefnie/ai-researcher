@@ -72,9 +72,10 @@ def configure_apt_acquire(
         sudo: tuple[str, ...] = ("sudo", "-n")) -> None:
     """Best-effort apt acquire limits."""
     # apt.conf(5): Retries; apt-transport-http(1), apt-transport-https(1): Timeout.
+    # apt retries a 429, 500/502/503/504 or timeout after 1+2+4+8+16 s (issue #395).
     settings = ('Acquire::http::Timeout "20";\n'
                 'Acquire::https::Timeout "20";\n'
-                'Acquire::Retries "2";\n')
+                'Acquire::Retries "5";\n')
     target = fragment_dir / "99ai-researcher-playwright-acquire"
     # apt.conf(5) ignores .disabled fragments until the atomic rename succeeds.
     staged = target.with_suffix(".disabled")

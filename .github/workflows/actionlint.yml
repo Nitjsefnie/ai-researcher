@@ -154,12 +154,14 @@ jobs:
       - name: Install actionlint
         # Downloaded and checksum-verified rather than piped from the install
         # script: `curl | bash` would make this job trust whatever that URL
-        # serves at run time. Explicit timeouts so a hung connection fails the
-        # step in two minutes instead of holding a runner for six hours.
+        # serves at run time. scripts/ci/download.py retries transient
+        # failures inside a bounded window (issue #395).
+        env:
+          AI_RESEARCHER_DOWNLOAD_TOKEN: ${{ github.token }}
         run: |
           tarball="actionlint_${AI_RESEARCHER_ACTIONLINT_VERSION}_linux_amd64.tar.gz"
-          curl -fsSL --retry 3 --connect-timeout 10 --max-time 120 -o "$tarball" \
-            "https://github.com/${AI_RESEARCHER_ACTIONLINT_REPO}/releases/download/v${AI_RESEARCHER_ACTIONLINT_VERSION}/${tarball}"
+          python3 scripts/ci/download.py \
+            "https://github.com/${AI_RESEARCHER_ACTIONLINT_REPO}/releases/download/v${AI_RESEARCHER_ACTIONLINT_VERSION}/${tarball}" "$tarball"
           echo "${AI_RESEARCHER_ACTIONLINT_SHA256}  ${tarball}" | sha256sum -c -
           tar -xzf "$tarball" actionlint
           ./actionlint --version
@@ -174,7 +176,7 @@ jobs:
         # here: the unreviewed pip upgrade is an unaudited component — the
         # very thing the audit gate judges — and the runner's stock pip
         # installs the pinned manifest.
-        run: python3 -m pip install --require-hashes -r requirements-zizmor.txt
+        run: python3 scripts/ci/download.py --run python3 -m pip install --require-hashes -r requirements-zizmor.txt
 
       - name: actionlint
         id: actionlint

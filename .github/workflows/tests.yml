@@ -127,7 +127,7 @@ jobs:
         # runner's stock pip installs the pinned manifest, so the unreviewed
         # upgrade would be the one unpinned install in the job (issue #141).
         run: |
-          python -m pip install -r requirements-test.txt
+          python scripts/ci/download.py --run python -m pip install -r requirements-test.txt
 
       - name: Run tests
         # --ignore=tests/test_browser.py: the browser suite stays OUT of the
@@ -192,7 +192,7 @@ jobs:
         # runner's stock pip installs the pinned manifest, so the unreviewed
         # upgrade would be the one unpinned install in the job (issue #141).
         run: |
-          python3 -m pip install -r requirements-test.txt
+          python3 scripts/ci/download.py --run python3 -m pip install -r requirements-test.txt
 
       # PR coverage restores main's debs; it never saves PR-authored caches.
       - name: Cache Chromium dependency debs
@@ -539,7 +539,7 @@ jobs:
         # diff_coverage.py borrows coverage.py's statement analyzer — the
         # same pinned copy requirements-test.txt gave the measuring run, so
         # the two can never disagree about which lines are executable.
-        run: python3 -m pip install --requirement requirements-test.txt
+        run: python3 scripts/ci/download.py --run python3 -m pip install --requirement requirements-test.txt
 
       - name: Measure the coverage of this change
         # HEAD is the merge tree checked out above and HEAD^1 is, by
