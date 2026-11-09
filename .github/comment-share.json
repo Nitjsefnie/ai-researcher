@@ -4,8 +4,8 @@
     2181
   ],
   ".github/workflows/actionlint.yml": [
-    5707,
-    7557
+    5693,
+    7703
   ],
   ".github/workflows/audit.yml": [
     4193,
@@ -96,12 +96,12 @@
     11949
   ],
   "scripts/ci/gate_base_freshness.py": [
-    13608,
-    24258
+    13589,
+    24241
   ],
   "scripts/ci/install_chromium.py": [
-    7759,
-    21927
+    7475,
+    21215
   ],
   "scripts/ci/instruction_budgets.py": [
     6219,
