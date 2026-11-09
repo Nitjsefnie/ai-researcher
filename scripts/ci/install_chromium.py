@@ -44,38 +44,30 @@ import stat
 import subprocess
 import sys
 import tempfile
-import urllib.error
-import urllib.request
 import zipfile
 from dataclasses import dataclass
 from importlib import metadata
 from pathlib import Path
 
 if __package__:
-    from . import apt_deb_cache
+    from . import apt_deb_cache, download
 else:
     apt_deb_cache = importlib.import_module("apt_deb_cache")
+    download = importlib.import_module("download")
 
 # cdn.playwright.dev is the registry's primary host. The CFT (Chrome for
 # Testing) paths 307-redirect to Google's chrome-for-testing-public bucket;
 # the digest pins the bytes, so the redirect target is verified like any
 # other source. ffmpeg additionally lists the Microsoft prss host as its
 # fallback mirror in playwright's own registry; mirrors are tried in order
-# on transport failure, and EVERY mirror's bytes are digest-checked.
+# once the shared retry budget gives up, and EVERY mirror's bytes are
+# digest-checked.
 CDN = "https://cdn.playwright.dev"
 PRSS = "https://playwright.download.prss.microsoft.com"
 
-# Socket-level timeout for the download: 60 s without a successful block
-# fails the attempt rather than hanging the job. Mirrors are still tried
-# before the whole product fails.
-DOWNLOAD_TIMEOUT = 60  # seconds
-
-# One read wants to be small enough to hash incrementally but large enough
-# to keep a 200 MiB transfer from spending its time in syscalls; progress
-# prints are throttled to one line per PROGRESS_INTERVAL so a CI log stays
-# readable.
-CHUNK = 1024 * 1024
-PROGRESS_INTERVAL = 25 * 1024 * 1024
+# Socket-level timeout: 20 s without progress fails one attempt, and
+# download.py retries it inside its window before the next mirror.
+DOWNLOAD_TIMEOUT = 20  # seconds
 
 # Playwright's completion marker, written by its installer and consulted
 # (by filename only) before any download. Seeding writes it ourselves.
@@ -332,36 +324,20 @@ def download_archive(urls: list, destination: Path, label: str,
                      timeout: int = DOWNLOAD_TIMEOUT) -> tuple:
     """Download the first mirror that answers, streaming to destination.
 
-    Returns (sha256 hex digest, bytes downloaded). Mirrors are tried in
-    order and only on transport failure (URLError/HTTPError, socket
-    timeouts (OSError), malformed or unopenable URLs (ValueError)); the
-    digest check downstream is what decides trust, so a mirror fallback is
-    never a trust decision.
+    Returns (sha256 hex digest, bytes downloaded). Each mirror gets
+    download.py's retry budget before the next is tried; the digest check
+    downstream is what decides trust, so a mirror fallback is never a trust
+    decision.
     """
     last_error = None
     for url in urls:
         try:
-            with urllib.request.urlopen(url, timeout=timeout) as response, \
-                    open(destination, "wb") as out:
-                digest = hashlib.sha256()
-                downloaded = 0
-                next_progress = PROGRESS_INTERVAL
-                while True:
-                    chunk = response.read(CHUNK)
-                    if not chunk:
-                        break
-                    digest.update(chunk)
-                    out.write(chunk)
-                    downloaded += len(chunk)
-                    if downloaded >= next_progress:
-                        print(f"{label}: {downloaded // (1024 * 1024)} MiB",
-                              flush=True)
-                        next_progress += PROGRESS_INTERVAL
-                return digest.hexdigest(), downloaded
-        except (urllib.error.URLError, OSError, ValueError) as error:
+            return download.download_to(url, destination, timeout,
+                                        label=label)
+        except download.DownloadError as error:
             last_error = error
-            print(f"{label}: {url} failed ({error}); trying the next mirror"
-                  if len(urls) > 1 else f"{label}: {url} failed ({error})",
+            print(f"{label}: {error}; trying the next mirror"
+                  if len(urls) > 1 else f"{label}: {error}",
                   file=sys.stderr, flush=True)
     raise InstallError(
         f"{label}: every download mirror failed; last error: {last_error}")

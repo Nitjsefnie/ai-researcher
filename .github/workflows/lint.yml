@@ -51,7 +51,7 @@ jobs:
         # runner's stock pip installs the pinned manifest, so the unreviewed
         # upgrade would be the one unpinned install in the job (issue #141).
         run: |
-          python3 -m pip install -r requirements-dev.txt
+          python3 scripts/ci/download.py --run python3 -m pip install -r requirements-dev.txt
 
       - name: pylint
         run: git ls-files '*.py' | xargs python3 -m pylint

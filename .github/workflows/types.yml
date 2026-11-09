@@ -51,7 +51,7 @@ jobs:
           # tests/test_browser.py and reports it as an error. The runtime is
           # stdlib, so these two files ARE the whole set of third-party names
           # pyright needs to know about.
-          python3 -m pip install -r requirements-dev.txt -r requirements-test.txt
+          python3 scripts/ci/download.py --run python3 -m pip install -r requirements-dev.txt -r requirements-test.txt
 
       - name: pyright
         run: python3 -m pyright

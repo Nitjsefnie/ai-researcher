@@ -191,7 +191,7 @@ jobs:
         # runner's stock pip installs the pinned manifest, so the unreviewed
         # upgrade would be the one unpinned install in the job (issue #141).
         run: |
-          python3 -m pip install -r requirements-test.txt
+          python3 scripts/ci/download.py --run python3 -m pip install -r requirements-test.txt
 
       # Restore the newest snapshot; save by the install's resolved environment below.
       - name: Cache Chromium dependency debs

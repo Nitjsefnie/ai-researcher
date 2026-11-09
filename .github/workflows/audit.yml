@@ -93,7 +93,7 @@ jobs:
         # unreviewed pip upgrade is an unaudited component — the very thing
         # this gate judges — and the runner's stock pip installs the pinned
         # manifest.
-        run: python3 -m pip install -r requirements-pip-audit.txt
+        run: python3 scripts/ci/download.py --run python3 -m pip install -r requirements-pip-audit.txt
 
       - name: Audit dependencies
         # Each requirements file gets its OWN pip-audit invocation, so every

@@ -137,7 +137,7 @@ def test_required_jobs_name_the_merge_gate_contexts(tmp_path):
         assert name in jobs, f'{path} must define the merge-gate job {name!r}'
 
 
-# Directories a gate job names with a `/` or SCRIPT_READ_DIRECTORIES lists (#378);
+# Directories a gate job names with a `/` or SCRIPT_READS lists (#378);
 # each expands to every tracked file beneath it, so a new file there needs no pin edit (#376).
 GATE_DIRECTORIES = ('.github/workflows', 'data', 'out', 'tests')
 
@@ -153,6 +153,7 @@ CORE_PIN = (
     'scripts/ci/check_ratchets.py',
     'scripts/ci/classify_changes.py',
     'scripts/ci/commit_scopes.py',
+    'scripts/ci/download.py',
     'scripts/ci/gate_base_freshness.py',
     'scripts/ci/install_chromium.py',
     'scripts/ci/install_valgrind.py',
@@ -160,14 +161,13 @@ CORE_PIN = (
     'scripts/ci/js_coverage.py',
     'scripts/ci/ratchet.py',
     'scripts/ci/thresholds.py',
+    'scripts/fetch_http.py',
 )
 
 
 def test_gate_paths_on_this_repository():
-    done = subprocess.run(
-        [sys.executable, str(ROOT / 'scripts/ci/gate_base_freshness.py'),
-         '--print-paths'], cwd=str(ROOT), check=True, capture_output=True,
-        text=True)
+    done = subprocess.run([sys.executable, str(ROOT / 'scripts/ci/gate_base_freshness.py'), '--print-paths'],
+                          cwd=str(ROOT), check=True, capture_output=True, text=True)
     # Listed by git, not by the module, so the expectation is independent of it.
     under = _git(ROOT, 'ls-tree', '-r', '--name-only', '--full-tree', 'HEAD',
                  '--', *GATE_DIRECTORIES).splitlines()
