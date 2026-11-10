@@ -1644,13 +1644,14 @@
   "intelligenceIndex": null,
   "omniscience": null,
   "scores": {
-   "aa-briefcase": 1012.16,
+   "aa-briefcase": 1012.15,
    "automationbench-aa": 0.28197929106327146,
    "terminal-bench-science": 0.00476190476190476,
+   "frontiercode-2-0": 0.0693335858585859,
    "hle-diamond": 0.116,
    "gdp-pdf": 0.112,
    "terminalbench-4-0": 0,
-   "gdpval-aa-normalized": 1195.61,
+   "gdpval-aa-normalized": 1195.2,
    "mmmu-pro": 0.791907514450867,
    "humanitys-last-exam": 0.340593141797961,
    "artificial-analysis-long-context-reasoning": 0.793333333333333,
@@ -1695,10 +1696,10 @@
    "economics": 35.4778016295953
   },
   "gdpPdfAllPass": 0.112,
-  "gdpval": 1195.61,
+  "gdpval": 1195.2,
   "gdpvalInterval": {
-   "lower": 1176.1,
-   "upper": 1215.13
+   "lower": 1176.11,
+   "upper": 1214.3
   },
   "itBenchSre": null,
   "tau2": null,
@@ -1707,7 +1708,7 @@
   "terminalBench21": 0.696629213483146,
   "terminalBench40": 0,
   "frontierCode": null,
-  "frontierCode20": null,
+  "frontierCode20": 0.0693335858585859,
   "terminalBenchScience": 0.00476190476190476,
   "healthbench": null,
   "vialsScore": null,
@@ -1736,20 +1737,20 @@
   "intelligenceIndexEvaluations": [],
   "briefcaseBreakdown": {
    "overall": {
-    "elo": 1012.16,
-    "lower95ci": 1002.47,
-    "upper95ci": 1021.13
+    "elo": 1012.15,
+    "lower95ci": 1002.5,
+    "upper95ci": 1021.29
    },
    "rubricPassRate": 0.2937563971340839,
    "analyticalQuality": {
-    "elo": 1058.05,
-    "lower95ci": 1040.66,
-    "upper95ci": 1074.35
+    "elo": 1057.84,
+    "lower95ci": 1041.39,
+    "upper95ci": 1073.58
    },
    "presentation": {
-    "elo": 922.38,
-    "lower95ci": 904.66,
-    "upper95ci": 938.75
+    "elo": 923.12,
+    "lower95ci": 906.14,
+    "upper95ci": 939.02
    }
   },
   "briefcaseTotalCost": 94.45961472833999,
@@ -28121,7 +28122,7 @@
    "type": "firstParty",
    "providerName": "Anthropic"
   },
-  "hostModelCount": 1,
+  "hostModelCount": 6,
   "creator": {
    "id": "f0aa413f-e8ae-4fcd-9c48-0e049f4f3128",
    "slug": "anthropic",
