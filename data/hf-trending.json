@@ -2,10 +2,10 @@
   "source": "https://huggingface.co/api/models?sort=trendingScore&limit=10",
   "models": [
     {
-      "id": "speridlabs/idol"
+      "id": "xtools-at/DeepSeek-V4-Pro-Qwen3.5-9B-UNCENSORED-heretic"
     },
     {
-      "id": "xtools-at/DeepSeek-V4-Pro-Qwen3.5-9B-UNCENSORED-heretic"
+      "id": "speridlabs/idol"
     },
     {
       "id": "moonshotai/Kimi-K3.1-Pro"
@@ -20,10 +20,10 @@
       "id": "NousResearch/Arete-27B"
     },
     {
-      "id": "DavidAU/Qwen3.8-27B-TURBO-Fable-Cold-Fusion-735-882-Heretic-Uncensored-NEO-CODER-MAX-MTP-GGUF"
+      "id": "MiniMaxAI/MiniMax-H3-Image"
     },
     {
-      "id": "MiniMaxAI/MiniMax-H3-Image"
+      "id": "DavidAU/Qwen3.8-27B-TURBO-Fable-Cold-Fusion-735-882-Heretic-Uncensored-NEO-CODER-MAX-MTP-GGUF"
     },
     {
       "id": "ccore/Qwen3.5-4B-3D-Coder"
