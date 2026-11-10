@@ -33807,7 +33807,7 @@
    "type": "firstParty",
    "providerName": "Kimi"
   },
-  "hostModelCount": 20,
+  "hostModelCount": 21,
   "creator": {
    "id": "0a177021-87dd-4250-9a37-f01df196bfe0",
    "slug": "kimi",
@@ -46583,6 +46583,7 @@
    "terminalbench-4-0": 0.651515151515151,
    "critpt-v2-hard": 0.69,
    "gdpval-aa-normalized": 1732.68,
+   "mlcr-aa": 0.194444444444444,
    "vials-aa": 0.639751552795031,
    "mka": 0.5434311169966699,
    "artificial-analysis-long-context-reasoning": 0.793333333333333
@@ -46673,11 +46674,13 @@
    "financeAndAccounting": 62.6175864077739,
    "strategyAndOps": 60.939553162606,
    "legal": 61.9585486390271,
+   "healthcareAndMedical": 56.7891285502872,
    "engineering": 65.3103995670996,
    "economics": 59.6066
   },
   "omniscienceAccuracy": 0.5826666666666667,
   "omniscienceHallucinationRate": 0.11421725239616613,
+  "mlcrOverall": 0.194444444444444,
   "gdpPdfAllPass": 0.284,
   "gdpval": 1732.68,
   "gdpvalInterval": {
@@ -93394,14 +93397,14 @@
   "automationBenchPartialScore": 0.4780780681445035,
   "price1mInputTokens": 0.3,
   "price1mOutputTokens": 1.2,
-  "cacheHitPrice": 0.0105,
-  "cacheHitDiscountPercent": 0.9762643678160919,
+  "cacheHitPrice": 0.006500000000000001,
+  "cacheHitDiscountPercent": 0.9782638888888888,
   "cacheWritePrice": null,
   "pricePer1k1mpImages": 0.1531,
   "price1mBlended0To3To1": 0.5249999999999999,
-  "price1mBlended7To2To1": 0.18735,
+  "price1mBlended7To2To1": 0.18455,
   "price1mBlended0To1To1": 0.75,
-  "price1mBlended100To1To1": 0.024999999999999998,
+  "price1mBlended100To1To1": 0.021078431372549018,
   "price1mBlended0To100To1": 0.3089108910891089,
   "intelligenceIndexEvaluations": [],
   "openness": {
@@ -93429,7 +93432,7 @@
     "upper95ci": 1249.56
    }
   },
-  "briefcaseTotalCost": 18.439078439046185,
+  "briefcaseTotalCost": 16.66683523820399,
   "headline": {
    "outputSpeed": 205.91863655300102,
    "timeToFirstToken": 0.953750795175007,
@@ -93474,7 +93477,7 @@
   "outputModalitySpeech": false,
   "outputModalityVideo": false,
   "modelCreatorName": "DeepSeek",
-  "gdpvalCostPerTask": 0.16256816780207203,
+  "gdpvalCostPerTask": 0.14886827558140667,
   "reasoningTokens": 0,
   "timescaleData": {
    "medianOutputSpeed": 246.537297672604,
