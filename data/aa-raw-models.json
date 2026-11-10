@@ -48879,16 +48879,16 @@
   "intelligenceIndex": null,
   "omniscience": -12.233333333333333,
   "scores": {
-   "aa-briefcase": 1573.51,
+   "aa-briefcase": 1572.56,
    "omniscience-accuracy": 0.23533333333333334,
    "omniscience-non-hallucination": 0.532258064516129,
    "automationbench-aa": 0.559083218951688,
    "hle-diamond": 0.163,
    "gdp-pdf": 0.156,
    "terminalbench-4-0": 0.252525252525253,
-   "gdpval-aa-normalized": 1635.78,
+   "gdpval-aa-normalized": 1636.35,
    "mlcr-aa": 0.205555555555556,
-   "mmmu-pro": 0.797687861271676,
+   "mmmu-pro": 0.786127167630058,
    "humanitys-last-exam": 0.380444856348471,
    "artificial-analysis-long-context-reasoning": 0.796666666666667,
    "scicode": 0.505787037037037,
@@ -48935,10 +48935,10 @@
   "omniscienceHallucinationRate": 0.46774193548387094,
   "mlcrOverall": 0.205555555555556,
   "gdpPdfAllPass": 0.156,
-  "gdpval": 1635.78,
+  "gdpval": 1636.35,
   "gdpvalInterval": {
-   "lower": 1617.46,
-   "upper": 1654.1
+   "lower": 1618.65,
+   "upper": 1654.04
   },
   "itBenchSre": null,
   "tau2": null,
@@ -48962,7 +48962,7 @@
   "gpqa": 0.923232323232323,
   "critpt": 0.111428571428571,
   "apexAgents": null,
-  "mmmuPro": 0.797687861271676,
+  "mmmuPro": 0.786127167630058,
   "livecodebench": null,
   "aime25": null,
   "analystAgent": null,
@@ -48984,20 +48984,20 @@
   },
   "briefcaseBreakdown": {
    "overall": {
-    "elo": 1573.51,
-    "lower95ci": 1565.46,
-    "upper95ci": 1581.76
+    "elo": 1572.56,
+    "lower95ci": 1564.34,
+    "upper95ci": 1580.81
    },
    "rubricPassRate": 0.5410010649627263,
    "analyticalQuality": {
-    "elo": 1861.94,
-    "lower95ci": 1845.68,
-    "upper95ci": 1878.26
+    "elo": 1857.27,
+    "lower95ci": 1842.1,
+    "upper95ci": 1874.53
    },
    "presentation": {
-    "elo": 1441.52,
-    "lower95ci": 1426.34,
-    "upper95ci": 1455.11
+    "elo": 1440.97,
+    "lower95ci": 1428.44,
+    "upper95ci": 1454.8
    }
   },
   "briefcaseTotalCost": 146.02786198087998,
