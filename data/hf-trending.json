@@ -2,13 +2,13 @@
   "source": "https://huggingface.co/api/models?sort=trendingScore&limit=10",
   "models": [
     {
-      "id": "speridlabs/idol"
-    },
-    {
       "id": "xtools-at/DeepSeek-V4-Pro-Qwen3.5-9B-UNCENSORED-heretic"
     },
     {
       "id": "MiniMaxAI/MiniMax-H3-Image"
+    },
+    {
+      "id": "speridlabs/idol"
     },
     {
       "id": "ricursiveAI/Ripple-65B-Preview"
