@@ -2,10 +2,10 @@
   "source": "https://huggingface.co/api/models?sort=trendingScore&limit=10",
   "models": [
     {
-      "id": "xtools-at/DeepSeek-V4-Pro-Qwen3.5-9B-UNCENSORED-heretic"
+      "id": "speridlabs/idol"
     },
     {
-      "id": "speridlabs/idol"
+      "id": "xtools-at/DeepSeek-V4-Pro-Qwen3.5-9B-UNCENSORED-heretic"
     },
     {
       "id": "MiniMaxAI/MiniMax-H3-Image"
@@ -17,10 +17,10 @@
       "id": "moonshotai/Kimi-K3.1-Pro"
     },
     {
-      "id": "Lightricks/LTX-2.5"
+      "id": "NousResearch/Arete-27B"
     },
     {
-      "id": "NousResearch/Arete-27B"
+      "id": "Lightricks/LTX-2.5"
     },
     {
       "id": "DavidAU/Qwen3.8-27B-TURBO-Fable-Cold-Fusion-735-882-Heretic-Uncensored-NEO-CODER-MAX-MTP-GGUF"
