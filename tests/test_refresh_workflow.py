@@ -34,10 +34,13 @@ import pytest
 import yaml
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
+import _hubfake  # noqa: E402  # pylint: disable=wrong-import-position
 import _workflowrun  # noqa: E402  # pylint: disable=wrong-import-position
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 WORKFLOW = ROOT / ".github" / "workflows" / "refresh.yml"
+# Each hub job's upload: the canonical client from the job's checkout (issue #402).
+PUBLISH_CMD = 'python3 "${GITHUB_WORKSPACE}/scripts/publish_docs.py"'
 
 
 def load():
@@ -290,16 +293,17 @@ class GateTests(unittest.TestCase):  # pylint: disable=too-many-public-methods
         self.assertIn("needs.publish.outputs.publish == 'true'", cond)
 
     def test_the_publish_job_runs_no_repository_code(self):
-        # The writer runs no checkout, no third-party install, no test
-        # suite, and no script from the tree: its only inputs are the
-        # artifact, git plumbing, and curl/jq/gh against the pinned hub
-        # host. Anything executed here would ride the write token.
+        # The writer runs no checkout, install, suite or tree script: its
+        # inputs are the artifact, git plumbing, curl/jq/gh.
+        # Anything run here rides the write token; the hub job runs only
+        # publish_docs.py and its imports (download.py, fetch_http.py).
         banned = re.compile(r"\bpython3\b|\bpip[0-9]?\b")
         for job in ("publish", "push", "hub"):
             for s in self.wf["jobs"][job]["steps"]:
-                run = s.get("run", "")
-                self.assertIsNone(banned.search(commands(run)),
-                                  commands(run))
+                run = commands(s.get("run", ""))
+                if job == "hub":
+                    run = run.replace(PUBLISH_CMD, "", 1)
+                self.assertIsNone(banned.search(run), run)
 
     def test_the_suite_step_rebuilds_the_page_stamped_too(self):
         # Issue #92: the suite's browser tests used to call build.main() over
@@ -502,13 +506,13 @@ class GateTests(unittest.TestCase):  # pylint: disable=too-many-public-methods
         # Issue #206: the step decides whether to upload at all by reading
         # the hub's live page -- its embedded source-commit stamp and its
         # bytes -- before the upload call. The refs-API GET that used to
-        # precede the upload is gone with the ref; the upload's own curl
-        # keeps its status-captured form, branched on explicitly.
+        # precede the upload is gone with the ref; the upload is
+        # publish_docs.py, its verdicts its own (issue #402).
         run = flattened(hub_step(self.wf, "Publish to docs-hub")["run"])
 
         self.assertLess(
             run.index("https://docs.nitjsefni.eu/d/ai-researcher/frontier-models"),
-            run.index("curl -sS"))
+            run.index(PUBLISH_CMD))
         self.assertIn("Source commit <code>", run)
 
     def test_no_refs_api_call_remains(self):
@@ -541,7 +545,7 @@ class GateTests(unittest.TestCase):  # pylint: disable=too-many-public-methods
         idx_cmp = run.index('cmp -s "$live_page"')
         idx_skip = run.index("nothing uploaded", idx_cmp)
         idx_exit = run.index("exit 0", idx_skip)
-        idx_upload = run.index("https://docs.nitjsefni.eu/api/publish")
+        idx_upload = run.index(PUBLISH_CMD)
         self.assertLess(idx_fetch, idx_stamp)
         self.assertLess(idx_stamp, idx_cmp)
         self.assertLess(idx_cmp, idx_skip)
@@ -688,36 +692,12 @@ class GateTests(unittest.TestCase):  # pylint: disable=too-many-public-methods
         idx_exit = run.index("exit 0", idx_concede)
         idx_fetch = run.index(
             "https://docs.nitjsefni.eu/d/ai-researcher/frontier-models")
-        idx_upload = run.index("https://docs.nitjsefni.eu/api/publish")
+        idx_upload = run.index(PUBLISH_CMD)
         self.assertLess(idx_mine, idx_tie)
         self.assertLess(idx_tie, idx_concede)
         self.assertLess(idx_concede, idx_exit)
         self.assertLess(idx_exit, idx_fetch)
         self.assertLess(idx_fetch, idx_upload)
-
-    def test_the_upload_mirrors_publish_docs_py(self):
-        # Review I2 on PR #151: the write job runs no repository code, so
-        # the upload is the endpoint's wire format inlined, and the step
-        # names scripts/publish_docs.py as the canonical client and mirror
-        # source. Nothing else binds the two -- this pin holds the literals
-        # that must drift together: the multipart part names, the key
-        # header, the pinned host and endpoint, and the hub's dual failure
-        # semantics (a non-2xx, or a 2xx carrying an error field).
-        raw = hub_step(self.wf, "Publish to docs-hub")["run"]
-        run = flattened(raw)
-
-        for piece in ("-F 'slug=ai-researcher/frontier-models'",
-                      "-F 'title=Frontier models — intelligence vs cost per task'",
-                      "-F 'tags=benchmarks,comparison,interactive,ai'",
-                      "-F 'project=ai-researcher'",
-                      "-F 'from=ai-researcher'",
-                      "-F 'file=@out/frontier-models.html;type=text/html'",
-                      'x-docs-key: ${DOCS_HUB_API_KEY}',
-                      "https://docs.nitjsefni.eu/api/publish",
-                      "scripts/publish_docs.py",
-                      '[ "${code}" -lt 200 ] || [ "${code}" -ge 300 ]',
-                      "jq -e '(.error // null) != null'"):
-            self.assertIn(piece, run)
 
     def test_the_publish_record_lives_in_the_page_itself(self):
         # Issue #152 asked that the publish record never leave main's
@@ -734,7 +714,7 @@ class GateTests(unittest.TestCase):  # pylint: disable=too-many-public-methods
             "https://docs.nitjsefni.eu/d/ai-researcher/frontier-models")
         idx_extract = run.index("Source commit <code>")
         idx_publishing = run.index("Publishing: the hub serves")
-        idx_upload = run.index("https://docs.nitjsefni.eu/api/publish")
+        idx_upload = run.index(PUBLISH_CMD)
         self.assertLess(idx_fetch, idx_extract)
         self.assertLess(idx_extract, idx_publishing)
         self.assertLess(idx_publishing, idx_upload)
@@ -1288,7 +1268,7 @@ class ExecutedCommitMessageTests(_SeededOrigin, unittest.TestCase):
             self.assertNotIn("commits=true\n", outputs)
             self.assertEqual(names, "")
             self.assertEqual(log.count("\n"), 1)
-            self.assertNotIn("Rebuild the page", message)
+            self.assertNotIn("chore(page)", message)
             self.assertEqual((tmp / 'commit-msg.txt').read_text(encoding='utf-8'),
                              'Captured by .github/workflows/refresh.yml.\n')
 
@@ -1928,7 +1908,7 @@ class RankingsStructureTests(unittest.TestCase):
         download = step_in(self.wf, 'rankings-hub', 'Download the rankings page')
         self.assertEqual(download['if'], "needs.rankings.result == 'success'")
 
-    def test_rankings_credentials_stay_in_the_code_free_upload_job(self):
+    def test_rankings_credentials_stay_in_the_upload_step(self):
         self.assertNotIn('env', self.wf)
         for name in ('rankings', 'rankings-hub'):
             job = self.wf['jobs'][name]
@@ -1946,23 +1926,10 @@ class RankingsStructureTests(unittest.TestCase):
         steps = self.wf['jobs']['rankings-hub']['steps']
         self.assertEqual([s for s in steps if 'secrets.' in str(s)], [upload])
         for entry in steps:
-            self.assertNotRegex(commands(entry.get('run', '')),
+            self.assertNotRegex(commands(entry.get('run', '')).replace(PUBLISH_CMD, '', 1),
                                 r'\bpython3?\b|\bpip[0-9]?\b')
-
-    def test_rankings_upload_mirrors_the_hub_wire_format(self):
-        run = commands(step_in(self.wf, 'rankings-hub', 'Publish to docs-hub')['run'])
-        for piece in ("-F 'slug=ai-researcher/trending-rankings'",
-                      "-F 'title=Trending rankings — Hugging Face, OpenRouter & GitHub top 10 over time'",
-                      "-F 'tags=trending,rankings,ai'",
-                      "-F 'project=ai-researcher'", "-F 'from=ai-researcher'",
-                      "-F 'file=@out/trending-rankings.html;type=text/html'",
-                      '-H "x-docs-key: ${DOCS_HUB_API_KEY}"',
-                      'https://docs.nitjsefni.eu/api/publish',
-                      '[ "${code}" -lt 200 ] || [ "${code}" -ge 300 ]',
-                      "jq -e '(.error // null) != null'"):
-            self.assertIn(piece, run)
-        self.assertNotIn('DOCS_HUB_URL', run)
-        self.assertNotIn('github.sha', run)
+        self.assertNotIn('DOCS_HUB_URL', str(self.wf))
+        self.assertNotIn('github.sha', commands(upload['run']))
 
 
 def _rankings_hub_runs(published, pushed, rankings, cancelled=False, verdict=''):
@@ -2013,11 +1980,6 @@ if url == 'https://docs.nitjsefni.eu/d/ai-researcher/trending-rankings':
     page = (Path(os.environ['RANKINGS_PAGE']).read_bytes()
             if os.environ['LIVE_PAGE'] == 'same' else b'previous page')
     output.write_bytes(page)
-elif url == 'https://docs.nitjsefni.eu/api/publish':
-    if os.environ['UPLOAD_CODE'] == 'transport':
-        raise SystemExit(7)
-    output.write_text(os.environ['UPLOAD_BODY'], encoding='utf-8')
-    print(os.environ['UPLOAD_CODE'], end='')
 else:
     raise SystemExit('unexpected curl endpoint: ' + url)
 '''
@@ -2027,7 +1989,7 @@ else:
 @pytest.mark.parametrize('job', ['hub', 'rankings-hub'])
 @pytest.mark.parametrize('live,code,expected', [
     ('same', '200', 0), ('stale', '200', 0),
-    ('stale', '503', 1), ('stale', 'transport', 7)])
+    ('stale', '503', 1), ('stale', 'transport', 1)])
 def test_publish_step_removes_temp_files(tmp_path, job, live, code, expected):
     """Raw publish steps clean scratch on skip, upload, refusal and transport failure."""
     # pylint: disable=protected-access
@@ -2052,10 +2014,11 @@ def test_publish_step_removes_temp_files(tmp_path, job, live, code, expected):
         '#!/bin/sh\nexec "$TEST_PYTHON" "$(dirname "$0")/curl_payload.py" "$@"\n',
         encoding='utf-8')
     (stub / 'curl').chmod(0o755)
+    record = _hubfake.install(stub)
     probe = tmp_path / 'probe'
     probe.mkdir()
     calls = tmp_path / 'calls'
-    env = {**harness._env(runner, config, base),
+    env = {**harness._env(runner, config, base), 'GITHUB_WORKSPACE': str(ROOT),
            'PATH': str(stub) + os.pathsep + os.environ['PATH'],
            'TMPDIR': str(probe), 'TEST_PYTHON': sys.executable,
            'DOCS_HUB_API_KEY': 'fixture', 'LIVE_PAGE': live,
@@ -2066,7 +2029,7 @@ def test_publish_step_removes_temp_files(tmp_path, job, live, code, expected):
         cwd=repo, env=env, check=False, capture_output=True, text=True, timeout=120)
     assert done.returncode == expected, done.stdout + done.stderr
     requests = [json.loads(line) for line in calls.read_text(encoding='utf-8').splitlines()]
-    assert len(requests) == (1 if live == 'same' else 2)
+    assert (len(requests), bool(_hubfake.uploads(record))) == (1, live != 'same')
     for request in requests:
         output = pathlib.Path(request[request.index('-o') + 1])
         assert output.parent == probe
@@ -2116,7 +2079,8 @@ def test_rankings_quiet_hour_recovers_a_failed_upload(tmp_path):
         '#!/bin/sh\nexec "$TEST_PYTHON" "$(dirname "$0")/curl_payload.py" "$@"\n',
         encoding='utf-8')
     (stub / 'curl').chmod(0o755)
-    env.update({'PATH': str(stub) + os.pathsep + os.environ['PATH'],
+    record = _hubfake.install(stub)
+    env.update({'PATH': str(stub) + os.pathsep + os.environ['PATH'], 'GITHUB_WORKSPACE': str(ROOT),
                 'TEST_PYTHON': sys.executable, 'DOCS_HUB_API_KEY': 'fixture',
                 'LIVE_PAGE': 'stale', 'UPLOAD_CODE': '503', 'UPLOAD_BODY': '{}',
                 'HUB_CALLS': str(tmp_path / 'calls')})
@@ -2128,7 +2092,7 @@ def test_rankings_quiet_hour_recovers_a_failed_upload(tmp_path):
     assert _rankings_hub_runs('success', 'success', 'success', verdict='true')
     done = _workflowrun.run_step(repo, hub, env)
     assert done.returncode == 1, done.stdout + done.stderr
-    assert 'publish failed: HTTP 503' in done.stderr
+    assert 'publish failed after 8 attempts in 255s: HTTP 503' in done.stderr
     quiet = tmp_path / 'quiet'
     quiet.mkdir()
     env.update(harness._env(quiet, config, landed))
@@ -2155,10 +2119,9 @@ def test_rankings_quiet_hour_recovers_a_failed_upload(tmp_path):
     assert done.returncode == 0, done.stdout + done.stderr
     verified = harness._git('show', 'FETCH_HEAD:out/trending-rankings.html',
                             cwd=quiet / 'ref-scratch').stdout.encode()
-    assert verified == original == (quiet / 'page/out/trending-rankings.html').read_bytes()
-    calls = [json.loads(line) for line in (tmp_path / 'calls').read_text().splitlines()]
-    assert [call[-1] for call in calls if call[-1].endswith('/api/publish')] == [
-        'https://docs.nitjsefni.eu/api/publish', 'https://docs.nitjsefni.eu/api/publish']
+    uploads = _hubfake.uploads(record)
+    assert verified == original == uploads[-1]['page'].encode()
+    assert len(uploads) == 9  # eight 503s spend the window, then the quiet hour's one
     assert harness._git('rev-parse', 'HEAD', cwd=repo).stdout.strip() == landed
     assert harness._git('rev-parse', 'main', cwd=origin).stdout.strip() == landed
 
@@ -2347,7 +2310,7 @@ def test_hubs_without_artifact_are_green(tmp_path, job):
     ('landed', 'stale', '200', '{"error":"refused"}', 1, 1),
     ('landed', 'stale', '200', '{"error":false}', 0, 1),
     ('landed', 'stale', '200', '{"error":null}', 0, 1),
-    ('landed', 'stale', 'transport', '{}', 7, 1),
+    ('landed', 'stale', 'transport', '{}', 1, 8),
 ])
 def test_rankings_hub_upload_verdicts(tmp_path, main, live, code, body, expected, uploads):
     """Publish verified main bytes, skip duplicates, and surface hub refusals."""
@@ -2402,8 +2365,9 @@ def test_rankings_hub_upload_verdicts(tmp_path, main, live, code, body, expected
         '#!/bin/sh\nexec "$TEST_PYTHON" "$(dirname "$0")/curl_payload.py" "$@"\n',
         encoding='utf-8')
     (stub / 'curl').chmod(0o755)
+    record = _hubfake.install(stub)
     calls = tmp_path / 'calls'
-    env = {**os.environ, 'PATH': str(stub) + os.pathsep + os.environ['PATH'],
+    env = {**os.environ, 'PATH': str(stub) + os.pathsep + os.environ['PATH'], 'GITHUB_WORKSPACE': str(ROOT),
            'TEST_PYTHON': sys.executable, 'RUNNER_TEMP': str(runner),
            'GITHUB_STEP_SUMMARY': str(tmp_path / 'summary'),
            'DOCS_HUB_API_KEY': 'fixture', 'LIVE_PAGE': live,
@@ -2422,31 +2386,23 @@ def test_rankings_hub_upload_verdicts(tmp_path, main, live, code, body, expected
         else:
             assert ("could not verify main's committed page — publishing nothing this run; "
                     "the next hourly run self-heals") in summary
-        assert not calls.exists()
-        assert not (runner / 'page').exists()
+        assert not calls.exists() and not _hubfake.uploads(record)
         return
     requests = [json.loads(line) for line in calls.read_text(encoding='utf-8').splitlines()]
-    assert len(requests) == 1 + uploads
+    assert (len(requests), len(_hubfake.uploads(record))) == (1, uploads)
     assert requests[0][-3:] == [
         'https://docs.nitjsefni.eu/d/ai-researcher/trending-rankings',
         '-o', requests[0][-1]]
     assert '-H' not in requests[0]
     if not uploads:
         assert 'Nothing uploaded' in done.stdout
-        assert not (runner / 'page').exists()
         return
-    request = requests[1]
-    assert request[-1] == 'https://docs.nitjsefni.eu/api/publish'
-    assert request[request.index('-H') + 1] == 'x-docs-key: fixture'
-    assert [request[i + 1] for i, arg in enumerate(request) if arg == '-F'] == [
-        'slug=ai-researcher/trending-rankings',
-        'title=Trending rankings — Hugging Face, OpenRouter & GitHub top 10 over time',
-        'tags=trending,rankings,ai', 'project=ai-researcher', 'from=ai-researcher',
-        'file=@out/trending-rankings.html;type=text/html']
-    assert (runner / 'page/out/trending-rankings.html').read_bytes() == page.read_bytes()
+    for upload in _hubfake.uploads(record):
+        assert (upload['key'], upload['page'].encode()) == ('fixture', page.read_bytes())
     if expected == 1:
-        assert f'publish failed: HTTP {code}' in done.stderr
-        assert body in done.stderr
+        assert ('publish failed after 8 attempts in 255s: cannot reach' if code == 'transport'
+                else f'publish failed: HTTP {code}') in done.stderr
+        assert 'refused' not in body or 'refused' in done.stdout + done.stderr
 
 
 @unittest.skipIf(os.name == 'nt', 'workflow shell runs on Ubuntu')
@@ -2705,14 +2661,6 @@ url = next((arg for arg in args if arg.startswith('https://')), '')
 output = Path(args[args.index('-o') + 1])
 if url == 'https://docs.nitjsefni.eu/d/ai-researcher/frontier-models':
     output.write_text('previous page', encoding='utf-8')
-elif url == 'https://docs.nitjsefni.eu/api/publish':
-    fields = [args[index + 1] for index, value in enumerate(args) if value == '-F']
-    assert 'slug=ai-researcher/frontier-models' in fields, fields
-    upload = next(field for field in fields if field.startswith('file=@'))
-    page = Path(upload[len('file=@'):].split(';', 1)[0]).read_bytes()
-    Path(os.environ['HUB_PUBLISHED']).write_bytes(page)
-    output.write_text('{}', encoding='utf-8')
-    print('200', end='')
 else:
     raise SystemExit('unexpected curl endpoint: ' + url)
 with Path(os.environ['HUB_CALLS']).open('a', encoding='utf-8') as calls:
@@ -2753,7 +2701,6 @@ class ExecutedHubTrackerOrderingTests(unittest.TestCase):
         subprocess.run(['ssh-keygen', '-q', '-t', 'ed25519', '-N', '', '-f', str(key)],
                        check=True, capture_output=True, timeout=60)
         self.key = key.read_text(encoding='utf-8')
-        self.published = self.root / 'published.html'
         self.calls = self.root / 'curl-calls'
         stub = self.root / 'bin'
         stub.mkdir()
@@ -2762,6 +2709,7 @@ class ExecutedHubTrackerOrderingTests(unittest.TestCase):
             '#!/bin/sh\nexec "$(command -v python || command -v python3)" '
             '"$(dirname "$0")/curl_payload.py" "$@"\n', encoding='utf-8')
         (stub / 'curl').chmod(0o755)
+        self.record = _hubfake.install(stub)
         self.contexts = {}
         self._context('joined', self.source, stub)
         runner = pathlib.Path(self.contexts['joined'][1]['RUNNER_TEMP'])
@@ -2808,7 +2756,7 @@ class ExecutedHubTrackerOrderingTests(unittest.TestCase):
                'GITHUB_REPOSITORY': 'fixture/trending', 'AI_RESEARCHER_REPO': 'fixture/trending',
                'GIT_CONFIG_GLOBAL': str(self.config), 'PUSH_REMOTE': self.origin.as_uri(),
                'AI_RESEARCHER_MASTER_PUSH_DEPLOY_KEY': self.key, 'DOCS_HUB_API_KEY': 'fixture',
-               'HUB_PUBLISHED': str(self.published), 'HUB_CALLS': str(self.calls),
+               'GITHUB_WORKSPACE': str(ROOT), 'UPLOAD_CODE': '200', 'UPLOAD_BODY': '{}', 'HUB_CALLS': str(self.calls),
                'PATH': str(stub) + os.pathsep + os.environ['PATH']}
         self.contexts[name] = repo, env
 
@@ -2825,10 +2773,9 @@ class ExecutedHubTrackerOrderingTests(unittest.TestCase):
         self.assertEqual(self._git(self.origin, 'rev-parse', 'main').strip(), self.joined_tip)
         self.assertEqual(self._git(self.origin, 'rev-parse', 'main^').strip(), self.base)
         self._run('hub', 'Publish to docs-hub', 'joined')
-        self.assertEqual(self.published.read_bytes(), self.page)
+        self.assertEqual([u['page'].encode() for u in _hubfake.uploads(self.record)], [self.page])
         self.assertEqual(self.calls.read_text(encoding='utf-8').splitlines(), [
-            'https://docs.nitjsefni.eu/d/ai-researcher/frontier-models',
-            'https://docs.nitjsefni.eu/api/publish'])
+            'https://docs.nitjsefni.eu/d/ai-researcher/frontier-models'])
         for path in ('data/hf-trending.json', 'data/openrouter-trending.json'):
             self.assertIn('org/new', self._git(self.origin, 'show', 'main:' + path))
         self.assertEqual(self._git(self.origin, 'rev-list', '--count',
@@ -2846,6 +2793,6 @@ class ExecutedHubTrackerOrderingTests(unittest.TestCase):
         moved = self._git(other, 'rev-parse', 'HEAD').strip()
         result = self._run('hub', 'Publish to docs-hub', 'joined')
         self.assertIn('Nothing published by this run.', result.stdout)
-        self.assertFalse(self.published.exists())
+        self.assertEqual(_hubfake.uploads(self.record), [])
         self.assertFalse(self.calls.exists())
         self.assertEqual(self._git(self.origin, 'rev-parse', 'main').strip(), moved)

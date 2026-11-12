@@ -543,7 +543,8 @@ jobs:
   # joins only successful sources with changes. One deploy-key delivery
   # starts CI on main, then each hub verifies its own publishable bytes
   # (issue #206). Failed producers stay red without blocking survivors.
-  # No repository code executes in the committer, push or hub jobs.
+  # No repository code executes in the committer or push jobs; each hub job
+  # runs only scripts/publish_docs.py, from the run's own commit.
   #
   # The push race and its outcomes are in the header; the committer concedes
   # the one race no base check sees, main landing a newer workflow
@@ -899,7 +900,8 @@ jobs:
     name: Publish the page to docs-hub
     runs-on: ubuntu-latest
 
-    # Per-job ceiling, like every other job's.
+    # Per-job ceiling: the upload's last retry starts inside download.py's
+    # 300 s window and may wait its 60 s socket timeout (issue #402).
     timeout-minutes: 15
 
     needs: [publish, push, refresh]
@@ -919,6 +921,10 @@ jobs:
       contents: read
 
     steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
       - name: Download the publish payload
         if: needs.refresh.result == 'success' && needs.refresh.outputs.proceed == 'true'
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
@@ -973,8 +979,7 @@ jobs:
           # costs less than a stale page. The summary names both stamps, so
           # a republish hour says which commit the hub was behind to.
           live_page="$(mktemp "${TMPDIR:-/tmp}/tmp.XXXXXXXXXX")"
-          # Later scratch files may not exist when an early exit runs cleanup.
-          trap 'rm -f "$live_page" "${publish_response:-}"' EXIT
+          trap 'rm -f "$live_page"' EXIT
           live_stamp="the hub could not be fetched"
           if curl -fsS --connect-timeout 10 --max-time 30 \
                https://docs.nitjsefni.eu/d/ai-researcher/frontier-models \
@@ -993,46 +998,18 @@ jobs:
           fi
           echo "Publishing: the hub serves ${live_stamp}; this run's page names ${mine}." \
             >> "$GITHUB_STEP_SUMMARY"
-          # THE UPLOAD. No repository code runs here, so this inlines the
-          # wire format of scripts/publish_docs.py, the canonical client:
-          # keep the two in sync. The key travels in a header, never an
-          # argument; the URL is a literal on the pinned hub host, as
-          # publish_docs.py enforces, so the credential goes nowhere else. A
-          # staging dir keeps the relative page path the canonical client pins.
-          page_dir="${RUNNER_TEMP}/page"
-          mkdir -p "${page_dir}/out"
-          cp "${RUNNER_TEMP}/publish-payload/tree/out/frontier-models.html" \
-            "${page_dir}/out/frontier-models.html"
-          cd "${page_dir}"
-          publish_response="$(mktemp "${TMPDIR:-/tmp}/tmp.XXXXXXXXXX")"
-          code="$(curl -sS --connect-timeout 10 --max-time 120 \
-            -o "$publish_response" -w '%{http_code}' \
-            -H "x-docs-key: ${DOCS_HUB_API_KEY}" \
-            -F 'slug=ai-researcher/frontier-models' \
-            -F 'title=Frontier models — intelligence vs cost per task' \
-            -F 'tags=benchmarks,comparison,interactive,ai' \
-            -F 'project=ai-researcher' \
-            -F 'from=ai-researcher' \
-            -F 'file=@out/frontier-models.html;type=text/html' \
-            https://docs.nitjsefni.eu/api/publish)"
-          # No --fail on curl: the status is captured and branched on
-          # explicitly, so the hub's refusal body reaches the log the way
-          # publish_docs.py surfaced it (review M2 on PR #151). A transport
-          # failure still kills the step under bash -e before the verdict.
-          if [ "${code}" -lt 200 ] || [ "${code}" -ge 300 ]; then
-            echo "publish failed: HTTP ${code}:" >&2
-            cat "$publish_response" >&2
-            exit 1
-          fi
-          # A 2xx carrying an error field is still a failure -- the hub uses
-          # both, the same verdict publish_docs.py computes for the hub's
-          # answers.
-          if jq -e '(.error // null) != null' "$publish_response" > /dev/null; then
-            echo "publish failed: HTTP ${code} with an error field:" >&2
-            cat "$publish_response" >&2
-            exit 1
-          fi
-          cat "$publish_response"
+          # THE UPLOAD is scripts/publish_docs.py from the checkout of the
+          # run's own commit, the one this workflow text came from, so it runs
+          # no code this block does not already trust. It sends the key only
+          # to the pinned https hub, retries a 429, a 5xx, a timeout or a
+          # dropped connection through scripts/ci/download.py (issue #402), and
+          # fails on any other refusal or a 2xx error field, printing the body.
+          python3 "${GITHUB_WORKSPACE}/scripts/publish_docs.py" \
+            "${RUNNER_TEMP}/publish-payload/tree/out/frontier-models.html" \
+            --slug ai-researcher/frontier-models \
+            --title 'Frontier models — intelligence vs cost per task' \
+            --tags benchmarks,comparison,interactive,ai \
+            --project ai-researcher --from ai-researcher
           # No ref move follows (issue #206): the upload response above is
           # the hub's receipt, and the page it stored carries the stamp --
           # the record the next run's republish gate reads. The published
@@ -1175,15 +1152,19 @@ jobs:
       (needs.publish.result == 'skipped' || needs.publish.result == 'success') &&
       (needs.push.result == 'skipped' || needs.push.result == 'success')
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 15  # the hub job's ceiling: covers the upload's retry
     permissions:
       contents: read
     # A successful build can recover a failed upload during an unchanged hour,
     # when the committer and push both skip. Failed commit or delivery jobs
     # suppress publication. Main's committed page must match the artifact
-    # before HTTP; identical live bytes skip the upload. No repository code
-    # executes beside the upload key.
+    # before HTTP; identical live bytes skip the upload. The only repository
+    # code beside the upload key is the hub job's publish_docs.py.
     steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
       - name: Download the rankings page
         if: needs.rankings.result == 'success'
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
@@ -1208,7 +1189,7 @@ jobs:
           # or different bytes concede; the next hourly run rebuilds and self-heals.
           main_page="$(mktemp "${TMPDIR:-/tmp}/tmp.XXXXXXXXXX")"
           # Later scratch files may not exist when an early exit runs cleanup.
-          trap 'rm -f "$main_page" "${live_page:-}" "${publish_response:-}"' EXIT
+          trap 'rm -f "$main_page" "${live_page:-}"' EXIT
           if ! git -C "${scratch}" fetch --quiet origin main ||
              ! git -C "${scratch}" show FETCH_HEAD:out/trending-rankings.html > "$main_page"; then
             echo "could not verify main's committed page — publishing nothing this run; the next hourly run self-heals" \
@@ -1238,37 +1219,13 @@ jobs:
               exit 0
             fi
           fi
-          # Mirror hub and scripts/publish_docs.py: literal pinned host,
-          # x-docs-key header, multipart fields and both failure verdicts.
-          page_dir="${RUNNER_TEMP}/page"
-          mkdir -p "${page_dir}/out"
-          cp "${RUNNER_TEMP}/rankings-page/trending-rankings.html" \
-            "${page_dir}/out/trending-rankings.html"
-          cd "${page_dir}"
-          publish_response="$(mktemp "${TMPDIR:-/tmp}/tmp.XXXXXXXXXX")"
-          code="$(curl -sS --connect-timeout 10 --max-time 120 \
-            -o "$publish_response" -w '%{http_code}' \
-            -H "x-docs-key: ${DOCS_HUB_API_KEY}" \
-            -F 'slug=ai-researcher/trending-rankings' \
-            -F 'title=Trending rankings — Hugging Face, OpenRouter & GitHub top 10 over time' \
-            -F 'tags=trending,rankings,ai' \
-            -F 'project=ai-researcher' \
-            -F 'from=ai-researcher' \
-            -F 'file=@out/trending-rankings.html;type=text/html' \
-            https://docs.nitjsefni.eu/api/publish)"
-          # Capture HTTP refusals explicitly so their bodies reach the log;
-          # a transport failure still ends the step under bash -e.
-          if [ "${code}" -lt 200 ] || [ "${code}" -ge 300 ]; then
-            echo "publish failed: HTTP ${code}:" >&2
-            cat "$publish_response" >&2
-            exit 1
-          fi
-          if jq -e '(.error // null) != null' "$publish_response" > /dev/null; then
-            echo "publish failed: HTTP ${code} with an error field:" >&2
-            cat "$publish_response" >&2
-            exit 1
-          fi
-          cat "$publish_response"
+          # The upload is the hub job's: scripts/publish_docs.py and its retry.
+          python3 "${GITHUB_WORKSPACE}/scripts/publish_docs.py" \
+            "${RUNNER_TEMP}/rankings-page/trending-rankings.html" \
+            --slug ai-researcher/trending-rankings \
+            --title 'Trending rankings — Hugging Face, OpenRouter & GitHub top 10 over time' \
+            --tags trending,rankings,ai \
+            --project ai-researcher --from ai-researcher
 
   or-fetch:
     name: Fetch and stage the OpenRouter top 10

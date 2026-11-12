@@ -1,4 +1,5 @@
 import email.message
+import http.client
 import io
 import json
 import pathlib
@@ -8,8 +9,10 @@ import urllib.error
 import urllib.parse
 from unittest import mock
 
-sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent / "scripts"))
+SCRIPTS = pathlib.Path(__file__).resolve().parent.parent / "scripts"
+sys.path[:0] = [str(SCRIPTS), str(SCRIPTS / "ci")]
 
+import download  # noqa: E402  # pylint: disable=wrong-import-position
 import publish_docs  # noqa: E402  # pylint: disable=wrong-import-position
 
 PAGE = b"<html>frontier</html>"
@@ -61,6 +64,30 @@ class PublishTests(unittest.TestCase):
         self.page = pathlib.Path(__file__).resolve().parent / "_page.html"
         self.page.write_bytes(PAGE)
         self.addCleanup(self.page.unlink)
+        # The retry backoff runs on a clock only its own sleeps advance.
+        self.sleeps = []
+        for name, fake in (("sleep", self.sleeps.append),
+                           ("monotonic", lambda: sum(self.sleeps))):
+            patcher = mock.patch.object(download.time, name, fake)
+            patcher.start()
+            self.addCleanup(patcher.stop)
+
+    def scripted(self, *answers):
+        """A urlopen answering each call with the next answer, the last
+        repeating: a status code, or an exception to raise."""
+        calls = []
+
+        def urlopen(req, timeout=None):
+            calls.append(req.full_url)
+            answer = answers[min(len(calls), len(answers)) - 1]
+            if isinstance(answer, BaseException):
+                raise answer
+            if not 200 <= answer < 300:
+                raise urllib.error.HTTPError(
+                    req.full_url, answer, "refused", email.message.Message(),
+                    io.BytesIO(b'{"error":"hub refusal"}'))
+            return Response(answer, json.dumps({"ok": True}).encode())
+        return urlopen, calls
 
     def publish(self, urlopen):
         with mock.patch.object(publish_docs.urllib.request, "urlopen", urlopen):
@@ -209,6 +236,70 @@ class PublishTests(unittest.TestCase):
             return Response(200, json.dumps({"error": "slug rejected"}).encode())
 
         self.assertEqual(self.publish(urlopen), 1)
+
+    def test_a_5xx_then_success_is_retried_once(self):
+        urlopen, calls = self.scripted(503, 200)
+        self.assertEqual(self.publish(urlopen), 0)
+        self.assertEqual((len(calls), self.sleeps), (2, [5]))
+
+    def test_a_429_is_retried(self):
+        urlopen, calls = self.scripted(429, 200)
+        self.assertEqual(self.publish(urlopen), 0)
+        self.assertEqual((len(calls), self.sleeps), (2, [5]))
+
+    def test_a_timeout_or_dropped_connection_is_retried(self):
+        for fault in (urllib.error.URLError("connection refused"),
+                      TimeoutError("timed out"),
+                      ConnectionResetError("connection reset by peer"),
+                      http.client.RemoteDisconnected("closed"),
+                      http.client.IncompleteRead(b"")):
+            with self.subTest(fault=fault):
+                self.sleeps.clear()
+                urlopen, calls = self.scripted(fault, 200)
+                with mock.patch.object(sys, "stderr", io.StringIO()):
+                    self.assertEqual(self.publish(urlopen), 0)
+                self.assertEqual((len(calls), self.sleeps), (2, [5]))
+
+    def test_another_4xx_fails_at_once_with_the_hubs_body(self):
+        urlopen, calls = self.scripted(400)
+        with mock.patch.object(sys, "stderr", io.StringIO()) as err:
+            self.assertEqual(self.publish(urlopen), 1)
+        self.assertEqual((len(calls), self.sleeps), (1, []))
+        self.assertIn("publish failed: HTTP 400", err.getvalue())
+        self.assertIn("hub refusal", err.getvalue())
+
+    def test_a_2xx_error_field_fails_at_once(self):
+        calls = []
+
+        def urlopen(req, timeout=None):
+            calls.append(req.full_url)
+            return Response(200, json.dumps({"error": "slug rejected"}).encode())
+
+        with mock.patch.object(sys, "stderr", io.StringIO()) as err, \
+                mock.patch.object(sys, "stdout", io.StringIO()) as out:
+            self.assertEqual(self.publish(urlopen), 1)
+        self.assertEqual((len(calls), self.sleeps), (1, []))
+        self.assertIn("publish failed: HTTP 200 with an error field", err.getvalue())
+        self.assertIn("slug rejected", out.getvalue())
+
+    def test_exhausting_the_window_fails_naming_the_attempts(self):
+        urlopen, calls = self.scripted(503)
+        with mock.patch.object(sys, "stderr", io.StringIO()) as err:
+            self.assertEqual(self.publish(urlopen), 1)
+        self.assertEqual((len(calls), self.sleeps), (8, [5, 10, 20, 40, 60, 60, 60]))
+        self.assertIn("publish failed after 8 attempts in 255s: HTTP 503",
+                      err.getvalue())
+        self.assertIn("hub refusal", err.getvalue())
+
+    def test_download_pys_window_governs_the_retry(self):
+        # 5 + 10 fit a 15 s window and the next 20 s backoff does not, so
+        # three attempts run: the window is download.py's, not a copy.
+        urlopen, calls = self.scripted(503)
+        with mock.patch.object(download, "WINDOW_SECONDS", 15), \
+                mock.patch.object(sys, "stderr", io.StringIO()) as err:
+            self.assertEqual(self.publish(urlopen), 1)
+        self.assertEqual((len(calls), self.sleeps), (3, [5, 10]))
+        self.assertIn("after 3 attempts in 15s", err.getvalue())
 
 
 class MainTests(unittest.TestCase):

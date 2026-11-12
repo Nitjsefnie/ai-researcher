@@ -24,6 +24,7 @@ import urllib.parse
 import urllib.request
 from collections.abc import Callable
 from pathlib import Path
+from typing import TypeVar
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 fetch_http = importlib.import_module("fetch_http")
@@ -38,8 +39,15 @@ API = "https://api.github.com"
 RELEASE = re.compile(r"https://github\.com/([^/]+)/([^/]+)/releases/download/([^/]+)/([^/]+)")
 
 
+T = TypeVar("T")
+
+
 class DownloadError(Exception):
     pass
+
+
+class RetriesExhausted(Exception):
+    """Raised from the last error once the window allows no attempt."""
 
 
 def _another_attempt(attempt: int, start: float, label: str, reason: object,
@@ -55,29 +63,44 @@ def _another_attempt(attempt: int, start: float, label: str, reason: object,
     return True
 
 
+def retrying(attempt: Callable[[], T], label: str, *,
+             sleep: Callable[[float], None] | None = None,
+             clock: Callable[[], float] | None = None) -> T:
+    """Re-run attempt() on a transient transport error (issue #402)."""
+    start = (clock or time.monotonic)()
+    count = 0
+    while True:
+        count += 1
+        try:
+            return attempt()
+        except (OSError, http.client.HTTPException) as exc:
+            if not _retryable(exc):
+                raise
+            if not _another_attempt(count, start, label, exc, sleep, clock):
+                spent = (clock or time.monotonic)() - start
+                raise RetriesExhausted(
+                    f"after {count} attempts in {spent:.0f}s") from exc
+
+
 def download_to(url: str, destination: Path, timeout: float, *,
                 label: str | None = None, token: str | None = None,
                 sleep: Callable[[float], None] | None = None,
                 clock: Callable[[], float] | None = None) -> tuple[str, int]:
-    start = (clock or time.monotonic)()
-    attempt = 0
-    while True:
-        attempt += 1
+    def attempt() -> tuple[str, int]:
         try:
             return _attempt(url, destination, timeout, label, token)
-        except (DownloadError, OSError, http.client.HTTPException,
-                ValueError) as exc:
+        except (DownloadError, OSError, http.client.HTTPException, ValueError):
             # No partial body survives to prefix a retry or to be verified.
             destination.unlink(missing_ok=True)
-            if isinstance(exc, DownloadError):
-                raise
-            if not _retryable(exc):
-                raise DownloadError(f"{url}: download failed: {exc}") from exc
-            if not _another_attempt(attempt, start, url, exc, sleep, clock):
-                spent = (clock or time.monotonic)() - start
-                raise DownloadError(
-                    f"{url}: download failed after {attempt} attempts in "
-                    f"{spent:.0f}s: {exc}") from exc
+            raise
+
+    try:
+        return retrying(attempt, url, sleep=sleep, clock=clock)
+    except RetriesExhausted as exc:
+        raise DownloadError(
+            f"{url}: download failed {exc}: {exc.__cause__}") from exc.__cause__
+    except (OSError, http.client.HTTPException, ValueError) as exc:
+        raise DownloadError(f"{url}: download failed: {exc}") from exc
 
 
 def _retryable(exc: BaseException) -> bool:

@@ -15,6 +15,7 @@ import pytest
 import yaml
 
 ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / 'scripts' / 'ci'))  # the gate imports its sibling gate_script_reach
 
 
 @pytest.fixture(autouse=True)
@@ -141,27 +142,24 @@ def test_required_jobs_name_the_merge_gate_contexts(tmp_path):
 # each expands to every tracked file beneath it, so a new file there needs no pin edit (#376).
 GATE_DIRECTORIES = ('.github/workflows', 'data', 'out', 'tests')
 
-# The gate-named files outside GATE_DIRECTORIES; a job naming another moves the pin.
+# The files outside GATE_DIRECTORIES a gate job names or a followed script imports or runs (#401); another moves the pin.
 CORE_PIN = (
-    '.github/ci-thresholds.json',
-    'requirements-dev.txt',
-    'requirements-pip-audit.txt',
-    'requirements-test.txt',
-    'requirements-zizmor.txt',
-    'scripts/ci/aggregate_gate.py',
-    'scripts/ci/check_committed_page.py',
-    'scripts/ci/check_ratchets.py',
-    'scripts/ci/classify_changes.py',
-    'scripts/ci/commit_scopes.py',
-    'scripts/ci/download.py',
-    'scripts/ci/gate_base_freshness.py',
-    'scripts/ci/install_chromium.py',
-    'scripts/ci/install_valgrind.py',
-    'scripts/ci/instruction_budgets.py',
-    'scripts/ci/js_coverage.py',
-    'scripts/ci/ratchet.py',
-    'scripts/ci/thresholds.py',
-    'scripts/fetch_http.py',
+    '.github/ci-thresholds.json', 'build.py', 'page_format.py', 'page_style.py',
+    'requirements-dev.txt', 'requirements-pip-audit.txt', 'requirements-test.txt',
+    'requirements-zizmor.txt', 'scripts/aa_aes_gcm.py', 'scripts/browser_temp.py',
+    'scripts/build_rankings.py', 'scripts/capture_gate.py', 'scripts/ci/aggregate_gate.py',
+    'scripts/ci/apt_deb_cache.py', 'scripts/ci/check_committed_page.py',
+    'scripts/ci/check_committed_rankings_page.py', 'scripts/ci/check_ratchets.py',
+    'scripts/ci/classify_changes.py', 'scripts/ci/commit_scopes.py', 'scripts/ci/diff_coverage.py',
+    'scripts/ci/download.py', 'scripts/ci/gate_base_freshness.py',
+    'scripts/ci/gate_script_reach.py', 'scripts/ci/install_chromium.py',
+    'scripts/ci/install_valgrind.py', 'scripts/ci/instruction_budgets.py',
+    'scripts/ci/js_coverage.py', 'scripts/ci/js_lines.py', 'scripts/ci/perf_budgets.py',
+    'scripts/ci/ratchet.py', 'scripts/ci/thresholds.py', 'scripts/diff_aa.py',
+    'scripts/fetch_aa.py', 'scripts/fetch_aa_parse.py', 'scripts/fetch_gdpval.py',
+    'scripts/fetch_github_stars.py', 'scripts/fetch_hf_trending.py', 'scripts/fetch_http.py',
+    'scripts/fetch_openrouter_trending.py', 'scripts/publish_docs.py',
+    'scripts/trending_message.py',
 )
 
 
@@ -232,7 +230,7 @@ def test_green_when_the_head_carries_every_gate_commit(tmp_path):
          '--root', str(repo)], check=False, capture_output=True, text=True)
     assert done.returncode == 0, (done.stdout, done.stderr)
     assert 'carries every commit on main' in done.stdout
-    assert 'BY NAME' in done.stdout
+    assert 'names or its scripts import or run' in done.stdout
 
 
 def test_red_when_main_advances_a_gate_file(tmp_path):
@@ -289,7 +287,7 @@ def test_a_push_head_main_has_passed_passes(tmp_path):
     assert "part of main's own history" in done.stdout
     assert 'holds 1 commit it does not' in done.stdout
     assert 'Rebase' not in done.stdout
-    assert 'BY NAME' in done.stdout, (
+    assert 'names or its scripts import or run' in done.stdout, (
         'the push verdict still derives the gate-path set, so its refusals '
         'stay universal')
 
@@ -604,7 +602,7 @@ def test_the_green_line_names_its_reach_limit(tmp_path):
     assert 'reading every tracked file' in out, out
     assert 'merge-marker step' in out, out
     assert 'named reach limit' in out, out
-    assert 'BY NAME' in out, out
+    assert 'names or its scripts import or run' in out, out
 
 
 # --- in-process coverage of the parser and comparison helpers ---------------
