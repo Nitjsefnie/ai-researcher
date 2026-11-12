@@ -48,7 +48,7 @@ class MessageTests(unittest.TestCase):
     def test_new_models_use_the_upstream_subject_and_body_spelling(self):
         self.assertEqual(
             fetch_hf_trending.message([], ids("org/a", "org/b")),
-            "Trending: 2 new in the top 10: org/a, org/b\n\n"
+            "chore(trending): 2 new in the top 10: org/a, org/b\n\n"
             "NEW  rank 1 org/a\n"
             "NEW  rank 2 org/b\n")
 
@@ -57,7 +57,7 @@ class MessageTests(unittest.TestCase):
             fetch_hf_trending.message(
                 ids("org/a", "org/b", "org/c"),
                 ids("org/b", "org/a", "org/c")),
-            "Trending: 2 rank change(s)\n\n"
+            "chore(trending): 2 rank change(s)\n\n"
             "MOVE org/b rank 2 -> 1\n"
             "MOVE org/a rank 1 -> 2\n")
 
@@ -65,12 +65,12 @@ class MessageTests(unittest.TestCase):
         self.assertEqual(
             fetch_hf_trending.message(ids("org/a", "org/b"),
                                       ids("org/a", "org/b")),
-            "Trending: order updated\n")
+            "chore(trending): order updated\n")
 
     def test_departed_models_use_the_exact_out_line(self):
         self.assertEqual(
             fetch_hf_trending.message(ids("org/a", "org/b"), ids("org/a")),
-            "Trending: order updated\n\n"
+            "chore(trending): order updated\n\n"
             "OUT  org/b (was rank 2)\n")
 
     def test_new_departed_and_moved_lines_are_combined_in_upstream_order(self):
@@ -78,7 +78,7 @@ class MessageTests(unittest.TestCase):
             fetch_hf_trending.message(
                 ids("org/a", "org/b", "org/c"),
                 ids("org/d", "org/a", "org/c")),
-            "Trending: 1 new in the top 10: org/d\n\n"
+            "chore(trending): 1 new in the top 10: org/d\n\n"
             "NEW  rank 1 org/d\n"
             "OUT  org/b (was rank 2)\n"
             "MOVE org/a rank 1 -> 2\n")
@@ -134,7 +134,7 @@ class MainTests(unittest.TestCase):
                     contextlib.redirect_stdout(output):
                 fetch_hf_trending.main([])
 
-            self.assertIn("Trending: 10 new in the top 10:", output.getvalue())
+            self.assertIn("chore(trending): 10 new in the top 10:", output.getvalue())
             self.assertTrue(capture.is_file())
 
     def test_capture_write_has_exact_json_bytes(self):
@@ -199,7 +199,7 @@ class MainTests(unittest.TestCase):
             ).encode("utf-8"))
             output = io.StringIO()
             expected = (
-                "Trending: 2 rank change(s)\n\n"
+                "chore(trending): 2 rank change(s)\n\n"
                 "MOVE org/model-1 rank 2 -> 1\n"
                 "MOVE org/model-0 rank 1 -> 2\n")
 

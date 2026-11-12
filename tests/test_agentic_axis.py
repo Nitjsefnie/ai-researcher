@@ -310,7 +310,7 @@ class AgenticDiffTests(unittest.TestCase):
         self.assertEqual(diff_aa.frontier_moves(report.splitlines()),
                          [("GDPval-AA", ["B", "C"], [])])
         self.assertEqual(diff_aa.as_commit_message(report).splitlines()[0],
-                         "Refresh capture: 3 models, GDPval-AA frontier: B in, C in, +1/-0")
+                         "chore(capture): 3 models, GDPval-AA frontier: B in, C in, +1/-0")
 
 
 class FrontierZeroScoreTests(unittest.TestCase):

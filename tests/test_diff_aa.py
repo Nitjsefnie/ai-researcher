@@ -86,7 +86,7 @@ class CommitMessageTests(unittest.TestCase):
 
         self.assertEqual(
             subject,
-            "Refresh capture: 616 models, intelligence frontier: Grok 4.6 (xhigh) in")
+            "chore(capture): 616 models, intelligence frontier: Grok 4.6 (xhigh) in")
         self.assertLessEqual(len(subject), diff_aa.SUBJECT_WIDTH)
 
     def test_a_frontier_swap_is_reported_even_though_the_count_holds(self):
@@ -126,7 +126,7 @@ class CommitMessageTests(unittest.TestCase):
 
     def test_subject_says_so_when_nothing_material_moved(self):
         self.assertEqual(diff_aa.as_commit_message(self.quiet()).splitlines()[0],
-                         "Refresh capture: 616 models, nothing the page renders")
+                         "chore(capture): 616 models, nothing the page renders")
 
     def test_speed_moves_alone_count_as_material(self):
         # Issue 9: a run whose only movement was rendered speed past the
@@ -138,7 +138,7 @@ class CommitMessageTests(unittest.TestCase):
 
         self.assertEqual(
             diff_aa.as_commit_message(speed_only).splitlines()[0],
-            "Refresh capture: 616 models, 769 rendered speed moves")
+            "chore(capture): 616 models, 769 rendered speed moves")
 
     def test_a_single_speed_move_is_not_pluralised(self):
         one = self.without_frontier(REPORT).replace(
@@ -147,7 +147,7 @@ class CommitMessageTests(unittest.TestCase):
 
         self.assertEqual(
             diff_aa.as_commit_message(one).splitlines()[0],
-            "Refresh capture: 616 models, 1 rendered speed move")
+            "chore(capture): 616 models, 1 rendered speed move")
 
     def test_keeps_the_thresholded_speed_section(self):
         body = diff_aa.as_commit_message(REPORT)
@@ -478,7 +478,7 @@ class ReportTests(unittest.TestCase):
         # chart, so it must not inflate that count to three.
         self.assertEqual(
             subject,
-            "Refresh capture: 2 models, 4 frontier moves across 2 charts, +1/-0")
+            "chore(capture): 2 models, 4 frontier moves across 2 charts, +1/-0")
 
     def test_a_removed_model_is_reported(self):
         old = [capture("Incumbent"), capture("Doomed", ident="doomed")]
@@ -784,7 +784,7 @@ class DisputeSectionTests(unittest.TestCase):
         subject = diff_aa.as_commit_message(
             self.render(old, new)).splitlines()[0]
         self.assertEqual(
-            subject, "Refresh capture: 1 models, 1 disputed value")
+            subject, "chore(capture): 1 models, 1 disputed value")
 
         carrier = dict(capture("Carrier", ident="carrier", intelligence=49),
                        genVariants=[{"ii": 49.0, "cost": 0.75},
@@ -797,7 +797,7 @@ class DisputeSectionTests(unittest.TestCase):
             self.render(old, new)).splitlines()[0]
         self.assertEqual(
             subject,
-            "Refresh capture: 2 models, 1 disputed value across 2 models")
+            "chore(capture): 2 models, 1 disputed value across 2 models")
 
     def test_disputes_and_frontier_moves_coexist_in_the_subject(self):
         # Both clauses present: the frontier phrase names the move, the
@@ -817,7 +817,7 @@ class DisputeSectionTests(unittest.TestCase):
 
         self.assertEqual(
             subject,
-            "Refresh capture: 2 models, parameters frontier: Ex out, "
+            "chore(capture): 2 models, parameters frontier: Ex out, "
             "1 disputed value")
 
     def test_the_disputes_clause_outranks_the_speed_clause(self):
@@ -851,7 +851,7 @@ class DisputeSectionTests(unittest.TestCase):
             self.render(old, new)).splitlines()[0]
 
         self.assertEqual(
-            subject, "Refresh capture: 1 models, nothing the page renders")
+            subject, "chore(capture): 1 models, nothing the page renders")
 
 
 class CostShapeSwitchTests(unittest.TestCase):
@@ -1083,7 +1083,7 @@ class RealCaptureTests(unittest.TestCase):
 
         message = diff_aa.as_commit_message(buffer.getvalue())
 
-        self.assertRegex(message, r"^Refresh capture: \d+ models")
+        self.assertRegex(message, r"^chore\(capture\): \d+ models")
         # DERIVED, never pinned. An earlier version of this line asserted
         # "644 models" and failed the build the next day because AA published
         # a 645th -- a test over live data asserting a live VALUE is a

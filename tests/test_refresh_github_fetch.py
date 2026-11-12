@@ -22,7 +22,7 @@ import test_refresh_workflow as refresh  # noqa: E402  # pylint: disable=wrong-i
 TOKEN_ENV = 'AI_RESEARCHER_GITHUB_TOKEN'
 # Built at run time so no token-shaped literal is committed.
 TOKEN = '-'.join(('fixture', 'credential', str(os.getpid())))
-MESSAGE = 'Most-starred: 1 new in the top 10: org/new\n\nNEW  rank 1 org/new\n'
+MESSAGE = 'chore(github-stars): 1 new in the top 10: org/new\n\nNEW  rank 1 org/new\n'
 
 
 class GitHubTrackerStructureTests(refresh.HFTrackerStructureTests):
@@ -76,7 +76,7 @@ class GitHubTrackerExecutedStepsTests(refresh.HFTrackerExecutedStepsTests):
         self.run_step('fetch', 'Fetch the top 10')
         self.assertEqual(seen.read_text(encoding='utf-8'), f'Bearer {TOKEN}')
         self.assertTrue((self.runner / 'message').read_text(encoding='utf-8').startswith(
-            'Most-starred: 10 new in the top 10:'))
+            'chore(github-stars): 10 new in the top 10:'))
         saved = (self.repo / self.data).read_bytes()
         self.env['COUNT'] = '9'
         result = self.run_step('fetch', 'Fetch the top 10', 1)
@@ -93,9 +93,9 @@ class GitHubTrackerExecutedStepsTests(refresh.HFTrackerExecutedStepsTests):
 class GitHubJoinedCommitTests(refresh._SeededOrigin, unittest.TestCase):  # pylint: disable=protected-access
     """The GitHub payload joins the one bot commit beside the other two."""
 
-    LISTS = (('hf', 'data/hf-trending.json', 'Trending: fresh HF'),
-             ('or', 'data/openrouter-trending.json', 'Top 10: fresh OR'),
-             ('github', 'data/github-stars.json', 'Most-starred: fresh GH'))
+    LISTS = (('hf', 'data/hf-trending.json', 'chore(trending): fresh HF'),
+             ('or', 'data/openrouter-trending.json', 'chore(openrouter): fresh OR'),
+             ('github', 'data/github-stars.json', 'chore(github-stars): fresh GH'))
 
     def test_github_list_commits_in_fixed_order_with_only_its_path(self):
         step = _workflowrun.step_by_name(refresh.WORKFLOW, 'publish', 'Commit the refresh')

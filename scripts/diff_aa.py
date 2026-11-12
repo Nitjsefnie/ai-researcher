@@ -491,7 +491,7 @@ def as_commit_message(report: str) -> str:
             multi = int(line.split()[0])
 
     moves = frontier_moves(lines)
-    head = f"Refresh capture: {models} models"
+    head = f"chore(capture): {models} models"
 
     def clauses(named):
         """Subject clauses, MOST newsworthy first -- that order is what the

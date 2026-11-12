@@ -242,7 +242,7 @@ jobs:
           fi
           case "$document" in
             ci-thresholds.json)
-              message='Ratchet ci-thresholds: raise the coverage floor (automated)'
+              message='chore(ratchet): raise the coverage floor (automated)'
               ;;
             *) echo 'unexpected ratchet document' >&2; exit 1 ;;
           esac

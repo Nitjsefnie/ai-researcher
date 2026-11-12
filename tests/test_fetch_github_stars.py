@@ -73,7 +73,7 @@ class MessageTests(unittest.TestCase):
     def test_new_repositories_use_the_sibling_subject_and_body_spelling(self):
         self.assertEqual(
             fetch_github_stars.message([], names("o/a", "o/b")),
-            "Most-starred: 2 new in the top 10: o/a, o/b\n\n"
+            "chore(github-stars): 2 new in the top 10: o/a, o/b\n\n"
             "NEW  rank 1 o/a\n"
             "NEW  rank 2 o/b\n")
 
@@ -81,26 +81,26 @@ class MessageTests(unittest.TestCase):
         self.assertEqual(
             fetch_github_stars.message(names("o/a", "o/b", "o/c"),
                                        names("o/b", "o/a", "o/c")),
-            "Most-starred: 2 rank change(s)\n\n"
+            "chore(github-stars): 2 rank change(s)\n\n"
             "MOVE o/b rank 2 -> 1\n"
             "MOVE o/a rank 1 -> 2\n")
 
     def test_no_changes_keep_the_order_updated_message(self):
         self.assertEqual(
             fetch_github_stars.message(names("o/a", "o/b"), names("o/a", "o/b")),
-            "Most-starred: order updated\n")
+            "chore(github-stars): order updated\n")
 
     def test_departed_repositories_use_the_exact_out_line(self):
         self.assertEqual(
             fetch_github_stars.message(names("o/a", "o/b"), names("o/a")),
-            "Most-starred: order updated\n\n"
+            "chore(github-stars): order updated\n\n"
             "OUT  o/b (was rank 2)\n")
 
     def test_new_departed_and_moved_lines_are_combined_in_sibling_order(self):
         text = fetch_github_stars.message(names("o/a", "o/b", "o/c"),
                                           names("o/d", "o/a", "o/c"))
         self.assertEqual(text,
-                         "Most-starred: 1 new in the top 10: o/d\n\n"
+                         "chore(github-stars): 1 new in the top 10: o/d\n\n"
                          "NEW  rank 1 o/d\n"
                          "OUT  o/b (was rank 2)\n"
                          "MOVE o/a rank 1 -> 2\n")
@@ -213,13 +213,13 @@ class MainTests(unittest.TestCase):
             capture.write_bytes(before)
             printed = self.run_main(capture, api_body())
             self.assertEqual(capture.read_bytes(), before)
-            self.assertEqual(printed, "Most-starred: order updated\n")
+            self.assertEqual(printed, "chore(github-stars): order updated\n")
 
     def test_missing_capture_uses_an_empty_previous_list(self):
         with tempfile.TemporaryDirectory() as directory:
             capture = pathlib.Path(directory) / "github-stars.json"
             printed = self.run_main(capture, api_body())
-            self.assertIn("Most-starred: 10 new in the top 10:", printed)
+            self.assertIn("chore(github-stars): 10 new in the top 10:", printed)
             self.assertTrue(capture.is_file())
 
     def test_message_option_writes_the_same_exact_bytes_it_prints(self):
@@ -231,7 +231,7 @@ class MainTests(unittest.TestCase):
             swapped = [{"full_name": name} for name in [old[1], old[0], *old[2:]]]
             printed = self.run_main(capture, api_body(items=swapped),
                                     ["--message", str(message_file)])
-            expected = ("Most-starred: 2 rank change(s)\n\n"
+            expected = ("chore(github-stars): 2 rank change(s)\n\n"
                         "MOVE owner/repo-1 rank 2 -> 1\n"
                         "MOVE owner/repo-0 rank 1 -> 2\n")
             self.assertEqual(message_file.read_bytes(), expected.encode("utf-8"))

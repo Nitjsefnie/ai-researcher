@@ -1222,13 +1222,13 @@ class ExecutedCommitMessageTests(_SeededOrigin, unittest.TestCase):
         with tempfile.TemporaryDirectory(prefix=".commit-msg-") as raw:
             message, names, log = self._run_hour(
                 pathlib.Path(raw),
-                differ_msg="Refresh capture: 690 models\n\nspeed rows\n")
-        self.assertEqual(message.strip(), "Refresh capture: 690 models\n\n"
+                differ_msg="chore(capture): 690 models\n\nspeed rows\n")
+        self.assertEqual(message.strip(), "chore(capture): 690 models\n\n"
                          "speed rows\n\n"
                          "Captured by .github/workflows/refresh.yml.")
         self.assertIn("speed rows", message)
         self.assertIn("Captured by .github/workflows/refresh.yml.", message)
-        self.assertNotIn("Rebuild the page: forced run", message)
+        self.assertNotIn("chore(page): forced run", message)
         self.assertIn("M\tdata/aa-raw-models.json", names)
         self.assertIn("A\tdata/aa-generation-state.json", names)
         self.assertIn("M\tout/frontier-models.html", names)
@@ -1242,8 +1242,8 @@ class ExecutedCommitMessageTests(_SeededOrigin, unittest.TestCase):
             message, names, log = self._run_hour(
                 pathlib.Path(raw), differ_msg=None)
         self.assertIn(
-            "Rebuild the page: forced run, AA capture unchanged", message)
-        self.assertNotIn("Refresh capture", message)
+            "chore(page): forced run, AA capture unchanged", message)
+        self.assertNotIn("chore(capture)", message)
         self.assertIn("M\tout/frontier-models.html", names)
         self.assertEqual(log.count("\n"), 2, log)
 
@@ -1285,12 +1285,12 @@ class ExecutedCommitMessageTests(_SeededOrigin, unittest.TestCase):
                 blocks = []
                 changed_paths = []
                 if 'aa' in sources:
-                    self._stage_payload(tmp, 'Refresh capture: new models\n\nDisputes\n')
-                    blocks.append('Refresh capture: new models\n\nDisputes')
+                    self._stage_payload(tmp, 'chore(capture): new models\n\nDisputes\n')
+                    blocks.append('chore(capture): new models\n\nDisputes')
                     changed_paths.extend(self.MOVED_FILES)
                 for tracker, filename, line in (
-                        ('hf', 'hf', 'Trending: fresh HF'),
-                        ('or', 'openrouter', 'Top 10: fresh OR')):
+                        ('hf', 'hf', 'chore(trending): fresh HF'),
+                        ('or', 'openrouter', 'chore(openrouter): fresh OR')):
                     if tracker in sources:
                         payload = tmp / f'{tracker}-payload'
                         (payload / 'data').mkdir(parents=True)
@@ -1307,7 +1307,7 @@ class ExecutedCommitMessageTests(_SeededOrigin, unittest.TestCase):
                     payload.mkdir()
                     (payload / 'trending-rankings.html').write_text('fresh page\n',
                                                                     encoding='utf-8')
-                    blocks.append("Rebuild the rankings page from this run's snapshots.")
+                    blocks.append("chore(rankings): Rebuild the rankings page from this run's snapshots.")
                     changed_paths.append('out/trending-rankings.html')
                 result = _workflowrun.run_step(tmp, self.step, self._env(tmp, config, base))
                 self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
@@ -1330,10 +1330,10 @@ class ExecutedCommitMessageTests(_SeededOrigin, unittest.TestCase):
             with self.subTest(ending=ending), tempfile.TemporaryDirectory() as raw:
                 tmp = pathlib.Path(raw)
                 config, base, _, _, _ = self._seed_origin(tmp, self.BASE_FILES)
-                self._stage_payload(tmp, 'Refresh capture: new models\n\nDisputes' + ending)
+                self._stage_payload(tmp, 'chore(capture): new models\n\nDisputes' + ending)
                 for tracker, filename, subject in (
-                        ('hf', 'hf', 'Trending: fresh HF'),
-                        ('or', 'openrouter', 'Top 10: fresh OR')):
+                        ('hf', 'hf', 'chore(trending): fresh HF'),
+                        ('or', 'openrouter', 'chore(openrouter): fresh OR')):
                     payload = tmp / f'{tracker}-payload'
                     (payload / 'data').mkdir(parents=True)
                     (payload / f'data/{filename}-trending.json').write_text(
@@ -1343,9 +1343,9 @@ class ExecutedCommitMessageTests(_SeededOrigin, unittest.TestCase):
                         encoding='utf-8', newline='\n')
                 result = _workflowrun.run_step(tmp, self.step, self._env(tmp, config, base))
                 self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-                expected = ('Refresh capture: new models\n\nDisputes\n\n'
-                            'Trending: fresh HF\n\nMOVE model rank 2 -> 1\n\n'
-                            'Top 10: fresh OR\n\nMOVE model rank 2 -> 1\n\n'
+                expected = ('chore(capture): new models\n\nDisputes\n\n'
+                            'chore(trending): fresh HF\n\nMOVE model rank 2 -> 1\n\n'
+                            'chore(openrouter): fresh OR\n\nMOVE model rank 2 -> 1\n\n'
                             'Captured by .github/workflows/refresh.yml.\n')
                 self.assertEqual((tmp / 'commit-msg.txt').read_text(encoding='utf-8'),
                                  expected)
@@ -1367,7 +1367,7 @@ class ExecutedCommitMessageTests(_SeededOrigin, unittest.TestCase):
                         mock.patch.object(pathlib.Path, 'write_text', windows_message_write):
                     tmp = pathlib.Path(raw)
                     config, base, _, _, _ = self._seed_origin(tmp, self.BASE_FILES)
-                    subject = 'Trending: ' + 'm' * (length - len('Trending: '))
+                    subject = 'chore(trending): ' + 'm' * (length - len('chore(trending): '))
                     block = subject + '\n\nMOVE org/model rank 2 -> 1\n'
                     payload = tmp / f'{tracker}-payload'
                     (payload / 'data').mkdir(parents=True)
@@ -1398,12 +1398,12 @@ class ExecutedCommitMessageTests(_SeededOrigin, unittest.TestCase):
             payload = tmp / 'hf-payload'
             (payload / 'data').mkdir(parents=True)
             (payload / 'data/hf-trending.json').write_text('new\n', encoding='utf-8')
-            (payload / 'message.txt').write_text('Trending: new HF\n',
+            (payload / 'message.txt').write_text('chore(trending): new HF\n',
                                                  encoding='utf-8', newline='\n')
             result = _workflowrun.run_step(tmp, self.step, self._env(tmp, config, base))
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             self.assertEqual(self._git('log', '-1', '--format=%B', cwd=tmp / 'scratch')
-                             .stdout.strip(), 'Trending: new HF\n\n'
+                             .stdout.strip(), 'chore(trending): new HF\n\n'
                              'Captured by .github/workflows/refresh.yml.')
 
 
@@ -1468,7 +1468,7 @@ class ExecutedGenerationTieTests(_SeededOrigin, unittest.TestCase):
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_text(text, encoding="utf-8")
         (tmp / "publish-payload" / "commit-msg.txt").write_text(
-            "Refresh capture: 690 models\n\nspeed rows\n", encoding="utf-8")
+            "chore(capture): 690 models\n\nspeed rows\n", encoding="utf-8")
 
     def _land_newer_generation(self, seed, origin, env):
         """Land the #200 tree: the snapshot's .gitignore rule is gone."""
@@ -1704,7 +1704,7 @@ def test_aa_payload_mode_and_republish_bytes(tmp_path, changed, force, mode, pag
     git(tmp_path, 'add', '--', *files)
     git(tmp_path, 'commit', '-qm', 'base')
     (tmp_path / 'out/frontier-models.html').write_text('fresh page', encoding='utf-8')
-    (tmp_path / 'commit-msg.txt').write_text('Refresh capture: fresh AA\n\nreport\n',
+    (tmp_path / 'commit-msg.txt').write_text('chore(capture): fresh AA\n\nreport\n',
                                              encoding='utf-8')
     env = {**os.environ, 'RUNNER_TEMP': str(tmp_path), 'AI_RESEARCHER_CHANGED': changed, 'AI_RESEARCHER_FORCE': force}
     result = _workflowrun.run_step(tmp_path, step(load(), 'Stage the publish payload'), env)
@@ -2412,7 +2412,7 @@ class HFTrackerExecutedStepsTests(unittest.TestCase):
     tracker = 'hf'
     fetcher = 'hf'
     data = 'data/hf-trending.json'
-    message = 'Trending: 1 new in the top 10: org/new\n\nNEW  rank 1 org/new\n'
+    message = 'chore(trending): 1 new in the top 10: org/new\n\nNEW  rank 1 org/new\n'
 
     def tracker_step(self, job, name):
         return step_in(load(), f'{self.tracker}-{job}', name)
@@ -2513,8 +2513,8 @@ class HFTrackerExecutedStepsTests(unittest.TestCase):
         self.env.update({'PYTHONPATH': str(stub), 'COUNT': '10'})
         self.run_step('fetch', 'Fetch the top 10')
         self.assertTrue((self.runner / 'message').read_text(encoding='utf-8').startswith(
-            'Trending: 10 new in the top 10:' if self.tracker == 'hf' else
-            'Top 10: 10 new:'))
+            'chore(trending): 10 new in the top 10:' if self.tracker == 'hf' else
+            'chore(openrouter): 10 new:'))
         saved = (self.repo / self.data).read_bytes()
         self.env['COUNT'] = '9'
         result = self.run_step('fetch', 'Fetch the top 10', 1)
@@ -2526,7 +2526,7 @@ class ORTrackerExecutedStepsTests(HFTrackerExecutedStepsTests):
     tracker = 'or'
     fetcher = 'openrouter'
     data = 'data/openrouter-trending.json'
-    message = 'Top 10: 1 new: org/new\n\nNEW  rank 1 org/new\n'
+    message = 'chore(openrouter): 1 new: org/new\n\nNEW  rank 1 org/new\n'
 
 
 @unittest.skipIf(os.name == 'nt', 'workflow shell runs on Ubuntu')
@@ -2540,7 +2540,7 @@ class JoinedPushExecutedTests(unittest.TestCase):
     base: str
     env: dict[str, str]
     data = 'data/hf-trending.json'
-    message = 'Trending: fresh list\n'
+    message = 'chore(trending): fresh list\n'
     setUp = HFTrackerExecutedStepsTests.setUp
     git = staticmethod(HFTrackerExecutedStepsTests.git)
     configure = HFTrackerExecutedStepsTests.configure
@@ -2723,7 +2723,7 @@ class ExecutedHubTrackerOrderingTests(unittest.TestCase):
             target.parent.mkdir(parents=True, exist_ok=True)
             target.write_text(content, encoding='utf-8')
         (payload / 'aa-mode.txt').write_text('moved\n', encoding='utf-8')
-        (payload / 'commit-msg.txt').write_text('Refresh capture: fresh AA\n', encoding='utf-8')
+        (payload / 'commit-msg.txt').write_text('chore(capture): fresh AA\n', encoding='utf-8')
         for tracker, name, key_name in (('hf', 'hf', 'id'), ('or', 'openrouter', 'slug')):
             payload = runner / f'{tracker}-payload'
             (payload / 'data').mkdir(parents=True)
