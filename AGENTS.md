@@ -110,7 +110,11 @@ they cannot alter its dispute or canonical order.
 `scripts/fetch_gdpval.py` reads `/evaluations/gdpval-aa`, takes the data
 file's path and key from the page's flight `manifest`, authenticates and
 decrypts the file (AES-256-GCM), and computes each model's cost; of all that,
-only `gdpvalCostPerTask` enters the capture.
+only `gdpvalCostPerTask` enters the capture. A pair that fails authentication
+is re-read, page, manifest and data file together, `AUTH_REREAD_SECONDS`
+(180 s) apart, up to `AUTH_ATTEMPTS` (2) attempts in all, never pairing one
+attempt's key with another's data; a cached input is read once, not re-read
+(issue #406).
 - The Elo comes from the leaderboard's `scores["gdpval-aa-normalized"]`; the
   detail route's top-level `gdpval` is read only for a record with no `scores`
   mapping (a detail-only model).
@@ -225,7 +229,8 @@ or hand-fix JSON — when:
   change under the same v2.1 title would rescale every cost unnoticed, a known
   limitation that no check guards;
 - the evaluation page or its flight `manifest` is missing or invalid, or its
-  data file is unreadable, fails authentication or decryption, fails to
+  data file is unreadable, fails authentication or decryption on every read
+  it is given (`AUTH_ATTEMPTS` live, one with a cached input), fails to
   decompress or parse, changes schema, or shares no dispute-capable field with
   the leaderboard — each message naming the page URL or the data file's path;
 - the Coding Agent Index falls below `CODING_ROW_FLOOR` paired rows.
