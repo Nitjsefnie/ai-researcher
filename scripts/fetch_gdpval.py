@@ -20,6 +20,12 @@ GDPVAL_VERSION = "2.1"
 # AA's GDPval-AA taskCount from its evaluation-config chunk.
 GDPVAL_TASK_COUNT = 220
 COST_FIELD = "gdpvalCostPerTask"
+# A page/data pair failing GCM authentication is re-read, page and data together,
+# AUTH_ATTEMPTS times IN TOTAL with AUTH_REREAD_SECONDS between attempts (issue #406).
+# Worst case, each fetch bounded at 3 * 25 + 5 + 10 = 90 s: 2 * (90 + 90) + 180 = 540 s,
+# which fetch_aa's RetryBoundArithmeticTests add to the capture's other worst-case terms.
+AUTH_ATTEMPTS = 2
+AUTH_REREAD_SECONDS = 180
 
 
 class Evaluation(NamedTuple):
@@ -169,26 +175,41 @@ def _manifest(page: str, flight_payload) -> dict:
         sys.exit(f"{GDPVAL_URL}: missing or invalid flight manifest ({exc})")
 
 
+def _authenticated(cached_page, cached_data, fetch_html, flight_payload, user_agent, timeout,
+                   sleep):
+    """The data path and its decrypted bytes, re-reading page and data together when authentication fails."""
+    attempts = 1 if cached_page or cached_data else AUTH_ATTEMPTS
+    for attempt in range(1, attempts + 1):
+        try:
+            page = fetch_html(cached_page, GDPVAL_URL)
+        except OSError as exc:
+            sys.exit(f"{GDPVAL_URL}: page read failed: {exc}")
+        manifest = _manifest(page, flight_payload)
+        path = manifest["path"]
+        try:
+            body = (pathlib.Path(cached_data).read_bytes() if cached_data else
+                    fetch_http.fetch_bytes("https://artificialanalysis.ai" + path,
+                                           {"User-Agent": user_agent}, timeout, sleep=sleep))
+        except OSError as exc:
+            sys.exit(f"{path}: data read failed: {exc}")
+        key = bytes.fromhex(manifest["key"])
+        nonce = hashlib.sha256(key).digest()[:12]
+        try:
+            return path, aa_aes_gcm.decrypt(key, nonce, body)
+        except ValueError as exc:
+            if attempt == attempts:
+                sys.exit(f"{path}: data authentication or decryption failed: {exc}")
+            print(f"{path}: authentication attempt {attempt} of {attempts} failed "
+                  f"({exc}); re-reading page and data in {AUTH_REREAD_SECONDS}s",
+                  file=sys.stderr)
+            sleep(AUTH_REREAD_SECONDS)
+    raise AssertionError("_authenticated ran out of attempts without a verdict")
+
+
 def fetch(cached_page, cached_data, fetch_html, flight_payload, user_agent, timeout, sleep):
     """Read and authenticate the evaluation records and their per-slug costs."""
-    try:
-        page = fetch_html(cached_page, GDPVAL_URL)
-    except OSError as exc:
-        sys.exit(f"{GDPVAL_URL}: page read failed: {exc}")
-    manifest = _manifest(page, flight_payload)
-    path = manifest["path"]
-    try:
-        body = (pathlib.Path(cached_data).read_bytes() if cached_data else
-                fetch_http.fetch_bytes("https://artificialanalysis.ai" + path,
-                                       {"User-Agent": user_agent}, timeout, sleep=sleep))
-    except OSError as exc:
-        sys.exit(f"{path}: data read failed: {exc}")
-    key = bytes.fromhex(manifest["key"])
-    nonce = hashlib.sha256(key).digest()[:12]
-    try:
-        compressed = aa_aes_gcm.decrypt(key, nonce, body)
-    except ValueError as exc:
-        sys.exit(f"{path}: data authentication or decryption failed: {exc}")
+    path, compressed = _authenticated(cached_page, cached_data, fetch_html, flight_payload,
+                                      user_agent, timeout, sleep)
     try:
         decoded = gzip.decompress(compressed)
     except (OSError, EOFError, zlib.error) as exc:
