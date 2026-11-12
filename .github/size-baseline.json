@@ -2,11 +2,11 @@
   "schema_version": 1,
   "baseline": {
     ".github/workflows/coverage-comment.yml": 517,
-    ".github/workflows/refresh.yml": 1360,
+    ".github/workflows/refresh.yml": 1317,
     ".github/workflows/tests.yml": 639,
     "build.py": 2632,
     "scripts/ci/check_ratchets.py": 690,
-    "scripts/ci/gate_base_freshness.py": 705,
+    "scripts/ci/gate_base_freshness.py": 701,
     "scripts/ci/install_chromium.py": 640,
     "scripts/ci/perf_budgets.py": 723,
     "scripts/diff_aa.py": 799,
@@ -24,8 +24,8 @@
     "tests/test_diff_aa.py": 1253,
     "tests/test_diff_coverage.py": 754,
     "tests/test_fetch_aa.py": 2722,
-    "tests/test_gate_base_freshness.py": 896,
+    "tests/test_gate_base_freshness.py": 894,
     "tests/test_ratchet_push_workflow.py": 595,
-    "tests/test_refresh_workflow.py": 2851
+    "tests/test_refresh_workflow.py": 2798
   }
 }

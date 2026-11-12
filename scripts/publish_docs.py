@@ -18,10 +18,14 @@ anything is sent: a base that does not parse as an https URL on the hub's
 own host is refused with exit code 2 and no network call, rather than
 followed — an environment override cannot point the credential at a
 cleartext destination or a different host.
+
+The upload retries a 429, a 5xx, a timeout or a dropped connection through
+scripts/ci/download.py's backoff window (issue #402).
 """
 from __future__ import annotations
 
 import argparse
+import importlib
 import json
 import os
 import sys
@@ -29,11 +33,16 @@ import urllib.error
 import urllib.parse
 import urllib.request
 import uuid
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent / "ci"))
+download = importlib.import_module("download")
 
 DEFAULT_URL = "https://docs.nitjsefni.eu"
 # The only host the credential may be sent to, derived from the default —
 # never restated as a literal that could drift away from it.
 DEFAULT_HOST = urllib.parse.urlsplit(DEFAULT_URL).hostname
+UPLOAD_TIMEOUT = 60  # seconds, the socket timeout of each attempt
 
 
 def multipart(fields: dict[str, str], filename: str,
@@ -84,20 +93,17 @@ def publish(path: str, fields: dict[str, str], key: str, base: str) -> int:
                                  data=body, method="POST")
     req.add_header("x-docs-key", key)
     req.add_header("Content-Type", content_type)
+
+    def attempt() -> tuple[int, bytes]:
+        with urllib.request.urlopen(req, timeout=UPLOAD_TIMEOUT) as resp:
+            return resp.status, resp.read()
+
     try:
-        with urllib.request.urlopen(req, timeout=60) as resp:
-            raw = resp.read()
-            status = resp.status
-    except urllib.error.HTTPError as exc:
-        # The hub answers with JSON on refusal; a Cloudflare error page is
-        # HTML. Print whichever came back rather than a traceback.
-        print(f"publish failed: HTTP {exc.code}\n{exc.read()[:400]!r}",
-              file=sys.stderr)
-        return 1
-    except urllib.error.URLError as exc:
-        print(f"publish failed: cannot reach {base}: {exc.reason}",
-              file=sys.stderr)
-        return 1
+        status, raw = download.retrying(attempt, req.full_url)
+    except download.RetriesExhausted as exc:
+        return _failed(f"publish failed {exc}", exc.__cause__, base)
+    except OSError as exc:
+        return _failed("publish failed", exc, base)
 
     try:
         payload = json.loads(raw)
@@ -108,7 +114,22 @@ def publish(path: str, fields: dict[str, str], key: str, base: str) -> int:
 
     print(json.dumps(payload, indent=1))
     # A 2xx with an error field is still a failure; the hub uses both.
-    return 0 if 200 <= status < 300 and not payload.get("error") else 1
+    if 200 <= status < 300 and not payload.get("error"):
+        return 0
+    print(f"publish failed: HTTP {status} with an error field", file=sys.stderr)
+    return 1
+
+
+def _failed(prefix: str, exc: BaseException | None, base: str) -> int:
+    if isinstance(exc, urllib.error.HTTPError):
+        # The hub answers with JSON on refusal; a Cloudflare error page is
+        # HTML. Print whichever came back rather than a traceback.
+        print(f"{prefix}: HTTP {exc.code}\n{exc.read()[:400]!r}",
+              file=sys.stderr)
+    else:
+        reason = getattr(exc, "reason", exc)
+        print(f"{prefix}: cannot reach {base}: {reason}", file=sys.stderr)
+    return 1
 
 
 def main() -> int:

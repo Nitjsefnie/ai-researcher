@@ -278,8 +278,10 @@ column uses the run and its fetch time, since a commit cannot contain its own
 SHA and committer time. Each page is published to docs-hub after the commit lands;
 `rankings-hub` publishes the same-run artifact to the
 [rankings page](https://docs.nitjsefni.eu/d/ai-researcher/trending-rankings),
-skipping an upload when the live bytes already match. The upload job executes
-no repository code and holds the docs-hub key only in its inline upload step.
+skipping an upload when the live bytes already match. Each hub job holds the
+docs-hub key only in its upload step, which runs `scripts/publish_docs.py` from
+the run's own commit and retries a 429, a 5xx, a timeout or a dropped
+connection inside `scripts/ci/download.py`'s backoff window (issue #402).
 
 For a build-only frontier change, `workflow_dispatch` with `force: true`
 rebuilds and republishes even when the fresh capture would render the identical

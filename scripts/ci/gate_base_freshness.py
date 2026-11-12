@@ -27,51 +27,47 @@ absent — a local run — the strict comparison stands, so nothing relaxes
 by accident.
 
 The set of such files is DERIVED from the workflows' text, not kept here:
-a hand-kept list goes stale exactly the way this check exists to prevent. The
-one hand-kept addition is SCRIPT_READS, what gate scripts read from
-inside, which no run text shows. The pin test fails when data/ or out/ holds
-no tracked file; a gate script reading a new, unlisted directory goes unseen.
+a hand-kept list goes stale exactly the way this check exists to prevent.
+Every tracked `.py` file in it is then followed, by gate_script_reach.py, to
+the tracked files it imports or runs, transitively (issue #401).
 
-The hand-held entries are REQUIRED_JOBS and SCRIPT_READS. Upstream
-(Nitjsefnie-Actions/pr-gate) derives nothing either: the ruleset that makes a
-status context required lives in repository settings, which are not in the
-repository. Here there is no ruleset, so REQUIRED_JOBS holds the de facto
-merge-gate jobs — the checks a pull request waits for green before it merges.
-Every name there must still be FOUND in a workflow below or the run refuses: a
-job renamed out of every workflow would otherwise shrink the set in silence,
-and a narrower set reports green over a wider gate.
+The hand-held entries are REQUIRED_JOBS and SCRIPT_READS (the data
+directories gate scripts read). Upstream (Nitjsefnie-Actions/pr-gate) derives
+nothing either: the ruleset that makes a status context required lives in
+repository settings, which are not in the repository. Here there is no
+ruleset, so REQUIRED_JOBS holds the de facto merge-gate jobs. Every name there
+must still be FOUND in a workflow below or the run refuses: a job renamed out
+of every workflow would otherwise shrink the set in silence, and a narrower
+set reports green over a wider gate.
 
-WHAT IT CANNOT SEE. The derivation reads text, so a file a gate reads that no
-`run:` block names, and no SCRIPT_READS entry holds, is outside it.
-Named here rather than left for a reader to infer, because each of these makes
-the gate NARROWER and a narrower gate looks the same as a correct one:
+WHAT IT CANNOT SEE: a file a gate reads that no `run:` names, no followed
+script imports or names as a `.py` literal, and SCRIPT_READS does not hold.
+Named here because each makes the gate NARROWER, and a narrower gate looks
+the same as a correct one:
 
   - A tool reading a configuration file no `run:` names. actionlint reads
     `.github/actionlint.yaml`; zizmor reads `zizmor.yml` at the root of the
     path it is given and under `.github/`; pylint and pyright read `.pylintrc`
     and `pyrightconfig.json` — named by no step's `run:` text.
-  - The whole-tree spelling. `git grep ... -- .` in the `actionlint` job's
+  - The whole-tree spelling: `git grep ... -- .` in the `actionlint` job's
     merge-marker step reads EVERY tracked file, and `.` resolves to nothing
-    here, so that step contributes no paths at all. Giving `resolve()` a
-    whole-tree arm would be correct and would make this "rebase before you
-    merge" on any change whatsoever — a rule this repository never asked for,
-    since no ruleset governs its merges. So the limit is named and the answer
-    stays visible rather than taken here.
-  - What a gate script reaches from inside itself, past the `run:` block —
-    pytest discovers every `tests/test_*.py` module, and none of those names
-    reaches this derivation.
-  - A path spelled only on a continuation line of a wrapped plain scalar —
-    the value this parser keeps is the first line's (see
-    `plain_continuation_end`), and the wrapped shapes in this repository
-    carry no paths.
+    here. A whole-tree arm would be correct and would make this "rebase
+    before you merge" on any change whatsoever, a rule this repository never
+    asked for; so the limit is named and the answer stays visible.
+  - An import spelled any other way (`__import__("x")`, a name that is not a
+    literal), a path built at runtime (`ROOT / "data" / name`), a non-`.py`
+    file a script reads, a `.py` a test names only as a literal, and the tests
+    pytest discovers (tests/ is in the set only because a `run:` names it).
+  - A path spelled only on a continuation line of a wrapped plain scalar (the
+    parser keeps the first line's; see `plain_continuation_end`); the wrapped
+    shapes in this repository carry no paths.
   - A directory a gate reads but no `run:` names with a `/` (a bare word is
     English as often as a directory) and SCRIPT_READS does not list.
 
-Runs on the standard library alone. The workflows are read with a parser for
-the block layout this repository uses rather than a YAML dependency, for the
-same reason the rest of the repo's stdlib-only runtime refuses unmodelled
-shapes: nothing installs a YAML dependency for it, and a parser that refuses a
-shape it does not model is better than a silent misreading.
+Runs on the standard library alone: the workflows are read with a parser for
+the block layout this repository uses, since nothing installs a YAML
+dependency for it, and a parser that refuses a shape it does not model is
+better than a silent misreading.
 
     scripts/ci/gate_base_freshness.py [--root DIR] [--print-paths]
 
@@ -79,28 +75,30 @@ shape it does not model is better than a silent misreading.
 pins the derivation.
 """
 
+import importlib
 import os
 import re
 import subprocess
 import sys
 from pathlib import Path
 
+if __package__:
+    from . import gate_script_reach
+else:
+    gate_script_reach = importlib.import_module("gate_script_reach")
+
 # The merge-gate jobs — the checks a pull request waits for green before it
-# merges. Hand-held, and only here: this repository carries no ruleset, so
-# nothing in repository settings can be asked which jobs are required, and the
-# de facto set lives in this one tuple. Each name is still looked up in the
-# workflows below, and a name with no job behind it is a refusal rather than a
-# silently smaller set. Two ci-gate names sit here beside the callee jobs:
-# `aggregate` is the fold ci-gate.yml reports on every push and pull request
-# (issue #133) and the context a required-check ruleset is to require, and
-# `classify` is the job whose decision binds every leg — naming both here is
-# what brings ci-gate's own steps, the classifier and the fold, into the
-# derived set.
+# merges; hand-held, and only here (see the module docstring). Two ci-gate
+# names sit beside the callee jobs: `aggregate` is the fold ci-gate.yml
+# reports on every push and pull request (issue #133) and the context a
+# required-check ruleset is to require, and `classify` is the job whose
+# decision binds every leg — naming both brings ci-gate's own steps, the
+# classifier and the fold, into the derived set.
 REQUIRED_JOBS = ("actionlint", "aggregate", "analyze", "classify", "coverage",
                  "lint", "page", "pip-audit", "pyright", "suites")
 
-# Paths gate scripts read from inside that no `run:` names: the `page` and `suites` data, and download.py's import.
-SCRIPT_READS = ("data/", "out/", "scripts/fetch_http.py")
+# Directories gate scripts read from inside that no `run:` names: the `page` and `suites` data.
+SCRIPT_READS = ("data/", "out/")
 
 # The branch a gate's head is compared against. Not configurable: a second
 # branch here would be a second base, and this question has one.
@@ -124,20 +122,28 @@ class WorkflowError(GateError):
     """A workflow whose shape this parser does not model."""
 
 
-def git(root, *arguments, what):
-    """Run one git command in `root` and return its stdout.
+def git_run(root, *arguments, what):
+    """(status, stdout, stderr) of one git command, decoded here as UTF-8.
 
-    Every call goes through here because a guard that reads its own error as a
-    clean tree is the false green this exists to prevent: a non-zero status is
-    a refusal naming what was being attempted, never an empty answer.
+    Text mode decodes in Windows reader threads that drop the error and hand back None; output
+    that is not UTF-8 is a refusal naming the command. Newlines stay as git wrote them (LF).
     """
     command = ("git", "-C", str(root)) + arguments
-    done = subprocess.run(command, capture_output=True, text=True, check=False)
-    if done.returncode != 0:
-        detail = done.stderr.strip() or "no output"
-        raise GateError(
-            f"cannot {what}: `{' '.join(command)}` exited {done.returncode}: {detail}")
-    return done.stdout
+    done = subprocess.run(command, capture_output=True, check=False)
+    try:
+        out, err = done.stdout.decode("utf-8"), done.stderr.decode("utf-8")
+    except UnicodeDecodeError as error:
+        raise GateError(f"cannot {what}: `{' '.join(command)}` wrote output that is not UTF-8: {error}") from error
+    return done.returncode, out, err
+
+
+def git(root, *arguments, what):
+    """git_run's stdout; a non-zero status is a refusal naming the attempt."""
+    status, out, err = git_run(root, *arguments, what=what)
+    if status != 0:
+        raise GateError(f"cannot {what}: `git -C {root} {' '.join(arguments)}` "
+                        f"exited {status}: {err.strip() or 'no output'}")
+    return out
 
 
 # --- reading the workflows -------------------------------------------------
@@ -512,6 +518,8 @@ def gate_paths(root):
             "to compare and this run can vouch for nothing")
     # After that refusal, so the list never stands in for workflows naming none.
     derived.update(f for d in SCRIPT_READS for f in resolve(d, files))
+    derived.update(gate_script_reach.reached(derived, files, lambda path: git(
+        root, "cat-file", "blob", f"HEAD:{path}", what=f"read {path}"), GateError))
     return sorted(derived)
 
 
@@ -554,17 +562,12 @@ def stale_commits(root, head, base, paths):
         raise GateError(
             f"the derived path set is {sized} bytes, past the {PATHSPECS_MAX_BYTES} "
             f"this run will put in an argument list")
-    listing = subprocess.run(
-        ("git", "-C", str(root), "log", f"{head}..{base}", "--name-only",
-         "--format=%x00%H%x09%s", "--", *paths),
-        capture_output=True, text=True, check=False)
-    if listing.returncode != 0:
-        raise GateError(
-            f"cannot list what {BASE_BRANCH} holds that this head lacks: "
-            f"`git log {head}..{base}` exited {listing.returncode}: "
-            f"{listing.stderr.strip() or 'no output'}")
+    attempt = f"list what {BASE_BRANCH} holds that this head lacks"
+    status, listing, err = git_run(root, "log", f"{head}..{base}", "--name-only", "--format=%x00%H%x09%s", "--", *paths, what=attempt)
+    if status != 0:
+        raise GateError(f"cannot {attempt}: `git log {head}..{base}` exited {status}: {err.strip() or 'no output'}")
     stale = []
-    for chunk in listing.stdout.split("\0"):
+    for chunk in listing.split("\0"):
         if not chunk.strip():
             continue
         header, _, body = chunk.partition("\n")
@@ -575,7 +578,7 @@ def stale_commits(root, head, base, paths):
 
 
 # The reach-limit sentence every green verdict prints: the derivation counts
-# only files a gate job names, never the whole-tree `.` spelling. One
+# only files a gate job names or its scripts reach, never the `.` spelling. One
 # constant, because two copies of a sentence have to be kept honest together.
 REACH_LIMIT_NOTE = (
     "  A step reading every tracked file — the `.` spelling, which the "
@@ -592,15 +595,12 @@ def head_is_mains_history(root, head, base):
     that read its own failure as "not an ancestor" would fall through to the
     strict comparison and judge a head whose ancestry was never established.
     """
-    done = subprocess.run(
-        ("git", "-C", str(root), "merge-base", "--is-ancestor", head, base),
-        capture_output=True, text=True, check=False)
-    if done.returncode not in (0, 1):
-        raise GateError(
-            f"cannot tell whether the head is {BASE_BRANCH}'s own history: "
-            f"`git merge-base --is-ancestor {head} {base}` exited "
-            f"{done.returncode}: {done.stderr.strip() or 'no output'}")
-    return done.returncode == 0
+    attempt = f"tell whether the head is {BASE_BRANCH}'s own history"
+    status, _, err = git_run(root, "merge-base", "--is-ancestor", head, base, what=attempt)
+    if status not in (0, 1):
+        raise GateError(f"cannot {attempt}: `git merge-base --is-ancestor {head} {base}` exited "
+                        f"{status}: {err.strip() or 'no output'}")
+    return status == 0
 
 
 def check(root):
@@ -623,20 +623,20 @@ def check(root):
               f"not — so the tree it checked out is a tree {BASE_BRANCH} carries "
               f"and there is nothing to rebase.")
         print("  The run derived the "
-              f"{len(paths)} file(s) a merge-gate job reads BY NAME.")
+              f"{len(paths)} file(s) a merge-gate job names or its scripts import or run.")
         print(REACH_LIMIT_NOTE)
         return 0
     stale = stale_commits(root, head, base, paths)
     if not stale:
-        # "reads", not "reads" with no limit attached. The merge-marker step
-        # reads EVERY tracked file through the `.` spelling, and this derivation
-        # resolves that to nothing, so the count below is the files a gate job
-        # names — not every file one touches. A green line is the one sentence
-        # a maintainer reads on this check, and a sentence that over-claims
-        # here is the same defect as an over-claiming report: it looks like
-        # the set is complete.
+        # Named with its limit attached. The merge-marker step reads EVERY
+        # tracked file through the `.` spelling, and this derivation resolves
+        # that to nothing, so the count below is the files a gate job names or
+        # its scripts import or run — not every file one touches. A green line
+        # is the one sentence a maintainer reads on this check, and one that
+        # over-claims here is the same defect as an over-claiming report: it
+        # looks like the set is complete.
         print(f"This head carries every commit on {BASE_BRANCH} that touches "
-              f"the {len(paths)} file(s) a merge-gate job reads BY NAME.")
+              f"the {len(paths)} file(s) a merge-gate job names or its scripts import or run.")
         print(REACH_LIMIT_NOTE)
         return 0
     plural = "s" if len(stale) != 1 else ""
@@ -673,11 +673,7 @@ def main(argv):
         argument = rest.pop(0)
         if argument == "--print-paths":
             print_paths = True
-        elif argument == "--root":
-            if not rest:
-                print("usage: gate_base_freshness.py [--root DIR] [--print-paths]",
-                      file=sys.stderr)
-                return 2
+        elif argument == "--root" and rest:
             root = Path(rest.pop(0))
         else:
             print("usage: gate_base_freshness.py [--root DIR] [--print-paths]",
