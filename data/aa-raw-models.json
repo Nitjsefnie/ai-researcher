@@ -45021,17 +45021,7 @@
   "outputModalityText": true,
   "outputModalityImage": false,
   "outputModalitySpeech": false,
-  "outputModalityVideo": false,
-  "genVariants": [
-   {},
-   {
-    "ii": 26.8936694361562,
-    "cost": 0.2922227000200506,
-    "ctx": 1000000,
-    "pin": 1.5,
-    "pout": 7.5
-   }
-  ]
+  "outputModalityVideo": false
  },
  {
   "slug": "apertus-8b-instruct",
@@ -45324,7 +45314,7 @@
   "timeToFirstAnswerToken": 17.103975315534605,
   "id": "8a999846-4c1d-4ce7-a8b7-1310a7166fd7",
   "suffix": "High",
-  "chartDefaultSelected": true,
+  "chartDefaultSelected": false,
   "chartHighlighted": false,
   "releaseDate": "2026-09-02",
   "knowledgeCutoffDate": null,
@@ -68369,7 +68359,7 @@
   "cacheWritePrice": null,
   "id": "dad0e3b1-e3e7-477a-99f9-c14457a91114",
   "suffix": "Xhigh",
-  "chartDefaultSelected": false,
+  "chartDefaultSelected": true,
   "chartHighlighted": false,
   "releaseDate": "2026-11-12",
   "knowledgeCutoffDate": null,
@@ -68558,17 +68548,7 @@
   "outputModalityText": true,
   "outputModalityImage": false,
   "outputModalitySpeech": false,
-  "outputModalityVideo": false,
-  "genVariants": [
-   {},
-   {
-    "ii": 53.9192287317542,
-    "cost": 3.1601590757006157,
-    "ctx": 1000000,
-    "pin": 1.5,
-    "pout": 7.5
-   }
-  ]
+  "outputModalityVideo": false
  },
  {
   "slug": "gemini-4-hydrogen-high",
@@ -68843,17 +68823,7 @@
   "outputModalityText": true,
   "outputModalityImage": false,
   "outputModalitySpeech": false,
-  "outputModalityVideo": false,
-  "genVariants": [
-   {},
-   {
-    "ii": 50.7870826951304,
-    "cost": 1.8733140062520008,
-    "ctx": 1000000,
-    "pin": 1.5,
-    "pout": 7.5
-   }
-  ]
+  "outputModalityVideo": false
  },
  {
   "slug": "k2-v2-low",
@@ -76654,17 +76624,7 @@
   "outputModalityText": true,
   "outputModalityImage": false,
   "outputModalitySpeech": false,
-  "outputModalityVideo": false,
-  "genVariants": [
-   {},
-   {
-    "ii": 41.2329566992579,
-    "cost": 0.7979866055252406,
-    "ctx": 1000000,
-    "pin": 1.5,
-    "pout": 7.5
-   }
-  ]
+  "outputModalityVideo": false
  },
  {
   "slug": "deepseek-v4-1-flash-1017",
