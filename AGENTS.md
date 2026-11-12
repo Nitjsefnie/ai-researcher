@@ -347,7 +347,7 @@ Deliberate failures: a nonzero `fetch_aa.py` exit turns the scheduled run red
 instead of committing a mangled capture; the suite runs before the commit, so a
 capture that breaks the page leaves the last good capture committed and the
 last good page live. A cross-route disagreement is never a failure: that hour's
-only scheduled commit is `Refresh capture: …`, with nothing estimated or
+only scheduled commit is `chore(capture): …`, with nothing estimated or
 interpolated. The one red disputed hour is the GDPval-AA case under "Disputed
 hours".
 

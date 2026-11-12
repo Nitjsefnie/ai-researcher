@@ -50,7 +50,7 @@ class MessageTests(unittest.TestCase):
         self.assertEqual(
             fetch_openrouter_trending.message(
                 slugs("org/a", "org/b", "org/x"), slugs("org/x")),
-            "Top 10: 1 rank change(s)\n\n"
+            "chore(openrouter): 1 rank change(s)\n\n"
             "OUT  org/a (was rank 1)\n"
             "OUT  org/b (was rank 2)\n"
             "MOVE org/x rank 3 -> 1\n")
@@ -58,7 +58,7 @@ class MessageTests(unittest.TestCase):
     def test_new_models_use_the_upstream_subject_and_body_spelling(self):
         self.assertEqual(
             fetch_openrouter_trending.message([], slugs("org/a", "org/b")),
-            "Top 10: 2 new: org/a, org/b\n\n"
+            "chore(openrouter): 2 new: org/a, org/b\n\n"
             "NEW  rank 1 org/a\n"
             "NEW  rank 2 org/b\n")
 
@@ -67,7 +67,7 @@ class MessageTests(unittest.TestCase):
             fetch_openrouter_trending.message(
                 slugs("org/a", "org/b", "org/c"),
                 slugs("org/b", "org/a", "org/c")),
-            "Top 10: 2 rank change(s)\n\n"
+            "chore(openrouter): 2 rank change(s)\n\n"
             "MOVE org/b rank 2 -> 1\n"
             "MOVE org/a rank 1 -> 2\n")
 
@@ -75,12 +75,12 @@ class MessageTests(unittest.TestCase):
         self.assertEqual(
             fetch_openrouter_trending.message(
                 slugs("org/a", "org/b"), slugs("org/a", "org/b")),
-            "Top 10: order updated\n")
+            "chore(openrouter): order updated\n")
 
     def test_departed_models_use_the_exact_out_line(self):
         self.assertEqual(
             fetch_openrouter_trending.message(slugs("org/a", "org/b"), slugs("org/a")),
-            "Top 10: order updated\n\n"
+            "chore(openrouter): order updated\n\n"
             "OUT  org/b (was rank 2)\n")
 
     def test_new_departed_and_moved_lines_are_combined_in_upstream_order(self):
@@ -88,7 +88,7 @@ class MessageTests(unittest.TestCase):
             fetch_openrouter_trending.message(
                 slugs("org/a", "org/old", "org/c"),
                 slugs("org/new", "org/a", "org/c")),
-            "Top 10: 1 new: org/new\n\n"
+            "chore(openrouter): 1 new: org/new\n\n"
             "NEW  rank 1 org/new\n"
             "OUT  org/old (was rank 2)\n"
             "MOVE org/a rank 1 -> 2\n")
@@ -169,7 +169,7 @@ class MainTests(unittest.TestCase):
                     contextlib.redirect_stdout(output):
                 fetch_openrouter_trending.main([])
 
-            self.assertIn("Top 10: 10 new:", output.getvalue())
+            self.assertIn("chore(openrouter): 10 new:", output.getvalue())
             self.assertTrue(capture.is_file())
 
     def test_capture_write_has_exact_json_bytes(self):
@@ -236,7 +236,7 @@ class MainTests(unittest.TestCase):
             ).encode("utf-8"))
             output = io.StringIO()
             expected = (
-                "Top 10: 2 rank change(s)\n\n"
+                "chore(openrouter): 2 rank change(s)\n\n"
                 "MOVE org/model-1 rank 2 -> 1\n"
                 "MOVE org/model-0 rank 1 -> 2\n")
 
@@ -267,7 +267,7 @@ class MainTests(unittest.TestCase):
                 fetch_openrouter_trending.main()
 
             self.assertEqual(capture.read_bytes(), seed_bytes)
-            self.assertEqual(output.getvalue(), "Top 10: order updated\n")
+            self.assertEqual(output.getvalue(), "chore(openrouter): order updated\n")
 
     def test_committed_seed_has_ten_model_slugs(self):
         seed = json.loads(SEED.read_text(encoding="utf-8"))

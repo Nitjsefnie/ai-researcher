@@ -42,7 +42,7 @@ DEFAULT_URL = "https://docs.nitjsefni.eu"
 # The only host the credential may be sent to, derived from the default —
 # never restated as a literal that could drift away from it.
 DEFAULT_HOST = urllib.parse.urlsplit(DEFAULT_URL).hostname
-UPLOAD_TIMEOUT = 60  # seconds, the socket timeout of each attempt
+UPLOAD_TIMEOUT = 60  # seconds, urllib's timeout for each socket operation
 
 
 def multipart(fields: dict[str, str], filename: str,

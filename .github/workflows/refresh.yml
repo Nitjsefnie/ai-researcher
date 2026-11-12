@@ -86,7 +86,7 @@ name: refresh
 # timestamps do not identify it). Nothing to dispute, retry or heal: the
 # leaderboard publishes every value it carries, the detail route fills only
 # what it omits (a FILL, not a disagreement; fetch_aa.py never exits 3). A
-# moved AA capture contributes its "Refresh capture: ..." subject.
+# moved AA capture contributes its "chore(capture): ..." subject.
 #
 # The three trending trackers stage their own changed snapshots independently of
 # AA and each other. Rankings builds from the run's base history plus those
@@ -544,7 +544,7 @@ jobs:
   # starts CI on main, then each hub verifies its own publishable bytes
   # (issue #206). Failed producers stay red without blocking survivors.
   # No repository code executes in the committer or push jobs; each hub job
-  # runs only scripts/publish_docs.py, from the run's own commit.
+  # runs scripts/publish_docs.py and its imports (download.py, fetch_http.py).
   #
   # The push race and its outcomes are in the header; the committer concedes
   # the one race no base check sees, main landing a newer workflow
@@ -738,7 +738,7 @@ jobs:
           if [ -f "${PAYLOAD}/aa-mode.txt" ]; then
             case "$(cat "${PAYLOAD}/aa-mode.txt")" in
               moved) blocks+=("$(cat "${PAYLOAD}/commit-msg.txt")") ;;
-              rebuild) blocks+=('Rebuild the page: forced run, AA capture unchanged') ;;
+              rebuild) blocks+=('chore(page): forced run, AA capture unchanged') ;;
             esac
           fi
           if [ -f "${RUNNER_TEMP}/hf-payload/message.txt" ]; then
@@ -751,7 +751,7 @@ jobs:
             blocks+=("$(cat "${RUNNER_TEMP}/github-payload/message.txt")")
           fi
           if [ -f "${RUNNER_TEMP}/rankings-page/trending-rankings.html" ]; then
-            blocks+=("Rebuild the rankings page from this run's snapshots.")
+            blocks+=("chore(rankings): Rebuild the rankings page from this run's snapshots.")
           fi
           {
             if [ "${#blocks[@]}" -gt 0 ]; then
@@ -900,8 +900,8 @@ jobs:
     name: Publish the page to docs-hub
     runs-on: ubuntu-latest
 
-    # Per-job ceiling: the upload's last retry starts inside download.py's
-    # 300 s window and may wait its 60 s socket timeout (issue #402).
+    # Per-job ceiling: the last upload retry starts inside download.py's 300 s
+    # window; its 60 s timeout is per socket operation, DNS has none (issue #402).
     timeout-minutes: 15
 
     needs: [publish, push, refresh]
@@ -1159,7 +1159,7 @@ jobs:
     # when the committer and push both skip. Failed commit or delivery jobs
     # suppress publication. Main's committed page must match the artifact
     # before HTTP; identical live bytes skip the upload. The only repository
-    # code beside the upload key is the hub job's publish_docs.py.
+    # code this job runs, from its own checkout: publish_docs.py and its imports.
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:

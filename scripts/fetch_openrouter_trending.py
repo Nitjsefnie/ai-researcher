@@ -35,7 +35,7 @@ def fetch() -> list[dict[str, str]]:
 
 def message(old: list[dict[str, str]], new: list[dict[str, str]]) -> str:
     """Describe entries, departures and rank changes with explicit rank labels."""
-    return trending_message.message(old, new, "slug", "Top 10:", "new")
+    return trending_message.message(old, new, "slug", "chore(openrouter):", "new")
 
 
 def main(argv: list[str] | None = None) -> None:

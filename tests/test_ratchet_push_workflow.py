@@ -299,7 +299,7 @@ DIRECTORIES = {
 }
 MESSAGES = {
     "ci-thresholds.json":
-        "Ratchet ci-thresholds: raise the coverage floor (automated)",
+        "chore(ratchet): raise the coverage floor (automated)",
 }
 # Each staging directory's list-step tag, as the steps' env reads it.
 TAGS = {"ratchet-data": "ratchet"}

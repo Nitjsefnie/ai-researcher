@@ -47,7 +47,7 @@ def fetch() -> list[dict[str, str]]:
 
 def message(old: list[dict[str, str]], new: list[dict[str, str]]) -> str:
     """Describe what moved."""
-    return trending_message.message(old, new, "full_name", "Most-starred:", "new in the top 10")
+    return trending_message.message(old, new, "full_name", "chore(github-stars):", "new in the top 10")
 
 
 def main(argv: list[str] | None = None) -> None:

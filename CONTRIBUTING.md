@@ -296,7 +296,7 @@ cells showed both routes' values. It no longer reacts at all, because there is
 nothing to react to: the leaderboard route is the fresh one and is published,
 the detail route fills fields a shared leaderboard record omits. A disagreement
 is resolved by fixed precedence rather than by a state. So the only scheduled
-commit is `Refresh capture: N models, …`, there is no disagreement that turns a
+commit is `chore(capture): N models, …`, there is no disagreement that turns a
 run red, and the published document only moves forward. The two rules that
 matter when you touch the capture are in AGENTS.md — the leaderboard-wins
 precedence and the breakdown-drop guard at the cost shape split. The dispute-layer
@@ -514,6 +514,13 @@ only with the `ci` type. The type disambiguates shared names: `ci(refresh)`
 changes the refresh workflow, while `fix(refresh)` would be a change no
 reader can place. A subject that check cannot parse is listed by it, and
 left to the pr gate.
+
+The commits this repository's automation writes follow the same format: the
+refresh workflow's scheduled commit leads with `chore(capture)`,
+`chore(trending)`, `chore(openrouter)`, `chore(github-stars)`, `chore(page)` or
+`chore(rankings)`, the ratchet push with `chore(ratchet)`, and Dependabot's
+pull requests with `build(deps)`, `build(deps-dev)` or `ci(deps)` (its
+`commit-message` setting in `.github/dependabot.yml`).
 
 ## House style
 

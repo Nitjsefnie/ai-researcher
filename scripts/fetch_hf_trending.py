@@ -33,7 +33,7 @@ def fetch() -> list[dict[str, str]]:
 
 def message(old: list[dict[str, str]], new: list[dict[str, str]]) -> str:
     """Describe entries, departures and rank changes in upstream spelling."""
-    return trending_message.message(old, new, "id", "Trending:", "new in the top 10")
+    return trending_message.message(old, new, "id", "chore(trending):", "new in the top 10")
 
 
 def main(argv: list[str] | None = None) -> None:
