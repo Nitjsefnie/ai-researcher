@@ -20,8 +20,9 @@ GDPVAL_VERSION = "2.1"
 # AA's GDPval-AA taskCount from its evaluation-config chunk.
 GDPVAL_TASK_COUNT = 220
 COST_FIELD = "gdpvalCostPerTask"
-# A page/data pair failing GCM authentication is re-read, page and data together,
-# AUTH_ATTEMPTS times IN TOTAL with AUTH_REREAD_SECONDS between attempts (issue #406).
+# A live page/data pair failing GCM authentication is re-read, page and data together,
+# AUTH_ATTEMPTS times IN TOTAL with AUTH_REREAD_SECONDS between attempts (issue #406);
+# a cached input is read once.
 # Worst case, each fetch bounded at 3 * 25 + 5 + 10 = 90 s: 2 * (90 + 90) + 180 = 540 s,
 # which fetch_aa's RetryBoundArithmeticTests add to the capture's other worst-case terms.
 AUTH_ATTEMPTS = 2
@@ -177,7 +178,7 @@ def _manifest(page: str, flight_payload) -> dict:
 
 def _authenticated(cached_page, cached_data, fetch_html, flight_payload, user_agent, timeout,
                    sleep):
-    """The data path and its decrypted bytes, re-reading page and data together when authentication fails."""
+    """The data path and its decrypted bytes; a live pair that fails authentication is re-read together."""
     attempts = 1 if cached_page or cached_data else AUTH_ATTEMPTS
     for attempt in range(1, attempts + 1):
         try:
