@@ -1510,8 +1510,7 @@ class RetryBoundArithmeticTests(unittest.TestCase):
     job timeout WITHOUT editing the workflow, so the fit is pinned as an
     assertion rather than narrated. A future constant bump that would crowd
     out the rest of the job (checkout, pip + Chromium, the browser suite,
-    build, publish -- ~7 min measured) fails here instead of timing out a
-    real run."""
+    build, publish -- ~7 min measured) fails here, not in a real run."""
 
     # One page fetch's bound: PAGE_ATTEMPTS attempts, each stalling at most
     # FETCH_TIMEOUT_SECONDS, plus the linear backoff sleeps between them.
@@ -1520,17 +1519,18 @@ class RetryBoundArithmeticTests(unittest.TestCase):
                         for k in range(1, fetch_aa.PAGE_ATTEMPTS)))
     # The capture fetches exactly five pages (the methodology version pin,
     # two spaced leaderboard looks, the detail page, the coding agents),
-    # each at that bound, plus one dispute-look spacing wait (issue #208);
-    # the page retry is the only retry level left (issue #200). 1200 s is
-    # the capture budget that leaves the ~7-min remainder room in the job's
-    # 1800 s, with slack.
+    # each at that bound, plus one dispute-look spacing wait (issue #208)
+    # and the GDPval-AA route (issue #406): AUTH_ATTEMPTS attempts of a page
+    # and a data fetch at that bound, AUTH_REREAD_SECONDS apart. 1200 s is
+    # the capture budget leaving the ~7-min remainder room in the 1800 s job.
     CAPTURE_BUDGET = 1200
 
     def test_worst_case_stays_within_the_capture_budget(self):
         # The comment in fetch_aa.py commits to exactly this arithmetic.
-        worst_case = (5 * self.PAGE_BOUND
-                      + fetch_aa.DISPUTE_LOOK_SPACING_SECONDS)
-
+        gdpval = fetch_aa.fetch_gdpval
+        worst_case = (5 * self.PAGE_BOUND + fetch_aa.DISPUTE_LOOK_SPACING_SECONDS
+                      + gdpval.AUTH_ATTEMPTS * 2 * self.PAGE_BOUND
+                      + (gdpval.AUTH_ATTEMPTS - 1) * gdpval.AUTH_REREAD_SECONDS)
         self.assertLessEqual(worst_case, self.CAPTURE_BUDGET)
 
     def test_a_hard_down_site_fails_inside_the_first_page_bound(self):

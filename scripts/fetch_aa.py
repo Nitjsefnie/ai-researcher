@@ -104,17 +104,17 @@ FETCH_TIMEOUT_SECONDS = 25
 # not an outage, and fails on attempt 1; the classifier's precedent is
 # audit.yml's pip-audit retry (issue #128, PR #142).
 #
-# Against refresh.yml's timeout-minutes: 30 (1800 s), which is sized for a FULL
-# run -- checkout, setup-python, the pip + Chromium installs, the browser suite,
-# build, commit, publish. Worst case for the capture itself is five page
-# fetches (the methodology version pin, two spaced leaderboard looks, the
-# detail page, the coding agents), each bounded at
-# PAGE_ATTEMPTS * FETCH_TIMEOUT_SECONDS plus its backoff sleeps
-# (3 * 25 + 15 = 90 s), so at most 450 s -- and that only if every fetch
-# succeeds slowly; transport exhaustion SHORT-CIRCUITS, fetch_html refuses and
-# the process exits inside one page bound. The fetch terms are the per-attempt
-# BOUND, not a promise: a slow-drip body can outlast a single socket timeout,
-# and the job's headroom is what absorbs the difference.
+# Against refresh.yml's timeout-minutes: 30 (1800 s), sized for a FULL run:
+# checkout, installs, browser suite, build, commit, publish. The capture's
+# worst case is five page fetches (the methodology version pin, two spaced
+# leaderboard looks, the detail page, the coding agents), each bounded at
+# PAGE_ATTEMPTS * FETCH_TIMEOUT_SECONDS plus its backoff sleeps (3 * 25 + 15
+# = 90 s), so 450 s; plus one dispute-look spacing wait (180 s) and the
+# GDPval-AA route's page and data fetches, fetch_gdpval.AUTH_ATTEMPTS times,
+# AUTH_REREAD_SECONDS apart (2 * (90 + 90) + 180 = 540 s): 1170 s, if every
+# fetch succeeds slowly; transport exhaustion exits in one page bound. These
+# are per-attempt BOUNDS, not a promise: a slow-drip body can outlast a single
+# socket timeout.
 PAGE_ATTEMPTS = fetch_http.ATTEMPTS
 PAGE_BACKOFF_SECONDS = fetch_http.BACKOFF_SECONDS
 
