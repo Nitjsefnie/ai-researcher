@@ -348,6 +348,25 @@ def test_main_reads_methodology_once_before_evaluation(tmp_path, monkeypatch):
     assert events.count(fetch_aa.METHODOLOGY_URL) == 1
 
 
+def test_main_hands_the_evaluation_fetch_the_capture_sleep_and_timeout(tmp_path, monkeypatch):
+    _main_files(tmp_path, monkeypatch)
+    seen = []
+    real = fetch_aa.fetch_gdpval.fetch
+
+    def fetch_evaluation(*args):
+        seen.append(args)
+        return real(*args)
+
+    def capture_sleep(_seconds):
+        pass
+
+    monkeypatch.setattr(fetch_aa, "_sleep", capture_sleep)
+    monkeypatch.setattr(fetch_aa, "FETCH_TIMEOUT_SECONDS", 7)
+    monkeypatch.setattr(fetch_aa.fetch_gdpval, "fetch", fetch_evaluation)
+    fetch_aa.main()
+    assert [args[5:] for args in seen] == [(7, capture_sleep)]
+
+
 @pytest.mark.parametrize("kind", ["page", "version", "manifest", "data", "tag", "gzip", "json", "schema"])
 def test_main_refusal_leaves_all_capture_files_unchanged(tmp_path, monkeypatch, kind):
     content = {"gzip": b"bad gzip", "json": gzip.compress(b"bad JSON"),
