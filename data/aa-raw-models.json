@@ -33334,7 +33334,7 @@
   "intelligenceIndex": 46.4526236744189,
   "omniscience": 29.866666666666667,
   "scores": {
-   "aa-briefcase": 1674.14,
+   "aa-briefcase": 1673.62,
    "omniscience-accuracy": 0.48933333333333334,
    "omniscience-non-hallucination": 0.6266318537859008,
    "automationbench-aa": 0.7329771090921112,
@@ -33514,7 +33514,7 @@
   "intelligenceIndexEvaluations": [
    {
     "slug": "aa-briefcase",
-    "score": 1674.14,
+    "score": 1673.62,
     "outputTokensPerTask": 144267.9120879121,
     "costPerTask": 7.220636366641112,
     "timePerTask": 4493.316955990389
@@ -33585,20 +33585,20 @@
   },
   "briefcaseBreakdown": {
    "overall": {
-    "elo": 1674.14,
-    "lower95ci": 1663.54,
-    "upper95ci": 1686.35
+    "elo": 1673.62,
+    "lower95ci": 1662.97,
+    "upper95ci": 1685.16
    },
    "rubricPassRate": 0.5040404040404041,
    "analyticalQuality": {
-    "elo": 1976.01,
-    "lower95ci": 1954.12,
-    "upper95ci": 1998.93
+    "elo": 1974.66,
+    "lower95ci": 1955.67,
+    "upper95ci": 1995.68
    },
    "presentation": {
-    "elo": 1671.36,
-    "lower95ci": 1651.38,
-    "upper95ci": 1692.55
+    "elo": 1670.85,
+    "lower95ci": 1650.51,
+    "upper95ci": 1691.81
    }
   },
   "briefcaseTotalCost": 657.0779093643412,
@@ -33609,79 +33609,79 @@
   },
   "personalityBench": {
    "scores": {
-    "lexicallyVaried": 1143.38,
-    "eloquent": 1189.4,
-    "literate": 1046.92,
-    "naturalSounding": 944.8,
-    "metaphorical": 1045.44,
-    "structured": 972.38,
-    "scannable": 972.74,
-    "summarizesBottomLine": 1072.19,
-    "answerFirst": 977.3,
-    "informationDense": 1127.52,
-    "evidenceBased": 849.87,
-    "resourceSpecific": 1122.34,
-    "providesActionableGuidance": 1185.2,
-    "pragmatic": 974.57,
-    "truthful": 988.88,
-    "admitsUncertainty": 912.98,
-    "disclaimsWithAssumptions": 954.81,
-    "flagsNuances": 1100.45,
-    "sycophantic": 1014.29,
-    "friendly": 858.5,
-    "humorous": 1001.17,
-    "sincere": 1023.2,
-    "emotionallyIntelligent": 894.32,
-    "direct": 976.87,
-    "confident": 1106.24,
-    "opinionated": 1090.94,
-    "constructivelyPushesBack": 1055.63,
-    "creative": 1021.09,
-    "openEnded": 780.3,
-    "slop": 1083.71
+    "lexicallyVaried": 1147.75,
+    "eloquent": 1189.33,
+    "literate": 1048.43,
+    "naturalSounding": 944.7,
+    "metaphorical": 1043.53,
+    "structured": 966,
+    "scannable": 969.88,
+    "summarizesBottomLine": 1073.03,
+    "answerFirst": 975.95,
+    "informationDense": 1126.25,
+    "evidenceBased": 853.4,
+    "resourceSpecific": 1122.5,
+    "providesActionableGuidance": 1169.88,
+    "pragmatic": 974.12,
+    "truthful": 990.89,
+    "admitsUncertainty": 917.81,
+    "disclaimsWithAssumptions": 953.12,
+    "flagsNuances": 1097.92,
+    "sycophantic": 1017.1,
+    "friendly": 860.31,
+    "humorous": 998.11,
+    "sincere": 1017.76,
+    "emotionallyIntelligent": 897.38,
+    "direct": 979.12,
+    "confident": 1107.04,
+    "opinionated": 1089.29,
+    "constructivelyPushesBack": 1055.51,
+    "creative": 1021.06,
+    "openEnded": 784.47,
+    "slop": 1083.01
    },
    "indexScores": {
-    "expressiveness": 67,
-    "organization": 83.5,
-    "informativeness": 27.812499999999996,
-    "transparency": 87.625,
-    "warmth": 56.6875,
-    "conviction": 64.9375,
-    "imagination": 54.62499999999999,
-    "slop": 17.5
+    "expressiveness": 65.73076923076923,
+    "organization": 82.86538461538461,
+    "informativeness": 31.461538461538463,
+    "transparency": 88.57692307692308,
+    "warmth": 58.11538461538461,
+    "conviction": 65.73076923076923,
+    "imagination": 54.30769230769231,
+    "slop": 21.942307692307693
    },
    "indexIntervals": {
     "expressiveness": {
-     "lower": 60,
-     "upper": 71
+     "lower": 59,
+     "upper": 69
     },
     "organization": {
-     "lower": 70,
+     "lower": 73,
      "upper": 96
     },
     "informativeness": {
-     "lower": 26,
-     "upper": 36
+     "lower": 30,
+     "upper": 39
     },
     "transparency": {
-     "lower": 79,
+     "lower": 82,
      "upper": 95
     },
     "warmth": {
-     "lower": 50,
+     "lower": 51,
      "upper": 60
     },
     "conviction": {
-     "lower": 59,
-     "upper": 74
+     "lower": 60,
+     "upper": 73
     },
     "imagination": {
-     "lower": 48,
-     "upper": 58
+     "lower": 47,
+     "upper": 56
     },
     "slop": {
-     "lower": 13,
-     "upper": 19
+     "lower": 18,
+     "upper": 24
     }
    }
   },
