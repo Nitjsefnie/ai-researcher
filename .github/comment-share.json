@@ -96,12 +96,12 @@
     11949
   ],
   "scripts/ci/gate_base_freshness.py": [
-    13161,
-    24125
+    13156,
+    24155
   ],
   "scripts/ci/install_chromium.py": [
-    7475,
-    21215
+    7290,
+    21083
   ],
   "scripts/ci/instruction_budgets.py": [
     6219,
