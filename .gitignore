@@ -90,6 +90,9 @@
 !/scripts/ci/
 /scripts/ci/*
 !/scripts/ci/*.py
+# install_chromium.py's browser-archive digest table, written by
+# update_chromium_digests.py.
+!/scripts/ci/chromium-digests.json
 
 # ---- tests/ ----------------------------------------------------------------
 !/tests/

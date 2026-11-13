@@ -142,7 +142,7 @@ def test_required_jobs_name_the_merge_gate_contexts(tmp_path):
 # each expands to every tracked file beneath it, so a new file there needs no pin edit (#376).
 GATE_DIRECTORIES = ('.github/workflows', 'data', 'out', 'tests')
 
-# The files outside GATE_DIRECTORIES a gate job names or a followed script imports or runs (#401); another moves the pin.
+# The files outside GATE_DIRECTORIES a gate job names, a followed script imports or runs (#401) or SCRIPT_READS lists; another moves the pin.
 CORE_PIN = (
     '.github/ci-thresholds.json', 'build.py', 'page_format.py', 'page_style.py',
     'requirements-dev.txt', 'requirements-pip-audit.txt', 'requirements-test.txt',
@@ -150,16 +150,16 @@ CORE_PIN = (
     'scripts/build_rankings.py', 'scripts/capture_gate.py', 'scripts/ci/aggregate_gate.py',
     'scripts/ci/apt_deb_cache.py', 'scripts/ci/check_committed_page.py',
     'scripts/ci/check_committed_rankings_page.py', 'scripts/ci/check_ratchets.py',
-    'scripts/ci/classify_changes.py', 'scripts/ci/commit_scopes.py', 'scripts/ci/diff_coverage.py',
-    'scripts/ci/download.py', 'scripts/ci/gate_base_freshness.py',
-    'scripts/ci/gate_script_reach.py', 'scripts/ci/install_chromium.py',
-    'scripts/ci/install_valgrind.py', 'scripts/ci/instruction_budgets.py',
-    'scripts/ci/js_coverage.py', 'scripts/ci/js_lines.py', 'scripts/ci/perf_budgets.py',
-    'scripts/ci/ratchet.py', 'scripts/ci/thresholds.py', 'scripts/diff_aa.py',
-    'scripts/fetch_aa.py', 'scripts/fetch_aa_parse.py', 'scripts/fetch_gdpval.py',
-    'scripts/fetch_github_stars.py', 'scripts/fetch_hf_trending.py', 'scripts/fetch_http.py',
-    'scripts/fetch_openrouter_trending.py', 'scripts/publish_docs.py',
-    'scripts/trending_message.py',
+    'scripts/ci/chromium-digests.json', 'scripts/ci/classify_changes.py', 'scripts/ci/commit_scopes.py',
+    'scripts/ci/diff_coverage.py', 'scripts/ci/download.py', 'scripts/ci/gate_base_freshness.py',
+    'scripts/ci/gate_script_reach.py', 'scripts/ci/install_chromium.py', 'scripts/ci/install_valgrind.py',
+    'scripts/ci/instruction_budgets.py', 'scripts/ci/js_coverage.py',
+    'scripts/ci/js_lines.py', 'scripts/ci/perf_budgets.py',
+    'scripts/ci/ratchet.py', 'scripts/ci/thresholds.py',
+    'scripts/ci/update_chromium_digests.py', 'scripts/diff_aa.py', 'scripts/fetch_aa.py',
+    'scripts/fetch_aa_parse.py', 'scripts/fetch_gdpval.py', 'scripts/fetch_github_stars.py',
+    'scripts/fetch_hf_trending.py', 'scripts/fetch_http.py', 'scripts/fetch_openrouter_trending.py',
+    'scripts/publish_docs.py', 'scripts/trending_message.py',
 )
 
 

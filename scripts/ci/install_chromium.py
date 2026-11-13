@@ -13,17 +13,17 @@ write token.
 
 This script closes that hole without forking playwright's installer. It
 resolves the pinned revision and archive URL from the INSTALLED playwright
-package, checks the archive against a digest committed in this file, and
-pre-seeds the browsers directory so the subsequent ``playwright install
-chromium`` finds every product present (marker file set) and
-downloads nothing. Afterwards it asserts that nothing was re-downloaded
-anyway -- a replaced browser directory or an unexpected new browser directory
-fails the job.
+package, checks the archive against a digest committed in
+chromium-digests.json beside this file, and pre-seeds the browsers directory
+so the subsequent ``playwright install chromium`` finds every product present
+(marker file set) and downloads nothing. Afterwards it asserts that nothing
+was re-downloaded anyway -- a replaced browser directory or an unexpected new
+browser directory fails the job.
 
 Failure is loud and there is no fallback: a digest mismatch names expected
 and actual and exits nonzero, and an unknown revision (a playwright bump
-without its digest yet) fails with the exact update recipe. See DIGESTS for
-the update procedure.
+without its digest yet) fails naming the one command that adds its row; see
+DIGESTS_FILE for the update procedure.
 
 linux x64 only, deliberately: both consumers are ubuntu-latest runners, and
 the layout below (directory names, zip roots, executable paths) was observed
@@ -34,6 +34,7 @@ extend it without observing them the same way.
 from __future__ import annotations
 
 import argparse
+import dataclasses
 import hashlib
 import importlib.util
 import json
@@ -80,39 +81,25 @@ INSTALLATION_COMPLETE = "INSTALLATION_COMPLETE"
 PROVENANCE_FILE = "DIGEST_VERIFIED"
 
 # The committed digest table: (browser name, playwright revision) -> sha256
-# of the archive cdn.playwright.dev serves for that revision. Observed by
-# downloading each archive (following the CDN's redirect) and hashing it
-# with sha256sum: revisions 1243/1011 on 2026-09-29 against playwright
-# 1.63.0's browsers.json, 1248/1013 on 2026-10-21 against 1.64.0's.
-#
-# Playwright publishes no digest anywhere (browsers.json has none and the
-# installer never hashes), so this table IS the trust anchor, and it is
-# updated BY HAND -- the repo's standard for checksummed binaries, same as
-# the actionlint digest:
-#
-#   1. Dependabot (or you) bumps playwright in requirements-test.txt;
-#   2. run this script -- it fails naming the new revision and the archive
-#      URL to hash;
-#   3. download that archive, `sha256sum` it, add the row here, and commit
-#      the playwright bump and the digest in ONE commit. The revision moved
-#      means the bytes moved; trusting the new bytes is a human decision
-#      made at that sha256sum step, never a runtime decision. Until the row
-#      lands, CI stays red: there is no bypass flag and no unverified
-#      fallback.
-DIGESTS = {
-    ("chromium", "1243"):
-        "8aac35011c18f6e2d10696154af89a5728ac2ddd6dc6fad24ffdf243c3fcfd5a",
-    ("chromium-headless-shell", "1243"):
-        "a9da028861a0cf789ff25c2fed45f5f1aaf969ed9247835b6a7821a4f7af9d1d",
-    ("ffmpeg", "1011"):
-        "ebc74fc5b94830176a3c2914ae96bd8bc7f6a91f4f33890230f84a172ee61ccc",
-    ("chromium", "1248"):
-        "43fd31766c7533a02dda2ded5ad50c2f861cd5400be7509c0abad71129f79d79",
-    ("chromium-headless-shell", "1248"):
-        "c3e50596aef52c58f8fda3c6b3411c33d34c88b177b3ed1c2243359fd3b8ba20",
-    ("ffmpeg", "1013"):
-        "ee986434d158f74fb5d9c5ff1092026ceedb63f324fe90b5be89460926b7b679",
-}
+# of the archive Playwright's CDN serves for that revision. Playwright
+# publishes no digest anywhere (browsers.json has none and the installer
+# never hashes), so this table IS the trust anchor. A playwright bump's fix is
+# `python3 scripts/ci/update_chromium_digests.py`: it downloads each pinned
+# archive with no row yet, refuses one that is not a zip listing the
+# product's executable or that holds a symlink or escaping entry (nothing is
+# extracted or run), and adds rows newest first, never changing one. Nothing
+# missing writes nothing; any failure writes no row. The rows land in a
+# reviewed commit with the bump; until then CI stays red: there is no bypass
+# flag and no unverified fallback.
+DIGESTS_FILE = Path(__file__).with_name("chromium-digests.json")
+
+
+def load_digests(path: Path) -> dict:
+    return {(name, revision): digest for name, rows in json.loads(path.read_text(
+        encoding="utf-8")).items() for revision, digest in rows.items()}
+
+
+DIGESTS = load_digests(DIGESTS_FILE)
 
 # The products `playwright install chromium` needs on linux x64, with the
 # layout observed on disk after a real install (playwright 1.63.0):
@@ -180,7 +167,7 @@ class Product:
     spec: ProductSpec
     revision: str
     browser_version: str | None
-    digest: str
+    digest: str | None
 
 
 def find_playwright_spec():
@@ -235,47 +222,52 @@ def load_registry(browsers_json: Path) -> dict:
     return registry
 
 
+def resolve_product(registry: dict, spec: ProductSpec) -> Product:
+    """Resolve one product's revision and browser version, no digest yet."""
+    entry = registry.get(spec.name)
+    if entry is None:
+        raise InstallError(
+            f"playwright's browsers.json has no {spec.name!r} entry; "
+            "the product set this script installs no longer matches "
+            "the registry -- re-verify the install set")
+    revision = entry.get("revision")
+    if not isinstance(revision, str):
+        raise InstallError(
+            f"playwright's browsers.json entry {spec.name!r} has no "
+            "revision; the registry format moved")
+    browser_version = entry.get("browserVersion")
+    if "{browser_version}" in spec.archive_path \
+            and not isinstance(browser_version, str):
+        raise InstallError(
+            f"playwright's browsers.json entry {spec.name!r} has no "
+            "browserVersion, which its archive URL template needs")
+    return Product(spec, revision, browser_version, None)
+
+
 def build_products(registry: dict, digests: dict | None = None) -> list:
     """Resolve every product's revision and expected digest.
 
     An unknown revision is the documented trust-on-first-use moment: the
-    error names the revision and the URL to hash so the table row can be
-    added in the same commit as the playwright bump.
+    error names the revision, its archive URL and the command that adds
+    the row, so it lands in the same commit as the playwright bump.
     """
     if digests is None:
         digests = DIGESTS
     products = []
     for spec in PRODUCTS:
-        entry = registry.get(spec.name)
-        if entry is None:
-            raise InstallError(
-                f"playwright's browsers.json has no {spec.name!r} entry; "
-                "the product set this script installs no longer matches "
-                "the registry -- re-verify the install set")
-        revision = entry.get("revision")
-        if not isinstance(revision, str):
-            raise InstallError(
-                f"playwright's browsers.json entry {spec.name!r} has no "
-                "revision; the registry format moved")
-        browser_version = entry.get("browserVersion")
-        if "{browser_version}" in spec.archive_path \
-                and not isinstance(browser_version, str):
-            raise InstallError(
-                f"playwright's browsers.json entry {spec.name!r} has no "
-                "browserVersion, which its archive URL template needs")
-        digest = digests.get((spec.name, revision))
+        product = resolve_product(registry, spec)
+        digest = digests.get((spec.name, product.revision))
         if digest is None:
-            url = f"{CDN}/{spec.archive_path.format(browser_version=browser_version, revision=revision)}"
             raise InstallError(
-                f"no committed digest for {spec.name} revision {revision} "
-                f"(playwright moved its pin). To trust it: download\n"
-                f"  {url}\n"
-                f"hash it with sha256sum, add the digest to DIGESTS in "
-                f"scripts/ci/install_chromium.py keyed "
-                f'("{spec.name}", "{revision}"), and commit that together '
+                f"no committed digest for {spec.name} revision "
+                f"{product.revision} (playwright moved its pin; archive "
+                f"{archive_urls(product)[0]}). To trust it, run\n"
+                f"  python3 scripts/ci/update_chromium_digests.py\n"
+                f"with this playwright installed, review the rows it adds to "
+                f"scripts/ci/chromium-digests.json, and commit them together "
                 "with the playwright bump. Nothing is downloaded or executed "
                 "until then.")
-        products.append(Product(spec, revision, browser_version, digest))
+        products.append(dataclasses.replace(product, digest=digest))
     return products
 
 
@@ -343,6 +335,20 @@ def download_archive(urls: list, destination: Path, label: str,
         f"{label}: every download mirror failed; last error: {last_error}")
 
 
+def refuse_unsafe_entry(source: object, info: zipfile.ZipInfo) -> list:
+    """Refuse a symlink or path-escaping zip entry; return its path parts."""
+    if stat.S_ISLNK(info.external_attr >> 16):
+        raise InstallError(
+            f"{source}: entry {info.filename!r} is a symlink; playwright's archives "
+            "carry none, so refusing to extract until this is re-verified")
+    parts = info.filename.split("/")
+    if info.filename.startswith("/") or ".." in parts:
+        raise InstallError(
+            f"{source}: entry {info.filename!r} escapes the extraction "
+            "directory (zip-slip); refusing")
+    return parts
+
+
 def extract_archive(archive_path: Path, destination: Path) -> None:
     """Extract a verified zip into destination, honoring its unix modes
     owner-only.
@@ -352,26 +358,14 @@ def extract_archive(archive_path: Path, destination: Path) -> None:
     past the owner bits is masked off -- CodeQL py/overly-permissive-file
     flags group-readable files too, and the job runs as a single user (the
     browser is launched by the same uid that extracted it), so a 0755
-    archive entry lands 0700. Symlink
-    entries and path escapes are refused loudly: playwright's zips carry
-    none, so one appearing is a format change to inspect, not to follow.
+    archive entry lands 0700. refuse_unsafe_entry refuses symlinks and escapes.
     """
     destination.mkdir(parents=True, exist_ok=True)
     try:
         with zipfile.ZipFile(archive_path) as archive:
             for info in archive.infolist():
                 mode = info.external_attr >> 16
-                if stat.S_ISLNK(mode):
-                    raise InstallError(
-                        f"{archive_path}: entry {info.filename!r} is a "
-                        "symlink; playwright's archives carry none, so "
-                        "refusing to extract until this is re-verified")
-                parts = info.filename.split("/")
-                if info.filename.startswith("/") \
-                        or ".." in parts:
-                    raise InstallError(
-                        f"{archive_path}: entry {info.filename!r} escapes "
-                        "the extraction directory (zip-slip); refusing")
+                parts = refuse_unsafe_entry(archive_path, info)
                 target = destination.joinpath(*parts)
                 if info.is_dir():
                     target.mkdir(parents=True, exist_ok=True)
@@ -454,9 +448,11 @@ def seed_product(root: Path, product: Product,
                 f"  expected: {product.digest}\n"
                 f"  actual:   {actual}\n"
                 f"  archive:  {urls[0]}\n"
-                "If a playwright bump moved the revision, follow the update "
-                "recipe in DIGESTS; otherwise treat the source as "
-                "compromised and investigate.")
+                "A playwright bump moves the revision and so the row's key, "
+                "and update_chromium_digests.py never rewrites an existing "
+                "row: the download served other bytes for a revision already "
+                "trusted, so treat the source as compromised and "
+                "investigate.")
         try:
             extract_archive(archive, product_dir)
             (product_dir / INSTALLATION_COMPLETE).write_bytes(b"")
@@ -608,7 +604,7 @@ def main(argv=None) -> int:
     """Resolve, verify, seed, then install dependencies only when missing."""
     parser = argparse.ArgumentParser(
         description="Digest-verify Playwright's Chromium archives against "
-                    "the committed table in this file, pre-seed the browsers "
+                    "the committed chromium-digests.json, pre-seed the browsers "
                     "directory, then run playwright install chromium "
                     "(adding --with-deps only for missing system dependencies).")
     parser.add_argument(
