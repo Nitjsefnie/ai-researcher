@@ -72335,6 +72335,13 @@
     "timePerTask": 4112.876153604339
    }
   ],
+  "openness": {
+   "opennessIndex": 38.888888888888886,
+   "modelAvailability": 5,
+   "transparencyMethodology": 2,
+   "transparencyPostTrainingData": 0,
+   "transparencyPreTrainingData": 0
+  },
   "briefcaseBreakdown": {
    "overall": {
     "elo": 1526.86,
