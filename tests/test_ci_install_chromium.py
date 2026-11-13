@@ -232,12 +232,11 @@ def test_build_products_digest_miss_is_trust_on_first_use(digests):
     with pytest.raises(install_chromium.InstallError) as raised:
         install_chromium.build_products(registry(), reduced)
     message = str(raised.value)
-    # the recipe: where the row goes, the revision to key it by, the URL to
-    # hash, and the refusal to download anything until it lands
-    assert f'("chromium", "{REVISION}")' in message
+    # the recipe: the revision, its archive URL, the one command that adds
+    # the row, and the refusal to download anything until it lands
+    assert f"chromium revision {REVISION}" in message
     assert "builds/cft/153.0.8010.12/linux64/chrome-linux64.zip" in message
-    assert "sha256sum" in message
-    assert "DIGESTS" in message
+    assert "python3 scripts/ci/update_chromium_digests.py\n" in message
     assert "Nothing is downloaded" in message
 
 

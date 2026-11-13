@@ -15,7 +15,9 @@
 #   CI installs it through scripts/ci/install_chromium.py, which verifies
 #   the browser archives against committed sha256 digests before playwright
 #   may execute them (a bare `playwright install` performs no integrity
-#   check; the script's DIGESTS table is keyed to this playwright pin).
+#   check). Its digest table, scripts/ci/chromium-digests.json, is keyed to
+#   this playwright pin: a bump's fix is running
+#   scripts/ci/update_chromium_digests.py and committing its rows with it.
 #
 #   pyyaml — tests/test_refresh_workflow.py parses the publish workflow with
 #   it, pinning the gating contracts between steps structurally.

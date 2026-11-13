@@ -1,6 +1,6 @@
 {
   "trees": {
-    "tests/": 32619
+    "tests/": 32756
   },
   "schema_version": 1,
   "baseline": {
@@ -10,7 +10,7 @@
     "build.py": 2632,
     "scripts/ci/check_ratchets.py": 690,
     "scripts/ci/gate_base_freshness.py": 701,
-    "scripts/ci/install_chromium.py": 640,
+    "scripts/ci/install_chromium.py": 636,
     "scripts/ci/perf_budgets.py": 723,
     "scripts/diff_aa.py": 799,
     "scripts/fetch_aa.py": 1247,
@@ -19,7 +19,7 @@
     "tests/test_build_rankings.py": 567,
     "tests/test_capture_gate.py": 1181,
     "tests/test_ci_gate_modules.py": 583,
-    "tests/test_ci_install_chromium.py": 1078,
+    "tests/test_ci_install_chromium.py": 1077,
     "tests/test_ci_instruction_budgets.py": 503,
     "tests/test_ci_perf_budgets.py": 780,
     "tests/test_ci_ratchets.py": 1844,

@@ -31,8 +31,8 @@ a hand-kept list goes stale exactly the way this check exists to prevent.
 Every tracked `.py` file in it is then followed, by gate_script_reach.py, to
 the tracked files it imports or runs, transitively (issue #401).
 
-The hand-held entries are REQUIRED_JOBS and SCRIPT_READS (the data
-directories gate scripts read). Upstream (Nitjsefnie-Actions/pr-gate) derives
+The hand-held entries are REQUIRED_JOBS and SCRIPT_READS (the data paths
+gate scripts read). Upstream (Nitjsefnie-Actions/pr-gate) derives
 nothing either: the ruleset that makes a status context required lives in
 repository settings, which are not in the repository. Here there is no
 ruleset, so REQUIRED_JOBS holds the de facto merge-gate jobs. Every name there
@@ -97,8 +97,8 @@ else:
 REQUIRED_JOBS = ("actionlint", "aggregate", "analyze", "classify", "coverage",
                  "lint", "page", "pip-audit", "pyright", "suites")
 
-# Directories gate scripts read from inside that no `run:` names: the `page` and `suites` data.
-SCRIPT_READS = ("data/", "out/")
+# Paths gate scripts read that no `run:` names: page/suites data, install_chromium's digests.
+SCRIPT_READS = ("data/", "out/", "scripts/ci/chromium-digests.json")
 
 # The branch a gate's head is compared against. Not configurable: a second
 # branch here would be a second base, and this question has one.
