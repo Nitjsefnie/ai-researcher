@@ -96,8 +96,8 @@
     11949
   ],
   "scripts/ci/gate_base_freshness.py": [
-    13589,
-    24241
+    13161,
+    24125
   ],
   "scripts/ci/install_chromium.py": [
     7475,
