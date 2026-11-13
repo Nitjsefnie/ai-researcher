@@ -324,6 +324,46 @@ def test_a_destination_error_fails_at_once(serve, sleeps, tmp_path,
     assert not out.exists()
 
 
+class FailsAfterFirstWrite:
+    """The real destination file, whose second write raises; `sizes` records how
+    many bytes sat on disk when it did."""
+
+    def __init__(self, path, sizes):
+        self.path, self.sizes, self.writes = path, sizes, 0
+        self.file = open(path, "wb")  # pylint: disable=consider-using-with
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        self.file.close()
+
+    def write(self, data, /):
+        self.writes += 1
+        if self.writes > 1:
+            self.file.flush()
+            self.sizes.append(self.path.stat().st_size)
+            raise OSError(errno.ENOSPC, "No space left on device")
+        return self.file.write(data)
+
+
+def test_a_write_error_after_the_first_chunk_deletes_the_partial_file(
+        serve, sleeps, tmp_path, monkeypatch):
+    server = serve()
+    out = tmp_path / "out"
+    sizes = []
+    monkeypatch.setattr(download, "CHUNK", 1000)
+    monkeypatch.setattr(download, "open",
+                        lambda path, mode: FailsAfterFirstWrite(path, sizes),
+                        raising=False)
+    with pytest.raises(download.DownloadError) as caught:
+        download.download_to(server.url, out, 5)
+    assert sizes == [1000]
+    assert str(caught.value).startswith(f"{server.url}: download failed: ")
+    assert (server.hits, sleeps) == (1, [])
+    assert not out.exists()
+
+
 class Api(http.server.ThreadingHTTPServer):
     """api.github.com: each path answers its scripted (status, headers, body)
     list in order, repeating the last; an unknown path is a 404."""
