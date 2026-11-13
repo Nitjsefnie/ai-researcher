@@ -8388,7 +8388,7 @@
   "intelligenceIndex": 27.803889160883,
   "omniscience": 0.6666666666666666,
   "scores": {
-   "aa-briefcase": 1449.84,
+   "aa-briefcase": 1449.78,
    "omniscience-accuracy": 0.282,
    "omniscience-non-hallucination": 0.6165273909006499,
    "automationbench-aa": 0.6036862782167782,
@@ -8401,7 +8401,7 @@
    "aa-analyst-agent": 0.25,
    "harvey-lab-aa": 0.008333333333333333,
    "enterprise-ops-gym-aa": 0.3321396598030439,
-   "gdpval-aa-normalized": 1648.97,
+   "gdpval-aa-normalized": 1648.28,
    "aa-3d": 937.3386,
    "code2video-aa": 974.54,
    "itbench-aa": 0.512429378531074,
@@ -8512,10 +8512,10 @@
   "mlcrOverall": 0.116666666666667,
   "harveyLab": 0.008333333333333333,
   "gdpPdfAllPass": 0.154,
-  "gdpval": 1648.97,
+  "gdpval": 1648.28,
   "gdpvalInterval": {
-   "lower": 1632.48,
-   "upper": 1665.45
+   "lower": 1631.87,
+   "upper": 1664.69
   },
   "itBenchSre": 0.512429378531074,
   "tau2": null,
@@ -8576,7 +8576,7 @@
   "intelligenceIndexEvaluations": [
    {
     "slug": "aa-briefcase",
-    "score": 1449.84,
+    "score": 1449.78,
     "outputTokensPerTask": 131964.56043956045,
     "costPerTask": 0.9839855425157805,
     "timePerTask": 2791.164161057977
@@ -8647,20 +8647,20 @@
   },
   "briefcaseBreakdown": {
    "overall": {
-    "elo": 1449.84,
-    "lower95ci": 1441.85,
-    "upper95ci": 1457.53
+    "elo": 1449.78,
+    "lower95ci": 1442.78,
+    "upper95ci": 1457.75
    },
    "rubricPassRate": 0.4635897435897436,
    "analyticalQuality": {
-    "elo": 1616.69,
-    "lower95ci": 1602.42,
-    "upper95ci": 1632.31
+    "elo": 1614.3,
+    "lower95ci": 1600.31,
+    "upper95ci": 1630.05
    },
    "presentation": {
-    "elo": 1410.14,
-    "lower95ci": 1397.17,
-    "upper95ci": 1421.94
+    "elo": 1410.95,
+    "lower95ci": 1399.39,
+    "upper95ci": 1423.4
    }
   },
   "briefcaseTotalCost": 89.54268436893602,
@@ -8676,79 +8676,79 @@
   },
   "personalityBench": {
    "scores": {
-    "lexicallyVaried": 1603.53,
-    "eloquent": 1575.89,
-    "literate": 946.91,
-    "naturalSounding": 1392.33,
-    "metaphorical": 1511.46,
-    "structured": 790.99,
-    "scannable": 1004.93,
-    "summarizesBottomLine": 951.18,
-    "answerFirst": 899.9,
-    "informationDense": 1416.34,
-    "evidenceBased": 1201.85,
-    "resourceSpecific": 1352.41,
-    "providesActionableGuidance": 974.54,
-    "pragmatic": 1191.11,
-    "truthful": 715.28,
-    "admitsUncertainty": 777.44,
-    "disclaimsWithAssumptions": 768.7,
-    "flagsNuances": 1096.62,
-    "sycophantic": 872.23,
-    "friendly": 1083.11,
-    "humorous": 1286.81,
-    "sincere": 1335.89,
-    "emotionallyIntelligent": 1182.16,
-    "direct": 739.84,
-    "confident": 1193.16,
-    "opinionated": 1182.02,
-    "constructivelyPushesBack": 1326.68,
-    "creative": 1424.65,
-    "openEnded": 884.1,
-    "slop": 1236.61
+    "lexicallyVaried": 1606.61,
+    "eloquent": 1578.25,
+    "literate": 946.3,
+    "naturalSounding": 1392.46,
+    "metaphorical": 1502.84,
+    "structured": 792.13,
+    "scannable": 1000.78,
+    "summarizesBottomLine": 950.54,
+    "answerFirst": 902.15,
+    "informationDense": 1414.1,
+    "evidenceBased": 1205.15,
+    "resourceSpecific": 1353.74,
+    "providesActionableGuidance": 976.08,
+    "pragmatic": 1193.63,
+    "truthful": 713.93,
+    "admitsUncertainty": 778.4,
+    "disclaimsWithAssumptions": 769.98,
+    "flagsNuances": 1096.09,
+    "sycophantic": 870.7,
+    "friendly": 1084.33,
+    "humorous": 1286.64,
+    "sincere": 1331.54,
+    "emotionallyIntelligent": 1183.98,
+    "direct": 738.84,
+    "confident": 1190.77,
+    "opinionated": 1180.5,
+    "constructivelyPushesBack": 1327.83,
+    "creative": 1425.32,
+    "openEnded": 886,
+    "slop": 1236.9
    },
    "indexScores": {
-    "expressiveness": 93.8125,
-    "organization": 36.0625,
-    "informativeness": 60.81249999999999,
-    "transparency": 64.9375,
-    "warmth": 87.625,
-    "conviction": 81.4375,
-    "imagination": 79.375,
-    "slop": 27.812499999999996
+    "expressiveness": 94.28846153846153,
+    "organization": 39.07692307692308,
+    "informativeness": 63.82692307692307,
+    "transparency": 65.73076923076923,
+    "warmth": 86.67307692307692,
+    "conviction": 80.96153846153847,
+    "imagination": 80.96153846153847,
+    "slop": 31.461538461538463
    },
    "indexIntervals": {
     "expressiveness": {
-     "lower": 91,
+     "lower": 92,
      "upper": 95
     },
     "organization": {
-     "lower": 24,
-     "upper": 50
+     "lower": 28,
+     "upper": 51
     },
     "informativeness": {
-     "lower": 52,
-     "upper": 62
+     "lower": 56,
+     "upper": 65
     },
     "transparency": {
-     "lower": 54,
-     "upper": 77
+     "lower": 59,
+     "upper": 80
     },
     "warmth": {
-     "lower": 86,
-     "upper": 94
+     "lower": 85,
+     "upper": 92
     },
     "conviction": {
-     "lower": 72,
+     "lower": 73,
      "upper": 90
     },
     "imagination": {
-     "lower": 77,
-     "upper": 85
+     "lower": 80,
+     "upper": 87
     },
     "slop": {
-     "lower": 25,
-     "upper": 32
+     "lower": 29,
+     "upper": 35
     }
    }
   },
@@ -8803,7 +8803,7 @@
    "type": "firstParty",
    "providerName": "Z AI"
   },
-  "hostModelCount": 27,
+  "hostModelCount": 28,
   "creator": {
    "id": "67437eb6-7dc1-4e93-befd-22c8b8ec2065",
    "slug": "zai",
@@ -77468,7 +77468,7 @@
    "type": "firstParty",
    "providerName": "DeepSeek"
   },
-  "hostModelCount": 26,
+  "hostModelCount": 27,
   "creator": {
    "id": "58b835bf-4c87-4f87-a846-df4b692c6e7d",
    "slug": "deepseek",
@@ -94793,17 +94793,17 @@
   "aime25": null,
   "analystAgent": 0.35,
   "automationBenchPartialScore": 0.6889097769674057,
-  "price1mInputTokens": 0.29,
+  "price1mInputTokens": 0.295,
   "price1mOutputTokens": 1.2,
   "cacheHitPrice": 0.006,
-  "cacheHitDiscountPercent": 0.9766666666666667,
+  "cacheHitDiscountPercent": 0.9771794871794872,
   "cacheWritePrice": null,
   "pricePer1k1mpImages": 0.1836,
-  "price1mBlended0To3To1": 0.5175,
-  "price1mBlended7To2To1": 0.1822,
-  "price1mBlended0To1To1": 0.745,
-  "price1mBlended100To1To1": 0.02049019607843137,
-  "price1mBlended0To100To1": 0.29900990099009894,
+  "price1mBlended0To3To1": 0.52125,
+  "price1mBlended7To2To1": 0.18319999999999997,
+  "price1mBlended0To1To1": 0.7474999999999999,
+  "price1mBlended100To1To1": 0.02053921568627451,
+  "price1mBlended0To100To1": 0.30396039603960395,
   "intelligenceIndexEvaluations": [],
   "openness": {
    "opennessIndex": 44.44444444444444,
@@ -94830,7 +94830,7 @@
     "upper95ci": 1349.03
    }
   },
-  "briefcaseTotalCost": 59.994094667317185,
+  "briefcaseTotalCost": 59.699317246307984,
   "code2videoElo": 1053.11,
   "code2videoEloInterval": {
    "lower": 1033.37,
@@ -94963,7 +94963,7 @@
   "priceDataSource": {
    "type": "median"
   },
-  "hostModelCount": 19,
+  "hostModelCount": 20,
   "creator": {
    "id": "58b835bf-4c87-4f87-a846-df4b692c6e7d",
    "slug": "deepseek",
@@ -94981,7 +94981,7 @@
   "outputModalitySpeech": false,
   "outputModalityVideo": false,
   "modelCreatorName": "DeepSeek",
-  "gdpvalCostPerTask": 0.338210716257966,
+  "gdpvalCostPerTask": 0.33710298894270946,
   "intelligenceIndexIsEstimated": false,
   "reasoningTokens": 2000,
   "timescaleData": {
