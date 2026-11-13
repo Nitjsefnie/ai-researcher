@@ -11,10 +11,10 @@
       "id": "NousResearch/Arete-27B"
     },
     {
-      "id": "speridlabs/idol"
+      "id": "Lightricks/LTX-2.5"
     },
     {
-      "id": "Lightricks/LTX-2.5"
+      "id": "speridlabs/idol"
     },
     {
       "id": "Qwen/Qwen3.8-27B"
@@ -29,7 +29,7 @@
       "id": "ccore/Qwen3.5-4B-3D-Coder"
     },
     {
-      "id": "ricursiveAI/Ripple-65B-Preview"
+      "id": "black-forest-labs/flux-3-image-klein-comfy"
     }
   ]
 }
