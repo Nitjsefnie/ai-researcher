@@ -1,4 +1,7 @@
 {
+  "trees": {
+    "tests/": 32619
+  },
   "schema_version": 1,
   "baseline": {
     ".github/workflows/coverage-comment.yml": 517,
