@@ -414,10 +414,10 @@ def detail_host_slug(models: list[dict]) -> str:
         total = cost.get("total") if isinstance(cost, dict) else None
         return isinstance(total, (int, float))
 
-    unpriced = sorted(m["slug"] for m in models
-                      if isinstance(m.get("slug"), str) and not measured(m))
+    slugged = [m for m in models if isinstance(m.get("slug"), str)]
+    unpriced = sorted(m["slug"] for m in slugged if not measured(m))
     if not unpriced:
-        sys.exit("every model carries a cost -- no free detail host; schema changed")
+        sys.exit("every model carries a cost -- no free detail host; schema changed" if slugged else "no model record carries a slug (read from slug, then release.slug) -- schema changed")
     return unpriced[0]
 
 

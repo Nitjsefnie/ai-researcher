@@ -65,6 +65,11 @@ def richest_models_array(payload: str) -> list[dict]:
     seen: set[str] = set()
     unique = []
     for m in records:
+        # The leaderboard moved slug to release.slug (issue #417).
+        release = m.get("release")
+        if (not isinstance(m.get("slug"), str) and isinstance(release, dict)
+                and isinstance(release.get("slug"), str)):
+            m["slug"] = release["slug"]
         slug = m.get("slug")
         if isinstance(slug, str):
             if slug in seen:
