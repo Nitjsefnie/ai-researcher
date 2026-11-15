@@ -77,7 +77,7 @@ def _publish(tmp_path, job, code):
            "RUNNER_TEMP": str(runner), "GITHUB_STEP_SUMMARY": str(tmp_path / "summary"),
            "GITHUB_REPOSITORY": "fixture/hub", "GIT_CONFIG_GLOBAL": str(config),
            "GITHUB_WORKSPACE": str(ROOT), "DOCS_HUB_API_KEY": "fixture",
-           "UPLOAD_CODE": code, "UPLOAD_BODY": '{"error":"refused"}' if code == "400" else "{}"}
+           "AI_RESEARCHER_UPLOAD_CODE": code, "AI_RESEARCHER_UPLOAD_BODY": '{"error":"refused"}' if code == "400" else "{}"}
     entry = [s for s in WORKFLOW["jobs"][job]["steps"] if s.get("name") == "Publish to docs-hub"]
     assert len(entry) == 1
     return _workflowrun.run_step(tmp_path, entry[0], env), _hubfake.uploads(record)

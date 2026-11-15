@@ -2022,7 +2022,7 @@ def test_publish_step_removes_temp_files(tmp_path, job, live, code, expected):
            'PATH': str(stub) + os.pathsep + os.environ['PATH'],
            'TMPDIR': str(probe), 'TEST_PYTHON': sys.executable,
            'DOCS_HUB_API_KEY': 'fixture', 'LIVE_PAGE': live,
-           'UPLOAD_CODE': code, 'UPLOAD_BODY': '{}',
+           'AI_RESEARCHER_UPLOAD_CODE': code, 'AI_RESEARCHER_UPLOAD_BODY': '{}',
            'HUB_CALLS': str(calls), 'RANKINGS_PAGE': str(page)}
     done = subprocess.run(
         ['bash', '-e', '-c', step_in(load(), job, 'Publish to docs-hub')['run']],
@@ -2082,7 +2082,7 @@ def test_rankings_quiet_hour_recovers_a_failed_upload(tmp_path):
     record = _hubfake.install(stub)
     env.update({'PATH': str(stub) + os.pathsep + os.environ['PATH'], 'GITHUB_WORKSPACE': str(ROOT),
                 'TEST_PYTHON': sys.executable, 'DOCS_HUB_API_KEY': 'fixture',
-                'LIVE_PAGE': 'stale', 'UPLOAD_CODE': '503', 'UPLOAD_BODY': '{}',
+                'LIVE_PAGE': 'stale', 'AI_RESEARCHER_UPLOAD_CODE': '503', 'AI_RESEARCHER_UPLOAD_BODY': '{}',
                 'HUB_CALLS': str(tmp_path / 'calls')})
     hub = step_in(load(), 'rankings-hub', 'Publish to docs-hub')
     artifact = landing / 'rankings-page/trending-rankings.html'
@@ -2097,7 +2097,7 @@ def test_rankings_quiet_hour_recovers_a_failed_upload(tmp_path):
     quiet.mkdir()
     env.update(harness._env(quiet, config, landed))
     env.update({'PATH': str(stub) + os.pathsep + os.environ['PATH'],
-                'GITHUB_RUN_ID': '67890', 'UPLOAD_CODE': '200'})
+                'GITHUB_RUN_ID': '67890', 'AI_RESEARCHER_UPLOAD_CODE': '200'})
     for entry in (build, step_in(load(), 'rankings', 'Stage the page state')):
         done = _workflowrun.run_step(repo, entry, env)
         assert done.returncode == 0, done.stdout + done.stderr
@@ -2371,7 +2371,7 @@ def test_rankings_hub_upload_verdicts(tmp_path, main, live, code, body, expected
            'TEST_PYTHON': sys.executable, 'RUNNER_TEMP': str(runner),
            'GITHUB_STEP_SUMMARY': str(tmp_path / 'summary'),
            'DOCS_HUB_API_KEY': 'fixture', 'LIVE_PAGE': live,
-           'UPLOAD_CODE': code, 'UPLOAD_BODY': body,
+           'AI_RESEARCHER_UPLOAD_CODE': code, 'AI_RESEARCHER_UPLOAD_BODY': body,
            'HUB_CALLS': str(calls), 'RANKINGS_PAGE': str(page),
            'GITHUB_REPOSITORY': 'fixture/rankings', 'GIT_CONFIG_GLOBAL': str(config),
            'REAL_GIT': shutil.which('git') or 'git', 'HEAD_STATE': main}
@@ -2756,7 +2756,7 @@ class ExecutedHubTrackerOrderingTests(unittest.TestCase):
                'GITHUB_REPOSITORY': 'fixture/trending', 'AI_RESEARCHER_REPO': 'fixture/trending',
                'GIT_CONFIG_GLOBAL': str(self.config), 'PUSH_REMOTE': self.origin.as_uri(),
                'AI_RESEARCHER_MASTER_PUSH_DEPLOY_KEY': self.key, 'DOCS_HUB_API_KEY': 'fixture',
-               'GITHUB_WORKSPACE': str(ROOT), 'UPLOAD_CODE': '200', 'UPLOAD_BODY': '{}', 'HUB_CALLS': str(self.calls),
+               'GITHUB_WORKSPACE': str(ROOT), 'AI_RESEARCHER_UPLOAD_CODE': '200', 'AI_RESEARCHER_UPLOAD_BODY': '{}', 'HUB_CALLS': str(self.calls),
                'PATH': str(stub) + os.pathsep + os.environ['PATH']}
         self.contexts[name] = repo, env
 
