@@ -1,7 +1,7 @@
 """A `python3` shim running a script with only docs-hub faked (issue #402).
 
-urlopen answers POST /api/publish from UPLOAD_CODE (statuses or `transport`,
-comma-separated, the last repeating) and UPLOAD_BODY; backoff sleeps are
+urlopen answers POST /api/publish from AI_RESEARCHER_UPLOAD_CODE (statuses or `transport`,
+comma-separated, the last repeating) and AI_RESEARCHER_UPLOAD_BODY; backoff sleeps are
 instant. Each upload is one JSON line in the record; other requests fail.
 """
 import email.message
@@ -66,9 +66,9 @@ def _urlopen(record, request, timeout=None):
     done = len(uploads(record))
     with Path(record).open("a", encoding="utf-8") as out:
         out.write(json.dumps(upload) + "\n")
-    answers = os.environ["UPLOAD_CODE"].split(",")
+    answers = os.environ["AI_RESEARCHER_UPLOAD_CODE" if "AI_RESEARCHER_UPLOAD_CODE" in os.environ else "UPLOAD_CODE"].split(",")
     answer = answers[min(done, len(answers) - 1)]
-    body = os.environ["UPLOAD_BODY"].encode()
+    body = os.environ["AI_RESEARCHER_UPLOAD_BODY" if "AI_RESEARCHER_UPLOAD_BODY" in os.environ else "UPLOAD_BODY"].encode()
     if answer == "transport":
         raise ConnectionResetError(errno.ECONNRESET, "Connection reset by peer")
     if not 200 <= int(answer) < 300:
