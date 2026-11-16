@@ -24,10 +24,8 @@ _DEFAULT_SHELL = "bash -e {0}"
 
 def step_by_name(workflow_path, job_id, name):
     """Return one job's named step, decoded, from a workflow file."""
-    workflow = yaml.safe_load(
-        Path(workflow_path).read_text(encoding="utf-8"))
-    [job] = [job for job_id_, job in workflow["jobs"].items()
-             if job_id_ == job_id]
+    workflow = yaml.safe_load(Path(workflow_path).read_text(encoding="utf-8"))
+    [job] = [job for job_id_, job in workflow["jobs"].items() if job_id_ == job_id]
     [step] = [step for step in job["steps"] if step.get("name") == name]
     return step
 
@@ -48,13 +46,11 @@ def run_step(workdir, step, env):
     script_path.write_text(script, encoding="utf-8")
     shell = step.get("shell", _DEFAULT_SHELL)
     assert shell.count("{0}") == 1, shell
-    command = [part.replace("{0}", str(script_path))
-               for part in shlex.split(shell)]
+    command = [part.replace("{0}", str(script_path)) for part in shlex.split(shell)]
     command[0] = shutil.which(command[0]) or command[0]
     child_env = dict(env)
     for name, value in (step.get("env") or {}).items():
-        assert "${{" not in value or name in env, (
-            f"unresolved workflow expression in {name}: {value!r}")
+        assert "${{" not in value or name in env, f"unresolved workflow expression in {name}: {value!r}"
         child_env.setdefault(name, value)
     temp_dir = tempfile.mkdtemp(prefix="workflow-step-", dir=workdir)
     child_env["TMPDIR"] = temp_dir
@@ -80,9 +76,7 @@ def write_gh_stub(bin_dir, state_path, calls_path):
     (bin_dir / "gh").write_text(
         "#!/bin/sh\n"
         '# The test double for the gh CLI; payload sits beside this file.\n'
-        'exec "$(command -v python || command -v python3)" '
-        '"$(dirname "$0")/gh_payload.py" "$@"\n',
-        encoding="utf-8")
+        'exec "$(command -v python || command -v python3)" "$(dirname "$0")/gh_payload.py" "$@"\n', encoding="utf-8")
     (bin_dir / "gh_payload.py").write_text(STUB_GH, encoding="utf-8")
     trampoline = bin_dir / "gh"
     trampoline.chmod(0o755)
@@ -181,9 +175,7 @@ def emit(document):
         sys.stdout.write(document + chr(10))
         return
     expression = args[args.index("--jq") + 1]
-    done = subprocess.run(
-        ["jq", "-r", expression], input=document,
-        capture_output=True, text=True)
+    done = subprocess.run(["jq", "-r", expression], input=document, capture_output=True, text=True)
     out = done.stdout
     sys.stderr.write(done.stderr)
     if done.returncode:
@@ -219,9 +211,7 @@ if "/issues/" in target and "/comments" in target and verb == "POST":
     if target != f"repos/{AI_RESEARCHER_REPO}/issues/{AI_RESEARCHER_PR_NUMBER}/comments":
         refuse(f"destination is not pull request {AI_RESEARCHER_PR_NUMBER}")
     comments = state.setdefault("comments", [])
-    comments.append({"id": len(comments) + 1,
-                     "user": {"login": "github-actions[bot]"},
-                     "body": fields().get("body", "")})
+    comments.append({"id": len(comments) + 1, "user": {"login": "github-actions[bot]"}, "body": fields().get("body", "")})
 elif "/issues/comments/" in target and verb == "PATCH":
     # The route is repo-level on the real API; the id is the identity, so
     # a PATCH to an id the PR's comment list never named is refused.
@@ -277,5 +267,4 @@ def recorded_writes(calls_path):
     if not calls_path.exists():
         return []
     calls = calls_path.read_text(encoding="utf-8").splitlines()
-    return [call for call in calls
-            if '"-X"' in call and ('"POST"' in call or '"PATCH"' in call)]
+    return [call for call in calls if '"-X"' in call and ('"POST"' in call or '"PATCH"' in call)]
