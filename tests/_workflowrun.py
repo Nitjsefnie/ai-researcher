@@ -242,11 +242,9 @@ elif "/pulls/" in target and verb == "GET":
         refuse(f"pull route is not pull request {AI_RESEARCHER_PR_NUMBER}")
     emit(json.dumps({"head": {"sha": state.get("head_sha", "")}}))
 elif target.endswith("/artifacts") and verb == "GET":
-    emit(json.dumps({"total_count": len(state.get("artifacts", [])),
-                     "artifacts": state.get("artifacts", [])}))
+    emit(json.dumps({"total_count": len(state.get("artifacts", [])), "artifacts": state.get("artifacts", [])}))
 elif target.endswith("/jobs") and verb == "GET":
-    emit(json.dumps({"total_count": len(state.get("jobs", [])),
-                     "jobs": state.get("jobs", [])}))
+    emit(json.dumps({"total_count": len(state.get("jobs", [])), "jobs": state.get("jobs", [])}))
 elif target.endswith("/check-runs") and verb == "GET":
     if f"/commits/{AI_RESEARCHER_HEAD_SHA}/" not in target:
         refuse(f"check route is not head {AI_RESEARCHER_HEAD_SHA}")
