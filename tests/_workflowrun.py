@@ -17,6 +17,7 @@ import shutil
 import signal
 import subprocess
 import tempfile
+import threading
 from pathlib import Path
 
 import yaml
@@ -61,11 +62,16 @@ def run_step(workdir, step, env):
     try:
         with subprocess.Popen(command, cwd=workdir, env=child_env, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                               text=True, start_new_session=os.name != "nt") as process:
+            hooked = os.name != "nt" and threading.current_thread() is threading.main_thread()  # our group's TERM, HUP miss the step
+            handlers = {sig: signal.signal(sig, signal.default_int_handler) for sig in (signal.SIGTERM, signal.SIGHUP)} if hooked else {}
             try:
                 stdout, stderr = process.communicate(timeout=STEP_TIMEOUT)
             except BaseException:  # TERM first: a SIGKILLed shell skips the EXIT trap that stops its daemons
                 _stop(process)
                 raise
+            finally:
+                for sig, handler in handlers.items():
+                    signal.signal(sig, handler)
         return subprocess.CompletedProcess(command, process.returncode, stdout, stderr)
     finally:
         shutil.rmtree(temp_dir)
