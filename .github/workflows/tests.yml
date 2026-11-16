@@ -322,10 +322,8 @@ jobs:
         env:
           AI_RESEARCHER_JS_COVERAGE_OUT: ${{ runner.temp }}/js-coverage.json
         run: |
-          js_floor="$(python3 scripts/ci/thresholds.py \
-            --coverage-floor javascript)"
-          python3 scripts/ci/js_coverage.py "$AI_RESEARCHER_JS_COVERAGE_OUT" \
-            "--fail-under=${js_floor}" --format=total
+          js_floor="$(python3 scripts/ci/thresholds.py --coverage-floor javascript)"
+          python3 scripts/ci/js_coverage.py "$AI_RESEARCHER_JS_COVERAGE_OUT" "--fail-under=${js_floor}" --format=total
 
       - name: Cache valgrind dependency debs
         if: ${{ !cancelled() && steps.pytest.conclusion != 'skipped' }}
@@ -408,21 +406,28 @@ jobs:
         # number as pulling the untrusted head — and fetching the merge
         # commit completes both sides at once. github.sha is trusted event
         # provenance, and a mutable PR-head refspec is not what the guard
-        # compares: HEAD^1 and HEAD^2 are its only inputs.
+        # compares: HEAD^1 and HEAD^2 are its only inputs. A fetch reruns on
+        # exit 128 alone (issue #426), asking per attempt whether the history
+        # is still shallow: --unshallow on a complete one exits 128 for good.
         env:
           AI_RESEARCHER_CI_SHA: ${{ github.sha }}
           AI_RESEARCHER_BEFORE: ${{ github.event.before }}
         run: |
+          # shellcheck disable=SC2016  # bash -c expands its own script
+          fetch_history() {
+            python3 scripts/ci/download.py --run --retry-on 128 bash -c '
+              [ "$(git rev-parse --is-shallow-repository)" = false ] || set -- --unshallow "$@"
+              exec git fetch "$@"' fetch-history "$@"
+          }
           if [ "${GITHUB_EVENT_NAME}" = "pull_request" ]; then
-            git fetch --unshallow origin "${AI_RESEARCHER_CI_SHA}"
-            python3 scripts/ci/check_ratchets.py --allow-declared-raises \
-              --route pr HEAD^1 HEAD^2
+            fetch_history origin "${AI_RESEARCHER_CI_SHA}"
+            python3 scripts/ci/check_ratchets.py --allow-declared-raises --route pr HEAD^1 HEAD^2
           else
             if [ "${AI_RESEARCHER_BEFORE}" = "0000000000000000000000000000000000000000" ]; then
               echo "branch creation: no previous main tip to compare against"
               exit 0
             fi
-            git fetch --unshallow origin main "${AI_RESEARCHER_BEFORE}"
+            fetch_history origin main "${AI_RESEARCHER_BEFORE}"
             python3 scripts/ci/check_ratchets.py --allow-declared-raises "${AI_RESEARCHER_BEFORE}" HEAD
           fi
 
@@ -437,19 +442,15 @@ jobs:
         # and #133 part 2b) — this job holds no write token, and the push
         # authenticates with the deploy key in that workflow's own job.
         id: ratchet
-        if: ${{ !cancelled() && steps.pytest.outcome == 'success'
-                && steps.jscov.outcome == 'success'
-                && github.event_name == 'push'
-                && github.ref == 'refs/heads/main' }}
+        if: ${{ !cancelled() && steps.pytest.outcome == 'success' && steps.jscov.outcome == 'success'
+                && github.event_name == 'push' && github.ref == 'refs/heads/main' }}
         env:
           AI_RESEARCHER_JS_COVERAGE_OUT: ${{ runner.temp }}/js-coverage.json
         run: |
           measured="$(python3 -m coverage report --format=total --precision=1)"
-          js_measured="$(python3 scripts/ci/js_coverage.py \
-            "$AI_RESEARCHER_JS_COVERAGE_OUT" --format=total)"
+          js_measured="$(python3 scripts/ci/js_coverage.py "$AI_RESEARCHER_JS_COVERAGE_OUT" --format=total)"
           python3 scripts/ci/ratchet.py --measured "${measured}"
-          python3 scripts/ci/ratchet.py --language javascript \
-            --measured "${js_measured}"
+          python3 scripts/ci/ratchet.py --language javascript --measured "${js_measured}"
           python3 scripts/ci/thresholds.py --check
           if [ -n "$(git status --porcelain .github/ci-thresholds.json)" ]; then
             echo "changed=true" >> "$GITHUB_OUTPUT"
@@ -462,8 +463,7 @@ jobs:
             } >> "$GITHUB_STEP_SUMMARY"
           else
             echo "changed=false" >> "$GITHUB_OUTPUT"
-            echo "Python coverage ${measured}% and JavaScript coverage" \
-              "${js_measured}% justify no raise." >> "$GITHUB_STEP_SUMMARY"
+            echo "Python coverage ${measured}% and JavaScript coverage ${js_measured}% justify no raise." >> "$GITHUB_STEP_SUMMARY"
           fi
 
       - name: Stage the raise for the push job

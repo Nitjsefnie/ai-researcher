@@ -12,22 +12,29 @@ import os
 import sys
 from pathlib import Path
 
+import pytest
+
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+import _hubfake  # noqa: E402  # pylint: disable=wrong-import-position
 import _workflowrun  # noqa: E402  # pylint: disable=wrong-import-position
+
+pytestmark = pytest.mark.skipif(os.name == "nt", reason="Ubuntu shell; download.py execs the stub gh")
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 WORKFLOW = REPO_ROOT / ".github" / "workflows" / "coverage-comment.yml"
 MARKER = "<!-- ai-researcher-diff-coverage -->"
 BODY = "### Coverage of this change\n\n**100.0%** of added lines covered."
+ARTIFACT = "temp/coverage-comment"
 
 
 def _workdir(tmp_path):
     workdir = tmp_path / "run"
     bin_dir = workdir / "bin"
-    workdir.mkdir(parents=True)
+    (workdir / ARTIFACT).mkdir(parents=True)
     state = workdir / "state.json"
     calls = workdir / "calls.jsonl"
     _workflowrun.write_gh_stub(bin_dir, state, calls)
+    _hubfake.install(bin_dir)
     return workdir, state, calls
 
 
@@ -48,7 +55,7 @@ def _env(workdir, state, calls, **extra):
         "STUB_STATE": str(state),
         "STUB_CALLS": str(calls),
         "GITHUB_OUTPUT": str(workdir / "github-output"),
-        "GH_TOKEN": "stub-token",
+        "GH_TOKEN": "stub-token", "GITHUB_WORKSPACE": str(REPO_ROOT), "RUNNER_TEMP": str(workdir / "temp"),
         "AI_RESEARCHER_REPO": "Nitjsefnie/ai-researcher",
         "AI_RESEARCHER_HEAD_SHA": "a" * 40,
         "AI_RESEARCHER_PR_NUMBER": "7",
@@ -74,6 +81,23 @@ def _run(workdir, state, calls, name, env):
     return _workflowrun.run_step(workdir, step, env)
 
 
+POST, MARK = "Post or update the pull request comment", "Mark missing patch coverage"
+PUBLISH, RESOLVE = "Publish coverage check", "Resolve the target pull request from the event"
+PUBLISHING = {"AI_RESEARCHER_STATUS": "success", "AI_RESEARCHER_JOB_SKIPPED": "", "AI_RESEARCHER_NOT_MEASURED_REASON": "",
+              "AI_RESEARCHER_VERDICT": "", "AI_RESEARCHER_RUN_URL": "https://github.invalid/runs/1"}
+SUCCEEDED = {"AI_RESEARCHER_RUN_CONCLUSION": "success"}
+FORK = {"AI_RESEARCHER_EVENT_NUMBERS": "[]", "AI_RESEARCHER_HEAD_REPO": "forker/ai-researcher", "AI_RESEARCHER_HEAD_BRANCH": "patch"}
+
+
+def _step(tmp_path, name, env=None, body=BODY, number="7\n", **values):
+    """Run step `name` over `values`, the artifact staged."""
+    workdir, state, calls = _workdir(tmp_path)
+    _state(state, **values)
+    (workdir / ARTIFACT / "body.md").write_text(body, encoding="utf-8")
+    (workdir / ARTIFACT / "pr-number.txt").write_text(number, encoding="utf-8")
+    return workdir, state, calls, _run(workdir, state, calls, name, _env(workdir, state, calls, **(env or {})))
+
+
 def test_an_unexpired_artifact_is_found_and_an_expired_one_is_not(tmp_path):
     cases = (
         ("unexpired", [{"name": "diff-coverage-comment",
@@ -96,13 +120,7 @@ def test_an_unexpired_artifact_is_found_and_an_expired_one_is_not(tmp_path):
 
 
 def test_a_post_happens_when_no_marker_comment_exists(tmp_path):
-    workdir, state, calls = _workdir(tmp_path)
-    _state(state, head_sha="a" * 40, comments=[])
-    (workdir / "body.md").write_text(BODY, encoding="utf-8")
-    (workdir / "pr-number.txt").write_text("7\n", encoding="utf-8")
-    done = _run(workdir, state, calls,
-                "Post or update the pull request comment",
-                _env(workdir, state, calls))
+    _, state, calls, done = _step(tmp_path, POST, head_sha="a" * 40, comments=[])
     assert done.returncode == 0, (done.stdout, done.stderr)
     writes = _workflowrun.recorded_writes(calls)
     assert len(writes) == 1 and '"POST"' in writes[0], writes
@@ -114,17 +132,11 @@ def test_a_post_happens_when_no_marker_comment_exists(tmp_path):
 
 
 def test_a_later_push_updates_one_comment_in_place(tmp_path):
-    workdir, state, calls = _workdir(tmp_path)
-    _state(state, head_sha="a" * 40, comments=[
+    _, state, calls, done = _step(tmp_path, POST, head_sha="a" * 40, comments=[
         {"id": 11, "user": {"login": "github-actions[bot]"},
          "body": f"{MARKER}\n\nPatch coverage for commit {'b' * 40}."},
         {"id": 12, "user": {"login": "a-human"}, "body": "looks low"},
     ])
-    (workdir / "body.md").write_text(BODY, encoding="utf-8")
-    (workdir / "pr-number.txt").write_text("7\n", encoding="utf-8")
-    done = _run(workdir, state, calls,
-                "Post or update the pull request comment",
-                _env(workdir, state, calls))
     assert done.returncode == 0, (done.stdout, done.stderr)
     writes = _workflowrun.recorded_writes(calls)
     # One PATCH to the marker comment's own id; the human's comment and the
@@ -138,52 +150,31 @@ def test_a_later_push_updates_one_comment_in_place(tmp_path):
 
 
 def test_an_artifact_naming_another_pull_request_is_refused(tmp_path):
-    workdir, state, calls = _workdir(tmp_path)
-    _state(state, head_sha="a" * 40, comments=[])
-    (workdir / "body.md").write_text(BODY, encoding="utf-8")
-    (workdir / "pr-number.txt").write_text("999\n", encoding="utf-8")
-    done = _run(workdir, state, calls,
-                "Post or update the pull request comment",
-                _env(workdir, state, calls))
+    _, _, calls, done = _step(tmp_path, POST, number="999\n", head_sha="a" * 40, comments=[])
     assert done.returncode != 0, done.stdout
     assert "refusing to post" in done.stderr, done.stderr
     assert _workflowrun.recorded_writes(calls) == [], "a write escaped"
 
 
 def test_an_oversized_body_is_refused_not_trimmed(tmp_path):
-    workdir, state, calls = _workdir(tmp_path)
-    _state(state, head_sha="a" * 40, comments=[])
-    (workdir / "body.md").write_text("x" * 60001, encoding="utf-8")
-    (workdir / "pr-number.txt").write_text("7\n", encoding="utf-8")
-    done = _run(workdir, state, calls,
-                "Post or update the pull request comment",
-                _env(workdir, state, calls))
+    _, _, calls, done = _step(tmp_path, POST, body="x" * 60001, head_sha="a" * 40, comments=[])
     assert done.returncode != 0, done.stdout
     assert "past the comment limit" in done.stderr, done.stderr
     assert _workflowrun.recorded_writes(calls) == [], "a write escaped"
 
 
 def test_a_stale_run_posts_nothing(tmp_path):
-    workdir, state, calls = _workdir(tmp_path)
-    _state(state, head_sha="b" * 40, comments=[])
-    (workdir / "body.md").write_text(BODY, encoding="utf-8")
-    (workdir / "pr-number.txt").write_text("7\n", encoding="utf-8")
-    done = _run(workdir, state, calls,
-                "Post or update the pull request comment",
-                _env(workdir, state, calls))
+    _, _, calls, done = _step(tmp_path, POST, head_sha="b" * 40, comments=[])
     assert done.returncode == 0, done.stderr
     assert "stale" in done.stdout, done.stdout
     assert _workflowrun.recorded_writes(calls) == [], "a write escaped"
 
 
 def test_a_cancelled_run_marks_an_existing_comment_not_measured(tmp_path):
-    workdir, state, calls = _workdir(tmp_path)
-    _state(state, head_sha="a" * 40, comments=[
+    workdir, state, _, done = _step(tmp_path, MARK, {"AI_RESEARCHER_RUN_CONCLUSION": "cancelled"}, head_sha="a" * 40, comments=[
         {"id": 11, "user": {"login": "github-actions[bot]"},
          "body": f"{MARKER}\n\nPatch coverage for commit {'b' * 40}."},
     ])
-    done = _run(workdir, state, calls, "Mark missing patch coverage",
-                _env(workdir, state, calls, AI_RESEARCHER_RUN_CONCLUSION="cancelled"))
     assert done.returncode == 0, (done.stdout, done.stderr)
     outputs = _outputs(workdir)
     assert outputs["skipped"] == "true", outputs
@@ -197,10 +188,7 @@ def test_a_cancelled_run_marks_an_existing_comment_not_measured(tmp_path):
 
 
 def test_a_cancelled_run_with_no_prior_comment_writes_nothing(tmp_path):
-    workdir, state, calls = _workdir(tmp_path)
-    _state(state, head_sha="a" * 40, comments=[])
-    done = _run(workdir, state, calls, "Mark missing patch coverage",
-                _env(workdir, state, calls, AI_RESEARCHER_RUN_CONCLUSION="cancelled"))
+    _, _, calls, done = _step(tmp_path, MARK, {"AI_RESEARCHER_RUN_CONCLUSION": "cancelled"}, head_sha="a" * 40, comments=[])
     assert done.returncode == 0, (done.stdout, done.stderr)
     assert "no patch-coverage marker to update" in done.stdout, done.stdout
     assert _workflowrun.recorded_writes(calls) == [], "a write escaped"
@@ -218,6 +206,7 @@ FULL_RUN_JOBS = [
     {"name": "tests", "conclusion": "success"},
     {"name": "aggregate", "conclusion": "success"},
 ]
+MARKED = [{"id": 11, "user": {"login": "github-actions[bot]"}, "body": f"{MARKER}\n\nPatch coverage for commit {'b' * 40}."}]
 
 
 def test_a_docs_only_run_marks_an_existing_comment_not_measured(tmp_path):
@@ -225,13 +214,10 @@ def test_a_docs_only_run_marks_an_existing_comment_not_measured(tmp_path):
     # a SUCCESSFUL run without the artifact is the narrowed shape when
     # its tests leg skipped: coverage was deliberately not measured, the
     # check goes neutral (never red), and the stale number is replaced.
-    workdir, state, calls = _workdir(tmp_path)
-    _state(state, head_sha="a" * 40, jobs=DOCS_ONLY_JOBS, comments=[
+    workdir, state, _, done = _step(tmp_path, MARK, SUCCEEDED, head_sha="a" * 40, jobs=DOCS_ONLY_JOBS, comments=[
         {"id": 11, "user": {"login": "github-actions[bot]"},
          "body": f"{MARKER}\n\nPatch coverage for commit {'b' * 40}."},
     ])
-    done = _run(workdir, state, calls, "Mark missing patch coverage",
-                _env(workdir, state, calls, AI_RESEARCHER_RUN_CONCLUSION="success"))
     assert done.returncode == 0, (done.stdout, done.stderr)
     outputs = _outputs(workdir)
     assert outputs["skipped"] == "true", outputs
@@ -246,10 +232,7 @@ def test_a_docs_only_run_marks_an_existing_comment_not_measured(tmp_path):
 
 
 def test_a_docs_only_run_with_no_prior_comment_writes_nothing(tmp_path):
-    workdir, state, calls = _workdir(tmp_path)
-    _state(state, head_sha="a" * 40, jobs=DOCS_ONLY_JOBS, comments=[])
-    done = _run(workdir, state, calls, "Mark missing patch coverage",
-                _env(workdir, state, calls, AI_RESEARCHER_RUN_CONCLUSION="success"))
+    _, _, calls, done = _step(tmp_path, MARK, SUCCEEDED, head_sha="a" * 40, jobs=DOCS_ONLY_JOBS, comments=[])
     assert done.returncode == 0, (done.stdout, done.stderr)
     assert "no patch-coverage marker to update" in done.stdout, done.stdout
     assert _workflowrun.recorded_writes(calls) == [], "a write escaped"
@@ -260,13 +243,10 @@ def test_a_successful_run_whose_tests_leg_ran_keeps_the_failure_default(tmp_path
     # (diff-coverage uploads with if-no-files-found: error), so a missing
     # artifact beside a running tests leg is the true-failure shape and
     # the default verdict stands.
-    workdir, state, calls = _workdir(tmp_path)
-    _state(state, head_sha="a" * 40, jobs=FULL_RUN_JOBS, comments=[
+    workdir, _, _, done = _step(tmp_path, MARK, SUCCEEDED, head_sha="a" * 40, jobs=FULL_RUN_JOBS, comments=[
         {"id": 11, "user": {"login": "github-actions[bot]"},
          "body": f"{MARKER}\n\nPatch coverage for commit {'b' * 40}."},
     ])
-    done = _run(workdir, state, calls, "Mark missing patch coverage",
-                _env(workdir, state, calls, AI_RESEARCHER_RUN_CONCLUSION="success"))
     assert done.returncode == 0, (done.stdout, done.stderr)
     outputs = _outputs(workdir)
     assert "skipped" not in outputs, outputs
@@ -276,24 +256,16 @@ def test_a_successful_run_whose_tests_leg_ran_keeps_the_failure_default(tmp_path
 def test_a_successful_run_without_a_tests_leg_is_refused(tmp_path):
     # Fail closed: a jobs list the step cannot read the tests leg out of
     # is a shape this harness never modelled, not a narrowed run.
-    workdir, state, calls = _workdir(tmp_path)
-    _state(state, head_sha="a" * 40, jobs=[
+    _, _, _, done = _step(tmp_path, MARK, SUCCEEDED, head_sha="a" * 40, jobs=[
         {"name": "classify", "conclusion": "success"},
         {"name": "aggregate", "conclusion": "success"},
     ], comments=[])
-    done = _run(workdir, state, calls, "Mark missing patch coverage",
-                _env(workdir, state, calls, AI_RESEARCHER_RUN_CONCLUSION="success"))
     assert done.returncode != 0, (done.stdout, done.stderr)
     assert "names no tests leg" in done.stderr, done.stderr
 
 
 def test_the_check_publishes_on_the_pull_request_head(tmp_path):
-    workdir, state, calls = _workdir(tmp_path)
-    _state(state, head_sha="a" * 40, checks=[])
-    done = _run(workdir, state, calls, "Publish coverage check",
-                _env(workdir, state, calls, AI_RESEARCHER_STATUS="success",
-                     AI_RESEARCHER_JOB_SKIPPED="", AI_RESEARCHER_NOT_MEASURED_REASON="", AI_RESEARCHER_VERDICT="",
-                     AI_RESEARCHER_RUN_URL="https://github.invalid/runs/1"))
+    _, state, calls, done = _step(tmp_path, PUBLISH, PUBLISHING, head_sha="a" * 40, checks=[])
     assert done.returncode == 0, (done.stdout, done.stderr)
     writes = _workflowrun.recorded_writes(calls)
     assert len(writes) == 1 and '"POST"' in writes[0], writes
@@ -307,14 +279,8 @@ def test_the_check_publishes_on_the_pull_request_head(tmp_path):
 
 
 def test_a_skipped_measurement_publishes_a_neutral_check(tmp_path):
-    workdir, state, calls = _workdir(tmp_path)
-    _state(state, head_sha="a" * 40, checks=[])
-    done = _run(workdir, state, calls, "Publish coverage check",
-                _env(workdir, state, calls, AI_RESEARCHER_STATUS="success",
-                     AI_RESEARCHER_JOB_SKIPPED="true",
-                     AI_RESEARCHER_NOT_MEASURED_REASON="a cancelled tests run",
-                     AI_RESEARCHER_VERDICT="",
-                     AI_RESEARCHER_RUN_URL="https://github.invalid/runs/1"))
+    _, state, _, done = _step(tmp_path, PUBLISH, dict(PUBLISHING, AI_RESEARCHER_JOB_SKIPPED="true",
+                                                      AI_RESEARCHER_NOT_MEASURED_REASON="a cancelled tests run"), head_sha="a" * 40, checks=[])
     assert done.returncode == 0, (done.stdout, done.stderr)
     state_now = json.loads(state.read_text(encoding="utf-8"))
     [check] = state_now["checks"]
@@ -323,23 +289,14 @@ def test_a_skipped_measurement_publishes_a_neutral_check(tmp_path):
 
 
 def test_a_neutral_verdict_without_a_reason_is_refused(tmp_path):
-    workdir, state, calls = _workdir(tmp_path)
-    _state(state, head_sha="a" * 40, checks=[])
-    done = _run(workdir, state, calls, "Publish coverage check",
-                _env(workdir, state, calls, AI_RESEARCHER_STATUS="success",
-                     AI_RESEARCHER_JOB_SKIPPED="true", AI_RESEARCHER_NOT_MEASURED_REASON="", AI_RESEARCHER_VERDICT="",
-                     AI_RESEARCHER_RUN_URL="https://github.invalid/runs/1"))
+    _, _, _, done = _step(tmp_path, PUBLISH, dict(PUBLISHING, AI_RESEARCHER_JOB_SKIPPED="true"), head_sha="a" * 40, checks=[])
     assert done.returncode != 0, done.stdout
     assert "not_measured_reason" in done.stderr, done.stderr
 
 
 def test_the_resolver_takes_the_event_pull_request(tmp_path):
     """A non-fork run resolves its number from the event's own list."""
-    workdir, state, calls = _workdir(tmp_path)
-    _state(state, head_sha="a" * 40)
-    done = _run(workdir, state, calls,
-                "Resolve the target pull request from the event",
-                _env(workdir, state, calls, AI_RESEARCHER_EVENT_NUMBERS="[7]"))
+    workdir, _, _, done = _step(tmp_path, RESOLVE, {"AI_RESEARCHER_EVENT_NUMBERS": "[7]"}, head_sha="a" * 40)
     assert done.returncode == 0, (done.stdout, done.stderr)
     outputs = _outputs(workdir)
     assert outputs["number"] == "7", outputs
@@ -353,8 +310,7 @@ def test_the_resolver_falls_back_to_a_base_namespace_head_label(tmp_path):
     commit association on the head repository, whose answer can be a
     fork-local pull request number (review finding F3, observed live).
     """
-    workdir, state, calls = _workdir(tmp_path)
-    _state(state, head_sha="a" * 40, pulls=[
+    workdir, _, _, done = _step(tmp_path, RESOLVE, FORK, head_sha="a" * 40, pulls=[
         {"number": 7, "head": {"sha": "a" * 40,
                                "repo": {"full_name": "forker/ai-researcher"},
                                "ref": "patch"},
@@ -362,50 +318,54 @@ def test_the_resolver_falls_back_to_a_base_namespace_head_label(tmp_path):
         # A fork-local pull request with a colliding number cannot appear:
         # the query names the base repository.
     ])
-    done = _run(workdir, state, calls,
-                "Resolve the target pull request from the event",
-                _env(workdir, state, calls, AI_RESEARCHER_EVENT_NUMBERS="[]",
-                     AI_RESEARCHER_HEAD_REPO="forker/ai-researcher",
-                     AI_RESEARCHER_HEAD_BRANCH="patch"))
     assert done.returncode == 0, (done.stdout, done.stderr)
     assert _outputs(workdir)["number"] == "7", done.stderr
 
 
 def test_the_resolver_without_any_pull_request_posts_nothing(tmp_path):
     """No open pull request for the head is a real state, not an error."""
-    workdir, state, calls = _workdir(tmp_path)
-    _state(state, head_sha="a" * 40, pulls=[])
-    done = _run(workdir, state, calls,
-                "Resolve the target pull request from the event",
-                _env(workdir, state, calls, AI_RESEARCHER_EVENT_NUMBERS="[]",
-                     AI_RESEARCHER_HEAD_REPO="forker/ai-researcher",
-                     AI_RESEARCHER_HEAD_BRANCH="patch"))
+    workdir, _, _, done = _step(tmp_path, RESOLVE, FORK, head_sha="a" * 40, pulls=[])
     assert done.returncode == 0, (done.stdout, done.stderr)
     assert _outputs(workdir).get("present") == "false"
 
 
 def test_the_resolver_refuses_an_ambiguous_head(tmp_path):
     """Two open pull requests on one fork branch cannot be told apart."""
-    workdir, state, calls = _workdir(tmp_path)
-    _state(state, head_sha="a" * 40, pulls=[
+    _, _, _, done = _step(tmp_path, RESOLVE, FORK, head_sha="a" * 40, pulls=[
         {"number": 7}, {"number": 8}])
-    done = _run(workdir, state, calls,
-                "Resolve the target pull request from the event",
-                _env(workdir, state, calls, AI_RESEARCHER_EVENT_NUMBERS="[]",
-                     AI_RESEARCHER_HEAD_REPO="forker/ai-researcher",
-                     AI_RESEARCHER_HEAD_BRANCH="patch"))
     assert done.returncode != 0, done.stdout
     assert "found 2" in done.stderr, done.stderr
 
 
 def test_the_resolver_calls_a_moved_head_stale(tmp_path):
     """A run whose head no longer is the pull request's head is stale."""
-    workdir, state, calls = _workdir(tmp_path)
-    _state(state, head_sha="b" * 40)
-    done = _run(workdir, state, calls,
-                "Resolve the target pull request from the event",
-                _env(workdir, state, calls, AI_RESEARCHER_EVENT_NUMBERS="[7]"))
+    workdir, _, _, done = _step(tmp_path, RESOLVE, {"AI_RESEARCHER_EVENT_NUMBERS": "[7]"}, head_sha="b" * 40)
     assert done.returncode == 0, (done.stdout, done.stderr)
     outputs = _outputs(workdir)
     assert outputs["stale"] == "true", outputs
     assert "number" not in outputs, outputs
+
+
+# Each gh call faulted once, a write applied first: a 502 reruns, a 404 fails.
+@pytest.mark.parametrize("name, verb, route, comments", [
+    ("Check for the comment artifact", "GET", "/artifacts", []), (RESOLVE, "GET", "/pulls/7", []),
+    (RESOLVE, "GET", "/pulls?", []), (MARK, "GET", "/jobs", MARKED), (MARK, "GET", "/comments", MARKED),
+    (MARK, "PATCH", "/issues/comments/11", MARKED), (POST, "GET", "/comments", []), (POST, "POST", "/comments", []),
+    (POST, "GET", "/pulls/7", MARKED), (PUBLISH, "GET", "/check-runs", []), (PUBLISH, "POST", "/check-runs", [])])
+@pytest.mark.parametrize("stderr", ["gh: Server Error (HTTP 502)", "gh: Not Found (HTTP 404)"])
+def test_one_gh_failure_reruns_only_when_transient(tmp_path, name, verb, route, comments, stderr):
+    runs = []
+    for faults in ([], [{"verb": verb, "route": route, "stderr": stderr, "lands": verb != "GET" and "502" in stderr}]):
+        workdir, state, calls, done = _step(
+            tmp_path / str(len(runs)), name, dict(PUBLISHING, **SUCCEEDED, **(FORK if route == "/pulls?" else {})),
+            head_sha="a" * 40, artifacts=[{"name": "diff-coverage-comment", "expired": False}], pulls=[{"number": 7}],
+            jobs=FULL_RUN_JOBS, checks=[], comments=comments, faults=faults)
+        final = json.loads(state.read_text(encoding="utf-8"))
+        mine = [(call + ["-X", "GET"])[(call + ["-X"]).index("-X") + 1] for call in
+                map(json.loads, calls.read_text(encoding="utf-8").splitlines()) if route in " ".join(call)]
+        runs.append((done.returncode, _outputs(workdir), final["comments"], final["checks"], mine.count(verb)))
+    assert runs[0][0] == 0 and runs[0][4] >= 1, runs[0]
+    if "502" in stderr:  # a landed POST is never resent
+        assert runs[1] == (*runs[0][:4], runs[0][4] + (verb != "POST")), runs
+    else:
+        assert runs[1][0] != 0 and runs[1][4] == 1, runs

@@ -20,8 +20,9 @@ name: ratchet push
 # green stages the ratchet data, and only a FULLY green gate run
 # (conclusion: success) publishes it. An unchanged record stages no artifact and
 # completes as a green no-op here. The artifacts are treated as data and
-# nothing else: the job runs no repository code — no checkout, no pip, no
-# script from the tree. Every staged artifact has exactly two files:
+# nothing else: no artifact byte executes. The only tree code is the retry
+# helper (scripts/ci/download.py, scripts/fetch_http.py) at github.sha,
+# checked out before the key loads (issue #426). Every staged artifact has exactly two files:
 # base.txt plus its selected document. Thresholds retain their exact-key
 # numeric schema. Validation precedes the key step. The next push's
 # "Ratchet documents" guard refuses any thresholds document that lowered
@@ -76,8 +77,18 @@ jobs:
     timeout-minutes: 15
     permissions:
       actions: read  # list and download the triggering run's artifacts
+      contents: read  # check out the retry helper
 
     steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+          sparse-checkout: |
+            scripts/ci/download.py
+            scripts/fetch_http.py
+          sparse-checkout-cone-mode: false
+
       - name: List the triggering run's artifacts
         id: list
         env:
@@ -93,10 +104,10 @@ jobs:
               ;;
             *) echo 'unexpected triggering workflow' >&2; exit 1 ;;
           esac
-          names="$(gh api -H 'Cache-Control: no-cache' --paginate \
+          # gh retries no HTTP error: --gh reruns a 429, 5xx or transport failure, keeping the last output.
+          names="$(python3 "$GITHUB_WORKSPACE/scripts/ci/download.py" --run --gh --timeout 60 gh api -H 'Cache-Control: no-cache' --paginate \
             "repos/$AI_RESEARCHER_REPO/actions/runs/$AI_RESEARCHER_RUN_ID/artifacts" \
-            --jq '.artifacts[] | select(.expired != true) | .name' \
-            | sort -u)"
+            --jq '.artifacts[] | select(.expired != true) | .name')"
           staged=false
           while [ "$#" -ge 3 ]; do
             tag="$1"; artifact="$2"; document="$3"; shift 3
@@ -226,6 +237,8 @@ jobs:
           # Transport failure must read as an error, not as an empty
           # listing that drops the raise with a "main moved" notice.
           set -o pipefail
+          # Exit 128 alone reruns a git call; a rejected push exits 1 (issue #426).
+          retry_128() { python3 "$GITHUB_WORKSPACE/scripts/ci/download.py" --run --retry-on 128 "$@"; }
           remote="${PUSH_REMOTE:-git@github.com:${AI_RESEARCHER_REPO}.git}"
           staged='ratchet-data ci-thresholds.json'
           data="${RUNNER_TEMP}/${staged%% *}"
@@ -249,7 +262,7 @@ jobs:
           # Main standing still is checked per candidate, against its
           # OWN base.txt: the landing builds on its measured base.
           base="$(cat "${data}/base.txt")"
-          fetched="$(git ls-remote "${remote}" refs/heads/main | cut -f1)"
+          fetched="$(retry_128 git ls-remote "${remote}" refs/heads/main | cut -f1)"
           if [ "${fetched}" != "${base}" ]; then
             echo "::notice::Main moved while this run measured; the next push measures again"
             {
@@ -262,7 +275,7 @@ jobs:
           fi
           git init -q "${RUNNER_TEMP}/ratchet-repo"
           git -C "${RUNNER_TEMP}/ratchet-repo" remote add origin "${remote}"
-          git -C "${RUNNER_TEMP}/ratchet-repo" fetch --quiet origin main
+          retry_128 git -C "${RUNNER_TEMP}/ratchet-repo" fetch --quiet origin main
           # Main can advance between ls-remote and fetch (issue #281).
           # Bind the commit to the measured base; later movement rejects.
           fetched="$(git -C "${RUNNER_TEMP}/ratchet-repo" rev-parse FETCH_HEAD)"
@@ -285,7 +298,7 @@ jobs:
             '41898282+github-actions[bot]@users.noreply.github.com'
           git -C "${RUNNER_TEMP}/ratchet-repo" add -f ".github/$document"
           git -C "${RUNNER_TEMP}/ratchet-repo" commit -q -m "$message"
-          if git -C "${RUNNER_TEMP}/ratchet-repo" push origin HEAD:main; then
+          if retry_128 git -C "${RUNNER_TEMP}/ratchet-repo" push origin HEAD:main; then
             exit 0
           fi
           # A rejected push after the base check usually means main moved
@@ -294,7 +307,7 @@ jobs:
           # it: if the remote still points at this commit's parent, the
           # race explanation is wrong and the push failed for a real
           # reason.
-          git -C "${RUNNER_TEMP}/ratchet-repo" fetch --quiet origin main
+          retry_128 git -C "${RUNNER_TEMP}/ratchet-repo" fetch --quiet origin main
           if [ "$(git -C "${RUNNER_TEMP}/ratchet-repo" rev-parse HEAD^)" \
               = "$(git -C "${RUNNER_TEMP}/ratchet-repo" rev-parse FETCH_HEAD)" ]; then
             echo "the ratchet push was rejected while main stood still" >&2

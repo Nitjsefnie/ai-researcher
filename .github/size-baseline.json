@@ -1,11 +1,11 @@
 {
   "trees": {
-    "tests/": 32756
+    "tests/": 32717
   },
   "schema_version": 1,
   "baseline": {
-    ".github/workflows/coverage-comment.yml": 517,
-    ".github/workflows/refresh.yml": 1317,
+    ".github/workflows/coverage-comment.yml": 513,
+    ".github/workflows/refresh.yml": 1315,
     ".github/workflows/tests.yml": 639,
     "build.py": 2632,
     "scripts/ci/check_ratchets.py": 690,
@@ -26,9 +26,9 @@
     "tests/test_ci_thresholds.py": 548,
     "tests/test_diff_aa.py": 1253,
     "tests/test_diff_coverage.py": 754,
-    "tests/test_fetch_aa.py": 2722,
-    "tests/test_gate_base_freshness.py": 894,
-    "tests/test_ratchet_push_workflow.py": 595,
-    "tests/test_refresh_workflow.py": 2798
+    "tests/test_fetch_aa.py": 2676,
+    "tests/test_gate_base_freshness.py": 866,
+    "tests/test_ratchet_push_workflow.py": 587,
+    "tests/test_refresh_workflow.py": 2718
   }
 }

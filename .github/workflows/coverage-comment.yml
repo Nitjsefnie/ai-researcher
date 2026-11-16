@@ -4,18 +4,21 @@ name: coverage comment
 #
 # WHY THIS IS A SEPARATE WORKFLOW. The tests leg checks out and executes the
 # proposed tree, so that job must not also hold the token that can write pull
-# request conversation. Only the rendered comment crosses this boundary; this
-# workflow checks out nothing and runs no code from the pull request.
+# request conversation. Only the rendered comment crosses this boundary, and
+# no pull request code runs here: the one checkout, the retry helper
+# (download.py, fetch_http.py), is at github.sha, for workflow_run the default
+# branch tip this file came from, before the artifact lands in runner.temp.
+# `--gh` reruns a gh 429, 5xx or transport failure, each read alone, each write
+# with the listing that chose it. A listing lagging a landed POST posts a
+# second comment, stale for good: later runs PATCH only the first (issue #426).
 #
-# The DESTINATION does not cross it either. The artifact carries a pull
-# request number, but that artifact is written by a job running the pull
-# request's own copy of `tests.yml` — inside the ci-gate run, since
-# tests.yml became a workflow_call callee (issue #133) and produces no run
-# of its own on a pull request; the run that carries the
-# diff-coverage-comment artifact is ci-gate's, so the relay keys on that
-# workflow's completion. Obeying the artifact's PR number would let any
-# pull request aim bot-authored text at any other one. The number below is
-# resolved from the `workflow_run` event instead, and the artifact's copy is
+# The DESTINATION does not cross it either. The artifact carries a pull request
+# number, but that artifact is written by a job running the pull request's own
+# copy of `tests.yml` inside the ci-gate run (tests.yml is a workflow_call
+# callee since issue #133, with no run of its own on a pull request), so the
+# relay keys on ci-gate's completion. Obeying the artifact's PR number would
+# let any pull request aim bot-authored text at any other one. The number below
+# is resolved from the `workflow_run` event instead, and the artifact's copy is
 # only compared with it — a disagreement fails the step loudly rather than
 # being corrected quietly, because it is the signal that somebody tried.
 #
@@ -27,7 +30,7 @@ name: coverage comment
 # zizmor calls `workflow_run` fundamentally insecure, and it is right about
 # the usual shape: a run that checks out the pull request, or runs something
 # the pull request produced, while holding a write token. This one does
-# neither. It has no `actions/checkout` at all, it executes nothing from the
+# neither: it checks out only the helper above, executes nothing from the
 # artifact, and the only thing crossing from the pull request is the TEXT of
 # a comment. The alternative zizmor would leave standing is the job that runs
 # proposed code holding `pull-requests: write` itself, which is worse.
@@ -40,6 +43,7 @@ permissions:
   pull-requests: write
   actions: read
   checks: write
+  contents: read  # check out the retry helper
 
 concurrency:
   # Per head branch of the triggering run, and cancel-in-progress unlike
@@ -63,9 +67,18 @@ jobs:
     if: >-
       github.event.workflow_run.event == 'pull_request'
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15  # a read spending its 300 s window, then the always() check
 
     steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+          sparse-checkout: |
+            scripts/ci/download.py
+            scripts/fetch_http.py
+          sparse-checkout-cone-mode: false
+
       - name: Check for the comment artifact
         id: artifact
         env:
@@ -79,7 +92,7 @@ jobs:
           # `x="$(gh api ... | jq ...)"` the status is jq's, so a failed API
           # call would print `false` and be reported as "no artifact" — the
           # comment silently never appears and nothing goes red.
-          if ! gh api -H 'Cache-Control: no-cache' --paginate \
+          if ! python3 "$GITHUB_WORKSPACE/scripts/ci/download.py" --run --gh --timeout 60 gh api -H 'Cache-Control: no-cache' --paginate \
             "repos/$AI_RESEARCHER_REPO/actions/runs/$AI_RESEARCHER_RUN_ID/artifacts" \
             --jq '.artifacts[]' > artifacts.json
           then
@@ -130,7 +143,7 @@ jobs:
             # the upstream pull request can be absent from it entirely
             # (observed against the live API during review).
             label="$(printf '%s:%s' "$AI_RESEARCHER_HEAD_REPO" "$AI_RESEARCHER_HEAD_BRANCH")"
-            if ! gh api -H 'Cache-Control: no-cache' --paginate \
+            if ! python3 "$GITHUB_WORKSPACE/scripts/ci/download.py" --run --gh --timeout 60 gh api -H 'Cache-Control: no-cache' --paginate \
               "repos/$AI_RESEARCHER_REPO/pulls?head=$(printf '%s' "$label" |
                 jq -Rr @uri)&state=open" \
               --jq '.[]' > pulls.txt
@@ -158,11 +171,10 @@ jobs:
               exit 1
               ;;
           esac
-          if ! current_sha="$(gh api -H 'Cache-Control: no-cache' \
+          if ! current_sha="$(python3 "$GITHUB_WORKSPACE/scripts/ci/download.py" --run --gh --timeout 60 gh api -H 'Cache-Control: no-cache' \
             "repos/$AI_RESEARCHER_REPO/pulls/$numbers" --jq '.head.sha')"
           then
-            echo "reading the current head of pull request $numbers failed" \
-              >&2
+            echo "reading the current head of pull request $numbers failed" >&2
             exit 1
           fi
           if [ -z "$current_sha" ]; then
@@ -171,8 +183,7 @@ jobs:
           fi
           echo "current_sha=$current_sha" >> "$GITHUB_OUTPUT"
           if [ "$current_sha" != "$AI_RESEARCHER_HEAD_SHA" ]; then
-            echo "run $AI_RESEARCHER_HEAD_SHA is stale; current pull request head is " \
-              "$current_sha"
+            echo "run $AI_RESEARCHER_HEAD_SHA is stale; current pull request head is " "$current_sha"
             echo 'stale=true' >> "$GITHUB_OUTPUT"
             exit 0
           fi
@@ -199,23 +210,22 @@ jobs:
           # request's own head; a workflow_run job's failure check would
           # land on main instead.
           echo 'verdict=failure' >> "$GITHUB_OUTPUT"
-          if ! gh api -H 'Cache-Control: no-cache' --paginate \
+          if ! python3 "$GITHUB_WORKSPACE/scripts/ci/download.py" --run --gh --timeout 60 gh api -H 'Cache-Control: no-cache' --paginate \
             "repos/$AI_RESEARCHER_REPO/actions/runs/$AI_RESEARCHER_RUN_ID/jobs" \
             --jq '.jobs[]' > jobs.json
           then
             echo "listing the jobs of run $AI_RESEARCHER_RUN_ID failed" >&2
             exit 1
           fi
-          # Credit is keyed on the run conclusion, not the coverage
-          # job's: a failed run that skipped coverage is a failure,
-          # not a documentation-only skip. Since #133 the tests leg
-          # itself narrows under ci-gate's docs-only / bot-data-only
-          # classification, so a SUCCESSFUL run without the artifact is
-          # exactly the narrowed shape when its tests leg skipped — the
-          # neutral case below. A successful run whose tests leg RAN
-          # always carries the artifact (diff-coverage uploads with
-          # if-no-files-found: error), so a missing artifact beside a
-          # running tests leg stays a failure.
+          # Credit is keyed on the run conclusion, not the coverage job's: a
+          # failed run that skipped coverage is a failure, not a
+          # documentation-only skip. Since #133 the tests leg itself narrows
+          # under ci-gate's docs-only / bot-data-only classification, so a
+          # SUCCESSFUL run without the artifact is exactly the narrowed shape
+          # when its tests leg skipped — the neutral case below. A successful
+          # run whose tests leg RAN always carries the artifact (diff-coverage
+          # uploads with if-no-files-found: error), so a missing artifact
+          # beside a running tests leg stays a failure.
           case "${AI_RESEARCHER_RUN_CONCLUSION:-}" in
             cancelled)
               # A cancelled run's coverage job may be `cancelled` or
@@ -227,13 +237,12 @@ jobs:
               } >> "$GITHUB_OUTPUT"
               ;;
             success)
-              # The tests leg's own conclusion decides: a skipped tests
-              # leg is ci-gate's narrowing (the aggregate folded it as
-              # legitimate, or the run would be red), so coverage was
-              # deliberately not measured and a neutral not-measured
-              # marker replaces any stale number. Any other tests-leg
-              # state beside a missing artifact stays the default
-              # failure.
+              # The tests leg's own conclusion decides: a skipped tests leg is
+              # ci-gate's narrowing (the aggregate folded it as legitimate, or
+              # the run would be red), so coverage was deliberately not
+              # measured and a neutral not-measured marker replaces any stale
+              # number. Any other tests-leg state beside a missing artifact
+              # stays the default failure.
               tests_leg="$(jq -s -r '[.[] | select(.name == "tests")
                 | .conclusion] | join(",")' jobs.json)"
               case "$tests_leg" in
@@ -255,53 +264,48 @@ jobs:
             printf 'Patch coverage was not measured for commit %s.\n' \
               "$AI_RESEARCHER_HEAD_SHA"
           } > comment.md
-          if ! gh api -H 'Cache-Control: no-cache' --paginate \
-            "repos/$AI_RESEARCHER_REPO/issues/$AI_RESEARCHER_PR_NUMBER/comments" \
-            --jq '.[]' > comments.json
-          then
-            echo "listing the comments on $AI_RESEARCHER_PR_NUMBER failed" >&2
-            exit 1
-          fi
-          existing="$(
-            jq -s 'map(select(.user.login == "github-actions[bot]" and
-              ((.body // "") | startswith(
-                "<!-- ai-researcher-diff-coverage -->")))) |
-              .[0].id // empty' comments.json
-          )"
-          revalidate_head() {
-            if ! current_sha="$(gh api -H 'Cache-Control: no-cache' \
-              "repos/$AI_RESEARCHER_REPO/pulls/$AI_RESEARCHER_PR_NUMBER" --jq '.head.sha')"
+          mark_comment() {
+            set -euo pipefail
+            if ! gh api -H 'Cache-Control: no-cache' --paginate \
+              "repos/$AI_RESEARCHER_REPO/issues/$AI_RESEARCHER_PR_NUMBER/comments" \
+              --jq '.[]' > comments.json
             then
-              echo "reading the current head of pull request $AI_RESEARCHER_PR_NUMBER" \
-                "failed" >&2
+              echo "listing the comments on $AI_RESEARCHER_PR_NUMBER failed" >&2
               exit 1
             fi
-            if [ -z "$current_sha" ]; then
-              echo "pull request $AI_RESEARCHER_PR_NUMBER has no current head SHA" >&2
-              exit 1
-            fi
-            if [ "$current_sha" != "$AI_RESEARCHER_HEAD_SHA" ]; then
-              echo "run $AI_RESEARCHER_HEAD_SHA is stale; current pull request head is " \
-                "$current_sha"
-              return 1
-            fi
-          }
-          case "$existing" in
-            '') echo 'no patch-coverage marker to update'; exit 0 ;;
-            *[!0-9]*)
-              echo "comment id is not only digits: $existing" >&2
-              exit 1
-              ;;
-            *)
-              if ! revalidate_head; then
-                exit 0
+            existing="$(jq -s 'map(select(.user.login == "github-actions[bot]" and
+              ((.body // "") | startswith("<!-- ai-researcher-diff-coverage -->")))) |
+              .[0].id // empty' comments.json)"
+            revalidate_head() {
+              if ! current_sha="$(gh api -H 'Cache-Control: no-cache' \
+                "repos/$AI_RESEARCHER_REPO/pulls/$AI_RESEARCHER_PR_NUMBER" --jq '.head.sha')"
+              then
+                echo "reading the current head of pull request $AI_RESEARCHER_PR_NUMBER failed" >&2
+                exit 1
               fi
-              gh api -X PATCH "repos/$AI_RESEARCHER_REPO/issues/comments/$existing" \
-                -F body=@comment.md >/dev/null
-              echo "marked patch coverage as unavailable for $AI_RESEARCHER_HEAD_SHA"
-              exit 0
-              ;;
-          esac
+              if [ -z "$current_sha" ]; then
+                echo "pull request $AI_RESEARCHER_PR_NUMBER has no current head SHA" >&2
+                exit 1
+              fi
+              if [ "$current_sha" != "$AI_RESEARCHER_HEAD_SHA" ]; then
+                echo "run $AI_RESEARCHER_HEAD_SHA is stale; current pull request head is " "$current_sha"
+                return 1
+              fi
+            }
+            case "$existing" in
+              '') echo 'no patch-coverage marker to update'; exit 0 ;;
+              *[!0-9]*) echo "comment id is not only digits: $existing" >&2; exit 1 ;;
+              *)
+                revalidate_head || exit 0
+                gh api -X PATCH "repos/$AI_RESEARCHER_REPO/issues/comments/$existing" \
+                  -F body=@comment.md >/dev/null
+                echo "marked patch coverage as unavailable for $AI_RESEARCHER_HEAD_SHA"
+                exit 0
+                ;;
+            esac
+          }
+          export -f mark_comment
+          python3 "$GITHUB_WORKSPACE/scripts/ci/download.py" --run --gh bash -c mark_comment
 
       - name: Download the comment artifact
         if: >-
@@ -313,6 +317,7 @@ jobs:
           actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
         with:
           name: diff-coverage-comment
+          path: ${{ runner.temp }}/coverage-comment
           run-id: ${{ github.event.workflow_run.id }}
           github-token: ${{ github.token }}
 
@@ -329,11 +334,12 @@ jobs:
         run: |
           set -euo pipefail
 
-          test -f body.md
-          test -f pr-number.txt
+          artifact="$RUNNER_TEMP/coverage-comment"
+          test -f "$artifact/body.md"
+          test -f "$artifact/pr-number.txt"
 
           # Checked, never obeyed. See the header: the producer is untrusted.
-          claimed="$(cat pr-number.txt)"
+          claimed="$(cat "$artifact/pr-number.txt")"
           if [ "$claimed" != "$AI_RESEARCHER_PR_NUMBER" ]; then
             echo "the artifact names pull request '$claimed' but the run" \
               "belongs to '$AI_RESEARCHER_PR_NUMBER'; refusing to post" >&2
@@ -343,7 +349,7 @@ jobs:
           # The comment API caps a body at 65536 characters. A silently
           # truncated coverage report is a wrong coverage report, so an
           # oversized body is refused rather than trimmed to fit.
-          size="$(wc -c < body.md)"
+          size="$(wc -c < "$artifact/body.md")"
           if [ "$size" -gt 60000 ]; then
             echo "body.md is $size bytes, past the comment limit" >&2
             exit 1
@@ -353,63 +359,56 @@ jobs:
           {
             printf '%s\n\n' "$marker"
             printf 'Patch coverage for commit %s.\n\n' "$AI_RESEARCHER_HEAD_SHA"
-            cat body.md
+            cat "$artifact/body.md"
           } > comment.md
-          if ! gh api -H 'Cache-Control: no-cache' --paginate \
-            "repos/$AI_RESEARCHER_REPO/issues/$AI_RESEARCHER_PR_NUMBER/comments" \
-            --jq '.[]' > comments.json
-          then
-            echo "listing the comments on $AI_RESEARCHER_PR_NUMBER failed" >&2
-            exit 1
-          fi
-          # Slurped, so pagination cannot yield one id per page, and the
-          # body is defaulted, so a null one is not an abort mid-select.
-          existing="$(
-            jq -s 'map(select(.user.login == "github-actions[bot]" and
-              ((.body // "") | startswith(
-                "<!-- ai-researcher-diff-coverage -->")))) |
-              .[0].id // empty' comments.json
-          )"
-          revalidate_head() {
-            if ! current_sha="$(gh api -H 'Cache-Control: no-cache' \
-              "repos/$AI_RESEARCHER_REPO/pulls/$AI_RESEARCHER_PR_NUMBER" --jq '.head.sha')"
+          post_comment() {
+            set -euo pipefail
+            if ! gh api -H 'Cache-Control: no-cache' --paginate \
+              "repos/$AI_RESEARCHER_REPO/issues/$AI_RESEARCHER_PR_NUMBER/comments" \
+              --jq '.[]' > comments.json
             then
-              echo "reading the current head of pull request $AI_RESEARCHER_PR_NUMBER" \
-                "failed" >&2
+              echo "listing the comments on $AI_RESEARCHER_PR_NUMBER failed" >&2
               exit 1
             fi
-            if [ -z "$current_sha" ]; then
-              echo "pull request $AI_RESEARCHER_PR_NUMBER has no current head SHA" >&2
-              exit 1
-            fi
-            if [ "$current_sha" != "$AI_RESEARCHER_HEAD_SHA" ]; then
-              echo "run $AI_RESEARCHER_HEAD_SHA is stale; current pull request head is " \
-                "$current_sha"
-              return 1
-            fi
+            # Slurped, so pagination cannot yield one id per page, and the
+            # body is defaulted, so a null one is not an abort mid-select.
+            existing="$(jq -s 'map(select(.user.login == "github-actions[bot]" and
+              ((.body // "") | startswith("<!-- ai-researcher-diff-coverage -->")))) |
+              .[0].id // empty' comments.json)"
+            revalidate_head() {
+              if ! current_sha="$(gh api -H 'Cache-Control: no-cache' \
+                "repos/$AI_RESEARCHER_REPO/pulls/$AI_RESEARCHER_PR_NUMBER" --jq '.head.sha')"
+              then
+                echo "reading the current head of pull request $AI_RESEARCHER_PR_NUMBER failed" >&2
+                exit 1
+              fi
+              if [ -z "$current_sha" ]; then
+                echo "pull request $AI_RESEARCHER_PR_NUMBER has no current head SHA" >&2
+                exit 1
+              fi
+              if [ "$current_sha" != "$AI_RESEARCHER_HEAD_SHA" ]; then
+                echo "run $AI_RESEARCHER_HEAD_SHA is stale; current pull request head is " "$current_sha"
+                return 1
+              fi
+            }
+            case "$existing" in
+              '')
+                revalidate_head || exit 0
+                gh api -X POST "repos/$AI_RESEARCHER_REPO/issues/$AI_RESEARCHER_PR_NUMBER/comments" \
+                  -F body=@comment.md >/dev/null
+                echo 'posted a new comment'
+                ;;
+              *[!0-9]*) echo "comment id is not only digits: $existing" >&2; exit 1 ;;
+              *)
+                revalidate_head || exit 0
+                gh api -X PATCH "repos/$AI_RESEARCHER_REPO/issues/comments/$existing" \
+                  -F body=@comment.md >/dev/null
+                echo "updated comment $existing"
+                ;;
+            esac
           }
-          case "$existing" in
-            '')
-              if ! revalidate_head; then
-                exit 0
-              fi
-              gh api -X POST "repos/$AI_RESEARCHER_REPO/issues/$AI_RESEARCHER_PR_NUMBER/comments" \
-                -F body=@comment.md >/dev/null
-              echo 'posted a new comment'
-              ;;
-            *[!0-9]*)
-              echo "comment id is not only digits: $existing" >&2
-              exit 1
-              ;;
-            *)
-              if ! revalidate_head; then
-                exit 0
-              fi
-              gh api -X PATCH "repos/$AI_RESEARCHER_REPO/issues/comments/$existing" \
-                -F body=@comment.md >/dev/null
-              echo "updated comment $existing"
-              ;;
-          esac
+          export -f post_comment
+          python3 "$GITHUB_WORKSPACE/scripts/ci/download.py" --run --gh bash -c post_comment
 
       - name: Publish coverage check
         if: >-
@@ -440,78 +439,75 @@ jobs:
 
           if [ "$AI_RESEARCHER_STATUS" = success ] && [ "${AI_RESEARCHER_JOB_SKIPPED:-}" = true ]; then
             if [ -z "${AI_RESEARCHER_NOT_MEASURED_REASON:-}" ]; then
-              echo 'skipped=true reached the publish step without a ' \
-                'not_measured_reason output' >&2
+              echo 'skipped=true reached the publish step without a not_measured_reason output' >&2
               exit 1
             fi
             AI_RESEARCHER_STATUS=neutral
           fi
 
-          external_id="ai-researcher-coverage-comment/v1/$AI_RESEARCHER_HEAD_SHA"
-          if ! gh api --method GET -H 'Cache-Control: no-cache' --paginate \
-            "repos/$AI_RESEARCHER_REPO/commits/$AI_RESEARCHER_HEAD_SHA/check-runs" \
-            -f filter=all -f per_page=100 \
-            --jq '.check_runs[]' > check-runs.json
-          then
-            echo "listing coverage comment checks for $AI_RESEARCHER_HEAD_SHA failed" >&2
-            exit 1
-          fi
-          if ! jq -s --arg name 'coverage comment' \
-            --arg external_id "$external_id" \
-            'map(select(.name == $name and
-              .external_id == $external_id and
-              .app.slug == "github-actions") | .id) | .[]' \
-            check-runs.json > check-ids.txt
-          then
-            echo "decoding coverage comment checks failed" >&2
-            exit 1
-          fi
-          while IFS= read -r check_id; do
-            check_id="${check_id%$'\r'}"
-            case "$check_id" in
-              ''|*[!0-9]*)
-                echo "coverage comment check id is not only digits:" \
-                  "$check_id" >&2
-                exit 1
-                ;;
-            esac
-          done < check-ids.txt
-
-          write_check() {
-            local method="$1"
-            local target="$2"
-            local -a args=(
-              -X "$method" "$target"
-              -f name='coverage comment'
-              -f status=completed
-              -f conclusion="$AI_RESEARCHER_STATUS"
-              -f external_id="$external_id"
-              -f details_url="$AI_RESEARCHER_RUN_URL"
-            )
-            if [ "$AI_RESEARCHER_STATUS" = neutral ]; then
-              local summary='Coverage was not measured for '
-              summary+="$AI_RESEARCHER_NOT_MEASURED_REASON."
-              args+=( -f 'output[title]=Coverage not measured'
-                -f "output[summary]=$summary" )
-            fi
-            if [ "$method" = POST ]; then
-              args+=( -f head_sha="$AI_RESEARCHER_HEAD_SHA" )
-            fi
-            if ! gh api "${args[@]}" >/dev/null
+          publish_check() {
+            set -euo pipefail
+            external_id="ai-researcher-coverage-comment/v1/$AI_RESEARCHER_HEAD_SHA"
+            if ! gh api --method GET -H 'Cache-Control: no-cache' --paginate \
+              "repos/$AI_RESEARCHER_REPO/commits/$AI_RESEARCHER_HEAD_SHA/check-runs" \
+              -f filter=all -f per_page=100 \
+              --jq '.check_runs[]' > check-runs.json
             then
-              echo "publishing coverage comment check failed:" \
-                "$method $target" >&2
-              return 1
+              echo "listing coverage comment checks for $AI_RESEARCHER_HEAD_SHA failed" >&2
+              exit 1
             fi
-          }
-
-          if [ ! -s check-ids.txt ]; then
-            write_check POST "repos/$AI_RESEARCHER_REPO/check-runs"
-            echo "created coverage comment check for $AI_RESEARCHER_HEAD_SHA"
-          else
+            if ! jq -s --arg name 'coverage comment' \
+              --arg external_id "$external_id" \
+              'map(select(.name == $name and
+                .external_id == $external_id and
+                .app.slug == "github-actions") | .id) | .[]' \
+              check-runs.json > check-ids.txt
+            then
+              echo "decoding coverage comment checks failed" >&2
+              exit 1
+            fi
             while IFS= read -r check_id; do
               check_id="${check_id%$'\r'}"
-              write_check PATCH "repos/$AI_RESEARCHER_REPO/check-runs/$check_id"
+              case "$check_id" in
+                ''|*[!0-9]*) echo "coverage comment check id is not only digits: $check_id" >&2; exit 1 ;;
+              esac
             done < check-ids.txt
-            echo "updated coverage comment checks for $AI_RESEARCHER_HEAD_SHA"
-          fi
+
+            write_check() {
+              local method="$1" target="$2"
+              local -a args=(
+                -X "$method" "$target"
+                -f name='coverage comment'
+                -f status=completed
+                -f conclusion="$AI_RESEARCHER_STATUS"
+                -f external_id="$external_id"
+                -f details_url="$AI_RESEARCHER_RUN_URL"
+              )
+              if [ "$AI_RESEARCHER_STATUS" = neutral ]; then
+                local summary='Coverage was not measured for '
+                summary+="$AI_RESEARCHER_NOT_MEASURED_REASON."
+                args+=( -f 'output[title]=Coverage not measured'
+                  -f "output[summary]=$summary" )
+              fi
+              if [ "$method" = POST ]; then
+                args+=( -f head_sha="$AI_RESEARCHER_HEAD_SHA" )
+              fi
+              if ! gh api "${args[@]}" >/dev/null; then
+                echo "publishing coverage comment check failed: $method $target" >&2
+                return 1
+              fi
+            }
+
+            if [ ! -s check-ids.txt ]; then
+              write_check POST "repos/$AI_RESEARCHER_REPO/check-runs"
+              echo "created coverage comment check for $AI_RESEARCHER_HEAD_SHA"
+            else
+              while IFS= read -r check_id; do
+                check_id="${check_id%$'\r'}"
+                write_check PATCH "repos/$AI_RESEARCHER_REPO/check-runs/$check_id"
+              done < check-ids.txt
+              echo "updated coverage comment checks for $AI_RESEARCHER_HEAD_SHA"
+            fi
+          }
+          export -f publish_check
+          python3 "$GITHUB_WORKSPACE/scripts/ci/download.py" --run --gh bash -c publish_check

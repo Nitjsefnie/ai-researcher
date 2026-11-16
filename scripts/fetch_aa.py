@@ -26,6 +26,7 @@ from __future__ import annotations
 import argparse
 import datetime as dt
 import hashlib
+import importlib
 import json
 import os
 import pathlib
@@ -37,6 +38,9 @@ import typing
 import fetch_http
 import fetch_aa_parse
 import fetch_gdpval
+
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent / "ci"))
+download = importlib.import_module("download")
 
 CODING_ROW_FLOOR = fetch_aa_parse.CODING_ROW_FLOOR
 balanced_array = fetch_aa_parse.balanced_array
@@ -97,26 +101,25 @@ CHUNK_RE = re.compile(r'self\.__next_f\.push\(\[1,("(?:[^"\\]|\\.)*")\]\)')
 # recovery path a stall costs one attempt instead of the whole page.
 FETCH_TIMEOUT_SECONDS = 25
 # The page-fetch retry (issue #154): a transient upstream answer -- HTTP
-# 429, a 5xx, a timeout, a dropped connection -- is attempted at most
-# PAGE_ATTEMPTS times IN TOTAL (the fetch loop bound, not a retry
-# count) with linear backoff (attempt k waits k * PAGE_BACKOFF_SECONDS)
-# before the page is refused for good. A non-retryable 4xx is an ANSWER,
-# not an outage, and fails on attempt 1; the classifier's precedent is
-# audit.yml's pip-audit retry (issue #128, PR #142).
+# 429, a 5xx, a timeout, a dropped connection -- is retried inside download.py's
+# backoff window (5 s, doubling) cut to PAGE_WINDOW_SECONDS (issue #426): the
+# window that still starts PAGE_ATTEMPTS attempts when every one stalls its full
+# FETCH_TIMEOUT_SECONDS, (3 - 1) * 25 + 5 + 10 = 65 s; quicker failures fit
+# more. A non-retryable 4xx is an ANSWER, not an outage, and fails on attempt
+# 1; the classifier's precedent is audit.yml's pip-audit retry (issue #128).
 #
 # Against refresh.yml's timeout-minutes: 30 (1800 s), sized for a FULL run:
-# checkout, installs, browser suite, build, commit, publish. The capture's
-# worst case is five page fetches (the methodology version pin, two spaced
-# leaderboard looks, the detail page, the coding agents), each bounded at
-# PAGE_ATTEMPTS * FETCH_TIMEOUT_SECONDS plus its backoff sleeps (3 * 25 + 15
-# = 90 s), so 450 s; plus one dispute-look spacing wait (180 s) and the
-# GDPval-AA route's page and data fetches, fetch_gdpval.AUTH_ATTEMPTS times,
-# AUTH_REREAD_SECONDS apart (2 * (90 + 90) + 180 = 540 s): 1170 s, if every
-# fetch succeeds slowly; transport exhaustion exits in one page bound. These
-# are per-attempt BOUNDS, not a promise: a slow-drip body can outlast a single
-# socket timeout.
-PAGE_ATTEMPTS = fetch_http.ATTEMPTS
-PAGE_BACKOFF_SECONDS = fetch_http.BACKOFF_SECONDS
+# checkout, installs, browser suite, build, commit, publish. A page fetch ends
+# by 65 + 25 = 90 s (the last attempt may start at 65 s and stall 25 s). The
+# capture's worst case is nine fetches at that bound (the methodology version
+# pin, two spaced leaderboard looks, the detail page, the coding agents, and
+# the GDPval-AA page and data, fetch_gdpval.AUTH_ATTEMPTS times), 810 s, plus
+# the dispute-look spacing wait and AUTH_REREAD_SECONDS (180 s each): 1170 s,
+# if every fetch succeeds slowly; transport exhaustion exits in one page bound.
+# These are per-attempt BOUNDS, not a promise: a slow-drip body can outlast a
+# single socket timeout.
+PAGE_ATTEMPTS, PAGE_BACKOFF_SECONDS = 3, download.BACKOFF_SECONDS
+PAGE_WINDOW_SECONDS = (PAGE_ATTEMPTS - 1) * FETCH_TIMEOUT_SECONDS + sum(PAGE_BACKOFF_SECONDS * 2 ** k for k in range(PAGE_ATTEMPTS - 1))
 
 # Issue #208: AA's two routes can serve two different generations of the
 # corpus at once, and a single leaderboard read takes whichever half is
@@ -203,14 +206,13 @@ def fetch_html(cached: str | None, url: str = URL) -> str:
     """The page text, from the pinned copy or a bounded set of live attempts.
 
     Each page carries its own bounded retry (issue #154): a transient answer is
-    retried within a total of PAGE_ATTEMPTS attempts with linear backoff, and
+    retried inside PAGE_WINDOW_SECONDS of download.py's backoff window, and
     the refusal -- exhaustion or a non-retryable 4xx -- is the same one-line
     guarded exit as before the retry existed.
     """
     if cached:
         return pathlib.Path(cached).read_text(encoding="utf-8", errors="replace")
-    body = fetch_http.fetch_bytes(url, {"User-Agent": UA},
-                                  FETCH_TIMEOUT_SECONDS, sleep=_sleep)
+    body = fetch_http.fetch_bytes(url, {"User-Agent": UA}, FETCH_TIMEOUT_SECONDS, window=PAGE_WINDOW_SECONDS, sleep=_sleep)
     return body.decode("utf-8", errors="replace")
 
 
@@ -1171,11 +1173,9 @@ def main() -> None:
     bootstrap = args.cross_run_lookback and not OUT.with_name(GENERATION_STATE_FILE).exists()
     revisit_state = (load_generation_state(prev_records)
                      if args.cross_run_lookback else None)
-    captured = capture(args.html, args.detail_html, args.methodology_html,
-                       prev_records, revisit_state,
-                       gdpval_loader=lambda: fetch_gdpval.fetch(
-                           args.gdpval_html, args.gdpval_data, fetch_html,
-                           flight_payload, UA, FETCH_TIMEOUT_SECONDS, _sleep))
+    captured = capture(args.html, args.detail_html, args.methodology_html, prev_records, revisit_state,
+                       gdpval_loader=lambda: fetch_gdpval.fetch(args.gdpval_html, args.gdpval_data, fetch_html, flight_payload,
+                                                                UA, FETCH_TIMEOUT_SECONDS, _sleep, PAGE_WINDOW_SECONDS))
     models = captured.models
     priced, dropped = check_cost_breakdown(models)
     check_breakdown_slugs(list(captured.fetched))

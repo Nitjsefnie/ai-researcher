@@ -348,7 +348,7 @@ def test_main_reads_methodology_once_before_evaluation(tmp_path, monkeypatch):
     assert events.count(fetch_aa.METHODOLOGY_URL) == 1
 
 
-def test_main_hands_the_evaluation_fetch_the_capture_sleep_and_timeout(tmp_path, monkeypatch):
+def test_main_hands_the_evaluation_fetch_the_capture_sleep_timeout_and_window(tmp_path, monkeypatch):
     _main_files(tmp_path, monkeypatch)
     seen = []
     real = fetch_aa.fetch_gdpval.fetch
@@ -364,7 +364,7 @@ def test_main_hands_the_evaluation_fetch_the_capture_sleep_and_timeout(tmp_path,
     monkeypatch.setattr(fetch_aa, "FETCH_TIMEOUT_SECONDS", 7)
     monkeypatch.setattr(fetch_aa.fetch_gdpval, "fetch", fetch_evaluation)
     fetch_aa.main()
-    assert [args[5:] for args in seen] == [(7, capture_sleep)]
+    assert [args[5:] for args in seen] == [(7, capture_sleep, fetch_aa.PAGE_WINDOW_SECONDS)]
 
 
 @pytest.mark.parametrize("kind", ["page", "version", "manifest", "data", "tag", "gzip", "json", "schema"])

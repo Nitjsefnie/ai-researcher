@@ -20,6 +20,7 @@ import fetch_aa  # noqa: E402  # pylint: disable=wrong-import-position
 import fetch_http  # noqa: E402  # pylint: disable=wrong-import-position
 import fetch_hf_trending  # noqa: E402  # pylint: disable=wrong-import-position
 import fetch_openrouter_trending  # noqa: E402  # pylint: disable=wrong-import-position
+import test_fetch_aa  # noqa: E402  # pylint: disable=wrong-import-position,wrong-import-order
 
 
 class TimedOutResponse(io.BytesIO):
@@ -58,15 +59,14 @@ class SharedFetchTests(unittest.TestCase):
                 self.assertTrue(fetch_http.retryable_transport_error(error))
         self.assertFalse(fetch_http.retryable_transport_error(ValueError("invalid JSON")))
 
-    def test_three_attempts_use_linear_backoff_and_keep_request_options(self):
+    def test_three_attempts_back_off_and_keep_request_options(self):
         url = "https://example.test/models"
-        outcomes = [
-            urllib.error.HTTPError(url, 429, "rate limited", email.message.Message(), None),
+        outcomes = [  # a 429 retries even with GitHub's limit spent; only a release download refuses one
+            urllib.error.HTTPError(url, 429, "rate limited", email.message_from_string("x-ratelimit-remaining: 0\n\n"), None),
             urllib.error.HTTPError(url, 503, "unavailable", email.message.Message(), None),
             io.BytesIO(b"response"),
         ]
-        with unittest.mock.patch.object(urllib.request, "urlopen",
-                                        side_effect=outcomes) as urlopen, \
+        with unittest.mock.patch.object(urllib.request, "urlopen", side_effect=outcomes) as urlopen, \
                 unittest.mock.patch.object(time, "sleep") as sleep, \
                 contextlib.redirect_stderr(io.StringIO()):
             result = fetch_http.fetch_bytes(url, {"User-Agent": "test-agent"}, 37)
@@ -83,8 +83,7 @@ class SharedFetchTests(unittest.TestCase):
     def test_a_dropped_body_is_closed_and_retried(self):
         failed = IncompleteResponse(b"partial")
         healthy = io.BytesIO(b"complete")
-        with unittest.mock.patch.object(urllib.request, "urlopen",
-                                        side_effect=[failed, healthy]) as urlopen, \
+        with unittest.mock.patch.object(urllib.request, "urlopen", side_effect=[failed, healthy]) as urlopen, \
                 unittest.mock.patch.object(time, "sleep") as sleep, \
                 contextlib.redirect_stderr(io.StringIO()):
             result = fetch_http.fetch_bytes("https://example.test/", {}, 30)
@@ -105,14 +104,31 @@ class SharedFetchTests(unittest.TestCase):
                 self.assertRaises(SystemExit) as caught:
             fetch_aa.fetch_html(None, url)
 
-        self.assertEqual(urlopen.call_count, 3)
-        self.assertEqual(sleep.call_args_list, [unittest.mock.call(5), unittest.mock.call(10)])
-        self.assertEqual(stderr.getvalue(),
-                         f"{url}: attempt 1 of 3 failed ({error}); retrying in 5s\n"
-                         f"{url}: attempt 2 of 3 failed ({error}); retrying in 10s\n")
-        self.assertEqual(str(caught.exception),
-                         f"{url}: fetch failed after 3 attempts: {error} -- nothing "
+        self.assertEqual(urlopen.call_count, 4)
+        self.assertEqual(sleep.call_args_list, [unittest.mock.call(5), unittest.mock.call(10), unittest.mock.call(20)])
+        self.assertEqual(stderr.getvalue(), "".join(
+            f"{url}: attempt {n} failed ({error}); retrying in {wait}s\n" for n, wait in ((1, 5), (2, 10), (3, 20))))
+        self.assertEqual(str(caught.exception), f"{url}: fetch failed after 4 attempts: {error} -- nothing "
                          "was captured; check connectivity or the site, then re-run")
+
+    def test_a_page_fetch_ends_inside_the_capture_budgets_page_bound(self):
+        # Every attempt stalls its 25 s timeout (three start), or three short failures put a fourth start on the
+        # window's edge before it stalls: both end at window + timeout, which must fit the budget test's page bound.
+        bound, edge = fetch_aa.PAGE_WINDOW_SECONDS + fetch_aa.FETCH_TIMEOUT_SECONDS, (fetch_aa.PAGE_WINDOW_SECONDS - 7 * fetch_aa.PAGE_BACKOFF_SECONDS) / 3
+        self.assertLessEqual(bound, test_fetch_aa.RetryBoundArithmeticTests.PAGE_BOUND)
+        now, spent = [0.0], []
+
+        def stall(*_args, **_kwargs):
+            now[0] += spent.pop(0) if spent else fetch_aa.FETCH_TIMEOUT_SECONDS
+            raise socket.timeout("timed out")
+        for costs, attempts in (([], fetch_aa.PAGE_ATTEMPTS), ([edge] * 3, 4)):
+            now[0], spent[:] = 1000.0, costs
+            with self.subTest(attempts=attempts), unittest.mock.patch.object(urllib.request, "urlopen", side_effect=stall) as urlopen, \
+                    unittest.mock.patch.object(time, "monotonic", lambda: now[0]), \
+                    unittest.mock.patch.object(fetch_aa, "_sleep", lambda seconds: now.__setitem__(0, now[0] + seconds)), \
+                    contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
+                fetch_aa.fetch_html(None, fetch_aa.URL)
+            self.assertEqual((urlopen.call_count, now[0] - 1000), (attempts, bound))
 
     def test_aa_non_retryable_refusal_keeps_its_exact_wording(self):
         url = fetch_aa.URL
@@ -127,8 +143,7 @@ class SharedFetchTests(unittest.TestCase):
         self.assertEqual(urlopen.call_count, 1)
         sleep.assert_not_called()
         self.assertEqual(stderr.getvalue(), "")
-        self.assertEqual(str(caught.exception),
-                         f"{url}: fetch failed: {error} -- nothing "
+        self.assertEqual(str(caught.exception), f"{url}: fetch failed: {error} -- nothing "
                          "was captured; check connectivity or the site, then re-run")
 
 
@@ -136,8 +151,7 @@ class TrendingRetryTests(unittest.TestCase):
     def assert_mid_body_retry(self, fetch, payload, expected, timeout):
         failed = TimedOutResponse(b"partial")
         healthy = io.BytesIO(json.dumps(payload).encode("utf-8"))
-        with unittest.mock.patch.object(urllib.request, "urlopen",
-                                        side_effect=[failed, healthy]) as urlopen, \
+        with unittest.mock.patch.object(urllib.request, "urlopen", side_effect=[failed, healthy]) as urlopen, \
                 unittest.mock.patch.object(time, "sleep") as sleep, \
                 contextlib.redirect_stderr(io.StringIO()):
             self.assertEqual(fetch(), expected)
@@ -145,8 +159,7 @@ class TrendingRetryTests(unittest.TestCase):
         self.assertEqual(urlopen.call_count, 2)
         self.assertTrue(failed.closed)
         self.assertTrue(healthy.closed)
-        self.assertEqual([call.kwargs["timeout"] for call in urlopen.call_args_list],
-                         [timeout, timeout])
+        self.assertEqual([call.kwargs["timeout"] for call in urlopen.call_args_list], [timeout, timeout])
         sleep.assert_called_once_with(5)
 
     def test_hugging_face_retries_a_mid_body_timeout(self):
@@ -162,8 +175,7 @@ class TrendingRetryTests(unittest.TestCase):
     def test_complete_invalid_json_is_not_retried(self):
         for fetch in (fetch_hf_trending.fetch, fetch_openrouter_trending.fetch):
             with self.subTest(fetch=fetch.__module__), \
-                    unittest.mock.patch.object(urllib.request, "urlopen",
-                                               return_value=io.BytesIO(b"{")) as urlopen, \
+                    unittest.mock.patch.object(urllib.request, "urlopen", return_value=io.BytesIO(b"{")) as urlopen, \
                     unittest.mock.patch.object(time, "sleep") as sleep:
                 with self.assertRaises(json.JSONDecodeError):
                     fetch()

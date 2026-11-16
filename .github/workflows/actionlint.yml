@@ -170,12 +170,10 @@ jobs:
         id: install_zizmor
         # From requirements-zizmor.txt rather than an inline pin: Dependabot's
         # pip ecosystem reads manifest files, never a `run:` block, so the
-        # inline pin was a version nothing ever bumped (issue #50).
-        # --require-hashes installs the manifest byte-for-byte as reviewed
-        # (issue #127). There is deliberately no `pip install --upgrade pip`
-        # here: the unreviewed pip upgrade is an unaudited component — the
-        # very thing the audit gate judges — and the runner's stock pip
-        # installs the pinned manifest.
+        # inline pin was a version nothing ever bumped (issue #50). There is
+        # deliberately no `pip install --upgrade pip` here: the unreviewed pip
+        # upgrade is an unaudited component — the very thing the audit gate
+        # judges — and the runner's stock pip installs the pinned manifest.
         run: python3 scripts/ci/download.py --run python3 -m pip install --require-hashes -r requirements-zizmor.txt
 
       - name: actionlint
@@ -185,11 +183,14 @@ jobs:
       - name: zizmor
         # Runs even when actionlint is red, so one push reports both gates.
         # Not when the install itself failed, which would report a tool bug as
-        # a clean audit.
+        # a clean audit. download.py reruns zizmor's error exit 1 (issue
+        # #426): findings (11-14) fail at once, other exit-1 errors after
+        # the window. zizmor has no network timeout: --timeout 60 kills a
+        # stall at 12x its slowest local run (4.9 s); four attempts fit.
         if: ${{ !cancelled() && steps.install_zizmor.outcome == 'success' }}
         env:
           # Enables the online audits (resolving action refs, checking for
           # known-vulnerable action versions). Read-only, and this workflow
           # declares contents: read.
           GH_TOKEN: ${{ github.token }}
-        run: zizmor --no-progress .github/workflows/
+        run: python3 scripts/ci/download.py --run --retry-on 1 --timeout 60 zizmor --no-progress .github/workflows/

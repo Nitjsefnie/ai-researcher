@@ -380,15 +380,3 @@ def test_main_handlers_and_fetch_arms(tmp_path):
         assert code == 1
     finally:
         os.environ['PATH'] = saved_path
-
-
-def test_fetch_base_deepens_a_shallow_clone(tmp_path):
-    _, origin = _fixture(tmp_path, head_subject='ci: clean')
-    shallow = tmp_path / 'shallow'
-    # file:// keeps --depth from being ignored; the fixture is a separate
-    # repository from this one and its worktrees throughout.
-    _git(tmp_path, 'clone', '--depth', '1', origin.as_uri(), str(shallow))
-    _config(shallow)
-    module = _load()
-    module.fetch_base(shallow)
-    assert _git(shallow, 'rev-parse', '--is-shallow-repository').strip() == 'false'

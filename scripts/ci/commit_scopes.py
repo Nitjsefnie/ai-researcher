@@ -57,10 +57,14 @@ gate has agreed to judge.
 scripts/ci/, which is how the suite rehearses it against real fixtures.
 """
 
+import importlib
 import re
 import subprocess
 import sys
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+download = importlib.import_module("download")
 
 # The branch a pull request's head is compared against. Not configurable: a
 # second branch here would be a second base, and this question has one.
@@ -239,13 +243,21 @@ def fetch_base(root):
     --unshallow deepens the ref actually being compared. Without it the
     grafted boundary hides the head's own ancestry, and a range against a
     base git cannot see into reports commits the head already carries.
+
+    Exit 128, git's fatal and how a refused or dropped connection ends, reruns
+    the fetch in download.py's window (issue #426), asking per attempt whether
+    the checkout is still shallow: --unshallow on a history an earlier attempt
+    completed exits 128.
     """
-    arguments = ["fetch", "--no-tags", "--quiet"]
-    if git(root, "rev-parse", "--is-shallow-repository",
-           what="ask whether the checkout is shallow").strip() == "true":
-        arguments.append("--unshallow")
-    arguments += ["origin", f"+refs/heads/{BASE_BRANCH}:refs/remotes/origin/{BASE_BRANCH}"]
-    git(root, *arguments, what=f"fetch origin/{BASE_BRANCH}")
+    def command():
+        arguments = ["git", "-C", str(root), "fetch", "--no-tags", "--quiet"]
+        if git(root, "rev-parse", "--is-shallow-repository",
+               what="ask whether the checkout is shallow").strip() == "true":
+            arguments.append("--unshallow")
+        return arguments + ["origin", f"+refs/heads/{BASE_BRANCH}:refs/remotes/origin/{BASE_BRANCH}"]
+
+    if status := download.run_retrying(command, retry_on=frozenset({128})):
+        raise GateError(f"cannot fetch origin/{BASE_BRANCH}: `git fetch` exited {status} (its stderr is above)")
 
 
 # A Conventional-Commits-shaped subject: a lowercase type, an optional

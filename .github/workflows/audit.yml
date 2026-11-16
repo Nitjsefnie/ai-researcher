@@ -110,16 +110,18 @@ jobs:
         #
         # No --ignore-vuln entries at present.
         #
-        # THE RETRY IS NARROW ON PURPOSE. pip-audit resolves against PyPI and
-        # the advisory database over the network, and a reset connection
-        # produces the same exit status as a real finding. A blanket retry
-        # would re-run a genuine vulnerability three times before reporting
-        # it, and a gate that goes red for reasons unrelated to its subject is
-        # one people learn to ignore. So this retries ONLY transport/service
-        # failures — connection errors, could-not-connect, SSLError, HTTP 5xx,
-        # rate-limited 429 (the sole retried 4xx, so a 403/404 exits
-        # immediately), and a ServiceError exception (issue #128). Findings
-        # and every other failure are reported verbatim.
+        # THE RETRY IS NARROW ON PURPOSE. A reset connection exits like a real
+        # finding, and a gate that goes red for reasons unrelated to its subject
+        # is one people learn to ignore. So download.py reruns pip-audit ONLY
+        # when its output (stdout joined to stderr, as the classifier reads it)
+        # shows a transport/service failure — connection errors,
+        # could-not-connect, SSLError, HTTP 5xx, 429 (the sole retried 4xx, so a
+        # 403/404 exits immediately), and a ServiceError (issue #128). Findings
+        # and every other failure are reported verbatim. A 75 s window and a
+        # 45 s kill (5x a 9.1 s cold local run) fit four manifests beside the
+        # install in 15 minutes (issue #426).
+        env:
+          AI_RESEARCHER_PIP_AUDIT_TRANSIENT: '(?i)\A(?:(?=[\s\S]*?429 (?:client error|too many requests))|(?![\s\S]*?4[0-9][0-9] client error)(?=[\s\S]*?(?:connection (?:aborted|reset|error)|read timed out|temporary failure in name resolution|could not connect to (?:pypi|osv).*vulnerability feed|(?:^|\s)[\w.]*sslerror:|5[0-9][0-9] server error|502 bad gateway|503 service unavailable|504 gateway timeout|(?:^|\s)(?:pip_audit\._service\.interface\.)?serviceerror:)))'
         run: |
           shopt -s nullglob
           manifests=(requirements*.txt)
@@ -130,43 +132,9 @@ jobs:
 
           for manifest in "${manifests[@]}"; do
             echo "auditing $manifest"
-            resolved=0
-            for attempt in 1 2 3; do
-              if pip-audit \
-                   --progress-spinner off \
-                   --requirement "$manifest" \
-                   > audit.out 2>&1; then
-                cat audit.out
-                resolved=1
-                break
-              fi
-
-              if grep -qiE '4[0-9][0-9] Client Error' audit.out \
-                  && ! grep -qiE '429 (Client Error|Too Many Requests)' audit.out; then
-                echo "pip-audit failed with a non-retryable 4xx client error:" >&2
-                cat audit.out >&2
-                exit 1
-              fi
-
-              if grep -qiE 'connection (aborted|reset|error)|read timed out|temporary failure in name resolution' audit.out \
-                  || grep -qiE 'Could not connect to (PyPI|OSV).*vulnerability feed' audit.out \
-                  || grep -qiE '(^|[[:space:]])[[:alnum:]_.]*SSLError:' audit.out \
-                  || grep -qiE '5[0-9][0-9] Server Error|502 Bad Gateway|503 Service Unavailable|504 Gateway Timeout|429 (Client Error|Too Many Requests)' audit.out \
-                  || grep -qiE '(^|[[:space:]])(pip_audit\._service\.interface\.)?ServiceError:' audit.out; then
-                echo "attempt $attempt: transport/service failure talking to PyPI, retrying"
-                tail -n 5 audit.out
-                sleep $(( attempt * 15 ))
-                continue
-              fi
-
-              echo "pip-audit reported findings:" >&2
-              cat audit.out >&2
-              exit 1
-            done
-
-            if [ "$resolved" -eq 0 ]; then
-              echo "pip-audit could not reach PyPI after 3 attempts on $manifest:" >&2
-              cat audit.out >&2
+            if ! python3 scripts/ci/download.py --run --window 75 --timeout 45 --retry-stderr "$AI_RESEARCHER_PIP_AUDIT_TRANSIENT" \
+                sh -c "exec pip-audit --progress-spinner off --requirement \"\$1\" 1>&2" sh "$manifest"; then
+              echo "pip-audit failed on $manifest: a finding, a non-retryable error, or no attempt left" >&2
               exit 1
             fi
           done

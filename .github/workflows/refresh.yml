@@ -6,9 +6,9 @@ name: refresh
 # source. Failed sources stay red and contribute nothing; survivors still
 # land. A quiet run has no commit or push (issues #143 and #133).
 #
-# Producers run repository code with read-only tokens. `publish` joins with
-# git plumbing without executing repository code or holding a key; `push`
-# loads the main-push deploy key and starts CI on its commit (issue #133).
+# Producers run repository code with read-only tokens. Keyless `publish` joins
+# with git plumbing; `push` loads the main-push key and starts CI (issue #133).
+# Neither runs an artifact byte; their only tree code is the retry helper.
 # Both hub publications verify against main and skip identical pages (issue #206).
 #
 # The rendered gate (issue #94) compares builds from HEAD's captures and the
@@ -351,21 +351,20 @@ jobs:
           fi
           # The republish gate (issue #206): a failed or missed publish leaves
           # the hub stale while later captures stay identical, and "nothing
-          # moved" would never repair it. On the unchanged path this run
-          # fetches the live page (the public /d/ route serves the stored
-          # bytes verbatim, proven 2026-09-29) and compares it byte for byte
-          # with HEAD's, stamp included. Divergence or a failed fetch sets
-          # hub_stale: a needless republish costs one hub version, while a
-          # real outage fails red at the publish step. hub_cause records
-          # WHICH set it, for the summary (issue #239): a failed fetch
-          # compared no page. The republish decision reads hub_stale alone.
+          # moved" would never repair it. On the unchanged path this run fetches
+          # the live page (the public /d/ route serves the stored bytes
+          # verbatim, proven 2026-09-29) and compares it byte for byte with
+          # HEAD's, stamp included. Divergence or a failed fetch (after
+          # download.py's retries, issue #426) sets hub_stale: a needless
+          # republish costs one hub version, while a real outage fails red at
+          # the publish step. hub_cause records WHICH set it, for the summary
+          # (issue #239): a failed fetch compared no page. The republish
+          # decision reads hub_stale alone.
           hub_stale=false
           hub_cause='diverged'
           if [ "$changed" = false ] && [ "${{ inputs.force }}" != 'true' ]; then
             hub_page="$(mktemp)"
-            if curl -fsS --connect-timeout 10 --max-time 30 \
-                 https://docs.nitjsefni.eu/d/ai-researcher/frontier-models \
-                 -o "$hub_page"; then
+            if python3 scripts/ci/download.py https://docs.nitjsefni.eu/d/ai-researcher/frontier-models "$hub_page"; then
               git show HEAD:out/frontier-models.html | cmp -s - "$hub_page" || hub_stale=true
             else
               hub_stale=true
@@ -400,13 +399,11 @@ jobs:
           # hour, and "AA capture unchanged" would mislabel it.
           if [ "$changed" = false ] && [ "${{ inputs.force }}" != 'true' ] \
              && [ "$AI_RESEARCHER_CAPTURED" != "false" ] && [ "$hub_stale" = false ]; then
-            echo 'AA capture unchanged and the live page is current.' \
-              >> "$GITHUB_STEP_SUMMARY"
+            echo 'AA capture unchanged and the live page is current.' >> "$GITHUB_STEP_SUMMARY"
           fi
           if [ "$hub_stale" = true ]; then
             if [ "$hub_cause" = 'fetch-failed' ]; then
-              echo 'AA capture unchanged, but the live-page fetch failed — republishing it.' \
-                >> "$GITHUB_STEP_SUMMARY"
+              echo 'AA capture unchanged, but the live-page fetch failed — republishing it.' >> "$GITHUB_STEP_SUMMARY"
             else
               echo 'AA capture unchanged, but the hub serves a page that differs from HEAD — republishing it.' \
                 >> "$GITHUB_STEP_SUMMARY"
@@ -435,8 +432,7 @@ jobs:
           # Only a run whose DATA moved gets diff_aa's message; a forced
           # build-only run writes its own in the write job's commit step.
           if [ "$AI_RESEARCHER_CHANGED" = true ]; then
-            python3 scripts/diff_aa.py git:HEAD data/aa-raw-models.json \
-              --commit-msg > commit-msg.txt
+            python3 scripts/diff_aa.py git:HEAD data/aa-raw-models.json --commit-msg > commit-msg.txt
           fi
           {
             echo '### What moved'
@@ -543,8 +539,8 @@ jobs:
   # joins only successful sources with changes. One deploy-key delivery
   # starts CI on main, then each hub verifies its own publishable bytes
   # (issue #206). Failed producers stay red without blocking survivors.
-  # No repository code executes in the committer or push jobs; each hub job
-  # runs scripts/publish_docs.py and its imports (download.py, fetch_http.py).
+  # The committer and push jobs execute no artifact byte; their only tree code is
+  # the retry helper at github.sha. Each hub job runs publish_docs.py and its imports.
   #
   # The push race and its outcomes are in the header; the committer concedes
   # the one race no base check sees, main landing a newer workflow
@@ -586,6 +582,16 @@ jobs:
       publish: ${{ steps.commit.outputs.publish }}
 
     steps:
+      # Only the retry helper's two files, at github.sha: this workflow text's own commit.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+          sparse-checkout: |
+            scripts/ci/download.py
+            scripts/fetch_http.py
+          sparse-checkout-cone-mode: false
+
       - name: Download the publish payload
         if: needs.refresh.result == 'success' && needs.refresh.outputs.proceed == 'true'
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
@@ -632,8 +638,7 @@ jobs:
           # to `tip`, so the page it serves always names that commit.
           stage_push_data() {            mkdir -p "${RUNNER_TEMP}/push-data"
             if [ "${1}" = "true" ]; then
-              git bundle create "${RUNNER_TEMP}/push-data/push.bundle" \
-                FETCH_HEAD..push
+              git bundle create "${RUNNER_TEMP}/push-data/push.bundle" FETCH_HEAD..push
               git rev-parse HEAD > "${RUNNER_TEMP}/push-data/tip.txt"
             else
               git rev-parse FETCH_HEAD > "${RUNNER_TEMP}/push-data/tip.txt"
@@ -650,7 +655,7 @@ jobs:
           # from the tree, and no credential in it.
           git init -q "${scratch}"
           git -C "${scratch}" remote add origin "${remote}"
-          git -C "${scratch}" fetch --quiet origin main
+          python3 "$GITHUB_WORKSPACE/scripts/ci/download.py" --run --retry-on 128 git -C "${scratch}" fetch --quiet origin main
           # THE GENERATION TIE (issue #202). This job replays a payload
           # produced by THIS run's workflow generation -- the one at
           # GITHUB_SHA -- over whatever main's tip is when the fetch lands.
@@ -687,8 +692,7 @@ jobs:
           fi
           git -C "${scratch}" checkout -q -B push FETCH_HEAD
           git -C "${scratch}" config user.name 'github-actions[bot]'
-          git -C "${scratch}" config user.email \
-            '41898282+github-actions[bot]@users.noreply.github.com'
+          git -C "${scratch}" config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           cd "${scratch}"
           # Every payload contributes only its fixed paths. AA's marker
           # guard handles both the opening and closing window hours.
@@ -772,8 +776,7 @@ jobs:
           # the shape of a republish run, where the page to serve is HEAD's
           # but the hub is behind it.
           if git diff --cached --quiet; then
-            echo "Staged tree matches main's tip — nothing committed." \
-              >> "$GITHUB_STEP_SUMMARY"
+            echo "Staged tree matches main's tip — nothing committed." >> "$GITHUB_STEP_SUMMARY"
             echo "publish=true" >> "$GITHUB_OUTPUT"
             echo "commits=false" >> "$GITHUB_OUTPUT"
             stage_push_data false
@@ -821,10 +824,19 @@ jobs:
       contents: read
 
     steps:
+      # Only the retry helper's two files, at github.sha: this workflow text's own commit.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+          sparse-checkout: |
+            scripts/ci/download.py
+            scripts/fetch_http.py
+          sparse-checkout-cone-mode: false
+
       - name: Download the push bundle
-        # The pinned download action is the only action here, and it runs
-        # before the key is loaded: no repository code executes in this
-        # job, before or while the key is in memory.
+        # Both actions run before the key is loaded, and no artifact byte
+        # executes in this job, before or while the key is in memory.
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: push-data
@@ -857,9 +869,11 @@ jobs:
             'github.com ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQCj7ndNxQowgcQnjshcLrqPEiiphnt+VTTvDP6mHBL9j1aNUkY4Ue1gvwnGLVlOhGeYrnZaMgRK6+PKCUXaDbC7qtbW8gIkhL7aGCsOr/C56SJMy/BCZfxd1nWzAOxSDPgVsmerOBYfNqltV9/hWCqBywINIR+5dIg6JTJ72pcEpEjcYgXkE2YEFXV1JHnsKgbLWNlhScqb2UmyRkQyytRLtL+38TGxkxCflmO+5Z8CSSNY7GidjMIZ7Q4zMjA2n1nGrlTDkzwDCsw+wqFPGQA179cnfGWOWRVruj16z6XyvxvjJwbz0wQZ75XK5tKSb7FNyeIEs4TT4jk+S4dhPeAUC5y+bDYirYgM4GC7uEnztnZyaVWQ7B381AK4Qdrwt51ZqExKbQpTUNn+EjqoTwvqNj4kqx5QUCI0ThS/YkOxJCXmPUWZbhjpCg56i+2aB6CmK2JGhn57K5mj0MNdBXA4/WnwH6XoPWJzK5Nyu2zB3nAZp+S5hpQs+p1vN1/wsjk=' \
             >> ~/.ssh/known_hosts
           export GIT_SSH_COMMAND='ssh -o StrictHostKeyChecking=yes'
+          # Exit 128 alone reruns a git call; a rejected push exits 1 (issue #426).
+          retry_128() { python3 "$GITHUB_WORKSPACE/scripts/ci/download.py" --run --retry-on 128 "$@"; }
           remote="${PUSH_REMOTE:-git@github.com:${AI_RESEARCHER_REPO}.git}"
           base="$(cat "${RUNNER_TEMP}/push-data/base.txt")"
-          fetched="$(git ls-remote "$remote" refs/heads/main | cut -f1)"
+          fetched="$(retry_128 git ls-remote "$remote" refs/heads/main | cut -f1)"
           if [ "$fetched" != "$base" ]; then
             echo "::notice::main moved under the run (tested base $base, current tip $fetched); the next hourly run re-fetches, re-tests and lands it"
             {
@@ -873,18 +887,17 @@ jobs:
           fi
           git init -q "${RUNNER_TEMP}/push-repo"
           git -C "${RUNNER_TEMP}/push-repo" remote add origin "$remote"
-          git -C "${RUNNER_TEMP}/push-repo" fetch --quiet origin main
+          retry_128 git -C "${RUNNER_TEMP}/push-repo" fetch --quiet origin main
           git -C "${RUNNER_TEMP}/push-repo" fetch --quiet \
             "${RUNNER_TEMP}/push-data/push.bundle" \
             'refs/heads/push:refs/heads/push'
-          if ! git -C "${RUNNER_TEMP}/push-repo" push origin \
+          if ! retry_128 git -C "${RUNNER_TEMP}/push-repo" push origin \
             "$(cat "${RUNNER_TEMP}/push-data/tip.txt"):refs/heads/main"; then
-            git -C "${RUNNER_TEMP}/push-repo" fetch --quiet origin main
+            retry_128 git -C "${RUNNER_TEMP}/push-repo" fetch --quiet origin main
             # base.txt, not tip^: tip^ would only be the tested base while
             # the bundle carries exactly the one hour's commit, and the
             # recorded base is what this comparison asserts.
-            if [ "$(cat "${RUNNER_TEMP}/push-data/base.txt")" = \
-                 "$(git -C "${RUNNER_TEMP}/push-repo" rev-parse FETCH_HEAD)" ]; then
+            if [ "$(cat "${RUNNER_TEMP}/push-data/base.txt")" = "$(git -C "${RUNNER_TEMP}/push-repo" rev-parse FETCH_HEAD)" ]; then
               echo "the push was rejected while main stood still" >&2
               exit 1
             fi
@@ -900,9 +913,9 @@ jobs:
     name: Publish the page to docs-hub
     runs-on: ubuntu-latest
 
-    # Per-job ceiling: the last upload retry starts inside download.py's 300 s
-    # window; its 60 s timeout is per socket operation, DNS has none (issue #402).
-    timeout-minutes: 15
+    # Per-job ceiling: three download.py 300 s windows, the ref fetch's, the live
+    # page's and the upload's (30 s and 60 s per socket operation; DNS has none).
+    timeout-minutes: 20
 
     needs: [publish, push, refresh]
 
@@ -947,15 +960,15 @@ jobs:
             echo "No frontier artifact from this run. Nothing published by this run."
             exit 0
           fi
-          # The scratch is read-only plumbing: init, one anonymous fetch
-          # (the repo is public), rev-parse, compare. No credential sits in
+          # The scratch is read-only plumbing: init, one anonymous fetch (the
+          # repo is public; exit 128 reruns it), rev-parse, compare. No credential sits in
           # it, and nothing in this step writes to GitHub at all: the only
           # writable surface is the docs-hub endpoint below, authenticated
           # by its own key.
           scratch="${RUNNER_TEMP}/ref-scratch"
           git init -q "${scratch}"
           git -C "${scratch}" remote add origin "https://github.com/${GITHUB_REPOSITORY}"
-          git -C "${scratch}" fetch --quiet origin main
+          python3 "${GITHUB_WORKSPACE}/scripts/ci/download.py" --run --retry-on 128 git -C "${scratch}" fetch --quiet origin main
           target="$(git -C "${scratch}" rev-parse FETCH_HEAD)"
           # THE PAGE-TIP TIE. The payload page belongs to the publish job's
           # `tip` (the bundle tip when the hour committed, its base when
@@ -966,38 +979,32 @@ jobs:
           # the header's upload-order paragraph).
           mine="$(cat "${RUNNER_TEMP}/push-data/tip.txt")"
           if [ "$mine" != "$target" ]; then
-            echo "Lost the race: main's tip moved past this run's page, and the newer run's hub job publishes it." \
-              >> "$GITHUB_STEP_SUMMARY"
+            echo "Lost the race: main's tip moved past this run's page, and the newer run's hub job publishes it." >> "$GITHUB_STEP_SUMMARY"
             echo "Nothing published by this run."
             exit 0
           fi
-          # THE LIVE-PAGE GATE (issue #206): never spend a version when
-          # nothing needs publishing. The hub already serving EXACTLY this
-          # run's page, stamp and every other byte, is a green skip. Any
-          # difference (hub behind main, a failed or missed publish, an
-          # unstamped page) or a failed fetch publishes: an extra version
-          # costs less than a stale page. The summary names both stamps, so
-          # a republish hour says which commit the hub was behind to.
+          # THE LIVE-PAGE GATE (issue #206): never spend a version when nothing
+          # needs publishing. The hub already serving EXACTLY this run's page,
+          # stamp and every other byte, is a green skip. Any difference (hub
+          # behind main, a failed or missed publish, an unstamped page) or a
+          # failed fetch publishes: an extra version costs less than a stale
+          # page. The summary names both stamps, so a republish hour says which
+          # commit the hub was behind to.
           live_page="$(mktemp "${TMPDIR:-/tmp}/tmp.XXXXXXXXXX")"
           trap 'rm -f "$live_page"' EXIT
           live_stamp="the hub could not be fetched"
-          if curl -fsS --connect-timeout 10 --max-time 30 \
-               https://docs.nitjsefni.eu/d/ai-researcher/frontier-models \
-               -o "$live_page"; then
+          if python3 "${GITHUB_WORKSPACE}/scripts/ci/download.py" https://docs.nitjsefni.eu/d/ai-researcher/frontier-models "$live_page"; then
             live_stamp="$(grep -oE 'Source commit <code>[0-9a-f]{40}</code>' "$live_page" | head -1)"
             live_stamp="${live_stamp#Source commit <code>}"
             live_stamp="${live_stamp%</code>}"
             [ -n "$live_stamp" ] || live_stamp="an unstamped page"
-            if cmp -s "$live_page" \
-                 "${RUNNER_TEMP}/publish-payload/tree/out/frontier-models.html"; then
-              echo "The hub already serves this run's page (source commit ${live_stamp}) — nothing uploaded." \
-                >> "$GITHUB_STEP_SUMMARY"
+            if cmp -s "$live_page" "${RUNNER_TEMP}/publish-payload/tree/out/frontier-models.html"; then
+              echo "The hub already serves this run's page (source commit ${live_stamp}) — nothing uploaded." >> "$GITHUB_STEP_SUMMARY"
               echo "Nothing uploaded: the hub already serves this page."
               exit 0
             fi
           fi
-          echo "Publishing: the hub serves ${live_stamp}; this run's page names ${mine}." \
-            >> "$GITHUB_STEP_SUMMARY"
+          echo "Publishing: the hub serves ${live_stamp}; this run's page names ${mine}." >> "$GITHUB_STEP_SUMMARY"
           # THE UPLOAD is scripts/publish_docs.py from the checkout of the
           # run's own commit, the one this workflow text came from, so it runs
           # no code this block does not already trust. It sends the key only
@@ -1005,10 +1012,8 @@ jobs:
           # dropped connection through scripts/ci/download.py (issue #402), and
           # fails on any other refusal or a 2xx error field, printing the body.
           python3 "${GITHUB_WORKSPACE}/scripts/publish_docs.py" \
-            "${RUNNER_TEMP}/publish-payload/tree/out/frontier-models.html" \
-            --slug ai-researcher/frontier-models \
-            --title 'Frontier models — intelligence vs cost per task' \
-            --tags benchmarks,comparison,interactive,ai \
+            "${RUNNER_TEMP}/publish-payload/tree/out/frontier-models.html" --slug ai-researcher/frontier-models \
+            --title 'Frontier models — intelligence vs cost per task' --tags benchmarks,comparison,interactive,ai \
             --project ai-researcher --from ai-researcher
           # No ref move follows (issue #206): the upload response above is
           # the hub's receipt, and the page it stored carries the stamp --
@@ -1152,14 +1157,14 @@ jobs:
       (needs.publish.result == 'skipped' || needs.publish.result == 'success') &&
       (needs.push.result == 'skipped' || needs.push.result == 'success')
     runs-on: ubuntu-latest
-    timeout-minutes: 15  # the hub job's ceiling: covers the upload's retry
+    timeout-minutes: 20  # the hub job's ceiling and windows
     permissions:
       contents: read
     # A successful build can recover a failed upload during an unchanged hour,
     # when the committer and push both skip. Failed commit or delivery jobs
     # suppress publication. Main's committed page must match the artifact
-    # before HTTP; identical live bytes skip the upload. The only repository
-    # code this job runs, from its own checkout: publish_docs.py and its imports.
+    # before HTTP; identical live bytes skip the upload. The only repository code
+    # this job runs, from its own checkout: download.py, publish_docs.py and its imports.
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -1190,41 +1195,34 @@ jobs:
           main_page="$(mktemp "${TMPDIR:-/tmp}/tmp.XXXXXXXXXX")"
           # Later scratch files may not exist when an early exit runs cleanup.
           trap 'rm -f "$main_page" "${live_page:-}"' EXIT
-          if ! git -C "${scratch}" fetch --quiet origin main ||
+          if ! python3 "${GITHUB_WORKSPACE}/scripts/ci/download.py" --run --retry-on 128 git -C "${scratch}" fetch --quiet origin main ||
              ! git -C "${scratch}" show FETCH_HEAD:out/trending-rankings.html > "$main_page"; then
             echo "could not verify main's committed page — publishing nothing this run; the next hourly run self-heals" \
               >> "$GITHUB_STEP_SUMMARY"
             echo "Nothing published by this run."
             exit 0
           fi
-          if ! cmp -s "$main_page" \
-               "${RUNNER_TEMP}/rankings-page/trending-rankings.html"; then
+          if ! cmp -s "$main_page" "${RUNNER_TEMP}/rankings-page/trending-rankings.html"; then
             echo "Lost the race: main's tip moved past this run's rankings page, and the newer run's hub job publishes it." \
               >> "$GITHUB_STEP_SUMMARY"
             echo "Nothing published by this run."
             exit 0
           fi
-          # After the tie, this live-page check only avoids duplicate uploads.
-          # Its fetch failure still uploads: the verified artifact bytes equal
-          # main's committed page, so the failure cannot publish uncommitted bytes.
+          # After the tie, this live-page check only avoids duplicate uploads. Its fetch
+          # failure still uploads: the verified artifact bytes equal main's committed page,
+          # so the failure cannot publish uncommitted bytes.
           live_page="$(mktemp "${TMPDIR:-/tmp}/tmp.XXXXXXXXXX")"
-          if curl -fsS --connect-timeout 10 --max-time 30 \
-               https://docs.nitjsefni.eu/d/ai-researcher/trending-rankings \
-               -o "$live_page"; then
-            if cmp -s "$live_page" \
-                 "${RUNNER_TEMP}/rankings-page/trending-rankings.html"; then
-              echo "The hub already serves this run's rankings — nothing uploaded." \
-                >> "$GITHUB_STEP_SUMMARY"
+          if python3 "${GITHUB_WORKSPACE}/scripts/ci/download.py" https://docs.nitjsefni.eu/d/ai-researcher/trending-rankings "$live_page"; then
+            if cmp -s "$live_page" "${RUNNER_TEMP}/rankings-page/trending-rankings.html"; then
+              echo "The hub already serves this run's rankings — nothing uploaded." >> "$GITHUB_STEP_SUMMARY"
               echo "Nothing uploaded: the hub already serves this page."
               exit 0
             fi
           fi
           # The upload is the hub job's: scripts/publish_docs.py and its retry.
           python3 "${GITHUB_WORKSPACE}/scripts/publish_docs.py" \
-            "${RUNNER_TEMP}/rankings-page/trending-rankings.html" \
-            --slug ai-researcher/trending-rankings \
-            --title 'Trending rankings — Hugging Face, OpenRouter & GitHub top 10 over time' \
-            --tags trending,rankings,ai \
+            "${RUNNER_TEMP}/rankings-page/trending-rankings.html" --slug ai-researcher/trending-rankings \
+            --title 'Trending rankings — Hugging Face, OpenRouter & GitHub top 10 over time' --tags trending,rankings,ai \
             --project ai-researcher --from ai-researcher
 
   or-fetch:

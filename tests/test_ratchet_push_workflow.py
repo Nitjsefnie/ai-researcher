@@ -17,6 +17,7 @@ import unittest
 import pytest
 import yaml
 
+import _hubfake
 import _workflowrun
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
@@ -32,8 +33,7 @@ def step(wf, name):
     matches = [s for s in wf["jobs"]["push"]["steps"]
                if s.get("name") == name]
     if len(matches) != 1:
-        raise AssertionError(
-            f"expected exactly one step named {name!r}, found {len(matches)}")
+        raise AssertionError(f"expected exactly one step named {name!r}, found {len(matches)}")
     return matches[0]
 
 
@@ -72,20 +72,15 @@ class TriggerGateTests(unittest.TestCase):
         # The deploy key is reachable only through the main-push
         # environment, and only this workflow's push job declares it.
         assert self.push.get("environment") == "main-push"
-        tests = yaml.load(
-            (ROOT / ".github" / "workflows" / "tests.yml").read_text(
-                encoding="utf-8"),
-            Loader=yaml.BaseLoader)
+        tests = yaml.load((ROOT / ".github" / "workflows" / "tests.yml").read_text(
+                encoding="utf-8"), Loader=yaml.BaseLoader)
         for name, job in tests["jobs"].items():
             assert "environment" not in job, (name, job.get("environment"))
 
-    def test_the_job_holds_no_checkout_and_no_contents_write(self):
-        assert self.push["permissions"] == {"actions": "read"}, (
-            "the push authenticates with the deploy key; the job token "
-            "stays at actions: read")
-        assert not [s for s in self.push["steps"]
-                    if s.get("uses", "").startswith("actions/checkout@")], (
-            "the push job runs no repository code: no checkout step")
+    def test_the_job_checks_out_only_the_retry_helper_and_holds_no_write(self):
+        # The push authenticates with the deploy key; the job token only reads.
+        assert self.push["permissions"] == {"actions": "read", "contents": "read"}
+        _workflowrun.assert_helper_only_checkout(self.push, "Push the ratchet commit")
 
     def test_the_workflow_floor_is_empty(self):
         assert self.wf.get("permissions") == {}, (
@@ -109,14 +104,12 @@ class ArtifactDataTests(unittest.TestCase):
         assert list_step["env"]["AI_RESEARCHER_WORKFLOW_NAME"] == (
             "${{ github.event.workflow_run.name }}")
         downloads = [entry for entry in self.wf["jobs"]["push"]["steps"]
-                     if entry.get("uses", "").startswith(
-                         "actions/download-artifact@")]
+                     if entry.get("uses", "").startswith("actions/download-artifact@")]
         assert len(downloads) == 1, downloads
         run_text = flattened(list_step["run"])
         for download in downloads:
-            gate = re.fullmatch(
-                r"steps\.list\.outputs\.(\w+)_staged == 'true'",
-                " ".join(download["if"].split()))
+            gate = re.fullmatch(r"steps\.list\.outputs\.(\w+)_staged == 'true'",
+                                " ".join(download["if"].split()))
             assert gate, download["if"]
             tag = gate.group(1)
             with_ = download["with"]
@@ -138,15 +131,13 @@ class ArtifactDataTests(unittest.TestCase):
         loop_text = " ".join(
             step(self.wf, name)["run"]
             for name in ("Validate the staged data", "Push the ratchet commit"))
-        walked = set(re.findall(
-            r"'([a-z0-9-]+) ([a-z0-9.-]+\.json)'", loop_text))
-        assert walked == {
-            ("ratchet-data", "ci-thresholds.json"),
-        }
+        walked = set(re.findall(r"'([a-z0-9-]+) ([a-z0-9.-]+\.json)'", loop_text))
+        assert walked == {("ratchet-data", "ci-thresholds.json")}
 
     def test_the_validation_step_runs_before_the_push_step(self):
         names = [s.get("name") for s in self.wf["jobs"]["push"]["steps"]]
         assert names == [
+            None,  # the retry helper's checkout
             "List the triggering run's artifacts",
             "Download the ratchet data",
             "Validate the staged data",
@@ -228,25 +219,20 @@ class ExecutedValidationTests(unittest.TestCase):
 
     def _run_with(self, tmp_path, document, base):
         payloads = {"ci-thresholds.json": self.VALID}
-        return self._validate(
-            tmp_path, document,
-            json.dumps(payloads[document]).encode("utf-8"),
-            base.encode("utf-8"))
+        return self._validate(tmp_path, document,
+                              json.dumps(payloads[document]).encode("utf-8"), base.encode("utf-8"))
 
     def test_the_real_shape_passes(self):
         for document in ("ci-thresholds.json",):
-            done = self._run_with(self.enterContext(_dir()), document,
-                                  self.BASE_COMMIT)
+            done = self._run_with(self.enterContext(_dir()), document, self.BASE_COMMIT)
             assert done.returncode == 0, (done.stdout, done.stderr)
 
     def test_wrong_leaf_keys_are_refused(self):
         document = {"coverage": {"javascript": {"a": 1, "b": 2},
                                  "python": {"floor": 1, "measured": 2}},
                     "schema_version": 1}
-        done = self._validate(
-            self.enterContext(_dir()), "ci-thresholds.json",
-            json.dumps(document).encode("utf-8"),
-            self.BASE_COMMIT.encode("utf-8"))
+        done = self._validate(self.enterContext(_dir()), "ci-thresholds.json",
+                              json.dumps(document).encode("utf-8"), self.BASE_COMMIT.encode("utf-8"))
         assert done.returncode != 0, done.stdout
 
     def test_a_garbage_suffixed_base_is_refused(self):
@@ -259,18 +245,14 @@ class ExecutedValidationTests(unittest.TestCase):
         document = {"coverage": {"javascript": {"floor": "95", "measured": 1},
                                  "python": {"floor": 1, "measured": 2}},
                     "schema_version": 1}
-        done = self._validate(
-            self.enterContext(_dir()), "ci-thresholds.json",
-            json.dumps(document).encode("utf-8"),
-            self.BASE_COMMIT.encode("utf-8"))
+        done = self._validate(self.enterContext(_dir()), "ci-thresholds.json",
+                              json.dumps(document).encode("utf-8"), self.BASE_COMMIT.encode("utf-8"))
         assert done.returncode != 0, done.stdout
 
     def test_a_string_schema_version_is_refused(self):
         document = dict(self.VALID, schema_version="1")
-        done = self._validate(
-            self.enterContext(_dir()), "ci-thresholds.json",
-            json.dumps(document).encode("utf-8"),
-            self.BASE_COMMIT.encode("utf-8"))
+        done = self._validate(self.enterContext(_dir()), "ci-thresholds.json",
+                              json.dumps(document).encode("utf-8"), self.BASE_COMMIT.encode("utf-8"))
         assert done.returncode != 0, done.stdout
 
     def test_a_sibling_document_in_the_wrong_staging_directory_is_refused(self):
@@ -327,36 +309,35 @@ EXPECTED_OUTPUTS = {
 
 
 @POSIX
-@pytest.mark.parametrize("workflow,staged", [
-    ("ci gate", []),
-    ("ci gate", ["ratchet-data"]),
-])
-def test_artifact_selection_and_absent_noop(tmp_path, workflow, staged):
+@pytest.mark.parametrize("workflow,staged,fault", [
+    ("ci gate", [], ""), ("ci gate", ["ratchet-data"], ""),
+    ("ci gate", ["ratchet-data"], "gh: Server Error (HTTP 502)"), ("ci gate", ["ratchet-data"], "gh: Not Found (HTTP 404)")])
+def test_artifact_selection_and_absent_noop(tmp_path, workflow, staged, fault):
     """The producer consumes only its own unexpired artifact (issues
-    #281 and #333)."""
+    #281 and #333). A listing failing with a 502 reruns; a 404 fails the step at once (#426)."""
     state, calls = tmp_path / "state.json", tmp_path / "calls.jsonl"
     bin_dir = tmp_path / "bin"
     _workflowrun.write_gh_stub(bin_dir, state, calls)
+    _hubfake.install(bin_dir)  # download.py's backoff, instant
     artifacts = [{"name": "unrelated", "expired": False},
                  {"name": "another-data", "expired": False}]
     for name in staged:
-        artifacts.append({"name": name, "expired": True})
-        artifacts.append({"name": name, "expired": False})
-    state.write_text(json.dumps({"artifacts": artifacts}), encoding="utf-8")
+        artifacts += [{"name": name, "expired": True}, {"name": name, "expired": False}]
+    state.write_text(json.dumps({"artifacts": artifacts, "faults": [
+        {"verb": "GET", "route": "/artifacts", "stderr": fault}] if fault else []}), encoding="utf-8")
     output = tmp_path / "output"
     done = _workflowrun.run_step(tmp_path, step(load(), "List the triggering run's artifacts"), {
         **os.environ, "PATH": str(bin_dir) + os.pathsep + os.environ["PATH"],
         "STUB_STATE": str(state), "STUB_CALLS": str(calls),
         "GITHUB_OUTPUT": str(output), "AI_RESEARCHER_WORKFLOW_NAME": workflow,
         "GH_TOKEN": "test", "AI_RESEARCHER_REPO": "Nitjsefnie/ai-researcher", "AI_RESEARCHER_RUN_ID": "281",
-    })
-    assert done.returncode == 0, done.stderr
+        "GITHUB_WORKSPACE": str(ROOT)})
+    assert done.returncode == ("404" in fault), done.stderr
     outputs = dict(line.split("=", 1)
-                   for line in output.read_text(encoding="utf-8").splitlines())
-    assert outputs == EXPECTED_OUTPUTS[workflow](staged)
-    [call] = [json.loads(line)
-              for line in calls.read_text(encoding="utf-8").splitlines()]
-    assert "repos/Nitjsefnie/ai-researcher/actions/runs/281/artifacts" in call
+                   for line in output.read_text(encoding="utf-8").splitlines()) if output.exists() else {}
+    assert outputs == ({} if "404" in fault else EXPECTED_OUTPUTS[workflow](staged))
+    listed = [json.loads(line) for line in calls.read_text(encoding="utf-8").splitlines()]
+    assert [call[-3] for call in listed] == ["repos/Nitjsefnie/ai-researcher/actions/runs/281/artifacts"] * (1 + ("502" in fault))
 
 
 def test_ratchet_artifact_names_have_exclusive_producers():
@@ -444,20 +425,20 @@ def _push_fixture(tmp_path, outcome, staged):
     bin_dir.mkdir()
     for name, body in {
         "ssh-agent": "printf 'SSH_AGENT_PID=; export SSH_AGENT_PID;\\n'",
-        "ssh-add": "exit 0",
-        "git": 'exec "$TEST_PYTHON" "$TEST_GIT_STUB" "$@"',
+        "ssh-add": "exit 0", "git": 'exec "$TEST_PYTHON" "$TEST_GIT_STUB" "$@"',
     }.items():
         path = bin_dir / name
         path.write_text("#!/bin/sh\n" + body + "\n", encoding="utf-8")
         path.chmod(0o755)
     stub = bin_dir / "git_stub.py"
     stub.write_text(PUSH_GIT_STUB, encoding="utf-8")
+    _hubfake.install(bin_dir)  # the python3 running download.py, its backoff instant
     # Isolate SSH's known_hosts writes from the user's home directory.
     home = tmp_path / "home"
     home.mkdir()
     env = {
         **os.environ, "PATH": str(bin_dir) + os.pathsep + os.environ["PATH"],
-        "HOME": str(home), "RUNNER_TEMP": str(tmp_path),
+        "HOME": str(home), "RUNNER_TEMP": str(tmp_path), "GITHUB_WORKSPACE": str(ROOT),
         "GITHUB_STEP_SUMMARY": str(tmp_path / "summary"),
         "AI_RESEARCHER_REPO": "Nitjsefnie/ai-researcher",
         "AI_RESEARCHER_MASTER_PUSH_DEPLOY_KEY": "" if outcome == "no-key" else "test input",
@@ -477,6 +458,7 @@ def _push_fixture(tmp_path, outcome, staged):
 @pytest.mark.parametrize("document", ["ci-thresholds.json"])
 @pytest.mark.parametrize("outcome", [
     "landed", "stale", "moved-before-fetch", "rejected", "moved", "no-key", "transport",
+    "flaky-ls-remote", "flaky-fetch", "flaky-push",
 ])
 def test_records_only_push_and_race_classification(tmp_path, document, outcome):
     """Run the real push script with isolated SSH and controlled remote movement."""
@@ -488,7 +470,11 @@ def test_records_only_push_and_race_classification(tmp_path, document, outcome):
     recorded = [json.loads(line) for line in
                 (tmp_path / "calls.jsonl").read_text().splitlines()] if (
         tmp_path / "calls.jsonl").exists() else []
-    if outcome == "landed":
+    verb = {"transport": "ls-remote", "rejected": "push", "moved": "push"}.get(outcome, outcome[6:])
+    if verb in {"ls-remote", "fetch", "push"}:  # 128 reruns the call alone, to the window's end or success; 1 never
+        assert sum((args[2:] if args[0] == "-C" else args)[0] == verb for args in recorded) == {
+            "transport": 8, "rejected": 1, "moved": 1}.get(outcome, 2)
+    if outcome == "landed" or outcome.startswith("flaky-"):
         payload = json.dumps(ExecutedValidationTests.VALID).encode("utf-8") + b"\n"
         assert _git(tmp_path, "--git-dir", str(remote), "rev-parse", tip + "^") == base
         assert _git(tmp_path, "--git-dir", str(remote), "diff-tree", "--no-commit-id",
@@ -580,6 +566,12 @@ command = args[2:] if args[0] == "-C" else args
 outcome = os.environ["TEST_OUTCOME"]
 real = os.environ["REAL_GIT"]
 if command[0] == "ls-remote" and outcome == "transport":
+    sys.exit(128)
+flaked = Path(os.environ["TEST_CALLS"] + ".flaked")
+if outcome == "flaky-" + command[0] and not flaked.exists():  # a push lands before its 128
+    flaked.touch()
+    if command[0] == "push":
+        subprocess.run([real, *args], check=False)
     sys.exit(128)
 if command[0] == "fetch" and outcome == "moved-before-fetch":
     subprocess.run([real, "--git-dir", os.environ["PUSH_REMOTE"], "update-ref",

@@ -9,6 +9,7 @@ another repository, pull request or head SHA is unmodeled and fails loudly
 — because a double that answers any destination cannot prove the
 destination.
 """
+import re
 import shlex
 import shutil
 import subprocess
@@ -90,6 +91,44 @@ def write_gh_stub(bin_dir, state_path, calls_path):
     return trampoline
 
 
+def write_git_stub(bin_dir, fault, log, verb="fetch"):
+    """A real `git`; the first `verb` runs, drops its output and reports `fault`. Each `verb` is logged."""
+    git = shutil.which("git")
+    (Path(bin_dir) / "git").write_text(
+        f"#!/bin/sh\ncase \" $* \" in *' {verb} '*)\n  echo \"$*\" >> '{log}'\n  if [ ! -e '{log}.faulted' ]; then\n"
+        f"    : > '{log}.faulted'; '{git}' \"$@\" > /dev/null; exit {fault}\n  fi ;;\nesac\nexec '{git}' \"$@\"\n",
+        encoding="utf-8")
+    (Path(bin_dir) / "git").chmod(0o755)
+
+
+HELPER = ["scripts/ci/download.py", "scripts/fetch_http.py"]
+
+
+def is_helper_checkout(step):
+    """A checkout of github.sha carrying no credential and only the retry helper's two files."""
+    with_ = step.get("with") or {}
+    return (step.get("uses", "").startswith("actions/checkout@") and "env" not in step
+            and set(with_) == {"ref", "persist-credentials", "sparse-checkout", "sparse-checkout-cone-mode"}
+            and with_["ref"] == "${{ github.sha }}" and str(with_["sparse-checkout"]).split() == HELPER
+            and str(with_["persist-credentials"]).lower() == str(with_["sparse-checkout-cone-mode"]).lower() == "false"
+            and set(re.findall(r"\$\{\{.*?\}\}", str(step))) == {"${{ github.sha }}"})
+
+
+def assert_helper_only_checkout(job, key_step):
+    """One helper checkout precedes `key_step`, every artifact lands under runner.temp, and no interpreter or
+    shell runs a file: python3 only as `download.py --run`, a shell only as `-c <function>`, no `.`, source or eval of a file."""
+    steps, names = job["steps"], [step.get("name") for step in job["steps"]]
+    [at] = [i for i, step in enumerate(steps) if step.get("uses", "").startswith("actions/checkout@")]
+    assert is_helper_checkout(steps[at]) and at < names.index(key_step), (steps[at], names)
+    for step in steps:
+        if step.get("uses", "").startswith("actions/download-artifact@"):
+            assert step["with"]["path"].startswith("${{ runner.temp }}/"), step
+        run = "\n".join(line for line in step.get("run", "").splitlines() if not line.lstrip().startswith("#"))
+        assert not re.search(r'(?<![\w.-])(?:(?:pip|python)[\d.]*\s(?!"\$GITHUB_WORKSPACE/scripts/ci/download\.py" --run )'
+                             r"|(?:ba|da|z)?sh\s+(?!-c [A-Za-z_]\w*\b)|source\s|eval\s+[\"']?\$\((?:cat\s|<))"
+                             r"|(?:^|[;&|({]|\b(?:then|do|else|if|elif|while|until))[ \t]*\.\s+\S", run, re.M), run
+
+
 STUB_GH = r'''#!/usr/bin/env python3
 """A `gh` double: canned JSON per route, every call recorded."""
 import json
@@ -167,6 +206,15 @@ AI_RESEARCHER_HEAD_SHA = os.environ.get("AI_RESEARCHER_HEAD_SHA") or os.environ.
 # step that writes anywhere else is unmodeled, never served.
 if not target.startswith(f"repos/{AI_RESEARCHER_REPO}/"):
     refuse(f"route outside {AI_RESEARCHER_REPO}")
+# A scripted fault fails the first matching call as gh does: error body on stdout, its line on stderr,
+# exit 1. One that `lands` is a write the API applied before the failure reached the caller.
+fault = next((f for f in state.get("faults", []) if f["verb"] == verb and f["route"] in target), None)
+if fault:
+    state["faults"].remove(fault)
+    if not fault.get("lands"):
+        state_path.write_text(json.dumps(state), encoding="utf-8")
+        print(json.dumps({"message": fault["stderr"]}))
+        sys.exit(fault["stderr"])
 if "/issues/" in target and "/comments" in target and verb == "POST":
     if target != f"repos/{AI_RESEARCHER_REPO}/issues/{AI_RESEARCHER_PR_NUMBER}/comments":
         refuse(f"destination is not pull request {AI_RESEARCHER_PR_NUMBER}")
@@ -218,6 +266,8 @@ else:
     refuse("unmodeled call")
 
 state_path.write_text(json.dumps(state), encoding="utf-8")
+if fault:
+    sys.exit(fault["stderr"])
 '''
 
 
