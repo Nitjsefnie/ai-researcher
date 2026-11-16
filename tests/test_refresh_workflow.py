@@ -41,6 +41,8 @@ ROOT = pathlib.Path(__file__).resolve().parent.parent
 WORKFLOW = ROOT / ".github" / "workflows" / "refresh.yml"
 # Each hub job's upload: the canonical client from the job's checkout (issue #402).
 PUBLISH_CMD = 'python3 "${GITHUB_WORKSPACE}/scripts/publish_docs.py"'
+FETCH_CMD = 'python3 "${GITHUB_WORKSPACE}/scripts/ci/download.py" --run --retry-on 128 git -C "${scratch}" fetch --quiet origin main'
+LIVE_CMD = 'python3 "${GITHUB_WORKSPACE}/scripts/ci/download.py" https://docs.nitjsefni.eu/d/ai-researcher/'
 
 
 def load():
@@ -91,12 +93,9 @@ class GateTests(unittest.TestCase):  # pylint: disable=too-many-public-methods
     def test_joined_sources_have_independent_participation_gates(self):
         job = self.wf['jobs']['publish']
         sources = (
-            ('refresh', 'proceed', 'publish'),
-            ('hf-fetch', 'changed', 'Hugging Face'),
-            ('or-fetch', 'changed', 'OpenRouter'),
-            ('github-fetch', 'changed', 'GitHub'),
-            ('rankings', 'changed', 'rankings page'),
-        )
+            ('refresh', 'proceed', 'publish'), ('hf-fetch', 'changed', 'Hugging Face'),
+            ('or-fetch', 'changed', 'OpenRouter'), ('github-fetch', 'changed', 'GitHub'),
+            ('rankings', 'changed', 'rankings page'))
         self.assertEqual(job['needs'], [source[0] for source in sources])
         for source, output, label in sources:
             term = (f"needs.{source}.result == 'success' && "
@@ -218,8 +217,7 @@ class GateTests(unittest.TestCase):  # pylint: disable=too-many-public-methods
         # job DECLARES read: it runs the capture, third-party installs and
         # the suite, so nothing in it may ride a write token.
         self.assertEqual(self.wf.get("permissions"), {"contents": "read"})
-        self.assertEqual(self.wf["jobs"]["refresh"]["permissions"],
-                         {"contents": "read"})
+        self.assertEqual(self.wf["jobs"]["refresh"]["permissions"], {"contents": "read"})
 
     def test_no_job_holds_contents_write(self):
         # Issues #143 and #133, narrowed by #206: the workflow floor and
@@ -258,8 +256,7 @@ class GateTests(unittest.TestCase):  # pylint: disable=too-many-public-methods
         # output must be wired to it.
         outputs = self.wf["jobs"]["refresh"]["outputs"]
 
-        self.assertEqual(outputs["proceed"],
-                         "${{ steps.capture.outputs.proceed }}")
+        self.assertEqual(outputs["proceed"], "${{ steps.capture.outputs.proceed }}")
 
     def test_the_payload_travels_as_this_runs_own_artifact(self):
         # The upload and download agree on the artifact name, and the
@@ -292,18 +289,15 @@ class GateTests(unittest.TestCase):  # pylint: disable=too-many-public-methods
         self.assertIn("needs.refresh.outputs.proceed == 'true'", gate)
         self.assertIn("needs.publish.outputs.publish == 'true'", cond)
 
-    def test_the_publish_job_runs_no_repository_code(self):
-        # The writer runs no checkout, install, suite or tree script: its
-        # inputs are the artifact, git plumbing, curl/jq/gh.
-        # Anything run here rides the write token; the hub job runs only
-        # publish_docs.py and its imports (download.py, fetch_http.py).
-        banned = re.compile(r"\bpython3\b|\bpip[0-9]?\b")
-        for job in ("publish", "push", "hub"):
-            for s in self.wf["jobs"][job]["steps"]:
-                run = commands(s.get("run", ""))
-                if job == "hub":
-                    run = run.replace(PUBLISH_CMD, "", 1)
-                self.assertIsNone(banned.search(run), run)
+    def test_the_committer_and_push_jobs_run_only_the_retry_helper(self):
+        # No artifact byte executes in the writer or the push job: their only tree code is the retry
+        # helper at github.sha, checked out before the key loads. The hub job runs only
+        # publish_docs.py and its imports, and download.py around its fetches.
+        for job, key_step in (("publish", "Commit the refresh"), ("push", "Push the tested tree to main")):
+            _workflowrun.assert_helper_only_checkout(self.wf["jobs"][job], key_step)
+        for s in self.wf["jobs"]["hub"]["steps"]:
+            run = commands(s.get("run", "")).replace(PUBLISH_CMD, "", 1).replace(FETCH_CMD, "", 1).replace(LIVE_CMD, "", 1)
+            self.assertIsNone(re.search(r"\bpython3\b|\bpip[0-9]?\b", run), run)
 
     def test_the_suite_step_rebuilds_the_page_stamped_too(self):
         # Issue #92: the suite's browser tests used to call build.main() over
@@ -327,8 +321,7 @@ class GateTests(unittest.TestCase):  # pylint: disable=too-many-public-methods
                           ("Run the suite against the new capture",
                            "python3 -m pytest -q -ra")):
             s = step(self.wf, name)
-            self.assertEqual(s["if"],
-                             "steps.capture.outputs.proceed == 'true'")
+            self.assertEqual(s["if"], "steps.capture.outputs.proceed == 'true'")
             self.assertEqual(flattened(s["run"]), run)
 
     def test_the_gate_compares_the_rendered_page_not_the_raw_capture_bytes(self):
@@ -385,17 +378,12 @@ class GateTests(unittest.TestCase):  # pylint: disable=too-many-public-methods
         s = step(self.wf, "Stage the publish payload")
         run = flattened(s["run"])
 
-        self.assertEqual(s["env"]["AI_RESEARCHER_CHANGED"],
-                         "${{ steps.capture.outputs.changed }}")
+        self.assertEqual(s["env"]["AI_RESEARCHER_CHANGED"], "${{ steps.capture.outputs.changed }}")
         self.assertEqual(s["env"]["AI_RESEARCHER_FORCE"], "${{ inputs.force }}")
         self.assertIn(
             'if [ "$AI_RESEARCHER_CHANGED" != "true" ] && [ "$AI_RESEARCHER_FORCE" != "true" ]; then', run)
-        self.assertIn(
-            "git show HEAD:out/frontier-models.html > out/frontier-models.html",
-            run)
-        self.assertLess(
-            run.index("git show HEAD:out/frontier-models.html"),
-            run.index("cp --parents"))
+        self.assertIn("git show HEAD:out/frontier-models.html > out/frontier-models.html", run)
+        self.assertLess(run.index("git show HEAD:out/frontier-models.html"), run.index("cp --parents"))
 
     def test_the_staging_step_ships_the_commit_payload(self):
         # The artifact is the exact commit payload the old single job staged:
@@ -406,12 +394,9 @@ class GateTests(unittest.TestCase):  # pylint: disable=too-many-public-methods
         # varies by hour.
         run = flattened(step(self.wf, "Stage the publish payload")["run"])
 
-        for piece in ("data/aa-raw-models.json",
-                      "data/aa-raw-coding-agents.json",
-                      "data/aa-generation-state.json",
-                      "data/captured-at.txt",
-                      "out/frontier-models.html",
-                      "data/cost-breakdown-window.txt",
+        for piece in ("data/aa-raw-models.json", "data/aa-raw-coding-agents.json",
+                      "data/aa-generation-state.json", "data/captured-at.txt",
+                      "out/frontier-models.html", "data/cost-breakdown-window.txt",
                       "commit-msg.txt"):
             self.assertIn(piece, run)
         # The marker copies only when this hour actually recorded one.
@@ -421,8 +406,7 @@ class GateTests(unittest.TestCase):  # pylint: disable=too-many-public-methods
         # No disagreement-era file and no retirement switch survives on this
         # path; the window marker is the one conditional payload file, and
         # the guard above is its whole conditional.
-        for gone in ("data/aa-disagreement-snapshot.json",
-                     "data/aa-route-disagreement.txt",
+        for gone in ("data/aa-disagreement-snapshot.json", "data/aa-route-disagreement.txt",
                      "data/aa-last-agreeing-capture.json",
                      "$RETIRE"):
             self.assertNotIn(gone, run)
@@ -442,15 +426,11 @@ class GateTests(unittest.TestCase):  # pylint: disable=too-many-public-methods
         # exactly the heal hour and the marker would never leave main (the
         # reviewer-reproduced defect this condition fixes). The removal is
         # the elif's `git rm`. Neither branch fires in a normal hour.
-        run = flattened(step_in(self.wf, "publish",
-                                "Commit the refresh")["run"])
+        run = flattened(step_in(self.wf, "publish", "Commit the refresh")["run"])
 
-        self.assertIn(
-            'if [ -f "${PAYLOAD}/tree/data/cost-breakdown-window.txt" ]; then',
-            run)
+        self.assertIn('if [ -f "${PAYLOAD}/tree/data/cost-breakdown-window.txt" ]; then', run)
         self.assertIn("git add data/cost-breakdown-window.txt", run)
-        self.assertIn(
-            "git cat-file -e HEAD:data/cost-breakdown-window.txt", run)
+        self.assertIn("git cat-file -e HEAD:data/cost-breakdown-window.txt", run)
         self.assertIn("git rm -q data/cost-breakdown-window.txt", run)
         # Presence stages before absence is considered, and the rm is the
         # elif -- never an unconditional removal.
@@ -492,8 +472,7 @@ class GateTests(unittest.TestCase):  # pylint: disable=too-many-public-methods
         idx_gate = run.index('if [ "$AI_RESEARCHER_REF" != "refs/heads/main" ]; then')
         # The off-main gate runs FIRST: before the rendered gate and before
         # any check that could be mislabeled as a main move.
-        self.assertLess(idx_gate,
-                        run.index('changed="$(python3 scripts/capture_gate.py)"'))
+        self.assertLess(idx_gate, run.index('changed="$(python3 scripts/capture_gate.py)"'))
         self.assertIn("Dropped: dispatched off main", run)
         self.assertIn("a payload built", run)
         # The drop is green and total: proceed=false is written and the
@@ -510,9 +489,8 @@ class GateTests(unittest.TestCase):  # pylint: disable=too-many-public-methods
         # publish_docs.py, its verdicts its own (issue #402).
         run = flattened(hub_step(self.wf, "Publish to docs-hub")["run"])
 
-        self.assertLess(
-            run.index("https://docs.nitjsefni.eu/d/ai-researcher/frontier-models"),
-            run.index(PUBLISH_CMD))
+        self.assertLess(run.index("https://docs.nitjsefni.eu/d/ai-researcher/frontier-models"),
+                        run.index(PUBLISH_CMD))
         self.assertIn("Source commit <code>", run)
 
     def test_no_refs_api_call_remains(self):
@@ -539,8 +517,7 @@ class GateTests(unittest.TestCase):  # pylint: disable=too-many-public-methods
         # same stance the ref gates it replaced held.
         run = flattened(hub_step(self.wf, "Publish to docs-hub")["run"])
 
-        idx_fetch = run.index(
-            "https://docs.nitjsefni.eu/d/ai-researcher/frontier-models")
+        idx_fetch = run.index("https://docs.nitjsefni.eu/d/ai-researcher/frontier-models")
         idx_stamp = run.index("Source commit <code>")
         idx_cmp = run.index('cmp -s "$live_page"')
         idx_skip = run.index("nothing uploaded", idx_cmp)
@@ -614,8 +591,7 @@ class GateTests(unittest.TestCase):  # pylint: disable=too-many-public-methods
         # re-fetches, re-tests and lands it). Exactly two attempts: the
         # original and the post-fetch verdict, which is the final one --
         # nothing loops.
-        run = flattened(
-            step_in(self.wf, "push", "Push the tested tree to main")["run"])
+        run = flattened(step_in(self.wf, "push", "Push the tested tree to main")["run"])
 
         # Exactly one guarded push attempt: a rejection is classified once
         # (stood still vs main moved) and never loops.
@@ -690,8 +666,7 @@ class GateTests(unittest.TestCase):  # pylint: disable=too-many-public-methods
         # The tie's concede leaves GREEN through its own exit 0 before the
         # live-page gate: a superseded hour must neither publish nor go red.
         idx_exit = run.index("exit 0", idx_concede)
-        idx_fetch = run.index(
-            "https://docs.nitjsefni.eu/d/ai-researcher/frontier-models")
+        idx_fetch = run.index("https://docs.nitjsefni.eu/d/ai-researcher/frontier-models")
         idx_upload = run.index(PUBLISH_CMD)
         self.assertLess(idx_mine, idx_tie)
         self.assertLess(idx_tie, idx_concede)
@@ -710,8 +685,7 @@ class GateTests(unittest.TestCase):  # pylint: disable=too-many-public-methods
         raw = hub_step(self.wf, "Publish to docs-hub")["run"]
         run = flattened(raw)
 
-        idx_fetch = run.index(
-            "https://docs.nitjsefni.eu/d/ai-researcher/frontier-models")
+        idx_fetch = run.index("https://docs.nitjsefni.eu/d/ai-researcher/frontier-models")
         idx_extract = run.index("Source commit <code>")
         idx_publishing = run.index("Publishing: the hub serves")
         idx_upload = run.index(PUBLISH_CMD)
@@ -729,8 +703,8 @@ class ExecutedHoldProbeTests(unittest.TestCase):
     hermetically -- a premise the corpus's
     ci/run-workflow-step-scripts-dont-read-them lesson (its fifth sighting
     on this file) disposes of: the step is executable code, so the contract
-    is pinned by running the real run block. python3 and curl are stubbed
-    (the only tools the step reaches beyond git), the gate and the probe
+    is pinned by running the real run block. python3 is stubbed (the only
+    tool the step reaches beyond git, the hub fetch included), the gate and the probe
     answer from fixtures, and every executed case asserts the exit code,
     the proceed output, the data/ state and -- where the case's meaning
     needs it -- the summary and the hub fetch.
@@ -762,7 +736,7 @@ class ExecutedHoldProbeTests(unittest.TestCase):
     def setUp(self):
         if os.name == "nt":
             # The step is a GitHub-runner bash script exercising POSIX
-            # tooling (mktemp, cmp, curl, a stub PATH); the refresh job
+            # tooling (mktemp, cmp, a stub PATH); the refresh job
             # itself runs on ubuntu, the same skip shape as the
             # stub-gh classifier tests.
             raise unittest.SkipTest(
@@ -771,7 +745,7 @@ class ExecutedHoldProbeTests(unittest.TestCase):
 
     def _run_hour(self, tmp: pathlib.Path, *, gate, probe, force, hub):
         """Seed one scratch repo at HEAD, dirty it with the fresh capture
-        and the untracked window marker, install the python3/curl doubles,
+        and the untracked window marker, install the python3 double,
         and run the real run block.
 
         `gate` is the no-argument capture_gate.py answer -- `true`, `false`
@@ -798,10 +772,8 @@ class ExecutedHoldProbeTests(unittest.TestCase):
         # A fixture's throwaway repo: the commit-identity rule governs OUR
         # commits, not scratch seeds (the same note the marker conditional
         # test carries).
-        seed_env = {**os.environ, "GIT_AUTHOR_NAME": "seed",
-                    "GIT_AUTHOR_EMAIL": "seed@example",
-                    "GIT_COMMITTER_NAME": "seed",
-                    "GIT_COMMITTER_EMAIL": "seed@example"}
+        seed_env = {**os.environ, "GIT_AUTHOR_NAME": "seed", "GIT_AUTHOR_EMAIL": "seed@example",
+                    "GIT_COMMITTER_NAME": "seed", "GIT_COMMITTER_EMAIL": "seed@example"}
         subprocess.run([*git, "init", "-q"], check=True, capture_output=True)
         subprocess.run([*git, "add", "."], check=True, capture_output=True)
         subprocess.run([*git, "commit", "-qm", "head"], env=seed_env,
@@ -810,26 +782,20 @@ class ExecutedHoldProbeTests(unittest.TestCase):
         # and fetch_aa.py's window marker -- untracked-but-whitelisted, so
         # `git checkout -- data/` cannot remove it. Exactly the tree state
         # a real window hour leaves.
-        (repo / "data" / "aa-raw-models.json").write_text(self.FRESH,
-                                                          encoding="utf-8")
-        (repo / "data" / "cost-breakdown-window.txt").write_text(
-            "3\n", encoding="utf-8")
+        (repo / "data" / "aa-raw-models.json").write_text(self.FRESH, encoding="utf-8")
+        (repo / "data" / "cost-breakdown-window.txt").write_text("3\n", encoding="utf-8")
 
         stub = tmp / "bin"
         stub.mkdir()
         (stub / "python3").write_text(STUB_PYTHON3, encoding="utf-8")
-        (stub / "curl").write_text(STUB_CURL, encoding="utf-8")
-        for tool in stub.iterdir():
-            tool.chmod(0o755)
+        (stub / "python3").chmod(0o755)
 
-        step_ = _workflowrun.step_by_name(
-            WORKFLOW, "refresh", "Did anything move?")
+        step_ = _workflowrun.step_by_name(WORKFLOW, "refresh", "Did anything move?")
         # The workflow engine substitutes ${{ }} in run text before a
         # script exists; the harness plays that part for the expression
         # the verdict and the quiet line still read inline. The held
         # branch reads $AI_RESEARCHER_FORCE from the step env instead.
-        script = step_["run"].replace("${{ inputs.force }}",
-                                      "true" if force else "")
+        script = step_["run"].replace("${{ inputs.force }}", "true" if force else "")
         env = {
             "PATH": f"{stub}:{os.environ['PATH']}",
             "HOME": str(tmp),
@@ -843,7 +809,7 @@ class ExecutedHoldProbeTests(unittest.TestCase):
             "HELD_OUT": held_out,
             "HELD_RC": str(held_rc),
             "HUB_SAME": {"same": "1", "stale": "0", "fail": "fail"}[hub],
-            "STUB_CALLS": str(tmp / "curl-calls.txt"),
+            "STUB_CALLS": str(tmp / "hub-calls.txt"),
         }
         done = _workflowrun.run_step(repo, dict(step_, run=script), env)
 
@@ -864,7 +830,7 @@ class ExecutedHoldProbeTests(unittest.TestCase):
             "marker": (repo / "data" / "cost-breakdown-window.txt").exists(),
             "summary": read(tmp / "summary.txt"),
             "stdout": done.stdout,
-            "hub_fetches": read(tmp / "curl-calls.txt").count("\n"),
+            "hub_fetches": read(tmp / "hub-calls.txt").count("\n"),
             "stderr": done.stderr,
         }
 
@@ -1039,7 +1005,15 @@ STUB_PYTHON3 = """\
 # byte-faithful to the real scripts/capture_gate.py, whose diagnostics go
 # to stderr (measured: exit 1, 0 bytes on stdout) -- so a failed probe or
 # gate leaves the step's command substitution empty exactly as the real
-# script does.
+# script does. download.py's live-page fetch writes HEAD's page when
+# HUB_SAME=1, a stale page when HUB_SAME=0, and fails when HUB_SAME=fail --
+# the step's else hub_stale=true arm; every fetch is recorded.
+if [ "$1" = scripts/ci/download.py ]; then
+  printf '%s\\n' "$3" >> "$STUB_CALLS"
+  [ "$HUB_SAME" = fail ] && exit 1
+  if [ "$HUB_SAME" = 1 ]; then printf 'page\\n' > "$3"; else printf 'old\\n' > "$3"; fi
+  exit 0
+fi
 if [ "$2" = "--fresh-held" ] && [ -n "$HELD_OUT" ]; then
   printf '%s\\n' "$HELD_OUT"
   exit "$HELD_RC"
@@ -1049,24 +1023,6 @@ if [ "$2" = "--fresh-held" ]; then
 fi
 [ -n "$GATE_OUT" ] && printf '%s\\n' "$GATE_OUT"
 exit "$GATE_RC"
-"""
-
-STUB_CURL = """\
-#!/bin/bash
-# The test double for the hub's live-page fetch: writes HEAD's page when
-# HUB_SAME=1, a stale page when HUB_SAME=0, and a failed fetch when
-# HUB_SAME=fail -- the step's else hub_stale=true arm. Every invocation
-# is recorded, the failed ones included.
-while [ $# -gt 0 ]; do
-  if [ "$1" = "-o" ]; then
-    shift
-    printf '%s\\n' "$1" >> "$STUB_CALLS"
-    if [ "$HUB_SAME" = fail ]; then exit 1; fi
-    if [ "$HUB_SAME" = 1 ]; then printf 'page\\n' > "$1"; else printf 'old\\n' > "$1"; fi
-  fi
-  shift
-done
-exit 0
 """
 
 
@@ -1158,7 +1114,7 @@ class _SeededOrigin:
             "GITHUB_OUTPUT": str(tmp / "output.txt"),
             "GITHUB_STEP_SUMMARY": str(tmp / "summary.txt"),
             "GIT_CONFIG_GLOBAL": config,
-            "GITHUB_SHA": sha,
+            "GITHUB_SHA": sha, "GITHUB_WORKSPACE": str(ROOT),
         }
 
 
@@ -1201,16 +1157,23 @@ class ExecutedCommitMessageTests(_SeededOrigin, unittest.TestCase):
             (payload / "commit-msg.txt").write_text(differ_msg,
                                                     encoding="utf-8", newline="\n")
 
-    def _run_hour(self, tmp: pathlib.Path, differ_msg):
+    def _run_hour(self, tmp: pathlib.Path, differ_msg, fault=None):
         """Stage one hour's payload and run the real commit step."""
         config, base, _, _, _ = self._seed_origin(tmp, self.BASE_FILES)
         self._stage_payload(tmp, differ_msg)
         # The run's own workflow generation is the commit it was dispatched
         # at: the payload and the tree it lands on are one generation.
         env = self._env(tmp, config, base)
+        if fault:
+            (tmp / "bin").mkdir()
+            _workflowrun.write_git_stub(tmp / "bin", fault, tmp / "git.log")
+            _hubfake.install(tmp / "bin")
+            env["PATH"] = f"{tmp / 'bin'}{os.pathsep}{env['PATH']}"
         proc = _workflowrun.run_step(tmp, self.step, env)
         self.assertEqual(proc.returncode, 0,
                          f"step failed: {proc.stderr}")
+        if fault:
+            self.assertEqual(len((tmp / "git.log").read_text(encoding="utf-8").splitlines()), 2)
         scratch = tmp / "scratch"
         message = self._git("log", "-1", "--format=%B", cwd=str(scratch)).stdout
         names = self._git("diff-tree", "--no-commit-id", "--name-status",
@@ -1222,7 +1185,8 @@ class ExecutedCommitMessageTests(_SeededOrigin, unittest.TestCase):
         with tempfile.TemporaryDirectory(prefix=".commit-msg-") as raw:
             message, names, log = self._run_hour(
                 pathlib.Path(raw),
-                differ_msg="chore(capture): 690 models\n\nspeed rows\n")
+                differ_msg="chore(capture): 690 models\n\nspeed rows\n",
+                fault=None if os.name == "nt" else 128)  # the git stub is sh
         self.assertEqual(message.strip(), "chore(capture): 690 models\n\n"
                          "speed rows\n\n"
                          "Captured by .github/workflows/refresh.yml.")
@@ -1896,10 +1860,10 @@ class RankingsStructureTests(unittest.TestCase):
         self.assertNotIn('rankings-push-data', str(job))
         self.assertNotIn('tip.txt', str(job))
         run = commands(step_in(self.wf, 'rankings-hub', 'Publish to docs-hub')['run'])
-        self.assertIn('if ! git -C "${scratch}" fetch --quiet origin main', run)
+        self.assertIn(f'if ! {FETCH_CMD} ||', run)
         self.assertIn('show FETCH_HEAD:out/trending-rankings.html', run)
         self.assertIn('cmp -s "$main_page"', run)
-        self.assertLess(run.index('cmp -s "$main_page"'), run.index('if curl'))
+        self.assertLess(run.index('cmp -s "$main_page"'), run.index(LIVE_CMD))
         self.assertNotIn('--depth', run)
         self.assertNotIn('git push', run)
 
@@ -1926,7 +1890,7 @@ class RankingsStructureTests(unittest.TestCase):
         steps = self.wf['jobs']['rankings-hub']['steps']
         self.assertEqual([s for s in steps if 'secrets.' in str(s)], [upload])
         for entry in steps:
-            self.assertNotRegex(commands(entry.get('run', '')).replace(PUBLISH_CMD, '', 1),
+            self.assertNotRegex(commands(entry.get('run', '')).replace(PUBLISH_CMD, '', 1).replace(FETCH_CMD, '', 1).replace(LIVE_CMD, '', 1),
                                 r'\bpython3?\b|\bpip[0-9]?\b')
         self.assertNotIn('DOCS_HUB_URL', str(self.wf))
         self.assertNotIn('github.sha', commands(upload['run']))
@@ -1964,31 +1928,17 @@ def test_rankings_hub_condition_covers_ancestor_outcomes(published, verdict, ran
                       and published in ('success', 'skipped') and pushed in ('success', 'skipped'))
 
 
-RANKINGS_CURL = '''import json
-import os
-from pathlib import Path
-import sys
-
-args = sys.argv[1:]
-url = next(arg for arg in args if arg.startswith('https://'))
-output = Path(args[args.index('-o') + 1])
-with Path(os.environ['HUB_CALLS']).open('a', encoding='utf-8') as calls:
-    calls.write(json.dumps(args) + chr(10))
-if url == 'https://docs.nitjsefni.eu/d/ai-researcher/trending-rankings':
-    if os.environ['LIVE_PAGE'] == 'fail':
-        raise SystemExit(22)
-    page = (Path(os.environ['RANKINGS_PAGE']).read_bytes()
-            if os.environ['LIVE_PAGE'] == 'same' else b'previous page')
-    output.write_bytes(page)
-else:
-    raise SystemExit('unexpected curl endpoint: ' + url)
-'''
+def _live_env(tmp_path, live, page=None):
+    """_hubfake's answer for `live`: same, flaky (503 first), stale or fail."""
+    (tmp_path / 'previous-page').write_text('previous page', encoding='utf-8')
+    return {'AI_RESEARCHER_LIVE_PAGE': str(page if live in ('same', 'flaky') else tmp_path / 'previous-page'),
+            'AI_RESEARCHER_LIVE_CODE': {'fail': 'transport', 'flaky': '503,200'}.get(live, '200')}
 
 
 @pytest.mark.skipif(os.name == 'nt', reason='workflow shell runs on Ubuntu')
 @pytest.mark.parametrize('job', ['hub', 'rankings-hub'])
 @pytest.mark.parametrize('live,code,expected', [
-    ('same', '200', 0), ('stale', '200', 0),
+    ('same', '200', 0), ('flaky', '200', 0), ('stale', '200', 0), ('fail', '200', 0),
     ('stale', '503', 1), ('stale', 'transport', 1)])
 def test_publish_step_removes_temp_files(tmp_path, job, live, code, expected):
     """Raw publish steps clean scratch on skip, upload, refusal and transport failure."""
@@ -2008,30 +1958,22 @@ def test_publish_step_removes_temp_files(tmp_path, job, live, code, expected):
     (runner / 'push-data/tip.txt').write_text(base, encoding='utf-8')
     stub = tmp_path / 'bin'
     stub.mkdir()
-    (stub / 'curl_payload.py').write_text(
-        RANKINGS_CURL.replace('trending-rankings', page_name), encoding='utf-8')
-    (stub / 'curl').write_text(
-        '#!/bin/sh\nexec "$TEST_PYTHON" "$(dirname "$0")/curl_payload.py" "$@"\n',
-        encoding='utf-8')
-    (stub / 'curl').chmod(0o755)
     record = _hubfake.install(stub)
     probe = tmp_path / 'probe'
     probe.mkdir()
-    calls = tmp_path / 'calls'
     env = {**harness._env(runner, config, base), 'GITHUB_WORKSPACE': str(ROOT),
            'PATH': str(stub) + os.pathsep + os.environ['PATH'],
            'TMPDIR': str(probe), 'TEST_PYTHON': sys.executable,
-           'DOCS_HUB_API_KEY': 'fixture', 'LIVE_PAGE': live,
-           'AI_RESEARCHER_UPLOAD_CODE': code, 'AI_RESEARCHER_UPLOAD_BODY': '{}',
-           'HUB_CALLS': str(calls), 'RANKINGS_PAGE': str(page)}
+           'DOCS_HUB_API_KEY': 'fixture', **_live_env(tmp_path, live, page),
+           'AI_RESEARCHER_UPLOAD_CODE': code, 'AI_RESEARCHER_UPLOAD_BODY': '{}'}
     done = subprocess.run(
         ['bash', '-e', '-c', step_in(load(), job, 'Publish to docs-hub')['run']],
         cwd=repo, env=env, check=False, capture_output=True, text=True, timeout=120)
     assert done.returncode == expected, done.stdout + done.stderr
-    requests = [json.loads(line) for line in calls.read_text(encoding='utf-8').splitlines()]
-    assert (len(requests), bool(_hubfake.uploads(record))) == (1, live != 'same')
+    requests = _hubfake.fetches(record)
+    assert (len(requests), bool(_hubfake.uploads(record))) == (1, live in ('stale', 'fail'))
     for request in requests:
-        output = pathlib.Path(request[request.index('-o') + 1])
+        output = pathlib.Path(request[1])
         assert output.parent == probe
         assert not output.exists()
     assert not list(probe.iterdir())
@@ -2074,21 +2016,14 @@ def test_rankings_quiet_hour_recovers_a_failed_upload(tmp_path):
     landed = harness._git('rev-parse', 'HEAD', cwd=repo).stdout.strip()
     stub = tmp_path / 'bin'
     stub.mkdir()
-    (stub / 'curl_payload.py').write_text(RANKINGS_CURL, encoding='utf-8')
-    (stub / 'curl').write_text(
-        '#!/bin/sh\nexec "$TEST_PYTHON" "$(dirname "$0")/curl_payload.py" "$@"\n',
-        encoding='utf-8')
-    (stub / 'curl').chmod(0o755)
     record = _hubfake.install(stub)
     env.update({'PATH': str(stub) + os.pathsep + os.environ['PATH'], 'GITHUB_WORKSPACE': str(ROOT),
                 'TEST_PYTHON': sys.executable, 'DOCS_HUB_API_KEY': 'fixture',
-                'LIVE_PAGE': 'stale', 'AI_RESEARCHER_UPLOAD_CODE': '503', 'AI_RESEARCHER_UPLOAD_BODY': '{}',
-                'HUB_CALLS': str(tmp_path / 'calls')})
+                **_live_env(tmp_path, 'stale'), 'AI_RESEARCHER_UPLOAD_CODE': '503', 'AI_RESEARCHER_UPLOAD_BODY': '{}'})
     hub = step_in(load(), 'rankings-hub', 'Publish to docs-hub')
     artifact = landing / 'rankings-page/trending-rankings.html'
     artifact.parent.mkdir()
     artifact.write_bytes(original)
-    env['RANKINGS_PAGE'] = str(artifact)
     assert _rankings_hub_runs('success', 'success', 'success', verdict='true')
     done = _workflowrun.run_step(repo, hub, env)
     assert done.returncode == 1, done.stdout + done.stderr
@@ -2114,7 +2049,6 @@ def test_rankings_quiet_hour_recovers_a_failed_upload(tmp_path):
     artifact = quiet / 'rankings-page/trending-rankings.html'
     artifact.parent.mkdir()
     artifact.write_bytes(page.read_bytes())
-    env['RANKINGS_PAGE'] = str(artifact)
     done = _workflowrun.run_step(repo, hub, env)
     assert done.returncode == 0, done.stdout + done.stderr
     verified = harness._git('show', 'FETCH_HEAD:out/trending-rankings.html',
@@ -2360,19 +2294,12 @@ def test_rankings_hub_upload_verdicts(tmp_path, main, live, code, body, expected
             'else (p.unlink(), p.mkdir())\' "$2" ;;\n'
             'esac\n', encoding='utf-8')
         (stub / 'git').chmod(0o755)
-    (stub / 'curl_payload.py').write_text(RANKINGS_CURL, encoding='utf-8')
-    (stub / 'curl').write_text(
-        '#!/bin/sh\nexec "$TEST_PYTHON" "$(dirname "$0")/curl_payload.py" "$@"\n',
-        encoding='utf-8')
-    (stub / 'curl').chmod(0o755)
     record = _hubfake.install(stub)
-    calls = tmp_path / 'calls'
     env = {**os.environ, 'PATH': str(stub) + os.pathsep + os.environ['PATH'], 'GITHUB_WORKSPACE': str(ROOT),
            'TEST_PYTHON': sys.executable, 'RUNNER_TEMP': str(runner),
            'GITHUB_STEP_SUMMARY': str(tmp_path / 'summary'),
-           'DOCS_HUB_API_KEY': 'fixture', 'LIVE_PAGE': live,
+           'DOCS_HUB_API_KEY': 'fixture', **_live_env(tmp_path, live, page),
            'AI_RESEARCHER_UPLOAD_CODE': code, 'AI_RESEARCHER_UPLOAD_BODY': body,
-           'HUB_CALLS': str(calls), 'RANKINGS_PAGE': str(page),
            'GITHUB_REPOSITORY': 'fixture/rankings', 'GIT_CONFIG_GLOBAL': str(config),
            'REAL_GIT': shutil.which('git') or 'git', 'HEAD_STATE': main}
     entry = step_in(load(), 'rankings-hub', 'Publish to docs-hub')
@@ -2386,14 +2313,11 @@ def test_rankings_hub_upload_verdicts(tmp_path, main, live, code, body, expected
         else:
             assert ("could not verify main's committed page — publishing nothing this run; "
                     "the next hourly run self-heals") in summary
-        assert not calls.exists() and not _hubfake.uploads(record)
+        assert not _hubfake.fetches(record) and not _hubfake.uploads(record)
         return
-    requests = [json.loads(line) for line in calls.read_text(encoding='utf-8').splitlines()]
+    requests = _hubfake.fetches(record)
     assert (len(requests), len(_hubfake.uploads(record))) == (1, uploads)
-    assert requests[0][-3:] == [
-        'https://docs.nitjsefni.eu/d/ai-researcher/trending-rankings',
-        '-o', requests[0][-1]]
-    assert '-H' not in requests[0]
+    assert requests[0][0] == 'https://docs.nitjsefni.eu/d/ai-researcher/trending-rankings' and len(requests[0]) == 2
     if not uploads:
         assert 'Nothing uploaded' in done.stdout
         return
@@ -2446,7 +2370,7 @@ class HFTrackerExecutedStepsTests(unittest.TestCase):
                     'GITHUB_REPOSITORY': 'fixture/trending',
                     'AI_RESEARCHER_REPO': 'fixture/trending',
                     'AI_RESEARCHER_MASTER_PUSH_DEPLOY_KEY': '',
-                    'HOME': str(home), 'PUSH_REMOTE': str(self.origin)}
+                    'HOME': str(home), 'PUSH_REMOTE': str(self.origin), 'GITHUB_WORKSPACE': str(ROOT)}
 
     @staticmethod
     def git(repo, *args):
@@ -2494,8 +2418,8 @@ class HFTrackerExecutedStepsTests(unittest.TestCase):
 
     def test_fetch_script_is_invoked_with_message_and_failure_propagates(self):
         scripts = self.repo / 'scripts'
-        scripts.mkdir()
-        for script in (f'fetch_{self.fetcher}_trending.py', 'fetch_http.py', 'trending_message.py'):
+        (scripts / 'ci').mkdir(parents=True)
+        for script in (f'fetch_{self.fetcher}_trending.py', 'fetch_http.py', 'ci/download.py', 'trending_message.py'):
             shutil.copyfile(ROOT / 'scripts' / script, scripts / script)
         # A sitecustomize stub answers the fetcher's network boundary only.
         stub = self.root / 'stub'
@@ -2640,6 +2564,24 @@ class JoinedPushExecutedTests(unittest.TestCase):
         self.assertIn('main moved before the push landed', pathlib.Path(self.env['GITHUB_STEP_SUMMARY']).read_text(encoding='utf-8'))
 
     @unittest.skipUnless(sys.platform == 'linux', 'requires Linux ssh-agent/ssh-add')
+    def test_a_128_reruns_the_call_alone_and_the_bundle_lands_once(self):
+        # The fault follows the real call: ls-remote's output is dropped, and the push has landed.
+        for verb in ('ls-remote', 'push'):
+            with self.subTest(verb=verb):
+                self.setUp()
+                self.stage_change()
+                self.replay()
+                bin_dir = self.root / 'bin'
+                bin_dir.mkdir()
+                _workflowrun.write_git_stub(bin_dir, 128, bin_dir / 'git.log', verb)
+                _hubfake.install(bin_dir)  # download.py's backoff, instant
+                self.env['PATH'] = str(bin_dir) + os.pathsep + os.environ['PATH']
+                self.load_ephemeral_key()
+                self.run_step('push', 'Push the tested tree to main')
+                self.assertEqual(len((bin_dir / 'git.log').read_text(encoding='utf-8').splitlines()), 2)
+                self.assertEqual(self.git(self.origin, 'rev-list', '--count', self.base + '..main').strip(), '1')
+
+    @unittest.skipUnless(sys.platform == 'linux', 'requires Linux ssh-agent/ssh-add')
     def test_joined_bundle_lands_once(self):
         self.stage_change()
         self.replay()
@@ -2650,22 +2592,6 @@ class JoinedPushExecutedTests(unittest.TestCase):
         self.assertEqual(self.git(self.origin, 'show', f'main:{self.data}'), 'new\n')
         self.assertEqual(self.git(self.origin, 'rev-parse', 'main').strip(),
                          (self.runner / 'push-data/tip.txt').read_text().strip())
-
-
-HUB_UPLOAD_CURL = '''import os
-from pathlib import Path
-import sys
-
-args = sys.argv[1:]
-url = next((arg for arg in args if arg.startswith('https://')), '')
-output = Path(args[args.index('-o') + 1])
-if url == 'https://docs.nitjsefni.eu/d/ai-researcher/frontier-models':
-    output.write_text('previous page', encoding='utf-8')
-else:
-    raise SystemExit('unexpected curl endpoint: ' + url)
-with Path(os.environ['HUB_CALLS']).open('a', encoding='utf-8') as calls:
-    calls.write(url + chr(10))
-'''
 
 
 @unittest.skipUnless(sys.platform == 'linux',
@@ -2701,14 +2627,8 @@ class ExecutedHubTrackerOrderingTests(unittest.TestCase):
         subprocess.run(['ssh-keygen', '-q', '-t', 'ed25519', '-N', '', '-f', str(key)],
                        check=True, capture_output=True, timeout=60)
         self.key = key.read_text(encoding='utf-8')
-        self.calls = self.root / 'curl-calls'
         stub = self.root / 'bin'
         stub.mkdir()
-        (stub / 'curl_payload.py').write_text(HUB_UPLOAD_CURL, encoding='utf-8')
-        (stub / 'curl').write_text(
-            '#!/bin/sh\nexec "$(command -v python || command -v python3)" '
-            '"$(dirname "$0")/curl_payload.py" "$@"\n', encoding='utf-8')
-        (stub / 'curl').chmod(0o755)
         self.record = _hubfake.install(stub)
         self.contexts = {}
         self._context('joined', self.source, stub)
@@ -2756,7 +2676,7 @@ class ExecutedHubTrackerOrderingTests(unittest.TestCase):
                'GITHUB_REPOSITORY': 'fixture/trending', 'AI_RESEARCHER_REPO': 'fixture/trending',
                'GIT_CONFIG_GLOBAL': str(self.config), 'PUSH_REMOTE': self.origin.as_uri(),
                'AI_RESEARCHER_MASTER_PUSH_DEPLOY_KEY': self.key, 'DOCS_HUB_API_KEY': 'fixture',
-               'GITHUB_WORKSPACE': str(ROOT), 'AI_RESEARCHER_UPLOAD_CODE': '200', 'AI_RESEARCHER_UPLOAD_BODY': '{}', 'HUB_CALLS': str(self.calls),
+               'GITHUB_WORKSPACE': str(ROOT), 'AI_RESEARCHER_UPLOAD_CODE': '200', 'AI_RESEARCHER_UPLOAD_BODY': '{}', **_live_env(self.root, 'stale'),
                'PATH': str(stub) + os.pathsep + os.environ['PATH']}
         self.contexts[name] = repo, env
 
@@ -2774,7 +2694,7 @@ class ExecutedHubTrackerOrderingTests(unittest.TestCase):
         self.assertEqual(self._git(self.origin, 'rev-parse', 'main^').strip(), self.base)
         self._run('hub', 'Publish to docs-hub', 'joined')
         self.assertEqual([u['page'].encode() for u in _hubfake.uploads(self.record)], [self.page])
-        self.assertEqual(self.calls.read_text(encoding='utf-8').splitlines(), [
+        self.assertEqual([fetch[0] for fetch in _hubfake.fetches(self.record)], [
             'https://docs.nitjsefni.eu/d/ai-researcher/frontier-models'])
         for path in ('data/hf-trending.json', 'data/openrouter-trending.json'):
             self.assertIn('org/new', self._git(self.origin, 'show', 'main:' + path))
@@ -2794,5 +2714,5 @@ class ExecutedHubTrackerOrderingTests(unittest.TestCase):
         result = self._run('hub', 'Publish to docs-hub', 'joined')
         self.assertIn('Nothing published by this run.', result.stdout)
         self.assertEqual(_hubfake.uploads(self.record), [])
-        self.assertFalse(self.calls.exists())
+        self.assertEqual(_hubfake.fetches(self.record), [])
         self.assertEqual(self._git(self.origin, 'rev-parse', 'main').strip(), moved)

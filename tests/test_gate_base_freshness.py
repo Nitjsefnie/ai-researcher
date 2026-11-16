@@ -9,6 +9,7 @@ import io
 import os
 import subprocess
 import sys
+import types
 from pathlib import Path
 
 import pytest
@@ -24,9 +25,9 @@ def _local_event_by_default(monkeypatch):
     monkeypatch.delenv('GITHUB_EVENT_NAME', raising=False)
 
 
-def _load():
-    path = ROOT / 'scripts/ci/gate_base_freshness.py'
-    spec = importlib.util.spec_from_file_location('gate_base_freshness', path)
+def _load(name='gate_base_freshness'):
+    path = ROOT / f'scripts/ci/{name}.py'
+    spec = importlib.util.spec_from_file_location(name, path)
     assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
@@ -38,6 +39,11 @@ def _git(root, *arguments):
         ['git', '-C', str(root), *arguments], check=True,
         capture_output=True, text=True)
     return done.stdout
+
+
+def _run_gate(repo, env=None):
+    return subprocess.run([sys.executable, str(ROOT / 'scripts/ci/gate_base_freshness.py'), '--root', str(repo)],
+                          check=False, capture_output=True, text=True, env=env)
 
 
 def _config(repo):
@@ -225,9 +231,7 @@ def test_the_pin_fails_when_a_gate_names_a_file_the_pipeline_cannot_commit(tmp_p
 
 def test_green_when_the_head_carries_every_gate_commit(tmp_path):
     repo, _ = _fixture(tmp_path)
-    done = subprocess.run(
-        [sys.executable, str(ROOT / 'scripts/ci/gate_base_freshness.py'),
-         '--root', str(repo)], check=False, capture_output=True, text=True)
+    done = _run_gate(repo)
     assert done.returncode == 0, (done.stdout, done.stderr)
     assert 'carries every commit on main' in done.stdout
     assert 'names or its scripts import or run' in done.stdout
@@ -237,17 +241,11 @@ def test_red_when_main_advances_a_gate_file(tmp_path):
     repo, origin = _fixture(tmp_path)
     _advance_main(tmp_path, origin, 'ci: move the gate the head already read', {
         '.github/workflows/actionlint.yml':
-            'name: actionlint\n'
-            'on: push\n'
-            'jobs:\n'
-            '  actionlint:\n'
-            '    runs-on: changed\n'
-            '    steps:\n'
+            'name: actionlint\non: push\njobs:\n  actionlint:\n'
+            '    runs-on: changed\n    steps:\n'
             '      - run: ./actionlint -color .github/workflows/*.yml\n',
     })
-    done = subprocess.run(
-        [sys.executable, str(ROOT / 'scripts/ci/gate_base_freshness.py'),
-         '--root', str(repo)], check=False, capture_output=True, text=True)
+    done = _run_gate(repo)
     assert done.returncode == 1, (done.stdout, done.stderr)
     assert 'main holds 1 commit this head does not' in done.stdout
     assert 'ci: move the gate the head already read' in done.stdout
@@ -269,20 +267,13 @@ def test_a_push_head_main_has_passed_passes(tmp_path):
     repo, origin = _fixture(tmp_path)
     _advance_main(tmp_path, origin, 'ci: move a gate file after the push landed', {
         '.github/workflows/actionlint.yml':
-            'name: actionlint\n'
-            'on: push\n'
-            'jobs:\n'
-            '  actionlint:\n'
-            '    runs-on: changed\n'
-            '    steps:\n'
+            'name: actionlint\non: push\njobs:\n  actionlint:\n'
+            '    runs-on: changed\n    steps:\n'
             '      - run: ./actionlint -color .github/workflows/*.yml\n',
     })
     monkeypatch_env = os.environ.copy()
     monkeypatch_env['GITHUB_EVENT_NAME'] = 'push'
-    done = subprocess.run(
-        [sys.executable, str(ROOT / 'scripts/ci/gate_base_freshness.py'),
-         '--root', str(repo)], check=False, capture_output=True, text=True,
-        env=monkeypatch_env)
+    done = _run_gate(repo, monkeypatch_env)
     assert done.returncode == 0, (done.stdout, done.stderr)
     assert "part of main's own history" in done.stdout
     assert 'holds 1 commit it does not' in done.stdout
@@ -313,20 +304,13 @@ def test_a_push_head_outside_mains_history_is_judged_strictly(tmp_path):
     })
     _advance_main(tmp_path, origin, 'ci: move a gate file past the diverged push', {
         '.github/workflows/actionlint.yml':
-            'name: actionlint\n'
-            'on: push\n'
-            'jobs:\n'
-            '  actionlint:\n'
-            '    runs-on: changed\n'
-            '    steps:\n'
+            'name: actionlint\non: push\njobs:\n  actionlint:\n'
+            '    runs-on: changed\n    steps:\n'
             '      - run: ./actionlint -color .github/workflows/*.yml\n',
     })
     monkeypatch_env = os.environ.copy()
     monkeypatch_env['GITHUB_EVENT_NAME'] = 'push'
-    done = subprocess.run(
-        [sys.executable, str(ROOT / 'scripts/ci/gate_base_freshness.py'),
-         '--root', str(repo)], check=False, capture_output=True, text=True,
-        env=monkeypatch_env)
+    done = _run_gate(repo, monkeypatch_env)
     assert done.returncode == 1, (done.stdout, done.stderr)
     assert 'main holds 1 commit this head does not' in done.stdout
     assert 'Rebase onto main' in done.stdout
@@ -343,20 +327,13 @@ def test_a_pull_request_head_keeps_the_strict_gate(tmp_path):
     repo, origin = _fixture(tmp_path)
     _advance_main(tmp_path, origin, 'ci: move a gate file under an open pull request', {
         '.github/workflows/actionlint.yml':
-            'name: actionlint\n'
-            'on: push\n'
-            'jobs:\n'
-            '  actionlint:\n'
-            '    runs-on: changed\n'
-            '    steps:\n'
+            'name: actionlint\non: push\njobs:\n  actionlint:\n'
+            '    runs-on: changed\n    steps:\n'
             '      - run: ./actionlint -color .github/workflows/*.yml\n',
     })
     monkeypatch_env = os.environ.copy()
     monkeypatch_env['GITHUB_EVENT_NAME'] = 'pull_request'
-    done = subprocess.run(
-        [sys.executable, str(ROOT / 'scripts/ci/gate_base_freshness.py'),
-         '--root', str(repo)], check=False, capture_output=True, text=True,
-        env=monkeypatch_env)
+    done = _run_gate(repo, monkeypatch_env)
     assert done.returncode == 1, (done.stdout, done.stderr)
     assert 'main holds 1 commit this head does not' in done.stdout
     assert 'Rebase onto main' in done.stdout
@@ -372,18 +349,12 @@ def test_an_unset_event_keeps_the_strict_gate(tmp_path):
     repo, origin = _fixture(tmp_path)
     _advance_main(tmp_path, origin, 'ci: move a gate file under a local run', {
         '.github/workflows/actionlint.yml':
-            'name: actionlint\n'
-            'on: push\n'
-            'jobs:\n'
-            '  actionlint:\n'
-            '    runs-on: changed\n'
-            '    steps:\n'
+            'name: actionlint\non: push\njobs:\n  actionlint:\n'
+            '    runs-on: changed\n    steps:\n'
             '      - run: ./actionlint -color .github/workflows/*.yml\n',
     })
     assert 'GITHUB_EVENT_NAME' not in os.environ
-    done = subprocess.run(
-        [sys.executable, str(ROOT / 'scripts/ci/gate_base_freshness.py'),
-         '--root', str(repo)], check=False, capture_output=True, text=True)
+    done = _run_gate(repo)
     assert done.returncode == 1, (done.stdout, done.stderr)
     assert 'Rebase onto main' in done.stdout
     assert "part of main's own history" not in done.stdout
@@ -412,9 +383,7 @@ def test_green_when_main_advances_a_non_gate_file(tmp_path):
     _advance_main(tmp_path, origin, 'fix: a file no required check reads by name', {
         '.pylintrc': '[MESSAGES CONTROL]\ndisable=\n',
     })
-    done = subprocess.run(
-        [sys.executable, str(ROOT / 'scripts/ci/gate_base_freshness.py'),
-         '--root', str(repo)], check=False, capture_output=True, text=True)
+    done = _run_gate(repo)
     assert done.returncode == 0, (done.stdout, done.stderr)
     assert 'carries every commit on main' in done.stdout
 
@@ -447,9 +416,7 @@ def test_red_names_a_merge_commit(tmp_path):
     _git(side, 'push', 'origin', 'main')
     _git(adv, 'pull', '--no-rebase', 'origin', 'main')
     _git(adv, 'push', 'origin', 'main')
-    done = subprocess.run(
-        [sys.executable, str(ROOT / 'scripts/ci/gate_base_freshness.py'),
-         '--root', str(behind)], check=False, capture_output=True, text=True)
+    done = _run_gate(behind)
     assert done.returncode == 1, (done.stdout, done.stderr)
     assert '(a merge commit, which git names no file for' in done.stdout
     assert 'ci: the side parent' in done.stdout
@@ -556,24 +523,29 @@ def test_whole_tree_spelling_adds_no_paths(tmp_path):
         raise AssertionError('a set with no resolved file must refuse')
 
 
-def test_a_shallow_clone_is_unshallowed_before_comparing(tmp_path):
+# Both gates' fetch: the real first one unshallows the clone, then reports the fault. Exit 128 reruns
+# it, re-asking whether the clone is shallow (--unshallow would now exit 128 for good); 1 refuses (#426).
+@pytest.mark.parametrize('script', ['gate_base_freshness', 'commit_scopes'])
+@pytest.mark.parametrize('fault, unshallows', [(128, [True, False]), (1, [True])])
+def test_a_shallow_clone_is_unshallowed_and_only_exit_128_reruns(tmp_path, monkeypatch, script, fault, unshallows):
     _, origin = _fixture(tmp_path)
-    _advance_main(tmp_path, origin, 'ci: main moved while the head was shallow', {
-        '.github/workflows/actionlint.yml':
-            'name: actionlint\non: push\njobs:\n  actionlint:\n'
-            '    runs-on: changed\n    steps:\n'
-            '      - run: ./actionlint -color .github/workflows/*.yml\n',
-    })
-    behind = tmp_path / 'behind'
+    behind, module, fetches, run, now = tmp_path / 'behind', _load(script), [], subprocess.run, [1000.0]
     # --depth is ignored for plain-path clones, so the fixture clones over
     # file:// and stays a separate repository from this one throughout.
     _git(tmp_path, 'clone', '--depth', '1', origin.as_uri(), str(behind))
-    _config(behind)
-    assert _git(behind, 'rev-parse', '--is-shallow-repository').strip() == 'true'
-    module = _load()
-    module.fetch_base(behind)
-    assert _git(behind, 'rev-parse', '--is-shallow-repository').strip() == 'false', (
-        'the fetch must deepen a shallow checkout before the comparison')
+
+    def faulty(argv, check=False, **kwargs):
+        done = run(argv, check=check, **kwargs)
+        fetches.extend([argv] if 'fetch' in argv else [])
+        return subprocess.CompletedProcess(argv, fault) if 'fetch' in argv and len(fetches) == 1 else done
+
+    monkeypatch.setattr(subprocess, 'run', faulty)
+    monkeypatch.setattr(module.download, 'time', types.SimpleNamespace(
+        sleep=lambda seconds: now.append(now[-1] + seconds), monotonic=lambda: now[-1]))
+    with pytest.raises(module.GateError, match='`git fetch` exited 1') if fault == 1 else contextlib.nullcontext():
+        module.fetch_base(behind)
+    assert ['--unshallow' in argv for argv in fetches] == unshallows
+    assert _git(behind, 'rev-parse', '--is-shallow-repository').strip() == 'false'
 
 
 def test_exit_codes_and_argv(tmp_path):

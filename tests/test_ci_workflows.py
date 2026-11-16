@@ -6,12 +6,15 @@ timeout (issues #45 and #52). Dependabot groups the action bumps together.
 from __future__ import annotations
 
 import re
+import sys
 import unittest
 from pathlib import Path
 
 import yaml
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(REPO_ROOT / "tests"))
+import _workflowrun  # noqa: E402  # pylint: disable=wrong-import-position
 
 CODEQL_WORKFLOW = REPO_ROOT / ".github" / "workflows" / "codeql.yml"
 DEPENDABOT = REPO_ROOT / ".github" / "dependabot.yml"
@@ -301,7 +304,7 @@ def test_no_job_that_checks_out_the_tree_holds_conversation_write():
         for name, job in (workflow.get("jobs") or {}).items():
             checks_out = any(
                 "uses" in step and step["uses"].startswith("actions/checkout@")
-                for step in job.get("steps", []))
+                and not _workflowrun.is_helper_checkout(step) for step in job.get("steps", []))
             requested = (job.get("permissions")
                          or workflow.get("permissions") or {})
             pull_write = requested.get("pull-requests") == "write"
@@ -327,7 +330,7 @@ def test_coverage_comment_workflow_never_executes_the_tree():
     # (tests.yml is a workflow_call callee since #133 and produces no run
     # of its own on a pull request; the run carrying the
     # diff-coverage-comment artifact is ci-gate's), filtered to its
-    # pull_request runs, and it checks out nothing — the only thing
+    # pull_request runs, and it checks out only the helper — the only thing
     # crossing from the pull request is the TEXT of a comment.
     assert list(workflow[True]) == ["workflow_run"], workflow.get("on")
     assert workflow[True]["workflow_run"]["workflows"] == ["ci gate"]
@@ -335,7 +338,8 @@ def test_coverage_comment_workflow_never_executes_the_tree():
     assert "github.event.workflow_run.event == 'pull_request'" in job["if"]
     # The write lives at workflow level: the single job inherits it.
     assert workflow["permissions"] == {
-        "pull-requests": "write", "actions": "read", "checks": "write"}
+        "pull-requests": "write", "actions": "read", "checks": "write", "contents": "read"}
+    _workflowrun.assert_helper_only_checkout(job, "Download the comment artifact")
 
 
 def test_coverage_job_is_unconditional_in_tests_workflow():

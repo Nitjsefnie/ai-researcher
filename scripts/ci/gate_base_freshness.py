@@ -83,8 +83,9 @@ import sys
 from pathlib import Path
 
 if __package__:
-    from . import gate_script_reach
+    from . import download, gate_script_reach
 else:
+    download = importlib.import_module("download")
     gate_script_reach = importlib.import_module("gate_script_reach")
 
 # The merge-gate jobs — the checks a pull request waits for green before it
@@ -141,8 +142,7 @@ def git(root, *arguments, what):
     """git_run's stdout; a non-zero status is a refusal naming the attempt."""
     status, out, err = git_run(root, *arguments, what=what)
     if status != 0:
-        raise GateError(f"cannot {what}: `git -C {root} {' '.join(arguments)}` "
-                        f"exited {status}: {err.strip() or 'no output'}")
+        raise GateError(f"cannot {what}: `git -C {root} {' '.join(arguments)}` exited {status}: {err.strip() or 'no output'}")
     return out
 
 
@@ -239,8 +239,7 @@ def workflow_steps(text, workflow):
             f"established")
     if job_matches[0][1]["value"] is not None:
         raise WorkflowError(
-            f"{workflow} writes `jobs:` as a flow mapping; this reader models "
-            f"only the block form")
+            f"{workflow} writes `jobs:` as a flow mapping; this reader models only the block form")
 
     jobs = {}
     index = tops[0] + 1
@@ -278,8 +277,7 @@ def job_steps(lines, name, span, workflow):
             continue
         if indent_of(line) != 4:
             raise WorkflowError(
-                f"{workflow}: expected a step list or a job key in job "
-                f"`{name}`, found {line!r}")
+                f"{workflow}: expected a step list or a job key in job `{name}`, found {line!r}")
         match = MAPPING.match(line.strip())
         if not match:
             raise WorkflowError(
@@ -290,8 +288,7 @@ def job_steps(lines, name, span, workflow):
             # plausible answer rather than a refusal, for a job whose steps are
             # right there.
             raise WorkflowError(
-                f"{workflow}: `steps:` carries a value in job `{name}`; this "
-                f"reader models only the block form")
+                f"{workflow}: `steps:` carries a value in job `{name}`; this reader models only the block form")
         if match["key"] != "steps":
             # Every other job key — runs-on, strategy, env, permissions — is a
             # mapping or a scalar that never names a file this check reads, and
@@ -538,14 +535,20 @@ def fetch_base(root):
     boundary hides the head's own ancestry, git cannot tell which of main's
     commits the head already carries, and the check reports main's history
     against it — naming commits whose content is sitting in the checkout. That
-    is a red nobody can satisfy by rebasing.
+    is a red nobody can satisfy by rebasing. Exit 128, git's fatal and how a
+    refused or dropped connection ends, reruns the fetch in download.py's window
+    (issue #426), asking per attempt whether the checkout is still shallow:
+    --unshallow on a history an earlier attempt completed exits 128.
     """
-    arguments = ["fetch", "--no-tags", "--quiet"]
-    if git(root, "rev-parse", "--is-shallow-repository",
-           what="ask whether the checkout is shallow").strip() == "true":
-        arguments.append("--unshallow")
-    arguments += ["origin", f"+refs/heads/{BASE_BRANCH}:refs/remotes/origin/{BASE_BRANCH}"]
-    git(root, *arguments, what=f"fetch origin/{BASE_BRANCH}")
+    def command():
+        arguments = ["git", "-C", str(root), "fetch", "--no-tags", "--quiet"]
+        if git(root, "rev-parse", "--is-shallow-repository",
+               what="ask whether the checkout is shallow").strip() == "true":
+            arguments.append("--unshallow")
+        return arguments + ["origin", f"+refs/heads/{BASE_BRANCH}:refs/remotes/origin/{BASE_BRANCH}"]
+
+    if status := download.run_retrying(command, retry_on=frozenset({128})):
+        raise GateError(f"cannot fetch origin/{BASE_BRANCH}: `git fetch` exited {status} (its stderr is above)")
 
 
 def stale_commits(root, head, base, paths):
@@ -559,9 +562,7 @@ def stale_commits(root, head, base, paths):
         raise GateError("the derived path set is empty, so there is nothing to compare")
     sized = sum(len(path) + 1 for path in paths)
     if sized > PATHSPECS_MAX_BYTES:
-        raise GateError(
-            f"the derived path set is {sized} bytes, past the {PATHSPECS_MAX_BYTES} "
-            f"this run will put in an argument list")
+        raise GateError(f"the derived path set is {sized} bytes, past the {PATHSPECS_MAX_BYTES} this run will put in an argument list")
     attempt = f"list what {BASE_BRANCH} holds that this head lacks"
     status, listing, err = git_run(root, "log", f"{head}..{base}", "--name-only", "--format=%x00%H%x09%s", "--", *paths, what=attempt)
     if status != 0:
@@ -598,8 +599,7 @@ def head_is_mains_history(root, head, base):
     attempt = f"tell whether the head is {BASE_BRANCH}'s own history"
     status, _, err = git_run(root, "merge-base", "--is-ancestor", head, base, what=attempt)
     if status not in (0, 1):
-        raise GateError(f"cannot {attempt}: `git merge-base --is-ancestor {head} {base}` exited "
-                        f"{status}: {err.strip() or 'no output'}")
+        raise GateError(f"cannot {attempt}: `git merge-base --is-ancestor {head} {base}` exited {status}: {err.strip() or 'no output'}")
     return status == 0
 
 

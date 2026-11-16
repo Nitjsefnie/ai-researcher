@@ -1,9 +1,12 @@
 #!/usr/bin/env python3
-"""Download a URL retrying transient failures, or re-run a command on a nonzero
-exit, inside one backoff window (issue #395).
+"""Download a URL retrying transient failures, or re-run a command inside one
+backoff window (issue #395): on any nonzero exit by default, narrowed by each
+of --retry-on (statuses) and --retry-stderr (multiline regex) given, and
+always after a --timeout kill (issue #426); --gh: for gh, last stdout only.
 
     python3 scripts/ci/download.py URL DESTINATION
-    python3 scripts/ci/download.py --run COMMAND...
+    python3 scripts/ci/download.py --run [--gh] [--retry-on STATUS,...] [--retry-stderr REGEX]
+        [--timeout SECONDS] [--window SECONDS] COMMAND...
 
 With AI_RESEARCHER_DOWNLOAD_TOKEN set, a github.com release download goes
 through the authenticated release-asset API instead.
@@ -33,10 +36,14 @@ BACKOFF_SECONDS = 5
 MAX_BACKOFF_SECONDS = 60
 WINDOW_SECONDS = 300
 CLI_TIMEOUT = 30
+TIMED_OUT = 124
 CHUNK = 1024 * 1024
 PROGRESS_INTERVAL = 25 * 1024 * 1024
 API = "https://api.github.com"
 RELEASE = re.compile(r"https://github\.com/([^/]+)/([^/]+)/releases/download/([^/]+)/([^/]+)")
+# gh exits 1 on all: 429/5xx, transport, DNS, dropped body, HTML page.
+GH_TRANSIENT = (r'HTTP (?:429|5\d\d)\)?$|^[A-Z][a-z]+ "[^"]*": |^error connecting to '
+                r"|^unexpected EOF$|^invalid character '<' looking for beginning of value$")
 
 
 T = TypeVar("T")
@@ -52,10 +59,10 @@ class RetriesExhausted(Exception):
 
 def _another_attempt(attempt: int, start: float, label: str, reason: object,
                      sleep: Callable[[float], None] | None,
-                     clock: Callable[[], float] | None) -> bool:
+                     clock: Callable[[], float] | None, window: float | None) -> bool:
     """The window decides only whether another attempt may start."""
     delay = min(BACKOFF_SECONDS * 2 ** (attempt - 1), MAX_BACKOFF_SECONDS)
-    if (clock or time.monotonic)() - start + delay > WINDOW_SECONDS:
+    if (clock or time.monotonic)() - start + delay > (WINDOW_SECONDS if window is None else window):
         return False
     print(f"{label}: attempt {attempt} failed ({reason}); retrying in "
           f"{delay}s", file=sys.stderr, flush=True)
@@ -65,7 +72,7 @@ def _another_attempt(attempt: int, start: float, label: str, reason: object,
 
 def retrying(attempt: Callable[[], T], label: str, *,
              sleep: Callable[[float], None] | None = None,
-             clock: Callable[[], float] | None = None) -> T:
+             clock: Callable[[], float] | None = None, window: float | None = None) -> T:
     """Re-run attempt() on a transient transport error (issue #402)."""
     start = (clock or time.monotonic)()
     count = 0
@@ -74,9 +81,9 @@ def retrying(attempt: Callable[[], T], label: str, *,
         try:
             return attempt()
         except (OSError, http.client.HTTPException) as exc:
-            if not _retryable(exc):
+            if not fetch_http.retryable_transport_error(exc):
                 raise
-            if not _another_attempt(count, start, label, exc, sleep, clock):
+            if not _another_attempt(count, start, label, exc, sleep, clock, window):
                 spent = (clock or time.monotonic)() - start
                 raise RetriesExhausted(
                     f"after {count} attempts in {spent:.0f}s") from exc
@@ -89,9 +96,13 @@ def download_to(url: str, destination: Path, timeout: float, *,
     def attempt() -> tuple[str, int]:
         try:
             return _attempt(url, destination, timeout, label, token)
-        except (DownloadError, OSError, http.client.HTTPException, ValueError):
+        except (DownloadError, OSError, http.client.HTTPException, ValueError) as exc:
             # No partial body survives to prefix a retry or to be verified.
             destination.unlink(missing_ok=True)
+            # GitHub: an exhausted rate limit is not to be retried before its reset.
+            if isinstance(exc, urllib.error.HTTPError) \
+                    and (getattr(exc, "headers", None) or {}).get("x-ratelimit-remaining") == "0":
+                raise DownloadError(f"{url}: download failed: {exc}") from exc
             raise
 
     try:
@@ -101,14 +112,6 @@ def download_to(url: str, destination: Path, timeout: float, *,
             f"{url}: download failed {exc}: {exc.__cause__}") from exc.__cause__
     except (OSError, http.client.HTTPException, ValueError) as exc:
         raise DownloadError(f"{url}: download failed: {exc}") from exc
-
-
-def _retryable(exc: BaseException) -> bool:
-    # GitHub: an exhausted rate limit is not to be retried before its reset.
-    if isinstance(exc, urllib.error.HTTPError) and exc.headers \
-            and exc.headers.get("x-ratelimit-remaining") == "0":
-        return False
-    return fetch_http.retryable_transport_error(exc)
 
 
 def _attempt(url: str, destination: Path, timeout: float, label: str | None,
@@ -162,24 +165,65 @@ def _local(url: str, operation: Callable, *args):
         raise DownloadError(f"{url}: download failed: {exc}") from exc
 
 
-def run_retrying(command: list[str], *,
-                 sleep: Callable[[float], None] | None = None,
+def run_retrying(command: list[str] | Callable[[], list[str]], *,
+                 retry_on: frozenset[int] | None = None,
+                 retry_stderr: re.Pattern[str] | None = None,
+                 timeout: float | None = None, last_stdout: bool = False,
+                 window: float | None = None, sleep: Callable[[float], None] | None = None,
                  clock: Callable[[], float] | None = None) -> int:
     start = (clock or time.monotonic)()
     attempt = 0
     while True:
         attempt += 1
-        status = subprocess.run(command, check=False).returncode
-        if status == 0 or not _another_attempt(
-                attempt, start, " ".join(command), f"exit {status}", sleep,
-                clock):
+        argv = command() if callable(command) else command
+        label = " ".join(argv)
+        timed_out = False
+        try:
+            # Kills only the direct child: enough for one binary, not a tree.
+            done = subprocess.run(argv, check=False, timeout=timeout, stderr=(
+                subprocess.PIPE if retry_stderr else None), stdout=(
+                    subprocess.PIPE if last_stdout else None))
+            status, stdout, stderr = done.returncode, done.stdout, done.stderr or b""
+        except subprocess.TimeoutExpired as expired:
+            status, stdout, stderr, timed_out = TIMED_OUT, expired.stdout, expired.stderr or b"", True
+        if retry_stderr:
+            sys.stderr.flush()
+            sys.stderr.buffer.write(stderr)
+            sys.stderr.buffer.flush()
+        matched = retry_stderr is None or bool(retry_stderr.search(
+            re.sub(r"\r\n?", "\n", stderr.decode("utf-8", "replace"))))
+        reason = f"timed out after {timeout:g}s" if timed_out else f"exit {status}"
+        retryable = timed_out or (
+            status != 0 and (retry_on is None or status in retry_on) and matched)
+        if not retryable or not _another_attempt(attempt, start, label, reason,
+                                                 sleep, clock, window):
+            if timed_out:
+                print(f"{label}: attempt {attempt} {reason}; no attempt left in "
+                      "the window", file=sys.stderr, flush=True)
+            if last_stdout:
+                sys.stdout.buffer.write(stdout or b"")
+                sys.stdout.buffer.flush()
             return status
 
 
 def main(argv: list[str] | None = None) -> int:
     args = sys.argv[1:] if argv is None else argv
     if args[:1] == ["--run"]:
-        return run_retrying(args[1:])
+        args, options = args[1:], {}
+        while args[:1] in (["--gh"], ["--retry-on"], ["--retry-stderr"], ["--timeout"], ["--window"]):
+            if args[0] == "--gh":
+                options.update({"--gh": "", "--retry-on": "1", "--retry-stderr": GH_TRANSIENT})
+                args = args[1:]
+            else:
+                options[args[0]], args = args[1], args[2:]
+        statuses, seconds = options.get("--retry-on"), options.get("--timeout")
+        pattern, window = options.get("--retry-stderr"), options.get("--window")
+        return run_retrying(
+            args, timeout=None if seconds is None else float(seconds), last_stdout="--gh" in options,
+            window=None if window is None else float(window),
+            retry_stderr=None if pattern is None else re.compile(pattern, re.MULTILINE),
+            retry_on=None if statuses is None
+            else frozenset(int(status) for status in statuses.split(",")))
     url, destination = args
     try:
         download_to(url, Path(destination), CLI_TIMEOUT,

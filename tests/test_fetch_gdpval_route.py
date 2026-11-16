@@ -171,9 +171,10 @@ def test_live_transport_retries_transient_failures_with_the_existing_ua(
     assert waits == [fetch_aa.PAGE_BACKOFF_SECONDS]
 
 
-@pytest.mark.parametrize("failed_url", [
-    fetch_gdpval.GDPVAL_URL, "https://artificialanalysis.ai/data/example.txt"])
-def test_forbidden_page_or_data_fetch_refuses_with_the_failed_url(tmp_path, monkeypatch, failed_url):
+# A 403 refuses at once; a 503 data read retries inside the window given (30 s fits three; download.py's 300 s, eight).
+@pytest.mark.parametrize("failed_url, code, attempts", [(fetch_gdpval.GDPVAL_URL, 403, ": "), *(
+    ("https://artificialanalysis.ai/data/example.txt", code, attempts) for code, attempts in ((403, ": "), (503, " after 3 attempts: ")))])
+def test_forbidden_page_or_data_fetch_refuses_with_the_failed_url(tmp_path, monkeypatch, failed_url, code, attempts):
     page, data = fixture_files(tmp_path)
     responses = {fetch_gdpval.GDPVAL_URL: page.read_bytes(),
                  "https://artificialanalysis.ai/data/example.txt": data.read_bytes()}
@@ -182,15 +183,15 @@ def test_forbidden_page_or_data_fetch_refuses_with_the_failed_url(tmp_path, monk
         assert timeout == fetch_aa.FETCH_TIMEOUT_SECONDS
         url = request.full_url
         if url == failed_url:
-            raise urllib.error.HTTPError(url, 403, "challenge", email.message.Message(), None)
+            raise urllib.error.HTTPError(url, code, "challenge", email.message.Message(), None)
         assert url in responses
         return _Response(responses[url])
 
     monkeypatch.setattr(urllib.request, "urlopen", urlopen)
     with pytest.raises(SystemExit) as caught:
         fetch_gdpval.fetch(None, None, fetch_aa.fetch_html, fetch_aa.flight_payload,
-                           fetch_aa.UA, fetch_aa.FETCH_TIMEOUT_SECONDS, lambda _: None)
-    assert failed_url in str(caught.value)
+                           fetch_aa.UA, fetch_aa.FETCH_TIMEOUT_SECONDS, lambda _: None, 30)
+    assert str(caught.value).startswith(f"{failed_url}: fetch failed{attempts}")
 
 
 DATA_HOST = "https://artificialanalysis.ai"

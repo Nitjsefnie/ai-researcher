@@ -70,6 +70,8 @@ from __future__ import annotations
 import fnmatch
 import os
 import subprocess
+import sys
+from pathlib import Path
 
 # The paths-ignore deny-lists the gate workflows carried on main, now
 # re-homed as classifier patterns.
@@ -323,10 +325,13 @@ def main():
     """Classify this run and record the outputs. Returns an exit status."""
     event = event_from_environment()
 
+    # Each read reruns a gh 429, 5xx or transport failure inside download.py's
+    # window, 60 s per attempt (issue #426); still failing, it over-runs.
     def run(command):
         return subprocess.run(
-            command, capture_output=True, text=True, check=True,
-            timeout=60).stdout
+            [sys.executable, str(Path(__file__).resolve().parent / 'download.py'),
+             '--run', '--gh', '--timeout', '60', *command],
+            capture_output=True, text=True, check=True).stdout
 
     documentation, data, reason = classify(event, run)
     write_outputs(os.environ.get('GITHUB_OUTPUT'), documentation, data,

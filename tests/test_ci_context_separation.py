@@ -133,5 +133,5 @@ def test_ratchet_documents_fetches_the_event_sha():
     assert env['AI_RESEARCHER_CI_SHA'] == '${{ github.sha }}'
     assert 'AI_RESEARCHER_PR_NUMBER' not in env
     run = step['run']
-    assert 'git fetch --unshallow origin "${AI_RESEARCHER_CI_SHA}"' in run
+    assert 'fetch_history origin "${AI_RESEARCHER_CI_SHA}"' in run
     assert 'refs/pull' not in run

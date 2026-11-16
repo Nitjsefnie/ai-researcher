@@ -54,8 +54,8 @@ class GitHubTrackerExecutedStepsTests(refresh.HFTrackerExecutedStepsTests):
 
     def test_fetch_script_is_invoked_with_message_and_failure_propagates(self):
         scripts = self.repo / 'scripts'
-        scripts.mkdir()
-        for script in ('fetch_github_stars.py', 'fetch_http.py', 'trending_message.py'):
+        (scripts / 'ci').mkdir(parents=True)
+        for script in ('fetch_github_stars.py', 'fetch_http.py', 'ci/download.py', 'trending_message.py'):
             shutil.copyfile(refresh.ROOT / 'scripts' / script, scripts / script)
         # A sitecustomize stub answers the network boundary and records the
         # credential the request carried.

@@ -52,6 +52,8 @@ jobs:
           # stdlib, so these two files ARE the whole set of third-party names
           # pyright needs to know about.
           python3 scripts/ci/download.py --run python3 -m pip install -r requirements-dev.txt -r requirements-test.txt
+          # With no node on PATH, pyright's first run downloads one (issue #426).
+          python3 scripts/ci/download.py --run python3 -m pyright --version
 
       - name: pyright
         run: python3 -m pyright

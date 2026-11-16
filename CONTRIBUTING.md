@@ -283,6 +283,69 @@ docs-hub key only in its upload step, which runs `scripts/publish_docs.py` from
 the run's own commit and retries a 429, a 5xx, a timeout or a dropped
 connection inside `scripts/ci/download.py`'s backoff window (issue #402).
 
+`download.py --run` retries a command inside the same window on any nonzero
+exit by default. `--retry-on STATUS,...` narrows that to the statuses named.
+`--retry-stderr REGEX` narrows it further to attempts whose stderr matches,
+searched as a multiline pattern on the stderr with CRLF and a lone CR turned
+into LF, so `^` and `$` anchor per line on every platform. That stderr is
+captured and written to the log unaltered once the attempt ends.
+`--timeout SECONDS` kills an attempt that runs longer and retries it whatever
+the other options say. When the window is spent on a killed attempt, the run
+prints that the last attempt timed out and exits 124. The kill reaches only the
+direct child, not a process tree (issue #426). A callable command handed to
+`run_retrying` in process is asked for its argv again before every attempt.
+
+git's network calls retry on exit 128 alone (issue #426). 128 is git's fatal
+exit, and it is how a refused, dropped or timed-out connection or an HTTP 5xx
+ends a fetch, an `ls-remote` or a push, while a rejected push exits 1 and is
+never retried.
+128 also ends a fetch of a ref the remote lacks and a refused credential; those
+fail red only once the window is spent. The freshness and commit-scope gates
+call `run_retrying` in process; every other call is wrapped alone, so a push's
+`if` still sends a rejection to its race branch and an `ls-remote` command
+substitution keeps its value. A push that lands but loses its reply reruns as
+"Everything up-to-date" and exits 0. A fetch that may add `--unshallow` asks
+before every attempt whether the history is still shallow, because
+`--unshallow` on a complete history exits 128 every time. None passes
+`--timeout`: git runs its transport as a child (`git-remote-http`, or `ssh`)
+that the kill would not reach, so a stalled attempt waits for the job's
+`timeout-minutes`.
+
+The two push jobs and the refresh committer execute no artifact byte. Their
+only repository code is `scripts/ci/download.py` and `scripts/fetch_http.py`,
+sparse-checked-out at `github.sha` (the commit the workflow text itself came
+from) with `persist-credentials: false`, before any step loads the deploy key.
+
+`download.py --run --gh` is for `gh api` (issue #426). gh exits 1 for every
+failure and retries none, so `--gh` reruns an exit 1 only when a stderr line is
+an HTTP 429 or 5xx, Go's transport error (`Get "<url>": ...`), a DNS failure,
+a dropped body (`unexpected EOF`) or an HTML error page read through `--jq`,
+each measured from gh 2.98.0; a 404, 401, 403 or 422 fails at once. It keeps
+only the last attempt's stdout, where gh prints an error body. The change
+classifier's reads, the ratchet push's artifact listing and coverage comment's
+reads pass `--timeout 60`, since gh sets no timeout. A write never reruns
+alone: coverage comment runs each list-then-write sequence, for its comment and
+its check run, as an exported shell function under `--gh`, so a POST that
+landed is listed again and PATCHed. A listing that lags a landed POST posts a
+second marker comment that no later run updates, since each PATCHes only the
+first, so its stale percentage stays visible. A second check run heals: every
+run PATCHes each one it lists. Coverage comment checks out only the same helper at
+`github.sha` and downloads its artifact into `runner.temp`.
+
+Both hub jobs' live-page checks and the refresh job's republish check fetch
+the page with `download.py URL DEST`. A fetch that still fails after the window
+keeps its old verdict: the page is treated as stale and published.
+
+The ci gate's zizmor step runs its online audits as `download.py --run
+--retry-on 1 --timeout 60`. zizmor documents exit 1 for an error during the
+audit, which is how an HTTP error status or a refused or dropped connection
+reaches it, and exits 11-14 for findings, which fail on the first run. Any
+other error that exits 1, such as an unreadable input, fails red too, but only
+once the window is spent. zizmor applies no network timeout of its own, so a
+stalled connection would hang until the job timeout. The 60 s bound is about
+12 times its slowest local online run (4.9 s), and lets four attempts start
+inside the 300 s window.
+
 For a build-only frontier change, `workflow_dispatch` with `force: true`
 rebuilds and republishes even when the fresh capture would render the identical
 page. The workflow also repairs a stale live frontier page on an unchanged

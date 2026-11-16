@@ -23,7 +23,7 @@ COST_FIELD = "gdpvalCostPerTask"
 # A live page/data pair failing GCM authentication is re-read, page and data together,
 # AUTH_ATTEMPTS times IN TOTAL with AUTH_REREAD_SECONDS between attempts (issue #406);
 # a cached input is read once.
-# Worst case, each fetch bounded at 3 * 25 + 5 + 10 = 90 s: 2 * (90 + 90) + 180 = 540 s,
+# Worst case, each fetch bounded at fetch_aa's 65 s window + 25 s = 90 s: 2 * (90 + 90) + 180 = 540 s,
 # which fetch_aa's RetryBoundArithmeticTests add to the capture's other worst-case terms.
 AUTH_ATTEMPTS = 2
 AUTH_REREAD_SECONDS = 180
@@ -177,7 +177,7 @@ def _manifest(page: str, flight_payload) -> dict:
 
 
 def _authenticated(cached_page, cached_data, fetch_html, flight_payload, user_agent, timeout,
-                   sleep):
+                   sleep, window):
     """The data path and its decrypted bytes; a live pair that fails authentication is re-read together."""
     attempts = 1 if cached_page or cached_data else AUTH_ATTEMPTS
     for attempt in range(1, attempts + 1):
@@ -190,7 +190,7 @@ def _authenticated(cached_page, cached_data, fetch_html, flight_payload, user_ag
         try:
             body = (pathlib.Path(cached_data).read_bytes() if cached_data else
                     fetch_http.fetch_bytes("https://artificialanalysis.ai" + path,
-                                           {"User-Agent": user_agent}, timeout, sleep=sleep))
+                                           {"User-Agent": user_agent}, timeout, sleep=sleep, window=window))
         except OSError as exc:
             sys.exit(f"{path}: data read failed: {exc}")
         key = bytes.fromhex(manifest["key"])
@@ -207,10 +207,10 @@ def _authenticated(cached_page, cached_data, fetch_html, flight_payload, user_ag
     raise AssertionError("_authenticated ran out of attempts without a verdict")
 
 
-def fetch(cached_page, cached_data, fetch_html, flight_payload, user_agent, timeout, sleep):
+def fetch(cached_page, cached_data, fetch_html, flight_payload, user_agent, timeout, sleep, window=None):
     """Read and authenticate the evaluation records and their per-slug costs."""
     path, compressed = _authenticated(cached_page, cached_data, fetch_html, flight_payload,
-                                      user_agent, timeout, sleep)
+                                      user_agent, timeout, sleep, window)
     try:
         decoded = gzip.decompress(compressed)
     except (OSError, EOFError, zlib.error) as exc:

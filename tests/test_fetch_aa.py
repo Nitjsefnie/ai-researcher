@@ -21,6 +21,8 @@ import fetch_aa  # noqa: E402  # pylint: disable=wrong-import-position
 import diff_aa  # noqa: E402  # pylint: disable=wrong-import-position
 import build  # noqa: E402  # pylint: disable=wrong-import-position
 from test_build import v5_evaluations  # noqa: E402  # pylint: disable=wrong-import-position,wrong-import-order
+# Instant failures inside the 65 s page window: waits double from 5 s until the next (40 s) would pass it.
+FAST_FAIL_WAITS = [5, 10, 20]
 
 
 def legacy_main(evaluation=None):
@@ -1139,9 +1141,7 @@ class TransportErrorTests(unittest.TestCase):
         # #154) rather than pretending attempt 1 was final.
         raisers = (
             ("URLError", urllib.error.URLError("Connection refused")),
-            ("HTTPError", urllib.error.HTTPError(
-                fetch_aa.URL, 503, "Service Unavailable",
-                email.message.Message(), None)),
+            ("HTTPError", urllib.error.HTTPError(fetch_aa.URL, 503, "Service Unavailable", email.message.Message(), None)),
             ("timeout", socket.timeout("The read operation timed out")),
         )
         for why, error in raisers:
@@ -1153,17 +1153,14 @@ class TransportErrorTests(unittest.TestCase):
                 # leaderboard only when the page itself is healthy), then the
                 # leaderboard fetch exercises the transport failure.
                 with self.assertRaises(SystemExit) as caught:
-                    self.run_capture_through_boundary({
-                        fetch_aa.METHODOLOGY_URL: lambda: _FakeResponse(
-                            methodology_html()),
-                        fetch_aa.URL: raiser})
+                    self.run_capture_through_boundary({fetch_aa.METHODOLOGY_URL: lambda: _FakeResponse(methodology_html()),
+                                                       fetch_aa.URL: raiser})
 
                 message = str(caught.exception)
                 self.assertIn(fetch_aa.URL, message)
                 self.assertIn("fetch failed", message)
                 self.assertIn(str(error), message)
-                self.assertIn(
-                    f"after {fetch_aa.PAGE_ATTEMPTS} attempts", message)
+                self.assertIn(f"after {len(FAST_FAIL_WAITS) + 1} attempts", message)
 
     def test_the_guarded_refusal_is_the_whole_of_stderr_at_exit_one(self):
         # End to end: a subprocess whose urlopen is stubbed before fetch_aa
@@ -1184,14 +1181,12 @@ class TransportErrorTests(unittest.TestCase):
                 "fetch_aa._sleep = lambda seconds: None\n"
                 "fetch_aa.main()\n",
                 encoding="utf-8")
-            proc = subprocess.run(
-                [sys.executable, str(runner)],
-                capture_output=True, text=True, timeout=120, check=False)
+            proc = subprocess.run([sys.executable, str(runner)], capture_output=True, text=True, timeout=120, check=False)
 
         self.assertEqual(proc.returncode, 1)
         self.assertNotIn("Traceback", proc.stderr)
         lines = proc.stderr.strip().splitlines()
-        self.assertEqual(len(lines), fetch_aa.PAGE_ATTEMPTS, proc.stderr)
+        self.assertEqual(len(lines), len(FAST_FAIL_WAITS) + 1, proc.stderr)
         self.assertIn("retrying", lines[0], proc.stderr)
         self.assertIn("fetch failed", lines[-1])
         self.assertIn("Connection refused", lines[-1])
@@ -1243,8 +1238,7 @@ class PageFetchRetryTests(unittest.TestCase):
         sleeps: list = []
         with tempfile.TemporaryDirectory(prefix=".issue-154-page-retry-") as tmp:
             root = pathlib.Path(tmp)
-            old = (fetch_aa.ROOT, fetch_aa.OUT, fetch_aa.AGENTS_OUT,
-                   fetch_aa.STAMP)
+            old = (fetch_aa.ROOT, fetch_aa.OUT, fetch_aa.AGENTS_OUT, fetch_aa.STAMP)
             argv = sys.argv
             try:
                 fetch_aa.ROOT = root
@@ -1257,11 +1251,8 @@ class PageFetchRetryTests(unittest.TestCase):
                     fetch_aa.AGENTS_OUT.write_bytes(b"SENTINEL AGENTS CAPTURE")
                     fetch_aa.STAMP.write_text("2020-01-01\n", encoding="utf-8")
                 sys.argv = ["fetch_aa.py"]
-                with unittest.mock.patch.object(urllib.request, "urlopen",
-                                                stub), \
-                        unittest.mock.patch.object(fetch_aa, "_sleep",
-                                                   side_effect=sleeps.append,
-                                                   create=True):
+                with unittest.mock.patch.object(urllib.request, "urlopen", stub), \
+                        unittest.mock.patch.object(fetch_aa, "_sleep", side_effect=sleeps.append, create=True):
                     def run() -> tuple[str, str]:
                         out, err = io.StringIO(), io.StringIO()
                         with contextlib.redirect_stdout(out), \
@@ -1277,8 +1268,7 @@ class PageFetchRetryTests(unittest.TestCase):
                     yield root, stub, sleeps, run, captured
             finally:
                 sys.argv = argv
-                (fetch_aa.ROOT, fetch_aa.OUT, fetch_aa.AGENTS_OUT,
-                 fetch_aa.STAMP) = old
+                (fetch_aa.ROOT, fetch_aa.OUT, fetch_aa.AGENTS_OUT, fetch_aa.STAMP) = old
 
     def test_a_transient_500_on_the_leaderboard_is_retried_and_captured(self):
         # The incident shape: attempt 1 refuses with 500, attempt 2 reads
@@ -1286,28 +1276,19 @@ class PageFetchRetryTests(unittest.TestCase):
         # and the stderr retry line as the only traces.
         routes = {
             fetch_aa.METHODOLOGY_URL: lambda: _FakeResponse(methodology_html()),
-            fetch_aa.URL: flaky(
-                urllib.error.HTTPError(fetch_aa.URL, 500,
-                                       "Internal Server Error",
-                                       email.message.Message(), None),
-                self.LEADERBOARD),
+            fetch_aa.URL: flaky(urllib.error.HTTPError(fetch_aa.URL, 500, "Internal Server Error", email.message.Message(), None),
+                                self.LEADERBOARD),
             self.DETAIL_URL: lambda: _FakeResponse(self.DETAIL),
             fetch_aa.AGENTS_URL: lambda: _FakeResponse(self.AGENTS),
         }
-        with self.capture_over_boundary(routes) as (root, stub, sleeps, run,
-                                                    _captured):
+        with self.capture_over_boundary(routes) as (root, stub, sleeps, run, _captured):
             stdout, stderr = run()
 
-            self.assertEqual(stub.calls,
-                             [fetch_aa.METHODOLOGY_URL, fetch_aa.URL,
-                              fetch_aa.URL, self.DETAIL_URL, fetch_aa.URL,
-                              fetch_aa.AGENTS_URL])
-            self.assertEqual(sleeps,
-                             [fetch_aa.PAGE_BACKOFF_SECONDS,
-                              fetch_aa.DISPUTE_LOOK_SPACING_SECONDS])
-            self.assertIn("attempt 1 of 3", stderr)
-            self.assertIn(
-                f"retrying in {fetch_aa.PAGE_BACKOFF_SECONDS}s", stderr)
+            self.assertEqual(stub.calls, [fetch_aa.METHODOLOGY_URL, fetch_aa.URL, fetch_aa.URL, self.DETAIL_URL,
+                                          fetch_aa.URL, fetch_aa.AGENTS_URL])
+            self.assertEqual(sleeps, [fetch_aa.PAGE_BACKOFF_SECONDS, fetch_aa.DISPUTE_LOOK_SPACING_SECONDS])
+            self.assertIn("attempt 1 failed", stderr)
+            self.assertIn(f"retrying in {fetch_aa.PAGE_BACKOFF_SECONDS}s", stderr)
             self.assertIn("wrote aa-raw-models.json", stdout)
             self.assertEqual(
                 (root / "captured-at.txt").read_text(encoding="utf-8"),
@@ -1319,34 +1300,20 @@ class PageFetchRetryTests(unittest.TestCase):
         # the last reason -- and the previous capture on disk is untouched,
         # because a refused run writes nothing.
         def unavailable():
-            raise urllib.error.HTTPError(fetch_aa.URL, 503,
-                                         "Service Unavailable",
-                                         email.message.Message(), None)
+            raise urllib.error.HTTPError(fetch_aa.URL, 503, "Service Unavailable", email.message.Message(), None)
 
-        routes = {fetch_aa.METHODOLOGY_URL: lambda: _FakeResponse(
-                      methodology_html()),
-                  fetch_aa.URL: unavailable}
-        with self.capture_over_boundary(routes, seed=True) as (root, stub,
-                                                               sleeps, run,
-                                                               _captured):
+        routes = {fetch_aa.METHODOLOGY_URL: lambda: _FakeResponse(methodology_html()), fetch_aa.URL: unavailable}
+        with self.capture_over_boundary(routes, seed=True) as (root, stub, sleeps, run, _captured):
             with self.assertRaises(SystemExit) as caught:
                 run()
 
             message = str(caught.exception)
             self.assertIn(fetch_aa.URL, message)
-            self.assertIn(
-                f"fetch failed after {fetch_aa.PAGE_ATTEMPTS} attempts",
-                message)
+            self.assertIn(f"fetch failed after {len(FAST_FAIL_WAITS) + 1} attempts", message)
             self.assertIn("503", message)
             self.assertIn("Service Unavailable", message)
-            self.assertEqual(
-                sleeps,
-                [k * fetch_aa.PAGE_BACKOFF_SECONDS
-                 for k in range(1, fetch_aa.PAGE_ATTEMPTS)])
-            self.assertEqual(
-                stub.calls,
-                [fetch_aa.METHODOLOGY_URL]
-                + [fetch_aa.URL] * fetch_aa.PAGE_ATTEMPTS)
+            self.assertEqual(sleeps, FAST_FAIL_WAITS)
+            self.assertEqual(stub.calls, [fetch_aa.METHODOLOGY_URL] + [fetch_aa.URL] * (len(FAST_FAIL_WAITS) + 1))
             self.assertEqual((root / "aa-raw-models.json").read_bytes(),
                              b"SENTINEL MODELS CAPTURE")
             self.assertEqual((root / "aa-raw-coding-agents.json").read_bytes(),
@@ -1363,12 +1330,8 @@ class PageFetchRetryTests(unittest.TestCase):
             raise urllib.error.HTTPError(fetch_aa.URL, 404, "Not Found",
                                          email.message.Message(), None)
 
-        routes = {fetch_aa.METHODOLOGY_URL: lambda: _FakeResponse(
-                      methodology_html()),
-                  fetch_aa.URL: not_found}
-        with self.capture_over_boundary(routes, seed=True) as (root, stub,
-                                                               sleeps, run,
-                                                               captured):
+        routes = {fetch_aa.METHODOLOGY_URL: lambda: _FakeResponse(methodology_html()), fetch_aa.URL: not_found}
+        with self.capture_over_boundary(routes, seed=True) as (root, stub, sleeps, run, captured):
             with self.assertRaises(SystemExit) as caught:
                 run()
 
@@ -1396,11 +1359,8 @@ class PageFetchRetryTests(unittest.TestCase):
         routes = {
             fetch_aa.METHODOLOGY_URL: lambda: _FakeResponse(methodology_html()),
             fetch_aa.URL: lambda: _FakeResponse(self.LEADERBOARD),
-            self.DETAIL_URL: flaky(
-                urllib.error.HTTPError(self.DETAIL_URL, 500,
-                                       "Internal Server Error",
-                                       email.message.Message(), None),
-                flight_html(detail_payload(intelligenceIndex=52))),
+            self.DETAIL_URL: flaky(urllib.error.HTTPError(self.DETAIL_URL, 500, "Internal Server Error", email.message.Message(), None),
+                                   flight_html(detail_payload(intelligenceIndex=52))),
             fetch_aa.AGENTS_URL: lambda: _FakeResponse(self.AGENTS),
         }
         with self.capture_over_boundary(routes) as (root, stub, sleeps, run,
@@ -1468,11 +1428,8 @@ class TransportErrorClassifierTests(unittest.TestCase):
                 calls, sleeps = self.attempts_through_boundary(raise_it)
 
                 self.assertEqual(calls,
-                                 fetch_aa.PAGE_ATTEMPTS if retried else 1)
-                self.assertEqual(
-                    sleeps,
-                    [k * fetch_aa.PAGE_BACKOFF_SECONDS
-                     for k in range(1, calls)])
+                                 len(FAST_FAIL_WAITS) + 1 if retried else 1)
+                self.assertEqual(sleeps, FAST_FAIL_WAITS[:calls - 1])
 
     def test_transport_shapes_are_all_retryable(self):
         # DNS (gaierror rides URLError), connection refused, a socket
@@ -1498,11 +1455,8 @@ class TransportErrorClassifierTests(unittest.TestCase):
 
                 calls, sleeps = self.attempts_through_boundary(raise_it)
 
-                self.assertEqual(calls, fetch_aa.PAGE_ATTEMPTS)
-                self.assertEqual(
-                    sleeps,
-                    [k * fetch_aa.PAGE_BACKOFF_SECONDS
-                     for k in range(1, calls)])
+                self.assertEqual(calls, len(FAST_FAIL_WAITS) + 1)
+                self.assertEqual(sleeps, FAST_FAIL_WAITS)
 
 
 class RetryBoundArithmeticTests(unittest.TestCase):

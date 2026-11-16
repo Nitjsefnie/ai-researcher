@@ -14,8 +14,10 @@ import io
 import json
 import socket
 import struct
+import subprocess
 import sys
 import threading
+import types
 import urllib.request
 from pathlib import Path
 
@@ -45,10 +47,9 @@ class FakeClock:
 
 @pytest.fixture(name="sleeps")
 def fixture_sleeps(monkeypatch):
-    """The defaults, time.sleep and time.monotonic, on one fake clock."""
+    """download.py's time.sleep and time.monotonic (not subprocess's) on one fake clock."""
     clock = FakeClock()
-    monkeypatch.setattr(download.time, "sleep", clock.sleep)
-    monkeypatch.setattr(download.time, "monotonic", clock)
+    monkeypatch.setattr(download, "time", types.SimpleNamespace(sleep=clock.sleep, monotonic=clock))
     return clock.sleeps
 
 
@@ -114,56 +115,18 @@ def fixture_serve():
         server.server_close()
 
 
-def test_429_is_retried_with_backoff(serve, sleeps, tmp_path):
-    server = serve(429)
+# A 429, every 5xx, a dropped body or a timeout (before or mid-body) is retried.
+@pytest.mark.parametrize("faults, timeout, schedule", [
+    ([429], 5, [5]), ([500, 502, 503, 504], 5, [5, 10, 20, 40]), (["drop"], 5, [5]),
+    (["stall"], 0.2, [5]), (["midstall"], 0.2, [5]), (["midreset"], 0.2, [5])])
+def test_a_transient_fault_is_retried_with_backoff(serve, sleeps, tmp_path,
+                                                   faults, timeout, schedule):
+    server = serve(*faults)
     out = tmp_path / "out"
-    digest, size = download.download_to(server.url, out, 5)
+    digest, size = download.download_to(server.url, out, timeout)
+    assert (server.hits, sleeps) == (len(faults) + 1, schedule)
     assert out.read_bytes() == BODY
     assert (digest, size) == (hashlib.sha256(BODY).hexdigest(), len(BODY))
-    assert server.hits == 2
-    assert sleeps == [5]
-
-
-def test_every_5xx_is_retried_on_a_doubling_schedule(serve, sleeps, tmp_path):
-    server = serve(500, 502, 503, 504)
-    download.download_to(server.url, tmp_path / "out", 5)
-    assert server.hits == 5
-    assert sleeps == [5, 10, 20, 40]
-
-
-@pytest.mark.parametrize("fault", ["midstall", "midreset"])
-def test_a_body_cut_by_a_timeout_or_reset_is_retried(serve, sleeps, tmp_path,
-                                                     fault):
-    server = serve(fault)
-    download.download_to(server.url, tmp_path / "out", 0.2)
-    assert (server.hits, sleeps) == (2, [5])
-    assert (tmp_path / "out").read_bytes() == BODY
-
-
-def test_a_dropped_body_is_retried_and_never_kept(serve, sleeps, tmp_path):
-    server = serve("drop")
-    out = tmp_path / "out"
-    download.download_to(server.url, out, 5)
-    assert server.hits == 2
-    assert out.read_bytes() == BODY
-    assert sleeps == [5]
-
-
-def test_a_timeout_is_retried(serve, sleeps, tmp_path):
-    server = serve("stall")
-    download.download_to(server.url, tmp_path / "out", 0.2)
-    assert server.hits == 2
-    assert sleeps == [5]
-
-
-def test_a_404_fails_at_once_naming_the_url(serve, sleeps, tmp_path):
-    server = serve(404)
-    with pytest.raises(download.DownloadError) as caught:
-        download.download_to(server.url, tmp_path / "out", 5)
-    assert server.hits == 1
-    assert sleeps == []
-    assert str(caught.value).startswith(f"{server.url}: download failed: ")
-    assert not (tmp_path / "out").exists()
 
 
 def test_exhaustion_names_the_url_and_leaves_no_partial_file(serve, sleeps,
@@ -181,22 +144,30 @@ def test_exhaustion_names_the_url_and_leaves_no_partial_file(serve, sleeps,
 
 # 17.5 s attempts put the seventh start exactly on the window's edge: 6 * 17.5
 # + 5 + 10 + 20 + 40 + 60 + 60 = 300, which still starts; 30 s ones stop at six.
+# A --run attempt --timeout kills spends it alike; at zizmor's 60 s bound, four fit.
 @pytest.mark.parametrize("cost, attempts, schedule", [
-    (30, 6, [5, 10, 20, 40, 60]), (17.5, 7, [5, 10, 20, 40, 60, 60])])
-def test_hung_attempts_spend_the_window(monkeypatch, tmp_path, cost, attempts,
-                                        schedule):
+    (30, 6, [5, 10, 20, 40, 60]), (17.5, 7, [5, 10, 20, 40, 60, 60]), (60, 4, [5, 10, 20])])
+def test_hung_attempts_spend_the_window(monkeypatch, tmp_path, capsys, cost, attempts, schedule):
     clock = FakeClock()
 
-    def hung(url, timeout):
+    def hung(*args, **kwargs):
         clock.now += cost
-        raise TimeoutError("timed out")
+        raise error
 
     monkeypatch.setattr(urllib.request, "urlopen", hung)
+    monkeypatch.setattr(download.subprocess, "run", hung)
+    error = TimeoutError("timed out")
     with pytest.raises(download.DownloadError,
                        match=f"after {attempts} attempts"):
         download.download_to("https://example.test/a", tmp_path / "out", 30,
                              sleep=clock.sleep, clock=clock)
-    assert clock.sleeps == schedule
+    downloaded, clock.sleeps = clock.sleeps, []
+    error = subprocess.TimeoutExpired("zizmor", cost)
+    assert download.run_retrying(["zizmor"], retry_on=frozenset({1}), timeout=cost,
+                                 sleep=clock.sleep, clock=clock) == 124
+    assert (downloaded, clock.sleeps) == (schedule, schedule)
+    assert capsys.readouterr().err.endswith(
+        f"zizmor: attempt {attempts} timed out after {cost:g}s; no attempt left in the window\n")
 
 
 class TrickleResponse(io.BytesIO):
@@ -252,23 +223,55 @@ def test_progress_prints_one_line_per_interval(serve, sleeps, tmp_path,
     assert capsys.readouterr().out == "chromium: 0 MiB\n" * 2
 
 
-# Exits argv[2] for its first argv[3] runs, then 0, counting runs in argv[1].
-FLAKY = ("import pathlib, sys; p = pathlib.Path(sys.argv[1]); "
+# For its first argv[3] runs, writes "flaky argv[2]" (CRLF-ended), "lone argv[2]" (lone CR) and a
+# non-UTF-8 line to stderr and exits argv[2] (hangs, for "hang"); then exits 0. Runs are counted in argv[1].
+FLAKY = ("import pathlib, sys, time; p = pathlib.Path(sys.argv[1]); "
          "n = int(p.read_text(encoding='utf-8')) if p.exists() else 0; "
-         "p.write_text(str(n + 1), encoding='utf-8'); "
-         "sys.exit(int(sys.argv[2]) if n < int(sys.argv[3]) else 0)")
+         "p.write_text(str(n + 1), encoding='utf-8'); fail = n < int(sys.argv[3]); "
+         "fail and sys.stderr.buffer.write(b'flaky %b\\r\\nlone %b\\r\\xff\\r\\n' % ((sys.argv[2].encode(),) * 2)); sys.stderr.flush(); "
+         "fail and sys.argv[2] == 'hang' and time.sleep(60); "
+         "sys.exit(int(sys.argv[2]) if fail else 0)")
 
 
-@pytest.mark.parametrize("failures, status, attempts, schedule", [
-    (0, 0, 1, []), (2, 0, 3, [5, 10]),
-    (99, 3, 8, [5, 10, 20, 40, 60, 60, 60])])
+# Any nonzero status reruns, or only those --retry-on names and, with --retry-stderr, whose
+# stderr matches (logged once per failed run either way); a --timeout kill always reruns.
+@pytest.mark.parametrize("retry_on, code, failures, status, attempts, schedule", [
+    ([], 3, 0, 0, 1, []), ([], 3, 2, 0, 3, [5, 10]), ([], 3, 99, 3, 8, [5, 10, 20, 40, 60, 60, 60]),
+    (["--retry-on", "1"], 1, 2, 0, 3, [5, 10]), (["--retry-on", "1"], 13, 99, 13, 1, []),
+    (["--retry-on", "13,1"], 1, 99, 1, 8, [5, 10, 20, 40, 60, 60, 60]), (["--retry-stderr", "^lone 1$"], 1, 2, 0, 3, [5, 10]),
+    (["--retry-stderr", "^flaky 1$"], 1, 2, 0, 3, [5, 10]), (["--retry-stderr", "^flaky 2$"], 1, 9, 1, 1, []),
+    (["--retry-stderr", "aky 1"], 1, 2, 0, 3, [5, 10]), (["--retry-on", "2", "--retry-stderr", "flaky"], 1, 9, 1, 1, []),
+    (["--timeout", "2", "--retry-on", "13", "--retry-stderr", "x"], "hang", 1, 0, 2, [5]), (["--window", "30"], 3, 99, 3, 3, [5, 10])])
 def test_a_failing_command_is_rerun_and_its_last_status_returned(
-        sleeps, tmp_path, failures, status, attempts, schedule):
+        sleeps, tmp_path, capfdbinary, retry_on, code, failures, status, attempts, schedule):
     counter = tmp_path / "runs"
-    assert download.main(["--run", sys.executable, "-c", FLAKY, str(counter),
-                          "3", str(failures)]) == status
+    assert download.main(["--run", *retry_on, sys.executable, "-c", FLAKY, str(counter), str(code), str(failures)]) == status
     assert int(counter.read_text(encoding="utf-8")) == attempts
     assert sleeps == schedule
+    err = capfdbinary.readouterr().err  # each failed run's bytes, unaltered; the give-up line only after a timeout
+    assert (err.count(b"flaky %s\r\nlone %s\r\xff\r\n" % ((str(code).encode(),) * 2)), b"no attempt left" in err) == (min(failures, attempts), False)
+
+
+# Its first run prints "body 0" and argv[3] on stderr and exits argv[2]; later runs print "body N", exit 0.
+GH = ("import pathlib, sys; p = pathlib.Path(sys.argv[1]); n = len(p.read_bytes()) if p.exists() else 0; "
+      "p.write_bytes(b'x' * (n + 1)); sys.stdout.buffer.write(b'body %d\\n' % n); "
+      "n or sys.stderr.write(sys.argv[3] + '\\n'); sys.exit(0 if n else int(sys.argv[2]))")
+
+
+# --gh reruns gh's exit 1 when a stderr line is an HTTP 429 or 5xx, Go's transport error, a DNS failure, a
+# dropped body or an HTML error page (gh 2.98.0, measured), and keeps only the last attempt's stdout.
+@pytest.mark.parametrize("code, line, rerun", [
+    (1, "gh: Server Error (HTTP 502)", True), (1, "gh: HTTP 503", True), (1, "gh: rate limit (HTTP 429)", True),
+    (1, 'Get "https://api.github.com/x": dial tcp 127.0.0.1:9: connect: connection refused', True),
+    (1, "error connecting to api.github.com", True), (1, "unexpected EOF", True),
+    (1, "invalid character '<' looking for beginning of value", True), (1, "gh: Not Found (HTTP 404)", False),
+    (1, "gh: Bad credentials (HTTP 401)", False), (1, "gh: Forbidden (HTTP 403)", False),
+    (1, "gh: Validation Failed (HTTP 422)", False), (1, "gh: see (HTTP 502) above", False), (4, "gh: HTTP 502", False)])
+def test_gh_reruns_only_a_transient_failure_and_keeps_the_last_stdout(sleeps, tmp_path, capfdbinary, code, line, rerun):
+    counter = tmp_path / "runs"
+    status = download.main(["--run", "--gh", sys.executable, "-c", GH, str(counter), str(code), line])
+    assert (status, counter.read_bytes(), capfdbinary.readouterr().out, sleeps) == (
+        (0, b"xx", b"body 1\n", [5]) if rerun else (code, b"x", b"body 0\n", []))
 
 
 def test_the_cli_retries_and_exits_nonzero_on_exhaustion(serve, sleeps,
@@ -307,12 +310,12 @@ class FullDisk(io.BytesIO):
         raise OSError(errno.ENOSPC, "No space left on device")
 
 
-@pytest.mark.parametrize("where, hits", [("missing directory", 0),
+@pytest.mark.parametrize("where, hits", [("404", 1), ("missing directory", 0),
                                          ("full disk", 1)])
-def test_a_destination_error_fails_at_once(serve, sleeps, tmp_path,
-                                           monkeypatch, where, hits):
-    server = serve()
-    out = tmp_path / "missing" / "out"
+def test_a_404_or_a_destination_error_fails_at_once(serve, sleeps, tmp_path,
+                                                    monkeypatch, where, hits):
+    server = serve(404) if where == "404" else serve()
+    out = tmp_path / ("out" if where == "404" else "missing/out")
     if where == "full disk":
         out = tmp_path / "out"
         monkeypatch.setattr(download, "open", lambda *args: FullDisk(),

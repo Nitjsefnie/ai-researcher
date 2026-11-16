@@ -94,6 +94,10 @@ if "/runs?" in url:
 elif "/jobs?" in url:
     print("tests success")
 elif "/compare/" in url:
+    if os.environ["STUB_FAULT"] and not os.path.exists(os.environ["GITHUB_STUB_LOG"] + ".faulted"):
+        open(os.environ["GITHUB_STUB_LOG"] + ".faulted", "w").close()  # once, as gh fails: body out, line err
+        print('{{"message": "fault"}}')
+        sys.exit(os.environ["STUB_FAULT"])
     for path in {paths!r}:
         print(path)
 else:
@@ -130,7 +134,7 @@ def _stub_gh(directory, paths):
     return script
 
 
-def _run_classifier(tmp_path, paths=None, writes=True):
+def _run_classifier(tmp_path, paths=None, writes=True, fault=""):
     """Run the classifier on a push event over the stub `gh`.
 
     AI_RESEARCHER_PR_NUMBER is empty and AI_RESEARCHER_BEFORE_SHA is a 40-hex commit, the shape of
@@ -160,7 +164,7 @@ def _run_classifier(tmp_path, paths=None, writes=True):
         "GITHUB_EVENT_NAME": "push",
         "GITHUB_REPOSITORY": "Nitjsefnie/ai-researcher",
         "GITHUB_SHA": HEAD,
-        "GITHUB_STUB_LOG": str(log),
+        "GITHUB_STUB_LOG": str(log), "STUB_FAULT": fault,
         "AI_RESEARCHER_PR_NUMBER": "",
         "AI_RESEARCHER_BEFORE_SHA": BEFORE_COMMIT,
         "GITHUB_OUTPUT": target,
@@ -313,18 +317,21 @@ def test_every_leg_needs_the_classifier():
 # ---------------------------------------------------------------------------
 
 
-def test_a_bot_push_runs_only_the_cheap_legs_end_to_end(tmp_path):
+@pytest.mark.parametrize("fault", ["", "gh: Server Error (HTTP 502)", "gh: Not Found (HTTP 404)"])
+def test_a_bot_push_runs_only_the_cheap_legs_end_to_end(tmp_path, fault):
     # The refresh bot's own push, with the paths its commit carries (the
     # fixture includes all six supported paths): the cheap
     # class is lint and actionlint, every other leg skips — and
-    # actionlint is unconditional, so it runs here too.
-    run = _run_classifier(tmp_path)
+    # actionlint is unconditional, so it runs here too. A compare read
+    # failing with a 502 reruns and still narrows; a 404 over-runs (#426).
+    run = _run_classifier(tmp_path, fault=fault)
     _only_modelled_reads(run)
     _over_the_verified_base(run)
+    narrowed = "404" not in fault
+    assert sum("/compare/" in url for url in run.reads) == 1 + ("502" in fault)
     outputs = _parse_step_outputs(run.written)
-    assert outputs.get("data_only") == "true", outputs
-    assert _published(outputs).get("data_only") == "true", outputs
-    assert _gating_legs(outputs) == {"lint", "actionlint"}
+    assert outputs.get("data_only") == _published(outputs).get("data_only") == str(narrowed).lower(), outputs
+    assert _gating_legs(outputs) == ({"lint", "actionlint"} if narrowed else set(_legs(_ci_gate())))
 
 
 def test_a_code_push_runs_every_leg_end_to_end(tmp_path):
