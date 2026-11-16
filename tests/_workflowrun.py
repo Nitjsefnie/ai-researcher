@@ -62,9 +62,9 @@ def run_step(workdir, step, env):
     child_env["TMPDIR"] = temp_dir
     try:
         with subprocess.Popen(command, cwd=workdir, env=child_env, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-                              text=True, start_new_session=os.name != "nt") as process:
-            hooked = os.name != "nt" and threading.current_thread() is threading.main_thread()  # our group's TERM, HUP miss the step
-            handlers = {sig: signal.signal(sig, signal.default_int_handler) for sig in (signal.SIGTERM, signal.SIGHUP)} if hooked else {}
+                              text=True, start_new_session=os.name != "nt") as process:  # misses our group's TERM, HUP: hooked below
+            hooked = (signal.SIGTERM, signal.SIGHUP) if os.name != "nt" and threading.current_thread() is threading.main_thread() else ()
+            handlers = {sig: signal.signal(sig, signal.default_int_handler) for sig in hooked if signal.getsignal(sig) == signal.SIG_DFL}
             try:
                 stdout, stderr = process.communicate(timeout=STEP_TIMEOUT)
             except BaseException:  # TERM first: a SIGKILLed shell skips the EXIT trap that stops its daemons
@@ -79,7 +79,7 @@ def run_step(workdir, step, env):
 
 
 def _stop(process):
-    with contextlib.suppress(ProcessLookupError):  # the group is gone
+    with contextlib.suppress(ProcessLookupError, PermissionError):  # the group is gone (macOS: EPERM)
         for sig in (signal.SIGTERM, signal.SIGKILL) if os.name != "nt" else ():
             os.killpg(process.pid, sig)
             for _ in range(50):  # 5 s for the whole group
