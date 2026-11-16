@@ -1,4 +1,4 @@
-"""Issue #303: withheld detail enrichment survives the cross-run look-back."""
+"""Withheld detail enrichment survives the cross-run look-back."""
 
 import copy
 import json

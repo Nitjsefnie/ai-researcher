@@ -1,4 +1,4 @@
-"""The head-freshness gate follows what gate scripts import or run (issue #401).
+"""The head-freshness gate follows what gate scripts import or run.
 
 Each fixture is a bare origin and a clone sitting on a `pr` branch; main then
 moves one file, and the gate must go red exactly when a gate script reaches it.

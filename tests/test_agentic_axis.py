@@ -1,4 +1,4 @@
-"""The GDPval-AA v2.1 axis (issue #356): the leaderboard's Elo against the
+"""The GDPval-AA v2.1 axis: the leaderboard's Elo against the
 cost per task AA's GDPval-AA evaluation page computes."""
 
 import contextlib
@@ -314,7 +314,7 @@ class AgenticDiffTests(unittest.TestCase):
 
 
 class FrontierZeroScoreTests(unittest.TestCase):
-    """Issue #146: a zero score is legal (GDPval-AA's Elo also goes negative)
+    """A zero score is legal (GDPval-AA's Elo also goes negative)
     and sits on an axis's frontier when it holds that axis's minimum cost.
     Its $/point cell renders the em dash, never a ZeroDivisionError or
     "$Infinity", and the JS mirror must match or the browser drift test fails.

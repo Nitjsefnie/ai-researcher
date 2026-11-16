@@ -6,11 +6,11 @@ measured justifies no raise, and a measurement below the recorded value
 never lowers anything. The guard refuses a head document that removes a
 key, lowers a value, changes schema_version, or rewrites a measurement
 without the floor it implies. The perf-budgets document
-(.github/perf-budgets.json, issue #109) gets the same guard with the
+(.github/perf-budgets.json) gets the same guard with the
 opposite value direction: every budget is an integer maximum, so the
 relaxation is the RAISE, schema_version is fixed, and key add/remove are
 findings there too. The instruction-budgets document
-(.github/instruction-budgets.json, issue #110) — integer maxima of the
+(.github/instruction-budgets.json) — integer maxima of the
 pipeline targets' startup-subtracted callgrind totals — shares the
 budgets' direction rules verbatim. The cases pin both tools' behaviour,
 and the guard also gets end-to-end git cases in temporary repositories.
@@ -568,15 +568,15 @@ def test_end_to_end_push_raise_on_main_is_clean(tmp_path, capsys,
     assert "not relaxed" in capsys.readouterr().out
 
 
-# --- the guard: the budgets document (issue #109) ----------------------------
+# --- the guard: the budgets document -----------------------------------------
 
 
 def _budgets_document(schema=1):
     """The committed budgets document's shape, as test values.
 
-    Option A's shape (issue #112): one code-only byte budget, absolute
-    long-task maxima, and hover DOM -- the load/filter/sort DOM counts
-    have no leaves because they are never gated.
+    One code-only byte budget, absolute long-task maxima, and hover DOM --
+    the load/filter/sort DOM counts have no leaves because they are never
+    gated.
     """
     return {
         "schema_version": schema,
@@ -792,7 +792,7 @@ def test_end_to_end_budgets_absent_from_history_is_clean(tmp_path):
     assert findings == []
 
 
-# --- the guard: the instruction budgets document (issue #110) -----------------
+# --- the guard: the instruction budgets document ------------------------------
 
 
 def _instruction_budgets_document(schema=1):
@@ -999,10 +999,10 @@ def test_guard_nan_and_infinity_leaves_fail_closed_in_both_walks():
 
     json's reader hands NaN/Infinity literals back as FLOATS, past the
     parse_float hook that would have made them Decimals, so _is_number's
-    float arm must finite-check them. Before that check a poisoned
-    budget compared as a number and passed the down-only walk clean
-    (NaN, -Infinity never compare greater) or read as a genuine raise
-    (+Infinity).
+    float arm must finite-check them. Unchecked, a poisoned budget would
+    compare as a number: NaN and -Infinity never compare greater, so they
+    would pass the down-only walk clean, and +Infinity would read as a
+    genuine raise.
     """
     guard = _guard()
 
@@ -1157,7 +1157,7 @@ def test_read_document_refuses_a_non_regular_entry(tmp_path):
         guard.read_document(repo, "HEAD", ".github/ci-thresholds.json")
 
 
-# --- declared budget raises: the push route (issue #120) ---------------------
+# --- declared budget raises: the push route -----------------------------------
 
 
 def _declaration(document, key, was, to):
@@ -1281,11 +1281,11 @@ def test_end_to_end_rewritten_push_dropping_coverage_raise_is_flagged(tmp_path):
 
 def test_end_to_end_push_declared_raise_is_clean(tmp_path, capsys,
                                                  monkeypatch):
-    """The route issue #120 opens: a deliberate raise lands on main as
-    its own commit, its message carrying one Budget-Raise line per
-    raised leaf with the exact values the diff carries. The push
-    invocation (--allow-declared-raises) passes it; the clean run
-    prints no route hint."""
+    """The push route: a deliberate raise lands on main as its own commit,
+    its message carrying one Budget-Raise line per raised leaf with the
+    exact values the diff carries. The push invocation
+    (--allow-declared-raises) passes it; the clean run prints no route
+    hint."""
     repo = _seed_repo(tmp_path, _document(), budgets=_budgets_document())
     was = _budgets_document()["bytes"]["code_bytes"]
     raised = _budgets_document()
@@ -1367,11 +1367,11 @@ def test_end_to_end_push_declared_raise_requires_feat(
                                      "feat(charts): add a chart"])
 def test_end_to_end_pull_request_declared_raise_is_clean(tmp_path, capsys,
                                                          monkeypatch, subject):
-    """Issue #133 part 3: the PR route opens the same rules the push
-    route applies. The window is the merge commit's own commits
-    (HEAD^1..HEAD^2), so a pure raise commit carrying perfectly formed
-    declaration lines passes with a feat sibling: --allow-declared-raises
-    --route pr is the invocation the workflow's PR branch makes."""
+    """The PR route applies the same rules the push route applies. The
+    window is the merge commit's own commits (HEAD^1..HEAD^2), so a pure
+    raise commit carrying perfectly formed declaration lines passes with
+    a feat sibling: --allow-declared-raises --route pr is the invocation
+    the workflow's PR branch makes."""
     repo = _seed_repo(tmp_path, _document(), budgets=_budgets_document())
     was = _budgets_document()["bytes"]["code_bytes"]
     raised = _budgets_document()
@@ -1742,9 +1742,8 @@ def test_declaration_parser_rejects_non_finite_values():
 
 def test_end_to_end_snan_declaration_cannot_crash_the_guard(
         tmp_path, capsys, monkeypatch):
-    """Regression for the reviewer's crash: a declaration line carrying
-    sNaN must be a finding, never an uncaught decimal.InvalidOperation
-    from the consumption's comparisons."""
+    """A declaration line carrying sNaN must be a finding, never an
+    uncaught decimal.InvalidOperation from the consumption's comparisons."""
     repo = _seed_repo(tmp_path, _document(), budgets=_budgets_document())
     raised = _budgets_document()
     raised["bytes"]["code_bytes"] = 79700

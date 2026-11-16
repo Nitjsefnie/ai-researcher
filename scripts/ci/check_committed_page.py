@@ -4,11 +4,11 @@
     python3 scripts/ci/check_committed_page.py
 
 out/frontier-models.html gets its `Source commit <code>...</code>` footer
-stamp only when AI_RESEARCHER_AA_SOURCE_COMMIT is set at build time, and only the refresh
-workflow sets it -- so a page a contributor builds and commits by hand goes
-out stamp-less, and the hourly republish run then republishes that stamp-less
-page byte for byte (issue #105). This check runs in CI on every commit of
-the page and refuses one that
+stamp only when AI_RESEARCHER_AA_SOURCE_COMMIT is set at build time, and only
+the refresh workflow sets it -- so a page a contributor builds and commits by
+hand goes out stamp-less, and the hourly republish run would republish that
+stamp-less page byte for byte. This check runs in CI on every commit of the
+page and refuses one that
 
   (i)   does not carry exactly one well-shaped source-commit stamp, or
   (ii)  differs from a stamp-less rebuild of HEAD's committed data once
@@ -19,10 +19,9 @@ The check's subject is the COMMITTED tree. The rebuild stages data/ from
 HEAD (`git show HEAD:data/...`) rather than reading the working tree's,
 because the refresh runs this suite after capture but before the commit:
 during a refresh the working data/ holds the fresh uncommitted capture, and
-building from it judged HEAD's page against data it was never built from,
-going red on exactly the runs that had something to commit (issue #108).
-In CI the checkout IS the committed tree, so the `page` job judges the same
-thing it always has.
+building from it would judge HEAD's page against data it was never built
+from, going red on exactly the runs that have something to commit. In CI the
+checkout is the committed tree, so the `page` job judges it directly.
 
 Exit 0 when the committed page is well-stamped and byte-equal to its masked
 rebuild; 1 with one line per violated invariant otherwise -- a missing page,
@@ -132,16 +131,16 @@ def _git_show(path: str) -> bytes:
 def rebuild_page() -> str:
     """The page HEAD's committed data/ builds, stamp-less.
 
-    The check's subject is the committed tree (issue #108): the refresh
-    runs this suite after capture but before the commit, so during a
-    refresh the working data/ holds the fresh uncommitted capture, and a
-    rebuild that honored it judged HEAD's page against data it was never
-    built from. HEAD's two captures, captured-at stamp, generation state and
-    window marker are staged into a temp data/ dir. build's
-    module globals and AI_RESEARCHER_AA_SOURCE_COMMIT are restored no matter how the
-    build ends, so a failed rebuild cannot poison the caller's tree state.
-    A failed `git show` for a required input raises; for an optional input
-    it leaves that file absent, matching the capture gate's staging policy.
+    The check's subject is the committed tree: the refresh runs this suite
+    after capture but before the commit, so during a refresh the working data/
+    holds the fresh uncommitted capture, and a rebuild that honored it would
+    judge HEAD's page against data it was never built from. HEAD's two
+    captures, captured-at stamp, generation state and window marker are staged
+    into a temp data/ dir. build's module globals and
+    AI_RESEARCHER_AA_SOURCE_COMMIT are restored no matter how the build ends,
+    so a failed rebuild cannot poison the caller's tree state. A failed
+    `git show` for a required input raises; for an optional input it leaves
+    that file absent, matching the capture gate's staging policy.
     """
     with tempfile.TemporaryDirectory(prefix=".committed-page-",
                                      dir=build.ROOT) as tmp:

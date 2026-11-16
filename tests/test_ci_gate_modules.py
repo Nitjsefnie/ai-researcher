@@ -2,11 +2,11 @@
 
 The docs-only classification and the aggregate verdict are the two load-
 bearing decisions of ci-gate.yml, so both live in tested modules here
-rather than inline in the workflow. The tests pin the rule the issue
-names: documentation-only runs narrow the expensive legs by
-classification while every required check still reports, and the
-aggregate folds every leg's result into one verdict where a leg skipped
-BECAUSE docs-only passes and any other non-success fails.
+rather than inline in the workflow. The tests pin the rule:
+documentation-only runs narrow the expensive legs by classification
+while every required check still reports, and the aggregate folds every
+leg's result into one verdict where a leg skipped BECAUSE docs-only
+passes and any other non-success fails.
 """
 from __future__ import annotations
 
@@ -145,7 +145,7 @@ def _url(argv):
 
 
 def test_push_event_diffs_against_the_previous_main_sha():
-    # Normal behavior preserved: the newest completed main run before
+    # The newest completed main run before
     # this push executed its legs over `before` itself, so the verified
     # base IS `before` and the classified range is the push's own.
     calls = []
@@ -340,7 +340,7 @@ def test_docs_only_rename_yields_both_paths_and_stays_docs_only():
 
 def test_row_without_previous_filename_yields_one_path():
     # Control: a row that names no previous path projects exactly its
-    # own filename, as before.
+    # own filename.
     rows = [{"status": "added", "filename": "build_new.py"}]
 
     def run(argv):

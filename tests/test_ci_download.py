@@ -1,4 +1,4 @@
-"""The retry path for CI's tool and browser downloads (issue #395).
+"""The retry path for CI's tool and browser downloads.
 
 Faults are injected at the network boundary only: a local HTTP server that
 answers a scripted status, drops the connection mid-body or stalls, or a

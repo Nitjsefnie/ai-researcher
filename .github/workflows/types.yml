@@ -10,9 +10,8 @@ on:
     # Standalone dispatch runs (no ci-gate classification) run every job
     # unconditionally.
 
-# Trigger ownership moved to ci-gate.yml (issue #133): the push and
-# pull_request triggers, and their paths-ignore deny-list
-# (`**/*.md` / LICENSE / .gitignore), live there now — a trigger filter
+# The push and pull_request triggers, and their paths-ignore deny-list
+# (`**/*.md` / LICENSE / .gitignore), live in ci-gate.yml: a trigger filter
 # cannot report, so a required-check ruleset could never go green on a
 # documentation-only change. ci-gate classifies the changed paths and
 # conditions this leg on the result.
@@ -45,7 +44,7 @@ jobs:
       - name: Install pyright
         # There is deliberately no `pip install --upgrade pip` here: the
         # runner's stock pip installs the pinned manifests, so the unreviewed
-        # upgrade would be the one unpinned install in the job (issue #141).
+        # upgrade would be the one unpinned install in the job.
         run: |
           # requirements-test.txt too, or pyright cannot resolve playwright in
           # tests/test_browser.py and reports it as an error. The runtime is

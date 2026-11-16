@@ -1,7 +1,7 @@
 """Tripwires for contracts across the workflow catalogue.
 
 CodeQL init and analyze must use matching versions, and every job needs a
-timeout (issues #45 and #52). Dependabot groups the action bumps together.
+timeout. Dependabot groups the action bumps together.
 """
 from __future__ import annotations
 

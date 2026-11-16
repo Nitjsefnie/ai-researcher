@@ -151,8 +151,8 @@ def flush_page_coverage(cls):
 
 
 # Both tables' tbody DOM, cell-for-cell: className and textContent per
-# td, row order preserved -- one expression shared by the #97 drift test
-# and both dispute drift contracts, so every drift contract stays one
+# td, row order preserved -- one expression shared by the drift test and
+# both dispute drift contracts, so every drift contract stays one
 # comparison.
 TBODY_DOM = """(tid) => [...document.querySelectorAll(`#${tid} tbody tr`)]
   .map(tr => [...tr.children].map(td => [td.className, td.textContent]))"""
@@ -160,7 +160,7 @@ TBODY_DOM = """(tid) => [...document.querySelectorAll(`#${tid} tbody tr`)]
 
 class BrowserInteractionTests(unittest.TestCase):
     # pylint: disable=too-many-public-methods
-    # One behaviour, one test: #85's per-chart label-distinctness guarantee is
+    # One behaviour, one test: the per-chart label-distinctness guarantee is
     # a 21st method here, not a subTest of an unrelated test.
     # V8 coverage for the JavaScript ratchet. With AI_RESEARCHER_JS_COVERAGE_OUT set (the
     # coverage job sets it), every page this class creates records V8 block
@@ -176,18 +176,17 @@ class BrowserInteractionTests(unittest.TestCase):
         # prints OUT.relative_to(ROOT)) and keeps build.OUT pointed there for
         # the class's lifetime, since every test navigates
         # build.OUT.as_uri(). The real out/frontier-models.html is never
-        # touched (#114); tearDownClass restores the module path.
+        # touched; tearDownClass restores the module path.
         cls._saved_out = build.OUT
         # The directory outlives this setup -- tearDownClass cleans it up
         # after the browser closes -- so it cannot live in a with.
         cls._page_dir = tempfile.TemporaryDirectory(  # pylint: disable=consider-using-with
             prefix=".issue-114-browser-", dir=build.ROOT)
-        # Issue #226: the class's second fixture page, built from the in-run
-        # disputed capture the interaction pins must also hold on. The
-        # ambient capture is a quiet single-generation one, so the dispute
-        # paths never execute on it; a disputed hour publishes, and the
-        # disputed page is a first-class subject of these pins, not a
-        # separate class's property.
+        # The class's second fixture page, built from the in-run disputed capture
+        # the interaction pins must also hold on. The ambient capture is a quiet
+        # single-generation one, so the dispute paths never execute on it; a
+        # disputed hour publishes, and the disputed page is a first-class subject
+        # of these pins, not a separate class's property.
         cls._disputed_dir = tempfile.TemporaryDirectory(  # pylint: disable=consider-using-with
             prefix=".issue-226-disputed-", dir=build.ROOT)
         build.OUT = pathlib.Path(cls._page_dir.name) / "frontier-models.html"
@@ -260,8 +259,8 @@ class BrowserInteractionTests(unittest.TestCase):
 
     # The two captures the dispute-class interaction pins hold on: the
     # ambient single-generation capture, and the class's own in-run
-    # disputed fixture (issue #226) -- a disputed hour publishes, so the
-    # pins are disputed-capture pins too.
+    # disputed fixture -- a disputed hour publishes, so the pins are
+    # disputed-capture pins too.
     CAPTURES = ("ambient", "disputed")
 
     def _capture_page(self, capture):
@@ -284,9 +283,9 @@ class BrowserInteractionTests(unittest.TestCase):
         """A point locator that fails SAYING SO rather than timing out.
 
         `hover()` on a selector that matches nothing waits the full 30s and
-        reports a locator timeout -- which is what an emptied chart looked like
-        when AA dropped the cost slugs the coding axis was built on. Counting
-        first turns that into "the chart is empty", named, in under a second.
+        reports a locator timeout, which hides that the chart is empty.
+        Counting first turns that into "the chart is empty", named, in under
+        a second.
         """
         points = page.locator(selector)
         self.assertGreater(
@@ -498,11 +497,10 @@ class BrowserInteractionTests(unittest.TestCase):
         # models draw in de-emphasis gray), so every off-frontier point
         # draws var(--muted) on every chart, and every legend documents the
         # swatch, while a frontier point carries no verdict fill.
-        # Issue #226: the rule is pinned against the in-run disputed
-        # fixture capture too -- a disputed hour publishes, and the
-        # disputed encoding's red variant marks are the one fill the
-        # de-emphasis set must admit (only on circles the page actually
-        # marks disputed, checked inside the body).
+        # The rule is pinned against the in-run disputed fixture capture too
+        # -- a disputed hour publishes, and the disputed encoding's red variant
+        # marks are the one fill the de-emphasis set must admit (only on
+        # circles the page actually marks disputed, checked inside the body).
         for capture in self.CAPTURES:
             with self.subTest(capture=capture):
                 self._de_emphasis_gray_holds(capture)
@@ -518,7 +516,7 @@ class BrowserInteractionTests(unittest.TestCase):
                         f"#svg-{chart} circle.pt[r='5']",
                     )
                     # A var(--dispute) FILL is the disputed encoding's
-                    # second-generation point (#226) and nothing else: the
+                    # second-generation point and nothing else: the
                     # de-emphasis set admits it only on a circle the page
                     # actually marks disputed -- on a plain off-frontier
                     # point it is still a bug.
@@ -565,11 +563,11 @@ class BrowserInteractionTests(unittest.TestCase):
             page.close()
 
     def test_the_disputed_fixture_renders_its_dispute_matrix(self):
-        # Issue #226's fixture matrix, asserted on the RENDERED disputed
+        # The disputed fixture's matrix, asserted on the RENDERED disputed
         # page: red "a / b" pairs exactly where two generations published
         # different values for a field (score and cost on the value row,
         # the presence rows' "value / —", the price-only and context-only
-        # rows in their own columns), and today's single value where a
+        # rows in their own columns), and the single value where a
         # generation merely fills the other's missing field or the two
         # generations agree -- red marks a real published disagreement and
         # nothing else. Chart marks answer the same test per ROW: only the
@@ -665,13 +663,13 @@ class BrowserInteractionTests(unittest.TestCase):
             page.close()
 
     def test_pinned_names_stay_labelled_on_every_chart(self):
-        # #27: a pin is an explicit reader request. The capability charts
+        # A pin is an explicit reader request. The capability charts
         # guarantee a pinned label with a last-resort clamp; the intelligence
-        # chart used to drop pinned names the same view kept labelled
+        # chart must not drop pinned names the same view keeps labelled
         # elsewhere. Every pinned name must be visible on every chart that
         # draws the pinned point. A pin is page-global, so pins made on one
         # chart must also survive wherever the pinned row renders on another.
-        # #153: the page is this test's own deterministic fixture, and every
+        # The page is this test's own deterministic fixture, and every
         # expectation -- which names exist, how many are pickable -- derives
         # from that fixture, never from the ambient capture. AA's rollout size
         # moves freely, so pin expectations read off the live page break in
@@ -680,20 +678,19 @@ class BrowserInteractionTests(unittest.TestCase):
         chart_labels = {"coding": "Coding Agent Index",
                         "intelligence": "Intelligence Index",
                         "parameters": "Parameter efficiency"}
-        # 40 probe pins on the intelligence chart -- the crowd the audit used,
-        # enough to exhaust the clear slots -- plus a couple on every other
-        # chart so each chart guarantees its own pins. Agent-run rows never
-        # share names with model rows, so the coding chart can only pin its
-        # own rows. Two more crafted intelligence pins carry the name shapes
-        # the crowd lacks: full names over the 34-character chart cap (the
-        # #27 guarantee is the FULL pinned name -- wide labels render r.name
-        # unclipped, so a truncation regression must red here), a shared long
-        # prefix pressuring distinctness, an effort suffix that must survive
-        # display_name, and Unicode. A crafted coding agent carries the same
-        # shape onto the coding chart. The picks are looked up on the page BY
-        # the fixture's own names, and the label checks hold those exact
-        # strings -- long ones included -- so nothing but the full name
-        # passes.
+        # 40 probe pins on the intelligence chart, enough to exhaust the clear
+        # slots, plus a couple on every other chart so each chart guarantees
+        # its own pins. Agent-run rows never share names with model rows, so
+        # the coding chart can only pin its own rows. Two more crafted
+        # intelligence pins carry the name shapes the probe pins lack: full
+        # names over the 34-character chart cap (the pin guarantee is the FULL
+        # pinned name -- wide labels render r.name unclipped, so a truncation
+        # regression must red here), a shared long prefix pressuring
+        # distinctness, an effort suffix that must survive display_name, and
+        # Unicode. A crafted coding agent carries the same shape onto the
+        # coding chart. The picks are looked up on the page BY the fixture's
+        # own names, and the label checks hold those exact strings -- long
+        # ones included -- so nothing but the full name passes.
         pin_long = "Probe Dynamics Ultra Long Benchmark Model Alpha (Reasoning)"
         pin_unicode = "Probe Dynamics Ultra Long Benchmark Model Ünïcödé — 東京"
         crafted = [
@@ -846,13 +843,12 @@ class BrowserInteractionTests(unittest.TestCase):
                 page.close()
 
     def test_unpinned_labels_still_refuse_when_no_clear_space(self):
-        # #27's flip side, as a guard: the pin fallback must stay pin-only.
-        # Thirty-one unpinned models crowd one spot (plus one anchor so the
-        # y-scale is not degenerate); the placer offers each label exactly 14
-        # candidate offsets from its dot, so at most 15 labels can ever place
-        # here whatever the platform's font metrics are -- well under the 31
-        # points. If this ever exceeds the bound, unpinned labels have begun
-        # overlapping, which the placer is designed to refuse.
+        # The pin fallback must stay pin-only. Thirty-one unpinned models crowd
+        # one spot (plus one anchor so the y-scale is not degenerate); the placer
+        # offers each label exactly 14 candidate offsets from its dot, so at most
+        # 15 labels can ever place here whatever the platform's font metrics are
+        # -- well under the 31 points. If this ever exceeds the bound, unpinned
+        # labels have begun overlapping, which the placer is designed to refuse.
         page = self.browser.new_page(viewport={"width": 1280, "height": 900})
         cluster = []
         for i in range(30):
@@ -909,10 +905,10 @@ class BrowserInteractionTests(unittest.TestCase):
                 page.close()
 
     def test_missing_lab_renders_as_em_dash_on_every_surface(self):
-        # #28: a coding-agent run whose capture record carries no creator
+        # A coding-agent run whose capture record carries no creator
         # (today's Devin Fusion CLI rows: display carries agent/model but no
         # creator) must render the em dash everywhere -- never a blank
-        # option, cell or export field (AGENTS.md). #159: the page is this
+        # option, cell or export field (AGENTS.md). The page is this
         # test's own deterministic fixture and every expectation -- which
         # rows exist and how many match -- derives from it, never from the
         # ambient capture, so AA republishing a different Devin run count
@@ -1028,14 +1024,13 @@ class BrowserInteractionTests(unittest.TestCase):
                 page.close()
 
     def test_tooltip_secondary_rows_identical_across_charts(self):
-        # #29: one record must read the same wherever it is hovered. Every
+        # One record must read the same wherever it is hovered. Every
         # tooltip shares one secondary-row builder; the chart's own metric
         # rows stay chart-specific and first.
-        # Issue #226: pinned against the in-run disputed fixture capture
-        # too -- a disputed hour publishes, and a disputed row's circles
-        # (the canonical anchor plus any second-generation point) must all
-        # carry the canonical pin label, or this pin crashes building its
-        # name sets before it hovers anything.
+        # Pinned against the in-run disputed fixture capture too -- a disputed
+        # hour publishes, and a disputed row's circles (the canonical anchor plus
+        # any second-generation point) must all carry the canonical pin label, or
+        # this pin crashes building its name sets before it hovers anything.
         for capture in self.CAPTURES:
             with self.subTest(capture=capture):
                 self._tooltip_secondary_rows_match(capture)
@@ -1062,7 +1057,7 @@ class BrowserInteractionTests(unittest.TestCase):
                 self.assertNotIn('"', name)
                 # A disputed row's circles share the canonical pin label;
                 # hovering the first -- the canonical anchor -- is hovering
-                # the row either way (#226).
+                # the row either way.
                 page.locator(
                     f'#svg-{chart} circle.pt[aria-label="{aria}"]'
                 ).first.hover()
@@ -1075,11 +1070,10 @@ class BrowserInteractionTests(unittest.TestCase):
                     "sel => [...document.querySelectorAll(sel)]"
                     ".map(c => c.getAttribute('aria-label'))",
                     f"#svg-{chart} circle.pt")
-                # Issue #226: every circle.pt carries a label -- the
-                # disputed encoding's second-generation marks included. A
-                # disputed point still has canonical values to be labelled
-                # by, and a label-less point breaks this pin before it
-                # hovers anything.
+                # Every circle.pt carries a label -- the disputed encoding's
+                # second-generation marks included. A disputed point still has
+                # canonical values to be labelled by, and a label-less point
+                # breaks this pin before it hovers anything.
                 self.assertTrue(
                     aris and all(aris),
                     f"{chart}: circle.pt without an aria-label: "
@@ -1147,8 +1141,8 @@ class BrowserInteractionTests(unittest.TestCase):
             "slug": "audit-model",
             "intelligenceIndex": 51,
             # The CURRENT field name: the empty-axis guard refuses a capture
-            # still carrying the pre-rename `totalParameters` (issue #60), so
-            # a stale name here would fail the build before the browser opens.
+            # still carrying the stale `totalParameters`, so a stale name
+            # here would fail the build before the browser opens.
             "parameters": 27,
             "intelligenceIndexCostPerTask": {
                 "cost": {"total": 0.75},
@@ -1273,20 +1267,18 @@ class BrowserInteractionTests(unittest.TestCase):
         return cells
 
     def test_copy_as_markdown_escapes_markdown_significant_cell_text(self):
-        # #48: the markdown export interpolated raw captured strings into a
-        # markdown table, where a literal pipe closes the cell, a backtick
-        # opens a code span and a backslash reads as an escape -- so a pasted
-        # row fell apart as text. Cells now carry the escaped display text.
+        # Markdown export cells carry the escaped display text: in a markdown
+        # table a literal pipe would close the cell, a backtick would open a
+        # code span and a backslash would read as an escape, so a pasted row of
+        # raw captured strings would fall apart as text.
         tmp, saved, page = self._hostile_export_page()
         try:
             page.locator("#copyMd").click()
             md = page.evaluate("() => window.__copied")
             self.assertIsNotNone(md)
-            # The exported name is the page's display name now (#88), not the
-            # raw capture string: display_name's kept-group rule renders the
-            # fixture's glued "alert(1)" as "alert (1)". This updates the #48
-            # pin's expected NAME value deliberately -- issue #88 changed the
-            # name rule; every escaping assertion below is untouched.
+            # The exported name is the page's display name, not the raw
+            # capture string: display_name's kept-group rule renders the
+            # fixture's glued "alert(1)" as "alert (1)".
             expected = build.display_name(self.HOSTILE_NAME)
             self.assertNotEqual(expected, self.HOSTILE_NAME)
             escaped = (expected.replace("\\", "\\\\")
@@ -1322,17 +1314,16 @@ class BrowserInteractionTests(unittest.TestCase):
             tmp.cleanup()
 
     def test_copy_as_json_keeps_raw_values_and_documents_the_rawness(self):
-        # #48's documented alternative: the JSON export stays RAW -- structured
-        # data goes out exactly as captured -- and the rawness is documented
-        # where the reader of the button sees it (the button's title).
+        # The JSON export stays RAW -- structured data goes out exactly as
+        # captured -- and the rawness is documented where the reader of the
+        # button sees it (the button's title).
         tmp, saved, page = self._hostile_export_page()
         try:
             page.locator("#copyJson").click()
             exported = json.loads(page.evaluate("() => window.__copied"))
-            # The name field carries the page's display name now (#88) -- the
-            # same value the table and tooltips show; the rawness this pin
-            # holds the export to applies to every value the page carries,
-            # and every other assertion here is untouched.
+            # The name field carries the page's display name -- the same
+            # value the table and tooltips show; the rawness this pin holds
+            # the export to applies to every value the page carries.
             expected = build.display_name(self.HOSTILE_NAME)
             rows = [m for m in exported["models"]
                     if m["name"] == expected]
@@ -1352,10 +1343,10 @@ class BrowserInteractionTests(unittest.TestCase):
             tmp.cleanup()
 
     def test_empty_filter_result_renders_an_announced_empty_state(self):
-        # #58: an empty filtered slice used to render a silent zero-row table
-        # -- the reader could not tell "nothing matches" from a broken page.
-        # The table region now carries an aria-live empty state, announced
-        # when the filtered slice empties and gone when rows return.
+        # An empty filtered slice must not render a silent zero-row table: the
+        # reader could not tell "nothing matches" from a broken page. The table
+        # region carries an aria-live empty state, announced when the filtered
+        # slice empties and gone when rows return.
         page = self.browser.new_page(viewport={"width": 1280, "height": 900})
         page.goto(build.OUT.as_uri())
         empty = page.locator("#tblEmpty")
@@ -1375,11 +1366,10 @@ class BrowserInteractionTests(unittest.TestCase):
         page.close()
 
     def test_tooltip_transition_honours_prefers_reduced_motion(self):
-        # #57: the tooltip's opacity fade ran unconditionally. Under
-        # prefers-reduced-motion the transition must be gone entirely so the
-        # tooltip appears and vanishes instantly. The bound is page-wide:
-        # the copy toast's fade is the same class of motion and is held to
-        # the same rule.
+        # The tooltip's opacity fade must not run under prefers-reduced-motion:
+        # the transition must be gone entirely so the tooltip appears and vanishes
+        # instantly. The bound is page-wide: the copy toast's fade is the same
+        # class of motion and is held to the same rule.
         page = self.browser.new_page(viewport={"width": 1280, "height": 900})
         page.goto(build.OUT.as_uri())
         duration = ("getComputedStyle(document.getElementById"
@@ -1403,17 +1393,15 @@ class BrowserInteractionTests(unittest.TestCase):
     # getComputedTextLength() under the same .lbl class so the font metrics
     # match to the pixel.
     #
-    # The text rule mirrors assignLabels' narrow path (#85), which REPLACES
-    # the plain 34-char name truncation the #84 pin replayed: the compact
+    # The text rule mirrors assignLabels' narrow path: the compact
     # build-time label (r.label) first, the full AA name re-truncated when
     # the compact form is ambiguous (two rows compacting alike) or its
     # truncated text is already taken on this chart, a numeric suffix when
-    # that collides too. This updates the #84 pin deliberately -- issue #85
-    # changed the text rule; the placement rule is untouched. The replay runs
-    # with no pins and st.sup off, so every replayed label is narrow and the
-    # queue IS the whole allocation order. r.label is read from the page's
-    # top-level `const DATA` -- a global lexical binding, reachable from
-    # page.evaluate -- matched to replay points by name.
+    # that collides too. The replay runs with no pins and st.sup off, so
+    # every replayed label is narrow and the queue IS the whole allocation
+    # order. r.label is read from the page's top-level `const DATA` -- a
+    # global lexical binding, reachable from page.evaluate -- matched to
+    # replay points by name.
     _REPLAY_NEAREST_CLEAR_SLOT = """(chartId) => {
       const svg = document.getElementById(chartId);
       const dom = [...svg.querySelectorAll("text.lbl")].map(t => ({
@@ -1491,28 +1479,25 @@ class BrowserInteractionTests(unittest.TestCase):
     }"""
 
     def test_capability_labels_take_the_nearest_clear_slot(self):
-        # #84: the capability placer walked its candidates in generation
-        # order -- right(-16), left(-16), right(0), left(0), right(16),
-        # left(16) -- so one blocked slot threw a label to the far side of
-        # its dot (a full truncated-label width, ~215px on the live capture)
-        # while nearer slots on the SAME side sat clear. The intelligence
-        # chart has sorted candidates by distance since 9c74397; the placer
-        # must drift a label only as far as the crowd genuinely forces it.
-        # Issue #226: pinned against the in-run disputed fixture capture
-        # too -- a disputed row's own variant points never block their own
-        # row's label, so the replay must judge clearance per ROW, the way
-        # the page does, not per DOM circle.
+        # The intelligence chart sorts candidates by distance; the capability
+        # placer must likewise drift a label only as far as the crowd
+        # genuinely forces it: one blocked slot must not throw a label to the
+        # far side of its dot (a full truncated-label width) while nearer
+        # slots on the SAME side sit clear.
+        # Pinned against the in-run disputed fixture capture too -- a
+        # disputed row's own variant points never block their own row's
+        # label, so the replay must judge clearance per ROW, the way the page
+        # does, not per DOM circle.
         for capture in self.CAPTURES:
             with self.subTest(capture=capture):
                 self._labels_take_the_nearest_clear_slot(capture)
 
-        # #84's first invariant, same ambient page: a click that does not
-        # change which points are drawn must leave every label exactly
-        # where it was. Table sort is the page's pure no-op control; a
-        # Hide-superseded round trip must restore the identical layout,
-        # because the placer is a pure function of the drawn state. The
-        # click-stability contract is dispute-independent, so it runs once,
-        # on the ambient page.
+        # A click that does not change which points are drawn must leave
+        # every label exactly where it was. Table sort is the page's pure
+        # no-op control; a Hide-superseded round trip must restore the
+        # identical layout, because the placer is a pure function of the
+        # drawn state. The click-stability contract is dispute-independent,
+        # so it runs once, on the ambient page.
         page = self._capture_page("ambient")
         try:
             with self.subTest(phase="no-op clicks"):
@@ -1582,14 +1567,10 @@ class BrowserInteractionTests(unittest.TestCase):
             page.close()
 
     def test_chart_labels_are_distinct_on_every_chart(self):
-        # #85: a chart label identifies exactly one row. Four effort variants
-        # of Claude Opus 5.5 shared a 33-char name prefix, so all four
-        # frontier rows rendered the identical truncated text on the
-        # intelligence chart, and a Codex row's dict-repr effort group ate 28
-        # of the 34 label characters. A collision means a reader cannot tell
-        # which row a label names, so every chart's rendered label list must
-        # be non-empty (the assertion must not pass vacuously on an emptied
-        # chart) and all-distinct.
+        # A chart label identifies exactly one row: a collision means a reader
+        # cannot tell which row a label names. So every chart's rendered label
+        # list must be non-empty (the assertion must not pass vacuously on an
+        # emptied chart) and all-distinct.
         page = self.browser.new_page(viewport={"width": 1280, "height": 900})
         page.goto(build.OUT.as_uri())
         for chart in ("coding", "intelligence", "parameters"):
@@ -1605,9 +1586,9 @@ class BrowserInteractionTests(unittest.TestCase):
         page.close()
 
     def test_a_truncated_name_collision_takes_a_numeric_suffix(self):
-        # #85's last resort: two frontier rows whose compact labels and full
-        # names truncate to the same 34-character text -- the second gets a
-        # numeric suffix, so the chart's labels stay distinct.
+        # The label rule's last resort: two frontier rows whose compact labels
+        # and full names truncate to the same 34-character text -- the second
+        # gets a numeric suffix, so the chart's labels stay distinct.
         base = "Probe Collision Benchmark Model Alpha"
         models = [dict(test_build.model_fixture(intelligence=60, slug="collide-a"),
                        name=base + " One"),
@@ -1635,10 +1616,10 @@ class BrowserInteractionTests(unittest.TestCase):
         self.assertEqual(sorted(labels), [stem, stem + " (2)"])
 
     def test_table_name_cells_carry_no_dict_effort_text(self):
-        # #88: AA's dict-form effort text must not reach the table -- the
-        # accessible twin of the tooltip, and the surface readers who cannot
-        # hover get their names from. The pin runs over every rendered name
-        # cell, so one dict row in the payload fails it.
+        # AA's dict-form effort text must not reach the table -- the accessible
+        # twin of the tooltip, and the surface readers who cannot hover get their
+        # names from. The pin runs over every rendered name cell, so one dict row
+        # in the payload fails it.
         page = self.browser.new_page(viewport={"width": 1280, "height": 900})
         page.goto(build.OUT.as_uri())
         cells = page.locator("#tbl td.name")
@@ -1649,11 +1630,8 @@ class BrowserInteractionTests(unittest.TestCase):
         page.close()
 
     def test_the_static_tbody_serves_the_data_without_javascript(self):
-        # #97: both tbody elements used to ship empty -- every data row was
-        # built client-side, so a visitor with JavaScript disabled got page
-        # chrome and no data. build.py now renders both bodies at build time
-        # in the page's default state, so the documented accessible twin is
-        # reachable without JS.
+        # build.py renders both tbody elements at build time in the page's
+        # default state, so the documented accessible twin is reachable without JS.
         page = self.browser.new_page(
             viewport={"width": 1280, "height": 900}, java_script_enabled=False)
         page.goto(build.OUT.as_uri())
@@ -1705,11 +1683,11 @@ class BrowserInteractionTests(unittest.TestCase):
         return page.evaluate(self._TBODY_DOM, table_id)
 
     def test_the_static_tbody_matches_the_js_rendered_tbody_cell_for_cell(self):
-        # #97's drift guard: the rows build.py renders statically must be
-        # exactly the rows the page's own script builds in its default state
-        # -- same cells, same classes, same order. Any Python/JS formatter
-        # drift fails here cell-for-cell rather than shipping a static table
-        # that disagrees with the interactive one.
+        # Drift guard: the rows build.py renders statically must be exactly the
+        # rows the page's own script builds in its default state -- same cells,
+        # same classes, same order. Any Python/JS formatter drift fails here
+        # cell-for-cell rather than shipping a static table that disagrees with
+        # the interactive one.
         on = self.browser.new_page(viewport={"width": 1280, "height": 900})
         off = self.browser.new_page(
             viewport={"width": 1280, "height": 900}, java_script_enabled=False)
@@ -1728,9 +1706,9 @@ class BrowserInteractionTests(unittest.TestCase):
         off.close()
 
     def test_footer_carries_a_licence_note_linking_the_licence(self):
-        # #69 (page half): the generated page ships under the repo's MIT
-        # licence but never said so. The footer now carries the one-line
-        # copyright/licence note, linking the licence blob on GitHub.
+        # The generated page ships under the repo's MIT licence, so the footer
+        # carries the one-line copyright/licence note, linking the licence blob
+        # on GitHub.
         page = self.browser.new_page(viewport={"width": 1280, "height": 900})
         page.goto(build.OUT.as_uri())
         foot = page.locator(".foot")
@@ -1761,11 +1739,11 @@ class BrowserInteractionTests(unittest.TestCase):
         return (hi + 0.05) / (lo + 0.05)
 
     def test_light_theme_text_surfaces_meet_wcag_aa_contrast(self):
-        # #56: light-theme table headers (--muted on --surface-1) and the
-        # frontier tags (--accent on the same surface) sat below the 4.5:1
-        # WCAG AA floor for their sizes. The ratio is computed here from the
-        # computed styles over the WCAG 2.x relative-luminance formula -- the
-        # test never trusts a pinned number.
+        # Light-theme table headers (--muted on --surface-1) and the frontier
+        # tags (--accent on the same surface) must clear the 4.5:1 WCAG AA floor
+        # for their sizes. The ratio is computed here from the computed styles
+        # over the WCAG 2.x relative-luminance formula -- the test never trusts a
+        # pinned number.
         page = self.browser.new_page(viewport={"width": 1280, "height": 900})
         page.goto(build.OUT.as_uri())
         page.evaluate("document.documentElement.dataset.theme = 'light'")
@@ -1797,14 +1775,13 @@ class BrowserInteractionTests(unittest.TestCase):
                 f"AA 4.5:1 floor (fg={pair['fg']}, bg={pair['bg']})")
 
     def test_dispute_red_meets_the_contrast_the_css_comment_claims(self):
-        # Issue #208's CSS comment states its own ratios -- 4.68:1 for the
-        # light text and the light mark, 3.62:1 for the mark on dark,
-        # 4.92:1 for the stepped dark text -- and they are pinned here by
-        # recomputing them from the hexes the stylesheet ships, so a retint
-        # that drops below the WCAG floors, or drifts from the comment,
-        # fails. The var() chain is pinned with them, so the computed ratio
-        # is what td.n.dispute and the tooltip's dispute rows actually
-        # render.
+        # The stylesheet's CSS comment states its own ratios -- 4.68:1 for the
+        # light text and the light mark, 3.62:1 for the mark on dark, 4.92:1 for
+        # the stepped dark text -- and they are pinned here by recomputing them
+        # from the hexes the stylesheet ships, so a retint that drops below the
+        # WCAG floors, or drifts from the comment, fails. The var() chain is
+        # pinned with them, so the computed ratio is what td.n.dispute and the
+        # tooltip's dispute rows actually render.
         css = build.TEMPLATE
 
         def token_hexes(token):
@@ -1878,7 +1855,7 @@ perf_budgets = _load_perf_budgets()
 
 
 class PerfBudgetTests(unittest.TestCase):
-    """The CI gate for issue #109's tighten-only perf ratchet.
+    """The CI gate for the tighten-only perf ratchet.
 
     This class runs in the coverage job; the 3x2 matrix --ignores
     tests/test_browser.py, so this is where CI enforces the committed
@@ -1892,11 +1869,11 @@ class PerfBudgetTests(unittest.TestCase):
     checkout's own.
 
     The gated page is built from this class's own DETERMINISTIC fixture
-    capture (#153), never the ambient data/: budgets measure code cost
-    and must be capture-size-invariant (issue #112), but AA's rollout size
-    moves the scale underneath a page built from the ambient capture. The
-    fixture is byte-identical every run, so the gate judges ONE fixed
-    workload against the committed ceilings, whatever AA ships.
+    capture, never the ambient data/: budgets measure code cost and must
+    be capture-size-invariant, but AA's rollout size moves the scale
+    underneath a page built from the ambient capture. The fixture is
+    byte-identical every run, so the gate judges ONE fixed workload against
+    the committed ceilings, whatever AA ships.
     """
 
     @classmethod
@@ -1905,14 +1882,13 @@ class PerfBudgetTests(unittest.TestCase):
         # keeps build.OUT pointed there for the class's lifetime -- the
         # journey test navigates build.OUT.as_uri() and gates
         # build.OUT.read_bytes(). The real out/frontier-models.html is
-        # never touched (#114); tearDownClass restores the module path.
+        # never touched; tearDownClass restores the module path.
         # The source stamp is stripped for the build so the bytes this
         # class gates are the canonical stamp-less build, whatever the
         # ambient environment carries. The capture behind the build is
-        # the class's deterministic fixture (#153): a fixed synthetic the
+        # the class's deterministic fixture: a fixed synthetic the
         # committed ceilings evaluate, written into the temp dir so the
-        # ambient data/ never reaches
-        # the gate.
+        # ambient data/ never reaches the gate.
         cls._saved = (build.RAW, build.AGENTS_RAW, build.OUT)
         # The directory outlives this setup -- tearDownClass cleans it up
         # after the browser closes -- so it cannot live in a with.
@@ -2021,7 +1997,7 @@ class PerfBudgetTests(unittest.TestCase):
         return gated
 
     def test_row_free_metrics_are_identical_across_capture_sizes(self):
-        """Decoupling proof (issue #112): the SAME code built against a
+        """Decoupling proof: the SAME code built against a
         small (~8 rows) and a large (~60 rows) synthetic capture must
         weigh the same in code bytes and cost the same in hover tooltip
         work -- the two gated metrics that are row-free by construction
@@ -2061,9 +2037,9 @@ class PerfBudgetTests(unittest.TestCase):
 
     def test_the_gate_passes_on_the_preceding_capture_without_budget_edit(
             self):
-        """Decoupling proof, live repro (issue #112): --check over the
-        686-model capture that preceded main's growth passes against the
-        committed budgets with no budget edit."""
+        """Decoupling proof, live repro: --check over the 686-model
+        capture that preceded main's growth passes against the committed
+        budgets with no budget edit."""
         models_686, agents_686 = self._preceding_capture_blobs()
         if models_686 is None or agents_686 is None:
             self.skipTest("shallow checkout: the pre-growth capture blob "
@@ -2113,12 +2089,12 @@ class PerfBudgetTests(unittest.TestCase):
 
 
 # The pin crowd test_pinned_names_stay_labelled_on_every_chart pins on the
-# intelligence chart: the audit's count (#27), large enough to exhaust the
-# clear slots so the clamp fallback is the only option. A property of the
-# test's own fixture -- never of the ambient capture (#153).
+# intelligence chart: a count large enough to exhaust the clear slots, so the
+# clamp fallback is the only option. A property of the test's own fixture --
+# never of the ambient capture.
 PIN_CROWD = 40
 
-# The row count of PerfBudgetTests' deterministic fixture capture (#153).
+# The row count of PerfBudgetTests' deterministic fixture capture.
 # Measured on this box, 8 runs: code_bytes 78687 against the committed 79700;
 # long_task_count maxima load 1 / filter 1 / sort 1 / hover 0 against the
 # committed 2 / 2 / 2 / 1; hover dom_nodes_mutated 32 against the committed
@@ -2177,7 +2153,7 @@ if __name__ == "__main__":
 
 
 class ZeroScoreBrowserTests(unittest.TestCase):
-    """Issue #146 in a real browser: a zero capability score is a legal AA
+    """In a real browser: a zero capability score is a legal AA
     publication, and the JS fillFrontiers cell for a zero-score frontier row
     must render the em dash the static render shows -- "$Infinity" would
     fail the drift contract and read as a real price. A dedicated class
@@ -2272,12 +2248,11 @@ def _disputed_probe_model():
     return probe
 
 
-# Issue #226's disputed-capture fixture (_in_run_disputed_models): the
-# shape refresh run 37682958494 (2026-10-07T20:33Z) captured and the suite
-# then failed six tests against -- five models carrying `genVariants`
-# across two generations, in the encoding the page's dispute layer reads.
+# The disputed-capture fixture (_in_run_disputed_models): the shape a
+# refresh run captured -- five models carrying `genVariants` across two
+# generations, in the encoding the page's dispute layer reads.
 # It lives in the suite permanently, so a disputed capture can never fail
-# these pins again without a red suite here.
+# these pins without a red suite here.
 
 
 def _carried_variant_map(model):
@@ -2334,11 +2309,10 @@ DISPUTED_FIXTURE_AGENTS = list(_PROBE_AGENTS) + [
 
 
 def _in_run_disputed_models(total=14):
-    """Issue #226's disputed-capture fixture: the shape refresh run
-    37682958494 (2026-10-07T20:33Z) captured and the suite then failed six
-    tests against -- five models carrying `genVariants` across two
-    generations -- plus one fixture entry per detection branch of the
-    page's dispute layer, one varied property per entry.
+    """The disputed-capture fixture: the shape a refresh run captured --
+    five models carrying `genVariants` across two generations -- plus one
+    fixture entry per detection branch of the page's dispute layer, one
+    varied property per entry.
 
     The run's five: four cross-run readded records (the empty map FIRST --
     the previous generation did not carry the model) and one genuine value
@@ -2366,7 +2340,7 @@ def _in_run_disputed_models(total=14):
     })
     models[2] = _variant_probe_model(models[2], [carried[2], second])
     # Pad LAST: the same presence dispute, pad side the one varied
-    # property (#211's original encoding).
+    # property.
     models[5] = _variant_probe_model(models[5], [carried[5], {}])
     # Agreeing generations: genVariants present, nothing disputed -- every
     # field renders today's single value and the charts draw no marks.
@@ -2390,8 +2364,8 @@ def _in_run_disputed_models(total=14):
 
 
 class DisputeBrowserTests(unittest.TestCase):
-    """Issue #208 in a browser on a synthetic two-generation capture. The
-    class exists as its own fixture-built page for the same reason
+    """The dispute layer in a browser on a synthetic two-generation capture.
+    The class exists as its own fixture-built page for the same reason
     ZeroScoreBrowserTests does: the dispute JS paths never execute on a
     single-generation page, so without coverage wiring the JavaScript
     ratchet reads them as uncovered and reds the coverage job."""
@@ -2538,10 +2512,10 @@ class DisputeBrowserTests(unittest.TestCase):
         page.close()
 
     def test_the_static_tbody_equals_the_js_tbody_on_the_disputed_page(self):
-        # #97's drift contract, extended to the dispute cells: the rows
-        # build.py renders statically must be exactly the rows fillTable /
-        # fillFrontiers build in the default state, cell-for-cell --
-        # className and textContent both.
+        # The drift contract also covers the dispute cells: the rows build.py
+        # renders statically must be exactly the rows fillTable / fillFrontiers
+        # build in the default state, cell-for-cell -- className and textContent
+        # both.
         on = self._loaded_page()
         off = self.browser.new_page(
             viewport={"width": 1280, "height": 900}, java_script_enabled=False)
@@ -2650,10 +2624,10 @@ class DisputeBrowserTests(unittest.TestCase):
 
 
 def _presence_probe_model():
-    """_probe_models(1)[0] widened into a PRESENCE-disputed record (issue
-    #211): variant 2 is the EMPTY map -- that generation does not carry the
-    model at all -- and variant 1 is the carried generation's full map,
-    never `{}` by construction."""
+    """_probe_models(1)[0] widened into a PRESENCE-disputed record:
+    variant 2 is the EMPTY map -- that generation does not carry the model
+    at all -- and variant 1 is the carried generation's full map, never
+    `{}` by construction."""
     probe = _probe_models(1)[0]  # ii 80.0, cost 0.5
     probe.update({
         "contextWindowTokens": 200000,
@@ -2668,7 +2642,7 @@ def _presence_probe_model():
 
 
 class PresenceDisputeBrowserTests(unittest.TestCase):
-    """Issue #211 in a browser: a presence-disputed row -- one variant the
+    """In a browser: a presence-disputed row -- one variant the
     empty map -- keeps exactly today's marks (the canonical anchor's red
     ring; no second point, no connector) while every carried field renders
     its "value / —" pair red. Sibling of DisputeBrowserTests with the same

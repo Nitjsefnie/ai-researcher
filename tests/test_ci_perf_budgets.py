@@ -1,4 +1,4 @@
-"""Tests for the performance-budgets loader and gate (issue #109).
+"""Tests for the performance-budgets loader and gate.
 
 The pure half of scripts/ci/perf_budgets.py and the measurement's temp
 wiring. Playwright is replaced at the driver boundary for the wiring
@@ -117,7 +117,7 @@ def _document():
     """A valid budgets document: maxima over every gated metric.
 
     The load/filter/sort records carry NO dom_nodes_mutated budget --
-    those counts are measured and reported only (issue #112, option A).
+    those counts are measured and reported only.
     """
     return {
         "schema_version": 1,
@@ -184,8 +184,8 @@ def test_valid_document_loads(tmp_path):
 
 def test_report_only_byte_counts_are_unknown_fields_in_a_budget(tmp_path):
     # bytes.raw / bytes.gzip are dominated by the capture: the ratchet
-    # must refuse to budget them, exactly like wall_ms_median (issue
-    # #112 -- data-coupled leaves never enter the document).
+    # must refuse to budget them, exactly like wall_ms_median
+    # (data-coupled leaves never enter the document).
     payload = _document()
     payload["bytes"]["raw"] = 248000
     with pytest.raises(ValueError, match="unknown field: raw"):
@@ -195,7 +195,7 @@ def test_report_only_byte_counts_are_unknown_fields_in_a_budget(tmp_path):
 def test_load_dom_budget_is_an_unknown_field(tmp_path):
     # The load journey's mutation count carries the capture's frontier
     # geometry (fillFrontiers' frontier rows): it is measured and
-    # reported, never gated (issue #112, option A).
+    # reported, never gated.
     payload = _document()
     payload["journeys"]["load"]["dom_nodes_mutated"] = 8700
     with pytest.raises(ValueError,
@@ -382,7 +382,7 @@ def test_gate_ignores_report_only_metrics():
     # wall_ms_median rides along in every measurement journey and is
     # never gated -- even a huge wall cannot produce a finding. The
     # load/filter/sort DOM counts are the same class of report-only
-    # number (issue #112): measured, reported, never judged.
+    # number: measured, reported, never judged.
     measurement = _measurement(**{"journeys.load.wall_ms_median": 99999.0},
                                **{"journeys.load.dom_nodes_mutated": 999999},
                                **{"journeys.filter.dom_nodes_mutated": 9999},
@@ -570,10 +570,9 @@ def test_main_measure_prints_without_an_out_file(capsys, monkeypatch):
 
 def test_check_returns_3_when_the_measure_path_fails(tmp_path, capsys,
                                                      monkeypatch):
-    # Addition 1 (the Task 1 review, binding): a broken harness -- a
-    # missing browser, a crashed Chromium, any exception escaping the
-    # measure path -- exits 3, never 1: CI would otherwise read a broken
-    # gate as a budget breach.
+    # A broken harness -- a missing browser, a crashed Chromium, any
+    # exception escaping the measure path -- exits 3, never 1: CI would
+    # otherwise read a broken gate as a budget breach.
     doc = _written(tmp_path, _document())
 
     def broken_measure():
@@ -586,8 +585,8 @@ def test_check_returns_3_when_the_measure_path_fails(tmp_path, capsys,
 
 
 def test_check_exit_0_1_2_contract_holds(tmp_path, capsys, monkeypatch):
-    # The full contract in one place, so the new exit 3 cannot crowd out
-    # the codes the gate already returned.
+    # The full contract in one place, so exit 3 cannot crowd out the
+    # other codes the gate returns.
     doc = _written(tmp_path, _document())
 
     # 0: every budget met by a fresh synthetic measurement.
@@ -629,11 +628,10 @@ def _measurement_at(budgets):
 
 
 def test_the_committed_budgets_document_loads_and_normalises():
-    # The REAL committed ratchet document (issue #109): the structure,
-    # integer and finite rules hold against the file CI gates on -- not
-    # only against synthetic fixtures. Option A's shape (issue #112):
-    # one code-only byte budget, absolute long-task maxima, and hover
-    # DOM; the report-only metrics are absent.
+    # The REAL committed ratchet document: the structure, integer and
+    # finite rules hold against the file CI gates on -- not only against
+    # synthetic fixtures. Its shape is one code-only byte budget, absolute
+    # long-task maxima, and hover DOM; the report-only metrics are absent.
     budgets = perf.load_budgets(REAL_BUDGETS)
     assert budgets["schema_version"] == 1
     assert set(budgets["bytes"]) == {"code_bytes"}
@@ -707,7 +705,7 @@ def test_check_never_reaches_the_browser_path_for_a_missing_document():
     assert result.stdout.strip() == "ok"
 
 
-# --- the decoupling proof: the 686 -> 688 capture growth (issue #112) --------
+# --- the decoupling proof: the 686 -> 688 capture growth ---------------------
 
 # The commit whose TREE carries the 686-model capture: the parent of the
 # refresh that grew the capture to 688. main's history, so a shallow CI
@@ -758,8 +756,8 @@ def _build_bytes(raw_path, agents_path):
 
 
 def test_code_bytes_is_identical_across_the_686_688_capture_growth():
-    """The live repro of issue #112: same code, capture 686 -> 688, and
-    the budgeted byte count must not have moved."""
+    """Same code, capture 686 -> 688: the budgeted byte count must not
+    have moved."""
     models_686 = _git_blob(_PRE_GROWTH_COMMIT + ":data/aa-raw-models.json")
     agents_686 = _git_blob(
         _PRE_GROWTH_COMMIT + ":data/aa-raw-coding-agents.json")

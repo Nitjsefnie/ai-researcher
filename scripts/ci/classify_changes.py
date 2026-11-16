@@ -1,18 +1,16 @@
 #!/usr/bin/env python3
 """Classify a ci-gate run: docs-only, bot-data-only, or a full change.
 
-The gate workflows used to narrow documentation-only runs at the
-trigger, with `paths-ignore` on their push and pull_request events. A
-trigger filter cannot report: a docs-only change started no run at all,
-so those check names never appeared, and a required-check ruleset could
-never go green on such a pull request (issue #133). ci-gate.yml starts
-on every push and pull request and narrows INSIDE the workflow instead:
-this script reads the run's changed paths and emits two outputs,
-`docs_only` and `data_only`, which condition the legs while the
-aggregate job still reports.
+A trigger filter cannot report: a docs-only change starts no run at all,
+so those check names never appear, and a required-check ruleset could
+never go green on such a pull request. ci-gate.yml therefore starts on
+every push and pull request and narrows INSIDE the workflow: this script
+reads the run's changed paths and emits two outputs, `docs_only` and
+`data_only`, which condition the legs while the aggregate job still
+reports.
 
-Documentation is the exact set the old deny-lists carried
-(`**/*.md`, `LICENSE`, `.gitignore`), re-homed as classifier patterns.
+Documentation is `**/*.md`, `LICENSE` and `.gitignore`, held as
+classifier patterns.
 Every fallback over-runs: an event this script cannot identify, a file
 list it cannot read, or a list that may be truncated all classify as a
 full change and run every leg. An API failure that under-runs would
@@ -34,7 +32,7 @@ data with no code, not a pre-test. Rankings normally joins its page to the
 same commit. If the rankings source fails, the tracker data can land without
 its page; the next hour's build heals that lag. Data-only classification skips
 the heavy legs, page-rankings included, so this retained lag does not reject
-the surviving sources (issue #277). The tenth path,
+the surviving sources. The tenth path,
 out/trending-rankings.html, joins out/frontier-models.html as a bot-generated
 page committed by the run that built it. Its dedicated tests/page-rankings
 check re-verifies it on full gate runs (outside both narrowing classes).
@@ -45,25 +43,23 @@ Lint and actionlint still run. An outside path keeps the full gate set;
 scripts/build_rankings.py, alone or mixed with generated data, is outside
 the signature, so a stale committed page after a code change still fails its
 dedicated check. The accepted trade-off remains: a hand-staged commit
-confined to the generated paths also gets the cheap class without a pre-test
-(issue #212).
+confined to the generated paths also gets the cheap class without a pre-test.
 
 On a PUSH the changed set is read over the verified base rather than
 the push's own `before`: the newest ci-gate run on main whose
 conclusion is `success` and that executed at least one leg marks the
 last commit whose code the gate actually ran over. Classifying only
-the push's own before...sha let a docs-only push hide an unverified
-code push behind a green aggregate, when the code push's own run had
-been cancelled by the docs-only push seconds after it started — and a
+the push's own before...sha would let a docs-only push hide an
+unverified code push behind a green aggregate, when the code push's own
+run is cancelled by the docs-only push seconds after it starts — and a
 run that concluded `failure` or `timed_out` verified nothing either,
 so a docs-only push on top of failed code would otherwise narrow over
 the very code that is failing. The base walk reads the workflow-runs
 and run-jobs endpoints, newest first; any failure over-runs to the
 full gate set.
 
-Ported from claudit's scripts/ci/classify_changes.py of the same name
-(design precedent for this repository's #133); the pattern set, the bot
-signature and the branch are this repository's own.
+Ported from claudit's scripts/ci/classify_changes.py of the same name;
+the pattern set, the bot signature and the branch are this repository's own.
 """
 from __future__ import annotations
 

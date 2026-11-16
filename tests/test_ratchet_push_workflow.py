@@ -1,4 +1,4 @@
-"""Exercise the data-only ratchet delivery workflow (issue #133).
+"""Exercise the data-only ratchet delivery workflow.
 
 The top-level workflow can access the deploy key, unlike its callee. It
 admits only successful pushes to this repository's main branch and

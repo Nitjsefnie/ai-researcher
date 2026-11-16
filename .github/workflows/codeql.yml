@@ -6,13 +6,12 @@ name: codeql
 # red, so a new query shipping upstream cannot block an unrelated push.
 #
 # THE JOB IS GATED ON VISIBILITY. Code scanning is free on public repositories
-# and needs GitHub Code Security on private ones — while this repo was private
-# the upload failed with "Code scanning is not enabled for this repository"
-# (run 32600213123). A gate that is red on every push for a reason no commit
-# can fix is one people learn to ignore, so the job skips itself instead of
-# failing. It runs today because the repository is public; a private fork gets
-# a skip rather than a red X, and enabling Code Security there is what turns
-# it back on.
+# and needs GitHub Code Security on private ones: without it the upload fails
+# with "Code scanning is not enabled for this repository". A gate that is red on
+# every push for a reason no commit can fix is one people learn to ignore, so
+# the job skips itself instead of failing. It runs today because the repository
+# is public; a private fork gets a skip rather than a red X, and enabling Code
+# Security there is what turns it back on.
 #
 # The weekly cron is not redundant with push: CodeQL's query packs are updated
 # continuously, and a new query only ever runs against code that has changed
@@ -30,24 +29,22 @@ on:
     # Standalone dispatch runs (no ci-gate classification) run every job
     # unconditionally.
 
-# Trigger ownership moved to ci-gate.yml (issue #133): the push and
-# pull_request triggers, and their paths-ignore deny-list
-# (`**/*.md` / LICENSE / .gitignore), live there now — a trigger filter
+# The push and pull_request triggers, and their paths-ignore deny-list
+# (`**/*.md` / LICENSE / .gitignore), live in ci-gate.yml: a trigger filter
 # cannot report, so a required-check ruleset could never go green on a
-# documentation-only change. The weekly cron survives here: CodeQL's
+# documentation-only change. The weekly cron stays here: CodeQL's
 # query packs update continuously, and a new query must still reach code
 # that has changed since it shipped.
 #
 # PR heads still run untrusted code under the caller's pull_request run
-# (the callee executes the caller's merge ref), so the write surface is
-# unchanged: this job's only write is the `security-events: write`
-# upload of its OWN analysis results, and the scheduled publish path
-# (refresh.yml) stays off PR events entirely.
+# (the callee executes the caller's merge ref), so this job's only write is
+# the `security-events: write` upload of its OWN analysis results, and the
+# scheduled publish path (refresh.yml) stays off PR events entirely.
 
 # The workflow-level floor. A workflow with no permissions block at all hands
 # every job the repository's default token scopes — potentially read/write —
 # so the read-only baseline is declared here even though the single job below
-# overrides it wholesale with its own block (issue #52).
+# overrides it wholesale with its own block.
 permissions:
   contents: read
 
@@ -74,7 +71,7 @@ jobs:
 
     strategy:
       # One entry per language CodeQL analyses here: `python` for the
-      # pipeline, `actions` for the workflow files themselves (issue #129).
+      # pipeline, `actions` for the workflow files themselves.
       # The workflows are among the most privileged code in the repository —
       # refresh.yml pushes to `main` and publishes to docs-hub with a secret
       # — and actionlint + zizmor already read them only for known-bad

@@ -19,7 +19,7 @@ PIPELINE_FIXTURES = pathlib.Path(__file__).resolve().parent / "fixtures" / "pipe
 
 def _build_in_temp_dir() -> str:
     """Run build.main() with OUT redirected into a temp dir and return the
-    page text, leaving the real out/frontier-models.html untouched (#114).
+    page text, leaving the real out/frontier-models.html untouched.
 
     The temp dir lives under build.ROOT because build.main() prints
     OUT.relative_to(ROOT) and would raise on a page outside it -- the same
@@ -200,7 +200,7 @@ class CapabilityCostTests(unittest.TestCase):
         self.assertAlmostEqual(measured_cost(model, "intelligence"), 0.75)
 
     def test_model_rows_carry_no_coding_pair(self):
-        # Coding is the Coding Agent Index now; AA publishes no cost for the
+        # Coding is the Coding Agent Index; AA publishes no cost for the
         # leaderboard's codingIndex, so a model row must not claim one.
         self.assertIsNone(build.capability_cost_per_task(model_fixture(), "coding"))
         self.assertIsNone(build.capability_score(model_fixture(), "coding"))
@@ -355,13 +355,12 @@ class GeneratedArtifactTests(unittest.TestCase):
         )
 
     def test_remote_strings_are_inert_in_the_inline_json_script(self):
-        # Template markers deliberately stay OUT of these strings: since #97
-        # the captured strings also render into the STATIC table bodies,
-        # where a marker would be spliced by a later substitution -- so a
-        # build carrying one now refuses outright
-        # (test_a_template_marker_in_a_captured_string_refuses_the_build),
-        # and a marker here would die before the payload assertions this
-        # test exists for ever ran.
+        # Template markers deliberately stay OUT of these strings: the captured
+        # strings also render into the STATIC table bodies, where a marker would
+        # be spliced by a later substitution -- so a build carrying one refuses
+        # outright (test_a_template_marker_in_a_captured_string_refuses_the_build),
+        # and a marker here would die before the payload assertions this test
+        # exists for.
         lower = "</script><script>document.documentElement.dataset.auditLower=1</script>"
         mixed = "</ScRiPt><ScRiPt>document.documentElement.dataset.auditMixed=1</sCrIpT>"
         upper = "</SCRIPT><SCRIPT>document.documentElement.dataset.auditUpper=1</SCRIPT>"
@@ -437,7 +436,7 @@ class GeneratedArtifactTests(unittest.TestCase):
 
 
 class StaticTableRenderTests(unittest.TestCase):
-    """Issue #97: build.py renders both table bodies into the page.
+    """build.py renders both table bodies into the page.
 
     The static rows must be the page's own default-state render -- the same
     cells the JS `fillTable`/`fillFrontiers` produce, from the same
@@ -628,23 +627,23 @@ class StaticTableRenderTests(unittest.TestCase):
 
 
 class CaptureStampTests(unittest.TestCase):
-    """Issue #40: the capture stamp reaches the page unescaped.
+    """The capture stamp reaches the page unescaped.
 
     build.py reads data/captured-at.txt and splices the value into four
     template sinks -- the header, the method grid, and the copy-as-Markdown
     and copy-as-JSON clips -- besides the inline payload's stats, all
     downstream of the single read at the top of main(). One guard at that
     read accepts exactly what scripts/fetch_aa.py writes -- a single ISO
-    date -- and refuses everything else: a stamp-less capture (issue #64)
-    and undecodable bytes included, with the today-fallback surviving only
+    date -- and refuses everything else: a stamp-less capture and
+    undecodable bytes included, with the today-fallback applying only
     for a data directory that holds no capture at all.
     """
 
     def build_with_stamp(self, stamp_text: str | bytes | None) -> str:
         """Build a hermetic capture whose stamp file holds `stamp_text`.
 
-        None leaves the stamp file absent -- a capture that lost its stamp
-        (issue #64). Bytes are written raw, so a non-UTF-8 stamp is
+        None leaves the stamp file absent -- a capture without its stamp.
+        Bytes are written raw, so a non-UTF-8 stamp is
         expressible. Returns the rendered HTML; a stamp the guard refuses
         raises SystemExit out of build.main() for the refusal tests to
         assert on.
@@ -741,10 +740,10 @@ class CaptureStampTests(unittest.TestCase):
                 self.assertIn("YYYY-MM-DD", str(raised.exception))
 
     def test_a_capture_without_its_stamp_is_refused_not_relabelled_with_today(self):
-        # Issue #64: fetch_aa.py writes the stamp beside the capture on every
-        # capture, so capture data without a stamp is a capture that lost it,
-        # not a pre-stamp checkout -- falling back to today would relabel the
-        # page with the build date, silently.
+        # fetch_aa.py writes the stamp beside the capture on every capture, so
+        # capture data without a stamp is a capture that lost it, not a pre-stamp
+        # checkout -- falling back to today would relabel the page with the build
+        # date, silently.
         with self.assertRaises(SystemExit) as raised:
             self.build_with_stamp(None)
 
@@ -754,12 +753,10 @@ class CaptureStampTests(unittest.TestCase):
         self.assertIn("fetch_aa.py", message)
 
     def test_a_data_directory_without_capture_data_still_falls_back_to_today(self):
-        # The surviving fallback arm, pinned: with no capture input beside the
-        # stamp there is no capture to relabel, so a genuinely empty
-        # (pre-stamp) data directory builds with today's date. Unreachable
-        # through main(), which reads the capture inputs before the stamp --
-        # which is exactly why the old fallback could only ever mask a lost
-        # stamp (issue #64).
+        # The fallback arm, pinned: with no capture input beside the stamp there
+        # is no capture to relabel, so a genuinely empty (pre-stamp) data directory
+        # builds with today's date. Unreachable through main(), which reads the
+        # capture inputs before the stamp.
         with tempfile.TemporaryDirectory(prefix=".issue-64-build-", dir=build.ROOT) as tmp:
             stamp = pathlib.Path(tmp) / "captured-at.txt"
 
@@ -825,7 +822,7 @@ class GenerationHoldRenderTests(unittest.TestCase):
 
 
 class CostBreakdownWindowReaderTests(unittest.TestCase):
-    """Issue #217: the build layer's one question about the window marker.
+    """The build layer's one question about the window marker.
 
     fetch_aa.py writes data/cost-breakdown-window.txt when the merge dropped
     EVERY model's cost breakdown -- a two-generation window, not a schema
@@ -845,10 +842,10 @@ class CostBreakdownWindowReaderTests(unittest.TestCase):
             self.assertTrue(build.cost_breakdown_window(data_dir))
 
     def test_the_generation_count_reader_parses_the_marker_line(self):
-        # Issue #223: the marker's "; N generation(s) observed in-run" tail
-        # is the one integer the refusal reads back. Absent and countless
-        # markers read as None -- the refusal then names the window
-        # generically -- and nothing here reaches the page.
+        # The marker's "; N generation(s) observed in-run" tail is the one
+        # integer the refusal reads back. Absent and countless markers read as
+        # None -- the refusal then names the window generically -- and nothing
+        # here reaches the page.
         with tempfile.TemporaryDirectory() as tmp:
             data_dir = pathlib.Path(tmp)
 
@@ -867,8 +864,8 @@ class CostBreakdownWindowReaderTests(unittest.TestCase):
 
 
 class EmptyAxisGuardTests(unittest.TestCase):
-    """Issues #54 + #60: the guard refusing a capture that leaves a rendered
-    axis with nothing on it.
+    """The guard refusing a capture that leaves a rendered axis with nothing
+    on it.
 
     The page renders FOUR axes -- coding, intelligence and agentic against
     their cost per task, plus parameters against the Intelligence
@@ -949,8 +946,8 @@ class EmptyAxisGuardTests(unittest.TestCase):
             self.assertFalse(output.exists(), "refusal still wrote the page")
 
     def test_a_capture_with_no_parameters_is_refused_naming_parameters(self):
-        # Issue #60, in the exact shape it was reproduced: a stale capture in
-        # AA's pre-rename shape, where the parameter count rode `totalParameters`.
+        # A stale capture in AA's pre-rename shape, where the parameter count
+        # rode `totalParameters`.
         # The row is otherwise fully measured, so the metric axes stay
         # alive and parameters is the only axis named -- the refusal must come
         # from the guard, not from a reader quietly falling back to the old
@@ -963,15 +960,14 @@ class EmptyAxisGuardTests(unittest.TestCase):
                 self.run_build()
 
             self.assertIn("no rows carry a score/cost pair for: parameters", str(raised.exception))
-            # The window branch must not have swallowed this one: the
-            # shape-change wording stays the no-window capture's refusal
-            # (issue #223), so pin it positively, not by the absence of an
-            # edit.
+            # The window branch must not swallow this one: the shape-change
+            # wording stays the no-window capture's refusal, so pin it
+            # positively, not by the absence of an edit.
             self.assertIn("changed shape", str(raised.exception))
             self.assertFalse(output.exists(), "refusal still wrote the page")
 
     def test_a_window_hour_with_every_axis_plotted_publishes(self):
-        # Issue #217's production window shape: the merge dropped every
+        # The window shape seen in production: the merge dropped every
         # breakdown, leaving the leaderboard's bare scalar (exactly what
         # check_cost_breakdown counts as dropped). Every axis still plots on
         # that total, so the marker beside it changes nothing: the hour
@@ -989,8 +985,8 @@ class EmptyAxisGuardTests(unittest.TestCase):
             self.assertEqual(stats["parameterCount"], 1)
 
     def test_a_window_marker_does_not_exempt_an_empty_axis(self):
-        # Outside the #232 hold, a marker hour that empties an axis is
-        # refused, naming the window rather than a shape change.
+        # Outside the three-generation hold, a marker hour that empties an axis
+        # is refused, naming the window rather than a shape change.
         with self.capture([model_fixture(intelligence=None)], [agent_fixture()]) as output:
             (output.parent / "cost-breakdown-window.txt").write_text(
                 "every cost breakdown dropped as another generation's: "
@@ -1006,9 +1002,8 @@ class EmptyAxisGuardTests(unittest.TestCase):
 
     def test_a_countless_window_marker_names_the_window_generically(self):
         # A marker written by an older fetch_aa.py carries no generation
-        # count (this repo shipped those before #223). The refusal still
-        # names the window -- generically -- and still never blames a shape
-        # change.
+        # count. The refusal still names the window -- generically -- and
+        # still never blames a shape change.
         corner = model_fixture()
         del corner["parameters"]
         with self.capture([corner], [agent_fixture()]) as output:
@@ -1039,8 +1034,7 @@ class EmptyAxisGuardTests(unittest.TestCase):
 
 
 class WindowHoldTests(unittest.TestCase):
-    """Issue #232: the three-generation corner holds the page instead of
-    failing red.
+    """The three-generation corner holds the page instead of failing red.
 
     The hold predicate and its evidence: the window marker records >= 3
     generations observed in-run AND parameters is the only emptied axis.
@@ -1092,14 +1086,13 @@ class WindowHoldTests(unittest.TestCase):
         return json.loads(html[start:end])
 
     def test_the_three_generation_corner_holds_the_page(self):
-        # Issue #232: the designed three-generation corner (the looks
-        # disagree AND the detail route matches neither fingerprint) empties
-        # parameters -- run 37676392811 is the reproduction. The
-        # capture records the window and the page self-heals when AA's
-        # routes converge, so the hour is not a shape change: main() raises
-        # WindowHold and writes nothing -- the capture gate catches it on
-        # the fresh side and reports the hour unchanged -- instead of the
-        # refusal's nonzero exit that went red although nothing was broken.
+        # The designed three-generation corner (the looks disagree AND the detail
+        # route matches neither fingerprint) empties parameters. The capture
+        # records the window and the page self-heals when AA's routes converge,
+        # so the hour is not a shape change: main() raises WindowHold and writes
+        # nothing -- the capture gate catches it on the fresh side and reports
+        # the hour unchanged -- instead of the refusal's nonzero exit, which
+        # would go red although nothing is broken.
         corner = model_fixture()
         del corner["parameters"]
         with self.capture([corner], [agent_fixture()]) as output:
@@ -1120,13 +1113,12 @@ class WindowHoldTests(unittest.TestCase):
             self.assertFalse(output.exists(), "hold still wrote the page")
 
     def test_a_converged_hour_with_an_empty_parameters_axis_still_refuses(self):
-        # The ruling's BOTH-DIRECTION mutation check, one test: the same
-        # corner fixture built twice, at two generation counts. At 2 the
-        # hour is an ordinary (converged-by-count) window whose emptied
-        # axes the exemption does not cover, and the refusal stands; at 3
-        # the hold fires. Dropping the `>= 3` condition from the hold
-        # predicate turns the first assertion red -- this pair is the
-        # mutation check the issue ruling mandates.
+        # Both-direction mutation check, one test: the same corner fixture built
+        # twice, at two generation counts. At 2 the hour is an ordinary
+        # (converged-by-count) window whose emptied axes the exemption does not
+        # cover, and the refusal stands; at 3 the hold fires. Dropping the `>= 3`
+        # condition from the hold predicate turns the first assertion red -- this
+        # pair is the mutation check.
         corner = model_fixture()
         del corner["parameters"]
         marker = ("every cost breakdown dropped as another generation's: "
@@ -1199,11 +1191,10 @@ class WindowHoldTests(unittest.TestCase):
             self.assertFalse(output.exists(), "refusal still wrote the page")
 
     def test_a_counted_marker_with_a_fully_measured_capture_still_builds(self):
-        # Kills a vacuous-subset mutant of the hold predicate (issue #234):
-        # set([]) <= {"parameters"} is true, so a check written that way
-        # would hold a FULLY measured capture beside a >= 3-generation marker
-        # instead of building it -- this row is what goes red under that
-        # mutant: the healthy pair builds, every axis nonzero.
+        # Kills a vacuous-subset mutant of the hold predicate: set([]) <= {"parameters"}
+        # is true, so a check written that way would hold a FULLY measured capture
+        # beside a >= 3-generation marker instead of building it -- this row is what
+        # goes red under that mutant: the healthy pair builds, every axis nonzero.
         with self.capture([model_fixture()], [agent_fixture()]) as output:
             (output.parent / "cost-breakdown-window.txt").write_text(
                 "every cost breakdown dropped as another generation's: "
@@ -1278,16 +1269,16 @@ class WindowHoldTests(unittest.TestCase):
 
 
 class MergeCapturesTests(unittest.TestCase):
-    """Issue #200: shared models publish the leaderboard's generation.
+    """Shared models publish the leaderboard's generation.
 
     AA's two routes are independently cached pages and its data lands on them
-    at different times, so one capture can straddle an update -- which is what
-    flipped the published page between two generations, hour by hour. The
+    at different times, so one capture can straddle an update -- which would
+    flip the published page between two generations, hour by hour. The
     leaderboard route is the authority; the detail route is a gap-fill that
     supplies only what the leaderboard does not ship (parameters, licence,
     release date, the per-evaluation cost breakdown) and never overrides a
-    value it does. There is no disagreement state left to resolve: a
-    conflicting detail value simply loses, silently and always.
+    value it does. There is no disagreement state to resolve: a conflicting
+    detail value simply loses, silently and always.
     """
 
     def test_the_leaderboard_bare_number_wins_over_the_detail_routes_object(self):
@@ -1351,15 +1342,15 @@ class MergeCapturesTests(unittest.TestCase):
 
 
 class SplitEffortTests(unittest.TestCase):
-    """Issue #47: what `split_effort` may strip, pinned before speeding it up.
+    """What `split_effort` may strip.
 
     AA encodes the effort knob in the model name and there is no field for it
     (AGENTS.md "Effort levels"), so the strip is load-bearing: only the effort
     component may go -- `(Adaptive Reasoning, Max Effort)` keeps its config
     list -- while `(Reasoning)`, `(Non-reasoning)` and date snapshots like
     `(Jan '25)` identify genuinely different models and must survive. Every
-    expected pair below was read off the pre-fix implementation, so these
-    pins pass on main and must keep passing after it is replaced.
+    expected pair below is what the split must return, whatever its
+    implementation.
     """
 
     def test_only_the_effort_component_is_stripped_from_a_config_list(self):
@@ -1411,8 +1402,8 @@ class SplitEffortTests(unittest.TestCase):
             build.split_effort("M (a, low, b, xhigh)"), ("M (a, b)", "low"))
 
     def test_a_dict_repr_effort_group_is_effort(self):
-        # #85: AA's own displayLabel carries a dict-repr effort group on some
-        # agent runs -- "Codex - GPT-6 Luna (max) ({'reasoning_effort':
+        # AA's own displayLabel carries a dict-repr effort group on some agent
+        # runs -- "Codex - GPT-6 Luna (max) ({'reasoning_effort':
         # 'max'})". The dict is the same effort knob in AA's encoding, so it
         # strips like the bare-word group before it instead of riding into
         # the base name and eating 28 of the chart label's 34 characters.
@@ -1455,12 +1446,12 @@ class SplitEffortTests(unittest.TestCase):
 
 
 class DisplayLabelTests(unittest.TestCase):
-    """Issue #85: the compact chart label `display_label` builds.
+    """The compact chart label `display_label` builds.
 
     Chart labels truncate at 34 characters, and the effort knob -- the one
-    word that distinguishes variants of one model -- sat at the END of long
-    names: four Claude Opus 5.5 effort variants shared a 33-char prefix, so
-    the intelligence chart rendered all four identically. `display_label`
+    word that distinguishes variants of one model -- can sit at the END of
+    long names: four Claude Opus 5.5 effort variants share a 33-char prefix,
+    so a plain truncation would render all four identically. `display_label`
     re-attaches the first effort word immediately after the model name,
     before any kept groups, so the distinguishing word survives the cap;
     everything that is not effort keeps its place.
@@ -1499,9 +1490,9 @@ class DisplayLabelTests(unittest.TestCase):
             build.display_label("M (a, low, b, xhigh)"), "M (low) (a, b)")
 
     def test_both_row_builders_carry_the_compact_label(self):
-        # The page's chart labels render from r.label (assignLabels, #85),
-        # so the field must reach the payload from BOTH row universes and
-        # equal display_label of the row's own name.
+        # The page's chart labels render from r.label (assignLabels), so the field
+        # must reach the payload from BOTH row universes and equal display_label of
+        # the row's own name.
         model = model_fixture()
         model["name"] = (
             "Fixture Model (Adaptive Reasoning, Max Effort, Default Fallback)")
@@ -1516,14 +1507,12 @@ class DisplayLabelTests(unittest.TestCase):
 
 
 class DisplayNameTests(unittest.TestCase):
-    """Issue #88: the reader-facing FULL name, with AA's dict form decoded.
+    """The reader-facing FULL name, with AA's dict form decoded.
 
-    #85 cleaned only the short chart labels (`display_label`); the full name
-    still carried "({'reasoning_effort': 'max'})" to every reader. Per group,
-    per comma-part, `display_name` keeps a plain effort part verbatim, DROPS a
-    dict-form effort part whose effort word already appears as a plain effort
-    part anywhere in the name, REWRITES such a part to the bare effort word
-    otherwise, and keeps everything else verbatim. The drop reads only the
+    Per group, per comma-part, `display_name` keeps a plain effort part verbatim,
+    DROPS a dict-form effort part whose effort word already appears as a plain
+    effort part anywhere in the name, REWRITES such a part to the bare effort
+    word otherwise, and keeps everything else verbatim. The drop reads only the
     raw name's plain parts, so it is order-independent by design.
     """
 
@@ -1620,7 +1609,7 @@ class DisplayNameTests(unittest.TestCase):
 
 
 class DisplayNameRowTests(unittest.TestCase):
-    """Issue #88 at the row builders: `"name"` is the cleaned display name.
+    """At the row builders, `"name"` is the cleaned display name.
 
     Every reader-facing sink -- the JS tooltip, popup, table cells,
     aria-labels, search, the copy-as-Markdown / copy-as-JSON exports -- reads
@@ -1630,9 +1619,9 @@ class DisplayNameRowTests(unittest.TestCase):
     Dump-effort collapse keys on `base`.
     """
 
-    # The live capture's dict rows (issue #88), with the plain form each
-    # cleans to. The first rewrites (no plain effort part to echo); the other
-    # two drop the dict echo of the plain part in front of them.
+    # The live capture's dict rows, with the plain form each cleans to. The
+    # first rewrites (no plain effort part to echo); the other two drop the dict
+    # echo of the plain part in front of them.
     REAL_DICT_LABELS = (
         ("Opencode - GLM-5.3 ({'reasoning_effort': 'max'})",
          "Opencode - GLM-5.3 (max)"),
@@ -1727,27 +1716,27 @@ class DisplayNameRowTests(unittest.TestCase):
 
 
 class SplitEffortScalingTests(unittest.TestCase):
-    """Issue #47: a pathological name must degrade to fast processing.
+    """A pathological name must degrade to fast processing.
 
-    The pre-fix implementation drove the EFFORT regex over the whole name,
-    and a "(" with no ")" to its right makes `[^)]*\\)` scan to the end of
-    the string and backtrack -- O(parens x remaining length), measured
-    ~62x CPU for 8x the groups at the sizes below (18 s for one 20,000-group
-    name). A crafted capture carrying such a name passes every schema check
-    and lands in `split_effort` through `build_rows`, so the hourly refresh
-    runs it ~680 times and times out.
+    Driving the EFFORT regex over the whole name is the hazard: a "(" with
+    no ")" to its right makes `[^)]*\\)` scan to the end of the string and
+    backtrack -- O(parens x remaining length), measured ~62x CPU for 8x the
+    groups at the sizes below (18 s for one 20,000-group name). A crafted
+    capture carrying such a name passes every schema check and lands in
+    `split_effort` through `build_rows`, so the hourly refresh runs it ~680
+    times and can time out.
 
     The pin is a growth ratio, not a wall-clock number: CPU time (immune to
     other processes on the box) for a pathological name at N and 8N, with a
-    40x ceiling. A linear scan ratios ~8-12x here; the quadratic it replaces
-    ratios ~47-70x across repeated runs. The absolute ceiling on the large
-    block is a belt-and-suspenders gross-regression trip, not the mechanism.
+    40x ceiling. A linear scan ratios ~8-12x here; a quadratic scan ratios
+    ~47-70x across repeated runs. The absolute ceiling on the large block
+    is a belt-and-suspenders gross-regression trip, not the mechanism.
 
-    The measurement is CALIBRATED against the host's clock (fix round 2):
-    each size is timed as k repeats inside one block, with k doubled until
-    the smaller size's total clears CLOCK_FLOOR -- well above the coarsest
-    tick in the CI fleet (Windows process_time ~15.6 ms), whose hosts read a
-    bare microsecond-scale sample as 0.0 and turned the ratio into a
+    The measurement is CALIBRATED against the host's clock: each size is
+    timed as k repeats inside one block, with k doubled until the smaller
+    size's total clears CLOCK_FLOOR -- well above the coarsest tick in the
+    CI fleet (Windows process_time ~15.6 ms), whose hosts read a bare
+    microsecond-scale sample as 0.0 and would turn the ratio into a
     ZeroDivisionError. Both sizes run the SAME k, so the totals' ratio is
     the per-operation ratio and the ceiling comparison is unchanged. A
     clock that cannot resolve even the calibrated smaller block fails
@@ -1818,9 +1807,9 @@ class SplitEffortScalingTests(unittest.TestCase):
             "-- split_effort is too slow on a pathological input")
 
     def test_a_clock_that_cannot_resolve_the_work_fails_loudly(self):
-        # The ZeroDivisionError that broke CI on coarse-clock hosts, pinned
-        # shut: a clock that never advances must trip the loud refusal
-        # naming the clock -- never reach the division.
+        # Coarse-clock hosts can read a zero interval, a ZeroDivisionError in
+        # the ratio; pinned shut: a clock that never advances must trip the
+        # loud refusal naming the clock -- never reach the division.
         class ZeroClock:
             """Every measurement reads 0.0: the coarse-tick failure at its
             limit."""
@@ -1838,14 +1827,14 @@ class SplitEffortScalingTests(unittest.TestCase):
 
 
 class BuildArgvTests(unittest.TestCase):
-    """Issue #55: `python3 build.py --help` must print usage, not rebuild.
+    """`python3 build.py --help` must print usage, not rebuild
+    out/frontier-models.html.
 
-    build.py handled argv not at all -- a `--help` ran the whole build and
-    rewrote out/frontier-models.html. The parser lives in the __main__ guard
-    (main() keeps its no-argument signature, which the direct callers in this
-    suite depend on), so these pins drive the real command line as a
-    subprocess and judge it by process observables: exit status, stdout, and
-    the output page's mtime -- the side effect the issue is about.
+    The parser lives in the __main__ guard (main() keeps its no-argument
+    signature, which the direct callers in this suite depend on), so these
+    pins drive the real command line as a subprocess and judge it by process
+    observables: exit status, stdout, and the output page's mtime -- the side
+    effect that must not happen.
     """
 
     PAGE = build.ROOT / "out" / "frontier-models.html"
@@ -1888,17 +1877,15 @@ class BuildArgvTests(unittest.TestCase):
 
 
 class CorruptCaptureTests(unittest.TestCase):
-    """Issue #66: a truncated capture must fail red naming the reason.
+    """A truncated capture must fail red naming the reason.
 
-    A capture written by a crashed runner can end mid-file; parsed anyway,
-    build.py died with a raw JSONDecodeError traceback that named no file.
-    These pins drive the REAL command line -- build.py copied into a
-    throwaway tree beside a data/ directory holding the truncated capture,
-    exactly the layout the hourly refresh runs -- and judge the process
-    observables: nonzero exit, stderr naming the capture and the designed
-    re-capture instruction, and no Python traceback. Nothing outside the
-    temp tree is touched; the copy resolves its own ROOT there and fails
-    before any output could be written.
+    A capture written by a crashed runner can end mid-file. These pins drive
+    the REAL command line -- build.py copied into a throwaway tree beside a
+    data/ directory holding the truncated capture, exactly the layout the
+    hourly refresh runs -- and judge the process observables: nonzero exit,
+    stderr naming the capture and the designed re-capture instruction, and no
+    Python traceback. Nothing outside the temp tree is touched; the copy
+    resolves its own ROOT there and fails before any output could be written.
     """
 
     CAPTURES = ("aa-raw-models.json", "aa-raw-coding-agents.json")
@@ -1955,14 +1942,14 @@ if __name__ == "__main__":
 
 
 class RetiredMismatchSummaryTests(unittest.TestCase):
-    """Issue #203: the retired-model summary names each undominated retired
-    model and the frontier (axis) it sits on. AGENTS.md defines MISMATCH as
-    a finding to report, not a bug to fix -- a vendor can retire a model
-    that still sits on an efficient frontier -- but the count-only phrasing
-    could not be acted on, or told apart from a stale alarm. The finding
-    stays a print and never changes the build's exit status, and WHICH
-    builds report a mismatch is unchanged: retired_front is the same set
-    the count subtraction always implied.
+    """The retired-model summary names each undominated retired model and the
+    frontier (axis) it sits on. AGENTS.md defines MISMATCH as a finding to
+    report, not a bug to fix -- a vendor can retire a model that still sits on
+    an efficient frontier -- so the summary names the model and the axis,
+    which a bare count cannot, and a real finding can be told apart from a
+    stale alarm. The finding stays a print and never changes the build's exit
+    status. WHICH builds report a mismatch is decided by retired_front, the
+    set a count subtraction implies.
     """
 
     @staticmethod
@@ -2118,11 +2105,11 @@ def disputed_model_fixture():
 
 
 def presence_disputed_model_fixture(carrier_first=True):
-    """A presence-disputed record per issue #211's padded interface: one
-    variant is the EMPTY map -- that generation does not carry the model at
-    all -- and the other variant is the carried generation's full map, which
-    is never `{}` by construction. `carrier_first` orders the padding so
-    both render directions are reachable from one fixture."""
+    """A presence-disputed record: one variant is the EMPTY map -- that
+    generation does not carry the model at all -- and the other variant is the
+    carried generation's full map, which is never `{}` by construction.
+    `carrier_first` orders the padding so both render directions are reachable
+    from one fixture."""
     m = model_fixture()  # ii 51, cost 0.75
     m.update({
         "contextWindowTokens": 400000,
@@ -2135,12 +2122,11 @@ def presence_disputed_model_fixture(carrier_first=True):
 
 
 class DisputeRenderTests(unittest.TestCase):
-    """Issue #208's rendering half: when the capture carries `genVariants`,
-    the page holds both generations -- red "a / b" cells on every table the
-    page renders, `gv` in the payload, and the legend + provenance wording
-    that says so. Agreeing cells inside a disputed row render exactly
-    today's single value; an undisputed capture renders byte-what it does
-    today."""
+    """When the capture carries `genVariants`, the page holds both
+    generations -- red "a / b" cells on every table the page renders, `gv` in
+    the payload, and the legend + provenance wording that says so. Agreeing
+    cells inside a disputed row render exactly today's single value; an
+    undisputed capture renders byte-what it does today."""
 
     def setUp(self):
         self._saved = (build.RAW, build.AGENTS_RAW)
@@ -2219,9 +2205,9 @@ class DisputeRenderTests(unittest.TestCase):
         self.assertNotIn("$0.5 /", main)
 
     def test_a_presence_row_renders_value_over_em_dash(self):
-        # Issue #211: variant 2 is `{}` -- that generation does not carry
-        # the model. Every carried field disputes: each absent side renders
-        # the em dash, red, canonical-first.
+        # Variant 2 is `{}` -- that generation does not carry the model.
+        # Every carried field disputes: each absent side renders the em dash,
+        # red, canonical-first.
         rows = build.build_rows([presence_disputed_model_fixture()])
         frontier, main = build.render_static_tbodies(rows)
 
@@ -2349,10 +2335,9 @@ class DisputeRenderTests(unittest.TestCase):
         self.assertIn("parameters", str(raised.exception))
 
     def test_the_dispute_legend_renders_under_the_methodology_text(self):
-        # PM rider 1: the canonical-first + canonical-pair-order rule is
-        # written down on the page, not silent. The legend names red as two
-        # inconsistent AA generations and pins the first value as the
-        # canonical one.
+        # The canonical-first + canonical-pair-order rule is written down on
+        # the page, not silent. The legend names red as two inconsistent AA
+        # generations and pins the first value as the canonical one.
         page = _build_in_temp_dir()
 
         self.assertIn(DISPUTE_LEGEND_MARK, page)

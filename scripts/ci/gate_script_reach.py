@@ -1,4 +1,4 @@
-"""Tracked files merge-gate Python files import, or run by a `.py` literal, to a fixpoint (#401).
+"""Tracked files merge-gate Python files import, or run by a `.py` literal, to a fixpoint.
 
 Literals in `tests/` are expectations (the freshness pin's), not runs.
 """

@@ -1,4 +1,4 @@
-"""Tests for the instruction-count budgets gate (issue #110).
+"""Tests for the instruction-count budgets gate.
 
 Three layers, and none of them runs valgrind. The committed pipeline
 fixture (tests/fixtures/pipeline/) is the fixed input every measured run

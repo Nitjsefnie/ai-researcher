@@ -221,8 +221,7 @@ def test_classify_job_reads_actions_for_the_verified_base_walk():
 
 
 def test_every_leg_grants_read_only():
-    # The callee runs no writer (issue #133 part 2b removed tests.yml's
-    # ratchet-push job; the raise leaves as an artifact for the
+    # The callee runs no writer (the raise leaves as an artifact for the
     # top-level ratchet-push workflow), so every leg's grant stays at the
     # workflow floor. The codeql leg forwards the security-events write
     # its callee's job requests — the one non-contents elevation.

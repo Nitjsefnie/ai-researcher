@@ -18,9 +18,9 @@ name: actionlint
 # Both tools are pinned. actionlint is verified by checksum rather than
 # trusted from the release page, because a linter that runs before every other
 # gate is a supply-chain position worth defending. zizmor is hash-pinned in
-# requirements-zizmor.txt and installed with --require-hashes (issue #127):
-# the tool that judges every workflow's supply chain is itself installed
-# byte-for-byte as reviewed.
+# requirements-zizmor.txt and installed with --require-hashes: the tool that
+# judges every workflow's supply chain is itself installed byte-for-byte as
+# reviewed.
 #
 # Suppressions belong at the offending line as a `# zizmor: ignore[rule]`
 # comment WITH a justification, never as a raised --min-severity here: a
@@ -33,15 +33,13 @@ on:
     # Standalone dispatch runs (no ci-gate classification) run every job
     # unconditionally.
 
-# Trigger ownership moved to ci-gate.yml (issue #133): the push and
-# pull_request triggers live there now. This leg is DELIBERATELY
-# UNCONDITIONAL in ci-gate — no narrowing output may skip it — which
-# preserves exactly the guarantee the old unfiltered triggers carried: a
-# conflict marker committed into a Markdown file is still read (the
-# merge-marker step below), the freshness and scope gates still read
-# every head, not only code heads, and the two gate scripts stay watched
-# on the hourly refresh bot's push, where both are trivially green (main
-# carries itself).
+# The push and pull_request triggers live in ci-gate.yml. This leg is
+# DELIBERATELY UNCONDITIONAL in ci-gate — no narrowing output may skip it —
+# so a conflict marker committed into a Markdown file is still read (the
+# merge-marker step below), the freshness and scope gates still read every
+# head, not only code heads, and the two gate scripts stay watched on the
+# hourly refresh bot's push, where both are trivially green (main carries
+# itself).
 
 permissions:
   contents: read
@@ -58,7 +56,7 @@ jobs:
     timeout-minutes: 15
 
     env:
-      # THE MANUAL UPDATE PATH (issue #50). actionlint ships as a
+      # THE MANUAL UPDATE PATH. actionlint ships as a
       # GitHub-release binary, which Dependabot cannot see — its pip
       # ecosystem reads requirements files and its github-actions ecosystem
       # reads `uses:` pins, and a curl-downloaded release tarball is neither
@@ -71,7 +69,7 @@ jobs:
       #
       # The fork, not rhysd's own release: stock 1.7.12 does not know the
       # `queue:` key in a concurrency group and rejects claim.yml's
-      # reference block with `unexpected key "queue"` (issue #123).
+      # reference block with `unexpected key "queue"`.
       # v1.7.12-queue.1 carries upstream rhysd/actionlint#654; the same pin
       # runs in the claim, pr-gate and daedalus repositories. Return to
       # rhysd's own release once it ships the key.
@@ -87,10 +85,7 @@ jobs:
           persist-credentials: false
 
       - name: Check no tracked file carries a merge-conflict marker
-        # a3363ac landed on upstream main with `<<<<<<< HEAD` and the
-        # `>>>>>>> 0d9bffc` line still in README.md, and three review rounds
-        # and every gate in that repository read straight past them: a
-        # conflict marker is text that looks like prose in a Markdown file,
+        # A conflict marker is text that looks like prose in a Markdown file,
         # so only a mechanical check can see it. git grep reads the tracked
         # files out of the working tree, which on a clean checkout is the
         # repository as shipped, and -I keeps a binary from being reported as
@@ -128,8 +123,7 @@ jobs:
         # In this job rather than a new one: this workflow is the gate on the
         # gates, its triggers are unfiltered so every head is judged, and a
         # `paths:` filter on a workflow hosting a merge-gate step would stop
-        # the step reporting at all on the heads that need it (the trap the
-        # old actionlint.yml trigger filter carried — removed in this change).
+        # the step reporting at all on the heads that need it.
         #
         # Before setup-python and every install: work done against a base
         # main has already moved on from is work whose verdict does not
@@ -155,7 +149,7 @@ jobs:
         # Downloaded and checksum-verified rather than piped from the install
         # script: `curl | bash` would make this job trust whatever that URL
         # serves at run time. scripts/ci/download.py retries transient
-        # failures inside a bounded window (issue #395).
+        # failures inside a bounded window.
         env:
           AI_RESEARCHER_DOWNLOAD_TOKEN: ${{ github.token }}
         run: |

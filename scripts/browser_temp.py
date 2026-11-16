@@ -1,4 +1,4 @@
-"""Own browser temp files (issue #310)."""
+"""Own browser temp files."""
 import contextlib
 import os
 from pathlib import Path

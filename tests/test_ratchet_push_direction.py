@@ -1,4 +1,4 @@
-"""Exercise the coverage validate step's direction boundary (issue #340).
+"""Exercise the coverage validate step's direction boundary.
 
 Helpers are copied: importing the sibling module collects its TestCase twice.
 """

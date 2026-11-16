@@ -1,14 +1,13 @@
 name: ci gate
 
 # One aggregate gate over every check this repository runs on a push or
-# pull request (issue #133).
+# pull request.
 #
-# WHY ONE WORKFLOW. Eight independent check names could not be
-# required: a ruleset requires one context per name, and the gate
-# workflows narrowed by paths-ignore, so a documentation-only change
-# started no run at all — those check names went MISSING rather than
-# reporting, and a ruleset requiring them could never go green on such
-# a change. This workflow starts on every push and pull request,
+# WHY ONE WORKFLOW. A ruleset requires one context per check name, and a
+# workflow narrowed by paths-ignore starts no run at all on a
+# documentation-only change: its check names go MISSING rather than
+# reporting, so a ruleset requiring them can never go green on such a
+# change. This workflow starts on every push and pull request,
 # classifies the changed paths, and either runs every gate leg or
 # narrows: a docs-only run skips the conditioned legs, a bot-data-only
 # run (the hourly refresh bot's four-file signature, any non-empty
@@ -52,7 +51,7 @@ on:
     # refresh bot's data push still gets a verdict (the cheap class)
     # and a merge marker committed into a Markdown file is still read.
     branches: [main]
-  # NO `workflow_dispatch`, deliberately (issue #180): CodeQL judges the
+  # NO `workflow_dispatch`, deliberately: CodeQL judges the
   # workflow_call callee through its caller's triggers, and an
   # externally triggerable event here re-arms the cache-poisoning alert
   # through the tests leg even with tests.yml's own trigger list clean.
@@ -125,10 +124,9 @@ jobs:
     uses: ./.github/workflows/tests.yml  # zizmor: ignore[self-repository]
     permissions:
       # Read-only: the callee runs no writer (its ratchet raise leaves as
-      # an artifact for the top-level ratchet-push workflow, issue #133
-      # part 2b), so the caller's grant stays at the workflow floor. The
-      # callee runs on the pull_request trust model: no secret is
-      # forwarded.
+      # an artifact for the top-level ratchet-push workflow), so the caller's
+      # grant stays at the workflow floor. The callee runs on the
+      # pull_request trust model: no secret is forwarded.
       contents: read
 
   lint:

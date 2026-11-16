@@ -1,4 +1,4 @@
-"""Issue #266: retain AA's detail-only models through every capture path."""
+"""Retain AA's detail-only models through every capture path."""
 
 import json
 import pathlib

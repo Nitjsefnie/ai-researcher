@@ -144,9 +144,9 @@ def test_write_publishes_canonical_bytes(tmp_path):
 
 
 def test_retired_baseline_section_is_now_an_unknown_field(tmp_path):
-    # The maintainer ruling for this repo is coverage only: a document
-    # carrying a sibling repo's module_size_baseline section is refused,
-    # not silently ignored.
+    # This repo's thresholds are coverage only: a document carrying a
+    # sibling repo's module_size_baseline section is refused, not
+    # silently ignored.
     target = _written_document(tmp_path)
     payload = json.loads(target.read_text(encoding="utf-8"))
     payload["module_size_baseline"] = {}
@@ -340,16 +340,16 @@ def test_check_cli_rejects_broken_document(tmp_path):
     assert "schema_version" in result.stderr
 
 
-# --- the --check history component (issue #53) -------------------------------
+# --- the --check history component ------------------------------------------
 #
 # These run thresholds.main() IN-PROCESS, not through a subprocess: the
 # coverage job traces the pytest process only, so a subprocess invocation
 # would leave the history component uncounted and drag the ratchet total
-# below its floor (PR #72's coverage-gate failure).
+# below its floor.
 
 
 def test_check_rejects_working_tree_lowering(tmp_path, capsys):
-    # Issue #53: a lowered document that keeps the 1.5 calibration gap is
+    # A lowered document that keeps the 1.5 calibration gap is
     # self-consistent, so the structural check alone accepts it. --check
     # must also judge the working tree against the committed copy.
     repo = _seed_repo(tmp_path)

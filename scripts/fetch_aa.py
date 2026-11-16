@@ -3,7 +3,7 @@
 
 artificialanalysis.ai is a Next.js app; scored records ship inside the embedded
 RSC flight payload rather than via a public JSON API. Select the richest models
-or initialModels array, not the lightweight model index (issue #266).
+or initialModels array, not the lightweight model index.
 
 Writes two captures, both from artificialanalysis.ai and nothing else:
 
@@ -1181,7 +1181,7 @@ def main() -> None:
     check_breakdown_slugs(list(captured.fetched))
     # All records were validated above. Only leaderboard records establish
     # the route window: a detail-only breakdown cannot clear that provenance
-    # merely by existing, whether or not it renders an axis (issue #266).
+    # merely by existing, whether or not it renders an axis.
     window_models = [m for m in models if m.get("slug") in captured.leaderboard_slugs]
     window_priced = sum(isinstance(m.get("intelligenceIndexCostPerTask"), dict)
                         for m in window_models)
@@ -1213,7 +1213,7 @@ def main() -> None:
           f"intelligence index, {priced} with {version_phrase} "
           f"(gaps filled from /models/{captured.host}; the leaderboard's own "
           "value wins wherever both routes carry the field)")
-    # The run's one-line generation summary (issue #208): how many distinct
+    # The run's one-line generation summary: how many distinct
     # generations this run's leaderboard, detail and evaluation reads
     # observed (Capture.generations), and how many records the
     # dispute layer holds. The quiet hour prints the 1 / 0 shape the

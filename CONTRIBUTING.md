@@ -113,7 +113,7 @@ AI_RESEARCHER_AA_SOURCE_COMMIT="$(git rev-parse HEAD)" python3 build.py
 
 immediately before committing, and change no build input afterwards. CI (the
 `page` job) refuses a committed page that lacks the stamp or differs from its
-own stamp-less rebuild (issue #105).
+own stamp-less rebuild.
 
 ## Tests
 
@@ -156,7 +156,7 @@ the coverage of the run that recorded it. CI never lowers them: the automated
 raise is the only writer on main, and it lands through the top-level
 `ratchet-push` workflow's write deploy key (the `main-push` environment) —
 a workflow_call callee cannot read an environment secret, which is why the
-push is not a job in tests.yml (issue #133 part 2b). There are two floors: Python statement
+push is not a job in tests.yml. There are two floors: Python statement
 coverage from the pytest run,
 and JavaScript physical code-line coverage of the page's inline script,
 measured through the browser suite (`tests/test_browser.py` records V8
@@ -188,7 +188,7 @@ not a per-row cost, and normalizing it would blind the guard to real
 regressions. The ratchet is **tighten-only**: `--check` measures fresh and
 fails on any budget exceeded, a budget may only fall, and **there is no
 automated raise** — the coverage ratchet's auto-raise has no perf analogue, by
-design. A deliberate raise has exactly one route onto `main` (issue #120): it
+design. A deliberate raise has exactly one route onto `main`: it
 lands **as its own commit** — nothing else rides along — and the commit
 message carries one declaration line per raised leaf,
 
@@ -196,9 +196,8 @@ message carries one declaration line per raised leaf,
 
 naming the exact values the diff carries. The guard honors the lines on a
 main **push** and on a **pull request** whose raise commit touches nothing
-outside the two budget documents (issue #133 part 3), with both routes
-requiring a `feat: ` or `feat(<scope>): ` commit subject in
-`base..head` (issue #271) — a raise cannot ride
+outside the two budget documents, with both routes requiring a `feat: ` or
+`feat(<scope>): ` commit subject in `base..head` — a raise cannot ride
 feature work onto main on either shape; a declaration whose values do not
 match the diff exactly refuses too. Merge a raise pull request with **rebase**:
 the lines live in the raise commit's message. A squash merge may replace them
@@ -222,13 +221,13 @@ startup (`python3 -c pass` under the same harness) from every count, and
 holds each target under its integer maximum. Tighten-only like the perf
 budgets: the default check mode fails on any budget exceeded, the ratchet
 guard refuses a budget that rises, and there is no automated raise. A
-deliberate raise follows the perf budgets' route (issue #120): its own
+deliberate raise follows the perf budgets' route: its own
 commit, one `Budget-Raise: <document> <key> <from> -> <to>` line
 per raised leaf with the exact values the diff carries — the lines count
 on a main push or a pull request's own raise commit, from a commit
 touching nothing outside the two budget documents, with both routes
 requiring a `feat: ` or `feat(<scope>): ` commit subject in
-`base..head` (issue #271). Budgets are pinned to
+`base..head`. Budgets are pinned to
 the CI cell that runs the gate —
 the coverage job's ubuntu-latest runner, CPython 3.15.1 / valgrind
 3.26.0 — and were seeded from that cell's measured counts
@@ -244,7 +243,7 @@ tighten-only PR calibrates against fresh CI numbers. Re-measure with
 `python3 scripts/ci/instruction_budgets.py --measure`.
 
 Four run only on GitHub. `ci gate` aggregates every merge gate into one
-`aggregate` verdict (issue #133): it starts on every push and pull request,
+`aggregate` verdict: it starts on every push and pull request,
 classifies the changed paths, and narrows the legs a documentation-only or
 bot-data-only change skips while its `ci gate / aggregate` check still
 reports — the one context a required-check ruleset can require, so a
@@ -269,7 +268,7 @@ A failed source fetch, or a red AA gate or suite, leaves that source out while
 the sources that succeeded still commit. A run in which nothing changed
 pushes nothing. The single push job uses its write deploy key (the `main-push`
 environment, restricted to main), so bot commits start workflow runs and get
-a real `ci gate` aggregate verdict (issue #133).
+a real `ci gate` aggregate verdict.
 
 Before the commit, `rankings` runs `python3 scripts/build_rankings.py` with full
 git history and this run's changed tracker snapshots, with no network input.
@@ -281,7 +280,7 @@ SHA and committer time. Each page is published to docs-hub after the commit land
 skipping an upload when the live bytes already match. Each hub job holds the
 docs-hub key only in its upload step, which runs `scripts/publish_docs.py` from
 the run's own commit and retries a 429, a 5xx, a timeout or a dropped
-connection inside `scripts/ci/download.py`'s backoff window (issue #402).
+connection inside `scripts/ci/download.py`'s backoff window.
 
 `download.py --run` retries a command inside the same window on any nonzero
 exit by default. `--retry-on STATUS,...` narrows that to the statuses named.

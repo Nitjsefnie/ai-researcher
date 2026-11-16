@@ -16,24 +16,23 @@ name: tests
 # near-zero signal, and (b) the page under test is OS-independent text (HTML/
 # JS built by build.py), so a second OS adds no behavioral coverage the matrix
 # misses. The coverage job installs playwright and Chromium; the matrix job
-# does not. That asymmetry is deliberate. The raise's push half left this
-# file for the top-level `ratchet-push` workflow (issue #133 part 2b): a
-# workflow_call callee cannot read an environment secret, and the deploy
-# key the push now authenticates with lives in one. The coverage job still
-# stages the raise as the `ratchet-data` artifact for that workflow. `page`
-# is the committed-page check
-# (issue #105): the source-commit stamp is set only on the refresh path, so a
-# page a PR commits by hand could go out stamp-less and the #94 republish run
-# would publish it — that job refuses a committed page lacking the stamp or
-# differing from its own stamp-less rebuild. `page-rankings` refuses a
-# committed rankings page that differs from its rebuild of HEAD's history.
+# does not. That asymmetry is deliberate. The raise's push half lives in the
+# top-level `ratchet-push` workflow: a workflow_call callee cannot read an
+# environment secret, and the deploy key the push authenticates with lives in
+# one. The coverage job still stages the raise as the `ratchet-data` artifact
+# for that workflow. `page` is the committed-page check: the source-commit
+# stamp is set only on the refresh path, so a page committed by hand could go
+# out stamp-less and the republish run would publish it — that job refuses a
+# committed page lacking the stamp or differing from its own stamp-less
+# rebuild. `page-rankings` refuses a committed rankings page that differs from
+# its rebuild of HEAD's history.
 #
 # A FOURTH job rides along on pull requests only. `diff-coverage` reports the
-# coverage of the change's OWN added lines — informational, never a gate
-# (issue #126) — and hands the rendered report to the `coverage comment`
-# workflow, which holds `pull-requests: write` beside the claim action's job
-# (issue #161, claim#153): no job that executes this tree ever carries a
-# conversation-write token, and the two writers never check the tree out.
+# coverage of the change's OWN added lines — informational, never a gate —
+# and hands the rendered report to the `coverage comment` workflow, which holds
+# `pull-requests: write` beside the claim action's job: no job that executes
+# this tree ever carries a conversation-write token, and the two writers never
+# check the tree out.
 #
 # THE RUNNER IS ALWAYS THE `-m` FORM — `python -m pytest`, which the coverage
 # job spells `python3 -m pytest` — NOT `pytest`, AND
@@ -48,23 +47,21 @@ name: tests
 on:
   workflow_call:
 
-# Trigger ownership moved to ci-gate.yml (issue #133): the push and
-# pull_request triggers, and their paths-ignore deny-list
-# (`**/*.md` / LICENSE / .gitignore), live there now — a trigger filter
+# The push and pull_request triggers, and their paths-ignore deny-list
+# (`**/*.md` / LICENSE / .gitignore), live in ci-gate.yml: a trigger filter
 # cannot report, so a required-check ruleset could never go green on a
 # documentation-only change. ci-gate classifies the changed paths and
 # conditions this leg on the result; this file keeps workflow_call (the
 # leg), its permissions block and its concurrency group.
 #
-# NO `workflow_dispatch`, deliberately — the one trigger this workflow
-# gives up (issue #180). The cache-poisoning query behind code-scanning
-# alert #26 (actions/cache-poisoning/poisonable-step) requires an
+# NO `workflow_dispatch`, deliberately. The cache-poisoning query behind
+# code-scanning alert #26 (actions/cache-poisoning/poisonable-step) requires an
 # externally triggerable event with default-branch cache-write access
 # and named workflow_dispatch in the alert message, so re-adding it
 # re-arms the alert, and tests/test_ci_context_separation.py refuses it
-# by name. What the trigger bought — running the suite on a ref no push
-# or pull request covers — is no route at all here: main's push trigger
-# carries every merge, and a finished run re-runs from its own page.
+# by name. Running the suite on a ref no push or pull request covers has no
+# route here: main's push trigger carries every merge, and a finished run
+# re-runs from its own page.
 
 # Least privilege: this job only reads the tree. Without an explicit block it
 # inherits the repository default, which can be read/write for the whole token.
@@ -125,7 +122,7 @@ jobs:
       - name: Install the test toolchain
         # There is deliberately no `pip install --upgrade pip` here: the
         # runner's stock pip installs the pinned manifest, so the unreviewed
-        # upgrade would be the one unpinned install in the job (issue #141).
+        # upgrade would be the one unpinned install in the job.
         run: |
           python scripts/ci/download.py --run python -m pip install -r requirements-test.txt
 
@@ -155,9 +152,9 @@ jobs:
 
     # Read-only, like every job here that runs code. This job installs
     # unhashed third-party dependencies and downloads a browser, so nothing
-    # in it may hold a write token (issue #134): the ratchet raise leaves
-    # the job as an artifact for the top-level `ratchet-push` workflow
-    # (issue #133 part 2b), whose own gates decide whether it lands.
+    # in it may hold a write token: the ratchet raise leaves the job as an
+    # artifact for the top-level `ratchet-push` workflow, whose own gates
+    # decide whether it lands.
     permissions:
       contents: read
 
@@ -190,7 +187,7 @@ jobs:
         id: install
         # There is deliberately no `pip install --upgrade pip` here: the
         # runner's stock pip installs the pinned manifest, so the unreviewed
-        # upgrade would be the one unpinned install in the job (issue #141).
+        # upgrade would be the one unpinned install in the job.
         run: |
           python3 scripts/ci/download.py --run python3 -m pip install -r requirements-test.txt
 
@@ -210,10 +207,10 @@ jobs:
         # verifies every archive against a committed sha256 first, pre-seeds
         # the browsers directory so playwright's install has nothing left to
         # download, and fails the run if anything was re-downloaded anyway.
-        # The verification keeps its point under the artifact split (issue
-        # #134): the browser produces the V8 coverage dump that sets the
-        # JavaScript floor, and that floor crosses into the privileged
-        # ratchet-push job inside the staged thresholds file.
+        # The verification matters because the browser produces the V8
+        # coverage dump that sets the JavaScript floor, and that floor crosses
+        # into the privileged ratchet-push job inside the staged thresholds
+        # file.
         # The --with-deps step inside the script still apt-installs the
         # shared libraries headless Chromium needs on a bare runner; without
         # them the launch fails with a missing-library error that reads
@@ -224,8 +221,8 @@ jobs:
         id: pytest
         # Under coverage, and with the repo root as cwd — see the header.
         # AI_RESEARCHER_JS_COVERAGE_OUT makes tests/test_browser.py record every page's V8
-        # coverage and dump it on teardown; unset, the suite behaves exactly
-        # as before.
+        # coverage and dump it on teardown; unset, the suite neither records
+        # nor dumps it and otherwise behaves exactly the same.
         env:
           AI_RESEARCHER_JS_COVERAGE_OUT: ${{ runner.temp }}/js-coverage.json
           # Measured subprocesses: the CLI contract tests launch the
@@ -293,12 +290,10 @@ jobs:
         # Ratchet documents step below refuses a pull request that relaxes
         # the document.
         #
-        # SCRIPTS ARE COUNTED, and that is a deliberate reversal. They were
-        # omitted while they were operator tooling a human ran and eyeballed.
-        # That stopped being true when diff_aa.py started writing the commit
-        # messages refresh.yml produces and publish_docs.py started talking to
-        # the hub with a credential: nobody is watching either at 01:11 UTC.
-        # Omitting them was measuring the half that a person checks anyway.
+        # SCRIPTS ARE COUNTED. diff_aa.py writes the commit messages
+        # refresh.yml produces and publish_docs.py talks to the hub with a
+        # credential, and nobody watches either at 01:11 UTC. Omitting scripts
+        # would measure only the half that a person checks anyway.
         #
         # Note what the number can and cannot speak to: what coverage counts
         # as statements in build.py is a small fraction of its size, because
@@ -578,10 +573,10 @@ jobs:
           if-no-files-found: error
 
   # --- The committed-page check -------------------------------------------
-  # Issue #105: out/frontier-models.html gets its "Source commit <code>…
+  # out/frontier-models.html gets its "Source commit <code>…
   # </code>" stamp only when AI_RESEARCHER_AA_SOURCE_COMMIT is set at build time, and only
   # refresh.yml sets it — so a page a pull request builds and commits by
-  # hand goes out stamp-less, and the #94 hourly republish run restores HEAD's
+  # hand goes out stamp-less, and the hourly republish run restores HEAD's
   # committed page byte for byte, stamp-less. This job refuses a committed
   # page that (i) lacks exactly one well-shaped source-commit stamp or
   # (ii) differs from a stamp-less rebuild of the same tree once build

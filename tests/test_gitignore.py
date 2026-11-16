@@ -1,15 +1,13 @@
-"""Pins the issue #165 invariant: the paths the refresh commits are
-git-trackable.
+"""Pins the invariant: the paths the refresh commits are git-trackable.
 
 The refresh workflow's commit step `git add`s its data paths. The
 deny-by-default .gitignore's data block names those paths back with `!`
-rules, and once one of them was missing the add exited 1 (issue #165):
-nothing was committed, the publish was skipped, and the hour stayed red.
-Fixing the block without a pin leaves the same rot available: any later
-edit that re-hides a committed path re-breaks the hour the same silent
-way -- `git status` will not tell you (an ignored file never appears on
-it), and the workflow only reds at the commit step, a full capture and a
-green suite later.
+rules, and a missing one makes the add exit 1: nothing is committed, the
+publish is skipped, and the hour stays red. Without a pin the same rot
+stays available: any edit that re-hides a committed path breaks the hour
+the same silent way -- `git status` will not tell you (an ignored file
+never appears on it), and the workflow only reds at the commit step, a
+full capture and a green suite later.
 
 So the pin: every path the refresh's commit step names is NOT ignored.
 `git check-ignore -q` exits 0 exactly when the ignore rules hide a path
@@ -25,9 +23,8 @@ exited 0).
 The path list is derived, not a hand-copied twin of the workflow's: the
 commit step is located by name and its `git add` commands are parsed,
 so a path the workflow starts adding joins this pin without a second
-edit -- the review corpus's shared-literal lesson, seen here in PRs 119
-and 151 before this. A parse that names no path is a failure (vacuity
-guard), never an empty pass.
+edit -- the review corpus's shared-literal lesson. A parse that names no
+path is a failure (vacuity guard), never an empty pass.
 
 The suite runs in a real checkout, so this is cheap. The suite never
 writes into data/ (fixture rules) -- this file only evaluates the ignore
@@ -63,9 +60,9 @@ def added_paths(workflow_name="refresh.yml", job="publish",
     # Join backslash continuations first, so an add split across lines
     # is read whole. Comment lines are dropped before the join, not after:
     # prose in the step mentions the adds it makes -- `git add <path>` in
-    # a rationale for issue #202 -- and a comment is not an add, so a
-    # path named only in one must not join the pin and be measured
-    # against .gitignore's rules for a file the refresh never stages.
+    # a rationale -- and a comment is not an add, so a path named only in
+    # one must not join the pin and be measured against .gitignore's rules
+    # for a file the refresh never stages.
     joined = []
     for line in steps[0]["run"].splitlines():
         if line.lstrip().startswith("#"):
@@ -164,7 +161,7 @@ DENY_PROBE_PATHS = (
 
 
 class GitignoreDenyDirectionTests(unittest.TestCase):
-    """Pins the deny DIRECTION of the data/ and out/ blocks (issue #169).
+    """Pins the deny DIRECTION of the data/ and out/ blocks.
 
     test_the_paths_the_refresh_commits_are_git_trackable proves the
     positive half: the paths the refresh names are NOT ignored. This is

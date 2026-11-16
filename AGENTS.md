@@ -10,7 +10,7 @@ up to date on `docs.nitjsefni.eu` via the docs-hub CLI, slug
 ## Single source of truth for the frontier page — artificialanalysis.ai
 
 **Every number on the frontier page comes from <https://artificialanalysis.ai/>
-(AA) and nowhere else** — a standing user decision (2026-07-30), not a default to
+(AA) and nowhere else** — a standing user decision, not a default to
 re-litigate.
 
 - Never take frontier-page numbers from lab blogs, model cards, technical
@@ -69,8 +69,8 @@ reasoning model costs more than its sticker price — the point of using it.
   `priceFallbackByModelId` has no cost.
 
 **Never use `codingIndex` or `agenticIndex`**: AA scores them from
-Terminal-Bench v2.1 and τ³-Banking, whose costs v4.3 removed from the
-breakdown. A score with no cost cannot go on a cost axis, and estimating the
+Terminal-Bench v2.1 and τ³-Banking, whose costs the breakdown does not
+carry. A score with no cost cannot go on a cost axis, and estimating the
 cost breaks the single-source rule; hence the coding axis uses another AA
 product.
 
@@ -82,12 +82,11 @@ with them. `fetch_aa.py` fetches both and gap-fills one level deep. AA caches
 each route separately, so a capture can straddle an update; the detail corpus
 is the measured-stale side, and per-route timestamps do NOT identify it (a
 detail page regenerated later still embeds the older corpus, so comparing
-dates picks the wrong side). Hence fixed precedence, never a comparison (Overseer ruling, delegated by the
-maintainer, 2026-10-05, issue #200): the leaderboard publishes every value it
-carries, the detail route fills only what the leaderboard omits, and a
-conflicting detail value loses. No disagreement state, heal, skip, baseline or
-exit code exists for it, and it never turns a run red. A field the leaderboard
-drops is a *fill*, not a disagreement.
+dates picks the wrong side). Hence fixed precedence, never a comparison: the
+leaderboard publishes every value it carries, the detail route fills only what
+the leaderboard omits, and a conflicting detail value loses. No disagreement
+state, heal, skip, baseline or exit code exists for it, and it never turns a
+run red. A field the leaderboard drops is a *fill*, not a disagreement.
 
 **Cost shape.** `intelligenceIndexCostPerTask` is a **bare number** (the
 flattened `cost.total`) on the leaderboard and the full **object** on the
@@ -97,13 +96,12 @@ this total's breakdown and is dropped whole, whatever its route, leaving the
 scalar until the routes converge (the alternatives are a stale total or hours
 of red).
 
-**Membership** is leaderboard ∪ detail corpus (issue #266, 2026-10-17). Shared
-models keep the precedence and cost guards; detail-only models use their detail
-record alone, and their values can lag a generation (issue #200).
-Vendor-retired models stay visible and tagged, preserving the independent
-`MISMATCH` verdict that leaderboard-only membership would silently end.
-Detail-only records join after the in-run comparison, so
-they cannot alter its dispute or canonical order.
+**Membership** is leaderboard ∪ detail corpus. Shared models keep the
+precedence and cost guards; detail-only models use their detail record alone,
+and their values can lag a generation. Vendor-retired models stay visible and
+tagged, preserving the independent `MISMATCH` verdict that leaderboard-only
+membership would silently end. Detail-only records join after the in-run
+comparison, so they cannot alter its dispute or canonical order.
 
 ### Third route: the GDPval-AA evaluation page
 
@@ -113,8 +111,7 @@ decrypts the file (AES-256-GCM), and computes each model's cost; of all that,
 only `gdpvalCostPerTask` enters the capture. A pair that fails authentication
 is re-read, page, manifest and data file together, `AUTH_REREAD_SECONDS`
 (180 s) apart, up to `AUTH_ATTEMPTS` (2) attempts in all, never pairing one
-attempt's key with another's data; a cached input is read once, not re-read
-(issue #406).
+attempt's key with another's data; a cached input is read once, not re-read.
 - The Elo comes from the leaderboard's `scores["gdpval-aa-normalized"]`; the
   detail route's top-level `gdpval` is read only for a record with no `scores`
   mapping (a detail-only model).
@@ -143,22 +140,20 @@ CONTRIBUTING.md "Capture dispute layers"; read it before touching the
 capture's merge, dispute or look-back code, and whenever a page shows "held
 since" or the run prints the 7-day hold warning. In short:
 - **In-run**: the run's two leaderboard looks, 180 s apart, are fingerprinted
-  (`generation_key`); two fingerprints, or one on different slug sets (Overseer
-  ruling, 2026-10-06, issue #211), hold both generations in `genVariants`.
-  Neither the detail route nor the GDPval-AA evaluation route raises a dispute
-  by itself, but an evaluation read matching neither disputed look joins no
-  GDPval-AA cost, and an agentic axis left empty refuses at the build until
-  AA's routes converge.
+  (`generation_key`); two fingerprints, or one on different slug sets, hold both
+  generations in `genVariants`. Neither the detail route nor the GDPval-AA
+  evaluation route raises a dispute by itself, but an evaluation read matching
+  neither disputed look joins no GDPval-AA cost, and an agentic axis left empty
+  refuses at the build until AA's routes converge.
 - **Cross-run generation** (`--cross-run-lookback`, the refresh workflow's flag only: a hand run does not
   pass it; state in
   `data/aa-generation-state.json`): a remembered revisit holds both generations
   until a fingerprint outside the remembered set arrives, or the state is
   cleared by hand (a retired side stays held otherwise); the hold carries a
   7-day stdout warning.
-- **Cross-run presence** (Overseer ruling, 2026-10-06, evening, issue #211): a
-  model in the previous capture's firm set and absent from this fetch, or the
-  reverse, is merged and disputed; one merged from the previous capture carries
-  `crossRunMerged: true`.
+- **Cross-run presence**: a model in the previous capture's firm set and absent
+  from this fetch, or the reverse, is merged and disputed; one merged from the
+  previous capture carries `crossRunMerged: true`.
 
 **Disputed hours** are ordinary: the run never exits red (except one whose
 GDPval-AA evaluation read matches neither leaderboard look: it joins no cost,
@@ -222,7 +217,7 @@ or hand-fix JSON — when:
   `build.py`'s `INDEX_EVAL_WEIGHTS` keys (records the look-back carries in from
   the previous capture were judged when captured), or per-evaluation costs stop
   summing to the published total — except an all-dropped window hour, which is
-  reported and returned (issue #217);
+  reported and returned;
 - the GDPval-AA evaluation page's title stops naming `fetch_gdpval.py`'s
   pinned `GDPVAL_VERSION` (2.1). The cost divides by the pinned
   `GDPVAL_TASK_COUNT` (220), which is never read from the page: a task-count

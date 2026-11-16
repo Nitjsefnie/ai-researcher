@@ -107,9 +107,8 @@ def test_data_only_accepts_the_signature_and_only_its_subsets():
         "data/aa-raw-models.json", "data/aa-raw-coding-agents.json",
         "data/aa-raw-models.json"])
     # An AA commit carries only the subset of its six paths whose bytes
-    # moved (git omits byte-identical files from the diff) — the real
-    # refresh push that ran the full matrix by mistake (issue #212,
-    # run 37490807791) touched exactly these two.
+    # moved (git omits byte-identical files from the diff) — a real
+    # refresh push touched exactly these two.
     assert classify.data_only([
         "data/aa-raw-models.json", "out/frontier-models.html"])
     assert classify.data_only(["data/captured-at.txt"])
@@ -160,7 +159,7 @@ def test_data_only_accepts_any_proper_subset():
     # an hour's commit carries only the files whose bytes moved, so a
     # dropped file is an hour with one byte-identical artifact, not a
     # hand-staged change to run the full matrix over. Dropping the window
-    # marker (issue #227) is the heal hour's own shape.
+    # marker is the heal hour's own shape.
     full = ["data/aa-raw-models.json", "data/aa-raw-coding-agents.json",
             "data/captured-at.txt", "out/frontier-models.html",
             "data/cost-breakdown-window.txt", "data/aa-generation-state.json",
