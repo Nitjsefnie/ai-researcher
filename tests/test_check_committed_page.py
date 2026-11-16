@@ -3,18 +3,17 @@
 The check runs in CI against out/frontier-models.html as committed, and
 refuses a page that carries no exactly-one well-shaped source-commit stamp
 or differs from a stamp-less rebuild of HEAD's committed data once build
-provenance is masked out (issue #105). These pins are on the DECISION, not
+provenance is masked out. These pins are on the DECISION, not
 the mechanism: every failure mode yields its own distinct violation, a
 correct page yields none, the mask removes exactly the provenance spans,
 and the stamp shape stays coupled to what build.py actually renders.
 
-Nothing here reads the working out/frontier-models.html: since #114 the
-suite builds every page into temp dirs and never rewrites the working copy,
-and these checks read both sides from HEAD with `git show` regardless: the
+Nothing here reads the working out/frontier-models.html: the suite builds
+every page into temp dirs and never rewrites the working copy, and these
+checks read both sides from HEAD with `git show` regardless: the
 committed page directly, and the data/ the rebuild stages from HEAD into a
 temp path, so a fresh uncommitted capture in the working data/ cannot move
-the rebuilt side (issue #108).
-"""
+the rebuilt side."""
 import contextlib
 import hashlib
 import io
@@ -141,7 +140,7 @@ class CheckCommittedPageTests(unittest.TestCase):
             [])
 
     def test_a_changed_working_capture_does_not_move_the_rebuild(self):
-        # The refresh's exact shape (issue #108): fetch_aa.py has just
+        # The refresh's exact shape: fetch_aa.py has just
         # written a fresh capture into the working data/ and the suite runs
         # before the commit. The check's subject is the committed tree, so
         # pointing build's capture paths at that fresh capture -- the state
@@ -380,7 +379,7 @@ class HeadStateTests(unittest.TestCase):
 
 
 class BuildProvenanceTests(unittest.TestCase):
-    """#49: the footer's provenance -- the source commit when the build
+    """The footer's provenance -- the source commit when the build
     environment carries one, and a sha256 over the two capture files, whole
     bytes models-then-agents, that a reader can verify by hashing them."""
 

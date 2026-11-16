@@ -17,14 +17,13 @@ name: audit
 # NOT HERMETIC, ON PURPOSE. The requirements files pin the direct tools only
 # — no lockfile — so every install resolves its transitive tree fresh at run
 # time. The one exception is requirements-zizmor.txt, whose single package
-# carries --hash lines for actionlint.yml's --require-hashes install
-# (issue #127); zizmor declares no dependencies, so nothing else was frozen
-# to get there. That is what gives this gate its subject: the
-# transitives are exactly where an advisory lands, and a frozen tree would go
-# stale exactly when an advisory did. The recorded cost (issue #50): with
-# zero repository change, a transitive release can turn CI red — here, or in
-# any gate that installs from these files — or alter the coverage numbers
-# that feed the ratchet in tests.yml.
+# carries --hash lines for actionlint.yml's --require-hashes install;
+# zizmor declares no dependencies, so nothing else was frozen to get there.
+# That is what gives this gate its subject: the transitives are exactly where
+# an advisory lands, and a frozen tree would go stale exactly when an advisory
+# did. The cost: with zero repository change, a transitive release can turn CI
+# red — here, or in any gate that installs from these files — or alter the
+# coverage numbers that feed the ratchet in tests.yml.
 #
 # WHY THE CRON IS THE IMPORTANT TRIGGER. Every other gate here answers "did
 # this commit break something", so push is the natural trigger. This one
@@ -47,14 +46,12 @@ on:
     # Standalone dispatch runs (no ci-gate classification) run every job
     # unconditionally.
 
-# Trigger ownership moved to ci-gate.yml (issue #133): the push and
-# pull_request triggers, and their paths-ignore deny-list
-# (`**/*.md` / LICENSE / .gitignore), live there now — a trigger filter
+# The push and pull_request triggers, and their paths-ignore deny-list
+# (`**/*.md` / LICENSE / .gitignore), live in ci-gate.yml: a trigger filter
 # cannot report, so a required-check ruleset could never go green on a
-# documentation-only change. The daily cron survives here: this gate
-# answers "is a version we froze months ago still safe", and that answer
-# changes when a stranger publishes an advisory, with no commit here to
-# hang it on.
+# documentation-only change. The daily cron stays here: this gate answers "is
+# a version we froze months ago still safe", and that answer changes when a
+# stranger publishes an advisory, with no commit here to hang it on.
 
 permissions:
   contents: read
@@ -84,10 +81,10 @@ jobs:
       - name: Install pip-audit
         # From requirements-pip-audit.txt rather than an inline pin:
         # Dependabot's pip ecosystem reads manifest files, never a `run:`
-        # block, so the inline pin was a version nothing ever bumped
-        # (issue #50). The manifest itself stays unhashed (issue #127): this
-        # workflow audits it per-manifest below, so a tampered pip-audit
-        # artifact is exactly what the audit step would surface.
+        # block, so an inline pin would never be bumped. The manifest itself
+        # stays unhashed: this workflow audits it per-manifest below, so a
+        # tampered pip-audit artifact is exactly what the audit step would
+        # surface.
         #
         # There is deliberately no `pip install --upgrade pip` here: the
         # unreviewed pip upgrade is an unaudited component — the very thing

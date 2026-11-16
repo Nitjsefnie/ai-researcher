@@ -4,9 +4,9 @@
 One question, one answer on stdout: `true` when the page built from the two
 capture files in data/ would differ from the page HEAD's two capture files
 build, `false` when it would not. The hourly refresh's no-change gate runs
-this instead of comparing raw capture bytes: AA's payload churns hourly in
+this rather than comparing raw capture bytes: AA's payload churns hourly in
 fields the page never renders, long after every rendered number is stable,
-and raw-byte comparison committed that churn hour after hour (issue #94).
+so a raw-byte comparison would commit that churn hour after hour.
 
 Both sides are built with build.py itself, so "the page" is the page: a
 changed render function IS a real page change, and a field the builder never
@@ -20,9 +20,9 @@ sub-threshold re-sample of output tokens/sec or time per task compares
 equal, so a quiet month of speed jitter commits nothing. The cost, stated
 plainly: outside a generation hold, speed columns can lag AA's live
 re-sampling by just under the threshold -- and they cannot lag further,
-because each hour compares against the last committed value, so a sustained crawl crosses
-the threshold cumulatively and commits. A generation hold instead renders
-the speeds frozen in the capture, for the length of that hold.
+because each hour compares against the last committed value, so a sustained
+crawl crosses the threshold cumulatively and commits. A generation hold
+instead renders the speeds frozen in the capture, for the length of that hold.
 
 Exit codes (the gate, run with no argument):
   0   an answer was reached: stdout carries `true` (moved) or `false`.
@@ -31,22 +31,22 @@ Exit codes (the gate, run with no argument):
       signal to re-read the leaderboard, never a quiet "nothing moved".
 No capture at HEAD (the first capture ever) is NOT broken: it fails OPEN,
 printing `true`, so the first run publishes instead of skipping forever.
-A held page (issue #232) is not broken either: it answers `false` (unchanged)
-on stdout with the reason on stderr -- still exit 0, still one word of stdout.
+A held page is not broken either: it answers `false` (unchanged) on stdout
+with the reason on stderr -- still exit 0, still one word of stdout.
 
-One second mode, the hold probe (`--fresh-held`, issue #236): answers whether
-the FRESH capture is in the #232 hold state -- `build.WindowHold` raised by a
-render of the fresh side alone. That exception fires only on the #232
-predicate (the marker records >= 3 generations in-run AND parameters is the
-only emptied axis), so the answer keys on exactly the
-evidence the hold mandates. `yes` (held) or `no` (a page built) on stdout,
-exit 0 both ways; a refused capture (build's SystemExit), a missing fresh
-capture, or anything unexpected is broken, not held -- exit 1, the reason on
-stderr, the refresh run turns red. The workflow runs this probe before its
-proceed verdict, so a forced or hub-stale run is held like an ordinary one.
-The converged hour with an emptied axis is NOT the probe's to answer: the
-no-argument gate refuses it (exit 1) earlier in the same step, and that
-refusal -- not the probe -- is the designed red for that shape.
+A second mode, the hold probe (`--fresh-held`): answers whether the FRESH
+capture is in the hold state -- `build.WindowHold` raised by a render of the
+fresh side alone. That exception fires only on the hold predicate (the marker
+records >= 3 generations in-run AND parameters is the only emptied axis), so
+the answer keys on exactly the evidence the hold mandates. `yes` (held) or
+`no` (a page built) on stdout, exit 0 both ways; a refused capture (build's
+SystemExit), a missing fresh capture, or anything unexpected is broken, not
+held -- exit 1, the reason on stderr, the refresh run turns red. The workflow
+runs this probe before its proceed verdict, so a forced or hub-stale run is
+held like an ordinary one. The converged hour with an emptied axis is NOT the
+probe's to answer: the no-argument gate refuses it (exit 1) earlier in the
+same step, and that refusal -- not the probe -- is the designed red for that
+shape.
 """
 from __future__ import annotations
 
@@ -113,7 +113,7 @@ class FreshCaptureError(Exception):
 
 
 class FreshWindowHold(Exception):
-    """The FRESH side of the gate held the page (issue #232).
+    """The FRESH side of the gate held the page.
 
     build_page_pair raises it only for the fresh side; the old side raising
     build.WindowHold propagates unwrapped and stays red -- HEAD never
@@ -254,11 +254,11 @@ def read_head_window_marker() -> bytes | None:
     the first healthy hour's commit removes it again -- so None is the normal
     hour's answer, and presence at HEAD means exactly that the committed
     capture is a window capture. The old side stages it because build.py
-    reads it beside the capture (issue #227); a committed capture plots every
-    axis, so it decides only a refusal's wording on a broken HEAD. Any
-    _git_show failure reads as None -- the captures were
-    already read from the same tree by the time this runs, so a plumbing
-    failure here is unheard-of rather than a state to distinguish.
+    reads it beside the capture; a committed capture plots every axis, so it
+    decides only a refusal's wording on a broken HEAD. Any _git_show failure
+    reads as None -- the captures were already read from the same tree by the
+    time this runs, so a plumbing failure here is unheard-of rather than a
+    state to distinguish.
     """
     try:
         return _git_show(f"data/{WINDOW_MARKER_NAME}")
@@ -378,16 +378,16 @@ def mask_digest(page: str) -> str:
         lambda m: m.group(1) + MASKED_DIGEST + m.group(2), page)
 
 
-# --- the hold probe (issue #236) ---------------------------------------------
+# --- the hold probe ----------------------------------------------------------
 
 
 def fresh_held() -> bool:
-    """Whether the FRESH capture is in the #232 hold state.
+    """Whether the FRESH capture is in the hold state.
 
     The probe renders the fresh side alone -- no HEAD side, no comparison,
     no speed reconciliation, none of which can move the empty-axis
     predicate the hold turns on -- and answers from the typed exception:
-    `build.WindowHold` is raised only on the #232 predicate, so "held"
+    `build.WindowHold` is raised only on the hold predicate, so "held"
     keys on exactly the evidence the hold mandates, never on output
     message text and never on which refresh path asked. A page built is
     "not held", whatever else the hour goes on to decide. The fresh reads
@@ -412,9 +412,9 @@ def held_main() -> int:
     `yes` = held, `no` = a page built. A refused capture (build's
     SystemExit) and a missing fresh capture (FreshCaptureError) are the
     named breakages; anything unexpected gets the traceback appended, so
-    the next occurrence names its site the way main()'s broad catch does
-    (issue #146). Every broken shape exits 1 with the reason on stderr and
-    no answer on stdout -- still the designed red, never a hold.
+    the next occurrence names its site the way main()'s broad catch does.
+    Every broken shape exits 1 with the reason on stderr and no answer on
+    stdout -- still the designed red, never a hold.
     """
     try:
         held = fresh_held()
@@ -477,9 +477,7 @@ def main() -> int:
     except (SystemExit, Exception) as exc:  # pylint: disable=broad-exception-caught
         # build.py's own refusals (SystemExit) already carry their named
         # reason. An unexpected crash gets the traceback appended, so the
-        # next occurrence names its site and field from the log alone --
-        # the 2026-10-03T01:09Z hour printed only "float division by zero"
-        # and named neither (issue #146).
+        # next occurrence names its site and field from the log alone.
         detail = str(exc)
         if not isinstance(exc, SystemExit):
             detail += "\n" + traceback.format_exc()

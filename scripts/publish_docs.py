@@ -20,7 +20,7 @@ followed — an environment override cannot point the credential at a
 cleartext destination or a different host.
 
 The upload retries a 429, a 5xx, a timeout or a dropped connection through
-scripts/ci/download.py's backoff window (issue #402).
+scripts/ci/download.py's backoff window.
 """
 from __future__ import annotations
 

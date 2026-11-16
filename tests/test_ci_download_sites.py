@@ -1,4 +1,4 @@
-"""The workflow sites of scripts/ci/download.py, executed (issue #395).
+"""The workflow sites of scripts/ci/download.py, executed.
 
 Each case runs a real `run:` block in a workspace holding copies of the real
 helper; only the network boundary (urlopen) or the pip child is faked.

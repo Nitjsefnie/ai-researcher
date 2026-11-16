@@ -37,9 +37,8 @@ failure without querying for a newer run.
 The verdict and a per-leg table go to the step summary; the exit code
 is the gate.
 
-Ported from claudit's scripts/ci/aggregate_gate.py of the same name
-(design precedent for this repository's #133); the leg set and the
-cheap set are this repository's own.
+Ported from claudit's scripts/ci/aggregate_gate.py of the same name; the
+leg set and the cheap set are this repository's own.
 """
 from __future__ import annotations
 

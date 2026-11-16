@@ -1,4 +1,4 @@
-"""Temp ownership and cleanup for browser launches (issue #310)."""
+"""Temp ownership and cleanup for browser launches."""
 import os
 from pathlib import Path
 import subprocess

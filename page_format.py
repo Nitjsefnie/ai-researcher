@@ -1,7 +1,7 @@
 """The generated page's number and text formatting, mirrored from its
 JavaScript.
 
-build.py renders both table bodies into the page at build time (#97) by
+build.py renders both table bodies into the page at build time by
 running the same rules the page's script runs on load. These functions ARE
 the script's fmtCost/fmtParams/fmtCtx/show/weightsOf/toFixed/String rules,
 one for one; the browser drift test loads the built page with JavaScript

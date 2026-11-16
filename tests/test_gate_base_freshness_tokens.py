@@ -1,4 +1,4 @@
-"""Which run-text tokens expand to a directory in the gate-path set (issue #378).
+"""Which run-text tokens expand to a directory in the gate-path set.
 
 A bare word names a tracked file or nothing; only a token containing `/`
 expands to every tracked file beneath a directory.

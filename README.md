@@ -79,13 +79,13 @@ python3 ~/.agent-bundle/scripts/docs_hub.py publish ./out/frontier-models.html \
 shape, when AA bumps the Intelligence Index version `build.py` is pinned to,
 when a fetched cost breakdown's slugs stop matching that version's exactly or its
 costs stop summing to the published total — except an all-dropped window hour,
-which is reported and returned (issue #217) — when the GDPval-AA evaluation
+which is reported and returned — when the GDPval-AA evaluation
 page stops naming v2.1, or its data file is missing, undecryptable on every
 read it is given (a live run reads page and data up to twice, a cached input
 once), or changes schema (the message names the file) — or when the Coding
 Agent Index table collapses. `build.py` refuses to write a page with an empty
 chart on it — except a three-generation window hour whose only empty chart is
-parameters, which holds the last good page instead (issue #232). All of those
+parameters, which holds the last good page instead. All of those
 are signals to re-read AA by hand, not to retry or to hand-fix JSON — never
 hand-edit either capture.
 

@@ -11,25 +11,24 @@ on main changing a file a gate reads is never applied to the pull request
 before it merges, and the merge publishes a tree whose green run proved
 nothing about it. Nothing else compares the two.
 
-THE EVENT DECIDES WHAT THE HEAD OWES (issue #195). A `push` run's head is a
-commit somebody pushed, and a push to main lands that head IN main's own
-history: main moving past it afterwards — including while the run is still
-executing, as the hourly refresh commits do — cannot make its verdict stale,
-because the tree it checked out is a tree main carries, and no push can
-change a commit that is already landed. So on `push` the gate asks exactly
-one question: is the head an ancestor of (or equal to) the freshly fetched
-main? Ancestor-or-equal passes; a pushed head OUTSIDE main's history (an
-ordinary feature branch) is judged like any other head, strictly. Every
-other event — pull_request above all — keeps the comparison exactly as
-before, and the event name comes from GITHUB_EVENT_NAME, which a workflow
-caller's event context supplies (a re-run keeps the original event);
-absent — a local run — the strict comparison stands, so nothing relaxes
+THE EVENT DECIDES WHAT THE HEAD OWES. A `push` run's head is a commit somebody
+pushed, and a push to main lands that head IN main's own history: main moving
+past it afterwards — including while the run is still executing, as the hourly
+refresh commits do — cannot make its verdict stale, because the tree it checked
+out is a tree main carries, and no push can change a commit that is already
+landed. So on `push` the gate asks exactly one question: is the head an ancestor
+of (or equal to) the freshly fetched main? Ancestor-or-equal passes; a pushed
+head OUTSIDE main's history (an ordinary feature branch) is judged like any
+other head, strictly. Every other event — pull_request above all — keeps the
+comparison exactly as before, and the event name comes from GITHUB_EVENT_NAME,
+which a workflow caller's event context supplies (a re-run keeps the original
+event); absent — a local run — the strict comparison stands, so nothing relaxes
 by accident.
 
 The set of such files is DERIVED from the workflows' text, not kept here:
 a hand-kept list goes stale exactly the way this check exists to prevent.
 Every tracked `.py` file in it is then followed, by gate_script_reach.py, to
-the tracked files it imports or runs, transitively (issue #401).
+the tracked files it imports or runs, transitively.
 
 The hand-held entries are REQUIRED_JOBS and SCRIPT_READS (the data paths
 gate scripts read). Upstream (Nitjsefnie-Actions/pr-gate) derives

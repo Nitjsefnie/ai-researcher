@@ -129,10 +129,9 @@ class CommitMessageTests(unittest.TestCase):
                          "chore(capture): 616 models, nothing the page renders")
 
     def test_speed_moves_alone_count_as_material(self):
-        # Issue 9: a run whose only movement was rendered speed past the
-        # tolerance was committed as "no material change" — and the moves
-        # were dropped from the body. The section is already threshold-
-        # filtered and the page renders those numbers, so it is material.
+        # A run whose only movement is rendered speed past the tolerance is
+        # material: the section is already threshold-filtered and the page
+        # renders those numbers, so the moves belong in the body.
         speed_only = self.without_frontier(REPORT).replace(
             "== models added: 6", "== models added: 0")
 
@@ -560,8 +559,8 @@ class ReportTests(unittest.TestCase):
         self.assertIn("nothing the page renders", diff_aa.as_commit_message(report))
 
     def test_unchanged_frontier_sections_are_omitted(self):
-        # A quiet capture used to spend most of its summary on five frontier
-        # sections whose only content was "(unchanged)".
+        # A quiet capture must not spend most of its summary on five frontier
+        # sections whose only content is "(unchanged)".
         old = [capture("Incumbent", intelligence=50, cost=1.0)]
         new = [capture("Incumbent", intelligence=50, cost=1.0)]
 
@@ -585,8 +584,8 @@ class ReportTests(unittest.TestCase):
         self.assertIn("+ Cheaper", report)
 
     def test_a_crafted_name_cannot_inject_a_trailer_into_the_commit_message(self):
-        # Issue 41: the report becomes `git commit -F` on main, so a crafted
-        # capture name carrying newlines could forge trailers or a subject.
+        # The report becomes `git commit -F` on main, so a crafted capture name
+        # carrying newlines could forge trailers or a subject.
         crafted = "X\n\nCo-Authored-By: crafted <crafted@example.invalid>"
         old = [capture("Incumbent", intelligence=50, cost=1.0)]
         new = old + [capture(crafted, ident="crafted", intelligence=62, cost=0.5)]
@@ -615,7 +614,7 @@ class ReportTests(unittest.TestCase):
 
 
 class DisputeSectionTests(unittest.TestCase):
-    """The differ learns the dispute layer (issue #208).
+    """The differ reports the dispute layer.
 
     `genVariants` is a TOP-LEVEL record key carrying the whole per-generation
     list, so its movement between two captures is section news -- one line
@@ -665,10 +664,10 @@ class DisputeSectionTests(unittest.TestCase):
         self.assertNotIn("genVariants:", report)
 
     def test_the_multi_count_ignores_padded_empty_variants(self):
-        # Issue #211: genVariants is padded to one entry per generation, with
-        # `{}` at every generation that does not carry the model. A padded
-        # empty is not a carrying generation: one non-empty map plus one
-        # empty is NOT more than one variant; two non-empty still count.
+        # genVariants is padded to one entry per generation, with `{}` at every
+        # generation that does not carry the model. A padded empty is not a
+        # carrying generation: one non-empty map plus one empty is NOT more than
+        # one variant; two non-empty still count.
         old = [capture("Incumbent", intelligence=50)]
         new = [dict(capture("Incumbent", intelligence=50), genVariants=[
             {"ii": 50.0, "cost": 0.75},
@@ -756,10 +755,9 @@ class DisputeSectionTests(unittest.TestCase):
         self.assertIn("genVariants appeared on 1 model(s)", message)
 
     def test_a_disputes_only_hour_is_material_in_the_subject(self):
-        # A run whose ONLY news is the Disputes section used to be committed
-        # as "nothing the page renders" -- while the page genuinely changed,
-        # both generations rendering red on it. The section's count lines are
-        # news, and the subject carries them.
+        # A run whose ONLY news is the Disputes section is still news: the page
+        # changed, both generations rendering red on it. The section's count
+        # lines are news, and the subject carries them.
         old = [capture("Incumbent", intelligence=50)]
         new = [dict(capture("Incumbent", intelligence=50), genVariants=[
             {"ii": 50.0, "cost": 0.75}, {"ii": 51.0, "cost": 0.80},
@@ -842,8 +840,8 @@ class DisputeSectionTests(unittest.TestCase):
         self.assertIn("rendered speed", message)
 
     def test_the_subject_is_unchanged_when_no_dispute_moved(self):
-        # The quiet capture's subject is byte-what it was before the clause
-        # existed: no disputes section, no disputes clause.
+        # The quiet capture's subject stays byte-for-byte the plain one: no
+        # disputes section, no disputes clause.
         old = [capture("Incumbent", intelligence=50)]
         new = [capture("Incumbent", intelligence=50)]
 
@@ -855,12 +853,12 @@ class DisputeSectionTests(unittest.TestCase):
 
 
 class CostShapeSwitchTests(unittest.TestCase):
-    """The cost field's shape switch (issue #244).
+    """The cost field's shape switch.
 
     The merge drops a cost breakdown that belongs to another generation,
     leaving the leaderboard's bare total. The record then flips shape with
-    its value unchanged, and the differ reported that as two field-change
-    lines spelling one unchanged total.
+    its value unchanged, and the differ must not report that as two
+    field-change lines spelling one unchanged total.
     """
 
     def setUp(self):
@@ -895,9 +893,8 @@ class CostShapeSwitchTests(unittest.TestCase):
 
         report = self.render(old, new)
 
-        # Field changes: none. The issue's two quoted lines both named this
-        # one unchanged total -- "appearing" at the bare path, "disappearing"
-        # from cost.total.
+        # Field changes: none. Both shapes name this one unchanged total --
+        # "appearing" at the bare path, "disappearing" from cost.total.
         self.assertIn("  (none)", report)
         self.assertNotIn("intelligenceIndexCostPerTask", report)
 
@@ -916,15 +913,14 @@ class CostShapeSwitchTests(unittest.TestCase):
 
 
 class DisplayNameTests(unittest.TestCase):
-    """Issue #88 in the differ: no report line carries AA's dict-form effort.
+    """No report line in the differ carries AA's dict-form effort.
 
     The chart-frontier sections key on the row builders' names, so they clean
-    through build.py; `line()` and the two section headers printed the raw
-    capture name directly and wrap it in build.display_name instead. The
-    exact-line pins also hold `line()`'s II/cost lookup to the CLEANED key: a
-    lookup left on the raw name matches nothing and silently degrades every
-    changed model's II/cost to the em-dash fallback ("62.0" -> "62",
-    "$0.50" -> "—").
+    through build.py; `line()` and the two section headers wrap the raw
+    capture name in build.display_name. The exact-line pins also hold
+    `line()`'s II/cost lookup to the CLEANED key: a lookup left on the raw
+    name matches nothing and silently degrades every changed model's II/cost
+    to the em-dash fallback ("62.0" -> "62", "$0.50" -> "—").
     """
 
     def setUp(self):
@@ -1027,8 +1023,8 @@ class DisplayNameTests(unittest.TestCase):
                 self.assertEqual(build.display_name(raw), cleaned)
 
     def test_a_record_without_a_name_still_renders_one_line(self):
-        # The degenerate record -- no name at all -- renders exactly as
-        # before: the cleaning wraps a string name only.
+        # The degenerate record -- no name at all -- renders unchanged:
+        # the cleaning wraps a string name only.
         self.assertEqual(diff_aa.shown_name({}), "None")
 
 
@@ -1084,10 +1080,8 @@ class RealCaptureTests(unittest.TestCase):
         message = diff_aa.as_commit_message(buffer.getvalue())
 
         self.assertRegex(message, r"^chore\(capture\): \d+ models")
-        # DERIVED, never pinned. An earlier version of this line asserted
-        # "644 models" and failed the build the next day because AA published
-        # a 645th -- a test over live data asserting a live VALUE is a
-        # scheduled failure, not a check. Tie it to the capture instead.
+        # DERIVED, never pinned. A test over live data asserting a live VALUE is
+        # a scheduled failure, not a check. Tie it to the capture instead.
         self.assertIn(f"{len(json.loads(build.RAW.read_text(encoding='utf-8')))} models",
                       message)
 
@@ -1208,10 +1202,9 @@ def unreferenced_helpers(texts: dict[str, str], module_path: str) -> list[str]:
 
 
 class NoDeadHelpersTests(unittest.TestCase):
-    """Issue #61: diff_aa.py carried a helper with zero call sites whose
-    docstring claimed "the real-capture test pins this set" -- no test did.
-    Deleted rather than decorated; this guard is the pin that must have
-    caught it, and the fixtures below prove the guard itself fires.
+    """A diff_aa.py helper with zero call sites, whose docstring can claim a
+    test pins it when no test does, fails this guard; the fixtures below
+    prove the guard itself fires.
     """
 
     MODULE = "scripts/diff_aa.py"

@@ -1,11 +1,10 @@
 """Structural pins on .github/workflows/refresh.yml.
 
 The hourly producers stage separate artifacts; the keyless publish job
-joins their successful changes into one commit (issue #285). The push job
-alone loads the deploy key in main-push and delivers that bundle (issues
-#143 and #133). Both hub jobs follow the landing and verify their page
-against main before uploading; identical live bytes skip the upload
-(issue #206).
+joins their successful changes into one commit. The push job alone loads
+the deploy key in main-push and delivers that bundle. Both hub jobs follow
+the landing and verify their page against main before uploading; identical
+live bytes skip the upload.
 Its safety lives in the gating BETWEEN steps and BETWEEN jobs: what runs only
 after the suite passed, what only when the commit actually landed, what
 republishes a stale live page. Those contracts are invisible to the Python
@@ -13,10 +12,10 @@ suite until something parses the YAML, so this file does -- structurally, on
 step shape and on substrings that name the mechanism, never on line numbers
 or whole-run-block equality that any reflow would break.
 
-There is NO route-disagreement state (issue #200): the leaderboard is the
-authority and the detail route fills gaps and adds detail-only models, so a
-moved capture has one exit colour and one commit message. The pins below cover
-the Capture step's recovery and re-raise, not a dispute branch.
+There is NO route-disagreement state: the leaderboard is the authority and
+the detail route fills gaps and adds detail-only models, so a moved capture
+has one exit colour and one commit message. The pins below cover the Capture
+step's recovery and re-raise, not a dispute branch.
 """
 from datetime import datetime, timezone
 import json
@@ -39,7 +38,7 @@ import _workflowrun  # noqa: E402  # pylint: disable=wrong-import-position
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 WORKFLOW = ROOT / ".github" / "workflows" / "refresh.yml"
-# Each hub job's upload: the canonical client from the job's checkout (issue #402).
+# Each hub job's upload: the canonical client from the job's checkout.
 PUBLISH_CMD = 'python3 "${GITHUB_WORKSPACE}/scripts/publish_docs.py"'
 FETCH_CMD = 'python3 "${GITHUB_WORKSPACE}/scripts/ci/download.py" --run --retry-on 128 git -C "${scratch}" fetch --quiet origin main'
 LIVE_CMD = 'python3 "${GITHUB_WORKSPACE}/scripts/ci/download.py" https://docs.nitjsefni.eu/d/ai-researcher/'

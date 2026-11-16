@@ -66,19 +66,17 @@ def churn(models: bytes) -> bytes:
 
 
 def disputed_capture(models: bytes) -> bytes:
-    """The capture with five models carrying the in-run disputed encoding
-    (issue #226's fixture): `genVariants` -- one map per generation, the
-    empty map the generation that does NOT carry the model (a missing key
-    would be a missing marker, a different thing) and the carried map the
-    record's own published values, so the plain fields stay the
-    canonical-first variant's.
+    """The capture with five models carrying the in-run disputed encoding:
+    `genVariants` -- one map per generation, the empty map the generation
+    that does NOT carry the model (a missing key would be a missing marker,
+    a different thing) and the carried map the record's own published
+    values, so the plain fields stay the canonical-first variant's.
 
-    Four carry the cross-run readded shape refresh run 37682958494 caught
-    (three with the pad FIRST, one with it last), and one carries a
-    cross-run dropped record (crossRunMerged: true) -- every shape
-    genVariants takes. The mutation lives in memory only -- never a data/
-    write. Self-contained by this file's convention: no import from the
-    build tests.
+    Four carry the cross-run readded shape (three with the pad FIRST, one
+    with it last), and one carries a cross-run dropped record
+    (crossRunMerged: true) -- every shape genVariants takes. The mutation
+    lives in memory only -- never a data/ write. Self-contained by this
+    file's convention: no import from the build tests.
     """
     parsed = json.loads(models)
     widened = 0
@@ -179,11 +177,11 @@ class CaptureGateTests(unittest.TestCase):
         self.assertEqual((code, out), (0, "true\n"))
 
     def test_sub_threshold_speed_drift_is_not_a_change(self):
-        # The ruling's contract: a sub-25% re-sample of a rendered speed
-        # field is jitter, not news -- the gate must agree with diff_aa's
-        # --speed-tol or the repo keeps producing commits whose own subject
-        # says "nothing the page renders". 100 -> 110 tokens/sec sits inside
-        # one ladder rung; the page compares equal.
+        # A sub-25% re-sample of a rendered speed field is jitter, not
+        # news -- the gate must agree with diff_aa's --speed-tol or the
+        # repo keeps producing commits whose own subject says "nothing the
+        # page renders". 100 -> 110 tokens/sec sits inside one ladder rung;
+        # the page compares equal.
         head = with_tps(FIXTURE_MODELS, 100.0)
         fresh = with_tps(FIXTURE_MODELS, 110.0)
         with head_serving(head, FIXTURE_AGENTS), \
@@ -231,12 +229,11 @@ class CaptureGateTests(unittest.TestCase):
 
         self.assertEqual((code, out), (0, "false\n"))
 
-        # Issue #226: the same churn over a disputed capture, both sides
-        # disputed (the fresh side patched the same way the speed tests
-        # patch theirs). genVariants rides the rows, and a page that let
-        # the capture's key layout into the embedded dispute maps votes
-        # true on exactly this fixture -- the vote that turned refresh run
-        # 37682958494's hour red.
+        # The same churn over a disputed capture, both sides disputed (the
+        # fresh side patched the same way the speed tests patch theirs).
+        # genVariants rides the rows, and a page that let the capture's key
+        # layout into the embedded dispute maps votes true on exactly this
+        # fixture.
         disputed = disputed_capture(FIXTURE_MODELS)
         with head_serving(churn(disputed), churn(FIXTURE_AGENTS)), \
              mock.patch.object(capture_gate, "read_fresh_captures",
@@ -260,10 +257,10 @@ class CaptureGateTests(unittest.TestCase):
         for page in (old_page, new_page):
             self.assertEqual(len(capture_gate.DIGEST_RE.findall(page)), 1)
 
-        # Issue #226: the disputed capture too. genVariants may be the ONLY
-        # raw difference (the churned keys inside its maps), so the masked
-        # pages must be byte-equal here as well -- the digest stays the one
-        # masked difference, and any OTHER rendered change still votes true
+        # The disputed capture too. genVariants may be the ONLY raw difference
+        # (the churned keys inside its maps), so the masked pages must be
+        # byte-equal here as well -- the digest stays the one masked
+        # difference, and any OTHER rendered change still votes true
         # (test_a_rendered_change_is_a_change, run over the disputed shape
         # below).
         disputed = disputed_capture(FIXTURE_MODELS)
@@ -279,11 +276,11 @@ class CaptureGateTests(unittest.TestCase):
             self.assertEqual(len(capture_gate.DIGEST_RE.findall(page)), 1)
 
     def test_a_rendered_change_on_a_disputed_capture_is_a_change(self):
-        # The true-vote control on the disputed shape (issue #226): a real
-        # rendered move -- one model's Intelligence Index, re-rendered
-        # through build.metric_record exactly as the quiet control mutates
-        # its field -- must still vote true when the capture carries
-        # genVariants, so the dispute handling can never swallow news.
+        # The true-vote control on the disputed shape: a real rendered move --
+        # one model's Intelligence Index, re-rendered through
+        # build.metric_record exactly as the quiet control mutates its field --
+        # must still vote true when the capture carries genVariants, so the
+        # dispute handling can never swallow news.
         disputed = disputed_capture(FIXTURE_MODELS)
         with head_serving(rendered_field_changed(disputed), FIXTURE_AGENTS), \
              mock.patch.object(capture_gate, "read_fresh_captures",
@@ -535,8 +532,8 @@ class GenerationBootstrapTests(unittest.TestCase):
         held = state["held"]
         if held is not None:
             # Later refreshes legitimately commit holds; the seed pin must not
-            # block them. A hold keyed while gdpvalNormalized was still in
-            # DISPUTE_CAPABLE (before v5.0) reproduces only under that field set.
+            # block them. A hold keyed under the pre-v5.0 field set
+            # (DISPUTE_CAPABLE plus gdpvalNormalized) reproduces only under that field set.
             older = set(fetcher.DISPUTE_CAPABLE) | {"gdpvalNormalized"}
             current = True
             for key, records in held["generations"].items():
@@ -704,11 +701,11 @@ class OscillationTests(unittest.TestCase):
         self.assertEqual((code, out), (0, "true\n"))
 
 
-# --- issue #146: a zero score is a legal AA publication ----------------------
+# --- a zero score is a legal AA publication ----------------------------------
 
 
 def zero_score_capture(models: bytes) -> bytes:
-    """The capture with one model turned into issue #146's crash shape: its
+    """The capture with one model turned into the zero-score crash shape: its
     intelligenceIndex zeroed and its cost total set strictly cheapest, so the
     model lands on the intelligence frontier carrying a zero score. The
     mutation lives in memory only -- never a data/ write. Self-contained by
@@ -734,11 +731,10 @@ def zero_score_capture(models: bytes) -> bytes:
 
 
 class ZeroScoreCaptureGateTests(unittest.TestCase):
-    """Issue #146 through the rendered no-change gate. A capture carrying a
-    legal zero score must BUILD -- the gate answers false on identical
-    bytes, it does not crash -- and an unexpected build crash now carries
-    its traceback on stderr, so the next occurrence is diagnosable from the
-    log alone instead of a bare "float division by zero"."""
+    """The rendered no-change gate with a capture carrying a legal zero score.
+    It must BUILD -- the gate answers false on identical bytes, it does not
+    crash -- and an unexpected build crash carries its traceback on stderr, so
+    the next occurrence is diagnosable from the log alone."""
 
     def test_a_zero_score_capture_builds_and_answers_false(self):
         models = zero_score_capture(FIXTURE_MODELS)
@@ -750,9 +746,8 @@ class ZeroScoreCaptureGateTests(unittest.TestCase):
         self.assertEqual((code, out), (0, "false\n"))
 
     def test_an_unexpected_build_crash_carries_its_traceback(self):
-        # The 2026-10-03T01:09Z hour failed with a bare "float division by
-        # zero" that named neither site nor field. An unexpected exception
-        # now carries the traceback on stderr.
+        # An unexpected exception carries the traceback on stderr, so the
+        # log names the failing site.
         err = io.StringIO()
         with head_serving(b"{not json", FIXTURE_AGENTS), \
              mock.patch.object(capture_gate, "read_fresh_captures",
@@ -779,17 +774,16 @@ class ZeroScoreCaptureGateTests(unittest.TestCase):
         self.assertNotIn("Traceback", err.getvalue())
 
 
-# --- issue #227: the window marker on the gate path --------------------------
+# --- the window marker on the gate path --------------------------------------
 
 
 def window_capture(models: bytes) -> bytes:
-    """The capture in the production window shape (issue #217): every model
-    that carried a decomposable cost breakdown now carries the bare scalar
-    the merge leaves when it drops every breakdown as another generation's.
-    Intelligence (the scalar IS the measured total, build.cost_per_task) and
-    parameters survive -- the two-generation window's exact shape.
-    Self-contained by this file's convention: no import from the build
-    tests."""
+    """The capture in the production window shape: every model that carried a
+    decomposable cost breakdown carries the bare scalar the merge leaves when
+    it drops every breakdown as another generation's. Intelligence (the scalar
+    IS the measured total, build.cost_per_task) and parameters survive -- the
+    two-generation window's exact shape. Self-contained by this file's
+    convention: no import from the build tests."""
     parsed = json.loads(models)
     for m in parsed:
         if isinstance(m.get("intelligenceIndexCostPerTask"), dict):
@@ -800,8 +794,7 @@ def window_capture(models: bytes) -> bytes:
 def corner_capture(models: bytes) -> bytes:
     """window_capture with every parameter count deleted too: the designed
     three-generation corner -- the detail route fills nothing, so the
-    parameters axis empties. #223's refusal shape, and run 37691148949's
-    failure exactly."""
+    parameters axis empties."""
     parsed = json.loads(window_capture(models))
     for m in parsed:
         m.pop("parameters", None)
@@ -818,19 +811,18 @@ CONVERGED_WINDOW_MARKER = ("every cost breakdown dropped as another "
 
 
 class WindowMarkerStagingTests(unittest.TestCase):
-    """Issue #227: the marker staged into the temp data dirs is what makes
-    the #232 hold and the #223 refusal wording reachable on the GATE path --
-    the gap that let #223's fix ship half-landed, its tests calling build.py
-    directly and never the gate. Each side stages its OWN source's marker
-    (HEAD's from git, the hour's from data/)."""
+    """The marker staged into the temp data dirs is what makes the
+    three-generation hold and the refusal wording reachable on the GATE
+    path, which tests calling build.py directly never reach. Each side
+    stages its OWN source's marker (HEAD's from git, the hour's from
+    data/)."""
 
     def test_the_corner_holds_through_the_gate(self):
-        # Issue #232, run 37691148949's state pinned at the gate: HEAD
-        # healthy, the fresh capture in the three-generation corner, the
-        # hour's marker recorded -- the build holds the page, the gate
-        # answers false (unchanged) with the hold's reason on stderr, and
-        # the refusal's nonzero exit is gone: the last good page stays
-        # live and nothing commits.
+        # The corner state pinned at the gate: HEAD healthy, the fresh capture
+        # in the three-generation corner, the hour's marker recorded -- the
+        # build holds the page, the gate answers false (unchanged) with the
+        # hold's reason on stderr, and the gate exits zero rather than
+        # refusing: the last good page stays live and nothing commits.
         err = io.StringIO()
         out = io.StringIO()
         with head_serving(FIXTURE_MODELS, FIXTURE_AGENTS), \
@@ -852,11 +844,11 @@ class WindowMarkerStagingTests(unittest.TestCase):
         self.assertNotIn("changed shape", err.getvalue())
 
     def test_a_converged_parameters_empty_hour_stays_red_through_the_gate(self):
-        # The gate must not start swallowing converged hours: the SAME
-        # corner capture with a 2-generation marker still refuses (the
-        # count is below the hold's threshold), and the gate relays that
-        # refusal as broken-red exactly as before -- the paired mutation
-        # check to the build-side test above.
+        # The gate must not start swallowing converged hours: the SAME corner
+        # capture with a 2-generation marker still refuses (the count is below
+        # the hold's threshold), and the gate relays that refusal as
+        # broken-red -- the paired mutation check to the build-side test
+        # above.
         err = io.StringIO()
         with head_serving(FIXTURE_MODELS, FIXTURE_AGENTS), \
              mock.patch.object(capture_gate, "read_head_window_marker",
@@ -1019,7 +1011,7 @@ class WindowMarkerStagingTests(unittest.TestCase):
 
 
 class FreshHoldProbeTests(unittest.TestCase):
-    """Issue #236: the --fresh-held probe the refresh verdict consumes.
+    """The --fresh-held probe the refresh verdict consumes.
 
     The probe answers ONE question about the FRESH capture alone -- is it
     in the #232 hold state? -- from the typed exception a fresh-side render
@@ -1028,7 +1020,7 @@ class FreshHoldProbeTests(unittest.TestCase):
     page answers no, and every broken shape (a refused capture, a missing
     fresh capture, an unexpected crash) exits 1 with the reason on stderr
     and no answer on stdout. The no-argument gate's own contract is pinned
-    by the classes above and stays untouched.
+    by the classes above.
     """
 
     def setUp(self):
@@ -1091,15 +1083,14 @@ class FreshHoldProbeTests(unittest.TestCase):
         self.assertEqual(err, "")
 
     def test_a_converged_corner_capture_is_refused_not_held(self):
-        # PROBE-LAYER PIN: handed a CONVERGED (2-generation) corner capture
-        # -- the marker plus the corner axes -- the probe itself relays the
-        # refusal: exit 1, the reason on stderr, no answer on stdout. A
-        # probe that answered yes here would hold a genuinely broken hour
-        # green. The WORKFLOW never brings this shape to the probe -- the
-        # no-argument gate refuses it earlier in the same step (issue
-        # #236 review) -- so the workflow-level red for it is pinned by
-        # test_refresh_workflow.py's ExecutedHoldProbeTests (the forced,
-        # gate-failure case), not here.
+        # PROBE-LAYER PIN: handed a CONVERGED (2-generation) corner capture --
+        # the marker plus the corner axes -- the probe itself relays the
+        # refusal: exit 1, the reason on stderr, no answer on stdout. A probe
+        # that answered yes here would hold a genuinely broken hour green. The
+        # WORKFLOW never brings this shape to the probe -- the no-argument gate
+        # refuses it earlier in the same step -- so the workflow-level red for
+        # it is pinned by test_refresh_workflow.py's ExecutedHoldProbeTests
+        # (the forced, gate-failure case), not here.
         err = io.StringIO()
         with mock.patch.object(capture_gate, "read_fresh_captures",
                                return_value=(corner_capture(FIXTURE_MODELS),
@@ -1143,7 +1134,7 @@ class FreshHoldProbeTests(unittest.TestCase):
     def test_an_unexpected_build_crash_exits_1_with_traceback(self):
         # Anything unexpected -- a raw exception the typed refusal and the
         # hold do not cover -- exits 1 with the traceback on stderr, the
-        # same diagnosability main()'s broad catch bought (issue #146).
+        # same diagnosability main()'s broad catch gives.
         err = io.StringIO()
         with mock.patch.object(capture_gate, "_render_side",
                                side_effect=RuntimeError("boom")), \

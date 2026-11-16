@@ -1,15 +1,15 @@
 """tests.yml keeps untrusted pull-request execution out of trusted contexts.
 
-Code-scanning alerts #26 (actions/cache-poisoning/poisonable-step) and #27
-(actions/untrusted-checkout/medium) on .github/workflows/tests.yml both
-flowed from two surfaces, and this file pins each shut:
+Two surfaces of .github/workflows/tests.yml arm the code-scanning queries
+actions/cache-poisoning/poisonable-step and
+actions/untrusted-checkout/medium, and this file pins each shut:
 
 - the ``workflow_dispatch`` trigger. The cache-poisoning query
   (CachePoisoningViaPoisonableStep.ql) requires an externally triggerable
   event with default-branch cache-write access
   (``Event.isExternallyTriggerable`` plus
-  ``hasDefaultBranchCacheWriteAccess``) and named workflow_dispatch in the
-  alert message, so the trigger is what armed the finding;
+  ``hasDefaultBranchCacheWriteAccess``) and its alert message names
+  workflow_dispatch, so the trigger is what arms the finding;
 - the "Ratchet documents" step's fetch of ``refs/pull/<number>/head``. The
   untrusted-checkout query (``GitMutableRefCheckout``) reads a ``git fetch``
   whose command or in-scope env carries the pull-request number — and its
@@ -48,8 +48,8 @@ def test_no_externally_triggerable_default_branch_write_trigger():
     both externally triggerable and default-branch cache-write capable.
     schedule is the one other event in both sets, and repository_dispatch
     would read the same way to the analyser — so the pin refuses all three
-    by pinning the boundary instead of naming members. Since #133 the
-    trigger surface is owned by the CALLER: tests.yml is a workflow_call
+    by pinning the boundary instead of naming members. The trigger surface
+    is owned by the CALLER: tests.yml is a workflow_call
     callee and declares `workflow_call` alone, and ci-gate.yml carries
     exactly {push, pull_request} with push scoped to main — CodeQL judges
     the callee through its caller's triggers, so a dispatch re-added on
@@ -86,7 +86,7 @@ def test_no_step_fetches_or_checks_out_a_pr_controlled_ref():
         r'|\b(?:gh|hub)\b[^\n]*?\bpr\s+checkout\b')
     # The analyser's own recognition grammar, mirrored needle for needle so
     # a grammar change upstream reds this pin as a diff instead of
-    # re-arming alert #27 in silence. Grouped by the UntrustedCheckoutQuery
+    # re-arming the alert in silence. Grouped by the UntrustedCheckoutQuery
     # predicate each needle comes from.
     forbidden = (
         'refs/pull',

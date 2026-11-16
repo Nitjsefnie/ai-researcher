@@ -19,7 +19,7 @@ import pathlib
 import re
 from types import EllipsisType
 
-# The page's formatting mirrors (#97) and stylesheet live in sibling modules.
+# The page's formatting mirrors and stylesheet live in sibling modules.
 from page_format import (EM_DASH, fmt_cost, fmt_ctx, fmt_params, js_number,
                          js_to_fixed, show_text, weights_text)
 from page_style import STYLE
@@ -35,7 +35,7 @@ OUT = ROOT / "out" / "frontier-models.html"
 # Terminal-Bench-Science and HLE-Diamond, swapped CritPt for CritPt v2 (Hard
 # Subset), cut GDP.pdf to 5% and removed GDPval-AA, SciCode, AA-LCR and
 # Humanity's Last Exam -- so fetch_aa.py refuses any other MAJOR.MINOR on that
-# page's live headline (issue #220); point releases (v4.3.2) do not rebalance
+# page's live headline; point releases (v4.3.2) do not rebalance
 # and pass.
 INDEX_VERSION = "5.0"
 
@@ -51,7 +51,7 @@ INDEX_EVAL_WEIGHTS = {
 
 METRIC_ORDER = ("coding", "intelligence", "agentic")
 
-# Every axis is now a score and a cost AA measured on the same run, and each
+# Every axis is a score and a cost AA measured on the same run, and each
 # comes from the source that publishes them together:
 #
 #   coding        the Coding Agent Index (data/aa-raw-coding-agents.json), whose
@@ -63,8 +63,8 @@ METRIC_ORDER = ("coding", "intelligence", "agentic")
 #                 AA's GDPval-AA page computes (fetch_gdpval.py's field).
 #
 # The leaderboard's `codingIndex` and `agenticIndex` fields are deliberately NOT
-# used: AA scores both from Terminal-Bench v2.1 and tau3-banking, whose per-task
-# cost it stopped publishing in v4.3. A score with no cost cannot go on a
+# used: AA scores both from Terminal-Bench v2.1 and tau3-banking, and publishes
+# no per-task cost for either. A score with no cost cannot go on a
 # cost axis, and estimating the missing half is off the table.
 
 
@@ -79,7 +79,7 @@ EFFORT = re.compile(r"^(minimal|low|medium|high|xhigh|max)(\s+effort)?$", re.I)
 # The dict-repr form AA's own displayLabel carries on some agent runs --
 # "Codex - GPT-6 Luna (max) ({'reasoning_effort': 'max'})". The inner value
 # is the same effort word the other two shapes carry; a typo'd key or a
-# non-effort value must NOT match (issue #85).
+# non-effort value must NOT match.
 EFFORT_DICT = re.compile(
     r"^\{\s*'reasoning_effort'\s*:\s*"
     r"'(minimal|low|medium|high|xhigh|max)'\s*\}$", re.I)
@@ -92,7 +92,7 @@ def _effort_scan(name):
     on commas, effort words are pulled out and everything else is kept. A "("
     with no ")" after it can never open a group, so the scan stops there and
     the rest is kept verbatim -- which is what keeps a pathological name
-    (issue #47: a capture-crafted name of ~80k parens cost ~54 s of regex
+    (a capture-crafted name of ~80k parens takes ~54 s under regex
     backtracking) linear instead of quadratic in the parens' count.
 
     `segments` is the name re-rendered without the effort words: the leading
@@ -147,7 +147,7 @@ def split_effort(name):
 def display_label(name):
     """The compact chart label: the name with the effort knob moved forward.
 
-    Identifies an effort variant within a 34-character chart cap (#85): the
+    Identifies an effort variant within a 34-character chart cap: the
     effort groups drop out of place and the FIRST effort re-attaches
     immediately after the leading text segment -- before any kept groups, so
     the one word that distinguishes effort variants of one model survives a
@@ -162,7 +162,7 @@ def display_label(name):
 def display_name(name):
     """The reader-facing full name: AA's dict-form effort text decoded (#88).
 
-    #85 moved the effort knob out of the chart labels; the dict-repr group
+    The effort knob is out of the chart labels; the dict-repr group
     AA puts on some agent runs still reached every full-name sink -- the
     payload's `name` field the tooltip, popup, table, aria-labels, search and
     the copy exports read, and diff_aa.py's report lines. The rule, per
@@ -201,7 +201,7 @@ def display_name(name):
                 plain.add(part.lower().replace(" effort", ""))
         i = close + 1
     # Pass 2: render. Two linear walks, never a regex over the whole name --
-    # the shape that cost issue #47 its ~54 s.
+    # that shape has been measured at ~54 s.
     out = []
     i = 0
     while True:
@@ -240,11 +240,11 @@ def cost_per_task(m):
     """AA's measured cost per task, USD.
 
     Two shapes: the object intelligenceIndexCostPerTask.cost.total from the
-    detail route, and -- since AA flattened the leaderboard -- a bare number
-    that IS the total. The merge restores the object for every model the
-    detail route describes; a bare number is what the one model it cannot
-    describe (the detail host) is left with, and what a model whose stale
-    breakdown was dropped under the leaderboard's newer total is left with
+    detail route, and a bare number from the leaderboard that IS the total.
+    The merge restores the object for every model the detail route
+    describes; a bare number is what the one model it cannot describe (the
+    detail host) is left with, and what a model whose stale breakdown was
+    dropped under the leaderboard's newer total is left with
     (merge_captures: its measured total is the fresh one and still plots).
     """
     outer = m.get("intelligenceIndexCostPerTask")
@@ -309,17 +309,16 @@ def build_rows(models):
         label = m.get("name") or m.get("shortName") or ""
         base, eff = split_effort(label)
         intelligence = metrics["intelligence"]
-        # Renamed by AA: totalParameters -> parameters. Same numbers -- every
-        # model carrying both across the rename agreed exactly.
+        # AA ships the parameter count as `parameters`.
         parameters = num(m.get("parameters"))
         row = {
-            # The reader-facing name (#88): AA's dict-form effort text is
-            # decoded out of it. The RAW label survives only in the capture;
-            # base/eff/label below keep their raw-label semantics.
+            # The reader-facing name: AA's dict-form effort text is decoded out of
+            # it. The RAW label survives only in the capture; base/eff/label below
+            # keep their raw-label semantics.
             "name": display_name(label),
             "base": base,
             "eff": eff,
-            # The compact chart label (#85): the effort word re-attached right
+            # The compact chart label: the effort word re-attached right
             # after the model name, so effort variants of one model stay
             # distinguishable under the page's 34-character chart cap.
             "label": display_label(label),
@@ -349,15 +348,14 @@ def build_rows(models):
             "pin": num(m.get("price1mInputTokens")),
             "pout": num(m.get("price1mOutputTokens")),
         }
-        # fetch_aa.py's dispute layer (issue #208): when the capture caught
-        # AA serving two inconsistent generations, the disputed records
-        # carry `genVariants` -- one flat map per generation in canonical
-        # order, whose fields are THAT generation's published values. The
-        # row carries them as `gv` with every map's keys in the canonical
-        # field order (canonical_variant_maps says why, issue #226). A quiet
-        # capture has no key and no `gv`: the payload is byte-what it has
-        # always shipped. Agent rows never carry it -- the agents capture
-        # has one in-run source.
+        # fetch_aa.py's dispute layer: when the capture caught AA serving two
+        # inconsistent generations, the disputed records carry `genVariants` --
+        # one flat map per generation in canonical order, whose fields are THAT
+        # generation's published values. The row carries them as `gv` with every
+        # map's keys in the canonical field order (canonical_variant_maps says why).
+        # A quiet capture has no key and no `gv`: the payload is byte-identical
+        # to one built without the dispute layer. Agent rows never carry it --
+        # the agents capture has one in-run source.
         if m.get("genVariants"):
             row["gv"] = canonical_variant_maps(m["genVariants"])
         rows.append(row)
@@ -413,13 +411,13 @@ def build_agent_rows(agents, models):
         creators = display.get("creator")
         creators = creators if isinstance(creators, dict) else {}
         rows.append({
-            # The reader-facing name (#88), same as model rows: the dict-form
+            # The reader-facing name, same as model rows: the dict-form
             # effort text is decoded out of it, and the RAW label survives
             # only in the capture.
             "name": display_name(label),
             "base": base,
             "eff": eff,
-            # The compact chart label (#85), same as model rows.
+            # The compact chart label, same as model rows.
             "label": display_label(label),
             "kind": "agent",
             "agent": a.get("agentName") or None,
@@ -466,7 +464,7 @@ def metric_of(row, metric):
     return row.get("metrics", {}).get(metric)
 
 
-# Issue #208's dispute rendering. A disputed row carries `gv` -- one flat
+# Dispute rendering. A disputed row carries `gv` -- one flat
 # map per AA generation in canonical order -- and every surface that renders
 # a disputed VALUE shows both generations red as "a / b": first value the
 # canonical generation's, pair order canonical. A field whose variants agree
@@ -483,7 +481,7 @@ VARIANT_PAIR_FIELDS = {
 # The fields a variant map carries, in fetch_aa.variant_fields' own
 # emission order -- restated here so a disputed row's `gv` reaches the
 # page with every map's keys in ONE order regardless of how the capture's
-# bytes happened to lay them out (issue #226). Anything outside the list
+# bytes happened to lay them out. Anything outside the list
 # (a field an older capture still carries) is appended sorted, so nothing is
 # dropped.
 GV_FIELD_ORDER = ("ii", "cost", "gdpval", "gdpvalCost", "ctx", "pin", "pout")
@@ -492,11 +490,9 @@ GV_FIELD_ORDER = ("ii", "cost", "gdpval", "gdpvalCost", "ctx", "pin", "pout")
 def canonical_variant_maps(gen_variants):
     """`genVariants` with every map's keys in the canonical field order.
 
-    The row is otherwise a pure function of the capture's parsed content;
-    these maps used to be copied key-order-verbatim (dict(v)), so the
-    capture gate's raw-only churn fixture -- every object's keys reordered
-    -- shifted the embedded dispute maps and voted true on nothing (issue
-    #226).
+    The row is otherwise a pure function of the capture's parsed content.
+    The maps are rebuilt in canonical key order, so reordering a capture's
+    keys (raw-only churn) cannot shift the embedded dispute maps.
     """
     ordered = []
     for variant in gen_variants:
@@ -514,7 +510,7 @@ def disputed_field_values(row, field):
     two variants); no two PRESENT variant values differ and no variant is
     the empty map (a missing marker in a genuine variant is a fill, never a
     conflict; a padded `{}` is a generation that does not carry the model
-    at all, issue #211, so a carried value against it IS a dispute).
+    at all, so a carried value against it IS a dispute).
     """
     gv = row.get("gv")
     if not gv or len(gv) < 2:
@@ -595,7 +591,7 @@ def retired_frontier_axes(rows, row):
 
 
 def retired_summary(rows, retired_front):
-    """The retired-model summary line's parenthetical (issue #203). MISMATCH
+    """The retired-model summary line's parenthetical. MISMATCH
     is a finding to report, not a bug to fix -- a vendor can retire a model
     that still sits on an efficient frontier -- so the mismatch state keeps
     naming the models and every frontier (axis) each one sits on: a
@@ -609,14 +605,14 @@ def retired_summary(rows, retired_front):
     return f"MISMATCH -- still undominated: {named}"
 
 
-# Shared models publish the leaderboard's copy (issue #200). The two routes are
+# Shared models publish the leaderboard's copy. The two routes are
 # independently cached Vercel pages and AA's data lands on them at different
 # times, so a capture can straddle an update -- but the detail route is
 # MEASURED to be the stale one (its corpus keeps the previous generation's
 # display names and scores), and the per-route generation timestamps do NOT
 # identify which route is stale: a detail page regenerated later still embeds
 # the older corpus. Shared models use leaderboard values and detail fills;
-# capture() also retains detail-only models with that lag caveat (issue #266).
+# capture() also retains detail-only models with that lag caveat.
 # The one field whose two halves must agree or the breakdown goes: the cost
 # object, whose .evaluations decompose .cost.total. AA writes the breakdown as
 # the index weights already applied, so the parts sum to the total exactly.
@@ -668,12 +664,12 @@ def merge_captures(base: list, detail: list) -> list:
     ships; the detail route fills only what the leaderboard does not carry
     (parameters, licence, release date, the per-evaluation cost breakdown).
     A value the leaderboard HAS is never replaced by the detail route's,
-    silently and always: two generations mixed into one capture is exactly
-    what made the page oscillate, so a conflicting detail value is not a
+    silently and always: two generations mixed into one capture make the
+    page oscillate, so a conflicting detail value is not a
     disagreement to resolve -- it simply loses.
 
     This helper widens only base records. capture() adds detail-only models
-    after the in-run comparison and before the cross-run layers (issue #266).
+    after the in-run comparison and before the cross-run layers.
     """
     def fill(into, extra):
         """`into` wins; `extra` supplies only what is absent.
@@ -740,7 +736,7 @@ CAPTURE_STAMP_RE = re.compile(r"[0-9]{4}-[0-9]{2}-[0-9]{2}")
 
 # fetch_aa.py writes the stamp beside the capture it stamps, and this build
 # reads that capture from RAW and AGENTS_RAW -- so the capture is present
-# exactly when one of these input files sits beside the stamp (issue #64).
+# exactly when one of these input files sits beside the stamp.
 # Fixed at import: a test that redirects RAW must not rename what the guard
 # looks for.
 CAPTURE_INPUTS = (RAW.name, AGENTS_RAW.name)
@@ -765,7 +761,7 @@ def read_capture_stamp(stamp_path: pathlib.Path) -> str:
     """
     if not stamp_path.exists():
         # A capture that lost its stamp must not be silently relabelled with
-        # the build date (issue #64): refuse when capture data is present.
+        # the build date: refuse when capture data is present.
         capture = [
             name for name in CAPTURE_INPUTS if (stamp_path.parent / name).exists()
         ]
@@ -817,7 +813,7 @@ def generation_hold_note(data_dir: pathlib.Path, raw: bytes | None | EllipsisTyp
 
 
 def cost_breakdown_window(data_dir: pathlib.Path) -> bool:
-    """Whether fetch_aa.py left the all-dropped window marker (issue #217).
+    """Whether fetch_aa.py left the all-dropped window marker.
 
     fetch_aa.py writes data/cost-breakdown-window.txt when the merge
     dropped the leaderboard models' cost breakdowns -- an AA window, not a
@@ -831,14 +827,14 @@ def cost_breakdown_window(data_dir: pathlib.Path) -> bool:
 def window_generations(data_dir: pathlib.Path) -> int | None:
     """The in-run generation count the window marker records, or None.
 
-    Issue #223: a window hour that empties an axis is refused unless it is the
-    #232 parameters hold, and the refusal must name the window it is instead of
+    A window hour that empties an axis is refused unless it is the
+    parameters hold, and the refusal must name the window it is instead of
     blaming a capture shape change. The count rides the marker's one line as
     "; N generation(s) observed in-run" -- record_cost_window writes it, and
     this reads the ONE integer back by its own literal; a marker without it
-    (an older fetch_aa.py wrote those) reads as None and the refusal names
-    the window generically. Nothing here reaches the page: the count feeds
-    the refusal message on stderr, exactly like the axis names.
+    (one an older fetch_aa.py wrote) reads as None and the refusal names the
+    window generically. Nothing here reaches the page: the count feeds the
+    refusal message on stderr, exactly like the axis names.
     """
     try:
         text = (data_dir / "cost-breakdown-window.txt").read_text(
@@ -852,9 +848,9 @@ def window_generations(data_dir: pathlib.Path) -> int | None:
 class WindowHold(Exception):
     """A window hour that holds the page instead of building one.
 
-    Issue #232: when the window marker records three or more generations
-    observed in-run and parameters is the only empty axis after detail-only
-    rows join, the page holds. Other empty axes still refuse.
+    When the window marker records three or more generations observed in-run
+    and parameters is the only empty axis after detail-only rows join, the page holds.
+    Other empty axes still refuse.
     For a hold, main() raises
     instead of writing: the capture gate catches it on the fresh side and
     reports the hour unchanged, so the last good page stays live and
@@ -866,10 +862,9 @@ class WindowHold(Exception):
 def read_capture(path):
     """The capture at path, parsed -- or a guarded exit naming the file.
 
-    A capture written by a crashed runner can end mid-file (issue #66), and
-    parsing it anyway died with a raw JSONDecodeError traceback that named no
-    file. A corrupt capture is the same signal as a schema change -- fail red
-    with one actionable line -- never a traceback and never a partial build.
+    A capture written by a crashed runner can end mid-file; that is the same
+    signal as a schema change -- fail red with one actionable line that names
+    the file, never a raw JSONDecodeError traceback and never a partial build.
     """
     try:
         return json.loads(path.read_text(encoding="utf-8"))
@@ -880,14 +875,14 @@ def read_capture(path):
         ) from exc
 
 
-# The two table bodies rendered at build time (#97). The page's script fills
-# #fTable and #tbl on load; with JavaScript disabled a visitor got page
-# chrome and no data. main() now renders both bodies into the template in the
-# page's DEFAULT state -- every filter chip on except superseded/effort, no
+# The two table bodies rendered at build time. The page's script fills
+# #fTable and #tbl on load; main() also renders both bodies into the template
+# in the page's DEFAULT state -- every filter chip on except superseded/effort, no
 # lab, no query, no pins, sorted by Intelligence Index descending -- by
-# running the same pipeline the script runs. The functions below mirror the
-# page's JavaScript one for one; the browser drift test loads the page with
-# and without JavaScript and holds the two renders equal cell-for-cell.
+# running the same pipeline the script runs, so a visitor with JavaScript
+# disabled still gets the data. The functions below mirror the page's
+# JavaScript one for one; the browser drift test loads the page with and
+# without JavaScript and holds the two renders equal cell-for-cell.
 
 METRIC_LABELS = {
     "coding": "Coding Agent Index",
@@ -978,8 +973,7 @@ def render_frontier_tbody(rows):
                 + f'<td class="{score_cls}">{score}</td>'
                 + f'<td class="{cost_cls}">{cost}</td>'
                 + '<td class="n">'
-                # $/point at zero capability is not a number (issue #146 red an
-                # hour on the bare ZeroDivisionError), nor on an Elo, whose zero
+                # $/point at zero capability is not a number, nor on an Elo, whose zero
                 # is arbitrary: em dash, never a crash or "$Infinity".
                 + ('$' + js_to_fixed(pair["cost"] / pair["score"], 4)
                    if pair["score"] and metric != "agentic" else EM_DASH)
@@ -1117,9 +1111,9 @@ def main(*, generation_state: bytes | None | EllipsisType = ...):
 
     # Written by fetch_aa.py when the capture was taken. The today-fallback
     # covers only a data directory with no capture in it; a capture that lost
-    # its stamp is refused rather than relabelled with the build date (issue
-    # #64), and the read validates the format because the stamp is
-    # interpolated unescaped downstream (issue #40).
+    # its stamp is refused rather than relabelled with the build date, and the
+    # read validates the format because the stamp is interpolated unescaped
+    # downstream.
     captured = read_capture_stamp(RAW.parent / "captured-at.txt")
     stats = {
         "total": len(models),
@@ -1145,7 +1139,7 @@ def main(*, generation_state: bytes | None | EllipsisType = ...):
             if r["params"] is not None and r["metrics"]["intelligence"] is not None
         ),
     }
-    # Issue #217: fetch_aa.py leaves data/cost-breakdown-window.txt when the
+    # fetch_aa.py leaves data/cost-breakdown-window.txt when the
     # merge dropped the leaderboard models' cost breakdowns -- an AA window.
     window = cost_breakdown_window(RAW.parent)
     # A rendered axis with nothing on it means the capture moved under us --
@@ -1154,21 +1148,21 @@ def main(*, generation_state: bytes | None | EllipsisType = ...):
     # "the pipeline broke". The page renders FOUR axes: metricCounts
     # quantifies the three score/cost ones, parameterCount the fourth, which
     # pairs the Intelligence Index with model size rather than with a cost
-    # (issue #60) -- so the enumeration here covers both stats, and a stale
+    # -- so the enumeration here covers both stats, and a stale
     # capture (AA's totalParameters rename) fails red instead of publishing
     # an empty parameters chart.
     #
-    # The guard's arms, narrowest first. The designed three-generation corner
-    # (issue #232): the marker records >= 3 generations AND parameters is the
-    # only emptied axis (never agentic: the marker reports leaderboard
-    # breakdowns, which no GDPval cost comes from) -- the hour HOLDS: WindowHold,
-    # which scripts/capture_gate.py reports as the hour unchanged -- the last
-    # good page stays live, nothing commits or publishes -- until AA's routes
+    # The guard's arms, narrowest first. The designed three-generation corner:
+    # the marker records >= 3 generations AND parameters is the only emptied
+    # axis (never agentic: the marker reports leaderboard breakdowns, which no
+    # GDPval cost comes from) -- the hour HOLDS: WindowHold, which
+    # scripts/capture_gate.py reports as the hour unchanged -- the last good
+    # page stays live, nothing commits or publishes -- until AA's routes
     # converge. Every other emptied axis still refuses (SystemExit, nonzero):
     # AGENTS.md's designed go-re-read-AA-by-hand signal, naming the observed
     # in-run generation count when the marker carries one, with the
     # shape-change wording only for a capture that does NOT record a window,
-    # where shape change is the honest cause (issue #223).
+    # where shape change is the honest cause.
     rendered = {**stats["metricCounts"], "parameters": stats["parameterCount"]}
     empty = [axis for axis, n in rendered.items() if not n]
     if (window and empty == ["parameters"]

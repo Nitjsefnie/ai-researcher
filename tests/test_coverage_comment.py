@@ -1,11 +1,11 @@
 """The trusted commenter executes its contract, not its source text.
 
-The `coverage comment` workflow holds `pull-requests: write` — shared, since
-issue #161, with the claim action's job, which also never checks out the tree —
-so its steps run here against a stub `gh` — posting only where the event's
-own pull request says to, updating one numbered comment in place, refusing
-an artifact that names a different pull request, and publishing a check
-that says plainly when coverage was not measured.
+The `coverage comment` workflow holds `pull-requests: write` — shared with the
+claim action's job, which also never checks out the tree — so its steps run
+here against a stub `gh`: posting only where the event's own pull request says
+to, updating one numbered comment in place, refusing an artifact that names a
+different pull request, and publishing a check that says plainly when coverage
+was not measured.
 """
 import json
 import os

@@ -55,8 +55,8 @@ BROWSERS_JSON = {
     ],
 }
 
-# The on-disk directory names playwright uses, observed 2026-09-29 (note the
-# headless shell's underscore where the registry name has a hyphen).
+# The on-disk directory names playwright uses (note the headless shell's
+# underscore where the registry name has a hyphen).
 DIR_NAMES = {
     "chromium": f"chromium-{REVISION}",
     "chromium-headless-shell": f"chromium_headless_shell-{REVISION}",
@@ -978,9 +978,9 @@ def test_assert_seeded_intact_catches_a_replaced_directory(
     # directories then exist at once, and two simultaneously existing
     # directories never share an inode — the replacement's inode differs
     # from the recorded one on every filesystem. (Creating it after the
-    # rmtree instead lets the filesystem hand the freed inode straight
-    # back, which ext4 usually does, so this test's outcome depended on
-    # the allocator state the ~400 preceding tests left behind.)
+    # rmtree would let the filesystem hand the freed inode straight back,
+    # which ext4 usually does, so the outcome would depend on the
+    # allocator state the ~400 preceding tests leave behind.)
     replacement = browsers_root / "replacement"
     replacement.mkdir()
     shutil.rmtree(chromium_dir)
