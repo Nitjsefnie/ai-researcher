@@ -9,9 +9,12 @@ another repository, pull request or head SHA is unmodeled and fails loudly
 — because a double that answers any destination cannot prove the
 destination.
 """
+import contextlib
+import os
 import re
 import shlex
 import shutil
+import signal
 import subprocess
 import tempfile
 from pathlib import Path
@@ -55,11 +58,25 @@ def run_step(workdir, step, env):
     temp_dir = tempfile.mkdtemp(prefix="workflow-step-", dir=workdir)
     child_env["TMPDIR"] = temp_dir
     try:
-        return subprocess.run(
-            command, cwd=workdir, env=child_env, check=False,
-            capture_output=True, text=True, timeout=120)
+        with subprocess.Popen(command, cwd=workdir, env=child_env, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                              text=True, start_new_session=os.name != "nt") as process:
+            try:
+                stdout, stderr = process.communicate(timeout=120)
+            except BaseException:  # TERM first: a SIGKILLed shell skips the EXIT trap that stops its daemons
+                _stop(process)
+                raise
+        return subprocess.CompletedProcess(command, process.returncode, stdout, stderr)
     finally:
         shutil.rmtree(temp_dir)
+
+
+def _stop(process):
+    for sig in (signal.SIGTERM, signal.SIGKILL) if os.name != "nt" else ():
+        with contextlib.suppress(ProcessLookupError):
+            os.killpg(process.pid, sig)
+        with contextlib.suppress(subprocess.TimeoutExpired):
+            process.wait(5)
+    process.kill()
 
 
 def write_gh_stub(bin_dir, state_path, calls_path):
