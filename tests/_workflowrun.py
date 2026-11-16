@@ -18,6 +18,7 @@ import signal
 import subprocess
 import tempfile
 import threading
+import time
 from pathlib import Path
 
 import yaml
@@ -78,11 +79,13 @@ def run_step(workdir, step, env):
 
 
 def _stop(process):
-    for sig in (signal.SIGTERM, signal.SIGKILL) if os.name != "nt" else ():
-        with contextlib.suppress(ProcessLookupError):
+    with contextlib.suppress(ProcessLookupError):  # the group is gone
+        for sig in (signal.SIGTERM, signal.SIGKILL) if os.name != "nt" else ():
             os.killpg(process.pid, sig)
-        with contextlib.suppress(subprocess.TimeoutExpired):
-            process.wait(5)
+            for _ in range(50):  # 5 s for the whole group
+                time.sleep(0.1)
+                process.poll()
+                os.killpg(process.pid, 0)
     process.kill()
 
 
