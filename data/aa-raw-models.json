@@ -227,9 +227,9 @@
   "price1mOutputTokens": 4.8,
   "cacheHitPrice": null,
   "cacheWritePrice": null,
-  "outputSpeed": 79.39785587942042,
-  "timeToFirstToken": 2.8088674269337,
-  "timeToFirstAnswerToken": 2.8088674269337,
+  "outputSpeed": 82.61797281405843,
+  "timeToFirstToken": 2.8016073034857123,
+  "timeToFirstAnswerToken": 2.8016073034857123,
   "slug": "qwen3-5-omni-plus",
   "chartDefaultSelected": false,
   "chartHighlighted": false,
@@ -718,9 +718,9 @@
   "price1mOutputTokens": 3.2,
   "cacheHitPrice": null,
   "cacheWritePrice": null,
-  "outputSpeed": 102.10699376047383,
-  "timeToFirstToken": 4.388897176777724,
-  "timeToFirstAnswerToken": 4.388897176777724,
+  "outputSpeed": 100.63928648402991,
+  "timeToFirstToken": 4.393558459848069,
+  "timeToFirstAnswerToken": 4.393558459848069,
   "slug": "qwen3-5-122b-a10b",
   "gdpvalCostPerTask": 0.23991564181818184,
   "chartDefaultSelected": false,
@@ -1382,14 +1382,14 @@
    "critpt": 0.168571428571429
   },
   "intelligenceIndexCostPerTask": 0.7806560352024481,
-  "intelligenceIndexTimePerTask": 243.0295579171035,
+  "intelligenceIndexTimePerTask": 240.01869525377072,
   "price1mInputTokens": 2,
   "price1mOutputTokens": 10,
   "cacheHitPrice": 0.1,
   "cacheWritePrice": 2.5,
-  "outputSpeed": 126.51092746767249,
-  "timeToFirstToken": 4.280746124172022,
-  "timeToFirstAnswerToken": 4.280746124172022,
+  "outputSpeed": 128.09791646289756,
+  "timeToFirstToken": 4.363454027451058,
+  "timeToFirstAnswerToken": 4.363454027451058,
   "slug": "claude-sonnet-5-5",
   "gdpvalCostPerTask": 6.8377462951486905,
   "chartDefaultSelected": true,
@@ -2549,14 +2549,14 @@
    "critpt": 0.317142857142857
   },
   "intelligenceIndexCostPerTask": 0.7639949356156494,
-  "intelligenceIndexTimePerTask": 602.866086385362,
+  "intelligenceIndexTimePerTask": 596.1297199343844,
   "price1mInputTokens": 2,
   "price1mOutputTokens": 10,
   "cacheHitPrice": 0.1,
   "cacheWritePrice": 2.5,
-  "outputSpeed": 50.1623571642462,
-  "timeToFirstToken": 81.3486208439612,
-  "timeToFirstAnswerToken": 81.3486208439612,
+  "outputSpeed": 50.72920026668434,
+  "timeToFirstToken": 74.19864364938111,
+  "timeToFirstAnswerToken": 74.19864364938111,
   "slug": "gpt-6-1-sol",
   "gdpvalCostPerTask": 0.8935140711105689,
   "chartDefaultSelected": true,
@@ -3158,14 +3158,14 @@
     }
    ]
   },
-  "intelligenceIndexTimePerTask": 101.90127306969514,
+  "intelligenceIndexTimePerTask": 98.90922277905567,
   "price1mInputTokens": 0.3,
   "price1mOutputTokens": 2.5,
   "cacheHitPrice": 0.03,
   "cacheWritePrice": null,
-  "outputSpeed": 297.35340223573445,
-  "timeToFirstToken": 4.912102621638444,
-  "timeToFirstAnswerToken": 4.912102621638444,
+  "outputSpeed": 306.3484818510043,
+  "timeToFirstToken": 4.91243883147918,
+  "timeToFirstAnswerToken": 4.91243883147918,
   "slug": "gemini-3-5-flash-lite",
   "gdpvalCostPerTask": 0.1296353690002401,
   "chartDefaultSelected": false,
@@ -3607,14 +3607,14 @@
    "apex-agents-aa": 0.379793510324484
   },
   "intelligenceIndexCostPerTask": 2.3452525606205166,
-  "intelligenceIndexTimePerTask": 888.4121149985301,
+  "intelligenceIndexTimePerTask": 873.615502967212,
   "price1mInputTokens": 1,
   "price1mOutputTokens": 2.7,
   "cacheHitPrice": 0.1,
   "cacheWritePrice": null,
-  "outputSpeed": 127.72549564113702,
-  "timeToFirstToken": 0.9190172680907361,
-  "timeToFirstAnswerToken": 23.759540322750443,
+  "outputSpeed": 129.8888095922868,
+  "timeToFirstToken": 0.9056420004160434,
+  "timeToFirstAnswerToken": 23.114518564062248,
   "slug": "step-5-preview"
  },
  {
@@ -3863,9 +3863,9 @@
   "price1mOutputTokens": 0.97,
   "cacheHitPrice": null,
   "cacheWritePrice": null,
-  "outputSpeed": 74.2121977333511,
-  "timeToFirstToken": 1.1360737872574465,
-  "timeToFirstAnswerToken": 1.1360737872574465,
+  "outputSpeed": 73.9486347349612,
+  "timeToFirstToken": 1.136047941039025,
+  "timeToFirstAnswerToken": 1.136047941039025,
   "slug": "qwen3-omni-30b-a3b-instruct",
   "chartDefaultSelected": false,
   "chartHighlighted": false,
@@ -4530,14 +4530,14 @@
    "critpt": 0.308571428571429
   },
   "intelligenceIndexCostPerTask": 3.8026050641787634,
-  "intelligenceIndexTimePerTask": 442.4041105197847,
+  "intelligenceIndexTimePerTask": 430.1924202890939,
   "price1mInputTokens": 8,
   "price1mOutputTokens": 40,
   "cacheHitPrice": 0.2,
   "cacheWritePrice": 10,
-  "outputSpeed": 97.49134949393493,
-  "timeToFirstToken": 10.22850547201524,
-  "timeToFirstAnswerToken": 10.22850547201524,
+  "outputSpeed": 100.25879518577649,
+  "timeToFirstToken": 9.645234256993978,
+  "timeToFirstAnswerToken": 9.645234256993978,
   "slug": "claude-fable-5-2",
   "gdpvalCostPerTask": 26.426560863596865,
   "chartDefaultSelected": true,
@@ -4989,14 +4989,14 @@
    "critpt": 0.0485714285714286
   },
   "intelligenceIndexCostPerTask": 0.22589585897456366,
-  "intelligenceIndexTimePerTask": 145.13908811493593,
+  "intelligenceIndexTimePerTask": 144.01245664949886,
   "price1mInputTokens": 1,
   "price1mOutputTokens": 5,
   "cacheHitPrice": 0.05,
   "cacheWritePrice": 1.25,
-  "outputSpeed": 65.37198550061045,
-  "timeToFirstToken": 1.955196835112859,
-  "timeToFirstAnswerToken": 1.955196835112859,
+  "outputSpeed": 65.88340053745227,
+  "timeToFirstToken": 2.2705988881365533,
+  "timeToFirstAnswerToken": 2.2705988881365533,
   "slug": "gpt-6-1-terra",
   "gdpvalCostPerTask": 0.5020139125446218,
   "chartDefaultSelected": true,
@@ -5413,14 +5413,14 @@
    "mmmu-pro": 0.892485549132948
   },
   "intelligenceIndexCostPerTask": 4.677653677420589,
-  "intelligenceIndexTimePerTask": 1725.2520090294056,
+  "intelligenceIndexTimePerTask": 1666.769307922484,
   "price1mInputTokens": 2,
   "price1mOutputTokens": 10,
   "cacheHitPrice": 0.1,
   "cacheWritePrice": 4,
-  "outputSpeed": 59.708665690073296,
-  "timeToFirstToken": 22.235766543577608,
-  "timeToFirstAnswerToken": 22.235766543577608,
+  "outputSpeed": 61.8036910978774,
+  "timeToFirstToken": 23.255912992502445,
+  "timeToFirstAnswerToken": 23.255912992502445,
   "slug": "gemini-4-carbon",
   "gdpvalCostPerTask": 2.1193113804671726,
   "chartDefaultSelected": true,
@@ -5841,9 +5841,9 @@
   "price1mOutputTokens": 10,
   "cacheHitPrice": 0.312,
   "cacheWritePrice": null,
-  "outputSpeed": 97.06418637091222,
-  "timeToFirstToken": 17.382506024945386,
-  "timeToFirstAnswerToken": 17.382506024945386,
+  "outputSpeed": 98.05077631647164,
+  "timeToFirstToken": 18.12478564219759,
+  "timeToFirstAnswerToken": 18.12478564219759,
   "slug": "nova-2-0-pro-preview"
  },
  {
@@ -5945,14 +5945,14 @@
     }
    ]
   },
-  "intelligenceIndexTimePerTask": 644.1083205410295,
+  "intelligenceIndexTimePerTask": 588.8872833469046,
   "price1mInputTokens": 1,
   "price1mOutputTokens": 4.05,
   "cacheHitPrice": 0.17,
   "cacheWritePrice": null,
-  "outputSpeed": 79.57616705466748,
-  "timeToFirstToken": 1.9162517227625044,
-  "timeToFirstAnswerToken": 20.995764993929683,
+  "outputSpeed": 87.03816972471509,
+  "timeToFirstToken": 1.8378650356834307,
+  "timeToFirstAnswerToken": 19.289122874688687,
   "slug": "inkling",
   "chartDefaultSelected": false,
   "chartHighlighted": false,
@@ -6182,19 +6182,19 @@
    "endsWithQuestion": 0.0555555555555556
   },
   "headline": {
-   "outputSpeed": 79.57616705466748,
-   "timeToFirstToken": 1.9162517227625044,
-   "timeToFirstAnswerToken": 20.995764993929683
+   "outputSpeed": 87.03816972471509,
+   "timeToFirstToken": 1.8378650356834307,
+   "timeToFirstAnswerToken": 19.289122874688687
   },
   "multiTurn": {
-   "timeToFirstToken": 1.7677509960249724
+   "timeToFirstToken": 1.6301253783799865
   },
   "workloads": {
    "1k": {
-    "timeToFirstToken": 2.010816322562541
+    "timeToFirstToken": 2.021673662157938
    },
    "10k": {
-    "timeToFirstToken": 2.1186885764375316
+    "timeToFirstToken": 2.0695357238158123
    },
    "100k": {
     "timeToFirstToken": 5.341897773
@@ -6460,9 +6460,9 @@
   "price1mOutputTokens": 3.6,
   "cacheHitPrice": null,
   "cacheWritePrice": null,
-  "outputSpeed": 55.0533113088624,
-  "timeToFirstToken": 2.464363403357327,
-  "timeToFirstAnswerToken": 40.134785199559225,
+  "outputSpeed": 54.05310162817634,
+  "timeToFirstToken": 2.4906404434575404,
+  "timeToFirstAnswerToken": 40.6485592265691,
   "slug": "qwen3-5-397b-a17b",
   "gdpvalCostPerTask": 0.3714979554545454,
   "chartDefaultSelected": false,
@@ -7456,14 +7456,14 @@
     }
    ]
   },
-  "intelligenceIndexTimePerTask": 2865.7387340513915,
+  "intelligenceIndexTimePerTask": 2992.351530167749,
   "price1mInputTokens": 0.14,
   "price1mOutputTokens": 0.28,
   "cacheHitPrice": 0.0028,
   "cacheWritePrice": null,
-  "outputSpeed": 45.993803955145665,
-  "timeToFirstToken": 5.873436112345086,
-  "timeToFirstAnswerToken": 39.291268768721864,
+  "outputSpeed": 44.047707694703256,
+  "timeToFirstToken": 5.593788083498232,
+  "timeToFirstAnswerToken": 37.264223072303885,
   "slug": "mimo-v2-6-flash",
   "chartDefaultSelected": false,
   "chartHighlighted": false,
@@ -7580,22 +7580,22 @@
    "upper": 1071.38
   },
   "headline": {
-   "outputSpeed": 45.993803955145665,
-   "timeToFirstToken": 5.873436112345086,
-   "timeToFirstAnswerToken": 39.291268768721864
+   "outputSpeed": 44.047707694703256,
+   "timeToFirstToken": 5.593788083498232,
+   "timeToFirstAnswerToken": 37.264223072303885
   },
   "multiTurn": {
-   "timeToFirstToken": 4.255752584169378
+   "timeToFirstToken": 4.049743705721052
   },
   "workloads": {
    "1k": {
-    "timeToFirstToken": 4.913389899499889
+    "timeToFirstToken": 4.603946795605182
    },
    "10k": {
-    "timeToFirstToken": 4.187936521812396
+    "timeToFirstToken": 4.141624259420956
    },
    "100k": {
-    "timeToFirstToken": 13.372032500250098
+    "timeToFirstToken": 12.667926328800103
    }
   },
   "performanceDataSource": {
@@ -7844,9 +7844,9 @@
   "price1mOutputTokens": 0.6,
   "cacheHitPrice": 0.015,
   "cacheWritePrice": null,
-  "outputSpeed": 120.47540176187107,
-  "timeToFirstToken": 1.5791565733279997,
-  "timeToFirstAnswerToken": 1.5791565733279997,
+  "outputSpeed": 118.42500289796324,
+  "timeToFirstToken": 1.5760922616274007,
+  "timeToFirstAnswerToken": 1.5760922616274007,
   "slug": "mistral-small-4",
   "gdpvalCostPerTask": 0.009368859095024103,
   "chartDefaultSelected": false,
@@ -8278,14 +8278,14 @@
    "tau3-banking": 0.232989690721649
   },
   "intelligenceIndexCostPerTask": 0.9557366659448332,
-  "intelligenceIndexTimePerTask": 3999.3220704379555,
+  "intelligenceIndexTimePerTask": 3954.941286256424,
   "price1mInputTokens": 0.3,
   "price1mOutputTokens": 1.2,
   "cacheHitPrice": 0.06,
   "cacheWritePrice": null,
-  "outputSpeed": 77.87634844336202,
-  "timeToFirstToken": 2.288164013471142,
-  "timeToFirstAnswerToken": 31.389679820523913,
+  "outputSpeed": 78.75024597127755,
+  "timeToFirstToken": 2.3157105402652074,
+  "timeToFirstAnswerToken": 31.787647263915044,
   "slug": "solar-pro-4"
  },
  {
@@ -8323,9 +8323,9 @@
   "price1mOutputTokens": 0.3,
   "cacheHitPrice": null,
   "cacheWritePrice": null,
-  "outputSpeed": 142.3805869424144,
-  "timeToFirstToken": 1.3052690049077413,
-  "timeToFirstAnswerToken": 2.1451862049036206,
+  "outputSpeed": 144.83315798447046,
+  "timeToFirstToken": 1.2911750083074915,
+  "timeToFirstAnswerToken": 1.9722060944849067,
   "slug": "gpt-oss-20b",
   "gdpvalCostPerTask": 0.062037228409090914,
   "chartDefaultSelected": false,
@@ -8692,9 +8692,9 @@
   "price1mOutputTokens": 8,
   "cacheHitPrice": 0.5,
   "cacheWritePrice": null,
-  "outputSpeed": 132.31938877150455,
-  "timeToFirstToken": 6.6679620468713034,
-  "timeToFirstAnswerToken": 6.6679620468713034,
+  "outputSpeed": 129.18838741848626,
+  "timeToFirstToken": 6.557296314136642,
+  "timeToFirstAnswerToken": 6.557296314136642,
   "slug": "o3",
   "chartDefaultSelected": false,
   "chartHighlighted": false,
@@ -9281,14 +9281,14 @@
     }
    ]
   },
-  "intelligenceIndexTimePerTask": 2703.4686961689736,
+  "intelligenceIndexTimePerTask": 2568.030211210141,
   "price1mInputTokens": 0.15,
   "price1mOutputTokens": 0.5,
   "cacheHitPrice": 0.03,
   "cacheWritePrice": null,
-  "outputSpeed": 49.641753046107645,
-  "timeToFirstToken": 3.5378046180563367,
-  "timeToFirstAnswerToken": 102.10693012301313,
+  "outputSpeed": 52.2598701515513,
+  "timeToFirstToken": 3.4239407772921964,
+  "timeToFirstAnswerToken": 94.9187432880848,
   "slug": "glm-5-3-flash",
   "chartDefaultSelected": false,
   "chartHighlighted": false,
@@ -9518,22 +9518,22 @@
    "endsWithQuestion": 0.101111111111111
   },
   "headline": {
-   "outputSpeed": 49.641753046107645,
-   "timeToFirstToken": 3.5378046180563367,
-   "timeToFirstAnswerToken": 102.10693012301313
+   "outputSpeed": 52.2598701515513,
+   "timeToFirstToken": 3.4239407772921964,
+   "timeToFirstAnswerToken": 94.9187432880848
   },
   "multiTurn": {
-   "timeToFirstToken": 3.459690542034288
+   "timeToFirstToken": 3.4180563967927617
   },
   "workloads": {
    "1k": {
-    "timeToFirstToken": 1.5037198945587362
+    "timeToFirstToken": 1.4646340129249247
    },
    "10k": {
-    "timeToFirstToken": 2.0408944391764536
+    "timeToFirstToken": 1.9771862358499928
    },
    "100k": {
-    "timeToFirstToken": 7.30314174849997
+    "timeToFirstToken": 6.847655224599978
    }
   },
   "performanceDataSource": {
@@ -9884,14 +9884,14 @@
    "critpt": 0.174285714285714
   },
   "intelligenceIndexCostPerTask": 0.10409320921120957,
-  "intelligenceIndexTimePerTask": 450.32771937172356,
+  "intelligenceIndexTimePerTask": 439.5369383006578,
   "price1mInputTokens": 0.1,
   "price1mOutputTokens": 0.5,
   "cacheHitPrice": 0.01,
   "cacheWritePrice": 0.125,
-  "outputSpeed": 97.46949213916109,
-  "timeToFirstToken": 20.55201283848151,
-  "timeToFirstAnswerToken": 20.55201283848151,
+  "outputSpeed": 99.8624012649516,
+  "timeToFirstToken": 18.989101528924046,
+  "timeToFirstAnswerToken": 18.989101528924046,
   "slug": "gpt-6-luna",
   "gdpvalCostPerTask": 0.08935398436610914,
   "chartDefaultSelected": true,
@@ -10493,14 +10493,14 @@
     }
    ]
   },
-  "intelligenceIndexTimePerTask": 175.67253691748655,
+  "intelligenceIndexTimePerTask": 177.09907078085098,
   "price1mInputTokens": 0,
   "price1mOutputTokens": 0,
   "cacheHitPrice": null,
   "cacheWritePrice": null,
-  "outputSpeed": 171.1737813726204,
-  "timeToFirstToken": 0.6483157483624357,
-  "timeToFirstAnswerToken": 5.463028420683538,
+  "outputSpeed": 169.79497574381872,
+  "timeToFirstToken": 0.6276083130880643,
+  "timeToFirstAnswerToken": 5.368653396812516,
   "slug": "north-mini-code",
   "chartDefaultSelected": false,
   "chartHighlighted": false,
@@ -10934,14 +10934,14 @@
    "tau3-banking": 0.430927835051546
   },
   "intelligenceIndexCostPerTask": 3.6589264906126227,
-  "intelligenceIndexTimePerTask": 700.5901914215731,
+  "intelligenceIndexTimePerTask": 674.7652592333634,
   "price1mInputTokens": 10,
   "price1mOutputTokens": 50,
   "cacheHitPrice": 1,
   "cacheWritePrice": 12.5,
-  "outputSpeed": 38.144637082591586,
-  "timeToFirstToken": 100.65101994933913,
-  "timeToFirstAnswerToken": 100.65101994933913,
+  "outputSpeed": 39.60452650713161,
+  "timeToFirstToken": 92.36906743515812,
+  "timeToFirstAnswerToken": 92.36906743515812,
   "slug": "gpt-6-astra",
   "gdpvalCostPerTask": 4.529484400556546,
   "chartDefaultSelected": true,
@@ -11694,14 +11694,14 @@
    "critpt": 0.185714285714286
   },
   "intelligenceIndexCostPerTask": 0.15856031956679498,
-  "intelligenceIndexTimePerTask": 395.7084995127485,
+  "intelligenceIndexTimePerTask": 392.39134851811514,
   "price1mInputTokens": 0.1,
   "price1mOutputTokens": 0.5,
   "cacheHitPrice": 0.01,
   "cacheWritePrice": 0.125,
-  "outputSpeed": 222.54853740399258,
-  "timeToFirstToken": 21.98866972647779,
-  "timeToFirstAnswerToken": 21.98866972647779,
+  "outputSpeed": 224.42989158010224,
+  "timeToFirstToken": 21.090694625738738,
+  "timeToFirstAnswerToken": 21.090694625738738,
   "slug": "claude-haiku-5-5",
   "gdpvalCostPerTask": 0.22229297310982069,
   "chartDefaultSelected": true,
@@ -12250,14 +12250,14 @@
    "critpt": 0.134285714285714
   },
   "intelligenceIndexCostPerTask": 2.9222013011913153,
-  "intelligenceIndexTimePerTask": 638.3928353806136,
+  "intelligenceIndexTimePerTask": 628.930758040841,
   "price1mInputTokens": 2,
   "price1mOutputTokens": 6,
   "cacheHitPrice": 0.5,
   "cacheWritePrice": null,
-  "outputSpeed": 66.8390723435719,
-  "timeToFirstToken": 9.901521469309959,
-  "timeToFirstAnswerToken": 9.901521469309959,
+  "outputSpeed": 67.84464642903022,
+  "timeToFirstToken": 10.408066560454266,
+  "timeToFirstAnswerToken": 10.408066560454266,
   "slug": "grok-4-7",
   "gdpvalCostPerTask": 5.572226716663577,
   "chartDefaultSelected": true,
@@ -12800,9 +12800,9 @@
   "price1mOutputTokens": 0.25,
   "cacheHitPrice": null,
   "cacheWritePrice": null,
-  "outputSpeed": 119.46841132767632,
-  "timeToFirstToken": 1.0183529672680662,
-  "timeToFirstAnswerToken": 1.0183529672680662,
+  "outputSpeed": 120.2229624066872,
+  "timeToFirstToken": 1.120343941267525,
+  "timeToFirstAnswerToken": 1.120343941267525,
   "slug": "qwen3-5-9b",
   "gdpvalCostPerTask": 0.6158871563636364,
   "chartDefaultSelected": false,
@@ -13364,9 +13364,9 @@
   "price1mOutputTokens": 0.2,
   "cacheHitPrice": 0.05,
   "cacheWritePrice": null,
-  "outputSpeed": 169.78334155565062,
-  "timeToFirstToken": 0.8642325886809071,
-  "timeToFirstAnswerToken": 0.8642325886809071,
+  "outputSpeed": 165.3491072352259,
+  "timeToFirstToken": 0.8591738200687745,
+  "timeToFirstAnswerToken": 0.8591738200687745,
   "slug": "nvidia-nemotron-3-nano-30b-a3b",
   "gdpvalCostPerTask": 0.2914153897727273,
   "chartDefaultSelected": false,
@@ -13728,14 +13728,14 @@
     }
    ]
   },
-  "intelligenceIndexTimePerTask": 2167.2909689664793,
+  "intelligenceIndexTimePerTask": 2190.3033815971553,
   "price1mInputTokens": 0.435,
   "price1mOutputTokens": 0.87,
   "cacheHitPrice": 0.0036,
   "cacheWritePrice": null,
-  "outputSpeed": 55.863809504514734,
-  "timeToFirstToken": 4.563516092278305,
-  "timeToFirstAnswerToken": 43.571297102927296,
+  "outputSpeed": 55.276876641131246,
+  "timeToFirstToken": 4.46567414681602,
+  "timeToFirstAnswerToken": 41.57854253376318,
   "slug": "mimo-v2-6-pro",
   "chartDefaultSelected": true,
   "chartHighlighted": true,
@@ -13958,22 +13958,22 @@
    "endsWithQuestion": 0.341111111111111
   },
   "headline": {
-   "outputSpeed": 55.863809504514734,
-   "timeToFirstToken": 4.563516092278305,
-   "timeToFirstAnswerToken": 43.571297102927296
+   "outputSpeed": 55.276876641131246,
+   "timeToFirstToken": 4.46567414681602,
+   "timeToFirstAnswerToken": 41.57854253376318
   },
   "multiTurn": {
-   "timeToFirstToken": 4.01693616580659
+   "timeToFirstToken": 3.961624079665345
   },
   "workloads": {
    "1k": {
-    "timeToFirstToken": 2.6570667333823295
+    "timeToFirstToken": 2.5759800823249597
    },
    "10k": {
-    "timeToFirstToken": 3.267070941117641
+    "timeToFirstToken": 3.152372220375025
    },
    "100k": {
-    "timeToFirstToken": 9.406150381750091
+    "timeToFirstToken": 9.1808203392001
    }
   },
   "performanceDataSource": {
@@ -14223,9 +14223,9 @@
   "price1mOutputTokens": 1.1,
   "cacheHitPrice": 0.09,
   "cacheWritePrice": null,
-  "outputSpeed": 137.33170923281514,
-  "timeToFirstToken": 1.2951828415163178,
-  "timeToFirstAnswerToken": 1.2951828415163178,
+  "outputSpeed": 131.6835950219182,
+  "timeToFirstToken": 1.2877304570199817,
+  "timeToFirstAnswerToken": 1.2877304570199817,
   "slug": "qwen3-next-80b-a3b-instruct",
   "chartDefaultSelected": false,
   "chartHighlighted": false,
@@ -14588,14 +14588,14 @@
     }
    ]
   },
-  "intelligenceIndexTimePerTask": 778.2061959233104,
+  "intelligenceIndexTimePerTask": 784.2536200860462,
   "price1mInputTokens": 0.3,
   "price1mOutputTokens": 1.2,
   "cacheHitPrice": 0.06,
   "cacheWritePrice": 0.375,
-  "outputSpeed": 117.51587924529753,
-  "timeToFirstToken": 1.5553820460669068,
-  "timeToFirstAnswerToken": 79.03507004587203,
+  "outputSpeed": 116.60970763263072,
+  "timeToFirstToken": 1.4938583302938682,
+  "timeToFirstAnswerToken": 71.59072584763668,
   "slug": "minimax-m3",
   "chartDefaultSelected": false,
   "chartHighlighted": false,
@@ -14820,22 +14820,22 @@
    "endsWithQuestion": 0.232222222222222
   },
   "headline": {
-   "outputSpeed": 117.51587924529753,
-   "timeToFirstToken": 1.5553820460669068,
-   "timeToFirstAnswerToken": 79.03507004587203
+   "outputSpeed": 116.60970763263072,
+   "timeToFirstToken": 1.4938583302938682,
+   "timeToFirstAnswerToken": 71.59072584763668
   },
   "multiTurn": {
-   "timeToFirstToken": 1.1880115464377785
+   "timeToFirstToken": 1.1936781285044404
   },
   "workloads": {
    "1k": {
-    "timeToFirstToken": 0.9119886974411152
+    "timeToFirstToken": 0.8588626502499498
    },
    "10k": {
-    "timeToFirstToken": 1.8919274596470748
+    "timeToFirstToken": 1.7478047146000157
    },
    "100k": {
-    "timeToFirstToken": 2.964341479999915
+    "timeToFirstToken": 2.775448231399922
    }
   },
   "performanceDataSource": {
@@ -15116,14 +15116,14 @@
    "critpt": 0.111428571428571
   },
   "intelligenceIndexCostPerTask": 1.4120973060945472,
-  "intelligenceIndexTimePerTask": 655.2631071554375,
+  "intelligenceIndexTimePerTask": 679.6083299809704,
   "price1mInputTokens": 0.7,
   "price1mOutputTokens": 2.1,
   "cacheHitPrice": 0.07,
   "cacheWritePrice": 0.7,
-  "outputSpeed": 85.95703151816542,
-  "timeToFirstToken": 3.0785376199212986,
-  "timeToFirstAnswerToken": 25.823698500671885,
+  "outputSpeed": 82.87784164745021,
+  "timeToFirstToken": 4.198579931705074,
+  "timeToFirstAnswerToken": 27.26357781915581,
   "slug": "mistral-large-4",
   "chartDefaultSelected": true,
   "chartHighlighted": false,
@@ -15236,22 +15236,22 @@
    }
   },
   "headline": {
-   "outputSpeed": 98.92429802553703,
-   "timeToFirstToken": 3.4336263740193576,
-   "timeToFirstAnswerToken": 41.694270624267794
+   "outputSpeed": 95.80289478184909,
+   "timeToFirstToken": 3.407868404565976,
+   "timeToFirstAnswerToken": 41.63607296846652
   },
   "multiTurn": {
-   "timeToFirstToken": 1.9988577366741964
+   "timeToFirstToken": 1.9599008629091976
   },
   "workloads": {
    "1k": {
-    "timeToFirstToken": 1.4821873329374704
+    "timeToFirstToken": 1.6996238633420682
    },
    "10k": {
-    "timeToFirstToken": 3.8316198179063234
+    "timeToFirstToken": 3.784344843526392
    },
    "100k": {
-    "timeToFirstToken": 9.291377883249762
+    "timeToFirstToken": 9.083539131799803
    }
   },
   "performanceDataSource": {
@@ -15514,14 +15514,14 @@
     }
    ]
   },
-  "intelligenceIndexTimePerTask": 241.5227698207221,
+  "intelligenceIndexTimePerTask": 246.21942123956745,
   "price1mInputTokens": 0.06,
   "price1mOutputTokens": 0.2,
   "cacheHitPrice": 0.04,
   "cacheWritePrice": null,
-  "outputSpeed": 269.2341131149938,
-  "timeToFirstToken": 0.8908630404909548,
-  "timeToFirstAnswerToken": 13.338985057817709,
+  "outputSpeed": 264.0984549569285,
+  "timeToFirstToken": 0.9029599066613513,
+  "timeToFirstAnswerToken": 12.226329447347043,
   "slug": "nemotron-3-5-lightning",
   "gdpvalCostPerTask": 0.08515721936363636,
   "chartDefaultSelected": false,
@@ -15943,9 +15943,9 @@
   "price1mOutputTokens": 0.32,
   "cacheHitPrice": null,
   "cacheWritePrice": null,
-  "outputSpeed": 21.746456576945178,
-  "timeToFirstToken": 0.3909416102058463,
-  "timeToFirstAnswerToken": 0.3909416102058463,
+  "outputSpeed": 21.782162502394605,
+  "timeToFirstToken": 0.3891252005499318,
+  "timeToFirstAnswerToken": 0.3891252005499318,
   "slug": "phi-4-multimodal",
   "chartDefaultSelected": false,
   "chartHighlighted": false,
@@ -16167,9 +16167,9 @@
   "price1mOutputTokens": 0.195,
   "cacheHitPrice": null,
   "cacheWritePrice": null,
-  "outputSpeed": 185.8150656013487,
-  "timeToFirstToken": 1.2459856745247242,
-  "timeToFirstAnswerToken": 1.2459856745247242,
+  "outputSpeed": 182.4353225479504,
+  "timeToFirstToken": 1.2379355504019502,
+  "timeToFirstAnswerToken": 1.2379355504019502,
   "slug": "nvidia-nemotron-nano-9b-v2",
   "chartDefaultSelected": false,
   "chartHighlighted": false,
@@ -16526,14 +16526,14 @@
     }
    ]
   },
-  "intelligenceIndexTimePerTask": 194.77105404690775,
+  "intelligenceIndexTimePerTask": 193.8671912022317,
   "price1mInputTokens": 0,
   "price1mOutputTokens": 0,
   "cacheHitPrice": null,
   "cacheWritePrice": null,
-  "outputSpeed": 182.93435022320125,
-  "timeToFirstToken": 1.0038215676006061,
-  "timeToFirstAnswerToken": 18.304363307351352,
+  "outputSpeed": 183.78724111802637,
+  "timeToFirstToken": 1.004595591317324,
+  "timeToFirstAnswerToken": 17.84634850361733,
   "slug": "command-a-plus",
   "chartDefaultSelected": false,
   "chartHighlighted": false,
@@ -17023,14 +17023,14 @@
     }
    ]
   },
-  "intelligenceIndexTimePerTask": 1526.9163527244104,
+  "intelligenceIndexTimePerTask": 1514.7689222924128,
   "price1mInputTokens": 4,
   "price1mOutputTokens": 20,
   "cacheHitPrice": 0.2,
   "cacheWritePrice": 5,
-  "outputSpeed": 113.50499884771688,
-  "timeToFirstToken": 404.53215894172513,
-  "timeToFirstAnswerToken": 404.53215894172513,
+  "outputSpeed": 114.41523278300254,
+  "timeToFirstToken": 371.495174828336,
+  "timeToFirstAnswerToken": 371.495174828336,
   "slug": "claude-opus-5-5",
   "gdpvalCostPerTask": 8.918386645138963,
   "chartDefaultSelected": true,
@@ -17978,9 +17978,9 @@
   "price1mOutputTokens": 0.15,
   "cacheHitPrice": null,
   "cacheWritePrice": null,
-  "outputSpeed": 33.577626265909664,
-  "timeToFirstToken": 1.3520856652555626,
-  "timeToFirstAnswerToken": 1.3520856652555626,
+  "outputSpeed": 32.10070612674334,
+  "timeToFirstToken": 1.4134271477406932,
+  "timeToFirstAnswerToken": 1.4134271477406932,
   "slug": "qwen3-5-4b",
   "chartDefaultSelected": false,
   "chartHighlighted": false,
@@ -19173,9 +19173,9 @@
   "price1mOutputTokens": 0.14,
   "cacheHitPrice": 0.00875,
   "cacheWritePrice": null,
-  "outputSpeed": 214.1333060240636,
-  "timeToFirstToken": 1.3461469279362295,
-  "timeToFirstAnswerToken": 1.3461469279362295,
+  "outputSpeed": 215.99613109068773,
+  "timeToFirstToken": 1.3295512254521686,
+  "timeToFirstAnswerToken": 1.3295512254521686,
   "slug": "nova-micro",
   "chartDefaultSelected": false,
   "chartHighlighted": false,
@@ -19681,14 +19681,14 @@
    "tau3-banking": 0.2
   },
   "intelligenceIndexCostPerTask": 3.7729435511821583,
-  "intelligenceIndexTimePerTask": 1096.3066070872344,
+  "intelligenceIndexTimePerTask": 1106.1502687193752,
   "price1mInputTokens": 0.5,
   "price1mOutputTokens": 3,
   "cacheHitPrice": 0.1,
   "cacheWritePrice": null,
-  "outputSpeed": 40.925687528397425,
-  "timeToFirstToken": 5.1904105125861255,
-  "timeToFirstAnswerToken": 5.1904105125861255,
+  "outputSpeed": 40.56148871067381,
+  "timeToFirstToken": 5.219413880521265,
+  "timeToFirstAnswerToken": 5.219413880521265,
   "slug": "qwen3-8-27b",
   "gdpvalCostPerTask": 1.2282560718497346,
   "chartDefaultSelected": true,
@@ -20290,14 +20290,14 @@
     }
    ]
   },
-  "intelligenceIndexTimePerTask": 399.13528817346196,
+  "intelligenceIndexTimePerTask": 378.7151926525829,
   "price1mInputTokens": 1.25,
   "price1mOutputTokens": 4.25,
   "cacheHitPrice": 0.15,
   "cacheWritePrice": null,
-  "outputSpeed": 166.46006745995354,
-  "timeToFirstToken": 1.1575822528775852,
-  "timeToFirstAnswerToken": 10.875241037484814,
+  "outputSpeed": 175.4354942289093,
+  "timeToFirstToken": 1.1273889255609224,
+  "timeToFirstAnswerToken": 10.590417531840327,
   "slug": "muse-spark-open",
   "chartDefaultSelected": false,
   "chartHighlighted": false,
@@ -20515,22 +20515,22 @@
    "endsWithQuestion": 0.264444444444444
   },
   "headline": {
-   "outputSpeed": 166.46006745995354,
-   "timeToFirstToken": 1.1575822528775852,
-   "timeToFirstAnswerToken": 10.875241037484814
+   "outputSpeed": 175.4354942289093,
+   "timeToFirstToken": 1.1273889255609224,
+   "timeToFirstAnswerToken": 10.590417531840327
   },
   "multiTurn": {
-   "timeToFirstToken": 0.6161443100986121
+   "timeToFirstToken": 0.6002056717011184
   },
   "workloads": {
    "1k": {
-    "timeToFirstToken": 0.4186664669062745
+    "timeToFirstToken": 0.41152463455263893
    },
    "10k": {
-    "timeToFirstToken": 0.7836787054687272
+    "timeToFirstToken": 0.7666965042368266
    },
    "100k": {
-    "timeToFirstToken": 3.9240995644999153
+    "timeToFirstToken": 3.8866874491999304
    }
   },
   "performanceDataSource": {
@@ -20986,14 +20986,14 @@
    "mmmu-pro": 0.838150289017341
   },
   "intelligenceIndexCostPerTask": 4.560546278670271,
-  "intelligenceIndexTimePerTask": 649.6426764296295,
+  "intelligenceIndexTimePerTask": 616.2737699908329,
   "price1mInputTokens": 4,
   "price1mOutputTokens": 20,
   "cacheHitPrice": 0.2,
   "cacheWritePrice": null,
-  "outputSpeed": 104.56036984810281,
-  "timeToFirstToken": 13.916525167153672,
-  "timeToFirstAnswerToken": 13.916525167153672,
+  "outputSpeed": 110.22192055586572,
+  "timeToFirstToken": 13.22980932107862,
+  "timeToFirstAnswerToken": 13.22980932107862,
   "slug": "muse-wonder",
   "gdpvalCostPerTask": 3.8641460348727286,
   "chartDefaultSelected": true,
@@ -21974,9 +21974,9 @@
   "price1mOutputTokens": 10,
   "cacheHitPrice": null,
   "cacheWritePrice": null,
-  "outputSpeed": 44.02574503721161,
-  "timeToFirstToken": 8.586803863753909,
-  "timeToFirstAnswerToken": 8.586803863753909,
+  "outputSpeed": 48.29924298626621,
+  "timeToFirstToken": 7.756717826533114,
+  "timeToFirstAnswerToken": 7.756717826533114,
   "slug": "command-a",
   "chartDefaultSelected": false,
   "chartHighlighted": false,
@@ -23380,9 +23380,9 @@
   "price1mOutputTokens": 0.17,
   "cacheHitPrice": 0.026,
   "cacheWritePrice": null,
-  "outputSpeed": 91.48947338108155,
-  "timeToFirstToken": 2.3459212123389674,
-  "timeToFirstAnswerToken": 11.057450887782268,
+  "outputSpeed": 90.8826151748607,
+  "timeToFirstToken": 2.341752157410344,
+  "timeToFirstAnswerToken": 11.015623167422994,
   "slug": "sarvam-105b",
   "chartDefaultSelected": false,
   "chartHighlighted": false,
@@ -24300,14 +24300,14 @@
    "critpt": 0.231428571428571
   },
   "intelligenceIndexCostPerTask": 4.314621569087732,
-  "intelligenceIndexTimePerTask": 1708.081844932415,
+  "intelligenceIndexTimePerTask": 1654.4499184916115,
   "price1mInputTokens": 2,
   "price1mOutputTokens": 10,
   "cacheHitPrice": 0.1,
   "cacheWritePrice": null,
-  "outputSpeed": 58.78361962305843,
-  "timeToFirstToken": 10.20111523948797,
-  "timeToFirstAnswerToken": 10.20111523948797,
+  "outputSpeed": 60.68919484072497,
+  "timeToFirstToken": 12.650982358066917,
+  "timeToFirstAnswerToken": 12.650982358066917,
   "slug": "gemini-4-argon",
   "gdpvalCostPerTask": 1.8192251097173668,
   "chartDefaultSelected": false,
@@ -25595,9 +25595,9 @@
   "price1mOutputTokens": 0.1,
   "cacheHitPrice": null,
   "cacheWritePrice": null,
-  "outputSpeed": 58.14267079691883,
-  "timeToFirstToken": 1.5808133739321546,
-  "timeToFirstAnswerToken": 1.5808133739321546,
+  "outputSpeed": 58.28016802450947,
+  "timeToFirstToken": 1.6218161048012305,
+  "timeToFirstAnswerToken": 1.6218161048012305,
   "slug": "gemma-4-e4b",
   "gdpvalCostPerTask": 0.05143386618181818,
   "chartDefaultSelected": false,
@@ -26817,14 +26817,14 @@
    "critpt": 0.00285714285714286
   },
   "intelligenceIndexCostPerTask": 0.4254202455035728,
-  "intelligenceIndexTimePerTask": 436.3217586113305,
+  "intelligenceIndexTimePerTask": 426.46751185533503,
   "price1mInputTokens": 0.3,
   "price1mOutputTokens": 1.2,
   "cacheHitPrice": 0.006,
   "cacheWritePrice": null,
-  "outputSpeed": 149.7921395301851,
-  "timeToFirstToken": 1.3359612008763861,
-  "timeToFirstAnswerToken": 1.3359612008763861,
+  "outputSpeed": 153.25333801308304,
+  "timeToFirstToken": 1.298906887309053,
+  "timeToFirstAnswerToken": 1.298906887309053,
   "slug": "deepseek-v4-1-flash-1017",
   "chartDefaultSelected": true,
   "chartHighlighted": true,
@@ -27042,22 +27042,22 @@
    "endsWithQuestion": 0.00111111111111111
   },
   "headline": {
-   "outputSpeed": 171.1234257413469,
-   "timeToFirstToken": 1.2548792582306514,
-   "timeToFirstAnswerToken": 44.54506501327604
+   "outputSpeed": 173.30460785788918,
+   "timeToFirstToken": 1.2596019495046449,
+   "timeToFirstAnswerToken": 42.07194914279179
   },
   "multiTurn": {
-   "timeToFirstToken": 1.0707280280029623
+   "timeToFirstToken": 1.0744929082162995
   },
   "workloads": {
    "1k": {
-    "timeToFirstToken": 0.8794664450312408
+    "timeToFirstToken": 0.8722657182631521
    },
    "10k": {
-    "timeToFirstToken": 1.0972667528437612
+    "timeToFirstToken": 1.0658917553157992
    },
    "100k": {
-    "timeToFirstToken": 2.34035826750002
+    "timeToFirstToken": 2.39597549880002
    }
   },
   "performanceDataSource": {
@@ -27402,14 +27402,14 @@
    "tau3-banking": 0.235051546391753
   },
   "intelligenceIndexCostPerTask": 0.17820832971071474,
-  "intelligenceIndexTimePerTask": 311.72693336264336,
+  "intelligenceIndexTimePerTask": 302.3904482205468,
   "price1mInputTokens": 0.32499999999999996,
   "price1mOutputTokens": 1.35,
   "cacheHitPrice": 0.04,
   "cacheWritePrice": null,
-  "outputSpeed": 83.62206127602394,
-  "timeToFirstToken": 1.6527678831601418,
-  "timeToFirstAnswerToken": 26.53966343762341,
+  "outputSpeed": 86.2039422092658,
+  "timeToFirstToken": 1.6147260797923373,
+  "timeToFirstAnswerToken": 25.25552202218808,
   "slug": "muse-glimmer",
   "gdpvalCostPerTask": 0.04580715473123421,
   "chartDefaultSelected": false,
@@ -28174,9 +28174,9 @@
   "price1mOutputTokens": 14,
   "cacheHitPrice": 0.175,
   "cacheWritePrice": null,
-  "outputSpeed": 86.9993260218103,
-  "timeToFirstToken": 44.551234672806686,
-  "timeToFirstAnswerToken": 44.551234672806686,
+  "outputSpeed": 90.72914536042852,
+  "timeToFirstToken": 41.1270726033514,
+  "timeToFirstAnswerToken": 41.1270726033514,
   "slug": "gpt-5-3-codex",
   "chartDefaultSelected": false,
   "chartHighlighted": false,
@@ -28947,14 +28947,14 @@
    "tau3-banking": 0.142268041237113
   },
   "intelligenceIndexCostPerTask": 2.2102962660498227,
-  "intelligenceIndexTimePerTask": 253.0084589284647,
+  "intelligenceIndexTimePerTask": 256.50306473244603,
   "price1mInputTokens": 0.6,
   "price1mOutputTokens": 2.4,
   "cacheHitPrice": 0.12,
   "cacheWritePrice": null,
-  "outputSpeed": 203.4225054079585,
-  "timeToFirstToken": 1.754170211039603,
-  "timeToFirstAnswerToken": 4.933438825652009,
+  "outputSpeed": 200.65107081008895,
+  "timeToFirstToken": 1.7180753242528748,
+  "timeToFirstAnswerToken": 4.848739213972497,
   "slug": "nemotron-3-ultra-550b-a55b"
  },
  {
@@ -28996,9 +28996,9 @@
   "price1mOutputTokens": 2.95,
   "cacheHitPrice": 0.015,
   "cacheWritePrice": null,
-  "outputSpeed": 60.51431490723726,
-  "timeToFirstToken": 3.168500542243523,
-  "timeToFirstAnswerToken": 53.87540914198964,
+  "outputSpeed": 60.6563094716681,
+  "timeToFirstToken": 3.180849758678031,
+  "timeToFirstAnswerToken": 55.28439789668773,
   "slug": "longcat-2-0",
   "gdpvalCostPerTask": 0.21320207377024622,
   "chartDefaultSelected": false,
@@ -29762,9 +29762,9 @@
   "price1mOutputTokens": 0.345,
   "cacheHitPrice": null,
   "cacheWritePrice": null,
-  "outputSpeed": 21.09492954075265,
-  "timeToFirstToken": 4.0847805568003075,
-  "timeToFirstAnswerToken": 4.0847805568003075,
+  "outputSpeed": 20.77415254695093,
+  "timeToFirstToken": 4.04650894922747,
+  "timeToFirstAnswerToken": 4.04650894922747,
   "slug": "llama-3-2-instruct-11b-vision",
   "chartDefaultSelected": false,
   "chartHighlighted": false,
@@ -30558,9 +30558,9 @@
   "price1mOutputTokens": 2.5,
   "cacheHitPrice": null,
   "cacheWritePrice": null,
-  "outputSpeed": 153.0102889232099,
-  "timeToFirstToken": 20.241229969365467,
-  "timeToFirstAnswerToken": 20.241229969365467,
+  "outputSpeed": 150.70427547837085,
+  "timeToFirstToken": 23.428728290537407,
+  "timeToFirstAnswerToken": 23.428728290537407,
   "slug": "nova-2-0-lite",
   "chartDefaultSelected": false,
   "chartHighlighted": false,
@@ -30853,9 +30853,9 @@
   "price1mOutputTokens": 0.4,
   "cacheHitPrice": 0.01,
   "cacheWritePrice": null,
-  "outputSpeed": 96.4728768539212,
-  "timeToFirstToken": 3.0375911063926275,
-  "timeToFirstAnswerToken": 90.67275231527675,
+  "outputSpeed": 104.70267874251446,
+  "timeToFirstToken": 2.868659154427238,
+  "timeToFirstAnswerToken": 79.71978228478643,
   "slug": "solar-mini4",
   "gdpvalCostPerTask": 0.5473396202497118,
   "chartDefaultSelected": false,
@@ -31524,14 +31524,14 @@
     }
    ]
   },
-  "intelligenceIndexTimePerTask": 2407.4900426553795,
+  "intelligenceIndexTimePerTask": 2385.3077482829603,
   "price1mInputTokens": 2,
   "price1mOutputTokens": 10,
   "cacheHitPrice": 0.2,
   "cacheWritePrice": null,
-  "outputSpeed": 30.005926899634357,
-  "timeToFirstToken": 4.3708633334333085,
-  "timeToFirstAnswerToken": 178.89751220666855,
+  "outputSpeed": 30.284968588860455,
+  "timeToFirstToken": 4.279152425700345,
+  "timeToFirstAnswerToken": 170.29852913273632,
   "slug": "kimi-k3-1-pro",
   "chartDefaultSelected": true,
   "chartHighlighted": true,
@@ -31754,22 +31754,22 @@
    "endsWithQuestion": 0.0633333333333333
   },
   "headline": {
-   "outputSpeed": 30.005926899634357,
-   "timeToFirstToken": 4.3708633334333085,
-   "timeToFirstAnswerToken": 178.89751220666855
+   "outputSpeed": 30.284968588860455,
+   "timeToFirstToken": 4.279152425700345,
+   "timeToFirstAnswerToken": 170.29852913273632
   },
   "multiTurn": {
-   "timeToFirstToken": 3.665648781219558
+   "timeToFirstToken": 3.5327251401840414
   },
   "workloads": {
    "1k": {
-    "timeToFirstToken": 2.568150930676442
+    "timeToFirstToken": 2.409618603199956
    },
    "10k": {
-    "timeToFirstToken": 3.286202209764751
+    "timeToFirstToken": 3.2286544470500163
    },
    "100k": {
-    "timeToFirstToken": 9.373880516499979
+    "timeToFirstToken": 9.438466083399975
    }
   },
   "performanceDataSource": {
@@ -32123,9 +32123,9 @@
   "price1mOutputTokens": 2.25,
   "cacheHitPrice": null,
   "cacheWritePrice": null,
-  "outputSpeed": 99.99121223091437,
-  "timeToFirstToken": 3.1470838768622276,
-  "timeToFirstAnswerToken": 3.1470838768622276,
+  "outputSpeed": 98.50053544838495,
+  "timeToFirstToken": 3.1519892919244707,
+  "timeToFirstAnswerToken": 3.1519892919244707,
   "slug": "qwen3-6-35b-a3b",
   "gdpvalCostPerTask": 0.4294626954545455,
   "chartDefaultSelected": false,
@@ -32498,9 +32498,9 @@
   "price1mOutputTokens": 0.1,
   "cacheHitPrice": 0.01,
   "cacheWritePrice": null,
-  "outputSpeed": 151.38917310066296,
-  "timeToFirstToken": 1.4665599240094114,
-  "timeToFirstAnswerToken": 1.4665599240094114,
+  "outputSpeed": 149.70308530722855,
+  "timeToFirstToken": 1.5109313365108135,
+  "timeToFirstAnswerToken": 1.5109313365108135,
   "slug": "ministral-3-3b",
   "gdpvalCostPerTask": 0.02258660931818182,
   "chartDefaultSelected": false,
@@ -32918,14 +32918,14 @@
     }
    ]
   },
-  "intelligenceIndexTimePerTask": 125.10847921280981,
+  "intelligenceIndexTimePerTask": 123.77947984052634,
   "price1mInputTokens": 0.4,
   "price1mOutputTokens": 1.2,
   "cacheHitPrice": 0.04,
   "cacheWritePrice": null,
-  "outputSpeed": 273.69991744581756,
-  "timeToFirstToken": 0.7526963705641592,
-  "timeToFirstAnswerToken": 6.701735291907696,
+  "outputSpeed": 276.63858723945526,
+  "timeToFirstToken": 0.7497987657127374,
+  "timeToFirstAnswerToken": 6.449199408528714,
   "slug": "reflection-beam",
   "chartDefaultSelected": true,
   "chartHighlighted": false,
@@ -33143,22 +33143,22 @@
    "endsWithQuestion": 0.05
   },
   "headline": {
-   "outputSpeed": 273.69991744581756,
-   "timeToFirstToken": 0.7526963705641592,
-   "timeToFirstAnswerToken": 6.701735291907696
+   "outputSpeed": 276.63858723945526,
+   "timeToFirstToken": 0.7497987657127374,
+   "timeToFirstAnswerToken": 6.449199408528714
   },
   "multiTurn": {
-   "timeToFirstToken": 0.4317898204312922
+   "timeToFirstToken": 0.42990935644628125
   },
   "workloads": {
    "1k": {
-    "timeToFirstToken": 0.40338117893753633
+    "timeToFirstToken": 0.4030586658421314
    },
    "10k": {
-    "timeToFirstToken": 0.6136468891764572
+    "timeToFirstToken": 0.613909667774961
    },
    "100k": {
-    "timeToFirstToken": 2.5756937240000752
+    "timeToFirstToken": 2.642963614000018
    }
   },
   "performanceDataSource": {
@@ -33730,9 +33730,9 @@
   "price1mOutputTokens": 0.32,
   "cacheHitPrice": 0.05,
   "cacheWritePrice": null,
-  "outputSpeed": 71.37313278387708,
-  "timeToFirstToken": 1.2958387325917446,
-  "timeToFirstAnswerToken": 25.883776558800477,
+  "outputSpeed": 71.65067614039936,
+  "timeToFirstToken": 1.3024502197204997,
+  "timeToFirstAnswerToken": 25.090580422377272,
   "slug": "gemma-4-26b-a4b",
   "gdpvalCostPerTask": 0.04866345993974258,
   "chartDefaultSelected": false,
@@ -34354,9 +34354,9 @@
   "price1mOutputTokens": 0.8,
   "cacheHitPrice": null,
   "cacheWritePrice": null,
-  "outputSpeed": 149.89734397552573,
-  "timeToFirstToken": 2.837938097627088,
-  "timeToFirstAnswerToken": 2.837938097627088,
+  "outputSpeed": 150.72491680824731,
+  "timeToFirstToken": 2.8443220940120195,
+  "timeToFirstAnswerToken": 2.8443220940120195,
   "slug": "qwen3-5-omni-flash",
   "chartDefaultSelected": false,
   "chartHighlighted": false,
@@ -34651,9 +34651,9 @@
   "price1mOutputTokens": 1.5,
   "cacheHitPrice": null,
   "cacheWritePrice": null,
-  "outputSpeed": 64.79763401004142,
-  "timeToFirstToken": 3.0246024986571065,
-  "timeToFirstAnswerToken": 3.3003179609751623,
+  "outputSpeed": 63.717398927256816,
+  "timeToFirstToken": 3.016548762935003,
+  "timeToFirstAnswerToken": 3.2372164029969475,
   "slug": "magistral-small-2509",
   "gdpvalCostPerTask": 0.8572884318181818,
   "chartDefaultSelected": false,
@@ -34968,9 +34968,9 @@
   "price1mOutputTokens": 0.2,
   "cacheHitPrice": 0.02,
   "cacheWritePrice": null,
-  "outputSpeed": 72.96109848122877,
-  "timeToFirstToken": 2.7349669592249914,
-  "timeToFirstAnswerToken": 2.7349669592249914,
+  "outputSpeed": 73.41572270872457,
+  "timeToFirstToken": 2.6442881738301325,
+  "timeToFirstAnswerToken": 2.6442881738301325,
   "slug": "ministral-3-14b",
   "gdpvalCostPerTask": 0.03035183281818182,
   "chartDefaultSelected": false,
@@ -35394,14 +35394,14 @@
     }
    ]
   },
-  "intelligenceIndexTimePerTask": 315.10996723637675,
+  "intelligenceIndexTimePerTask": 327.71649952638705,
   "price1mInputTokens": 0.3,
   "price1mOutputTokens": 1.2,
   "cacheHitPrice": 0.06,
   "cacheWritePrice": null,
-  "outputSpeed": 116.52326462997075,
-  "timeToFirstToken": 1.322701883289405,
-  "timeToFirstAnswerToken": 15.144224980128238,
+  "outputSpeed": 112.04087115811915,
+  "timeToFirstToken": 1.346873165134994,
+  "timeToFirstAnswerToken": 15.593529199860004,
   "slug": "inkling-small",
   "chartDefaultSelected": false,
   "chartHighlighted": false,
@@ -35515,19 +35515,19 @@
    }
   },
   "headline": {
-   "outputSpeed": 116.52326462997075,
-   "timeToFirstToken": 1.322701883289405,
-   "timeToFirstAnswerToken": 15.144224980128238
+   "outputSpeed": 112.04087115811915,
+   "timeToFirstToken": 1.346873165134994,
+   "timeToFirstAnswerToken": 15.593529199860004
   },
   "multiTurn": {
-   "timeToFirstToken": 1.0268139994333592
+   "timeToFirstToken": 1.0286802432000244
   },
   "workloads": {
    "1k": {
-    "timeToFirstToken": 1.6946583334411092
+    "timeToFirstToken": 1.7359645638749381
    },
    "10k": {
-    "timeToFirstToken": 1.8384090847058387
+    "timeToFirstToken": 1.912360532199959
    },
    "100k": {
     "timeToFirstToken": 4.50368707100006
@@ -35780,14 +35780,14 @@
    "tau3-banking": 0.457731958762887
   },
   "intelligenceIndexCostPerTask": 6.258586089480771,
-  "intelligenceIndexTimePerTask": 729.551649499351,
+  "intelligenceIndexTimePerTask": 715.1317547852556,
   "price1mInputTokens": 0.75,
   "price1mOutputTokens": 3.75,
   "cacheHitPrice": 0.075,
   "cacheWritePrice": 0.75,
-  "outputSpeed": 112.49102838349745,
-  "timeToFirstToken": 15.335200841036736,
-  "timeToFirstAnswerToken": 15.335200841036736,
+  "outputSpeed": 114.75929402086585,
+  "timeToFirstToken": 15.09384873830748,
+  "timeToFirstAnswerToken": 15.09384873830748,
   "slug": "gemini-3-8-flash",
   "gdpvalCostPerTask": 4.338599934345787,
   "chartDefaultSelected": false,
@@ -36747,9 +36747,9 @@
   "price1mOutputTokens": 0.75,
   "cacheHitPrice": 0.02,
   "cacheWritePrice": null,
-  "outputSpeed": 525.6118987591287,
-  "timeToFirstToken": 2.1848287590245543,
-  "timeToFirstAnswerToken": 2.1848287590245543,
+  "outputSpeed": 524.4415235481558,
+  "timeToFirstToken": 2.2118619768723122,
+  "timeToFirstAnswerToken": 2.2118619768723122,
   "slug": "mercury-2-5",
   "gdpvalCostPerTask": 0.030267732314160682,
   "chartDefaultSelected": false,
@@ -37106,9 +37106,9 @@
   "price1mOutputTokens": 1.32,
   "cacheHitPrice": 0.014,
   "cacheWritePrice": null,
-  "outputSpeed": 158.54209623381814,
-  "timeToFirstToken": 1.9832434819980982,
-  "timeToFirstAnswerToken": 47.69070961529848,
+  "outputSpeed": 160.8906065989908,
+  "timeToFirstToken": 1.8763021835308102,
+  "timeToFirstAnswerToken": 44.91150647132583,
   "slug": "deepseek-v4-flash-vision",
   "gdpvalCostPerTask": 1.001310050277258,
   "chartDefaultSelected": false,
@@ -37869,14 +37869,14 @@
    "critpt-v2-hard": 0.385
   },
   "intelligenceIndexCostPerTask": 0.1162277983030469,
-  "intelligenceIndexTimePerTask": 172.75134484694624,
+  "intelligenceIndexTimePerTask": 173.86611020280571,
   "price1mInputTokens": 0.1,
   "price1mOutputTokens": 0.5,
   "cacheHitPrice": 0.004,
   "cacheWritePrice": null,
-  "outputSpeed": 418.8961592732094,
-  "timeToFirstToken": 4.091475441837752,
-  "timeToFirstAnswerToken": 4.091475441837752,
+  "outputSpeed": 416.21035163930264,
+  "timeToFirstToken": 3.9359998001870893,
+  "timeToFirstAnswerToken": 3.9359998001870893,
   "slug": "muse-ember",
   "chartDefaultSelected": true,
   "chartHighlighted": false,
@@ -38879,9 +38879,9 @@
   "price1mOutputTokens": 0,
   "cacheHitPrice": null,
   "cacheWritePrice": null,
-  "outputSpeed": 180.07274390045163,
-  "timeToFirstToken": 3.850012270220821,
-  "timeToFirstAnswerToken": 11.968205183428111,
+  "outputSpeed": 177.99663158108115,
+  "timeToFirstToken": 4.6980289742861725,
+  "timeToFirstAnswerToken": 12.44232024664784,
   "slug": "ling-3-0-tiny",
   "chartDefaultSelected": false,
   "chartHighlighted": false,
@@ -39244,9 +39244,9 @@
   "price1mOutputTokens": 0.7,
   "cacheHitPrice": 0.02,
   "cacheWritePrice": null,
-  "outputSpeed": 817.8563098215576,
-  "timeToFirstToken": 0.6830254724955802,
-  "timeToFirstAnswerToken": 0.6830254724955802,
+  "outputSpeed": 825.479242215977,
+  "timeToFirstToken": 0.6846418412284088,
+  "timeToFirstAnswerToken": 0.6846418412284088,
   "slug": "celeris-1",
   "gdpvalCostPerTask": 0.054483652586459125,
   "chartDefaultSelected": false,
@@ -39595,9 +39595,9 @@
   "price1mOutputTokens": 0,
   "cacheHitPrice": null,
   "cacheWritePrice": null,
-  "outputSpeed": 130.0609862615059,
-  "timeToFirstToken": 0.20185114365624288,
-  "timeToFirstAnswerToken": 0.20185114365624288,
+  "outputSpeed": 130.40410112999876,
+  "timeToFirstToken": 0.1994360681841889,
+  "timeToFirstAnswerToken": 0.1994360681841889,
   "slug": "tiny-aya-global",
   "chartDefaultSelected": false,
   "chartHighlighted": false,
@@ -40183,9 +40183,9 @@
   "price1mOutputTokens": 3,
   "cacheHitPrice": null,
   "cacheWritePrice": null,
-  "outputSpeed": 38.3962391945036,
-  "timeToFirstToken": 5.118147860450384,
-  "timeToFirstAnswerToken": 21.984447236067876,
+  "outputSpeed": 38.051039033952236,
+  "timeToFirstToken": 5.078274685286066,
+  "timeToFirstAnswerToken": 22.481894989847977,
   "slug": "hermes-4-llama-3-1-405b",
   "chartDefaultSelected": false,
   "chartHighlighted": false,
@@ -40539,14 +40539,14 @@
     }
    ]
   },
-  "intelligenceIndexTimePerTask": 1083.298790143927,
+  "intelligenceIndexTimePerTask": 1051.5386418693756,
   "price1mInputTokens": 1.32,
   "price1mOutputTokens": 3.96,
   "cacheHitPrice": 0.044,
   "cacheWritePrice": null,
-  "outputSpeed": 91.14077456860213,
-  "timeToFirstToken": 2.7500801970812816,
-  "timeToFirstAnswerToken": 51.47893367695138,
+  "outputSpeed": 93.8935450317116,
+  "timeToFirstToken": 2.699243269026127,
+  "timeToFirstAnswerToken": 49.10215630097679,
   "slug": "deepseek-v4-pro",
   "chartDefaultSelected": false,
   "chartHighlighted": false,
@@ -40663,22 +40663,22 @@
    }
   },
   "headline": {
-   "outputSpeed": 91.14077456860213,
-   "timeToFirstToken": 2.7500801970812816,
-   "timeToFirstAnswerToken": 51.47893367695138
+   "outputSpeed": 93.8935450317116,
+   "timeToFirstToken": 2.699243269026127,
+   "timeToFirstAnswerToken": 49.10215630097679
   },
   "multiTurn": {
-   "timeToFirstToken": 1.1912890552250086
+   "timeToFirstToken": 1.1939964560083507
   },
   "workloads": {
    "1k": {
-    "timeToFirstToken": 1.0105052995937907
+    "timeToFirstToken": 1.0272615465000172
    },
    "10k": {
-    "timeToFirstToken": 1.5606461704688253
+    "timeToFirstToken": 1.535083812631667
    },
    "100k": {
-    "timeToFirstToken": 10.355462546750049
+    "timeToFirstToken": 10.051124887000027
    }
   },
   "performanceDataSource": {
@@ -41160,14 +41160,14 @@
    "critpt-v2-hard": 0.48
   },
   "intelligenceIndexCostPerTask": 0.2922227000200506,
-  "intelligenceIndexTimePerTask": 84.31722642380936,
+  "intelligenceIndexTimePerTask": 85.8242872208217,
   "price1mInputTokens": 1.5,
   "price1mOutputTokens": 7.5,
   "cacheHitPrice": 0.075,
   "cacheWritePrice": null,
-  "outputSpeed": 166.91509009675227,
-  "timeToFirstToken": 5.721961581878834,
-  "timeToFirstAnswerToken": 5.721961581878834,
+  "outputSpeed": 163.98408773296484,
+  "timeToFirstToken": 6.283433703632178,
+  "timeToFirstAnswerToken": 6.283433703632178,
   "slug": "gemini-4-hydrogen",
   "chartDefaultSelected": true,
   "chartHighlighted": false,
@@ -42042,9 +42042,9 @@
   "price1mOutputTokens": 4,
   "cacheHitPrice": 0.19,
   "cacheWritePrice": null,
-  "outputSpeed": 53.80585833785639,
-  "timeToFirstToken": 6.071203315653876,
-  "timeToFirstAnswerToken": 45.31076508006719,
+  "outputSpeed": 54.097007812322836,
+  "timeToFirstToken": 6.084220125741084,
+  "timeToFirstAnswerToken": 44.02599461156535,
   "slug": "kimi-k2-7-code",
   "gdpvalCostPerTask": 0.39648028772206384,
   "chartDefaultSelected": false,
@@ -42416,9 +42416,9 @@
   "price1mOutputTokens": 6,
   "cacheHitPrice": 0.25,
   "cacheWritePrice": null,
-  "outputSpeed": 39.364378145377195,
-  "timeToFirstToken": 4.944514893919851,
-  "timeToFirstAnswerToken": 119.15770195425132,
+  "outputSpeed": 39.31499400139811,
+  "timeToFirstToken": 4.724897389086128,
+  "timeToFirstAnswerToken": 110.92763681135084,
   "slug": "qwen3-8-2-4t-a95b",
   "gdpvalCostPerTask": 2.5254921533204024,
   "chartDefaultSelected": false,
@@ -42995,9 +42995,9 @@
   "price1mOutputTokens": 0.97,
   "cacheHitPrice": 0.24,
   "cacheWritePrice": null,
-  "outputSpeed": 66.91665691698464,
-  "timeToFirstToken": 1.6124368365472772,
-  "timeToFirstAnswerToken": 1.6124368365472772,
+  "outputSpeed": 66.88878425696251,
+  "timeToFirstToken": 1.5782336057497433,
+  "timeToFirstAnswerToken": 1.5782336057497433,
   "slug": "llama-4-maverick",
   "gdpvalCostPerTask": 0.08940509463636363,
   "chartDefaultSelected": false,
@@ -43859,9 +43859,9 @@
   "price1mOutputTokens": 0.15,
   "cacheHitPrice": 0.015,
   "cacheWritePrice": null,
-  "outputSpeed": 82.5216870647265,
-  "timeToFirstToken": 1.8354796026777251,
-  "timeToFirstAnswerToken": 1.8354796026777251,
+  "outputSpeed": 84.35176149930716,
+  "timeToFirstToken": 1.8340812347049409,
+  "timeToFirstAnswerToken": 1.8340812347049409,
   "slug": "ministral-3-8b",
   "gdpvalCostPerTask": 0.011006692636363636,
   "chartDefaultSelected": false,
@@ -44226,9 +44226,9 @@
   "price1mOutputTokens": 0.71,
   "cacheHitPrice": 0.6,
   "cacheWritePrice": null,
-  "outputSpeed": 77.85675445459972,
-  "timeToFirstToken": 1.723812216032521,
-  "timeToFirstAnswerToken": 1.723812216032521,
+  "outputSpeed": 76.6050381957623,
+  "timeToFirstToken": 1.7403653386274902,
+  "timeToFirstAnswerToken": 1.7403653386274902,
   "slug": "llama-3-3-instruct-70b",
   "gdpvalCostPerTask": 0.20957053477272727,
   "chartDefaultSelected": false,
@@ -44985,14 +44985,14 @@
     }
    ]
   },
-  "intelligenceIndexTimePerTask": 1913.0397184095013,
+  "intelligenceIndexTimePerTask": 1925.180078866654,
   "price1mInputTokens": 0.15,
   "price1mOutputTokens": 0.47,
   "cacheHitPrice": 0.016,
   "cacheWritePrice": null,
-  "outputSpeed": 77.21020607846677,
-  "timeToFirstToken": 2.5343297097606303,
-  "timeToFirstAnswerToken": 87.23995660573819,
+  "outputSpeed": 76.72331150530276,
+  "timeToFirstToken": 2.523919456636261,
+  "timeToFirstAnswerToken": 83.04296699753597,
   "slug": "qwen3-8-flash-next",
   "chartDefaultSelected": false,
   "chartHighlighted": false,
@@ -45104,22 +45104,22 @@
    }
   },
   "headline": {
-   "outputSpeed": 77.21020607846677,
-   "timeToFirstToken": 2.5343297097606303,
-   "timeToFirstAnswerToken": 87.23995660573819
+   "outputSpeed": 76.72331150530276,
+   "timeToFirstToken": 2.523919456636261,
+   "timeToFirstAnswerToken": 83.04296699753597
   },
   "multiTurn": {
-   "timeToFirstToken": 1.8406483185629243
+   "timeToFirstToken": 1.8542234525620038
   },
   "workloads": {
    "1k": {
-    "timeToFirstToken": 1.3494567143125016
+    "timeToFirstToken": 1.3266352921052635
    },
    "10k": {
-    "timeToFirstToken": 1.9889371960625024
+    "timeToFirstToken": 1.9879139210263184
    },
    "100k": {
-    "timeToFirstToken": 6.345639392500005
+    "timeToFirstToken": 6.266297168999972
    }
   },
   "performanceDataSource": {
@@ -46104,9 +46104,9 @@
   "price1mOutputTokens": 0.3,
   "cacheHitPrice": null,
   "cacheWritePrice": null,
-  "outputSpeed": 19.476115258735334,
-  "timeToFirstToken": 4.5592124482646526,
-  "timeToFirstAnswerToken": 4.5592124482646526,
+  "outputSpeed": 19.14966417375378,
+  "timeToFirstToken": 4.551191948656989,
+  "timeToFirstAnswerToken": 4.551191948656989,
   "slug": "phi-4-mini",
   "gdpvalCostPerTask": 0.6924670275,
   "chartDefaultSelected": false,
@@ -46999,9 +46999,9 @@
   "price1mOutputTokens": 0.9,
   "cacheHitPrice": 0.06,
   "cacheWritePrice": null,
-  "outputSpeed": 90.14350519892348,
-  "timeToFirstToken": 4.461030081353183,
-  "timeToFirstAnswerToken": 50.007343022829296,
+  "outputSpeed": 92.42818199546123,
+  "timeToFirstToken": 4.4266123078117054,
+  "timeToFirstAnswerToken": 48.29905396777869,
   "slug": "ling-3-1-flash-1001",
   "gdpvalCostPerTask": 1.3014776768363971,
   "chartDefaultSelected": false,
@@ -47657,9 +47657,9 @@
   "price1mOutputTokens": 1.6,
   "cacheHitPrice": 0.08,
   "cacheWritePrice": null,
-  "outputSpeed": 57.62668901836101,
-  "timeToFirstToken": 2.6418510905592525,
-  "timeToFirstAnswerToken": 54.403010484936466,
+  "outputSpeed": 57.385466891783715,
+  "timeToFirstToken": 2.6423198779803982,
+  "timeToFirstAnswerToken": 53.96719981224566,
   "slug": "qwen3-7-plus",
   "gdpvalCostPerTask": 0.06833400389980358,
   "chartDefaultSelected": false,
@@ -48252,9 +48252,9 @@
   "price1mOutputTokens": 0.66,
   "cacheHitPrice": null,
   "cacheWritePrice": null,
-  "outputSpeed": 99.12597003463164,
-  "timeToFirstToken": 1.103979723752588,
-  "timeToFirstAnswerToken": 1.103979723752588,
+  "outputSpeed": 99.66710118350193,
+  "timeToFirstToken": 1.0972017243375154,
+  "timeToFirstAnswerToken": 1.0972017243375154,
   "slug": "llama-4-scout",
   "gdpvalCostPerTask": 0.019131165272727273,
   "chartDefaultSelected": false,
@@ -48666,14 +48666,14 @@
     }
    ]
   },
-  "intelligenceIndexTimePerTask": 782.1630903017656,
+  "intelligenceIndexTimePerTask": 779.4393683242571,
   "price1mInputTokens": 0.06,
   "price1mOutputTokens": 0.25,
   "cacheHitPrice": 0.015,
   "cacheWritePrice": null,
-  "outputSpeed": 65.86231294848272,
-  "timeToFirstToken": 6.41734564902394,
-  "timeToFirstAnswerToken": 62.48545555750622,
+  "outputSpeed": 66.09246635945682,
+  "timeToFirstToken": 5.644880917400163,
+  "timeToFirstAnswerToken": 59.69730158486485,
   "slug": "granite-4-2-8b",
   "gdpvalCostPerTask": 0.02632363087024091,
   "chartDefaultSelected": false,
@@ -49797,14 +49797,14 @@
     }
    ]
   },
-  "intelligenceIndexTimePerTask": 2893.981694516835,
+  "intelligenceIndexTimePerTask": 2882.267854884636,
   "price1mInputTokens": 2,
   "price1mOutputTokens": 6,
   "cacheHitPrice": 0.25,
   "cacheWritePrice": null,
-  "outputSpeed": 59.0169460427983,
-  "timeToFirstToken": 4.624676763322792,
-  "timeToFirstAnswerToken": 111.01809630615223,
+  "outputSpeed": 59.25679711713752,
+  "timeToFirstToken": 4.439739007068154,
+  "timeToFirstAnswerToken": 106.41594071183756,
   "slug": "qwen3-8-max",
   "gdpvalCostPerTask": 4.538143258221448,
   "chartDefaultSelected": true,
@@ -50352,9 +50352,9 @@
   "price1mOutputTokens": 0.5549999999999999,
   "cacheHitPrice": 0.034,
   "cacheWritePrice": null,
-  "outputSpeed": 75.78234523292042,
-  "timeToFirstToken": 4.46773110068807,
-  "timeToFirstAnswerToken": 47.80219425115152,
+  "outputSpeed": 76.3383986850863,
+  "timeToFirstToken": 4.51083173325053,
+  "timeToFirstAnswerToken": 46.546766799950156,
   "slug": "hy3",
   "gdpvalCostPerTask": 0.036119444078771816,
   "chartDefaultSelected": false,
@@ -51721,9 +51721,9 @@
   "price1mOutputTokens": 0.97,
   "cacheHitPrice": null,
   "cacheWritePrice": null,
-  "outputSpeed": 85.22457902528268,
-  "timeToFirstToken": 1.1528691705570815,
-  "timeToFirstAnswerToken": 28.554155164811288,
+  "outputSpeed": 86.17502364671314,
+  "timeToFirstToken": 1.157279832298217,
+  "timeToFirstAnswerToken": 29.25076836199454,
   "slug": "qwen3-omni-30b-a3b"
  },
  {
@@ -51819,14 +51819,14 @@
     }
    ]
   },
-  "intelligenceIndexTimePerTask": 260.56649867696535,
+  "intelligenceIndexTimePerTask": 290.708468538484,
   "price1mInputTokens": 0,
   "price1mOutputTokens": 0,
   "cacheHitPrice": null,
   "cacheWritePrice": null,
-  "outputSpeed": 244.3345461370681,
-  "timeToFirstToken": 4.801755653490051,
-  "timeToFirstAnswerToken": 17.70760634102525,
+  "outputSpeed": 219.00083445396174,
+  "timeToFirstToken": 6.395175945747284,
+  "timeToFirstAnswerToken": 19.159974094461354,
   "slug": "k2-horizon-375b-a23b",
   "chartDefaultSelected": true,
   "chartHighlighted": false,
@@ -52037,22 +52037,22 @@
    "endsWithQuestion": 0.0222222222222222
   },
   "headline": {
-   "outputSpeed": 244.3345461370681,
-   "timeToFirstToken": 4.801755653490051,
-   "timeToFirstAnswerToken": 17.70760634102525
+   "outputSpeed": 219.00083445396174,
+   "timeToFirstToken": 6.395175945747284,
+   "timeToFirstAnswerToken": 19.159974094461354
   },
   "multiTurn": {
-   "timeToFirstToken": 3.7641341747301076
+   "timeToFirstToken": 5.396436031271768
   },
   "workloads": {
    "1k": {
-    "timeToFirstToken": 3.357626128249952
+    "timeToFirstToken": 5.092131132868381
    },
    "10k": {
-    "timeToFirstToken": 4.050268638249938
+    "timeToFirstToken": 5.6360202439999485
    },
    "100k": {
-    "timeToFirstToken": 10.110236630250094
+    "timeToFirstToken": 11.453596203800075
    }
   },
   "performanceDataSource": {
@@ -52298,9 +52298,9 @@
   "price1mOutputTokens": 12,
   "cacheHitPrice": 0.2,
   "cacheWritePrice": null,
-  "outputSpeed": 111.51435282282877,
-  "timeToFirstToken": 15.555390489886882,
-  "timeToFirstAnswerToken": 15.555390489886882,
+  "outputSpeed": 113.51577512761413,
+  "timeToFirstToken": 15.487626486106008,
+  "timeToFirstAnswerToken": 15.487626486106008,
   "slug": "gemini-3-1-pro-preview",
   "gdpvalCostPerTask": 0.44738673641112403,
   "chartDefaultSelected": false,
@@ -53182,9 +53182,9 @@
   "price1mOutputTokens": 30,
   "cacheHitPrice": 0.5,
   "cacheWritePrice": null,
-  "outputSpeed": 124.35222978226905,
-  "timeToFirstToken": 1.9001213863695738,
-  "timeToFirstAnswerToken": 1.9001213863695738,
+  "outputSpeed": 124.40863838175916,
+  "timeToFirstToken": 1.866582521950196,
+  "timeToFirstAnswerToken": 1.866582521950196,
   "slug": "gpt-5-5-instant-06-26",
   "gdpvalCostPerTask": 0.07025806261942051,
   "chartDefaultSelected": false,
@@ -53785,9 +53785,9 @@
   "price1mOutputTokens": 0.595,
   "cacheHitPrice": 0.125,
   "cacheWritePrice": null,
-  "outputSpeed": 174.48831528537016,
-  "timeToFirstToken": 1.1647522298324895,
-  "timeToFirstAnswerToken": 2.347433610329614,
+  "outputSpeed": 175.46795923218238,
+  "timeToFirstToken": 1.1373855756441456,
+  "timeToFirstAnswerToken": 2.1853961230800025,
   "slug": "gpt-oss-120b",
   "gdpvalCostPerTask": 0.105246315,
   "chartDefaultSelected": false,
@@ -54225,14 +54225,14 @@
    "critpt": 0.145714285714286
   },
   "intelligenceIndexCostPerTask": 1.5749301149593384,
-  "intelligenceIndexTimePerTask": 764.0606489216652,
+  "intelligenceIndexTimePerTask": 736.6229722046476,
   "price1mInputTokens": 1.4,
   "price1mOutputTokens": 4.4,
   "cacheHitPrice": 0.26,
   "cacheWritePrice": null,
-  "outputSpeed": 68.03856542166237,
-  "timeToFirstToken": 2.5477219017000396,
-  "timeToFirstAnswerToken": 7.551454496080267,
+  "outputSpeed": 70.57286075695716,
+  "timeToFirstToken": 2.519329778305344,
+  "timeToFirstAnswerToken": 7.407046305556281,
   "slug": "glm-5-3",
   "chartDefaultSelected": true,
   "chartHighlighted": true,
@@ -54462,22 +54462,22 @@
    "endsWithQuestion": 0.1
   },
   "headline": {
-   "outputSpeed": 84.18773862623792,
-   "timeToFirstToken": 2.7796900245022917,
-   "timeToFirstAnswerToken": 63.064618057007756
+   "outputSpeed": 86.76716236338446,
+   "timeToFirstToken": 2.645953482489268,
+   "timeToFirstAnswerToken": 60.49825370864311
   },
   "multiTurn": {
-   "timeToFirstToken": 2.931784474285882
+   "timeToFirstToken": 2.8189423600803316
   },
   "workloads": {
    "1k": {
-    "timeToFirstToken": 1.3432504823749813
+    "timeToFirstToken": 1.3402897408157664
    },
    "10k": {
-    "timeToFirstToken": 1.6701990617812614
+    "timeToFirstToken": 1.6047093850789502
    },
    "100k": {
-    "timeToFirstToken": 4.869337179999863
+    "timeToFirstToken": 4.4738946887998985
    }
   },
   "performanceDataSource": {
@@ -54847,9 +54847,9 @@
   "price1mOutputTokens": 0,
   "cacheHitPrice": null,
   "cacheWritePrice": null,
-  "outputSpeed": 31.635090182200397,
-  "timeToFirstToken": 0.9588057880500788,
-  "timeToFirstAnswerToken": 52.46146870228127,
+  "outputSpeed": 31.6112654195347,
+  "timeToFirstToken": 0.95971351689218,
+  "timeToFirstAnswerToken": 52.23389949952633,
   "slug": "gemma-4-31b",
   "chartDefaultSelected": false,
   "chartHighlighted": false,
@@ -55282,14 +55282,14 @@
     }
    ]
   },
-  "intelligenceIndexTimePerTask": 846.4565749581665,
+  "intelligenceIndexTimePerTask": 832.4458001314746,
   "price1mInputTokens": 0.834,
   "price1mOutputTokens": 2.501,
   "cacheHitPrice": 0.042,
   "cacheWritePrice": null,
-  "outputSpeed": 92.21742762522292,
-  "timeToFirstToken": 3.011368221174999,
-  "timeToFirstAnswerToken": 115.62510654641902,
+  "outputSpeed": 93.76952580789101,
+  "timeToFirstToken": 2.944837064973605,
+  "timeToFirstAnswerToken": 110.01143695401761,
   "slug": "tencent-hy4",
   "chartDefaultSelected": true,
   "chartHighlighted": false,
@@ -55671,14 +55671,14 @@
     }
    ]
   },
-  "intelligenceIndexTimePerTask": 942.437124297438,
+  "intelligenceIndexTimePerTask": 916.3879534492954,
   "price1mInputTokens": 0.15,
   "price1mOutputTokens": 0.6,
   "cacheHitPrice": 0.015,
   "cacheWritePrice": null,
-  "outputSpeed": 146.61599669074323,
-  "timeToFirstToken": 1.5758214300534898,
-  "timeToFirstAnswerToken": 50.19486223227083,
+  "outputSpeed": 150.78369131450194,
+  "timeToFirstToken": 1.485265466405617,
+  "timeToFirstAnswerToken": 47.14682209226894,
   "slug": "minimax-m3-1-flash",
   "chartDefaultSelected": false,
   "chartHighlighted": false,
@@ -55896,22 +55896,22 @@
    "endsWithQuestion": 0.0155555555555556
   },
   "headline": {
-   "outputSpeed": 146.61599669074323,
-   "timeToFirstToken": 1.5758214300534898,
-   "timeToFirstAnswerToken": 50.19486223227083
+   "outputSpeed": 150.78369131450194,
+   "timeToFirstToken": 1.485265466405617,
+   "timeToFirstAnswerToken": 47.14682209226894
   },
   "multiTurn": {
-   "timeToFirstToken": 1.4503684684611053
+   "timeToFirstToken": 1.3103739351094412
   },
   "workloads": {
    "1k": {
-    "timeToFirstToken": 1.0252040926875206
+    "timeToFirstToken": 0.9809321027105669
    },
    "10k": {
-    "timeToFirstToken": 1.2880767565000095
+    "timeToFirstToken": 1.2010544083947177
    },
    "100k": {
-    "timeToFirstToken": 2.7905423257500948
+    "timeToFirstToken": 2.798484482000094
    }
   },
   "performanceDataSource": {
@@ -56254,14 +56254,14 @@
     }
    ]
   },
-  "intelligenceIndexTimePerTask": 1411.6473728664018,
+  "intelligenceIndexTimePerTask": 1477.4664888376265,
   "price1mInputTokens": 0.1,
   "price1mOutputTokens": 0.3,
   "cacheHitPrice": 0.01,
   "cacheWritePrice": null,
-  "outputSpeed": 196.83965516847317,
-  "timeToFirstToken": 2.13663111932743,
-  "timeToFirstAnswerToken": 5.832113979896443,
+  "outputSpeed": 188.07071713221197,
+  "timeToFirstToken": 3.893090413166833,
+  "timeToFirstAnswerToken": 8.135523483909573,
   "slug": "agnes-2-5-pro-theta",
   "gdpvalCostPerTask": 0.41393287626329106,
   "chartDefaultSelected": false,
@@ -56790,9 +56790,9 @@
   "price1mOutputTokens": 0.2,
   "cacheHitPrice": null,
   "cacheWritePrice": null,
-  "outputSpeed": 61.461023031837364,
-  "timeToFirstToken": 0.8927927272860602,
-  "timeToFirstAnswerToken": 5.982971528261268,
+  "outputSpeed": 60.823818072930294,
+  "timeToFirstToken": 0.8950298359816689,
+  "timeToFirstAnswerToken": 6.782830926925065,
   "slug": "reka-flash-3",
   "chartDefaultSelected": false,
   "chartHighlighted": false,
@@ -57141,14 +57141,14 @@
     }
    ]
   },
-  "intelligenceIndexTimePerTask": 269.78223245862284,
+  "intelligenceIndexTimePerTask": 268.4630845602055,
   "price1mInputTokens": 1.5,
   "price1mOutputTokens": 7.5,
   "cacheHitPrice": 0.15,
   "cacheWritePrice": null,
-  "outputSpeed": 146.51686873129748,
-  "timeToFirstToken": 7.106212368964429,
-  "timeToFirstAnswerToken": 23.90801517942776,
+  "outputSpeed": 147.23680912752067,
+  "timeToFirstToken": 7.044069913944831,
+  "timeToFirstAnswerToken": 23.95341300166706,
   "slug": "mistral-medium-3-5",
   "gdpvalCostPerTask": 0.35275452119610423,
   "chartDefaultSelected": false,
@@ -58194,14 +58194,14 @@
    "critpt": 0.105714285714286
   },
   "intelligenceIndexCostPerTask": 0.5574566144919201,
-  "intelligenceIndexTimePerTask": 360.7999666753732,
+  "intelligenceIndexTimePerTask": 314.9169813981945,
   "price1mInputTokens": 0.2,
   "price1mOutputTokens": 0.5,
   "cacheHitPrice": 0.05,
   "cacheWritePrice": null,
-  "outputSpeed": 225.70577033112934,
+  "outputSpeed": 258.59080082741383,
   "timeToFirstToken": 1.1441308495265552,
-  "timeToFirstAnswerToken": 17.140931994982044,
+  "timeToFirstAnswerToken": 16.42618633285646,
   "slug": "nemotron-3-5-super-vl",
   "gdpvalCostPerTask": 0.1132114839254919,
   "chartDefaultSelected": true,
@@ -58795,14 +58795,14 @@
     }
    ]
   },
-  "intelligenceIndexTimePerTask": 1711.0350510724272,
+  "intelligenceIndexTimePerTask": 1661.80901810082,
   "price1mInputTokens": 0.3,
   "price1mOutputTokens": 1,
   "cacheHitPrice": 0.03,
   "cacheWritePrice": null,
-  "outputSpeed": 87.53649828032012,
-  "timeToFirstToken": 3.356790330682729,
-  "timeToFirstAnswerToken": 68.68771492104752,
+  "outputSpeed": 90.12950054690468,
+  "timeToFirstToken": 3.2359970446330704,
+  "timeToFirstAnswerToken": 64.56882629725804,
   "slug": "inkling-2-small",
   "chartDefaultSelected": true,
   "chartHighlighted": false,
@@ -58925,22 +58925,22 @@
    "upper": 1034.69
   },
   "headline": {
-   "outputSpeed": 87.53649828032012,
-   "timeToFirstToken": 3.356790330682729,
-   "timeToFirstAnswerToken": 68.68771492104752
+   "outputSpeed": 90.12950054690468,
+   "timeToFirstToken": 3.2359970446330704,
+   "timeToFirstAnswerToken": 64.56882629725804
   },
   "multiTurn": {
-   "timeToFirstToken": 2.7788828088311113
+   "timeToFirstToken": 2.667948623157789
   },
   "workloads": {
    "1k": {
-    "timeToFirstToken": 2.6124106388529604
+    "timeToFirstToken": 2.494836848274991
    },
    "10k": {
-    "timeToFirstToken": 2.8114679810000354
+    "timeToFirstToken": 2.7219920374500397
    },
    "100k": {
-    "timeToFirstToken": 6.38021493775004
+    "timeToFirstToken": 6.195307512600028
    }
   },
   "performanceDataSource": {
@@ -59832,9 +59832,9 @@
   "price1mOutputTokens": 2.5,
   "cacheHitPrice": null,
   "cacheWritePrice": null,
-  "outputSpeed": 106.73988319381691,
-  "timeToFirstToken": 4.10867742317084,
-  "timeToFirstAnswerToken": 10.342724387201057,
+  "outputSpeed": 105.35040093490788,
+  "timeToFirstToken": 4.021915542630674,
+  "timeToFirstAnswerToken": 9.953686532563568,
   "slug": "ring-2-6-1t",
   "gdpvalCostPerTask": 0.2871769240909091,
   "chartDefaultSelected": false,
@@ -60202,9 +60202,9 @@
   "price1mOutputTokens": 0.5,
   "cacheHitPrice": null,
   "cacheWritePrice": null,
-  "outputSpeed": 32.336789837088354,
-  "timeToFirstToken": 4.115904765735298,
-  "timeToFirstAnswerToken": 4.115904765735298,
+  "outputSpeed": 32.91162956163437,
+  "timeToFirstToken": 3.796523716024992,
+  "timeToFirstAnswerToken": 3.796523716024992,
   "slug": "phi-4",
   "chartDefaultSelected": false,
   "chartHighlighted": false,
@@ -61715,9 +61715,9 @@
   "price1mOutputTokens": 1,
   "cacheHitPrice": 0.28500000000000003,
   "cacheWritePrice": null,
-  "outputSpeed": 70.32189992769277,
-  "timeToFirstToken": 1.601111693388047,
-  "timeToFirstAnswerToken": 1.601111693388047,
+  "outputSpeed": 66.23791201234017,
+  "timeToFirstToken": 1.6341810476199923,
+  "timeToFirstAnswerToken": 1.6341810476199923,
   "slug": "qwen3-coder-next",
   "gdpvalCostPerTask": 0.2443750386601608,
   "chartDefaultSelected": false,
@@ -62121,7 +62121,7 @@
   "price1mBlended0To1To1": 0.75,
   "price1mBlended100To1To1": 0.020588235294117643,
   "price1mBlended0To100To1": 0.3089108910891089,
-  "intelligenceIndexTimePerTask": 642.6511126380569,
+  "intelligenceIndexTimePerTask": 633.3829450098258,
   "intelligenceIndexCost": {
    "total": 384.14101940631247,
    "input": 223.6376630063125,
@@ -62219,22 +62219,22 @@
    }
   },
   "headline": {
-   "outputSpeed": 171.8352132549721,
-   "timeToFirstToken": 1.3142716778925185,
-   "timeToFirstAnswerToken": 21.795536696869757
+   "outputSpeed": 174.34964401668955,
+   "timeToFirstToken": 1.2889087542260824,
+   "timeToFirstAnswerToken": 20.394558110031426
   },
   "multiTurn": {
-   "timeToFirstToken": 1.107377105760454
+   "timeToFirstToken": 1.0914132095354576
   },
   "workloads": {
    "1k": {
-    "timeToFirstToken": 0.8970294074705911
+    "timeToFirstToken": 0.8846483806000153
    },
    "10k": {
-    "timeToFirstToken": 1.219705217352972
+    "timeToFirstToken": 1.197801632750025
    },
    "100k": {
-    "timeToFirstToken": 2.446764125250185
+    "timeToFirstToken": 2.37676288340008
    }
   },
   "performanceDataSource": {
@@ -62505,7 +62505,7 @@
   "price1mBlended0To1To1": 0.75,
   "price1mBlended100To1To1": 0.020588235294117643,
   "price1mBlended0To100To1": 0.3089108910891089,
-  "intelligenceIndexTimePerTask": 436.3217586113305,
+  "intelligenceIndexTimePerTask": 426.46751185533503,
   "intelligenceIndexCost": {
    "total": 310.2424270648679,
    "input": 248.77249426486793,
@@ -62603,22 +62603,22 @@
    }
   },
   "headline": {
-   "outputSpeed": 149.7921395301851,
-   "timeToFirstToken": 1.3359612008763861,
-   "timeToFirstAnswerToken": 1.3359612008763861
+   "outputSpeed": 153.25333801308304,
+   "timeToFirstToken": 1.298906887309053,
+   "timeToFirstAnswerToken": 1.298906887309053
   },
   "multiTurn": {
-   "timeToFirstToken": 1.1172223617110164
+   "timeToFirstToken": 1.1047649879776884
   },
   "workloads": {
    "1k": {
-    "timeToFirstToken": 0.9531304573125359
+    "timeToFirstToken": 0.9282814223421388
    },
    "10k": {
-    "timeToFirstToken": 1.1333300535624937
+    "timeToFirstToken": 1.1043273035789192
    },
    "100k": {
-    "timeToFirstToken": 2.5776396092502396
+    "timeToFirstToken": 2.4465376340001956
    }
   },
   "performanceDataSource": {
@@ -63229,7 +63229,7 @@
   "price1mBlended0To1To1": 2.64,
   "price1mBlended100To1To1": 0.09490196078431372,
   "price1mBlended0To100To1": 1.3461386138613862,
-  "intelligenceIndexTimePerTask": 796.7674312428637,
+  "intelligenceIndexTimePerTask": 799.9375565053074,
   "intelligenceIndexCost": {
    "total": 771.0253004389941,
    "input": 540.3358647589941,
@@ -63327,22 +63327,22 @@
    }
   },
   "headline": {
-   "outputSpeed": 89.84815487801403,
-   "timeToFirstToken": 2.452650964141362,
-   "timeToFirstAnswerToken": 2.452650964141362
+   "outputSpeed": 89.49208970361832,
+   "timeToFirstToken": 2.491261518006725,
+   "timeToFirstAnswerToken": 2.491261518006725
   },
   "multiTurn": {
-   "timeToFirstToken": 1.301533107321917
+   "timeToFirstToken": 1.294760156321748
   },
   "workloads": {
    "1k": {
-    "timeToFirstToken": 1.3032382294705906
+    "timeToFirstToken": 1.279890843650009
    },
    "10k": {
-    "timeToFirstToken": 1.640414533911861
+    "timeToFirstToken": 1.6476194268250883
    },
    "100k": {
-    "timeToFirstToken": 7.867653699499968
+    "timeToFirstToken": 8.135778368600006
    }
   },
   "performanceDataSource": {
@@ -63641,7 +63641,7 @@
   "price1mBlended0To1To1": 2.9000000000000004,
   "price1mBlended100To1To1": 0.3117647058823529,
   "price1mBlended0To100To1": 1.4297029702970299,
-  "intelligenceIndexTimePerTask": 764.0606489216652,
+  "intelligenceIndexTimePerTask": 736.6229722046476,
   "intelligenceIndexCost": {
    "total": 1218.5473602734003,
    "input": 940.0902010734002,
@@ -63739,22 +63739,22 @@
    }
   },
   "headline": {
-   "outputSpeed": 68.03856542166237,
-   "timeToFirstToken": 2.5477219017000396,
-   "timeToFirstAnswerToken": 7.551454496080267
+   "outputSpeed": 70.57286075695716,
+   "timeToFirstToken": 2.519329778305344,
+   "timeToFirstAnswerToken": 7.407046305556281
   },
   "multiTurn": {
-   "timeToFirstToken": 2.877724514346188
+   "timeToFirstToken": 2.822437919210723
   },
   "workloads": {
    "1k": {
-    "timeToFirstToken": 1.3018104019411672
+    "timeToFirstToken": 1.286118521424995
    },
    "10k": {
-    "timeToFirstToken": 1.6782595619705254
+    "timeToFirstToken": 1.6115072843749167
    },
    "100k": {
-    "timeToFirstToken": 3.6730879032499795
+    "timeToFirstToken": 3.7510391063999817
    }
   },
   "performanceDataSource": {
@@ -64077,7 +64077,7 @@
   "price1mBlended0To1To1": 1.4,
   "price1mBlended100To1To1": 0.09607843137254903,
   "price1mBlended0To100To1": 0.7138613861386138,
-  "intelligenceIndexTimePerTask": 655.2631071554375,
+  "intelligenceIndexTimePerTask": 679.6083299809704,
   "intelligenceIndexCost": {
    "total": 936.4532008246869,
    "input": 784.1288167246869,
@@ -64175,22 +64175,22 @@
    }
   },
   "headline": {
-   "outputSpeed": 85.95703151816542,
-   "timeToFirstToken": 3.0785376199212986,
-   "timeToFirstAnswerToken": 25.823698500671885
+   "outputSpeed": 82.87784164745021,
+   "timeToFirstToken": 4.198579931705074,
+   "timeToFirstAnswerToken": 27.26357781915581
   },
   "multiTurn": {
-   "timeToFirstToken": 1.5491363089259067
+   "timeToFirstToken": 1.726259983125914
   },
   "workloads": {
    "1k": {
-    "timeToFirstToken": 1.1903062158125
+    "timeToFirstToken": 1.202130274552649
    },
    "10k": {
-    "timeToFirstToken": 3.1229319121875956
+    "timeToFirstToken": 4.147926800500074
    },
    "100k": {
-    "timeToFirstToken": 9.510578664749975
+    "timeToFirstToken": 14.66264256579998
    }
   },
   "performanceDataSource": {
@@ -64395,7 +64395,7 @@
   "price1mBlended0To1To1": 1.5,
   "price1mBlended100To1To1": 0.14705882352941177,
   "price1mBlended0To100To1": 0.6178217821782178,
-  "intelligenceIndexTimePerTask": 253.0084589284647,
+  "intelligenceIndexTimePerTask": 256.50306473244603,
   "intelligenceIndexCost": {
    "total": 1523.7286431139225,
    "input": 1377.6850695139226,
@@ -64604,22 +64604,22 @@
    "endsWithQuestion": 0
   },
   "headline": {
-   "outputSpeed": 203.4225054079585,
-   "timeToFirstToken": 1.754170211039603,
-   "timeToFirstAnswerToken": 4.933438825652009
+   "outputSpeed": 200.65107081008895,
+   "timeToFirstToken": 1.7180753242528748,
+   "timeToFirstAnswerToken": 4.848739213972497
   },
   "multiTurn": {
-   "timeToFirstToken": 0.84899553733899
+   "timeToFirstToken": 0.8434589314974114
   },
   "workloads": {
    "1k": {
-    "timeToFirstToken": 0.7403971644706409
+    "timeToFirstToken": 0.8476181319750425
    },
    "10k": {
-    "timeToFirstToken": 0.9617882884999889
+    "timeToFirstToken": 0.972980231449988
    },
    "100k": {
-    "timeToFirstToken": 4.457740496499923
+    "timeToFirstToken": 4.469204478599931
    }
   },
   "performanceDataSource": {
@@ -64917,7 +64917,7 @@
   "price1mBlended0To1To1": 1.85,
   "price1mBlended100To1To1": 0.13431372549019607,
   "price1mBlended0To100To1": 1.0168316831683168,
-  "intelligenceIndexTimePerTask": 888.4121149985301,
+  "intelligenceIndexTimePerTask": 873.615502967212,
   "intelligenceIndexCost": {
    "total": 1643.7486034067194,
    "input": 1296.2357452067195,
@@ -65126,22 +65126,22 @@
    "endsWithQuestion": 0.0177777777777778
   },
   "headline": {
-   "outputSpeed": 127.72549564113702,
-   "timeToFirstToken": 0.9190172680907361,
-   "timeToFirstAnswerToken": 23.759540322750443
+   "outputSpeed": 129.8888095922868,
+   "timeToFirstToken": 0.9056420004160434,
+   "timeToFirstAnswerToken": 23.114518564062248
   },
   "multiTurn": {
-   "timeToFirstToken": 0.5604612602549576
+   "timeToFirstToken": 0.5534726749737149
   },
   "workloads": {
    "1k": {
-    "timeToFirstToken": 0.49716530770589057
+    "timeToFirstToken": 0.4936623719250222
    },
    "10k": {
-    "timeToFirstToken": 0.7993851298235816
+    "timeToFirstToken": 0.7612462320500368
    },
    "100k": {
-    "timeToFirstToken": 2.5361693902500724
+    "timeToFirstToken": 2.5185253736000557
    }
   },
   "performanceDataSource": {
