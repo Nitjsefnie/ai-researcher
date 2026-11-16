@@ -30,15 +30,7 @@ def _wait_for(path, future=None):
 
 def _run(repo, name, env):
     entry = _workflowrun.step_by_name(WORKFLOW, 'refresh', name)
-    real_run = subprocess.run
-
-    def bounded_run(*args, **kwargs):
-        kwargs['timeout'] = 10
-        kwargs['encoding'] = 'utf-8'
-        kwargs.pop('check', None)
-        return real_run(*args, check=False, **kwargs)
-
-    with mock.patch.object(_workflowrun.subprocess, 'run', side_effect=bounded_run):
+    with mock.patch.object(_workflowrun, 'STEP_TIMEOUT', 10):
         return _workflowrun.run_step(repo, entry, env)
 
 
