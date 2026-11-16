@@ -139,16 +139,10 @@ with calls_path.open("a", encoding="utf-8") as handle:
     handle.write(json.dumps(args) + chr(10))
 
 def endpoint():
-    for value in args:
-        if value.startswith("repos/"):
-            return value
-    return ""
+    return next((value for value in args if value.startswith("repos/")), "")
 
 def method():
-    for flag in ("-X", "--method"):
-        if flag in args:
-            return args[args.index(flag) + 1]
-    return "GET"
+    return next((args[args.index(flag) + 1] for flag in ("-X", "--method") if flag in args), "GET")
 
 def fields():
     """Field flags, with `@file` expansion on -F/--field only.
