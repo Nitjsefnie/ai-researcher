@@ -1,11 +1,11 @@
 {
   ".github/dependabot.yml": [
-    1696,
-    2181
+    1607,
+    2119
   ],
   ".github/workflows/actionlint.yml": [
-    5693,
-    7703
+    5443,
+    7509
   ],
   ".github/workflows/audit.yml": [
     4193,
@@ -16,16 +16,16 @@
     7246
   ],
   ".github/workflows/codeql.yml": [
-    3304,
-    4244
+    3174,
+    4114
   ],
   ".github/workflows/coverage-comment.yml": [
     4547,
     13754
   ],
   ".github/workflows/lint.yml": [
-    1102,
-    1845
+    1047,
+    1824
   ],
   ".github/workflows/pr-gate.yml": [
     427,
@@ -44,12 +44,12 @@
     1587
   ],
   ".github/workflows/secrets.yml": [
-    2521,
-    3828
+    2492,
+    3869
   ],
   ".github/workflows/tests.yml": [
-    17223,
-    24669
+    17016,
+    24718
   ],
   ".github/workflows/types.yml": [
     1021,
@@ -60,16 +60,16 @@
     107173
   ],
   "page_format.py": [
-    1906,
-    2991
+    1901,
+    2986
   ],
   "scripts/capture_gate.py": [
-    9865,
-    16759
+    9710,
+    16604
   ],
   "scripts/ci/aggregate_gate.py": [
-    3297,
-    6426
+    3257,
+    6474
   ],
   "scripts/ci/check_committed_page.py": [
     4527,
@@ -84,8 +84,8 @@
     21494
   ],
   "scripts/ci/classify_changes.py": [
-    6545,
-    11334
+    6438,
+    11347
   ],
   "scripts/ci/commit_scopes.py": [
     6375,
@@ -128,8 +128,8 @@
     27599
   ],
   "scripts/fetch_aa.py": [
-    22379,
-    46257
+    22359,
+    46619
   ],
   "scripts/fetch_hf_trending.py": [
     661,
@@ -148,16 +148,16 @@
     7346
   ],
   "tests/test_browser.py": [
-    30611,
-    94722
+    29175,
+    93286
   ],
   "tests/test_build.py": [
-    27831,
-    86011
+    26966,
+    85146
   ],
   "tests/test_capture_gate.py": [
-    13376,
-    44289
+    12588,
+    42451
   ],
   "tests/test_check_committed_page.py": [
     3775,
@@ -168,44 +168,44 @@
     10868
   ],
   "tests/test_ci_context_separation.py": [
-    3048,
-    4862
+    3033,
+    4883
   ],
   "tests/test_ci_gate_botdata.py": [
     2560,
     10511
   ],
   "tests/test_ci_gate_modules.py": [
-    3955,
-    16676
+    3909,
+    16741
   ],
   "tests/test_ci_gate_output_wiring.py": [
     7310,
     14508
   ],
   "tests/test_ci_instruction_budgets.py": [
-    3816,
-    15776
+    3805,
+    15765
   ],
   "tests/test_ci_perf_budgets.py": [
-    5066,
-    24001
+    4898,
+    23833
   ],
   "tests/test_ci_ratchets.py": [
-    10493,
-    61964
+    10411,
+    61882
   ],
   "tests/test_ci_thresholds.py": [
-    3332,
-    18694
+    3286,
+    18648
   ],
   "tests/test_ci_workflows.py": [
     4054,
     15794
   ],
   "tests/test_diff_aa.py": [
-    11086,
-    43214
+    10693,
+    42894
   ],
   "tests/test_diff_coverage.py": [
     3651,
@@ -216,8 +216,8 @@
     104015
   ],
   "tests/test_gitignore.py": [
-    3628,
-    7163
+    3516,
+    7011
   ],
   "tests/test_js_coverage.py": [
     1840,
