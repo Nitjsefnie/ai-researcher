@@ -23,6 +23,7 @@ import yaml
 
 # The comment workflow declares no `shell:`, so this is the runner default.
 _DEFAULT_SHELL = "bash -e {0}"
+STEP_TIMEOUT = 120
 
 
 def step_by_name(workflow_path, job_id, name):
@@ -61,7 +62,7 @@ def run_step(workdir, step, env):
         with subprocess.Popen(command, cwd=workdir, env=child_env, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                               text=True, start_new_session=os.name != "nt") as process:
             try:
-                stdout, stderr = process.communicate(timeout=120)
+                stdout, stderr = process.communicate(timeout=STEP_TIMEOUT)
             except BaseException:  # TERM first: a SIGKILLed shell skips the EXIT trap that stops its daemons
                 _stop(process)
                 raise
