@@ -4505,7 +4505,7 @@
   "intelligenceIndex": 56.4083157101519,
   "omniscience": 63.5,
   "scores": {
-   "aa-briefcase": 1622.24,
+   "aa-briefcase": 1621.81,
    "omniscience-accuracy": 0.7696666666666667,
    "omniscience-non-hallucination": 0.41534008683068013,
    "automationbench-aa": 0.6882266338432704,
@@ -4516,7 +4516,7 @@
    "terminalbench-4-0": 0.55050505050505,
    "critpt-v2-hard": 0.615,
    "harvey-lab-aa": 0.06388888888888888,
-   "gdpval-aa-normalized": 1591.16,
+   "gdpval-aa-normalized": 1591.13,
    "frontiercode": 0.640310666666667,
    "healthbench": 0.6024901059725118,
    "healthbench-professional": 0.6704790811200546,
