@@ -25771,15 +25771,7 @@
   "price1mOutputTokens": 40,
   "cacheHitPrice": 0.4,
   "cacheWritePrice": 10,
-  "slug": "astra-for-law-6-2",
-  "genVariants": [
-   {
-    "ctx": 1000000,
-    "pin": 8,
-    "pout": 40
-   },
-   {}
-  ]
+  "slug": "astra-for-law-6-2"
  },
  {
   "id": "583f98fb-c4b8-4df3-8d40-60ac0ed69882",
@@ -51764,6 +51756,11 @@
     "slug": "inco",
     "name": "Inco",
     "logo": "/img/logos/inco.svg"
+   },
+   {
+    "slug": "makora",
+    "name": "Makora",
+    "logo": "/img/logos/makora.svg"
    },
    {
     "slug": "minimax",
