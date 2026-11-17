@@ -17,13 +17,13 @@
       "id": "thinkingmachines/Inkling-2-Small"
     },
     {
-      "id": "Comfy-Org/MiniMax-H3-Image"
-    },
-    {
       "id": "unsloth/Qwen3.8-27B-GGUF"
     },
     {
       "id": "Zyphra/ZONOS3-Mini"
+    },
+    {
+      "id": "Comfy-Org/MiniMax-H3-Image"
     },
     {
       "id": "black-forest-labs/flux-3-image-klein-comfy"
