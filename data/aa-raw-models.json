@@ -37959,7 +37959,7 @@
   "intelligenceIndex": null,
   "omniscience": -8.033333333333333,
   "scores": {
-   "aa-briefcase": 739.42,
+   "aa-briefcase": 739.39,
    "omniscience-accuracy": 0.17466666666666666,
    "omniscience-non-hallucination": 0.6910339256865913,
    "automationbench-aa": 0.02479417400536003,
@@ -37967,7 +37967,8 @@
    "frontiercode-2-0": 0,
    "gdp-pdf": 0.064,
    "terminalbench-4-0": 0,
-   "gdpval-aa-normalized": 968.01,
+   "critpt-v2-hard": 0.075,
+   "gdpval-aa-normalized": 967.42,
    "humanitys-last-exam": 0.295644114921223,
    "artificial-analysis-long-context-reasoning": 0.7,
    "scicode": 0.409722222222222,
@@ -37999,10 +38000,10 @@
   "omniscienceAccuracy": 0.17466666666666666,
   "omniscienceHallucinationRate": 0.3089660743134087,
   "gdpPdfAllPass": 0.064,
-  "gdpval": 968.01,
+  "gdpval": 967.42,
   "gdpvalInterval": {
-   "lower": 945.11,
-   "upper": 990.92
+   "lower": 944.56,
+   "upper": 990.27
   },
   "itBenchSre": null,
   "tau2": null,
@@ -38018,7 +38019,7 @@
   "mkaClimbWsr": null,
   "healthbenchProfessional": null,
   "hleDiamond": null,
-  "critptAgenticHard": null,
+  "critptAgenticHard": 0.075,
   "scicode": 0.409722222222222,
   "lcr": 0.7,
   "ifbench": null,
@@ -38047,9 +38048,9 @@
   },
   "briefcaseBreakdown": {
    "overall": {
-    "elo": 739.42,
-    "lower95ci": 727.89,
-    "upper95ci": 750.17
+    "elo": 739.39,
+    "lower95ci": 726.75,
+    "upper95ci": 750.61
    }
   },
   "headline": null,
