@@ -1,6 +1,7 @@
 """Exercise ranking history and the standalone page against real git commits."""
 from __future__ import annotations
 
+import contextlib
 from datetime import datetime, timezone
 from html.parser import HTMLParser
 import json
@@ -24,6 +25,7 @@ ROOT = pathlib.Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
 
 import build_rankings  # noqa: E402  # pylint: disable=wrong-import-position
+from scripts.browser_temp import chromium_browser  # noqa: E402  # pylint: disable=wrong-import-position
 
 HF = "data/hf-trending.json"
 OR = "data/openrouter-trending.json"
@@ -267,51 +269,60 @@ class RankingsTests(RankingsFixture):
                          self._document())
         self.assertIsNotNone(rule, "a hidden SVG crosshair must have display: none")
 
+    def _launch_chromium(self):
+        """Start a Chromium that owns its temp files; skip when none is installed."""
+        chromium = (os.environ.get("AI_RESEARCHER_CHROMIUM_PATH")
+                    or os.environ.get("CHROMIUM_PATH") or "/usr/bin/chromium")
+        executable = chromium if pathlib.Path(chromium).exists() else None
+        stack = contextlib.ExitStack()
+        self.addCleanup(stack.close)
+        # Only entering the context manager may skip: a PlaywrightError raised
+        # later, in the test body, must still fail the test.
+        try:
+            return stack.enter_context(chromium_browser(
+                sync_playwright,
+                headless=True,
+                executable_path=executable,
+            ))
+        except PlaywrightError as error:
+            if "Executable doesn't exist at " in str(error):
+                self.skipTest("Chromium executable is not installed")
+            raise
+
     def test_browser_rings_stay_solid_and_crosshair_hides_after_escape(self):
         self.commit(HF, [f"org/model-{rank}" for rank in range(10)], "id")
         document = self._document()
-        chromium = os.environ.get("AI_RESEARCHER_CHROMIUM_PATH") or os.environ.get("CHROMIUM_PATH") or "/usr/bin/chromium"
-        executable = chromium if pathlib.Path(chromium).exists() else None
-        with sync_playwright() as playwright:
-            try:
-                browser = playwright.chromium.launch(headless=True, executable_path=executable)
-            except PlaywrightError as error:
-                if "Executable doesn't exist at " in str(error):
-                    self.skipTest("Chromium executable is not installed")
-                raise
-            try:
-                page = browser.new_page(color_scheme="light")
-                page.set_content(document)
-                crosshair = page.locator("#hugging-face .crosshair")
-                with self.subTest(state="initial crosshair"):
-                    self.assertEqual(crosshair.evaluate(
-                        "node => getComputedStyle(node).display"), "none")
-                point = page.locator("#hugging-face .point[data-dashed='true']").first
-                styles = point.evaluate("""node => {
-                    const chart = node.closest('.chart');
-                    const path = Array.from(chart.querySelectorAll('.series'))
-                      .find(series => series.dataset.model === node.dataset.model);
-                    const ring = getComputedStyle(node);
-                    return {dash: ring.strokeDasharray, width: ring.strokeWidth,
-                      stroke: ring.stroke, surface: getComputedStyle(chart).backgroundColor,
-                      pathDash: getComputedStyle(path).strokeDasharray};
-                }""")
-                with self.subTest(state="marker ring"):
-                    self.assertEqual(styles["dash"], "none")
-                    self.assertEqual(styles["width"], "2px")
-                    self.assertEqual(styles["stroke"], styles["surface"])
-                with self.subTest(state="series path"):
-                    self.assertNotEqual(styles["pathDash"], "none")
-                point.focus()
-                with self.subTest(state="focused crosshair"):
-                    self.assertNotEqual(crosshair.evaluate(
-                        "node => getComputedStyle(node).display"), "none")
-                page.keyboard.press("Escape")
-                with self.subTest(state="dismissed crosshair"):
-                    self.assertEqual(crosshair.evaluate(
-                        "node => getComputedStyle(node).display"), "none")
-            finally:
-                browser.close()
+        browser = self._launch_chromium()
+        page = browser.new_page(color_scheme="light")
+        page.set_content(document)
+        crosshair = page.locator("#hugging-face .crosshair")
+        with self.subTest(state="initial crosshair"):
+            self.assertEqual(crosshair.evaluate(
+                "node => getComputedStyle(node).display"), "none")
+        point = page.locator("#hugging-face .point[data-dashed='true']").first
+        styles = point.evaluate("""node => {
+            const chart = node.closest('.chart');
+            const path = Array.from(chart.querySelectorAll('.series'))
+              .find(series => series.dataset.model === node.dataset.model);
+            const ring = getComputedStyle(node);
+            return {dash: ring.strokeDasharray, width: ring.strokeWidth,
+              stroke: ring.stroke, surface: getComputedStyle(chart).backgroundColor,
+              pathDash: getComputedStyle(path).strokeDasharray};
+        }""")
+        with self.subTest(state="marker ring"):
+            self.assertEqual(styles["dash"], "none")
+            self.assertEqual(styles["width"], "2px")
+            self.assertEqual(styles["stroke"], styles["surface"])
+        with self.subTest(state="series path"):
+            self.assertNotEqual(styles["pathDash"], "none")
+        point.focus()
+        with self.subTest(state="focused crosshair"):
+            self.assertNotEqual(crosshair.evaluate(
+                "node => getComputedStyle(node).display"), "none")
+        page.keyboard.press("Escape")
+        with self.subTest(state="dismissed crosshair"):
+            self.assertEqual(crosshair.evaluate(
+                "node => getComputedStyle(node).display"), "none")
 
     def test_charts_fit_their_containers_at_common_widths(self):
         for index in range(1, 10):
@@ -325,95 +336,84 @@ class RankingsTests(RankingsFixture):
             latest_gh = self.commit(GH, star_models, "full_name")
 
         document = self._document("--limit", "10")
-        chromium = os.environ.get("AI_RESEARCHER_CHROMIUM_PATH") or os.environ.get("CHROMIUM_PATH") or "/usr/bin/chromium"
-        executable = chromium if pathlib.Path(chromium).exists() else None
-        with sync_playwright() as playwright:
-            try:
-                browser = playwright.chromium.launch(headless=True, executable_path=executable)
-            except PlaywrightError as error:
-                if "Executable doesn't exist at " in str(error):
-                    self.skipTest("Chromium executable is not installed")
-                raise
-            try:
-                page = browser.new_page(viewport={"width": 390, "height": 900},
-                                        color_scheme="dark")
-                page.set_content(document)
-                latest_commits = [latest_hf, latest_or, latest_gh]
-                for width in (390, 768, 1280, 2560):
-                    page.set_viewport_size({"width": width, "height": 900})
-                    if width == 2560:
-                        main_width = page.locator("main").evaluate(
-                            "node => node.getBoundingClientRect().width")
-                        self.assertGreater(
-                            main_width, 2000,
-                            f"main should use the wide viewport at {width}px; got {main_width}px")
-                    page.locator(".chart-scroll").evaluate_all(
-                        "containers => containers.forEach(container => container.scrollLeft = 0)")
-                    charts = page.locator(".chart-scroll").evaluate_all("""(containers, commits) =>
-                      containers.map((container, index) => {
-                        const svg = container.querySelector('svg');
-                        const bounds = svg.getBoundingClientRect();
-                        const containerBounds = container.getBoundingClientRect();
-                        const newestPoints = Array.from(svg.querySelectorAll('.point'))
-                          .filter(point => point.dataset.commit === commits[index]);
-                        const newestBounds = newestPoints.map(point =>
-                          point.getBoundingClientRect());
-                        return {
-                          svgWidth: bounds.width,
-                          containerWidth: containerBounds.width,
-                          svgRight: bounds.right,
-                          containerRight: containerBounds.right,
-                          scrollWidth: container.scrollWidth,
-                          clientWidth: container.clientWidth,
-                          newestVisible: newestBounds.length > 0 && newestBounds.every(point =>
-                            point.left >= containerBounds.left - 0.5 &&
-                            point.right <= containerBounds.right + 0.5)
-                        };
-                      })""", latest_commits)
-                    widths = [chart["svgWidth"] for chart in charts]
-                    self.assertLessEqual(
-                        max(widths) - min(widths), 0.5,
-                        f"chart SVG widths differ at {width}px: {widths}")
-                    for index, chart in enumerate(charts):
-                        message = f"chart {index} at {width}px: {chart}"
-                        self.assertLessEqual(
-                            chart["svgWidth"], chart["containerWidth"] + 0.5,
-                            f"SVG exceeds its container; {message}")
-                        self.assertLessEqual(
-                            chart["scrollWidth"], chart["clientWidth"] + 1,
-                            f"chart scrolls horizontally; {message}")
-                        self.assertLessEqual(
-                            chart["svgRight"], chart["containerRight"] + 0.5,
-                            f"SVG right edge is clipped; {message}")
-                        self.assertTrue(
-                            chart["newestVisible"],
-                            f"newest commit points are clipped; {message}")
+        browser = self._launch_chromium()
+        page = browser.new_page(viewport={"width": 390, "height": 900},
+                                color_scheme="dark")
+        page.set_content(document)
+        latest_commits = [latest_hf, latest_or, latest_gh]
+        for width in (390, 768, 1280, 2560):
+            page.set_viewport_size({"width": width, "height": 900})
+            if width == 2560:
+                main_width = page.locator("main").evaluate(
+                    "node => node.getBoundingClientRect().width")
+                self.assertGreater(
+                    main_width, 2000,
+                    f"main should use the wide viewport at {width}px; got {main_width}px")
+            page.locator(".chart-scroll").evaluate_all(
+                "containers => containers.forEach(container => container.scrollLeft = 0)")
+            charts = page.locator(".chart-scroll").evaluate_all("""(containers, commits) =>
+              containers.map((container, index) => {
+                const svg = container.querySelector('svg');
+                const bounds = svg.getBoundingClientRect();
+                const containerBounds = container.getBoundingClientRect();
+                const newestPoints = Array.from(svg.querySelectorAll('.point'))
+                  .filter(point => point.dataset.commit === commits[index]);
+                const newestBounds = newestPoints.map(point =>
+                  point.getBoundingClientRect());
+                return {
+                  svgWidth: bounds.width,
+                  containerWidth: containerBounds.width,
+                  svgRight: bounds.right,
+                  containerRight: containerBounds.right,
+                  scrollWidth: container.scrollWidth,
+                  clientWidth: container.clientWidth,
+                  newestVisible: newestBounds.length > 0 && newestBounds.every(point =>
+                    point.left >= containerBounds.left - 0.5 &&
+                    point.right <= containerBounds.right + 0.5)
+                };
+              })""", latest_commits)
+            widths = [chart["svgWidth"] for chart in charts]
+            self.assertLessEqual(
+                max(widths) - min(widths), 0.5,
+                f"chart SVG widths differ at {width}px: {widths}")
+            for index, chart in enumerate(charts):
+                message = f"chart {index} at {width}px: {chart}"
+                self.assertLessEqual(
+                    chart["svgWidth"], chart["containerWidth"] + 0.5,
+                    f"SVG exceeds its container; {message}")
+                self.assertLessEqual(
+                    chart["scrollWidth"], chart["clientWidth"] + 1,
+                    f"chart scrolls horizontally; {message}")
+                self.assertLessEqual(
+                    chart["svgRight"], chart["containerRight"] + 0.5,
+                    f"SVG right edge is clipped; {message}")
+                self.assertTrue(
+                    chart["newestVisible"],
+                    f"newest commit points are clipped; {message}")
 
-                latest_point = page.locator(
-                    f"#hugging-face .point[data-commit='{latest_hf}']").first
-                expected_timestamp = latest_point.get_attribute("data-timestamp")
-                latest_point.hover()
-                self.assertEqual(page.locator(
-                    "#hugging-face .point.selected").get_attribute("data-commit"), latest_hf)
-                self.assertIn(expected_timestamp, page.locator(
-                    "#hugging-face .tooltip").inner_text())
+        latest_point = page.locator(
+            f"#hugging-face .point[data-commit='{latest_hf}']").first
+        expected_timestamp = latest_point.get_attribute("data-timestamp")
+        latest_point.hover()
+        self.assertEqual(page.locator(
+            "#hugging-face .point.selected").get_attribute("data-commit"), latest_hf)
+        self.assertIn(expected_timestamp, page.locator(
+            "#hugging-face .tooltip").inner_text())
 
-                page.locator("#theme").click()
-                self.assertEqual(page.locator("html").get_attribute("data-theme"), "light")
-                light_surface = page.locator("#hugging-face .chart").evaluate(
-                    "node => getComputedStyle(node).backgroundColor")
-                page.locator("#theme").click()
-                self.assertEqual(page.locator("html").get_attribute("data-theme"), "dark")
-                dark_surface = page.locator("#hugging-face .chart").evaluate(
-                    "node => getComputedStyle(node).backgroundColor")
-                self.assertNotEqual(light_surface, dark_surface)
-                self.assertLessEqual(page.locator(".chart-scroll").evaluate_all("""containers => {
-                  const widths = containers.map(container =>
-                    container.querySelector('svg').getBoundingClientRect().width);
-                  return Math.max(...widths) - Math.min(...widths);
-                }"""), 0.5)
-            finally:
-                browser.close()
+        page.locator("#theme").click()
+        self.assertEqual(page.locator("html").get_attribute("data-theme"), "light")
+        light_surface = page.locator("#hugging-face .chart").evaluate(
+            "node => getComputedStyle(node).backgroundColor")
+        page.locator("#theme").click()
+        self.assertEqual(page.locator("html").get_attribute("data-theme"), "dark")
+        dark_surface = page.locator("#hugging-face .chart").evaluate(
+            "node => getComputedStyle(node).backgroundColor")
+        self.assertNotEqual(light_surface, dark_surface)
+        self.assertLessEqual(page.locator(".chart-scroll").evaluate_all("""containers => {
+          const widths = containers.map(container =>
+            container.querySelector('svg').getBoundingClientRect().width);
+          return Math.max(...widths) - Math.min(...widths);
+        }"""), 0.5)
 
     def test_many_departed_models_keep_endpoint_labels_within_the_chart(self):
         for index in range(10):
