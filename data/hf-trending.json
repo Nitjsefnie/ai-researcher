@@ -20,6 +20,9 @@
       "id": "unsloth/Qwen3.8-27B-GGUF"
     },
     {
+      "id": "sensenova/SenseNova-Loop-9B"
+    },
+    {
       "id": "chatrlabs/Qwen-Image-2.1-Uncensored-Omni-Quantized"
     },
     {
@@ -27,9 +30,6 @@
     },
     {
       "id": "black-forest-labs/flux-3-image-klein-comfy"
-    },
-    {
-      "id": "sensenova/SenseNova-Loop-9B"
     }
   ]
 }
