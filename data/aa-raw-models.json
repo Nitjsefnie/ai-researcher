@@ -3309,17 +3309,7 @@
   "outputSpeed": 97.1096390202611,
   "timeToFirstToken": 13.9258903539458,
   "timeToFirstAnswerToken": 13.9258903539458,
-  "slug": "gemini-4-neon",
-  "genVariants": [
-   {
-    "ii": 44.0831506204565,
-    "cost": 0.7452280945089245,
-    "ctx": 1000000,
-    "pin": 3,
-    "pout": 15
-   },
-   {}
-  ]
+  "slug": "gemini-4-neon"
  },
  {
   "id": "0b226b82-1462-4860-bf1a-f8aed7024791",
@@ -48123,10 +48113,12 @@
    }
   },
   "performanceDataSource": {
-   "type": "median"
+   "type": "firstParty",
+   "providerName": "Institute of Foundation Models"
   },
   "priceDataSource": {
-   "type": "median"
+   "type": "firstParty",
+   "providerName": "Institute of Foundation Models"
   },
   "creator": {
    "id": "8b8b84fb-4b24-45be-b9e2-74ed50d00ff7",
