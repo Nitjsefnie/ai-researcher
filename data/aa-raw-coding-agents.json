@@ -2527,7 +2527,12 @@
    "key": "Codex:gpt-6-1-terra",
    "name": "Codex - GPT-6.1 Terra"
   },
-  "agentCreator": "$31:props:children:props:rows:7:agentCreator",
+  "agentCreator": {
+   "slug": "openai",
+   "name": "OpenAI",
+   "color": "#1f1f1f",
+   "logo": "/img/logos/openai.svg"
+  },
   "modelCreators": [
    {
     "slug": "openai",
@@ -2754,7 +2759,12 @@
    "key": "Codex:gpt-6-2-sol",
    "name": "Codex - GPT-6.2 Sol"
   },
-  "agentCreator": "$31:props:children:props:rows:7:agentCreator",
+  "agentCreator": {
+   "slug": "openai",
+   "name": "OpenAI",
+   "color": "#1f1f1f",
+   "logo": "/img/logos/openai.svg"
+  },
   "modelCreators": [
    {
     "slug": "openai",
@@ -3025,7 +3035,12 @@
    "key": "Codex:gpt-6-2-sol",
    "name": "Codex - GPT-6.2 Sol"
   },
-  "agentCreator": "$31:props:children:props:rows:7:agentCreator",
+  "agentCreator": {
+   "slug": "openai",
+   "name": "OpenAI",
+   "color": "#1f1f1f",
+   "logo": "/img/logos/openai.svg"
+  },
   "modelCreators": [
    {
     "slug": "openai",
@@ -3580,7 +3595,12 @@
    "key": "Antigravity CLI:gemini-4-hydrogen",
    "name": "Antigravity CLI - Gemini 4 Hydrogen"
   },
-  "agentCreator": "$31:props:children:props:rows:4:agentCreator",
+  "agentCreator": {
+   "slug": "google",
+   "name": "Google",
+   "color": "#34A853",
+   "logo": "/img/logos/google.svg"
+  },
   "modelCreators": [
    {
     "slug": "google",
@@ -3908,7 +3928,12 @@
    "key": "Claude Code:claude-fable-5-2",
    "name": "Claude Code - Claude Fable 5.2"
   },
-  "agentCreator": "$31:props:children:props:rows:1:agentCreator",
+  "agentCreator": {
+   "slug": "anthropic",
+   "name": "Anthropic",
+   "color": "#cc785c",
+   "logo": "/img/logos/anthropic.svg"
+  },
   "modelCreators": [
    {
     "slug": "anthropic",
@@ -5088,7 +5113,12 @@
    "key": "Muse Code:muse-ember",
    "name": "Muse Code - Muse Ember"
   },
-  "agentCreator": "$31:props:children:props:rows:0:agentCreator",
+  "agentCreator": {
+   "slug": "meta",
+   "name": "Meta",
+   "color": "#0089f4",
+   "logo": "/img/logos/meta.svg"
+  },
   "modelCreators": [
    {
     "slug": "meta",
@@ -5315,7 +5345,12 @@
    "key": "Claude Code:claude-fable-5-2",
    "name": "Claude Code - Claude Fable 5.2"
   },
-  "agentCreator": "$31:props:children:props:rows:1:agentCreator",
+  "agentCreator": {
+   "slug": "anthropic",
+   "name": "Anthropic",
+   "color": "#cc785c",
+   "logo": "/img/logos/anthropic.svg"
+  },
   "modelCreators": [
    {
     "slug": "anthropic",
@@ -6120,7 +6155,12 @@
    "key": "Claude Code:claude-fable-5-2",
    "name": "Claude Code - Claude Fable 5.2"
   },
-  "agentCreator": "$31:props:children:props:rows:1:agentCreator",
+  "agentCreator": {
+   "slug": "anthropic",
+   "name": "Anthropic",
+   "color": "#cc785c",
+   "logo": "/img/logos/anthropic.svg"
+  },
   "modelCreators": [
    {
     "slug": "anthropic",
@@ -6875,7 +6915,12 @@
    "key": "Claude Code:claude-fable-5-2",
    "name": "Claude Code - Claude Fable 5.2"
   },
-  "agentCreator": "$31:props:children:props:rows:1:agentCreator",
+  "agentCreator": {
+   "slug": "anthropic",
+   "name": "Anthropic",
+   "color": "#cc785c",
+   "logo": "/img/logos/anthropic.svg"
+  },
   "modelCreators": [
    {
     "slug": "anthropic",
@@ -7730,7 +7775,12 @@
    "key": "Antigravity CLI:gemini-4-argon",
    "name": "Antigravity CLI - Gemini 4 Argon"
   },
-  "agentCreator": "$31:props:children:props:rows:4:agentCreator",
+  "agentCreator": {
+   "slug": "google",
+   "name": "Google",
+   "color": "#34A853",
+   "logo": "/img/logos/google.svg"
+  },
   "modelCreators": [
    {
     "slug": "google",
@@ -7957,7 +8007,12 @@
    "key": "Codex:gpt-6-1-sol",
    "name": "Codex - GPT-6.1 Sol"
   },
-  "agentCreator": "$31:props:children:props:rows:7:agentCreator",
+  "agentCreator": {
+   "slug": "openai",
+   "name": "OpenAI",
+   "color": "#1f1f1f",
+   "logo": "/img/logos/openai.svg"
+  },
   "modelCreators": [
    {
     "slug": "openai",
@@ -8312,7 +8367,12 @@
    "key": "Mistral Vibe:mistral-large-4",
    "name": "Mistral Vibe - Mistral Large 4"
   },
-  "agentCreator": "$31:props:children:props:rows:6:agentCreator",
+  "agentCreator": {
+   "slug": "mistral",
+   "name": "Mistral",
+   "color": "#f32e02",
+   "logo": "/img/logos/mistral.svg"
+  },
   "modelCreators": [
    {
     "slug": "mistral",
@@ -8539,7 +8599,12 @@
    "key": "Codex:gpt-6-2-astra",
    "name": "Codex - GPT-6.2 Astra"
   },
-  "agentCreator": "$31:props:children:props:rows:7:agentCreator",
+  "agentCreator": {
+   "slug": "openai",
+   "name": "OpenAI",
+   "color": "#1f1f1f",
+   "logo": "/img/logos/openai.svg"
+  },
   "modelCreators": [
    {
     "slug": "openai",
@@ -8782,7 +8847,12 @@
    "key": "Codex:gpt-6-astra",
    "name": "Codex - GPT-6 Astra"
   },
-  "agentCreator": "$31:props:children:props:rows:7:agentCreator",
+  "agentCreator": {
+   "slug": "openai",
+   "name": "OpenAI",
+   "color": "#1f1f1f",
+   "logo": "/img/logos/openai.svg"
+  },
   "modelCreators": [
    {
     "slug": "openai",
@@ -9109,7 +9179,12 @@
    "key": "Codex:gpt-6-2-astra",
    "name": "Codex - GPT-6.2 Astra"
   },
-  "agentCreator": "$31:props:children:props:rows:7:agentCreator",
+  "agentCreator": {
+   "slug": "openai",
+   "name": "OpenAI",
+   "color": "#1f1f1f",
+   "logo": "/img/logos/openai.svg"
+  },
   "modelCreators": [
    {
     "slug": "openai",
@@ -9352,7 +9427,12 @@
    "key": "Codex:gpt-6-2-astra",
    "name": "Codex - GPT-6.2 Astra"
   },
-  "agentCreator": "$31:props:children:props:rows:7:agentCreator",
+  "agentCreator": {
+   "slug": "openai",
+   "name": "OpenAI",
+   "color": "#1f1f1f",
+   "logo": "/img/logos/openai.svg"
+  },
   "modelCreators": [
    {
     "slug": "openai",
@@ -9595,7 +9675,12 @@
    "key": "Codex:gpt-6-2-astra",
    "name": "Codex - GPT-6.2 Astra"
   },
-  "agentCreator": "$31:props:children:props:rows:7:agentCreator",
+  "agentCreator": {
+   "slug": "openai",
+   "name": "OpenAI",
+   "color": "#1f1f1f",
+   "logo": "/img/logos/openai.svg"
+  },
   "modelCreators": [
    {
     "slug": "openai",
@@ -9838,7 +9923,12 @@
    "key": "Codex:gpt-6-2-sol",
    "name": "Codex - GPT-6.2 Sol"
   },
-  "agentCreator": "$31:props:children:props:rows:7:agentCreator",
+  "agentCreator": {
+   "slug": "openai",
+   "name": "OpenAI",
+   "color": "#1f1f1f",
+   "logo": "/img/logos/openai.svg"
+  },
   "modelCreators": [
    {
     "slug": "openai",
@@ -10249,7 +10339,12 @@
    "key": "Codex:gpt-6-2-sol",
    "name": "Codex - GPT-6.2 Sol"
   },
-  "agentCreator": "$31:props:children:props:rows:7:agentCreator",
+  "agentCreator": {
+   "slug": "openai",
+   "name": "OpenAI",
+   "color": "#1f1f1f",
+   "logo": "/img/logos/openai.svg"
+  },
   "modelCreators": [
    {
     "slug": "openai",
@@ -10702,7 +10797,12 @@
    "key": "Codex:gpt-6-2-sol",
    "name": "Codex - GPT-6.2 Sol"
   },
-  "agentCreator": "$31:props:children:props:rows:7:agentCreator",
+  "agentCreator": {
+   "slug": "openai",
+   "name": "OpenAI",
+   "color": "#1f1f1f",
+   "logo": "/img/logos/openai.svg"
+  },
   "modelCreators": [
    {
     "slug": "openai",
@@ -11029,7 +11129,12 @@
    "key": "Claude Code:claude-fable-5-1",
    "name": "Claude Code - Claude Fable 5.1"
   },
-  "agentCreator": "$31:props:children:props:rows:1:agentCreator",
+  "agentCreator": {
+   "slug": "anthropic",
+   "name": "Anthropic",
+   "color": "#cc785c",
+   "logo": "/img/logos/anthropic.svg"
+  },
   "modelCreators": [
    {
     "slug": "anthropic",
@@ -12110,7 +12215,12 @@
    "key": "Claude Code:claude-haiku-5-5",
    "name": "Claude Code - Claude Haiku 5.5"
   },
-  "agentCreator": "$31:props:children:props:rows:1:agentCreator",
+  "agentCreator": {
+   "slug": "anthropic",
+   "name": "Anthropic",
+   "color": "#cc785c",
+   "logo": "/img/logos/anthropic.svg"
+  },
   "modelCreators": [
    {
     "slug": "anthropic",
@@ -12414,7 +12524,12 @@
    "key": "Claude Code:claude-opus-5-5",
    "name": "Claude Code - Claude Opus 5.5"
   },
-  "agentCreator": "$31:props:children:props:rows:1:agentCreator",
+  "agentCreator": {
+   "slug": "anthropic",
+   "name": "Anthropic",
+   "color": "#cc785c",
+   "logo": "/img/logos/anthropic.svg"
+  },
   "modelCreators": [
    {
     "slug": "anthropic",
@@ -13816,7 +13931,12 @@
    "key": "Claude Code:qwen3-8-max-0803",
    "name": "Claude Code - Qwen3.8 Max"
   },
-  "agentCreator": "$31:props:children:props:rows:1:agentCreator",
+  "agentCreator": {
+   "slug": "anthropic",
+   "name": "Anthropic",
+   "color": "#cc785c",
+   "logo": "/img/logos/anthropic.svg"
+  },
   "modelCreators": [
    {
     "slug": "alibaba",
@@ -14043,7 +14163,12 @@
    "key": "Claude Code:claude-sonnet-5-5",
    "name": "Claude Code - Claude Sonnet 5.5"
   },
-  "agentCreator": "$31:props:children:props:rows:1:agentCreator",
+  "agentCreator": {
+   "slug": "anthropic",
+   "name": "Anthropic",
+   "color": "#cc785c",
+   "logo": "/img/logos/anthropic.svg"
+  },
   "modelCreators": [
    {
     "slug": "anthropic",
@@ -15269,7 +15394,12 @@
    "key": "Claude Code:step-5-preview",
    "name": "Claude Code - Step 5 Preview"
   },
-  "agentCreator": "$31:props:children:props:rows:1:agentCreator",
+  "agentCreator": {
+   "slug": "anthropic",
+   "name": "Anthropic",
+   "color": "#cc785c",
+   "logo": "/img/logos/anthropic.svg"
+  },
   "modelCreators": [
    {
     "slug": "stepfun",
@@ -15496,7 +15626,12 @@
    "key": "Codex:gpt-6-luna",
    "name": "Codex - GPT-6 Luna"
   },
-  "agentCreator": "$31:props:children:props:rows:7:agentCreator",
+  "agentCreator": {
+   "slug": "openai",
+   "name": "OpenAI",
+   "color": "#1f1f1f",
+   "logo": "/img/logos/openai.svg"
+  },
   "modelCreators": [
    {
     "slug": "openai",
@@ -15943,11 +16078,21 @@
    "slug": "cognition",
    "name": "Cognition",
    "color": "#2200FF",
-   "logo": "/img/logos/devin.svg"
+   "logo": "/img/logos/cognition.svg"
   },
   "modelCreators": [
-   "$31:props:children:props:rows:1:agentCreator",
-   "$31:props:children:props:rows:7:agentCreator"
+   {
+    "slug": "anthropic",
+    "name": "Anthropic",
+    "color": "#cc785c",
+    "logo": "/img/logos/anthropic.svg"
+   },
+   {
+    "slug": "openai",
+    "name": "OpenAI",
+    "color": "#1f1f1f",
+    "logo": "/img/logos/openai.svg"
+   }
   ],
   "hasTieredPricing": false,
   "isRouter": true,
@@ -16736,7 +16881,12 @@
    "key": "Muse Code:muse-spark-1-3",
    "name": "Muse Code - Muse Spark 1.3"
   },
-  "agentCreator": "$31:props:children:props:rows:0:agentCreator",
+  "agentCreator": {
+   "slug": "meta",
+   "name": "Meta",
+   "color": "#0089f4",
+   "logo": "/img/logos/meta.svg"
+  },
   "modelCreators": [
    {
     "slug": "meta",
@@ -16963,7 +17113,12 @@
    "key": "Muse Code:muse-wonder",
    "name": "Muse Code - Muse Wonder"
   },
-  "agentCreator": "$31:props:children:props:rows:0:agentCreator",
+  "agentCreator": {
+   "slug": "meta",
+   "name": "Meta",
+   "color": "#0089f4",
+   "logo": "/img/logos/meta.svg"
+  },
   "modelCreators": [
    {
     "slug": "meta",
