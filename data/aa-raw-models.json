@@ -25436,79 +25436,79 @@
   },
   "personalityBench": {
    "scores": {
-    "lexicallyVaried": 1098.06,
+    "lexicallyVaried": 1080.67,
     "eloquent": 1069.92,
-    "literate": 901.41,
-    "naturalSounding": 781.93,
-    "metaphorical": 1181.53,
-    "structured": 851.26,
-    "scannable": 1051.69,
-    "summarizesBottomLine": 1132.07,
-    "answerFirst": 978.13,
-    "informationDense": 1472.71,
-    "evidenceBased": 882.73,
-    "resourceSpecific": 1592.76,
-    "providesActionableGuidance": 1470.6,
-    "pragmatic": 1005.79,
-    "truthful": 768.59,
-    "admitsUncertainty": 942.06,
-    "disclaimsWithAssumptions": 854.04,
-    "flagsNuances": 1160.13,
-    "sycophantic": 858.53,
-    "friendly": 677.22,
-    "humorous": 902.56,
-    "sincere": 737.66,
-    "emotionallyIntelligent": 639.31,
-    "direct": 908.93,
-    "confident": 1331.79,
-    "opinionated": 1163.18,
-    "constructivelyPushesBack": 1316.79,
-    "creative": 1016.91,
-    "openEnded": 599.74,
-    "slop": 1330.88
+    "literate": 898.03,
+    "naturalSounding": 783.45,
+    "metaphorical": 1169.75,
+    "structured": 851,
+    "scannable": 1055.37,
+    "summarizesBottomLine": 1136.35,
+    "answerFirst": 979.92,
+    "informationDense": 1452.65,
+    "evidenceBased": 878.94,
+    "resourceSpecific": 1576.15,
+    "providesActionableGuidance": 1441.28,
+    "pragmatic": 995.74,
+    "truthful": 776.67,
+    "admitsUncertainty": 942.27,
+    "disclaimsWithAssumptions": 842.64,
+    "flagsNuances": 1154.66,
+    "sycophantic": 858.69,
+    "friendly": 664.04,
+    "humorous": 897.19,
+    "sincere": 740.65,
+    "emotionallyIntelligent": 634.13,
+    "direct": 915.13,
+    "confident": 1331.01,
+    "opinionated": 1163.77,
+    "constructivelyPushesBack": 1299.7,
+    "creative": 1018.73,
+    "openEnded": 586.7,
+    "slop": 1327.95
    },
    "indexScores": {
-    "expressiveness": 52.40384615384616,
-    "organization": 88.57692307692308,
-    "informativeness": 71.4423076923077,
-    "transparency": 86.67307692307692,
-    "warmth": 27.653846153846153,
-    "conviction": 94.28846153846153,
-    "imagination": 37.17307692307692,
-    "slop": 39.07692307692308
+    "expressiveness": 50.5,
+    "organization": 92.01612903225806,
+    "informativeness": 76.04838709677419,
+    "transparency": 88.8225806451613,
+    "warmth": 23.35483870967742,
+    "conviction": 95.20967741935485,
+    "imagination": 31.338709677419356,
+    "slop": 48.903225806451616
    },
    "indexIntervals": {
     "expressiveness": {
-     "lower": 45,
-     "upper": 59
+     "lower": 39,
+     "upper": 63
     },
     "organization": {
-     "lower": 74,
+     "lower": 79,
      "upper": 97
     },
     "informativeness": {
-     "lower": 66,
-     "upper": 74
+     "lower": 71,
+     "upper": 79
     },
     "transparency": {
-     "lower": 82,
+     "lower": 85,
      "upper": 95
     },
     "warmth": {
-     "lower": 26,
-     "upper": 32
+     "lower": 22,
+     "upper": 28
     },
     "conviction": {
-     "lower": 92,
+     "lower": 94,
      "upper": 97
     },
     "imagination": {
-     "lower": 28,
-     "upper": 42
+     "lower": 24,
+     "upper": 38
     },
     "slop": {
-     "lower": 36,
-     "upper": 43
+     "lower": 47,
+     "upper": 51
     }
    }
   },
@@ -60208,17 +60208,7 @@
   "outputModalityImage": false,
   "outputModalitySpeech": false,
   "outputModalityVideo": false,
-  "modelCreatorName": "Thinking Machines",
-  "genVariants": [
-   {},
-   {
-    "ii": 11.0316478809701,
-    "cost": 0.6169624656051849,
-    "ctx": 1000000,
-    "pin": 1,
-    "pout": 4.05
-   }
-  ]
+  "modelCreatorName": "Thinking Machines"
  },
  {
   "id": "27b24366-fd1a-44b7-8011-e24d7501318d",
