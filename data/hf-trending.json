@@ -20,16 +20,16 @@
       "id": "Qwen/Qwen3.8-27B"
     },
     {
-      "id": "chatrlabs/Qwen-Image-2.1-Uncensored-Omni-Quantized"
+      "id": "n4ze3m/tiny-voca"
     },
     {
-      "id": "n4ze3m/tiny-voca"
+      "id": "tencent/Hy4-flash"
     },
     {
       "id": "meituan-longcat/LongCat-Video-Avatar-1.6"
     },
     {
-      "id": "tencent/Hy4-flash"
+      "id": "maxwell-model/Maxwell-V1-Flash"
     }
   ]
 }
