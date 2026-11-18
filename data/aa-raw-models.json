@@ -13786,11 +13786,6 @@
     "logo": "/img/logos/minimax.svg"
    },
    {
-    "slug": "modular",
-    "name": "Modular",
-    "logo": "/img/logos/modular.svg"
-   },
-   {
     "slug": "nebius",
     "name": "Nebius",
     "logo": "/img/logos/nebius.svg"
@@ -14899,22 +14894,12 @@
    "critpt-v2-hard": 0,
    "mmmu-pro": 0.474566473988439
   },
-  "intelligenceIndexCostPerTask": 0.4252323506224818,
+  "intelligenceIndexCostPerTask": 0.12372622709334724,
   "price1mInputTokens": 0.1,
   "price1mOutputTokens": 0.5,
-  "cacheHitPrice": null,
+  "cacheHitPrice": 0.02,
   "cacheWritePrice": null,
-  "slug": "lfm3-vl-2b",
-  "genVariants": [
-   {
-    "ii": 1.70629313092144,
-    "cost": 0.4252323506224818,
-    "ctx": 128000,
-    "pin": 0.1,
-    "pout": 0.5
-   },
-   {}
-  ]
+  "slug": "lfm3-vl-2b"
  },
  {
   "id": "2cd04201-2b6e-47ef-853e-7601f705f2a8",
@@ -41514,15 +41499,15 @@
    "livecodebench": 0.287830687830688,
    "aime-2025": 0.0766666666666667
   },
-  "price1mInputTokens": 0.6,
+  "price1mInputTokens": 0.6499999999999999,
   "price1mOutputTokens": 0.71,
-  "cacheHitPrice": 0.6,
+  "cacheHitPrice": 0.6499999999999999,
   "cacheWritePrice": null,
-  "outputSpeed": 74.59119034956827,
-  "timeToFirstToken": 1.7488561175447446,
-  "timeToFirstAnswerToken": 1.7488561175447446,
+  "outputSpeed": 71.06134192808389,
+  "timeToFirstToken": 2.1670955256959767,
+  "timeToFirstAnswerToken": 2.1670955256959767,
   "slug": "llama-3-3-instruct-70b",
-  "gdpvalCostPerTask": 0.20957053477272727,
+  "gdpvalCostPerTask": 0.22678644636363635,
   "chartDefaultSelected": false,
   "chartHighlighted": false,
   "releaseDate": "2024-12-06",
@@ -49600,22 +49585,12 @@
    "terminalbench-4-0": 0,
    "critpt-v2-hard": 0
   },
-  "intelligenceIndexCostPerTask": 0.5517647964574847,
+  "intelligenceIndexCostPerTask": 0.17318927264981218,
   "price1mInputTokens": 0.08,
   "price1mOutputTokens": 0.2,
-  "cacheHitPrice": null,
+  "cacheHitPrice": 0.02,
   "cacheWritePrice": null,
-  "slug": "lfm3-1-7b",
-  "genVariants": [
-   {
-    "ii": 5.99389916662478,
-    "cost": 0.5517647964574847,
-    "ctx": 262144,
-    "pin": 0.08,
-    "pout": 0.2
-   },
-   {}
-  ]
+  "slug": "lfm3-1-7b"
  },
  {
   "id": "c8a79180-7d16-4474-8701-9a77c0baa56a",
@@ -55726,7 +55701,7 @@
   "isReasoning": true,
   "isOpenWeights": true,
   "paramClass": "large",
-  "priceClass": "medium",
+  "priceClass": null,
   "modelCreatorName": "InclusionAI",
   "modelCreatorColor": "#4fb5ff",
   "modelCreatorLogo": "/img/logos/inclusionai.jpg",
@@ -55753,15 +55728,11 @@
    "ifbench": 0.445578231292517,
    "tau3-banking": 0.179381443298969
   },
-  "price1mInputTokens": 0.3,
-  "price1mOutputTokens": 2.5,
+  "price1mInputTokens": null,
+  "price1mOutputTokens": null,
   "cacheHitPrice": null,
   "cacheWritePrice": null,
-  "outputSpeed": 108.5853857232208,
-  "timeToFirstToken": 3.9702280655528086,
-  "timeToFirstAnswerToken": 8.067615452276405,
   "slug": "ring-2-6-1t",
-  "gdpvalCostPerTask": 0.2871769240909091,
   "chartDefaultSelected": false,
   "chartHighlighted": false,
   "releaseDate": "2026-05-08",
