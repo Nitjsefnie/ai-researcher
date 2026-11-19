@@ -2,15 +2,6 @@
   "source": "https://huggingface.co/api/models?sort=trendingScore&limit=10",
   "models": [
     {
-      "id": "harness-hub/Qwen3.8-27B-pi-adapted"
-    },
-    {
-      "id": "Lightricks/LTX-2.5"
-    },
-    {
-      "id": "thinkingmachines/Inkling-2-Small"
-    },
-    {
       "id": "higurashi-ai/Haru-4B"
     },
     {
@@ -23,6 +14,9 @@
       "id": "tencent/Hy4-flash"
     },
     {
+      "id": "harness-hub/Qwen3.8-27B-pi-adapted"
+    },
+    {
       "id": "n4ze3m/tiny-voca"
     },
     {
@@ -30,6 +24,12 @@
     },
     {
       "id": "meituan-longcat/LongCat-Video-Avatar-1.6"
+    },
+    {
+      "id": "Lightricks/LTX-2.5"
+    },
+    {
+      "id": "maxwell-model/Maxwell-V1-Flash"
     }
   ]
 }
