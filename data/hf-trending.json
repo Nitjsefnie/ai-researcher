@@ -5,10 +5,10 @@
       "id": "higurashi-ai/Haru-4B"
     },
     {
-      "id": "Qwen/Qwen3.8-27B"
+      "id": "tencent/Hy4-flash"
     },
     {
-      "id": "tencent/Hy4-flash"
+      "id": "Qwen/Qwen3.8-27B"
     },
     {
       "id": "MiniMaxAI/MiniMax-H3-Image"
@@ -17,10 +17,10 @@
       "id": "harness-hub/Qwen3.8-27B-pi-adapted"
     },
     {
-      "id": "n4ze3m/tiny-voca"
+      "id": "apple/FastFrames-L"
     },
     {
-      "id": "apple/FastFrames-L"
+      "id": "n4ze3m/tiny-voca"
     },
     {
       "id": "meituan-longcat/LongCat-Video-Avatar-1.6"
