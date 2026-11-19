@@ -8,10 +8,10 @@
       "id": "tencent/Hy4-flash"
     },
     {
-      "id": "Qwen/Qwen3.8-27B"
+      "id": "apple/FastFrames-L"
     },
     {
-      "id": "apple/FastFrames-L"
+      "id": "Qwen/Qwen3.8-27B"
     },
     {
       "id": "harness-hub/Qwen3.8-27B-pi-adapted"
@@ -20,16 +20,16 @@
       "id": "n4ze3m/tiny-voca"
     },
     {
-      "id": "MiniMaxAI/MiniMax-H3-Image"
+      "id": "meituan-longcat/LongCat-Video-Avatar-1.6"
     },
     {
-      "id": "meituan-longcat/LongCat-Video-Avatar-1.6"
+      "id": "MiniMaxAI/MiniMax-H3-Image"
     },
     {
       "id": "maxwell-model/Maxwell-V1-Flash"
     },
     {
-      "id": "Lightricks/LTX-2.5"
+      "id": "inworld/voice-isolator"
     }
   ]
 }
