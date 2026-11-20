@@ -1003,7 +1003,7 @@ class WindowMarkerStagingTests(unittest.TestCase):
     def test_the_head_marker_reader_converts_git_failure_to_none(self):
         # Same pin for the HEAD side: ROOT pointed at a non-repo makes the
         # real `git show` in read_head_window_marker fail, and the failure
-        # reads as absent -- a HEAD predating the evidence -- never as a build
+        # reads as absent -- a tree with no committed copy -- never as a build
         # break.
         with tempfile.TemporaryDirectory() as tmp:
             with mock.patch.object(capture_gate, "ROOT", pathlib.Path(tmp)):

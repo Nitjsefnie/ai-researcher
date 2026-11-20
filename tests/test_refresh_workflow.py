@@ -721,9 +721,10 @@ class ExecutedHoldProbeTests(unittest.TestCase):
 
     HEAD_FILES = {
         "data/aa-raw-models.json": "head\n",
+        "data/cost-breakdown-window.txt": "in-run generations: 1\n",
         "out/frontier-models.html": "page\n",
     }
-    FRESH = "fresh\n"
+    FRESH, FRESH_EVIDENCE = "fresh\n", "in-run generations: 3\n"
     # The republish hour's two cause lines (issue #239), byte-equal to the
     # workflow's summary echoes: the cause that set hub_stale is named, so
     # a failed fetch never reports a comparison result it did not make.
@@ -744,7 +745,7 @@ class ExecutedHoldProbeTests(unittest.TestCase):
 
     def _run_hour(self, tmp: pathlib.Path, *, gate, probe, force, hub):
         """Seed one scratch repo at HEAD, dirty it with the fresh capture
-        and the untracked route evidence, install the python3 double,
+        and the fresh route evidence, install the python3 double,
         and run the real run block.
 
         `gate` is the no-argument capture_gate.py answer -- `true`, `false`
@@ -754,7 +755,7 @@ class ExecutedHoldProbeTests(unittest.TestCase):
         HEAD's page), `stale` (it serves a stale one) or `fail` (the fetch
         itself fails). Returns the observables: the exit code, the step
         output text, the parsed proceed, the tracked capture's content,
-        whether the untracked marker survived, the summary, the log the
+        the route evidence's content, the summary, the log the
         step wrote and the hub fetch count.
         """
         gate_out = {"true": "true", "false": "false"}.get(gate, "")
@@ -777,12 +778,11 @@ class ExecutedHoldProbeTests(unittest.TestCase):
         subprocess.run([*git, "add", "."], check=True, capture_output=True)
         subprocess.run([*git, "commit", "-qm", "head"], env=seed_env,
                        check=True, capture_output=True)
-        # The hour's raw material: the fresh capture, dirty against HEAD,
-        # and fetch_aa.py's route evidence -- untracked-but-whitelisted, so
-        # `git checkout -- data/` cannot remove it. The tree state an hour
-        # leaves while HEAD has no evidence committed.
+        # The hour's raw material: the fresh capture and fetch_aa.py's fresh
+        # route evidence, both dirty against HEAD, which tracks both, so
+        # `git checkout -- data/` restores the evidence with the capture.
         (repo / "data" / "aa-raw-models.json").write_text(self.FRESH, encoding="utf-8")
-        (repo / "data" / "cost-breakdown-window.txt").write_text("3\n", encoding="utf-8")
+        (repo / "data" / "cost-breakdown-window.txt").write_text(self.FRESH_EVIDENCE, encoding="utf-8")
 
         stub = tmp / "bin"
         stub.mkdir()
@@ -826,7 +826,7 @@ class ExecutedHoldProbeTests(unittest.TestCase):
                 None),
             "capture": (repo / "data" / "aa-raw-models.json").read_text(
                 encoding="utf-8"),
-            "marker": (repo / "data" / "cost-breakdown-window.txt").exists(),
+            "marker": read(repo / "data" / "cost-breakdown-window.txt"),
             "summary": read(tmp / "summary.txt"),
             "stdout": done.stdout,
             "hub_fetches": read(tmp / "hub-calls.txt").count("\n"),
@@ -858,15 +858,15 @@ class ExecutedHoldProbeTests(unittest.TestCase):
                             self.assertNotEqual(hour["rc"], 0, hour["stderr"])
                             self.assertNotIn("proceed=", hour["outputs"])
                             self.assertEqual(hour["capture"], self.FRESH)
-                            self.assertTrue(hour["marker"])
+                            self.assertEqual(hour["marker"], self.FRESH_EVIDENCE)
 
     def test_a_held_probe_drops_every_path_to_proceed_false(self):
         # probe=yes is the hold on every other axis: even a gate that saw
         # the capture MOVE, a forced dispatch and a stale hub all drop to
-        # proceed=false, green. The tracked capture is restored to HEAD;
-        # the fresh untracked route evidence is left on disk -- inert,
-        # because a held hour stages no payload -- which is the honest
-        # tree state the old structural pin misdescribed as a clean tree;
+        # proceed=false, green. The tracked capture is restored to HEAD,
+        # and so is the tracked route evidence -- a held hour stages no
+        # payload either way, and the restore is what keeps a republish
+        # hour's payload equal to HEAD's;
         # and the hub fetch never runs: the held branch exits before the
         # live-page check could. The summary carries the pins the old
         # structural class owned and the first executed draft dropped:
@@ -896,7 +896,7 @@ class ExecutedHoldProbeTests(unittest.TestCase):
                         self.assertEqual(hour["outputs"].count("proceed="),
                                          1)
                         self.assertEqual(hour["capture"], "head\n")
-                        self.assertTrue(hour["marker"])
+                        self.assertEqual(hour["marker"], self.HEAD_FILES["data/cost-breakdown-window.txt"])
                         self.assertIn("### Held", hour["summary"])
                         if force:
                             self.assertIn("Force was requested",
@@ -939,7 +939,7 @@ class ExecutedHoldProbeTests(unittest.TestCase):
                         self.assertEqual(hour["proceed"], proceed)
                         self.assertEqual(hour["hub_fetches"], fetches)
                         self.assertEqual(hour["capture"], capture)
-                        self.assertTrue(hour["marker"])
+                        self.assertEqual(hour["marker"], self.FRESH_EVIDENCE if capture == self.FRESH else self.HEAD_FILES["data/cost-breakdown-window.txt"])
                         # Exactly one proceed= line on the verdict path
                         # too (issue #240): the value read by the harness
                         # takes the FIRST proceed= line, so a stray second
