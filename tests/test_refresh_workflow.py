@@ -421,10 +421,10 @@ class GateTests(unittest.TestCase):  # pylint: disable=too-many-public-methods
         # keys on the PAYLOAD, never on the worktree file -- the checkout at
         # main's tip materializes the tracked file and `cp -a` never
         # deletes, so a worktree probe would fire the add on an hour whose
-        # payload lacks it (the reviewer-reproduced defect this condition
-        # fixes). The removal is the elif's `git rm`, for a payload lacking
-        # the file; fetch_aa.py writes it every hour (issue #441), so the
-        # add fires on each commit that carries an AA payload.
+        # payload lacks it (the defect this condition fixes). The removal
+        # is the elif's `git rm`, for a payload lacking the file;
+        # fetch_aa.py writes it every hour (issue #441), so the add fires
+        # on each commit that carries an AA payload.
         run = flattened(step_in(self.wf, "publish", "Commit the refresh")["run"])
 
         self.assertIn('if [ -f "${PAYLOAD}/tree/data/cost-breakdown-window.txt" ]; then', run)
