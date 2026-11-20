@@ -388,7 +388,7 @@ class GateTests(unittest.TestCase):  # pylint: disable=too-many-public-methods
         # The artifact is the exact commit payload the old single job staged:
         # the fixed add list and the differ's message when one ran. The
         # disagreement-era files are gone with the disagreement state (issue
-        # #200), so the list is the five payload paths, the window marker
+        # #200), so the list is the five payload paths, the route evidence
         # behind its own presence guard (issue #227), and nothing that
         # varies by hour.
         run = flattened(step(self.wf, "Stage the publish payload")["run"])
@@ -398,12 +398,12 @@ class GateTests(unittest.TestCase):  # pylint: disable=too-many-public-methods
                       "out/frontier-models.html", "data/cost-breakdown-window.txt",
                       "commit-msg.txt"):
             self.assertIn(piece, run)
-        # The marker copies only when this hour actually recorded one.
+        # The evidence copies whenever fetch_aa.py wrote it, every hour.
         self.assertIn(
             "[ ! -f data/cost-breakdown-window.txt ] || "
             "cp --parents data/cost-breakdown-window.txt", run)
         # No disagreement-era file and no retirement switch survives on this
-        # path; the window marker is the one conditional payload file, and
+        # path; the route evidence is the one conditional payload file, and
         # the guard above is its whole conditional.
         for gone in ("data/aa-disagreement-snapshot.json", "data/aa-route-disagreement.txt",
                      "data/aa-last-agreeing-capture.json",
@@ -416,15 +416,15 @@ class GateTests(unittest.TestCase):  # pylint: disable=too-many-public-methods
         self.assertIn("steps.fetch.outputs.captured == 'true'", artifact["if"])
 
     def test_the_write_job_stages_the_window_marker_both_ways(self):
-        # Issue #227: the gate's HEAD-side rebuild reads the window marker
-        # from GIT at HEAD, so a window hour's commit must carry it and the
-        # first healthy hour's commit must remove it. The add keys on the
-        # PAYLOAD, never on the worktree file -- the scratch checkout at
-        # main's tip materializes a tracked marker into the tree and
+        # Issue #227: the gate's HEAD-side rebuild reads the route evidence
+        # from GIT at HEAD, so a committing hour must carry it. The add keys
+        # on the PAYLOAD, never on the worktree file -- the scratch checkout
+        # at main's tip materializes the tracked file into the tree and
         # `cp -a` never deletes, so a worktree probe would fire the add on
-        # exactly the heal hour and the marker would never leave main (the
-        # reviewer-reproduced defect this condition fixes). The removal is
-        # the elif's `git rm`. Neither branch fires in a normal hour.
+        # an hour whose payload lacks it (the reviewer-reproduced defect
+        # this condition fixes). The removal is the elif's `git rm`, which
+        # fires only when a payload lacks the file; since fetch_aa.py
+        # writes it every hour (issue #441), the add fires on each commit.
         run = flattened(step_in(self.wf, "publish", "Commit the refresh")["run"])
 
         self.assertIn('if [ -f "${PAYLOAD}/tree/data/cost-breakdown-window.txt" ]; then', run)
@@ -744,7 +744,7 @@ class ExecutedHoldProbeTests(unittest.TestCase):
 
     def _run_hour(self, tmp: pathlib.Path, *, gate, probe, force, hub):
         """Seed one scratch repo at HEAD, dirty it with the fresh capture
-        and the untracked window marker, install the python3 double,
+        and the untracked route evidence, install the python3 double,
         and run the real run block.
 
         `gate` is the no-argument capture_gate.py answer -- `true`, `false`
@@ -769,7 +769,7 @@ class ExecutedHoldProbeTests(unittest.TestCase):
             (repo / rel).write_text(text, encoding="utf-8")
         git = ["git", "-C", str(repo)]
         # A fixture's throwaway repo: the commit-identity rule governs OUR
-        # commits, not scratch seeds (the same note the marker conditional
+        # commits, not scratch seeds (the same note the evidence conditional
         # test carries).
         seed_env = {**os.environ, "GIT_AUTHOR_NAME": "seed", "GIT_AUTHOR_EMAIL": "seed@example",
                     "GIT_COMMITTER_NAME": "seed", "GIT_COMMITTER_EMAIL": "seed@example"}
@@ -841,7 +841,7 @@ class ExecutedHoldProbeTests(unittest.TestCase):
         # red-path pin: a forced run on a refused (converged, empty-axis)
         # capture must exit red, never proceed=true. Asserted: exit
         # nonzero, no proceed output written, the fresh capture left on
-        # disk, the marker with it.
+        # disk, the evidence with it.
         for gate in ("rc1", "true", "false"):
             for probe in ("yes", "no", "rc1"):
                 if gate != "rc1" and probe != "rc1":
@@ -864,7 +864,7 @@ class ExecutedHoldProbeTests(unittest.TestCase):
         # probe=yes is the hold on every other axis: even a gate that saw
         # the capture MOVE, a forced dispatch and a stale hub all drop to
         # proceed=false, green. The tracked capture is restored to HEAD;
-        # the fresh untracked window marker is left on disk -- inert,
+        # the fresh untracked route evidence is left on disk -- inert,
         # because a held hour stages no payload -- which is the honest
         # tree state the old structural pin misdescribed as a clean tree;
         # and the hub fetch never runs: the held branch exits before the
@@ -1572,7 +1572,7 @@ class DeployKeyPushTests(unittest.TestCase):
 
 
 # ---------------------------------------------------------------------------
-# issue #227: the marker conditional's operator semantics
+# issue #227: the evidence conditional's operator semantics
 # ---------------------------------------------------------------------------
 
 
@@ -1687,7 +1687,7 @@ def test_the_marker_conditional_behaves_on_the_four_hours(tmp_path):
     # own materialized copy. The block is extracted from refresh.yml
     # VERBATIM and run in a scratch repo shaped like the write job's --
     # sitting at the tip being committed onto, the payload tree copied
-    # over it -- across the four hours of the marker lifecycle.
+    # over it -- across the four hours of the file's add/remove lifecycle.
     if os.name == "nt":
         pytest.skip(
             "the block under test is GitHub-runner bash against a "
@@ -1744,25 +1744,25 @@ def test_the_marker_conditional_behaves_on_the_four_hours(tmp_path):
         assert proc.returncode == 0, (
             f"marker conditional rc={proc.returncode}: {proc.stderr}")
 
-    # Heal hour: tracked at the tip, absent from the payload -- the
+    # Removal state: tracked at the tip, absent from the payload -- the
     # checkout's own materialized copy must not fire the add branch; the
     # removal stages.
     repo = scratch("heal", tracked=True)
     run_block(repo)
     assert "D  data/cost-breakdown-window.txt" in status(repo)
 
-    # Window hour: the payload carries it -- staged in, tracked or not.
+    # Add state: the payload carries it -- staged in, tracked or not.
     (payload_data / "cost-breakdown-window.txt").write_text("w\n")
     repo = scratch("window", tracked=False)
     run_block(repo)
     assert "A  data/cost-breakdown-window.txt" in status(repo)
 
-    # Persist hour: tracked and unchanged in the payload -- a no-op.
+    # Unchanged state: tracked and unchanged in the payload -- a no-op.
     repo = scratch("persist", tracked=True)
     run_block(repo)
     assert status(repo) == ""
 
-    # Quiet hour: absent from both -- a no-op.
+    # Absent state: absent from both -- a no-op.
     (payload_data / "cost-breakdown-window.txt").unlink()
     repo = scratch("quiet", tracked=False)
     run_block(repo)

@@ -295,7 +295,7 @@ def read_fresh_generation_state() -> bytes | None:
 
 def _stage(side_dir: pathlib.Path, captures: tuple[bytes, bytes],
            window_marker: bytes | None) -> None:
-    """Stage the captures, synthetic stamp, and that side's window marker.
+    """Stage the captures, synthetic stamp, and that side's route evidence.
 
     The real stamps (tree and HEAD) are never read: the date is build-machine
     metadata, and building both sides from the same synthetic date is what

@@ -774,7 +774,7 @@ class ZeroScoreCaptureGateTests(unittest.TestCase):
         self.assertNotIn("Traceback", err.getvalue())
 
 
-# --- the window marker on the gate path --------------------------------------
+# --- the route evidence on the gate path -------------------------------------
 
 
 def window_capture(models: bytes) -> bytes:

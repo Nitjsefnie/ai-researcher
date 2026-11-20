@@ -86,7 +86,7 @@ def test_bot_signature_names_every_file_the_refresh_committers_add():
                   if any(re.search(r'^\s*git commit\b', step.get('run', ''), re.MULTILINE)
                          for step in job['steps'])}
     assert committers == {'publish'}
-    # And the marker's removal stays conditional: never an unconditional
+    # And the evidence's removal stays conditional: never an unconditional
     # `git rm` of a data path.
     rms = re.findall(r"^\s*git rm(?:[^\n\\]|\\\n)*", raw, re.MULTILINE)
     assert [rm.lstrip() for rm in rms] == \
@@ -158,8 +158,8 @@ def test_data_only_accepts_any_proper_subset():
     # Any non-empty subset of the ten is a shape the bot's pushes take:
     # an hour's commit carries only the files whose bytes moved, so a
     # dropped file is an hour with one byte-identical artifact, not a
-    # hand-staged change to run the full matrix over. Dropping the window
-    # marker is the heal hour's own shape.
+    # hand-staged change to run the full matrix over. Dropping the route
+    # evidence is an hour whose evidence bytes did not move.
     full = ["data/aa-raw-models.json", "data/aa-raw-coding-agents.json",
             "data/captured-at.txt", "out/frontier-models.html",
             "data/cost-breakdown-window.txt", "data/aa-generation-state.json",
