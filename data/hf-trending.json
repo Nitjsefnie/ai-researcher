@@ -5,9 +5,6 @@
       "id": "higurashi-ai/Haru-4B"
     },
     {
-      "id": "apple/FastFrames-L"
-    },
-    {
       "id": "inworld/voice-isolator"
     },
     {
@@ -17,19 +14,22 @@
       "id": "Qwen/Qwen3.8-27B"
     },
     {
-      "id": "maxwell-model/Maxwell-V1-Flash"
+      "id": "Lightricks/LTX-2.5"
     },
     {
       "id": "MiniMaxAI/MiniMax-H3-Image"
-    },
-    {
-      "id": "Lightricks/LTX-2.5"
     },
     {
       "id": "chatrlabs/Qwen-Image-2.1-Uncensored-Omni-Quantized"
     },
     {
       "id": "tencent/Hy4-flash"
+    },
+    {
+      "id": "sensenova/SenseNova-Loop-9B"
+    },
+    {
+      "id": "apple/FastFrames-L"
     }
   ]
 }

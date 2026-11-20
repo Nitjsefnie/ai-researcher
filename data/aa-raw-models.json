@@ -27759,16 +27759,7 @@
   "price1mOutputTokens": 0,
   "cacheHitPrice": null,
   "cacheWritePrice": null,
-  "slug": "joyai-vl",
-  "genVariants": [
-   {},
-   {
-    "ii": 28.0361254876924,
-    "ctx": 1048576,
-    "pin": 0,
-    "pout": 0
-   }
-  ]
+  "slug": "joyai-vl"
  },
  {
   "id": "5d891609-fe1c-4e8d-b9f0-5b0ff6d9f439",
@@ -61790,54 +61781,6 @@
    "reasoningTokens",
    "timeToFirstChunkVariance",
    "timescaleData"
-  ]
- },
- {
-  "id": "5ca91b0e-0e47-4793-ace9-2ca763106e62",
-  "release": {
-   "slug": "joyvl2_v27",
-   "name": "JoyAI-VL-Preview"
-  },
-  "name": "JoyAI-VL-Preview",
-  "shortName": "JoyAI-VL-Preview",
-  "suffix": null,
-  "deprecated": false,
-  "isReasoning": true,
-  "isOpenWeights": false,
-  "paramClass": "large",
-  "priceClass": "low",
-  "modelCreatorName": "Joy Future Academy",
-  "modelCreatorColor": "#E1251B",
-  "modelCreatorLogo": "/img/logos/joy-ai.svg",
-  "contextWindowTokens": 1048576,
-  "intelligenceIndex": 28.0361254876924,
-  "omniscience": -9.933333333333334,
-  "scores": {
-   "aa-briefcase": 1462.66,
-   "omniscience-accuracy": 0.3353333333333333,
-   "omniscience-non-hallucination": 0.3460381143430291,
-   "automationbench-aa": 0.6174567739602399,
-   "terminal-bench-science": 0.0380952380952381,
-   "frontiercode-2-0": 0.190037121212121,
-   "hle-diamond": 0.267,
-   "gdp-pdf": 0.206,
-   "terminalbench-4-0": 0.232323232323232,
-   "critpt-v2-hard": 0.32
-  },
-  "price1mInputTokens": 0,
-  "price1mOutputTokens": 0,
-  "cacheHitPrice": null,
-  "cacheWritePrice": null,
-  "slug": "joyvl2_v27",
-  "crossRunMerged": true,
-  "genVariants": [
-   {
-    "ii": 28.0361254876924,
-    "ctx": 1048576,
-    "pin": 0,
-    "pout": 0
-   },
-   {}
   ]
  }
 ]
