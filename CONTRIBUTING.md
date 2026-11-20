@@ -367,11 +367,17 @@ Membership is the union of both routes (issue #266): detail-only retired models
 remain visible, with their detail lab and no leaderboard-only speed; their
 values can lag a generation.
 
-The window marker counts leaderboard models after validating the whole union,
-so a detail-only breakdown cannot erase a route window (issue #266). In the
-marked three-generation corner, empty parameters hold the last good page.
-Detail-only rows that rescue parameters publish fully. Unplottable extras leave
-the original hold intact. Other empty axes still refuse.
+Every hour `fetch_aa.py` writes the route evidence
+`data/cost-breakdown-window.txt` beside the capture (issue #441): the in-run
+generation count and whether the detail and GDPval-AA evaluation reads were
+withheld. Its content is the evidence, not its presence, and `build.py`'s
+`guard_empty_axes` is its one reader: with ≥ 2 generations and every empty
+axis traced to a withheld route (parameters: detail, agentic: evaluation), the
+last good page holds and the message names the count. Detail-only rows that
+rescue parameters publish fully; unplottable extras leave the hold intact.
+Other empty axes refuse, naming the count when there are several; only absent,
+unparseable or one-generation evidence reads as a shape change. The capture
+gate stages HEAD's committed copy and the fresh one into its two builds.
 
 **Actions are hash-pinned**, with the version in a trailing comment. Do not
 "tidy" one back to `@v4`: a tag is a moving pointer, and these jobs hold a
@@ -553,8 +559,9 @@ kept, both generations shown, red, paired.
 **Disputed hours.** A run whose looks disagree counts a third in-run
 generation when the detail route matches neither look's fingerprint, or when
 the GDPval-AA evaluation route matches neither look, and a fourth when both
-miss. A detail route matching neither gives shared models no detail fills from
-that run; the final look-back pass can restore their previous fills.
+miss; each such route is recorded as withheld in the route evidence. A detail
+route matching neither gives shared models no detail fills from that run; the
+final look-back pass can restore their previous fills.
 Without the cross-run look-back, a run whose looks agree writes no `genVariants`
 key anywhere and is byte-identical to the single-generation capture; with it,
 the same holds when the two slug sets agree, no generation hold renders and no

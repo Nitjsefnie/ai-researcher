@@ -84,8 +84,9 @@ page stops naming v2.1, or its data file is missing, undecryptable on every
 read it is given (a live run reads page and data up to twice, a cached input
 once), or changes schema (the message names the file) — or when the Coding
 Agent Index table collapses. `build.py` refuses to write a page with an empty
-chart on it — except a three-generation window hour whose only empty chart is
-parameters, which holds the last good page instead. All of those
+chart on it — except an AA update-window hour whose every empty chart traces to
+a route the capture recorded as withheld, which holds the last good page
+instead, naming the generation count it saw. All of those
 are signals to re-read AA by hand, not to retry or to hand-fix JSON — never
 hand-edit either capture.
 
