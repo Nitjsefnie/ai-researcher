@@ -1123,8 +1123,8 @@ def record_route_evidence(captured: Capture) -> None:
     from it alone (issue #441). main() writes it after the captures, so a
     run that refuses earlier leaves the previous hour's evidence beside the
     previous hour's capture. A quiet run records neither flag, its joins
-    being unconditional; a HEAD committed before this file existed carries
-    none, which the build reads as no recorded mismatch.
+    being unconditional. Main tracks the file, so an unchanged hour's
+    `git checkout -- data/` restores it and a republish stages nothing.
     """
     text = render_route_evidence(
         captured.generations,
