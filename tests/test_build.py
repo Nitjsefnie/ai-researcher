@@ -1123,8 +1123,8 @@ class WindowHoldTests(unittest.TestCase):
                     build.guard_empty_axes(empty, evidence)
                 message = str(raised.exception)
                 self.assertIn("no rows carry a score/cost pair for: " + ", ".join(empty) + " -- ", message)
-                self.assertEqual("holding the page" in message, outcome == "hold")
-                self.assertEqual("unchanged / window" in message, outcome == "hold")
+                held = "holding the page: the last good page stays live, AA's capture neither commits nor publishes this hour"
+                self.assertEqual(("unchanged / window" in message, held in message), (outcome == "hold",) * 2)
                 # Only a windowless capture claims a shape change; only a hold denies one.
                 self.assertEqual("changed shape" in message, outcome == "shape")
                 self.assertEqual("not a shape change" in message, outcome == "hold")
