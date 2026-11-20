@@ -64,8 +64,8 @@
     2986
   ],
   "scripts/capture_gate.py": [
-    9710,
-    16604
+    9688,
+    16570
   ],
   "scripts/ci/aggregate_gate.py": [
     3257,
@@ -84,8 +84,8 @@
     21494
   ],
   "scripts/ci/classify_changes.py": [
-    6438,
-    11347
+    6433,
+    11342
   ],
   "scripts/ci/commit_scopes.py": [
     6375,
@@ -216,8 +216,8 @@
     104015
   ],
   "tests/test_gitignore.py": [
-    3516,
-    7011
+    3509,
+    7004
   ],
   "tests/test_js_coverage.py": [
     1840,
