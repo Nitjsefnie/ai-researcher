@@ -370,14 +370,16 @@ values can lag a generation.
 Every hour `fetch_aa.py` writes the route evidence
 `data/cost-breakdown-window.txt` beside the capture (issue #441): the in-run
 generation count and whether the detail and GDPval-AA evaluation reads were
-withheld. Its content is the evidence, not its presence, and `build.py`'s
-`guard_empty_axes` is its one reader: with ≥ 2 generations and every empty
-axis traced to a withheld route (parameters: detail, agentic: evaluation), the
-last good page holds and the message names the count. Detail-only rows that
+withheld. Its content is the evidence, not its presence:
+`build.read_route_evidence` is its one parser, and `guard_empty_axes` decides
+from the result. With ≥ 2 generations and every empty axis traced to a withheld
+route (parameters: detail, agentic: evaluation), the last good page holds and
+the message names the count. Detail-only rows that
 rescue parameters publish fully; unplottable extras leave the hold intact.
 Other empty axes refuse, naming the count when there are several; only absent,
 unparseable or one-generation evidence reads as a shape change. The capture
-gate stages HEAD's committed copy and the fresh one into its two builds.
+gate stages HEAD's committed copy and the fresh one into its two builds, and
+the committed-page check stages HEAD's; neither parses it.
 
 **Actions are hash-pinned**, with the version in a trailing comment. Do not
 "tidy" one back to `@v4`: a tag is a moving pointer, and these jobs hold a

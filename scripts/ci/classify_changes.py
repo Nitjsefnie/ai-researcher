@@ -20,8 +20,8 @@ A second class narrows refresh.yml's generated artifacts to ten supported
 paths. The keyless publish job makes at most one bot commit per run,
 carrying every changed source. The AA payload includes data/aa-raw-models.json,
 data/aa-raw-coding-agents.json, data/aa-generation-state.json,
-data/captured-at.txt and out/frontier-models.html, plus the conditional
-add/removal of data/cost-breakdown-window.txt. The refresh job runs the full
+data/captured-at.txt and out/frontier-models.html, plus the hourly route
+evidence data/cost-breakdown-window.txt. The refresh job runs the full
 suite against the fresh capture before handing it to publish, so the heavy
 matrix would only repeat that verification for the AA artifacts.
 

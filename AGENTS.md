@@ -144,8 +144,8 @@ since" or the run prints the 7-day hold warning. In short:
   generations in `genVariants`. Neither the detail route nor the GDPval-AA
   evaluation route raises a dispute by itself, but a detail or evaluation read
   matching neither disputed look joins no generation: it is withheld, and an
-  axis only it feeds (parameters, agentic) holds the page until AA's routes
-  converge (route evidence, below).
+  axis it leaves empty (parameters, agentic) holds the page until AA's routes
+  converge, unless another empty axis is unexplained (route evidence, below).
 - **Cross-run generation** (`--cross-run-lookback`, the refresh workflow's flag only: a hand run does not
   pass it; state in
   `data/aa-generation-state.json`): a remembered revisit holds both generations

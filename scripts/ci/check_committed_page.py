@@ -98,7 +98,7 @@ def mask(page: str) -> str:
 
 
 # All data inputs the rebuild stages from HEAD: two captures and their
-# stamp, plus generation state and the window marker when committed.
+# stamp, plus generation state and route evidence when committed.
 # build.py reads the optional inputs beside RAW, so omitting one would
 # rebuild a different page from the one the refresh published.
 MODELS_NAME = "aa-raw-models.json"
@@ -135,7 +135,7 @@ def rebuild_page() -> str:
     after capture but before the commit, so during a refresh the working data/
     holds the fresh uncommitted capture, and a rebuild that honored it would
     judge HEAD's page against data it was never built from. HEAD's two
-    captures, captured-at stamp, generation state and window marker are staged
+    captures, captured-at stamp, generation state and route evidence are staged
     into a temp data/ dir. build's module globals and
     AI_RESEARCHER_AA_SOURCE_COMMIT are restored no matter how the build ends,
     so a failed rebuild cannot poison the caller's tree state. A failed
