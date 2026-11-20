@@ -1124,7 +1124,7 @@ def record_route_evidence(captured: Capture) -> None:
     run that refuses earlier leaves the previous hour's evidence beside the
     previous hour's capture. A quiet run records neither flag, its joins
     being unconditional. Main tracks the file, so an unchanged hour's
-    `git checkout -- data/` restores it and a republish stages nothing.
+    `git checkout -- data/` restores it and a republish stages no evidence change.
     """
     text = render_route_evidence(
         captured.generations,

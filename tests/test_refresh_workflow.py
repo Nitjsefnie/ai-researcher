@@ -865,8 +865,8 @@ class ExecutedHoldProbeTests(unittest.TestCase):
         # the capture MOVE, a forced dispatch and a stale hub all drop to
         # proceed=false, green. The tracked capture is restored to HEAD,
         # and so is the tracked route evidence -- a held hour stages no
-        # payload either way, and the restore is what keeps a republish
-        # hour's payload equal to HEAD's;
+        # AA payload either way, and the restore is what keeps a republish
+        # hour's AA payload equal to HEAD's;
         # and the hub fetch never runs: the held branch exits before the
         # live-page check could. The summary carries the pins the old
         # structural class owned and the first executed draft dropped:

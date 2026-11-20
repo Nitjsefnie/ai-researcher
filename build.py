@@ -860,7 +860,7 @@ class WindowHold(Exception):
     withheld. main() raises
     instead of writing: the capture gate catches it on the fresh side and
     reports the hour unchanged, so the last good page stays live and
-    nothing commits or publishes. Never caught inside build.py's own main()
+    AA's capture neither commits nor publishes. Never caught inside build.py's own main()
     -- the CLI wrapper below translates it to a printed report and exit 0.
     """
 
@@ -1194,8 +1194,8 @@ def main(*, generation_state: bytes | None | EllipsisType = ...):
     # The hold-or-refuse decision is guard_empty_axes', from the route
     # evidence fetch_aa.py recorded beside the capture (issue #441): a hold
     # raises WindowHold, which scripts/capture_gate.py reports as the hour
-    # unchanged -- the last good page stays live, nothing commits or
-    # publishes -- until AA's routes converge; a refusal exits nonzero.
+    # unchanged -- the last good page stays live, AA's capture neither
+    # commits nor publishes -- until AA's routes converge; a refusal exits nonzero.
     rendered = {**stats["metricCounts"], "parameters": stats["parameterCount"]}
     guard_empty_axes([axis for axis, n in rendered.items() if not n],
                      read_route_evidence(RAW.parent))
