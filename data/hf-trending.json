@@ -20,16 +20,16 @@
       "id": "tencent/Hy4-flash"
     },
     {
-      "id": "sensenova/SenseNova-Loop-9B"
-    },
-    {
       "id": "Sentinel7/h3"
     },
     {
-      "id": "inworld/voice-isolator"
+      "id": "sensenova/SenseNova-Loop-9B"
     },
     {
-      "id": "chatrlabs/Qwen-Image-2.1-Uncensored-Omni-Quantized"
+      "id": "thinkingmachines/Inkling-2-Mini"
+    },
+    {
+      "id": "inworld/voice-isolator"
     }
   ]
 }

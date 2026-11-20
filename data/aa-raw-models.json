@@ -52740,19 +52740,7 @@
   "timeToFirstToken": 1.48736381188096,
   "timeToFirstAnswerToken": 9.72425692688333,
   "slug": "inkling-2-mini",
-  "gdpvalCostPerTask": 0.24638650587224864,
-  "genVariants": [
-   {},
-   {
-    "ii": 20.1315214698783,
-    "cost": 0.5865441229709887,
-    "gdpval": 1318.54,
-    "gdpvalCost": 0.24638650587224864,
-    "ctx": 1024000,
-    "pin": 0.15,
-    "pout": 0.5
-   }
-  ]
+  "gdpvalCostPerTask": 0.24638650587224864
  },
  {
   "id": "dafbb6d2-4825-43d1-a927-feedcfd2e998",
