@@ -23,13 +23,13 @@
       "id": "MiniMaxAI/MiniMax-H3-Image"
     },
     {
-      "id": "maxwell-model/Maxwell-V1-Flash"
-    },
-    {
       "id": "Lightricks/LTX-2.5"
     },
     {
       "id": "chatrlabs/Qwen-Image-2.1-Uncensored-Omni-Quantized"
+    },
+    {
+      "id": "sensenova/SenseNova-Loop-9B"
     }
   ]
 }
