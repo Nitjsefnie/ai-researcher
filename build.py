@@ -892,8 +892,8 @@ def guard_empty_axes(empty: list[str], evidence: tuple[int, set[str]] | None) ->
     if all(AXIS_ROUTE.get(axis) in evidence[1] for axis in empty):
         raise WindowHold("unchanged / window: " + named + counted + ", not a shape change: the route each of these "
                          "axes needs matched none of the run's leaderboard looks, and no honest page exists to build -- holding "
-                         "the page: the last good page stays live, nothing commits or publishes this hour, and the axes return "
-                         "when AA's routes converge")
+                         "the page: the last good page stays live, AA's capture neither commits nor publishes this hour, and "
+                         "the axes return when AA's routes converge")
     state = ("matched none of the run's leaderboard looks" if "evaluation" in evidence[1]
              else "joined, yet no row pairs its cost with a GDPval-AA Elo")
     note = f"; agentic: the GDPval-AA evaluation read {state} -- re-read the GDPval-AA evaluation page"
