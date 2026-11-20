@@ -188,14 +188,9 @@ class NegativeFormatTests(unittest.TestCase):
 
 
 class AgenticEmptyAxisTests(unittest.TestCase):
-    WINDOW = ("every cost breakdown dropped as another generation's: "
-              "185 model(s), first apodex-1-1; 3 generation(s) observed in-run\n")
-
-    def refusal(self, model, window=False):
+    def refusal(self, model):
         harness = test_build.EmptyAxisGuardTests()
         with harness.capture([model], [agent_fixture()]) as output:
-            if window:
-                (output.parent / "cost-breakdown-window.txt").write_text(self.WINDOW, encoding="utf-8")
             with self.assertRaises(SystemExit) as raised:
                 harness.run_build()
             self.assertFalse(output.exists(), "refusal still wrote the page")
@@ -208,19 +203,6 @@ class AgenticEmptyAxisTests(unittest.TestCase):
         self.assertIn("changed shape", message)
         self.assertIn(GDPVAL_NOTE, message)
         self.assertNotIn(GDPVAL_NOTE, self.refusal(model_fixture(intelligence=None)))
-
-    def test_an_empty_agentic_axis_never_holds_in_a_window_hour(self):
-        # The hold covers parameters alone: an emptied agentic axis beside a
-        # three-generation marker refuses, alone or beside parameters.
-        corner = model_fixture(gdpval_cost=None)
-        del corner["parameters"]
-        for model, axes in ((model_fixture(gdpval_cost=None), "agentic"),
-                            (corner, "agentic, parameters")):
-            with self.subTest(axes=axes):
-                message = self.refusal(model, window=True)
-                self.assertIn(f"for: {axes} -- the capture records a cross-generation AA window", message)
-                self.assertIn(GDPVAL_NOTE, message)
-                self.assertNotIn("holding the page", message)
 
 
 def without_agentic(models: bytes) -> bytes:
@@ -240,17 +222,18 @@ class AgenticGateTests(unittest.TestCase):
         self.assertEqual((code, out), (1, ""))
         self.assertIn("no rows carry a score/cost pair for: agentic", err.getvalue())
 
-    def test_the_hold_probe_reads_an_empty_agentic_corner_as_broken(self):
+    def test_the_hold_probe_holds_an_empty_agentic_corner_only_when_its_evaluation_was_withheld(self):
         corner = without_agentic(test_capture_gate.corner_capture(test_capture_gate.FIXTURE_MODELS))
-        with mock.patch.object(capture_gate, "read_fresh_generation_state", return_value=None), \
-                mock.patch.object(capture_gate, "read_fresh_captures", return_value=(
-                    corner, test_capture_gate.FIXTURE_AGENTS)), \
-                mock.patch.object(capture_gate, "read_fresh_window_marker",
-                                  return_value=test_capture_gate.WINDOW_MARKER):
-            code, out, err = test_capture_gate.FreshHoldProbeTests.run_probe()
-
-        self.assertEqual((code, out), (1, ""))
-        self.assertIn("for: agentic, parameters", err)
+        both = test_capture_gate.WINDOW_MARKER.replace(b"3", b"4").replace(b"costs withheld: no", b"costs withheld: yes")
+        for marker, answer in ((test_capture_gate.WINDOW_MARKER, (1, "")), (both, (0, "yes\n"))):
+            with self.subTest(answer=answer), mock.patch.object(
+                    capture_gate, "read_fresh_generation_state", return_value=None), \
+                    mock.patch.object(capture_gate, "read_fresh_captures", return_value=(
+                        corner, test_capture_gate.FIXTURE_AGENTS)), \
+                    mock.patch.object(capture_gate, "read_fresh_window_marker", return_value=marker):
+                code, out, err = test_capture_gate.FreshHoldProbeTests.run_probe()
+                self.assertEqual((code, out), answer)
+                self.assertEqual("for: agentic, parameters" in err, answer[0] == 1)
 
 
 def scored(name, elo, gdpval_cost, **extra):

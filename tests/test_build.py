@@ -821,46 +821,65 @@ class GenerationHoldRenderTests(unittest.TestCase):
             build.generation_hold_note(pathlib.Path("unused"), b'{"held": null,')
 
 
-class CostBreakdownWindowReaderTests(unittest.TestCase):
-    """The build layer's one question about the window marker.
+def route_evidence(generations, withheld=""):
+    """The evidence file's exact text: `withheld` names the routes, by word."""
+    return (f"in-run generations: {generations}\n"
+            f"detail fills withheld: {'yes' if 'detail' in withheld else 'no'}\n"
+            f"evaluation costs withheld: {'yes' if 'evaluation' in withheld else 'no'}\n")
 
-    fetch_aa.py writes data/cost-breakdown-window.txt when the merge dropped
-    EVERY model's cost breakdown -- a two-generation window, not a schema
-    change. The reader answers EXISTENCE and nothing else: the file's content
-    is a git-history note for a human, and nothing from it reaches the page.
+
+class RouteEvidenceReaderTests(unittest.TestCase):
+    """The build layer reads fetch_aa.py's route evidence by its content.
+
+    fetch_aa.py writes data/cost-breakdown-window.txt every hour (issue
+    #441). The one reader returns (in-run generations, withheld routes) for
+    the exact text the writer renders, and None -- no recorded mismatch, so
+    an emptied axis refuses -- for an absent file and for any other bytes,
+    the older one-line all-dropped marker included.
     """
 
-    def test_the_reader_answers_existence_only(self):
+    def test_the_written_format_reads_back(self):
+        # The literal pins the persisted format; the rendered rows pin the
+        # writer and the reader to each other over every combination.
         with tempfile.TemporaryDirectory() as tmp:
             data_dir = pathlib.Path(tmp)
-            marker = data_dir / "cost-breakdown-window.txt"
+            self.assertIsNone(build.read_route_evidence(data_dir))
+            path = data_dir / build.ROUTE_EVIDENCE_NAME
+            path.write_text(route_evidence(4, "detail"), encoding="utf-8")
+            self.assertEqual(build.read_route_evidence(data_dir), (4, {"detail"}))
+            for generations, detail, evaluation in ((1, False, False), (2, True, False),
+                                                    (3, False, True), (12, True, True)):
+                path.write_text(build.render_route_evidence(generations, detail, evaluation),
+                                encoding="utf-8")
+                withheld = {"detail"} if detail else set()
+                self.assertEqual(build.read_route_evidence(data_dir),
+                                 (generations, withheld | ({"evaluation"} if evaluation else set())))
 
-            self.assertFalse(build.cost_breakdown_window(data_dir))
-
-            marker.write_text("not page input -- any bytes count\n",
-                              encoding="utf-8")
-            self.assertTrue(build.cost_breakdown_window(data_dir))
-
-    def test_the_generation_count_reader_parses_the_marker_line(self):
-        # The marker's "; N generation(s) observed in-run" tail is the one
-        # integer the refusal reads back. Absent and countless markers read as
-        # None -- the refusal then names the window generically -- and nothing
-        # here reaches the page.
+    def test_any_other_bytes_record_no_mismatch(self):
+        good = route_evidence(3, "detail evaluation")
         with tempfile.TemporaryDirectory() as tmp:
-            data_dir = pathlib.Path(tmp)
+            path = pathlib.Path(tmp) / build.ROUTE_EVIDENCE_NAME
+            for bad in ("every cost breakdown dropped as another generation's: 185 model(s), "
+                        "first apodex-1-1; 3 generation(s) observed in-run\n",
+                        good + "extra\n", good.rstrip("\n"), good.replace("3", "0"),
+                        good.replace("yes", "maybe", 1), good.replace("detail", "Detail"), ""):
+                with self.subTest(bad=bad):
+                    path.write_text(bad, encoding="utf-8")
+                    self.assertIsNone(build.read_route_evidence(path.parent))
+            path.write_bytes(b"\xff\xfe")
+            self.assertIsNone(build.read_route_evidence(path.parent))
+            # Unreadable is absent too: an OSError other than a missing file.
+            path.unlink()
+            path.mkdir()
+            self.assertIsNone(build.read_route_evidence(path.parent))
 
-            self.assertIsNone(build.window_generations(data_dir))
-
-            (data_dir / "cost-breakdown-window.txt").write_text(
-                "every cost breakdown dropped as another generation's: "
-                "185 model(s), first apodex-1-1; 3 generation(s) observed "
-                "in-run\n", encoding="utf-8")
-            self.assertEqual(build.window_generations(data_dir), 3)
-
-            (data_dir / "cost-breakdown-window.txt").write_text(
-                "every cost breakdown dropped as another generation's: "
-                "1 model(s), first fixture-model\n", encoding="utf-8")
-            self.assertIsNone(build.window_generations(data_dir))
+    def test_a_crlf_checkout_reads_back(self):
+        # A Windows autocrlf checkout of the committed evidence (no eol rule
+        # covers it) hands the reader CRLF line ends; it is the same evidence.
+        with tempfile.TemporaryDirectory() as tmp:
+            path = pathlib.Path(tmp) / build.ROUTE_EVIDENCE_NAME
+            path.write_bytes(route_evidence(2, "evaluation").replace("\n", "\r\n").encode("utf-8"))
+            self.assertEqual(build.read_route_evidence(path.parent), (2, {"evaluation"}))
 
 
 class EmptyAxisGuardTests(unittest.TestCase):
@@ -970,54 +989,37 @@ class EmptyAxisGuardTests(unittest.TestCase):
         # The window shape seen in production: the merge dropped every
         # breakdown, leaving the leaderboard's bare scalar (exactly what
         # check_cost_breakdown counts as dropped). Every axis still plots on
-        # that total, so the marker beside it changes nothing: the hour
-        # publishes like any other.
+        # that total, so evidence of withheld routes beside it changes
+        # nothing: the hour publishes like any other.
         window_model = model_fixture()
         window_model["intelligenceIndexCostPerTask"] = 0.75
         with self.capture([window_model], [agent_fixture()]) as output:
-            (output.parent / "cost-breakdown-window.txt").write_text(
-                "every cost breakdown dropped as another generation's: "
-                "1 model(s), first fixture-model\n", encoding="utf-8")
+            (output.parent / build.ROUTE_EVIDENCE_NAME).write_text(
+                route_evidence(4, "detail evaluation"), encoding="utf-8")
             self.run_build()
 
             stats = self.payload_of(output)["stats"]
             self.assertEqual(stats["metricCounts"], {"coding": 1, "intelligence": 1, "agentic": 1})
             self.assertEqual(stats["parameterCount"], 1)
 
-    def test_a_window_marker_does_not_exempt_an_empty_axis(self):
-        # Outside the three-generation hold, a marker hour that empties an axis
-        # is refused, naming the window rather than a shape change.
-        with self.capture([model_fixture(intelligence=None)], [agent_fixture()]) as output:
-            (output.parent / "cost-breakdown-window.txt").write_text(
-                "every cost breakdown dropped as another generation's: "
-                "1 model(s), first fixture-model\n", encoding="utf-8")
-            with self.assertRaises(SystemExit) as raised:
-                self.run_build()
-
-            message = str(raised.exception)
-            self.assertIn("no rows carry a score/cost pair for: intelligence", message)
-            self.assertIn("parameters", message)
-            self.assertIn("records a cross-generation AA window", message)
-            self.assertFalse(output.exists(), "refusal still wrote the page")
-
-    def test_a_countless_window_marker_names_the_window_generically(self):
-        # A marker written by an older fetch_aa.py carries no generation
-        # count. The refusal still names the window -- generically -- and
-        # still never blames a shape change.
-        corner = model_fixture()
-        del corner["parameters"]
-        with self.capture([corner], [agent_fixture()]) as output:
-            (output.parent / "cost-breakdown-window.txt").write_text(
-                "every cost breakdown dropped as another generation's: "
-                "1 model(s), first fixture-model\n", encoding="utf-8")
-            with self.assertRaises(SystemExit) as raised:
-                self.run_build()
-
-            message = str(raised.exception)
-            self.assertIn("records a cross-generation AA window", message)
-            self.assertIn("the marker carries no generation count", message)
-            self.assertNotIn("changed shape", message)
-            self.assertFalse(output.exists(), "refusal still wrote the page")
+    def test_main_reads_the_evidence_beside_the_capture(self):
+        # The guard's evidence through main(): an unexplained axis in a
+        # multi-generation hour refuses naming the count, never a shape
+        # change; the same capture beside the older all-dropped marker line
+        # has no evidence that parses, so it is the shape change.
+        corner = model_fixture(intelligence=None)
+        for text, wording in ((route_evidence(3, "detail evaluation"), "3 generation(s) observed in-run"),
+                              ("every cost breakdown dropped as another generation's: 1 model(s), "
+                               "first fixture-model; 3 generation(s) observed in-run\n", "changed shape")):
+            with self.subTest(wording=wording), self.capture([corner], [agent_fixture()]) as output:
+                (output.parent / build.ROUTE_EVIDENCE_NAME).write_text(text, encoding="utf-8")
+                with self.assertRaises(SystemExit) as raised:
+                    self.run_build()
+                message = str(raised.exception)
+                self.assertIn("no rows carry a score/cost pair for: intelligence, parameters -- ", message)
+                self.assertIn(wording, message)
+                self.assertEqual("changed shape" in message, wording == "changed shape")
+                self.assertFalse(output.exists(), "refusal still wrote the page")
 
     def test_a_fully_measured_capture_builds_and_names_all_four_axes_nonzero(self):
         # The healthy control: the guard enumerates the same stats the page
@@ -1034,14 +1036,15 @@ class EmptyAxisGuardTests(unittest.TestCase):
 
 
 class WindowHoldTests(unittest.TestCase):
-    """The three-generation corner holds the page instead of failing red.
+    """An AA update window holds the page instead of failing red (issue #441).
 
-    The hold predicate and its evidence: the window marker records >= 3
-    generations observed in-run AND parameters is the only emptied axis.
-    One row per direction of that conjunction -- the 2/3 boundary pair, a
-    4-generation marker still holds, a second emptied axis still refuses, a
-    fully measured capture still builds -- and the real command line proving
-    the typed exception never escapes the wrapper as a traceback.
+    The hold predicate and its evidence: the route evidence records >= 2
+    generations observed in-run AND, for every emptied axis, the route that
+    axis needs as withheld (parameters: the detail route's fills; agentic:
+    the GDPval-AA evaluation's costs; intelligence and coding: none). The
+    guard table holds one row per branch and per conjunct limb; main() and
+    the real command line prove the typed exception holds the page and
+    never escapes the wrapper as a traceback.
     """
 
     # The stamp fetch_aa.py writes, so a refusal below can only come from the
@@ -1085,135 +1088,102 @@ class WindowHoldTests(unittest.TestCase):
         end = html.index(";\n(function(){", start)
         return json.loads(html[start:end])
 
-    def test_the_three_generation_corner_holds_the_page(self):
-        # The designed three-generation corner (the looks disagree AND the detail
-        # route matches neither fingerprint) empties parameters. The capture
-        # records the window and the page self-heals when AA's routes converge,
-        # so the hour is not a shape change: main() raises WindowHold and writes
-        # nothing -- the capture gate catches it on the fresh side and reports
-        # the hour unchanged -- instead of the refusal's nonzero exit, which
-        # would go red although nothing is broken.
-        corner = model_fixture()
-        del corner["parameters"]
-        with self.capture([corner], [agent_fixture()]) as output:
-            (output.parent / "cost-breakdown-window.txt").write_text(
-                "every cost breakdown dropped as another generation's: "
-                "185 model(s), first apodex-1-1; 3 generation(s) observed "
-                "in-run\n", encoding="utf-8")
-            with self.assertRaises(build.WindowHold) as raised:
+    # (emptied axes, recorded evidence, outcome); evidence is (in-run
+    # generations, withheld routes), outcome None builds the page.
+    GUARD_TABLE = (
+        # Nothing empty builds, whatever the evidence: kills an all() over an
+        # empty list holding a healthy hour.
+        ([], (3, {"detail", "evaluation"}), None),
+        # The detail route's limb, at the 2-generation boundary of the count
+        # conjunct and below it, and with no evidence at all.
+        (["parameters"], (3, {"detail"}), "hold"),
+        (["parameters"], (2, {"detail"}), "hold"),
+        (["parameters"], (1, {"detail"}), "shape"),
+        (["parameters"], None, "shape"),
+        # A withheld route explains only its own axis.
+        (["parameters"], (3, {"evaluation"}), "window"),
+        (["agentic"], (3, {"evaluation"}), "hold"),
+        (["agentic"], (3, {"detail"}), "window"),
+        # The evaluation joined and still left agentic empty: a refusal,
+        # naming the count when the hour saw several, a shape change if one.
+        (["agentic"], (2, set()), "window"),
+        (["agentic"], (1, set()), "shape"),
+        # Every empty axis must trace (all, not any); intelligence and coding
+        # trace to no route, so their emptying never holds.
+        (["agentic", "parameters"], (4, {"detail", "evaluation"}), "hold"),
+        (["agentic", "parameters"], (3, {"evaluation"}), "window"),
+        (["intelligence", "parameters"], (3, {"detail", "evaluation"}), "window"),
+        (["coding"], (4, {"detail", "evaluation"}), "window"),
+        (["intelligence"], (4, {"detail", "evaluation"}), "window"),
+    )
+
+    def test_the_guard_holds_only_when_every_empty_axis_traces_to_a_withheld_route(self):
+        for empty, evidence, outcome in self.GUARD_TABLE:
+            with self.subTest(empty=empty, evidence=evidence):
+                if outcome is None:
+                    self.assertIsNone(build.guard_empty_axes(empty, evidence))
+                    continue
+                with self.assertRaises(build.WindowHold if outcome == "hold" else SystemExit) as raised:
+                    build.guard_empty_axes(empty, evidence)
+                message = str(raised.exception)
+                self.assertIn("no rows carry a score/cost pair for: " + ", ".join(empty) + " -- ", message)
+                self.assertEqual("holding the page" in message, outcome == "hold")
+                self.assertEqual("unchanged / window" in message, outcome == "hold")
+                # Only a capture recording no cross-generation window is a shape change.
+                self.assertEqual("changed shape" in message, outcome == "shape")
+                if evidence is not None and outcome != "shape":
+                    self.assertIn(f"{evidence[0]} generation(s) observed in-run", message)
+                self.assertEqual("re-read the GDPval-AA evaluation page" in message,
+                                 "agentic" in empty and outcome != "hold")
+
+    def test_a_held_hour_writes_no_page(self):
+        # main() raises the typed hold and writes nothing: the capture gate
+        # catches it on the fresh side and reports the hour unchanged,
+        # instead of the refusal's nonzero exit, which would go red although
+        # nothing is broken. One row per withheld route and the issue's
+        # four-generation hour with both; each row's capture empties exactly
+        # the axes its routes feed, read through main() from the data dir.
+        no_agentic = model_fixture(gdpval_cost=None)
+        no_parameters = model_fixture()
+        del no_parameters["parameters"]
+        both = dict(no_agentic)
+        del both["parameters"]
+        for model, generations, withheld, axes in (
+                (no_parameters, 3, "detail", "parameters"),
+                (no_agentic, 3, "evaluation", "agentic"),
+                (both, 4, "detail evaluation", "agentic, parameters")):
+            with self.subTest(axes=axes), self.capture([model], [agent_fixture()]) as output:
+                (output.parent / build.ROUTE_EVIDENCE_NAME).write_text(
+                    route_evidence(generations, withheld), encoding="utf-8")
+                with self.assertRaises(build.WindowHold) as raised:
+                    self.run_build()
+
+                self.assertIn(f"for: {axes} -- the capture records {generations} generation(s) "
+                              "observed in-run", str(raised.exception))
+                self.assertFalse(output.exists(), "hold still wrote the page")
+
+    def test_the_evidence_never_reaches_the_page(self):
+        # fetch_aa.py rewrites the evidence every hour and the capture gate
+        # compares rendered pages, so evidence that reached the page would
+        # make every hour whose count moved look like news and commit it.
+        # The same healthy capture builds byte-identical pages beside no
+        # evidence, a quiet hour's and a four-generation window's.
+        pages = []
+        for text in (None, route_evidence(1), route_evidence(4, "detail evaluation")):
+            with self.capture([model_fixture()], [agent_fixture()]) as output:
+                if text is not None:
+                    (output.parent / build.ROUTE_EVIDENCE_NAME).write_text(text, encoding="utf-8")
                 self.run_build()
+                pages.append(output.read_text(encoding="utf-8"))
+        self.assertEqual(pages[1], pages[0])
+        self.assertEqual(pages[2], pages[0])
 
-            message = str(raised.exception)
-            self.assertIn(
-                "no rows carry a score/cost pair for: parameters -- ", message)
-            self.assertIn("3 generation(s) observed in-run", message)
-            self.assertIn("unchanged / window", message)
-            self.assertIn("holding the page", message)
-            self.assertNotIn("changed shape", message)
-            self.assertFalse(output.exists(), "hold still wrote the page")
-
-    def test_a_converged_hour_with_an_empty_parameters_axis_still_refuses(self):
-        # Both-direction mutation check, one test: the same corner fixture built
-        # twice, at two generation counts. At 2 the hour is an ordinary
-        # (converged-by-count) window whose emptied axes the exemption does not
-        # cover, and the refusal stands; at 3 the hold fires. Dropping the `>= 3`
-        # condition from the hold predicate turns the first assertion red -- this
-        # pair is the mutation check.
-        corner = model_fixture()
-        del corner["parameters"]
-        marker = ("every cost breakdown dropped as another generation's: "
-                  "185 model(s), first apodex-1-1; {n} generation(s) observed "
-                  "in-run\n")
-        with self.capture([corner], [agent_fixture()]) as output:
-            (output.parent / "cost-breakdown-window.txt").write_text(
-                marker.format(n=2), encoding="utf-8")
-            with self.assertRaises(SystemExit) as raised:
-                self.run_build()
-
-            message = str(raised.exception)
-            self.assertIn("2 generation(s) observed in-run", message)
-            self.assertIn("records a cross-generation AA window", message)
-            self.assertNotIn("changed shape", message)
-            self.assertFalse(output.exists(), "refusal still wrote the page")
-
-        with self.capture([corner], [agent_fixture()]) as output:
-            (output.parent / "cost-breakdown-window.txt").write_text(
-                marker.format(n=3), encoding="utf-8")
-            with self.assertRaises(build.WindowHold):
-                self.run_build()
-
-            self.assertFalse(output.exists(), "hold still wrote the page")
-
-    def test_a_four_generation_window_with_the_corner_axes_still_holds(self):
-        # Kills a `>= 3` -> `== 3` mutant in the hold predicate: the hold
-        # is "three OR MORE generations observed in-run", so the same corner
-        # fixture under a 4-generation marker holds exactly like the 3 --
-        # same axes, same typed exception, same no-page outcome.
-        corner = model_fixture()
-        del corner["parameters"]
-        with self.capture([corner], [agent_fixture()]) as output:
-            (output.parent / "cost-breakdown-window.txt").write_text(
-                "every cost breakdown dropped as another generation's: "
-                "185 model(s), first apodex-1-1; 4 generation(s) observed "
-                "in-run\n", encoding="utf-8")
-            with self.assertRaises(build.WindowHold) as raised:
-                self.run_build()
-
-            message = str(raised.exception)
-            self.assertIn("4 generation(s) observed in-run", message)
-            self.assertIn("holding the page", message)
-            self.assertFalse(output.exists(), "hold still wrote the page")
-
-    def test_a_second_axis_emptied_at_three_generations_still_refuses(self):
-        # Kills a widened mutant (the emptied-axes check loosened to "parameters
-        # is among the empty axes"): intelligence is not window-droppable, so
-        # its emptying beside parameters at a 3-generation marker must still
-        # refuse -- naming the window -- never hold. The hold is only for the
-        # one state that self-heals; a dropped intelligence axis is a real
-        # shape change and stays the go-re-read-AA-by-hand red.
-        corner = model_fixture(intelligence=None)
-        del corner["parameters"]
-        with self.capture([corner], [agent_fixture()]) as output:
-            (output.parent / "cost-breakdown-window.txt").write_text(
-                "every cost breakdown dropped as another generation's: "
-                "185 model(s), first apodex-1-1; 3 generation(s) observed "
-                "in-run\n", encoding="utf-8")
-            with self.assertRaises(SystemExit) as raised:
-                self.run_build()
-
-            message = str(raised.exception)
-            self.assertIn(
-                "no rows carry a score/cost pair for: intelligence, parameters",
-                message)
-            self.assertIn("3 generation(s) observed in-run", message)
-            self.assertIn("records a cross-generation AA window", message)
-            self.assertNotIn("holding the page", message)
-            self.assertFalse(output.exists(), "refusal still wrote the page")
-
-    def test_a_counted_marker_with_a_fully_measured_capture_still_builds(self):
-        # Kills a vacuous-subset mutant of the hold predicate: set([]) <= {"parameters"}
-        # is true, so a check written that way would hold a FULLY measured capture
-        # beside a >= 3-generation marker instead of building it -- this row is what
-        # goes red under that mutant: the healthy pair builds, every axis nonzero.
-        with self.capture([model_fixture()], [agent_fixture()]) as output:
-            (output.parent / "cost-breakdown-window.txt").write_text(
-                "every cost breakdown dropped as another generation's: "
-                "185 model(s), first apodex-1-1; 3 generation(s) observed "
-                "in-run\n", encoding="utf-8")
-            self.run_build()
-
-            self.assertTrue(output.exists(), "hold swallowed a healthy hour")
-            stats = self.payload_of(output)["stats"]
-            self.assertEqual(
-                stats["metricCounts"], {"coding": 1, "intelligence": 1, "agentic": 1})
-            self.assertEqual(stats["parameterCount"], 1)
-
-    def run_cli_with_corner(self) -> tuple[subprocess.CompletedProcess,
-                                           pathlib.Path]:
+    def run_cli_with_corner(self, evidence=route_evidence(3, "detail")) -> tuple[
+            subprocess.CompletedProcess, pathlib.Path]:
         """The real command line over a corner capture, driven the way
         CorruptCaptureTests drives a truncated one: build.py copied into a
         throwaway tree beside a data/ directory holding the corner-shaped
-        capture, the 3-generation marker and the stamp -- exactly the layout
+        capture, its 3-generation evidence and the stamp -- exactly the layout
         the hourly refresh runs. Nothing outside the temp tree is touched;
         the copy resolves its own ROOT there."""
         with tempfile.TemporaryDirectory(
@@ -1243,10 +1213,8 @@ class WindowHoldTests(unittest.TestCase):
                 (PIPELINE_FIXTURES / "aa-raw-coding-agents.json").read_bytes())
             (root / "data" / "captured-at.txt").write_text(
                 self.STAMP, encoding="utf-8")
-            (root / "data" / "cost-breakdown-window.txt").write_text(
-                "every cost breakdown dropped as another generation's: "
-                "185 model(s), first apodex-1-1; 3 generation(s) observed "
-                "in-run\n", encoding="utf-8")
+            (root / "data" / build.ROUTE_EVIDENCE_NAME).write_text(
+                evidence, encoding="utf-8")
             proc = subprocess.run(
                 [sys.executable, str(root / "build.py")],
                 capture_output=True, text=True, timeout=120, check=False)
@@ -1266,6 +1234,38 @@ class WindowHoldTests(unittest.TestCase):
         self.assertFalse(
             (root / "out" / "frontier-models.html").exists(),
             "the held hour still wrote a page")
+
+    def test_the_cli_refuses_an_unexplained_window_hour_red(self):
+        # The same corner beside evidence that withheld no route: the real
+        # command line exits nonzero with the refusal on stderr, naming the
+        # count it saw and never a shape change, and writes no page.
+        proc, root = self.run_cli_with_corner(route_evidence(2))
+
+        self.assertEqual(proc.returncode, 1)
+        self.assertIn("for: parameters -- the capture records 2 generation(s) observed in-run",
+                      proc.stderr)
+        self.assertNotIn("changed shape", proc.stderr)
+        self.assertNotIn("unchanged / window", proc.stdout)
+        self.assertFalse((root / "out" / "frontier-models.html").exists(),
+                         "the refused hour still wrote a page")
+
+    def test_an_agentic_refusal_names_what_the_evaluation_read_did(self):
+        # The refusal's agentic note follows the evidence: a withheld
+        # evaluation matched no look; a joined one paired with no Elo. A
+        # one-generation hour keeps the shape note, which says either.
+        reread = " -- re-read the GDPval-AA evaluation page"
+        for empty, evidence, said in (
+                (["agentic", "intelligence"], (3, {"evaluation"}),
+                 "; agentic: the GDPval-AA evaluation read matched none of the run's "
+                 "leaderboard looks" + reread),
+                (["agentic"], (2, {"detail"}),
+                 "; agentic: the GDPval-AA evaluation read joined, yet no row pairs its "
+                 "cost with a GDPval-AA Elo" + reread),
+                (["agentic"], (1, set()), "matched none of the run's leaderboard generations, "
+                 "or its fields changed shape)" + reread)):
+            with self.subTest(evidence=evidence), self.assertRaises(SystemExit) as raised:
+                build.guard_empty_axes(empty, evidence)
+            self.assertIn(said, str(raised.exception))
 
 
 class MergeCapturesTests(unittest.TestCase):

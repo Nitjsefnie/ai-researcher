@@ -778,9 +778,9 @@ class ExecutedHoldProbeTests(unittest.TestCase):
         subprocess.run([*git, "commit", "-qm", "head"], env=seed_env,
                        check=True, capture_output=True)
         # The hour's raw material: the fresh capture, dirty against HEAD,
-        # and fetch_aa.py's window marker -- untracked-but-whitelisted, so
-        # `git checkout -- data/` cannot remove it. Exactly the tree state
-        # a real window hour leaves.
+        # and fetch_aa.py's route evidence -- untracked-but-whitelisted, so
+        # `git checkout -- data/` cannot remove it. The tree state an hour
+        # leaves while HEAD has no evidence committed.
         (repo / "data" / "aa-raw-models.json").write_text(self.FRESH, encoding="utf-8")
         (repo / "data" / "cost-breakdown-window.txt").write_text("3\n", encoding="utf-8")
 

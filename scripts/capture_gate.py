@@ -36,9 +36,9 @@ with the reason on stderr -- still exit 0, still one word of stdout.
 
 A second mode, the hold probe (`--fresh-held`): answers whether the FRESH
 capture is in the hold state -- `build.WindowHold` raised by a render of the
-fresh side alone. That exception fires only on the hold predicate (the marker
-records >= 3 generations in-run AND parameters is the only emptied axis), so
-the answer keys on exactly the evidence the hold mandates. `yes` (held) or
+fresh side alone. That exception fires only on the hold predicate (the route
+evidence records >= 2 generations in-run AND every emptied axis's route as
+withheld), so the answer keys on exactly that evidence. `yes` (held) or
 `no` (a page built) on stdout, exit 0 both ways; a refused capture (build's
 SystemExit), a missing fresh capture, or anything unexpected is broken, not
 held -- exit 1, the reason on stderr, the refresh run turns red. The workflow
@@ -74,7 +74,7 @@ import build  # noqa: E402  # pylint: disable=wrong-import-position
 MODELS_NAME = "aa-raw-models.json"
 AGENTS_NAME = "aa-raw-coding-agents.json"
 STAMP_NAME = "captured-at.txt"
-WINDOW_MARKER_NAME = "cost-breakdown-window.txt"
+WINDOW_MARKER_NAME = build.ROUTE_EVIDENCE_NAME
 GENERATION_STATE_NAME = "aa-generation-state.json"
 
 # Both gate builds suppress AI_RESEARCHER_AA_SOURCE_COMMIT and its fallback:
@@ -116,9 +116,9 @@ class FreshWindowHold(Exception):
     """The FRESH side of the gate held the page.
 
     build_page_pair raises it only for the fresh side; the old side raising
-    build.WindowHold propagates unwrapped and stays red -- HEAD never
-    carries a corner marker under this design, so that state is unexpected
-    and must fail loudly, never read as "unchanged".
+    build.WindowHold propagates unwrapped and stays red -- a held hour
+    never commits, so HEAD's capture empties no axis, and that state is
+    unexpected and must fail loudly, never read as "unchanged".
     """
 
 
@@ -248,17 +248,17 @@ def read_fresh_captures() -> tuple[bytes, bytes]:
 
 
 def read_head_window_marker() -> bytes | None:
-    """The window marker exactly as HEAD committed it, or None when absent.
+    """The route evidence exactly as HEAD committed it, or None when absent.
 
-    refresh.yml commits the marker beside the captures in a window hour, and
-    the first healthy hour's commit removes it again -- so None is the normal
-    hour's answer, and presence at HEAD means exactly that the committed
-    capture is a window capture. The old side stages it because build.py
-    reads it beside the capture; a committed capture plots every axis, so it
-    decides only a refusal's wording on a broken HEAD. Any _git_show failure
-    reads as None -- the captures were already read from the same tree by the
-    time this runs, so a plumbing failure here is unheard-of rather than a
-    state to distinguish.
+    fetch_aa.py writes the evidence every hour and refresh.yml commits it
+    beside the captures, so its CONTENT is the evidence; None (a HEAD
+    committed before that) reads as no recorded mismatch. The old side
+    stages it because build.py reads it beside the capture; a committed
+    capture plots every axis, so it decides only a refusal on a broken
+    HEAD. Any _git_show failure reads as None -- the captures were already
+    read from the same tree by the time this runs, so a plumbing failure
+    here is unheard-of rather than a state to distinguish, and it too
+    refuses an emptied axis.
     """
     try:
         return _git_show(f"data/{WINDOW_MARKER_NAME}")
@@ -267,7 +267,7 @@ def read_head_window_marker() -> bytes | None:
 
 
 def read_fresh_window_marker() -> bytes | None:
-    """The window marker as fetch_aa.py just wrote or cleared it, or None."""
+    """The route evidence as fetch_aa.py just wrote it, or None when absent."""
     try:
         return (ROOT / "data" / WINDOW_MARKER_NAME).read_bytes()
     except FileNotFoundError:
@@ -469,7 +469,7 @@ def main() -> int:
     try:
         old_page, new_page = build_page_pair(head, fresh)
     except FreshWindowHold as exc:
-        print("capture-gate: three-generation AA window -- the build held "
+        print("capture-gate: AA update window -- the build held "
               "the page: reporting the hour unchanged, the last good page "
               f"stays live ({exc})", file=sys.stderr)
         print("false")

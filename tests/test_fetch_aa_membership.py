@@ -287,17 +287,40 @@ def test_build_renders_detail_only_retirement_lab_speed_and_mismatch(
         build.main(generation_state=None)
 
 
-@pytest.mark.parametrize("rescued,eval_ii,outcome", [
-    ("no-extra", 51, "hold"), ("neither", 51, "hold"), ("parameters", 51, "publish"),
-    ("no-extra", 50, "refuse"),
-])
-def test_three_generation_window_uses_leaderboard_provenance(
-        tmp_path, monkeypatch, capsys, rescued, eval_ii, outcome):
-    """Real capture CLI through build: extras cannot erase a route window.
+# Each route mismatching each axis it feeds (issue #441): (look scores,
+# detail score, evaluation score, evaluation cost, the detail route's
+# parameter key, detail-only extras, outcome, the evidence the run records).
+ROUTE_ROWS = [
+    # Disputed looks: each withheld route empties its own axis and holds.
+    ((51, 52), 53, 51, 2.0, "parameters", "no-extra", "hold", (3, "yes", "no")),
+    ((51, 52), 53, 51, 2.0, "parameters", "neither", "hold", (3, "yes", "no")),
+    ((51, 52), 53, 51, 2.0, "parameters", "parameters", "publish", (3, "yes", "no")),
+    ((51, 52), 53, 50, 2.0, "parameters", "no-extra", "hold", (4, "yes", "yes")),
+    ((51, 52), 53, 50, 2.0, "parameters", "parameters", "hold", (4, "yes", "yes")),
+    ((51, 52), 51, 50, 2.0, "parameters", "no-extra", "hold", (3, "no", "yes")),
+    ((51, 52), 51, 51, 2.0, "parameters", "no-extra", "publish", (2, "no", "no")),
+    # A route that joined yet left its axis empty refuses; quiet looks join both.
+    ((51, 52), 51, 51, None, "parameters", "no-extra", "window", (2, "no", "no")),
+    ((51, 52), 51, 51, 2.0, "totalParameters", "no-extra", "window", (2, "no", "no")),
+    ((51, 51), 53, 51, 2.0, "totalParameters", "no-extra", "window", (2, "no", "no")),
+    ((51, 51), 51, 51, 2.0, "totalParameters", "no-extra", "shape", (1, "no", "no")),
+    ((51, 51), 51, 51, None, "parameters", "no-extra", "shape", (1, "no", "no")),
+    ((51, 51), 51, 51, None, "totalParameters", "no-extra", "shape", (1, "no", "no")),
+]
 
-    The GDPval read matching the first look gives the axis its costs; matching
-    neither look leaves it empty, which refuses rather than holds: the window
-    marker reports leaderboard breakdowns, which no GDPval cost comes from."""
+
+@pytest.mark.parametrize("row", ROUTE_ROWS, ids=[
+    f"{index}-{row[6]}-evidence-{row[7][0]}{row[7][1]}{row[7][2]}" for index, row in enumerate(ROUTE_ROWS)])
+def test_each_route_window_holds_or_refuses_by_its_recorded_evidence(tmp_path, monkeypatch, capsys, row):
+    """Real capture CLI through build: the evidence fetch_aa records decides.
+
+    A route that matched none of the run's leaderboard looks is withheld and
+    recorded; the axes it alone feeds (detail: parameters, evaluation:
+    agentic) empty and hold. A route that joined, or a quiet run whose
+    joins are unconditional, records nothing withheld, so an axis it leaves
+    empty refuses: naming the generation count when the run saw several,
+    as a shape change only when it saw one. Extras cannot erase a window."""
+    scores, detail_ii, eval_ii, eval_cost, params, rescued, outcome, evidence = row
     data = tmp_path / "data"
     data.mkdir()
     base, detail, methodology, agents = (tmp_path / name for name in
@@ -306,12 +329,13 @@ def test_three_generation_window_uses_leaderboard_provenance(
     if rescued != "parameters":
         retired.pop("parameters")
         retired.pop("intelligenceIndex")
-    detail_rows = [detail_record(ii=53)]
+    detail_rows = [detail_record(ii=detail_ii)]
+    detail_rows[0][params] = detail_rows[0].pop("parameters")
     if rescued != "no-extra":
         detail_rows.append(retired)
-    looks = [leaderboard(ii) for ii in (51, 52)]
-    for look in looks:
-        look[1]["scores"] = {"gdpval-aa-normalized": 900.0}
+    looks = [leaderboard(ii) for ii in scores]
+    for record in [look[1] for look in looks] + detail_rows[:1]:
+        record["scores"] = {"gdpval-aa-normalized": 900.0}
     base.write_text(page(looks[0], "initialModels"), encoding="utf-8")
     detail.write_text(page(detail_rows, "models"), encoding="utf-8")
     methodology.write_text(f"Artificial Analysis Intelligence Index v{fetch_aa.INDEX_VERSION}",
@@ -334,26 +358,22 @@ def test_three_generation_window_uses_leaderboard_provenance(
                                       "--methodology-html", str(methodology)])
     monkeypatch.setattr(fetch_aa, "_sleep", lambda _seconds:
                         base.write_text(page(looks[1], "initialModels"), encoding="utf-8"))
-    # Redirect only marker IO while exercising the real recording decision.
-    record_window = fetch_aa.record_cost_window
-    monkeypatch.setattr(fetch_aa, "record_cost_window", lambda priced, dropped, **kwargs:
-                        record_window(priced, dropped, data / "cost-breakdown-window.txt", **kwargs))
     monkeypatch.setattr(fetch_aa.fetch_gdpval, "fetch", lambda *_args: fetch_aa.fetch_gdpval.Evaluation(
-        [{"slug": "current", "intelligenceIndex": eval_ii}], {"current": 2.0}, "/data/gdpval.txt"))
+        [{"slug": "current", "intelligenceIndex": eval_ii}], {} if eval_cost is None else {"current": eval_cost},
+        "/data/gdpval.txt"))
     fetch_aa.main()
-    generations = 3 if eval_ii == 51 else 4
-    assert f"{generations} generation(s) observed in-run" in capsys.readouterr().out
-    if outcome == "hold":
-        with pytest.raises(build.WindowHold, match="3 generation\\(s\\) observed in-run"):
-            build.main(generation_state=None)
-        assert not output.exists()
-    elif outcome == "refuse":
-        with pytest.raises(SystemExit, match="for: agentic, parameters -- the capture records a "
-                           "cross-generation AA window, not a shape change: 4 generation"):
-            build.main(generation_state=None)
-        assert not output.exists()
-    else:
+    assert f"{evidence[0]} generation(s) observed in-run" in capsys.readouterr().out
+    assert (data / build.ROUTE_EVIDENCE_NAME).read_text(encoding="utf-8") == (
+        f"in-run generations: {evidence[0]}\ndetail fills withheld: {evidence[1]}\n"
+        f"evaluation costs withheld: {evidence[2]}\n")
+    if outcome == "publish":
         build.main(generation_state=None)
         assert output.exists()
-    assert (data / "cost-breakdown-window.txt").exists()
-    assert "changed shape" not in capsys.readouterr().out
+        return
+    with pytest.raises(build.WindowHold if outcome == "hold" else SystemExit) as raised:
+        build.main(generation_state=None)
+    assert not output.exists()
+    message = str(raised.value)
+    assert ("changed shape" in message) == (outcome == "shape")
+    assert ("holding the page" in message) == (outcome == "hold")
+    assert (f"{evidence[0]} generation(s) observed in-run" in message) == (outcome != "shape")
