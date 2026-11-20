@@ -287,9 +287,8 @@ def test_build_renders_detail_only_retirement_lab_speed_and_mismatch(
         build.main(generation_state=None)
 
 
-# Each route mismatching each axis it feeds (issue #441): (look scores,
-# detail score, evaluation score, evaluation cost, the detail route's
-# parameter key, detail-only extras, outcome, the evidence the run records).
+# Each route against each axis it feeds (issue #441): look scores, detail and evaluation
+# scores, evaluation cost, the detail parameter key, extras, outcome, recorded evidence.
 ROUTE_ROWS = [
     # Disputed looks: each withheld route empties its own axis and holds.
     ((51, 52), 53, 51, 2.0, "parameters", "no-extra", "hold", (3, "yes", "no")),
@@ -309,17 +308,12 @@ ROUTE_ROWS = [
 ]
 
 
-@pytest.mark.parametrize("row", ROUTE_ROWS, ids=[
-    f"{index}-{row[6]}-evidence-{row[7][0]}{row[7][1]}{row[7][2]}" for index, row in enumerate(ROUTE_ROWS)])
+@pytest.mark.parametrize("row", ROUTE_ROWS, ids=[f"{i}-{r[6]}-evidence-{r[7][0]}{r[7][1]}{r[7][2]}" for i, r in enumerate(ROUTE_ROWS)])
 def test_each_route_window_holds_or_refuses_by_its_recorded_evidence(tmp_path, monkeypatch, capsys, row):
     """Real capture CLI through build: the evidence fetch_aa records decides.
 
-    A route that matched none of the run's leaderboard looks is withheld and
-    recorded; the axes it alone feeds (detail: parameters, evaluation:
-    agentic) empty and hold. A route that joined, or a quiet run whose
-    joins are unconditional, records nothing withheld, so an axis it leaves
-    empty refuses: naming the generation count when the run saw several,
-    as a shape change only when it saw one. Extras cannot erase a window."""
+    A withheld route's axis, left empty, holds; a joined route (a quiet run joins
+    both) records nothing withheld, so an axis it leaves empty refuses."""
     scores, detail_ii, eval_ii, eval_cost, params, rescued, outcome, evidence = row
     data = tmp_path / "data"
     data.mkdir()

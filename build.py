@@ -877,28 +877,28 @@ def guard_empty_axes(empty: list[str], evidence: tuple[int, set[str]] | None) ->
     if not empty:
         return
     named = "no rows carry a score/cost pair for: " + ", ".join(sorted(empty)) + " -- "
-    reread = " -- re-read the GDPval-AA evaluation page" if "agentic" in empty else ""
+    agentic = "agentic" in empty
     # No evidence or one generation: no window to name; a quiet run joins the
     # evaluation unconditionally, so only absent evidence can "match none".
     if evidence is None or evidence[0] < 2:
-        cause = ("no GDPval-AA evaluation cost joined this capture (the evaluation read matched none "
-                 "of the run's leaderboard generations, or its fields changed shape)" if evidence is None
-                 else "the GDPval-AA evaluation read joined, as a quiet run's always does, yet no row "
-                 "pairs its cost with a GDPval-AA Elo: its fields changed shape")
+        note = ("no GDPval-AA evaluation cost joined this capture (the evaluation read matched none of the run's "
+                "leaderboard generations, or its fields changed shape) -- re-read the GDPval-AA evaluation page"
+                if evidence is None else "the GDPval-AA evaluation read joined, as a quiet run's always does, yet "
+                "no row pairs a GDPval-AA Elo with its cost: a field on the leaderboard or the evaluation read "
+                "changed shape or went empty -- re-read the leaderboard and the GDPval-AA evaluation page")
         raise SystemExit(named + "the AA capture changed shape; re-read the leaderboard rather than "
-                         "publishing an empty chart" + ("; agentic: " + cause + reread if reread else ""))
+                         "publishing an empty chart" + ("; agentic: " + note if agentic else ""))
     counted = f"the capture records {evidence[0]} generation(s) observed in-run"
     if all(AXIS_ROUTE.get(axis) in evidence[1] for axis in empty):
-        raise WindowHold(
-            "unchanged / window: " + named + counted + ", not a shape change: the route each of "
-            "these axes needs matched none of the run's leaderboard looks, and no honest page "
-            "exists to build -- holding the page: the last good page stays live, nothing "
-            "commits or publishes this hour, and the axes return when AA's routes converge")
+        raise WindowHold("unchanged / window: " + named + counted + ", not a shape change: the route each of these "
+                         "axes needs matched none of the run's leaderboard looks, and no honest page exists to build -- holding "
+                         "the page: the last good page stays live, nothing commits or publishes this hour, and the axes return "
+                         "when AA's routes converge")
     state = ("matched none of the run's leaderboard looks" if "evaluation" in evidence[1]
              else "joined, yet no row pairs its cost with a GDPval-AA Elo")
-    note = f"; agentic: the GDPval-AA evaluation read {state}{reread}" if reread else ""
-    raise SystemExit(named + counted + ", but no route it records as withheld explains "
-                     "every one of these axes -- re-read the AA leaderboard by hand" + note)
+    note = f"; agentic: the GDPval-AA evaluation read {state} -- re-read the GDPval-AA evaluation page"
+    raise SystemExit(named + counted + ", but no route it records as withheld explains every one of "
+                     "these axes -- re-read the AA leaderboard by hand" + (note if agentic else ""))
 
 
 def read_capture(path):
