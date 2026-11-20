@@ -919,7 +919,7 @@ class WindowMarkerStagingTests(unittest.TestCase):
         self.assertEqual((code, out), (0, "true\n"))
 
     def test_a_committed_window_hour_rebuilds_from_heads_marker(self):
-        # A window hour's commit carries the capture AND its marker; the
+        # A window hour's commit carries the capture AND its evidence; the
         # NEXT hour's old side rebuilds the published page, and the hour
         # answers on the data's own movement (here: a rendered move past
         # tolerance, so true).
@@ -986,8 +986,8 @@ class WindowMarkerStagingTests(unittest.TestCase):
     def test_the_fresh_marker_reader_converts_only_absence(self):
         # The None conversion against the real substrate, not a mock: a
         # marker missing from the live data dir reads as None -- a
-        # regression propagating the FileNotFoundError would turn every
-        # no-marker hour red through main()'s broad catch with the wrong
+        # regression propagating the FileNotFoundError would turn an
+        # evidence-less hour red through main()'s broad catch with the wrong
         # "capture broke the build" attribution.
         with tempfile.TemporaryDirectory() as tmp:
             root = pathlib.Path(tmp)
@@ -1003,7 +1003,7 @@ class WindowMarkerStagingTests(unittest.TestCase):
     def test_the_head_marker_reader_converts_git_failure_to_none(self):
         # Same pin for the HEAD side: ROOT pointed at a non-repo makes the
         # real `git show` in read_head_window_marker fail, and the failure
-        # reads as absent -- the normal hour's answer -- never as a build
+        # reads as absent -- a HEAD predating the evidence -- never as a build
         # break.
         with tempfile.TemporaryDirectory() as tmp:
             with mock.patch.object(capture_gate, "ROOT", pathlib.Path(tmp)):
