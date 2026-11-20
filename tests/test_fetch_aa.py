@@ -17,9 +17,11 @@ import urllib.request
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent / "scripts"))
 
+import pytest  # noqa: E402  # pylint: disable=wrong-import-position,wrong-import-order
 import fetch_aa  # noqa: E402  # pylint: disable=wrong-import-position
 import diff_aa  # noqa: E402  # pylint: disable=wrong-import-position
 import build  # noqa: E402  # pylint: disable=wrong-import-position
+import test_fetch_aa_membership as membership  # noqa: E402  # pylint: disable=wrong-import-position,wrong-import-order
 from test_build import v5_evaluations  # noqa: E402  # pylint: disable=wrong-import-position,wrong-import-order
 # Instant failures inside the 65 s page window: waits double from 5 s until the next (40 s) would pass it.
 FAST_FAIL_WAITS = [5, 10, 20]
@@ -266,40 +268,29 @@ class CostBreakdownTests(unittest.TestCase):
         self.assertIn("dropped-0", message)
         self.assertNotIn("schema changed", message)
 
-    def test_the_window_marker_is_written_on_a_window_and_cleared_after(self):
-        # The capture step records the window state to a sidecar marker so
-        # the build layer can tell a window hour from a broken capture (issue
-        # #217). Window on: the file appears with ONE human-readable line.
-        # Window off: the file goes, so a stale marker can never outlive its
-        # hour. Clearing when it is already absent is not an error -- that is
-        # the common hour, and the schema sys.exit paths run before any
-        # record call, so a schema-broken run never leaves a marker. Since
-        # #223 the line also carries the observed in-run generation count
-        # when the caller supplies one -- the build layer's refusal reads
-        # that integer, so a window hour that empties an axis outside the
-        # #232 hold names the window instead of blaming a shape change.
+    def test_the_route_evidence_is_recorded_every_hour(self):
+        # The capture step records the route evidence beside the capture on
+        # EVERY hour (issue #441), the quiet one included, replacing the
+        # previous hour's: the build's hold reads its content, so a window
+        # hour's evidence must never outlive its hour. Each hour's Capture
+        # fields reach the file, and the build layer reads back exactly them.
         with tempfile.TemporaryDirectory() as tmp:
-            marker = pathlib.Path(tmp) / "cost-breakdown-window.txt"
-
-            fetch_aa.record_cost_window(
-                0, ["dropped-0", "dropped-1"], marker, generations=3)
-            note = marker.read_text(encoding="utf-8")
-            self.assertIn("every leaderboard cost breakdown dropped", note)
-            self.assertIn("dropped-0", note)
-            self.assertIn("; 3 generation(s) observed in-run", note)
-            self.assertEqual(len(note.splitlines()), 1)
-
-            fetch_aa.record_cost_window(0, ["dropped-2"], marker)
-            self.assertNotIn(
-                "generation(s) observed in-run",
-                marker.read_text(encoding="utf-8"),
-                "a countless hour must not inherit the previous one's count")
-
-            fetch_aa.record_cost_window(2, ["dropped-3"], marker)
-            self.assertFalse(marker.exists(), "stale marker outlived its hour")
-
-            fetch_aa.record_cost_window(2, [], marker)
-            self.assertFalse(marker.exists())
+            out = pathlib.Path(tmp) / "aa-raw-models.json"
+            evidence = out.with_name("cost-breakdown-window.txt")
+            hours = ((4, True, True, {"detail", "evaluation"}), (3, False, True, {"evaluation"}),
+                     (3, True, False, {"detail"}), (1, False, False, set()))
+            with unittest.mock.patch.object(fetch_aa, "OUT", out):
+                for generations, detail, evaluation, withheld in hours:
+                    fetch_aa.record_route_evidence(fetch_aa.Capture(
+                        [], "host", None, generations, False, fetch_aa.CrossRun([], []), None,
+                        detail, evaluation))
+                    self.assertEqual(build.read_route_evidence(evidence.parent),
+                                     (generations, withheld))
+            self.assertEqual(evidence.read_text(encoding="utf-8"),
+                             "in-run generations: 1\ndetail fills withheld: no\n"
+                             "evaluation costs withheld: no\n")
+            self.assertEqual(sorted(p.name for p in evidence.parent.iterdir()),
+                             ["cost-breakdown-window.txt"], "a temp file outlived the write")
 
     def refused_breakdown(self, evaluations):
         """The slug check's refusal message for one model whose parts still
@@ -396,48 +387,49 @@ class CostBreakdownTests(unittest.TestCase):
         self.assertIn("schema changed", str(caught.exception))
 
 
-class WindowMarkerSpanTests(unittest.TestCase):
-    """The marker filename is a three-leg contract, and each leg has a test
-    on its own side -- but nothing held the legs together. The producer
-    writes under fetch_aa.COST_WINDOW_MARKER, the build layer's reader
-    accepts that name by its own literal, and the deny-by-default .gitignore
-    must carry the negation for the same name or the marker is invisible to
-    git. One span test: a rename on any leg fails here instead of silently
-    orphaning the other two (review finding, issue #217).
+class CaptureWithheldTests(unittest.TestCase):
+    """Which reads capture() records as withheld (issue #441).
+
+    Only a disputed run's read that matched neither look is withheld; a
+    quiet run joins both reads whatever generation they are, and a run
+    that read no evaluation at all has no evaluation read to withhold.
     """
 
-    def test_producer_consumer_and_gitignore_share_one_marker_name(self):
+    def test_only_a_disputed_runs_unjoined_reads_are_withheld(self):
+        # (look scores, detail score, generations, (detail, evaluation) withheld):
+        # the detail read matching either look joins; no loader reads no evaluation.
+        for scores, detail_ii, generations, withheld in (
+                ((51, 51), 53, 2, (False, False)), ((51, 52), 53, 3, (True, False)),
+                ((51, 52), 51, 2, (False, False)), ((51, 52), 52, 2, (False, False))):
+            looks = [membership.leaderboard(ii) for ii in scores]
+            detail = [membership.detail_record(ii=detail_ii)]
+            for record in [look[1] for look in looks] + detail:
+                record["scores"] = {"gdpval-aa-normalized": 900.0}
+            with self.subTest(scores=scores, detail_ii=detail_ii), \
+                    tempfile.TemporaryDirectory() as tmp, pytest.MonkeyPatch.context() as patch:
+                captured = membership.capture_pages(pathlib.Path(tmp), patch, looks[0], looks[1], detail)
+                self.assertEqual((captured.generations, captured.detail_withheld,
+                                  captured.evaluation_withheld), (generations, *withheld))
+
+
+class WindowMarkerSpanTests(unittest.TestCase):
+    """The evidence filename is a three-leg contract, and each leg has a
+    test on its own side -- but nothing held the legs together. The producer
+    writes beside OUT under build.ROUTE_EVIDENCE_NAME, the build layer's
+    reader opens that name (test_the_route_evidence_is_recorded_every_hour
+    holds those two legs to the literal name), and the deny-by-default
+    .gitignore must carry the negation for the same name or the evidence is
+    invisible to git. A rename on any leg fails a span test instead of
+    silently orphaning the other two (review finding, issue #217).
+    """
+
+    def test_producer_consumer_and_gitignore_share_one_evidence_name(self):
         # Passes as written against the shipped code -- the pin exists so a
         # future rename on any leg fails, not to drive a change.
-        with tempfile.TemporaryDirectory() as tmp:
-            data_dir = pathlib.Path(tmp)
-
-            fetch_aa.record_cost_window(
-                0, ["x"], data_dir / fetch_aa.COST_WINDOW_MARKER.name)
-
-            self.assertTrue(build.cost_breakdown_window(data_dir))
-
+        self.assertEqual(build.ROUTE_EVIDENCE_NAME, "cost-breakdown-window.txt")
         gitignore = (pathlib.Path(fetch_aa.ROOT) / ".gitignore").read_text(
             encoding="utf-8")
-        self.assertIn(f"!/data/{fetch_aa.COST_WINDOW_MARKER.name}", gitignore)
-
-    def test_the_generation_count_round_trips_from_producer_to_reader(self):
-        # Issue #223's second contract leg: the integer record_cost_window
-        # writes into the marker is the integer build.py's refusal reads.
-        # The name was already pinned leg-by-leg above; this pins the
-        # FORMAT -- a producer rename or reformat must fail here, not as a
-        # "generation count not recorded" refusal on the next window hour.
-        with tempfile.TemporaryDirectory() as tmp:
-            data_dir = pathlib.Path(tmp)
-
-            fetch_aa.record_cost_window(
-                0, ["x"], data_dir / fetch_aa.COST_WINDOW_MARKER.name,
-                generations=3)
-            self.assertEqual(build.window_generations(data_dir), 3)
-
-            fetch_aa.record_cost_window(
-                0, ["y"], data_dir / fetch_aa.COST_WINDOW_MARKER.name)
-            self.assertIsNone(build.window_generations(data_dir))
+        self.assertIn(f"!/data/{build.ROUTE_EVIDENCE_NAME}", gitignore)
 
 
 def agent_row(label: str, score: float | None = 0.64,
@@ -776,6 +768,9 @@ class CaptureGapFillWiringTests(unittest.TestCase):
             # The methodology page is plain HTML -- the pin reads the page
             # text directly, no flight wrapper (issue #220).
             pages[3].write_text(methodology_html(), encoding="utf-8")
+            # A window hour's evidence left beside the previous capture.
+            (root / build.ROUTE_EVIDENCE_NAME).write_text(
+                build.render_route_evidence(4, True, True), encoding="utf-8")
             old = (fetch_aa.ROOT, fetch_aa.OUT, fetch_aa.AGENTS_OUT,
                    fetch_aa.STAMP)
             argv = sys.argv
@@ -795,6 +790,7 @@ class CaptureGapFillWiringTests(unittest.TestCase):
                         unittest.mock.patch.object(fetch_aa, "_sleep",
                                                    side_effect=lambda s: None):
                     legacy_main()
+                evidence = (root / build.ROUTE_EVIDENCE_NAME).read_text(encoding="utf-8")
             finally:
                 sys.argv = argv
                 (fetch_aa.ROOT, fetch_aa.OUT, fetch_aa.AGENTS_OUT,
@@ -808,6 +804,10 @@ class CaptureGapFillWiringTests(unittest.TestCase):
         # Issue #208: the run's one-line generation summary, quiet shape.
         self.assertIn("1 generation(s) observed in-run; 0 models carry "
                       "disputed values", stdout)
+        # Issue #441: the quiet hour records its own evidence too, so the
+        # previous window hour's cannot outlive its hour.
+        self.assertEqual(evidence, "in-run generations: 1\ndetail fills withheld: no\n"
+                                   "evaluation costs withheld: no\n")
 
     def test_the_capture_log_stays_honest_when_the_page_names_no_version(self):
         # Contract b, end to end: a methodology page with no version string

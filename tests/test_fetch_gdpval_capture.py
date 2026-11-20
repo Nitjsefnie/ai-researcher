@@ -257,10 +257,7 @@ def _main_files(tmp_path, monkeypatch, content=None):
     for name, path in paths.items():
         monkeypatch.setattr(fetch_aa, name, path)
     monkeypatch.setattr(fetch_aa, "_sleep", lambda _: None)
-    marker = tmp_path / "window.txt"
-    record = fetch_aa.record_cost_window
-    monkeypatch.setattr(fetch_aa, "record_cost_window", lambda priced, dropped, **kwargs:
-                        record(priced, dropped, marker, **kwargs))
+    marker = paths["OUT"].with_name(fetch_aa.ROUTE_EVIDENCE_NAME)
     args = ["fetch_aa.py", "--html", str(base), "--detail-html", str(detail),
             "--agents-html", str(agents), "--methodology-html", str(method),
             "--gdpval-html", str(evaluation), "--gdpval-data", str(data)]

@@ -51,7 +51,13 @@ ROOT_FOR_IMPORT = pathlib.Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT_FOR_IMPORT))
 
 from build import (  # noqa: E402  # pylint: disable=wrong-import-position
-    INDEX_EVAL_WEIGHTS, INDEX_VERSION, SUM_TOLERANCE, gdpval_elo, merge_captures,
+    INDEX_EVAL_WEIGHTS,
+    INDEX_VERSION,
+    ROUTE_EVIDENCE_NAME,
+    SUM_TOLERANCE,
+    gdpval_elo,
+    merge_captures,
+    render_route_evidence,
 )
 
 URL = "https://artificialanalysis.ai/leaderboards/models"
@@ -306,9 +312,8 @@ def check_cost_breakdown(models: list[dict]) -> tuple[int, list[str]]:
     routes converge (issue #200). When the merge dropped EVERY breakdown, the
     hour is a cross-generation window the merge is holding honest through, not
     a schema change: it is reported and returned as (0, dropped). These are
-    whole-union validation counts; main() separately counts leaderboard
-    members for the window marker, so detail-only prices cannot erase the
-    window (issue #266).
+    whole-union validation counts, reported in the capture log; the build's
+    hold reads the route evidence main() records instead (issue #441).
     """
     checked = 0
     dropped: list[str] = []
@@ -353,44 +358,6 @@ def check_cost_breakdown(models: list[dict]) -> tuple[int, list[str]]:
             return 0, dropped
         sys.exit("no model carries a cost breakdown -- schema changed")
     return checked, dropped
-
-
-# The sidecar marker for the leaderboard's all-dropped window (issue #217).
-# main validates the whole union but scopes these counts to leaderboard
-# models, so detail-only prices cannot erase route provenance (issue #266).
-COST_WINDOW_MARKER = ROOT / "data" / "cost-breakdown-window.txt"
-
-
-def record_cost_window(priced: int, dropped: list[str],
-                       path: pathlib.Path = COST_WINDOW_MARKER, *,
-                       generations: int | None = None) -> None:
-    """Record -- or clear -- the all-dropped window marker beside the capture.
-
-    `priced` and `dropped` describe leaderboard models after validating the
-    whole union (issue #266); detail-only records do not establish or clear
-    this evidence. A window hour (priced == 0 with non-empty `dropped`) writes
-    the file with ONE human-readable line -- count and first dropped slug,
-    plus the in-run generation count when the caller supplies one (issue
-    #223: the build layer's refusal reads it, so a window hour that empties
-    an axis outside the #232 hold names the window instead of blaming a
-    capture shape change). The line stays a git-history note first: nothing
-    from the file is page input, build.py reads EXISTENCE plus this one
-    integer, and no marker text is ever interpolated into the page. Any other
-    hour removes the file (missing_ok=True), so a stale marker can never
-    outlive its own hour. The function guarantees only what its arguments
-    say: the schema sys.exit paths live in check_cost_breakdown, and a
-    schema-broken run escapes there only because main() records the returned
-    verdict -- call order, not a property of this function.
-    """
-    if priced == 0 and dropped:
-        count = (f"; {generations} generation(s) observed in-run"
-                 if generations is not None else "")
-        path.write_text(
-            f"every leaderboard cost breakdown dropped as another generation's: "
-            f"{len(dropped)} model(s), first {dropped[0]}{count}\n",
-            encoding="utf-8")
-        return
-    path.unlink(missing_ok=True)
 
 
 def detail_host_slug(models: list[dict]) -> str:
@@ -916,8 +883,10 @@ class Capture(typing.NamedTuple):
     evaluation read that matches neither look. `disputed` says the written
     corpus carries genVariants, including cross-run presence and revisit
     holds; it can be true even when this run's two looks agree.
-    `leaderboard_slugs` is the union of the looks' membership, used only to
-    scope window evidence; it is not written into the captured AA records.
+    `detail_withheld` and `evaluation_withheld` say a disputed run's detail
+    or evaluation read matched neither look, so no generation took its
+    fills or costs; main() records them, with `generations`, as the route
+    evidence the build's hold reads (issue #441).
     """
 
     models: list
@@ -929,8 +898,8 @@ class Capture(typing.NamedTuple):
     # look-back was not engaged or found no presence diff.
     cross_run: CrossRun = CrossRun([], [])
     revisit_action: str | None = None
-    # Window evidence belongs to leaderboard models, not detail-only prices.
-    leaderboard_slugs: frozenset[str] = frozenset()
+    detail_withheld: bool = False
+    evaluation_withheld: bool = False
     fetched: tuple = ()  # this run's reads, before any cross-run layer
 
 
@@ -982,6 +951,14 @@ def capture(cached_base: str | None, cached_detail: str | None,
 
     With prev_records, a final carry_detail_fills pass restores withheld
     detail enrichment without changing any layer's decisions or corpora.
+
+    Issue #441 records which reads joined no generation. A disputed run's
+    detail or evaluation read matching neither look is withheld
+    (Capture.detail_withheld, Capture.evaluation_withheld) and counts one
+    more in-run generation; a quiet run joins both reads unconditionally and
+    withholds neither, whatever generation they are. main() writes the
+    flags and the count as the route evidence build.py's hold reads; the
+    carry pass above can still refill parameters, never a GDPval-AA cost.
     """
     version = check_index_version(
         fetch_html(cached_methodology, METHODOLOGY_URL))
@@ -1012,7 +989,7 @@ def capture(cached_base: str | None, cached_detail: str | None,
              if isinstance(r.get("slug"), str) and r.get("slug") in keep],
             fields)
 
-    look1_key, look2_key = [keyed(look, slugs[0] & slugs[1]) for look in (look1, look2)]
+    looks_agree = keyed(look1, slugs[0] & slugs[1]) == keyed(look2, slugs[0] & slugs[1])
 
     detail_slugs = {m.get("slug") for m in detail
                     if isinstance(m.get("slug"), str)}
@@ -1037,7 +1014,7 @@ def capture(cached_base: str | None, cached_detail: str | None,
         eval_slugs = {r["slug"] for r in evaluation.records if isinstance(r.get("slug"), str)}
 
     run_corpora: list[list[dict]]
-    if look1_key == look2_key and slugs[0] == slugs[1]:
+    if looks_agree and slugs[0] == slugs[1]:
         # One leaderboard generation: today's merge, byte for byte, with
         # the detail route filling what the leaderboard omits whatever
         # generation the detail corpus itself is (issue #200).
@@ -1046,6 +1023,10 @@ def capture(cached_base: str | None, cached_detail: str | None,
         generations = 1 + (0 if same_generation(look1, slugs[0], detail, detail_slugs, universe) else 1)
         run_corpora = [models]
         eval_matches = [True]
+        # A quiet run joins the detail corpus here and the evaluation's
+        # costs below unconditionally, so neither read is withheld, even when
+        # the detail corpus counted a second generation.
+        withheld = (False, False)
     else:
         # The looks disagree on a published value, or on WHICH SLUGS the
         # generation carries (issue #211): a model present in one look and
@@ -1072,8 +1053,13 @@ def capture(cached_base: str | None, cached_detail: str | None,
                        for corpus, matched in zip(corpora, eval_matches)]
         models = cross_generation_merge(corpora, rank_universe)
         disputed = any("genVariants" in m for m in models)
-        generations = 2 + (0 if matches1 or matches2 else 1) + (
-            0 if evaluation is None or any(eval_matches) else 1)
+        # A read matching neither look joined no generation: it is
+        # withheld, and counts one more generation observed in-run.
+        withheld = (
+            not (matches1 or matches2),
+            evaluation is not None and not any(eval_matches),
+        )
+        generations = 2 + sum(withheld)
         run_corpora = corpora
 
     # Issue #266: membership is the union of both routes. Append detail-only
@@ -1123,8 +1109,30 @@ def capture(cached_base: str | None, cached_detail: str | None,
             models, prev_records,
             universe | HELD_SPEED_FIELDS if rendering_hold else universe)
     return Capture(models, host, version, generations, disputed, cross_run,
-                   revisit_action, frozenset(s for s in listed if isinstance(s, str)),
-                   fetched)
+                   revisit_action,
+                   detail_withheld=withheld[0],
+                   evaluation_withheld=withheld[1],
+                   fetched=fetched)
+
+
+def record_route_evidence(captured: Capture) -> None:
+    """Write this run's route evidence beside the capture, every hour.
+
+    The text (build.render_route_evidence) records the in-run generation
+    count and Capture's two withheld flags; build.py decides hold-or-refuse
+    from it alone (issue #441). main() writes it after the captures, so a
+    run that refuses earlier leaves the previous hour's evidence beside the
+    previous hour's capture. A quiet run records neither flag, its joins
+    being unconditional; a HEAD committed before this file existed carries
+    none, which the build reads as no recorded mismatch.
+    """
+    text = render_route_evidence(
+        captured.generations,
+        captured.detail_withheld,
+        captured.evaluation_withheld,
+    )
+    path = OUT.with_name(ROUTE_EVIDENCE_NAME)
+    write_atomic(path, text)
 
 
 def load_previous_capture() -> list | None:
@@ -1179,21 +1187,13 @@ def main() -> None:
     models = captured.models
     priced, dropped = check_cost_breakdown(models)
     check_breakdown_slugs(list(captured.fetched))
-    # All records were validated above. Only leaderboard records establish
-    # the route window: a detail-only breakdown cannot clear that provenance
-    # merely by existing, whether or not it renders an axis.
-    window_models = [m for m in models if m.get("slug") in captured.leaderboard_slugs]
-    window_priced = sum(isinstance(m.get("intelligenceIndexCostPerTask"), dict)
-                        for m in window_models)
-    window_dropped = [label(m) for m in window_models
-                      if _number(m.get("intelligenceIndexCostPerTask")) is not None]
-    record_cost_window(window_priced, window_dropped, generations=captured.generations)
     agents_text = fetch_html(args.agents_html, AGENTS_URL)
     agents = coding_agent_rows(flight_payload(agents_text))
 
     OUT.parent.mkdir(parents=True, exist_ok=True)
     write_atomic(OUT, json.dumps(models, indent=1))
     write_atomic(AGENTS_OUT, json.dumps(agents, indent=1))
+    record_route_evidence(captured)
     if revisit_state is not None:
         write_atomic(OUT.with_name(GENERATION_STATE_FILE),
                      json.dumps(revisit_state, sort_keys=True, indent=1) + "\n")
@@ -1215,9 +1215,9 @@ def main() -> None:
           "value wins wherever both routes carry the field)")
     # The run's one-line generation summary: how many distinct
     # generations this run's leaderboard, detail and evaluation reads
-    # observed (Capture.generations), and how many records the
-    # dispute layer holds. The quiet hour prints the 1 / 0 shape the
-    # capture-log test pins.
+    # observed (Capture.generations, the count the route evidence written
+    # above records), and how many records the dispute layer holds. The
+    # quiet hour prints the 1 / 0 shape the capture-log test pins.
     disputed = sum(1 for m in models if "genVariants" in m)
     print(f"{captured.generations} generation(s) observed in-run; "
           f"{disputed} models carry disputed values")

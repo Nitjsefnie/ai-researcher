@@ -70,8 +70,8 @@
 !/data/openrouter-trending.json
 # GitHub most-starred top-10 list; not AA capture data and not page input.
 !/data/github-stars.json
-# fetch_aa.py's all-dropped cost-breakdown window marker (issue #217):
-# pipeline state the build reads by existence, never page input.
+# fetch_aa.py's hourly route evidence (issues #217, #441): pipeline
+# state the build reads by content, never page input.
 !/data/cost-breakdown-window.txt
 
 # ---- out/ — the published page --------------------------------------------

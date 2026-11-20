@@ -148,7 +148,7 @@ def check_ignore(flags, path):
 
 # Synthetic probe paths: no real artifact would ever carry them. The data
 # block names the AA captures, the trending lists, `captured-at.txt`
-# and the optional cost-window marker; out/ names exactly one page. A future
+# and the route-evidence file; out/ names exactly one page. A future
 # legitimate negation names a concrete path, so it cannot match a synthetic
 # name and turn these probes falsely red. Any edit broad enough to un-deny a
 # probe flips the verdict -- a wholesale `!/data/*` (the issue's own repro) or

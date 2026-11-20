@@ -801,20 +801,20 @@ def corner_capture(models: bytes) -> bytes:
     return json.dumps(parsed, indent=1).encode("utf-8")
 
 
-WINDOW_MARKER = ("every cost breakdown dropped as another generation's: "
-                 "185 model(s), first apodex-1-1; 3 generation(s) observed "
-                 "in-run\n").encode("utf-8")
+WINDOW_MARKER = ("in-run generations: 3\n"
+                 "detail fills withheld: yes\n"
+                 "evaluation costs withheld: no\n").encode("utf-8")
 
-CONVERGED_WINDOW_MARKER = ("every cost breakdown dropped as another "
-                           "generation's: 185 model(s), first apodex-1-1; "
-                           "2 generation(s) observed in-run\n").encode("utf-8")
+CONVERGED_WINDOW_MARKER = ("in-run generations: 2\n"
+                           "detail fills withheld: no\n"
+                           "evaluation costs withheld: no\n").encode("utf-8")
 
 
 class WindowMarkerStagingTests(unittest.TestCase):
-    """The marker staged into the temp data dirs is what makes the
-    three-generation hold and the refusal wording reachable on the GATE
-    path, which tests calling build.py directly never reach. Each side
-    stages its OWN source's marker (HEAD's from git, the hour's from
+    """The route evidence staged into the temp data dirs is what makes the
+    window hold and the refusal wording reachable on the GATE path, which
+    tests calling build.py directly never reach. Each side stages its OWN
+    source's evidence (HEAD's from git, the hour's from
     data/)."""
 
     def test_the_corner_holds_through_the_gate(self):
@@ -845,8 +845,8 @@ class WindowMarkerStagingTests(unittest.TestCase):
 
     def test_a_converged_parameters_empty_hour_stays_red_through_the_gate(self):
         # The gate must not start swallowing converged hours: the SAME corner
-        # capture with a 2-generation marker still refuses (the count is below
-        # the hold's threshold), and the gate relays that refusal as
+        # capture whose evidence withheld no route still refuses (nothing
+        # explains the empty axis), and the gate relays that refusal as
         # broken-red -- the paired mutation check to the build-side test
         # above.
         err = io.StringIO()
@@ -867,9 +867,9 @@ class WindowMarkerStagingTests(unittest.TestCase):
 
     def test_a_held_page_at_HEAD_is_red_not_unchanged(self):
         # The typed exception is a FRESH-side answer only: an old-side
-        # build.WindowHold propagates unwrapped and fails loudly -- HEAD
-        # never carries a corner marker under this design, so that state is
-        # unexpected and must never read as "unchanged".
+        # build.WindowHold propagates unwrapped and fails loudly -- a held
+        # hour never commits, so a held capture at HEAD is unexpected and
+        # must never read as "unchanged".
         err = io.StringIO()
         with head_serving(corner_capture(FIXTURE_MODELS), FIXTURE_AGENTS), \
              mock.patch.object(capture_gate, "read_head_window_marker",
@@ -884,9 +884,9 @@ class WindowMarkerStagingTests(unittest.TestCase):
         self.assertEqual(code, 1)
 
     def test_no_marker_staged_the_shape_change_wording_stands(self):
-        # The wording split itself: the same corner capture with NO marker
+        # The wording split itself: the same corner capture with NO evidence
         # recorded is a shape change to build.py, and the gate relays that
-        # wording verbatim. The marker's presence is the whole difference.
+        # wording verbatim. The recorded evidence is the whole difference.
         err = io.StringIO()
         with head_serving(FIXTURE_MODELS, FIXTURE_AGENTS), \
              mock.patch.object(capture_gate, "read_head_window_marker",
@@ -966,11 +966,11 @@ class WindowMarkerStagingTests(unittest.TestCase):
         self.assertEqual((code, out), (0, "false\n"))
 
     def test_the_first_healthy_hour_after_a_window_heals(self):
-        # Window ended: fetch cleared the marker, HEAD still tracks it, the
-        # fresh capture is healthy. The old window page vs the new page
-        # differs, so the hour commits -- and its payload leaves the marker
-        # out, which is what the workflow's `git rm` branch removes (pinned
-        # in test_refresh_workflow.py).
+        # Window ended: fetch recorded a quiet hour, HEAD still carries the
+        # window's evidence, the fresh capture is healthy. The old window
+        # page vs the new page differs, so the hour commits, carrying the
+        # quiet evidence over the window's (the workflow's add branch,
+        # pinned in test_refresh_workflow.py).
         head = window_capture(FIXTURE_MODELS)
         with head_serving(head, FIXTURE_AGENTS), \
              mock.patch.object(capture_gate, "read_head_window_marker",
@@ -978,7 +978,7 @@ class WindowMarkerStagingTests(unittest.TestCase):
              mock.patch.object(capture_gate, "read_fresh_captures",
                                return_value=(FIXTURE_MODELS, FIXTURE_AGENTS)), \
              mock.patch.object(capture_gate, "read_fresh_window_marker",
-                               return_value=None):
+                               return_value=CONVERGED_WINDOW_MARKER.replace(b"2", b"1")):
             code, out = run_gate()
 
         self.assertEqual((code, out), (0, "true\n"))
@@ -1014,7 +1014,7 @@ class FreshHoldProbeTests(unittest.TestCase):
     """The --fresh-held probe the refresh verdict consumes.
 
     The probe answers ONE question about the FRESH capture alone -- is it
-    in the #232 hold state? -- from the typed exception a fresh-side render
+    in the hold state? -- from the typed exception a fresh-side render
     raises. These pins run held_main() over the same patched reads the
     gate tests use: a held capture answers yes, any capture that builds a
     page answers no, and every broken shape (a refused capture, a missing
@@ -1083,8 +1083,8 @@ class FreshHoldProbeTests(unittest.TestCase):
         self.assertEqual(err, "")
 
     def test_a_converged_corner_capture_is_refused_not_held(self):
-        # PROBE-LAYER PIN: handed a CONVERGED (2-generation) corner capture --
-        # the marker plus the corner axes -- the probe itself relays the
+        # PROBE-LAYER PIN: handed a CONVERGED corner capture -- evidence
+        # withholding no route plus the corner axes -- the probe relays the
         # refusal: exit 1, the reason on stderr, no answer on stdout. A probe
         # that answered yes here would hold a genuinely broken hour green. The
         # WORKFLOW never brings this shape to the probe -- the no-argument gate

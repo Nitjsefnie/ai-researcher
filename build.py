@@ -812,51 +812,93 @@ def generation_hold_note(data_dir: pathlib.Path, raw: bytes | None | EllipsisTyp
     return f' <span id="generation-hold">held since {since}</span>'
 
 
-def cost_breakdown_window(data_dir: pathlib.Path) -> bool:
-    """Whether fetch_aa.py left the all-dropped window marker.
+# The route evidence fetch_aa.py writes beside every capture (issue #441):
+# rendered and parsed only here, so the writer and the reader share one text.
+ROUTE_EVIDENCE_NAME = "cost-breakdown-window.txt"
+ROUTE_EVIDENCE_RE = re.compile(r"in-run generations: ([1-9][0-9]*)\n"
+                               r"detail fills withheld: (yes|no)\n"
+                               r"evaluation costs withheld: (yes|no)\n")
+# The route whose withheld join alone empties an axis; intelligence and coding
+# ride routes no generation evidence covers, so their emptying never holds.
+AXIS_ROUTE = {"parameters": "detail", "agentic": "evaluation"}
 
-    fetch_aa.py writes data/cost-breakdown-window.txt when the merge
-    dropped the leaderboard models' cost breakdowns -- an AA window, not a
-    schema change. EXISTENCE is the whole signal: the file's one-line content
-    is a git-history note for a human, and nothing from it reaches the page.
-    (The stamp is validated exactly because it IS rendered; nothing here is.)
-    """
-    return (data_dir / "cost-breakdown-window.txt").exists()
+
+def render_route_evidence(generations: int, detail_withheld: bool,
+                          evaluation_withheld: bool) -> str:
+    """The evidence text: the in-run generation count, and whether the
+    detail route's fills and the GDPval-AA evaluation's costs were withheld
+    because the route matched none of the run's leaderboard looks."""
+    return (f"in-run generations: {generations}\n"
+            f"detail fills withheld: {'yes' if detail_withheld else 'no'}\n"
+            f"evaluation costs withheld: {'yes' if evaluation_withheld else 'no'}\n")
 
 
-def window_generations(data_dir: pathlib.Path) -> int | None:
-    """The in-run generation count the window marker records, or None.
+def read_route_evidence(data_dir: pathlib.Path) -> tuple[int, set[str]] | None:
+    """(in-run generations, withheld routes) as fetch_aa.py recorded them.
 
-    A window hour that empties an axis is refused unless it is the
-    parameters hold, and the refusal must name the window it is instead of
-    blaming a capture shape change. The count rides the marker's one line as
-    "; N generation(s) observed in-run" -- record_cost_window writes it, and
-    this reads the ONE integer back by its own literal; a marker without it
-    (one an older fetch_aa.py wrote) reads as None and the refusal names the
-    window generically. Nothing here reaches the page: the count feeds the
-    refusal message on stderr, exactly like the axis names.
+    None for an absent file and for any text other than an exact rendering:
+    unparseable evidence records no mismatch, so an emptied axis refuses.
+    Text-mode reading folds a checkout's CRLF line ends back to LF. Nothing
+    here reaches the page; it decides the guard and its message.
     """
     try:
-        text = (data_dir / "cost-breakdown-window.txt").read_text(
-            encoding="utf-8")
-    except OSError:
+        text = (data_dir / ROUTE_EVIDENCE_NAME).read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError):
         return None
-    match = re.search(r"; (\d+) generation\(s\) observed in-run", text)
-    return int(match.group(1)) if match else None
+    match = ROUTE_EVIDENCE_RE.fullmatch(text)
+    if match is None:
+        return None
+    flags = zip(("detail", "evaluation"), match.group(2, 3))
+    return int(match.group(1)), {route for route, flag in flags if flag == "yes"}
 
 
 class WindowHold(Exception):
     """A window hour that holds the page instead of building one.
 
-    When the window marker records three or more generations observed in-run
-    and parameters is the only empty axis after detail-only rows join, the page holds.
-    Other empty axes still refuse.
-    For a hold, main() raises
+    guard_empty_axes raises it when the run observed >= 2 generations
+    in-run and every empty axis traces to a route the evidence records as
+    withheld. main() raises
     instead of writing: the capture gate catches it on the fresh side and
     reports the hour unchanged, so the last good page stays live and
     nothing commits or publishes. Never caught inside build.py's own main()
     -- the CLI wrapper below translates it to a printed report and exit 0.
     """
+
+
+def guard_empty_axes(empty: list[str], evidence: tuple[int, set[str]] | None) -> None:
+    """Hold or refuse a capture that leaves rendered axes empty, in one place.
+
+    A rendered axis with nothing on it never publishes. With no evidence or
+    one generation in-run, the capture changed shape: refuse with that
+    wording. With >= 2 generations it holds (WindowHold) when every empty
+    axis's route was withheld, and otherwise refuses naming the count, never
+    as a shape change. Refusals are SystemExit, the re-read-AA-by-hand red.
+    """
+    if not empty:
+        return
+    named = "no rows carry a score/cost pair for: " + ", ".join(sorted(empty)) + " -- "
+    agentic = "agentic" in empty
+    # No evidence, or one generation: no cross-generation window to name.
+    if evidence is None or evidence[0] < 2:
+        note = ("; agentic: no GDPval-AA evaluation cost joined this capture (the evaluation read "
+                "matched none of the run's leaderboard generations, or its fields changed shape) "
+                "-- re-read the GDPval-AA evaluation page" if agentic else "")
+        raise SystemExit(named + "the AA capture changed shape; re-read the leaderboard rather "
+                         "than publishing an empty chart" + note)
+    counted = f"the capture records {evidence[0]} generation(s) observed in-run, not a shape change"
+    if all(AXIS_ROUTE.get(axis) in evidence[1] for axis in empty):
+        raise WindowHold(
+            "unchanged / window: " + named + counted + ": the route each of these axes "
+            "needs matched none of the run's leaderboard looks, and no honest "
+            "page exists to build -- holding the page: the last good page "
+            "stays live, nothing commits or publishes this hour, and the "
+            "axes return when AA's routes converge")
+    state = ("matched none of the run's leaderboard looks" if "evaluation" in evidence[1]
+             else "joined, yet no row pairs its cost with a GDPval-AA Elo")
+    note = f"; agentic: the GDPval-AA evaluation read {state} -- re-read the GDPval-AA evaluation page"
+    raise SystemExit(named + counted + ", but no route it records as withheld explains "
+                     "every one of these axes -- re-read the AA leaderboard by hand"
+                     + (note if agentic else ""))
 
 
 def read_capture(path):
@@ -1139,9 +1181,6 @@ def main(*, generation_state: bytes | None | EllipsisType = ...):
             if r["params"] is not None and r["metrics"]["intelligence"] is not None
         ),
     }
-    # fetch_aa.py leaves data/cost-breakdown-window.txt when the
-    # merge dropped the leaderboard models' cost breakdowns -- an AA window.
-    window = cost_breakdown_window(RAW.parent)
     # A rendered axis with nothing on it means the capture moved under us --
     # a renamed field, a dropped cost slug. The page must not be published in
     # that state: an empty scatter reads as "nothing qualifies" rather than
@@ -1152,53 +1191,14 @@ def main(*, generation_state: bytes | None | EllipsisType = ...):
     # capture (AA's totalParameters rename) fails red instead of publishing
     # an empty parameters chart.
     #
-    # The guard's arms, narrowest first. The designed three-generation corner:
-    # the marker records >= 3 generations AND parameters is the only emptied
-    # axis (never agentic: the marker reports leaderboard breakdowns, which no
-    # GDPval cost comes from) -- the hour HOLDS: WindowHold, which
-    # scripts/capture_gate.py reports as the hour unchanged -- the last good
-    # page stays live, nothing commits or publishes -- until AA's routes
-    # converge. Every other emptied axis still refuses (SystemExit, nonzero):
-    # AGENTS.md's designed go-re-read-AA-by-hand signal, naming the observed
-    # in-run generation count when the marker carries one, with the
-    # shape-change wording only for a capture that does NOT record a window,
-    # where shape change is the honest cause.
+    # The hold-or-refuse decision is guard_empty_axes', from the route
+    # evidence fetch_aa.py recorded beside the capture (issue #441): a hold
+    # raises WindowHold, which scripts/capture_gate.py reports as the hour
+    # unchanged -- the last good page stays live, nothing commits or
+    # publishes -- until AA's routes converge; a refusal exits nonzero.
     rendered = {**stats["metricCounts"], "parameters": stats["parameterCount"]}
-    empty = [axis for axis, n in rendered.items() if not n]
-    if (window and empty == ["parameters"]
-            and (window_generations(RAW.parent) or 0) >= 3):
-        raise WindowHold(
-            "unchanged / window: no rows carry a score/cost pair for: "
-            + ", ".join(sorted(empty))
-            + f" -- the capture records "
-            f"{window_generations(RAW.parent)} generation(s) observed in-run, "
-            "not a shape change: leaderboard detail fills are unavailable "
-            "for these axes, and no honest "
-            "page exists to build -- holding the page: the last good page "
-            "stays live, nothing commits or publishes this hour, and the "
-            "axes return when AA's routes converge")
-    gdpval_note = ("; agentic: no GDPval-AA evaluation cost joined this capture "
-                   "(the evaluation read matched none of the run's leaderboard "
-                   "generations, or its fields changed shape) -- re-read the "
-                   "GDPval-AA evaluation page" if "agentic" in empty else "")
-    if empty and window:
-        generations = window_generations(RAW.parent)
-        count_phrase = (f"{generations} generation(s) observed in-run"
-                        if generations is not None
-                        else "the marker carries no generation count")
-        raise SystemExit(
-            "no rows carry a score/cost pair for: " + ", ".join(sorted(empty))
-            + " -- the capture records a cross-generation AA window, not a "
-            "shape change: " + count_phrase + ", and leaderboard detail fills "
-            "are unavailable for these axes -- re-read the AA leaderboard "
-            "by hand; the page recovers when AA's routes converge" + gdpval_note
-        )
-    if empty:
-        raise SystemExit(
-            "no rows carry a score/cost pair for: " + ", ".join(sorted(empty))
-            + " -- the AA capture changed shape; re-read the leaderboard rather "
-            "than publishing an empty chart" + gdpval_note
-        )
+    guard_empty_axes([axis for axis, n in rendered.items() if not n],
+                     read_route_evidence(RAW.parent))
 
     payload = json.dumps({"rows": rows, "stats": stats}, separators=(",", ":")).replace(
         "<", "\\u003c"
