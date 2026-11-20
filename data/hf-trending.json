@@ -2,9 +2,6 @@
   "source": "https://huggingface.co/api/models?sort=trendingScore&limit=10",
   "models": [
     {
-      "id": "inworld/voice-isolator"
-    },
-    {
       "id": "higurashi-ai/Haru-4B"
     },
     {
@@ -20,13 +17,16 @@
       "id": "MiniMaxAI/MiniMax-H3-Image"
     },
     {
-      "id": "chatrlabs/Qwen-Image-2.1-Uncensored-Omni-Quantized"
-    },
-    {
       "id": "tencent/Hy4-flash"
     },
     {
+      "id": "chatrlabs/Qwen-Image-2.1-Uncensored-Omni-Quantized"
+    },
+    {
       "id": "sensenova/SenseNova-Loop-9B"
+    },
+    {
+      "id": "inworld/voice-isolator"
     },
     {
       "id": "apple/FastFrames-L"
