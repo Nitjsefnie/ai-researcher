@@ -142,9 +142,10 @@ since" or the run prints the 7-day hold warning. In short:
 - **In-run**: the run's two leaderboard looks, 180 s apart, are fingerprinted
   (`generation_key`); two fingerprints, or one on different slug sets, hold both
   generations in `genVariants`. Neither the detail route nor the GDPval-AA
-  evaluation route raises a dispute by itself, but an evaluation read matching
-  neither disputed look joins no GDPval-AA cost, and an agentic axis left empty
-  refuses at the build until AA's routes converge.
+  evaluation route raises a dispute by itself, but a detail or evaluation read
+  matching neither disputed look joins no generation: it is withheld, and an
+  axis only it feeds (parameters, agentic) holds the page until AA's routes
+  converge (route evidence, below).
 - **Cross-run generation** (`--cross-run-lookback`, the refresh workflow's flag only: a hand run does not
   pass it; state in
   `data/aa-generation-state.json`): a remembered revisit holds both generations
@@ -155,10 +156,9 @@ since" or the run prints the 7-day hold warning. In short:
   from this fetch, or the reverse, is merged and disputed; one merged from the
   previous capture carries `crossRunMerged: true`.
 
-**Disputed hours** are ordinary: the run never exits red (except one whose
-GDPval-AA evaluation read matches neither leaderboard look: it joins no cost,
-and an agentic axis left empty refuses at the build until AA's routes
-converge), the page renders both values red in canonical pair order, and the
+**Disputed hours** are ordinary: the run never exits red for the mix of
+generations AA's routes serve (an axis a withheld route empties holds the last
+good page), the page renders both values red in canonical pair order, and the
 scheduled commit's body carries the differ's Disputes section. The capture is
 merged and dispute-bearing (three routes, every held generation), so the
 page's raw-byte provenance digest is a sha256 over that merged content, never
@@ -234,21 +234,26 @@ A route disagreement is never one of these: precedence resolves it, silently and
 always.
 
 `build.py` refuses to write a page where a rendered axis has no rows (a build
-failure, not a published blank), except a three-generation window hour: the
-marker `data/cost-breakdown-window.txt` (written by `fetch_aa.py` on a
-leaderboard all-dropped hour) records ≥ 3 generations observed in-run, and
-parameters is the only axis still empty after detail-only rows join. That page
-HOLDS (the gate reports unchanged, the last good page stays live). Detail-only
-rows that rescue parameters publish a full page; unplottable extras rescue
-nothing and keep the HOLD.
+failure, not a published blank), except an AA update-window hour. Every hour
+`fetch_aa.py` writes the route evidence `data/cost-breakdown-window.txt`: the
+in-run generation count and whether the detail route's fills and the GDPval-AA
+evaluation's costs were withheld (a disputed run's read matched neither look).
+`build.py` decides from that content alone, in `guard_empty_axes`, never
+inferring a mismatch from an empty axis. When the evidence records ≥ 2
+generations and every empty axis traces to a withheld route (parameters to the
+detail route, agentic to the evaluation route), the page HOLDS, naming the
+generation count: the gate reports unchanged, the last good page stays live.
+Detail-only rows that rescue parameters publish a full page; unplottable extras
+rescue nothing and keep the HOLD. A route that never converges holds silently
+hour after hour.
 
-Window evidence counts leaderboard models after validating the whole union;
-detail-only breakdowns cannot clear it, even on models that render no rows.
-Every other empty axis refuses: with a marker, naming the window and the
-generation count it records (or that it records none); without one, as the
-go-re-read-AA-by-hand signal for a real shape change. An empty agentic axis
-never holds, and its refusal adds that no GDPval-AA evaluation cost joined
-the capture.
+Every other empty axis refuses red. Intelligence and coding never hold, nor
+does an axis whose route joined yet left it empty (a renamed field, matched
+costs that pair with no Elo); an evaluation read whose fields are absent or
+unparseable already exits `fetch_aa.py` nonzero (above). The refusal
+names the generation count when the evidence records ≥ 2; only absent or
+unparseable evidence, or one generation, gets the shape-change wording, the
+go-re-read-AA-by-hand signal.
 
 Never hand-edit either capture. Re-publishing a slug adds a version and never
 destroys history.
@@ -343,8 +348,7 @@ instead of committing a mangled capture; the suite runs before the commit, so a
 capture that breaks the page leaves the last good capture committed and the
 last good page live. A cross-route disagreement is never a failure: that hour's
 only scheduled commit is `chore(capture): …`, with nothing estimated or
-interpolated. The one red disputed hour is the GDPval-AA case under "Disputed
-hours".
+interpolated.
 
 ## Commit / co-author trailer
 
