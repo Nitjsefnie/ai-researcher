@@ -8,25 +8,25 @@
       "id": "harness-hub/Qwen3.8-27B-pi-adapted"
     },
     {
+      "id": "thinkingmachines/Inkling-2-Mini"
+    },
+    {
       "id": "Qwen/Qwen3.8-27B"
     },
     {
       "id": "Lightricks/LTX-2.5"
     },
     {
-      "id": "MiniMaxAI/MiniMax-H3-Image"
+      "id": "tencent/Hy4-flash"
     },
     {
-      "id": "tencent/Hy4-flash"
+      "id": "MiniMaxAI/MiniMax-H3-Image"
     },
     {
       "id": "Sentinel7/h3"
     },
     {
       "id": "sensenova/SenseNova-Loop-9B"
-    },
-    {
-      "id": "thinkingmachines/Inkling-2-Mini"
     },
     {
       "id": "inworld/voice-isolator"
