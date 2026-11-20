@@ -1091,11 +1091,9 @@ class WindowHoldTests(unittest.TestCase):
     # (emptied axes, recorded evidence, outcome); evidence is (in-run
     # generations, withheld routes), outcome None builds the page.
     GUARD_TABLE = (
-        # Nothing empty builds, whatever the evidence: kills an all() over an
-        # empty list holding a healthy hour.
+        # Nothing empty builds, whatever the evidence (all() over [] is true).
         ([], (3, {"detail", "evaluation"}), None),
-        # The detail route's limb, at the 2-generation boundary of the count
-        # conjunct and below it, and with no evidence at all.
+        # The detail limb at and below the 2-generation boundary, and with no evidence.
         (["parameters"], (3, {"detail"}), "hold"),
         (["parameters"], (2, {"detail"}), "hold"),
         (["parameters"], (1, {"detail"}), "shape"),
@@ -1104,12 +1102,10 @@ class WindowHoldTests(unittest.TestCase):
         (["parameters"], (3, {"evaluation"}), "window"),
         (["agentic"], (3, {"evaluation"}), "hold"),
         (["agentic"], (3, {"detail"}), "window"),
-        # The evaluation joined and still left agentic empty: a refusal,
-        # naming the count when the hour saw several, a shape change if one.
+        # The evaluation joined yet left agentic empty: a refusal either way.
         (["agentic"], (2, set()), "window"),
         (["agentic"], (1, set()), "shape"),
-        # Every empty axis must trace (all, not any); intelligence and coding
-        # trace to no route, so their emptying never holds.
+        # Every empty axis must trace (all, not any); intelligence and coding never do.
         (["agentic", "parameters"], (4, {"detail", "evaluation"}), "hold"),
         (["agentic", "parameters"], (3, {"evaluation"}), "window"),
         (["intelligence", "parameters"], (3, {"detail", "evaluation"}), "window"),
@@ -1129,8 +1125,9 @@ class WindowHoldTests(unittest.TestCase):
                 self.assertIn("no rows carry a score/cost pair for: " + ", ".join(empty) + " -- ", message)
                 self.assertEqual("holding the page" in message, outcome == "hold")
                 self.assertEqual("unchanged / window" in message, outcome == "hold")
-                # Only a capture recording no cross-generation window is a shape change.
+                # Only a windowless capture claims a shape change; only a hold denies one.
                 self.assertEqual("changed shape" in message, outcome == "shape")
+                self.assertEqual("not a shape change" in message, outcome == "hold")
                 if evidence is not None and outcome != "shape":
                     self.assertIn(f"{evidence[0]} generation(s) observed in-run", message)
                 self.assertEqual("re-read the GDPval-AA evaluation page" in message,
@@ -1252,7 +1249,7 @@ class WindowHoldTests(unittest.TestCase):
     def test_an_agentic_refusal_names_what_the_evaluation_read_did(self):
         # The refusal's agentic note follows the evidence: a withheld
         # evaluation matched no look; a joined one paired with no Elo. A
-        # one-generation hour keeps the shape note, which says either.
+        # quiet hour joined it, so only absent evidence says either cause.
         reread = " -- re-read the GDPval-AA evaluation page"
         for empty, evidence, said in (
                 (["agentic", "intelligence"], (3, {"evaluation"}),
@@ -1261,8 +1258,11 @@ class WindowHoldTests(unittest.TestCase):
                 (["agentic"], (2, {"detail"}),
                  "; agentic: the GDPval-AA evaluation read joined, yet no row pairs its "
                  "cost with a GDPval-AA Elo" + reread),
-                (["agentic"], (1, set()), "matched none of the run's leaderboard generations, "
-                 "or its fields changed shape)" + reread)):
+                (["agentic"], None, "matched none of the run's leaderboard generations, "
+                 "or its fields changed shape)" + reread),
+                (["agentic"], (1, set()), "; agentic: the GDPval-AA evaluation read joined, as a "
+                 "quiet run's always does, yet no row pairs its cost with a GDPval-AA Elo: its "
+                 "fields changed shape" + reread)):
             with self.subTest(evidence=evidence), self.assertRaises(SystemExit) as raised:
                 build.guard_empty_axes(empty, evidence)
             self.assertIn(said, str(raised.exception))
