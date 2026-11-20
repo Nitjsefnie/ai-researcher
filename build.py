@@ -868,37 +868,37 @@ class WindowHold(Exception):
 def guard_empty_axes(empty: list[str], evidence: tuple[int, set[str]] | None) -> None:
     """Hold or refuse a capture that leaves rendered axes empty, in one place.
 
-    A rendered axis with nothing on it never publishes. With no evidence or
-    one generation in-run, the capture changed shape: refuse with that
-    wording. With >= 2 generations it holds (WindowHold) when every empty
-    axis's route was withheld, and otherwise refuses naming the count, never
-    as a shape change. Refusals are SystemExit, the re-read-AA-by-hand red.
+    A rendered axis with nothing on it never publishes. No evidence, or one
+    in-run generation, refuses as a shape change. With >= 2 generations it
+    holds (WindowHold) when every empty axis's route was withheld, else refuses
+    naming the count, neither claiming nor denying a shape change. Refusals are
+    SystemExit, the re-read-AA-by-hand red.
     """
     if not empty:
         return
     named = "no rows carry a score/cost pair for: " + ", ".join(sorted(empty)) + " -- "
-    agentic = "agentic" in empty
-    # No evidence, or one generation: no cross-generation window to name.
+    reread = " -- re-read the GDPval-AA evaluation page" if "agentic" in empty else ""
+    # No evidence or one generation: no window to name; a quiet run joins the
+    # evaluation unconditionally, so only absent evidence can "match none".
     if evidence is None or evidence[0] < 2:
-        note = ("; agentic: no GDPval-AA evaluation cost joined this capture (the evaluation read "
-                "matched none of the run's leaderboard generations, or its fields changed shape) "
-                "-- re-read the GDPval-AA evaluation page" if agentic else "")
-        raise SystemExit(named + "the AA capture changed shape; re-read the leaderboard rather "
-                         "than publishing an empty chart" + note)
-    counted = f"the capture records {evidence[0]} generation(s) observed in-run, not a shape change"
+        cause = ("no GDPval-AA evaluation cost joined this capture (the evaluation read matched none "
+                 "of the run's leaderboard generations, or its fields changed shape)" if evidence is None
+                 else "the GDPval-AA evaluation read joined, as a quiet run's always does, yet no row "
+                 "pairs its cost with a GDPval-AA Elo: its fields changed shape")
+        raise SystemExit(named + "the AA capture changed shape; re-read the leaderboard rather than "
+                         "publishing an empty chart" + ("; agentic: " + cause + reread if reread else ""))
+    counted = f"the capture records {evidence[0]} generation(s) observed in-run"
     if all(AXIS_ROUTE.get(axis) in evidence[1] for axis in empty):
         raise WindowHold(
-            "unchanged / window: " + named + counted + ": the route each of these axes "
-            "needs matched none of the run's leaderboard looks, and no honest "
-            "page exists to build -- holding the page: the last good page "
-            "stays live, nothing commits or publishes this hour, and the "
-            "axes return when AA's routes converge")
+            "unchanged / window: " + named + counted + ", not a shape change: the route each of "
+            "these axes needs matched none of the run's leaderboard looks, and no honest page "
+            "exists to build -- holding the page: the last good page stays live, nothing "
+            "commits or publishes this hour, and the axes return when AA's routes converge")
     state = ("matched none of the run's leaderboard looks" if "evaluation" in evidence[1]
              else "joined, yet no row pairs its cost with a GDPval-AA Elo")
-    note = f"; agentic: the GDPval-AA evaluation read {state} -- re-read the GDPval-AA evaluation page"
+    note = f"; agentic: the GDPval-AA evaluation read {state}{reread}" if reread else ""
     raise SystemExit(named + counted + ", but no route it records as withheld explains "
-                     "every one of these axes -- re-read the AA leaderboard by hand"
-                     + (note if agentic else ""))
+                     "every one of these axes -- re-read the AA leaderboard by hand" + note)
 
 
 def read_capture(path):
