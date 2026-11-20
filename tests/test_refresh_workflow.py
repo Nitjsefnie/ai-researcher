@@ -398,7 +398,7 @@ class GateTests(unittest.TestCase):  # pylint: disable=too-many-public-methods
                       "out/frontier-models.html", "data/cost-breakdown-window.txt",
                       "commit-msg.txt"):
             self.assertIn(piece, run)
-        # The evidence copies whenever fetch_aa.py wrote it, every hour.
+        # The guard copies the evidence when this hour's fetch wrote it.
         self.assertIn(
             "[ ! -f data/cost-breakdown-window.txt ] || "
             "cp --parents data/cost-breakdown-window.txt", run)
@@ -417,14 +417,14 @@ class GateTests(unittest.TestCase):  # pylint: disable=too-many-public-methods
 
     def test_the_write_job_stages_the_window_marker_both_ways(self):
         # Issue #227: the gate's HEAD-side rebuild reads the route evidence
-        # from GIT at HEAD, so a committing hour must carry it. The add keys
-        # on the PAYLOAD, never on the worktree file -- the scratch checkout
-        # at main's tip materializes the tracked file into the tree and
-        # `cp -a` never deletes, so a worktree probe would fire the add on
-        # an hour whose payload lacks it (the reviewer-reproduced defect
-        # this condition fixes). The removal is the elif's `git rm`, which
-        # fires only when a payload lacks the file; since fetch_aa.py
-        # writes it every hour (issue #441), the add fires on each commit.
+        # from GIT at HEAD, so an AA-payload commit must carry it. The add
+        # keys on the PAYLOAD, never on the worktree file -- the checkout at
+        # main's tip materializes the tracked file and `cp -a` never
+        # deletes, so a worktree probe would fire the add on an hour whose
+        # payload lacks it (the reviewer-reproduced defect this condition
+        # fixes). The removal is the elif's `git rm`, for a payload lacking
+        # the file; fetch_aa.py writes it every hour (issue #441), so the
+        # add fires on each commit that carries an AA payload.
         run = flattened(step_in(self.wf, "publish", "Commit the refresh")["run"])
 
         self.assertIn('if [ -f "${PAYLOAD}/tree/data/cost-breakdown-window.txt" ]; then', run)
