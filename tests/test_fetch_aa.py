@@ -420,7 +420,7 @@ class WindowMarkerSpanTests(unittest.TestCase):
     holds those two legs to the literal name), and the deny-by-default
     .gitignore must carry the negation for the same name or the evidence is
     invisible to git. A rename on any leg fails a span test instead of
-    silently orphaning the other two (review finding, issue #217).
+    silently orphaning the other two (issue #217).
     """
 
     def test_producer_consumer_and_gitignore_share_one_evidence_name(self):
