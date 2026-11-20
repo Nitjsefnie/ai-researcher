@@ -398,7 +398,7 @@ class GateTests(unittest.TestCase):  # pylint: disable=too-many-public-methods
                       "out/frontier-models.html", "data/cost-breakdown-window.txt",
                       "commit-msg.txt"):
             self.assertIn(piece, run)
-        # The guard copies the evidence when this hour's fetch wrote it.
+        # The guard copies the evidence whenever data/ holds it.
         self.assertIn(
             "[ ! -f data/cost-breakdown-window.txt ] || "
             "cp --parents data/cost-breakdown-window.txt", run)
