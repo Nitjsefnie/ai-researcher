@@ -188,9 +188,11 @@ class NegativeFormatTests(unittest.TestCase):
 
 
 class AgenticEmptyAxisTests(unittest.TestCase):
-    def refusal(self, model):
+    def refusal(self, model, evidence=None):
         harness = test_build.EmptyAxisGuardTests()
         with harness.capture([model], [agent_fixture()]) as output:
+            if evidence is not None:
+                (output.parent / build.ROUTE_EVIDENCE_NAME).write_text(evidence, encoding="utf-8")
             with self.assertRaises(SystemExit) as raised:
                 harness.run_build()
             self.assertFalse(output.exists(), "refusal still wrote the page")
@@ -203,6 +205,11 @@ class AgenticEmptyAxisTests(unittest.TestCase):
         self.assertIn("changed shape", message)
         self.assertIn(GDPVAL_NOTE, message)
         self.assertNotIn(GDPVAL_NOTE, self.refusal(model_fixture(intelligence=None)))
+
+    def test_a_quiet_hour_with_a_renamed_leaderboard_elo_blames_either_route(self):
+        message = self.refusal(dict(model_fixture(), scores={"gdpval-aa-renamed": 1047.0}), test_build.route_evidence(1))
+        self.assertIn("a field on the leaderboard or the evaluation read changed shape or went empty", message)
+        self.assertNotIn("matched none", message)
 
 
 def without_agentic(models: bytes) -> bytes:
@@ -226,10 +233,9 @@ class AgenticGateTests(unittest.TestCase):
         corner = without_agentic(test_capture_gate.corner_capture(test_capture_gate.FIXTURE_MODELS))
         both = test_capture_gate.WINDOW_MARKER.replace(b"3", b"4").replace(b"costs withheld: no", b"costs withheld: yes")
         for marker, answer in ((test_capture_gate.WINDOW_MARKER, (1, "")), (both, (0, "yes\n"))):
-            with self.subTest(answer=answer), mock.patch.object(
-                    capture_gate, "read_fresh_generation_state", return_value=None), \
-                    mock.patch.object(capture_gate, "read_fresh_captures", return_value=(
-                        corner, test_capture_gate.FIXTURE_AGENTS)), \
+            with self.subTest(answer=answer), \
+                    mock.patch.object(capture_gate, "read_fresh_generation_state", return_value=None), \
+                    mock.patch.object(capture_gate, "read_fresh_captures", return_value=(corner, test_capture_gate.FIXTURE_AGENTS)), \
                     mock.patch.object(capture_gate, "read_fresh_window_marker", return_value=marker):
                 code, out, err = test_capture_gate.FreshHoldProbeTests.run_probe()
                 self.assertEqual((code, out), answer)

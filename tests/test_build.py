@@ -1130,8 +1130,8 @@ class WindowHoldTests(unittest.TestCase):
                 self.assertEqual("not a shape change" in message, outcome == "hold")
                 if evidence is not None and outcome != "shape":
                     self.assertIn(f"{evidence[0]} generation(s) observed in-run", message)
-                self.assertEqual("re-read the GDPval-AA evaluation page" in message,
-                                 "agentic" in empty and outcome != "hold")
+                # Every refusal carries the agentic note exactly when agentic is empty.
+                self.assertEqual("; agentic:" in message, "agentic" in empty and outcome != "hold")
 
     def test_a_held_hour_writes_no_page(self):
         # main() raises the typed hold and writes nothing: the capture gate
@@ -1247,9 +1247,9 @@ class WindowHoldTests(unittest.TestCase):
                          "the refused hour still wrote a page")
 
     def test_an_agentic_refusal_names_what_the_evaluation_read_did(self):
-        # The refusal's agentic note follows the evidence: a withheld
-        # evaluation matched no look; a joined one paired with no Elo. A
-        # quiet hour joined it, so only absent evidence says either cause.
+        # The agentic note follows the evidence: a withheld evaluation matched
+        # no look; a joined one paired with no Elo, and in a quiet hour either
+        # route's field can be why; only absent evidence says "matched none".
         reread = " -- re-read the GDPval-AA evaluation page"
         for empty, evidence, said in (
                 (["agentic", "intelligence"], (3, {"evaluation"}),
@@ -1260,9 +1260,9 @@ class WindowHoldTests(unittest.TestCase):
                  "cost with a GDPval-AA Elo" + reread),
                 (["agentic"], None, "matched none of the run's leaderboard generations, "
                  "or its fields changed shape)" + reread),
-                (["agentic"], (1, set()), "; agentic: the GDPval-AA evaluation read joined, as a "
-                 "quiet run's always does, yet no row pairs its cost with a GDPval-AA Elo: its "
-                 "fields changed shape" + reread)):
+                (["agentic"], (1, set()), "; agentic: the GDPval-AA evaluation read joined, as a quiet run's always "
+                 "does, yet no row pairs a GDPval-AA Elo with its cost: a field on the leaderboard or the evaluation "
+                 "read changed shape or went empty -- re-read the leaderboard and the GDPval-AA evaluation page")):
             with self.subTest(evidence=evidence), self.assertRaises(SystemExit) as raised:
                 build.guard_empty_axes(empty, evidence)
             self.assertIn(said, str(raised.exception))
