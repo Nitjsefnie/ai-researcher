@@ -8,9 +8,6 @@
       "id": "harness-hub/Qwen3.8-27B-pi-adapted"
     },
     {
-      "id": "Sentinel7/h3"
-    },
-    {
       "id": "unsloth/Inkling-2-Mini-GGUF"
     },
     {
@@ -30,6 +27,9 @@
     },
     {
       "id": "meituan-longcat/LongCat-Video-Avatar-1.6"
+    },
+    {
+      "id": "n4ze3m/tiny-voca"
     }
   ]
 }
