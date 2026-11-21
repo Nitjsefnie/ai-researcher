@@ -2,22 +2,22 @@
   "source": "https://huggingface.co/api/models?sort=trendingScore&limit=10",
   "models": [
     {
+      "id": "thinkingmachines/Inkling-2-Mini"
+    },
+    {
       "id": "higurashi-ai/Haru-4B"
     },
     {
       "id": "harness-hub/Qwen3.8-27B-pi-adapted"
     },
     {
-      "id": "thinkingmachines/Inkling-2-Mini"
-    },
-    {
-      "id": "Qwen/Qwen3.8-27B"
-    },
-    {
       "id": "Sentinel7/h3"
     },
     {
       "id": "unsloth/Inkling-2-Mini-GGUF"
+    },
+    {
+      "id": "Qwen/Qwen3.8-27B"
     },
     {
       "id": "Lightricks/LTX-2.5"
