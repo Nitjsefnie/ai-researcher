@@ -298,7 +298,7 @@ def test_the_ratchet_guard_reruns_its_history_fetch_on_exit_128_alone(tmp_path, 
                     ["git", "clone", "-q", "--depth", "1", origin.as_uri(), str(tmp_path / "ws")]):
         subprocess.run(command, check=True, capture_output=True)
     sha = subprocess.run([*git, "rev-parse", "HEAD"], check=True, capture_output=True, text=True).stdout.strip()
-    result, calls = run_stubbed(tmp_path, "tests.yml", "coverage", "Ratchet documents", verdict, fault, GITHUB_EVENT_NAME=event,
+    result, calls = run_stubbed(tmp_path, "tests.yml", "budgets", "Ratchet documents", verdict, fault, GITHUB_EVENT_NAME=event,
                                 AI_RESEARCHER_CI_SHA=sha, AI_RESEARCHER_BEFORE=sha)
     assert result.returncode == status, result.stderr
     assert (tmp_path / "git.log").read_text(encoding="utf-8").splitlines() == [f"fetch {f} {sha}" for f in fetches]

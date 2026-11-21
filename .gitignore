@@ -46,9 +46,9 @@
 !/.github/ci-thresholds.json
 !/.github/comment-share.json
 !/.github/size-baseline.json
+!/.github/test-times.json
 !/.github/perf-budgets.json
 !/.github/instruction-budgets.json
-!/.github/coverage-children.rc
 !/.github/ISSUE_TEMPLATE/
 /.github/ISSUE_TEMPLATE/*
 !/.github/ISSUE_TEMPLATE/*.md

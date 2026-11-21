@@ -26,8 +26,12 @@ name: ci gate
 # The size-baseline callee also runs independently on pull requests and
 # main/master pushes; the other callees have no `push` or `pull_request`
 # trigger. Each callee keeps its own `permissions:` blocks and concurrency group.
-# refresh.yml, secrets.yml, scorecard.yml, claim.yml and
-# coverage-comment.yml are outside the aggregate.
+# One leg is a job of this workflow, not a callee: `report`, the
+# test-ratchet job that merges the tests leg's coverage, gates it and
+# commits the raised records with the main-push environment's deploy key,
+# which a workflow_call callee could not read. refresh.yml, secrets.yml,
+# scorecard.yml, claim.yml and test-ratchet-comment.yml are outside the
+# aggregate.
 #
 # SUPERSESSION AND CANCELLATION. The concurrency group is one per pull
 # request, or per pushed SHA. The other callees mirror that keying:
@@ -104,7 +108,7 @@ jobs:
         # (scripts/ci/classify_changes.py).
         run: python3 scripts/ci/classify_changes.py
 
-  # One leg per gate workflow. `skipped` is reserved for the
+  # One leg per gate workflow, plus report. `skipped` is reserved for the
   # classification narrowing (docs-only skips the conditioned legs;
   # data-only skips every leg but lint and actionlint): any leg skipped
   # without it fails the aggregate, as does a cancelled or failed leg,
@@ -123,11 +127,39 @@ jobs:
     # resolves in-repo (suppressed at the line below).
     uses: ./.github/workflows/tests.yml  # zizmor: ignore[self-repository]
     permissions:
-      # Read-only: the callee runs no writer (its ratchet raise leaves as
-      # an artifact for the top-level ratchet-push workflow), so the caller's
-      # grant stays at the workflow floor. The callee runs on the
-      # pull_request trust model: no secret is forwarded.
+      # Read-only: the callee runs no writer (the report job below commits
+      # the raised records), so the caller's grant stays at the workflow
+      # floor. The callee runs on the pull_request trust model: no secret
+      # is forwarded.
       contents: read
+
+  report:
+    needs: [classify, tests]
+    # Runs after every test job, also when one failed, and skips exactly
+    # when the tests leg does.
+    if: ${{ !cancelled() && needs.classify.outputs.docs_only != 'true' && needs.classify.outputs.data_only != 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: ${{ github.event_name == 'push' && github.ref_type == 'branch' && github.ref_name == github.event.repository.default_branch && format('{0}-push', github.event.repository.default_branch) || '' }}
+    permissions:
+      # No pull-requests: write: this job checks out the tree, so its
+      # comment goes to the job summary and test-ratchet-comment.yml, which
+      # checks out only the default branch, writes it on the pull request.
+      contents: read
+      pull-requests: read
+      actions: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: Nitjsefnie-Actions/test-ratchet/report@7845a0154a83a454ec9045536a067c61fc3db4cb # v2.2.0
+        with:
+          github-token: ${{ github.token }}
+          cell: ubuntu-latest-py3.15
+          times: .github/test-times.json
+          records-only-rise: 'true'
+          push-key: ${{ secrets.MASTER_PUSH_DEPLOY_KEY }}
 
   lint:
     needs: classify
@@ -194,8 +226,8 @@ jobs:
       contents: read
 
   aggregate:
-    needs: [classify, tests, lint, types, audit, actionlint, size-baseline,
-            codeql]
+    needs: [classify, tests, report, lint, types, audit, actionlint,
+            size-baseline, codeql]
     if: ${{ always() }}
     runs-on: ubuntu-latest
     timeout-minutes: 15

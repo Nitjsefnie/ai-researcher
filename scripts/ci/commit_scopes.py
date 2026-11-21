@@ -39,7 +39,7 @@ WHAT IT CANNOT SEE, and says so rather than guessing:
     `ci` violates when the scope names a workflow, and the scope rule is
     what fires.
   - A workflow whose `name:` can never be a scope. A name carrying a space —
-    `coverage comment`, in this repository — can never equal a `[^()\\s]+`
+    `ci gate`, in this repository — can never equal a `[^()\\s]+`
     scope, so it sits outside the rule; the pr-gate repository's `pr gate`
     is the same case its own copy of this check names. A hyphenated
     repository name is not a workflow `name:` and stays outside the rule

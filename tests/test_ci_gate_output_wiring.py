@@ -68,6 +68,7 @@ REFERENCE = re.compile(r"needs\.classify\.outputs\.([A-Za-z_][A-Za-z0-9_-]*)")
 CONJUNCT = (r"needs\.classify\.outputs\.([A-Za-z_][A-Za-z0-9_-]*)"
             r" != 'true'")
 CONJUNCT_RE = re.compile(CONJUNCT)
+RUNS_UNLESS_CANCELLED = "!cancelled() && "
 EVALUABLE = re.compile(rf"^{CONJUNCT}(?: && {CONJUNCT})?$")
 
 # The stub `gh`: the classifier shells out to it, so the reads it
@@ -242,7 +243,7 @@ def _runs(job, outputs):
     Each conjunct is one `output != 'true'`, so the condition runs the
     leg exactly when none of the outputs it reads is the string `true`.
     """
-    condition = _condition(job)
+    condition = _condition(job).removeprefix(RUNS_UNLESS_CANCELLED)
     if not condition:
         return True
     assert EVALUABLE.match(condition), \

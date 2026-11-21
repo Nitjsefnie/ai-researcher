@@ -4,8 +4,6 @@ import io
 import json
 import os
 import pathlib
-import subprocess
-import sys
 import tempfile
 from types import SimpleNamespace
 
@@ -15,7 +13,6 @@ import _workflowrun
 import test_browser
 import test_capture_gate
 import test_check_committed_page
-import test_diff_coverage
 
 import build
 from scripts.ci import aggregate_gate, classify_changes, perf_budgets
@@ -169,26 +166,17 @@ def test_refresh_stamp_handoff(monkeypatch, name):
         assert f"Source commit <code>{'a' * 40}</code>" in output.read_text(encoding="utf-8")
 
 
-def test_coverage_workflow_handoff(monkeypatch, tmp_path):
-    expressions = _step_environment("tests.yml", "coverage", "Run tests")
-    assert expressions == {
-        "AI_RESEARCHER_JS_COVERAGE_OUT": "${{ runner.temp }}/js-coverage.json",
-        "AI_RESEARCHER_COVERAGE_MEASURE_CHILDREN_RC": "${{ github.workspace }}/.github/coverage-children.rc",
-    }
-    env = {key: str(pathlib.Path(value.replace("${{ runner.temp }}", str(tmp_path))
-                                 .replace("${{ github.workspace }}", str(ROOT))))
-           for key, value in expressions.items()}
-    monkeypatch.setattr(os, "environ", env)
-    test_browser.flush_page_coverage(SimpleNamespace(
-        _open_pages=[], _coverage_entries=[{"url": "workflow"}]))
-    assert json.loads((tmp_path / "js-coverage.json").read_text(encoding="utf-8")) == [{"url": "workflow"}]
-    seen = []
-
-    def run(args, **_kwargs):
-        seen.append(args)
-        return subprocess.CompletedProcess(args, 0)
-
-    monkeypatch.setattr(subprocess, "run", run)
-    test_diff_coverage._run_cli([sys.executable, "child.py"])  # pylint: disable=protected-access
-    assert seen == [[sys.executable, "-m", "coverage", "run", "--parallel-mode",
-                     "--rcfile", str(ROOT / ".github" / "coverage-children.rc"), "child.py"]]
+def test_browser_coverage_reaches_the_test_ratchet_directory(monkeypatch, tmp_path):
+    # test-ratchet's run reads every V8 dump in TEST_RATCHET_V8_DIR and maps a
+    # file: URL to the tracked file at that path, so each class's dump lands
+    # there with its built pages' URLs naming the committed page.
+    monkeypatch.setenv("TEST_RATCHET_V8_DIR", str(tmp_path))
+    page = (ROOT / "out" / "frontier-models.html").as_uri()
+    built = (ROOT / ".issue-114-browser-x" / "frontier-models.html").as_uri()
+    for url in (built, "file:///tmp/page.html"):
+        test_browser.flush_page_coverage(SimpleNamespace(_open_pages=[], _coverage_entries=[
+            {"url": url, "source": "s", "functions": []}, {"url": "", "functions": []}]))
+    dumps = [json.loads(path.read_text(encoding="utf-8")) for path in sorted(tmp_path.iterdir())]
+    assert len(dumps) == 2
+    assert all(dump == [{"url": page, "source": "s", "functions": []}, {"url": "", "functions": []}]
+               for dump in dumps)

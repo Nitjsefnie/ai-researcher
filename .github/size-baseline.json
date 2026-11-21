@@ -1,20 +1,18 @@
 {
   "trees": {
-    "tests/": 32541
+    "tests/": 29255
   },
   "schema_version": 1,
   "baseline": {
-    ".github/workflows/coverage-comment.yml": 513,
     ".github/workflows/refresh.yml": 1306,
-    ".github/workflows/tests.yml": 634,
     "build.py": 2626,
-    "scripts/ci/check_ratchets.py": 690,
+    "scripts/ci/check_ratchets.py": 618,
     "scripts/ci/gate_base_freshness.py": 700,
     "scripts/ci/install_chromium.py": 636,
     "scripts/ci/perf_budgets.py": 723,
     "scripts/diff_aa.py": 799,
     "scripts/fetch_aa.py": 1247,
-    "tests/test_browser.py": 2761,
+    "tests/test_browser.py": 2755,
     "tests/test_build.py": 2361,
     "tests/test_build_rankings.py": 567,
     "tests/test_capture_gate.py": 1172,
@@ -22,13 +20,10 @@
     "tests/test_ci_install_chromium.py": 1077,
     "tests/test_ci_instruction_budgets.py": 503,
     "tests/test_ci_perf_budgets.py": 778,
-    "tests/test_ci_ratchets.py": 1843,
-    "tests/test_ci_thresholds.py": 548,
+    "tests/test_ci_ratchets.py": 1454,
     "tests/test_diff_aa.py": 1246,
-    "tests/test_diff_coverage.py": 754,
     "tests/test_fetch_aa.py": 2676,
     "tests/test_gate_base_freshness.py": 866,
-    "tests/test_ratchet_push_workflow.py": 587,
     "tests/test_refresh_workflow.py": 2609
   }
 }

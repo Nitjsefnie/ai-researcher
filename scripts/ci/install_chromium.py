@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Digest-verify and pre-seed Playwright's Chromium before it can execute.
 
-The write-capable CI jobs (refresh.yml, tests.yml's coverage job) run the
+The write-capable CI jobs (refresh.yml, tests.yml's browser cell) run the
 browser suite, and the browser they execute is whatever ``python3 -m
 playwright install`` fetched: playwright's downloader checks only that a
 marker file exists, then downloads over TLS and extracts -- no digest is

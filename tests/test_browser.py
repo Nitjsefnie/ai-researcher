@@ -85,8 +85,8 @@ def install_page_coverage_wiring(cls):
         if kwargs.get("java_script_enabled") is False:
             # A JavaScript-disabled page compiles no script, so it has no
             # V8 block coverage to give: wiring a Profiler session onto it
-            # would only add empty records to the dump js_coverage.py
-            # folds. Skipped, the dump stays the JS-enabled run's.
+            # would only add empty records to the dump test-ratchet
+            # converts. Skipped, the dump stays the JS-enabled run's.
             return page
         # playwright-python ships no page.coverage wrapper, so the V8
         # block coverage comes straight from Chromium's Profiler domain
@@ -133,21 +133,17 @@ def flush_page_coverage(cls):
         except Exception:  # pylint: disable=broad-exception-caught
             pass
     cls._open_pages.clear()
-    dump = os.environ.get("AI_RESEARCHER_JS_COVERAGE_OUT") or os.environ.get("JS_COVERAGE_OUT")
-    if dump:
-        # The coverage job runs more than one page-building class, and
-        # each dumps at ITS teardown: merge with whatever an earlier
-        # class already wrote, or the later teardown would erase the
-        # earlier class's whole contribution.
-        path = pathlib.Path(dump)
-        entries = cls._coverage_entries
-        if path.exists():
-            try:
-                entries = json.loads(
-                    path.read_text(encoding="utf-8")) + entries
-            except (OSError, json.JSONDecodeError):
-                pass
-        path.write_text(json.dumps(entries), encoding="utf-8")
+    directory = os.environ.get("TEST_RATCHET_V8_DIR")
+    if directory:
+        # Every page opened is a build.py page in an untracked temp dir:
+        # name the committed page, where test-ratchet places the source.
+        page = (build.ROOT / "out" / "frontier-models.html").as_uri()
+        entries = [dict(entry, url=page)
+                   if entry["url"].startswith("file:") and entry["url"].endswith(".html")
+                   else entry for entry in cls._coverage_entries]
+        with tempfile.NamedTemporaryFile("w", dir=directory, suffix=".json", delete=False,
+                                         encoding="utf-8") as dump:
+            json.dump(entries, dump)
 
 
 # Both tables' tbody DOM, cell-for-cell: className and textContent per
@@ -162,11 +158,10 @@ class BrowserInteractionTests(unittest.TestCase):
     # pylint: disable=too-many-public-methods
     # One behaviour, one test: the per-chart label-distinctness guarantee is
     # a 21st method here, not a subTest of an unrelated test.
-    # V8 coverage for the JavaScript ratchet. With AI_RESEARCHER_JS_COVERAGE_OUT set (the
-    # coverage job sets it), every page this class creates records V8 block
-    # coverage and its dump joins a class-level list written out when the
-    # class tears down; unset, nothing changes. One pytest run then produces
-    # both measurements the coverage gates read.
+    # V8 coverage for the JavaScript ratchet. With TEST_RATCHET_V8_DIR set
+    # (test-ratchet sets it), every page this class creates records V8 block
+    # coverage and its dump joins a class-level list written there when the
+    # class tears down; unset, nothing changes.
     _coverage_entries = []
     _open_pages = []
 
@@ -1857,8 +1852,7 @@ perf_budgets = _load_perf_budgets()
 class PerfBudgetTests(unittest.TestCase):
     """The CI gate for the tighten-only perf ratchet.
 
-    This class runs in the coverage job; the 3x2 matrix --ignores
-    tests/test_browser.py, so this is where CI enforces the committed
+    This class runs only in the browser cell, so this is where CI enforces the committed
     budgets in .github/perf-budgets.json on every pull request. Nothing
     about the journeys or the verdict is re-implemented here: the
     journeys come from the harness's own runners
@@ -2160,7 +2154,7 @@ class ZeroScoreBrowserTests(unittest.TestCase):
     exists because this JS path never executes on a normal page (the
     standard capture puts no zero on the frontier), so without coverage
     wiring the JavaScript ratchet reads it as uncovered and reds the
-    coverage job.
+    coverage gate.
     """
 
     @classmethod
@@ -2368,7 +2362,7 @@ class DisputeBrowserTests(unittest.TestCase):
     The class exists as its own fixture-built page for the same reason
     ZeroScoreBrowserTests does: the dispute JS paths never execute on a
     single-generation page, so without coverage wiring the JavaScript
-    ratchet reads them as uncovered and reds the coverage job."""
+    ratchet reads them as uncovered and reds the coverage gate."""
 
     @classmethod
     def setUpClass(cls):
@@ -2648,7 +2642,7 @@ class PresenceDisputeBrowserTests(unittest.TestCase):
     its "value / —" pair red. Sibling of DisputeBrowserTests with the same
     V8-coverage wiring, on its own fixture page: the padded JS paths never
     execute on a page without a presence row, so without coverage wiring the
-    JavaScript ratchet reads them as uncovered and reds the coverage job."""
+    JavaScript ratchet reads them as uncovered and reds the coverage gate."""
 
     @classmethod
     def setUpClass(cls):

@@ -18,11 +18,9 @@ disable=
 [DESIGN]
 # Raised, not disabled: the max-* limits below sit above what a page generator
 # and a capture differ actually look like — build.py is one long HTML/SVG
-# emitter, diff_aa.main() walks every field class in sequence, and the coverage
-# ratchet's JavaScript scanner (scripts/ci/js_lines.py, ported from daedalus)
-# classifies every token shape in one loop. A limit set below the real code
-# teaches people to add a disable comment, which is worse than a limit that
-# flags only genuine sprawl. Module length is not raised here: the
+# emitter and diff_aa.main() walks every field class in sequence. A limit set
+# below the real code teaches people to add a disable comment, which is worse
+# than a limit that flags only genuine sprawl. Module length is not raised here: the
 # size-baseline workflow gates it.
 max-args=10
 max-positional-arguments=10

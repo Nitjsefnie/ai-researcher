@@ -423,8 +423,8 @@ def test_main_writes_full_run_over_an_unhandled_event(tmp_path, monkeypatch):
 # aggregate_gate: the fold
 # ---------------------------------------------------------------------------
 
-LEGS = ("classify", "tests", "lint", "types", "audit", "actionlint",
-        "size-baseline", "codeql")
+LEGS = ("classify", "tests", "report", "lint", "types", "audit",
+        "actionlint", "size-baseline", "codeql")
 
 
 def _needs(**overrides):

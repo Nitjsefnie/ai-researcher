@@ -17,13 +17,13 @@ from test_gate_base_freshness import ROOT, _commit, _config, _git, _load, _stub_
 GATE = ROOT / 'scripts/ci/gate_base_freshness.py'
 
 
-def _suites(command):
-    return ('name: tests\non: push\njobs:\n  suites:\n    steps:\n'
+def _test_job(command):
+    return ('name: tests\non: push\njobs:\n  test:\n    steps:\n'
             f'      - run: {command}\n')
 
 
 def _repo(tmp_path, command, files):
-    """A pushed fixture whose `suites` job runs `command`, checked out on `pr`."""
+    """A pushed fixture whose `test` job runs `command`, checked out on `pr`."""
     repo = tmp_path / 'repo'
     _git(tmp_path, 'init', '-b', 'main', str(repo))
     _config(repo)
@@ -33,7 +33,7 @@ def _repo(tmp_path, command, files):
         '.github/workflows/actionlint.yml':
             'name: actionlint\non: push\njobs:\n  actionlint:\n'
             '    steps:\n      - run: cat README.md\n',
-        '.github/workflows/tests.yml': _suites(command),
+        '.github/workflows/tests.yml': _test_job(command),
         '.github/workflows/gates.yml': _stub_workflow(),
         **files,
     })
