@@ -8,7 +8,7 @@ axes. The budgets-document validation and the gate itself run on
 synthetic measurements. The mini-tree seeding functions are exercised on
 real files and a real git repository, but the callgrind subprocesses of
 the measure path run only where the gate runs: locally and in the
-coverage job -- pytest here never invokes valgrind.
+budgets job -- pytest here never invokes valgrind.
 
 Every number in this module's docstrings is either labelled synthetic
 (a test input, judged for its comparison behaviour only) or measured

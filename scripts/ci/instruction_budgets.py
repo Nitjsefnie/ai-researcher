@@ -34,7 +34,7 @@ PYTHONHASHSEED=0 removes dict-order jitter; PYTHONNOUSERSITE=1 keeps
 user-site .pth execution out of every count. Under the pins the observed
 run-to-run spread was under 0.002% (recorded in CONTRIBUTING.md); the
 3% margin covers that jitter. The budgets are pinned to the CI cell
-that runs this gate -- the coverage job's ubuntu-latest runner,
+that runs this gate -- the budgets job's ubuntu-latest runner,
 CPython 3.15.1 / valgrind 3.26.0 -- and were seeded from that cell's
 measured counts (build 215,934,993, capture_gate 316,217,922,
 diff_aa 282,204,262 startup-subtracted Ir), each plus 3% rounded up to
@@ -46,7 +46,7 @@ Every run executes under ``nice -n 19 timeout <seconds>``: nice, so the
 measurement yields to everything else on the box, timeout, so a hung
 target is a failed gate rather than a hung CI job (callgrind runs 20-50x
 slower than the instrumented program alone; 180s per run bounds four runs
-at worst 12 of the coverage job's 30 minutes).
+at worst 12 of the budgets job's 30 minutes).
 
 The gate writes ONLY under one tempfile directory: the mini-tree, the
 callgrind output files and every target's own scratch (build's out/,

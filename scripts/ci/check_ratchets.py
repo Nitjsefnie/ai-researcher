@@ -18,21 +18,15 @@ because a shallow history can make ``git merge-base`` fail or return a
 wrong base without erroring, and the fix is to fetch full history
 (``git fetch --unshallow``) — a PR merge base that cannot be computed
 (unrelated histories), or a document that is not valid JSON. A document
-absent at the reference cannot be relaxed; the sibling checks (thresholds
-``--check``, the coverage gates, the perf budgets gate) judge its
-content. A non-regular entry at the head is a finding (exit 1) — it is
+absent at the reference cannot be relaxed; the sibling checks (the perf
+and instruction budgets gates) judge its content. A non-regular entry at the head is a finding (exit 1) — it is
 the head's own change; a non-regular entry at the reference is a git
 error (exit 2).
 
-Three documents are guarded, each with its own direction rules:
+Two documents are guarded, each with its own direction rules (the coverage
+records in ``.github/ci-thresholds.json`` are test-ratchet's report job's,
+whose ``records-only-rise`` refuses a relaxed one):
 
-- ``.github/ci-thresholds.json`` — every coverage value (``measured``
-  and ``floor``, for both languages) may only rise, and
-  ``schema_version`` may not change at all. The one value-direction
-  subtlety is the raise itself: the ratchet rewrites the document so
-  ``floor = measured - 1.5``, so a changed measurement must carry the
-  floor it implies — a measured that rose while its floor stayed below
-  ``measured - 1.5`` would lower the effective floor, and is a finding.
 - ``.github/perf-budgets.json`` — every value is an integer MAXIMUM the
   gates hold a measurement under, so every numeric leaf except
   ``schema_version`` may only FALL: lowering a budget tightens, raising
@@ -65,9 +59,8 @@ feature work onto main. Every raised budget leaf needs a declaration
 naming it exactly: a raise with no declaration refuses, and so does a
 declaration the diff does not carry exactly — a mismatched value, a
 duplicate, a key that did not rise, a non-finite token, or one naming
-the coverage document (whose raises are the ratchet's own automated act
-and whose relaxations refuse everywhere; only the two budget documents'
-raises are declarable). Merge shape matters on the PR route: a rebase
+any other document (only the two budget documents' raises are
+declarable). Merge shape matters on the PR route: a rebase
 merge keeps the raise commit's lines, while a squash merge may replace
 them with the pull request's title — GitHub's squash message can also
 prefill the commit's own message, so the lines are not always lost —
@@ -85,11 +78,9 @@ import sys
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
 
-THRESHOLDS_DOCUMENT = '.github/ci-thresholds.json'
 BUDGETS = '.github/perf-budgets.json'
 INSTRUCTION_BUDGETS = '.github/instruction-budgets.json'
 REGULAR_FILE = '100644 blob'
-GAP = Decimal('1.5')
 # The declared-raise route (issue #120): one line per
 # raised leaf in the raise commit's message, naming the exact values the
 # diff carries. Only these documents' raises may be declared.
@@ -97,16 +88,8 @@ DECLARABLE_DOCUMENTS = (BUDGETS, INSTRUCTION_BUDGETS)
 _DECLARATION_PREFIX = 'Budget-Raise: '
 _DECLARATION_LINE = re.compile(
     r'^(?P<document>\S+) +(?P<key>.+) +(?P<was>\S+) -> (?P<to>\S+)$')
-# Direction each leaf may move: "up" means it may only rise, "down" means
-# it may only fall, "fixed" means it may not change at all.
-_DIRECTIONS = {
-    'schema_version': 'fixed',
-    'coverage.python.measured': 'up',
-    'coverage.python.floor': 'up',
-    'coverage.javascript.measured': 'up',
-    'coverage.javascript.floor': 'up',
-}
-_LANGUAGES = ('python', 'javascript')
+# Direction each leaf may move: "down" means it may only fall, "fixed"
+# means it may not change at all.
 
 
 def _budget_direction(key):
@@ -136,13 +119,6 @@ def _is_number(value):
     # masquerade as a genuine raise instead of naming the non-finite
     # leaf.
     return isinstance(value, float) and math.isfinite(value)
-
-
-def _decimal(value):
-    """The value as a Decimal, so the gap arithmetic cannot mix types."""
-    if isinstance(value, Decimal):
-        return value
-    return Decimal(str(value))
 
 
 def _show(value):
@@ -200,41 +176,13 @@ def _deleted(document):
                     'the document was deleted')
 
 
-def _implied_floor_findings(before, after, document):
-    """A changed measurement must carry the floor it implies.
-
-    The ratchet writes ``floor = measured - 1.5`` on every raise, so a
-    changed measurement whose floor no longer equals that difference is
-    not a document the ratchet would have written: with the floor below
-    the implied value the gate would pass runs the recorded measurement
-    says are worse.
-    """
-    findings = []
-    for language in _LANGUAGES:
-        measured_key = f'coverage.{language}.measured'
-        floor_key = f'coverage.{language}.floor'
-        measured = after.get(measured_key)
-        floor = after.get(floor_key)
-        if before.get(measured_key) == measured:
-            continue
-        if not (_is_number(measured) and _is_number(floor)):
-            continue
-        if _decimal(floor) != _decimal(measured) - GAP:
-            findings.append(_finding(
-                document, floor_key, before.get(floor_key), floor,
-                f'is not the floor implied by measured {measured}: a '
-                f'changed measurement must carry floor = measured - '
-                f'{GAP}'))
-    return findings
-
-
 def _relaxations(base, head, document, direction_of, cross_checks,
                  declarations=None):
     """Findings for a head document that relaxes the reference's.
 
     ``document`` names the checked path in the finding lines;
     ``direction_of`` answers a leaf's dotted path with the one direction
-    that leaf may move in (None: any change at all is a finding); each
+    that leaf may move in; each
     cross-check receives ``(before, after, document)`` and adds the
     document's own shape rules on top of the direction walk.
 
@@ -265,17 +213,10 @@ def _relaxations(base, head, document, direction_of, cross_checks,
         if was == now:
             continue
         direction = direction_of(key)
-        if direction is None:
-            findings.append(_finding(
-                document, key, was, now,
-                'changed, and has no tightening direction'))
-        elif not _is_number(was):
+        if not _is_number(was):
             findings.append(_finding(
                 document, key, was, now,
                 'reference value is not a finite number'))
-        elif direction == 'up' and now < was:
-            findings.append(_finding(
-                document, key, was, now, 'lowered; it may only rise'))
         elif direction == 'down' and now > was:
             if declarations is not None and _consume_declaration(
                     declarations, key, was, now):
@@ -290,18 +231,6 @@ def _relaxations(base, head, document, direction_of, cross_checks,
     for _decl_document, key, was, to in declarations or ():
         findings.append(_declaration_mismatch(document, key, was, to))
     return findings
-
-
-def coverage_relaxations(base, head, document=THRESHOLDS_DOCUMENT):
-    """Findings for a head thresholds document that relaxes the base's.
-
-    ``document`` names the checked path in the finding lines; the default
-    is the canonical ratchet document, and ``thresholds.py --check``
-    passes the path it compared so a finding always names the file it is
-    about.
-    """
-    return _relaxations(base, head, document, _DIRECTIONS.get,
-                        (_implied_floor_findings,))
 
 
 def budgets_relaxations(base, head, document=BUDGETS):
@@ -328,7 +257,6 @@ def instruction_budgets_relaxations(base, head, document=INSTRUCTION_BUDGETS):
 # The guarded documents, in the order the guard walks and reports them:
 # each entry is (path, direction resolver, cross-checks).
 DOCUMENTS = (
-    (THRESHOLDS_DOCUMENT, _DIRECTIONS.get, (_implied_floor_findings,)),
     (BUDGETS, _budget_direction, ()),
     (INSTRUCTION_BUDGETS, _budget_direction, ()),
 )

@@ -94,11 +94,11 @@ else:
 # required-check ruleset is to require, and `classify` is the job whose
 # decision binds every leg — naming both brings ci-gate's own steps, the
 # classifier and the fold, into the derived set.
-REQUIRED_JOBS = ("actionlint", "aggregate", "analyze", "classify", "coverage",
-                 "lint", "page", "pip-audit", "pyright", "suites")
+REQUIRED_JOBS = ("actionlint", "aggregate", "analyze", "budgets", "classify",
+                 "lint", "page", "pip-audit", "plan", "pyright", "report", "test")
 
-# Paths gate scripts read that no `run:` names: page/suites data, install_chromium's digests.
-SCRIPT_READS = ("data/", "out/", "scripts/ci/chromium-digests.json")
+# Paths gate steps read that no `run:` names: tests, floors, page data, Chromium digests.
+SCRIPT_READS = (".github/ci-thresholds.json", "data/", "out/", "scripts/ci/chromium-digests.json", "tests/")
 
 # The branch a gate's head is compared against. Not configurable: a second
 # branch here would be a second base, and this question has one.

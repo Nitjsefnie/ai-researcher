@@ -72,7 +72,7 @@ def _stub_workflow():
     repository must define all of them or gate_paths refuses. The stub jobs
     read README.md, a file the fixtures carry."""
     module = _load()
-    covered = {'actionlint', 'suites'}
+    covered = {'actionlint', 'test'}
     jobs = '\n'.join(
         f'  {job}:\n    steps:\n      - run: cat README.md\n'
         for job in module.REQUIRED_JOBS if job not in covered)
@@ -97,7 +97,7 @@ def _fixture(tmp_path):
             'name: tests\n'
             'on: push\n'
             'jobs:\n'
-            '  suites:\n'
+            '  test:\n'
             '    runs-on: ubuntu-latest\n'
             '    steps:\n'
             '      - run: python run_tests.py\n',
@@ -125,19 +125,22 @@ def test_required_jobs_name_the_merge_gate_contexts(tmp_path):
     del tmp_path
     module = _load()
     assert module.REQUIRED_JOBS == ('actionlint', 'aggregate', 'analyze',
-                                    'classify', 'coverage', 'lint', 'page',
-                                    'pip-audit', 'pyright', 'suites')
+                                    'budgets', 'classify', 'lint', 'page',
+                                    'pip-audit', 'plan', 'pyright', 'report',
+                                    'test')
     assert module.BASE_BRANCH == 'main'
     for name, path in (('actionlint', 'actionlint.yml'),
                        ('aggregate', 'ci-gate.yml'),
                        ('analyze', 'codeql.yml'),
+                       ('budgets', 'tests.yml'),
                        ('classify', 'ci-gate.yml'),
-                       ('coverage', 'tests.yml'),
                        ('lint', 'lint.yml'),
                        ('page', 'tests.yml'),
                        ('pip-audit', 'audit.yml'),
+                       ('plan', 'tests.yml'),
                        ('pyright', 'types.yml'),
-                       ('suites', 'tests.yml')):
+                       ('report', 'ci-gate.yml'),
+                       ('test', 'tests.yml')):
         jobs = yaml.load(
             (ROOT / '.github/workflows' / path).read_text(encoding='utf-8'),
             Loader=yaml.BaseLoader)['jobs']
@@ -157,11 +160,9 @@ CORE_PIN = (
     'scripts/ci/apt_deb_cache.py', 'scripts/ci/check_committed_page.py',
     'scripts/ci/check_committed_rankings_page.py', 'scripts/ci/check_ratchets.py',
     'scripts/ci/chromium-digests.json', 'scripts/ci/classify_changes.py', 'scripts/ci/commit_scopes.py',
-    'scripts/ci/diff_coverage.py', 'scripts/ci/download.py', 'scripts/ci/gate_base_freshness.py',
+    'scripts/ci/download.py', 'scripts/ci/gate_base_freshness.py',
     'scripts/ci/gate_script_reach.py', 'scripts/ci/install_chromium.py', 'scripts/ci/install_valgrind.py',
-    'scripts/ci/instruction_budgets.py', 'scripts/ci/js_coverage.py',
-    'scripts/ci/js_lines.py', 'scripts/ci/perf_budgets.py',
-    'scripts/ci/ratchet.py', 'scripts/ci/thresholds.py',
+    'scripts/ci/instruction_budgets.py', 'scripts/ci/perf_budgets.py',
     'scripts/ci/update_chromium_digests.py', 'scripts/diff_aa.py', 'scripts/fetch_aa.py',
     'scripts/fetch_aa_parse.py', 'scripts/fetch_gdpval.py', 'scripts/fetch_github_stars.py',
     'scripts/fetch_hf_trending.py', 'scripts/fetch_http.py', 'scripts/fetch_openrouter_trending.py',
@@ -205,7 +206,7 @@ def test_the_pin_fails_when_a_gate_names_a_file_the_pipeline_cannot_commit(tmp_p
             '    steps:\n'
             '      - run: ./actionlint -color .github/workflows/*.yml\n',
         '.github/workflows/tests.yml':
-            'name: tests\non: push\njobs:\n  suites:\n'
+            'name: tests\non: push\njobs:\n  test:\n'
             '    runs-on: ubuntu-latest\n'
             '    steps:\n'
             '      - run: cat README.md\n',
@@ -215,9 +216,9 @@ def test_the_pin_fails_when_a_gate_names_a_file_the_pipeline_cannot_commit(tmp_p
 
     # A gate job names a new tracked file the pipeline cannot commit.
     _commit(repo, 'ci: a gate reads a file the pipeline cannot commit', {
-        'scripts/ci/fixture-gate-read.py': '# read by the suites job\n',
+        'scripts/ci/fixture-gate-read.py': '# read by the test job\n',
         '.github/workflows/tests.yml':
-            'name: tests\non: push\njobs:\n  suites:\n'
+            'name: tests\non: push\njobs:\n  test:\n'
             '    runs-on: ubuntu-latest\n'
             '    steps:\n'
             '      - run: cat README.md scripts/ci/fixture-gate-read.py\n',
@@ -297,7 +298,7 @@ def test_a_push_head_outside_mains_history_is_judged_strictly(tmp_path):
             'name: tests\n'
             'on: push\n'
             'jobs:\n'
-            '  suites:\n'
+            '  test:\n'
             '    runs-on: diverged\n'
             '    steps:\n'
             '      - run: python run_tests.py\n',
@@ -411,7 +412,7 @@ def test_red_names_a_merge_commit(tmp_path):
     _config(adv)
     _commit(adv, 'ci: the second parent', {
         '.github/workflows/tests.yml':
-            'name: tests\non: push\njobs:\n  suites:\n'
+            'name: tests\non: push\njobs:\n  test:\n'
             '    steps:\n      - run: python run_tests.py\n'})
     _git(side, 'push', 'origin', 'main')
     _git(adv, 'pull', '--no-rebase', 'origin', 'main')
@@ -485,7 +486,7 @@ def test_expressions_are_stripped_before_paths_are_taken(tmp_path):
             '    steps:\n'
             '      - run: python -m pytest ${{ matrix.python }}\n',
         '.github/workflows/tests.yml':
-            'name: tests\non: push\njobs:\n  suites:\n'
+            'name: tests\non: push\njobs:\n  test:\n'
             '    steps:\n      - run: python run_tests.py\n',
         '.github/workflows/gates.yml': _stub_workflow(),
     })
@@ -504,13 +505,13 @@ def test_whole_tree_spelling_adds_no_paths(tmp_path):
     idle = '\n'.join(
         f'  {job}:\n    steps:\n      - run: echo done\n'
         for job in module.REQUIRED_JOBS
-        if job not in ('actionlint', 'suites'))
+        if job not in ('actionlint', 'test'))
     _commit(repo, 'base: seed', {
         '.github/workflows/actionlint.yml':
             'name: actionlint\non: push\njobs:\n  actionlint:\n'
             f'    steps:\n{marker}',
         '.github/workflows/tests.yml':
-            'name: tests\non: push\njobs:\n  suites:\n'
+            'name: tests\non: push\njobs:\n  test:\n'
             f'    steps:\n{marker}',
         '.github/workflows/gates.yml':
             'name: gates\non: push\njobs:\n' + idle,
@@ -756,9 +757,8 @@ def test_parser_refusal_arms(tmp_path):
 
 def test_a_plain_scalar_continuation_parses(tmp_path):
     # The one shape upstream refuses and this port models: a plain value
-    # wrapped onto more-indented lines (the coverage gate in tests.yml wraps
-    # its `if:` expression this way, and tests.yml is not this change's to
-    # reformat). A continuation line carrying a mapping shape is NOT a
+    # wrapped onto more-indented lines (a step's `if:` expression wrapped
+    # this way is valid YAML a workflow may carry). A continuation line carrying a mapping shape is NOT a
     # continuation — a plain scalar cannot carry colon-space — so the
     # wrong-indent refusal arm above keeps its teeth.
     del tmp_path
@@ -806,7 +806,7 @@ def test_whole_action_use_takes_the_directory_whole(tmp_path):
             'name: actionlint\non: push\njobs:\n  actionlint:\n'
             '    steps:\n      - uses: ./\n',
         '.github/workflows/tests.yml':
-            'name: tests\non: push\njobs:\n  suites:\n'
+            'name: tests\non: push\njobs:\n  test:\n'
             '    steps:\n      - run: python run_tests.py\n',
         '.github/workflows/gates.yml': _stub_workflow(),
     })
@@ -834,7 +834,7 @@ def test_check_reports_a_merge_commit_in_process(tmp_path):
     _config(adv)
     _commit(adv, 'ci: the second parent', {
         '.github/workflows/tests.yml':
-            'name: tests\non: push\njobs:\n  suites:\n'
+            'name: tests\non: push\njobs:\n  test:\n'
             '    steps:\n      - run: python run_tests.py\n'})
     _git(side, 'push', 'origin', 'main')
     _git(adv, 'pull', '--no-rebase', 'origin', 'main')

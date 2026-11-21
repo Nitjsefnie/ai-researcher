@@ -1,19 +1,12 @@
-"""Tests for the coverage ratchet and the ratchet-document guard.
+"""Tests for the ratchet-document guard.
 
-The ratchet moves the recorded calibration in one direction only: a run
-whose measured coverage sits at most the hysteresis above the recorded
-measured justifies no raise, and a measurement below the recorded value
-never lowers anything. The guard refuses a head document that removes a
-key, lowers a value, changes schema_version, or rewrites a measurement
-without the floor it implies. The perf-budgets document
-(.github/perf-budgets.json) gets the same guard with the
-opposite value direction: every budget is an integer maximum, so the
-relaxation is the RAISE, schema_version is fixed, and key add/remove are
-findings there too. The instruction-budgets document
-(.github/instruction-budgets.json) — integer maxima of the
-pipeline targets' startup-subtracted callgrind totals — shares the
-budgets' direction rules verbatim. The cases pin both tools' behaviour,
-and the guard also gets end-to-end git cases in temporary repositories.
+The perf-budgets document (.github/perf-budgets.json) holds integer
+maxima, so the guard's relaxation is the RAISE: schema_version is fixed,
+and key add/remove are findings. The instruction-budgets document
+(.github/instruction-budgets.json) — integer maxima of the pipeline
+targets' startup-subtracted callgrind totals — shares the budgets'
+direction rules verbatim. The guard also gets end-to-end git cases in
+temporary repositories.
 """
 from __future__ import annotations
 
@@ -47,282 +40,8 @@ def _load(name):
     return module
 
 
-def _thresholds():
-    return _load("thresholds")
-
-
-def _ratchet():
-    return _load("ratchet")
-
-
 def _guard():
     return _load("check_ratchets")
-
-
-def _document(measured="92.6", floor="91.1", javascript=("50.0", "48.5"),
-              schema=1):
-    return {
-        "schema_version": schema,
-        "coverage": {
-            "python": {
-                "measured": Decimal(measured),
-                "floor": Decimal(floor),
-            },
-            "javascript": {
-                "measured": Decimal(javascript[0]),
-                "floor": Decimal(javascript[1]),
-            },
-        },
-    }
-
-
-def _written(tmp_path):
-    thresholds = _thresholds()
-    target = tmp_path / "ci-thresholds.json"
-    thresholds.write(target, _document())
-    return target
-
-
-# --- the ratchet ----------------------------------------------------------
-
-
-def test_no_raise_within_hysteresis():
-    ratchet = _ratchet()
-    measured = Decimal("94.1")  # recorded 92.6 + hysteresis 1.5, not over
-    assert ratchet.update(_document(), measured) is None
-
-
-def test_raise_beyond_hysteresis():
-    ratchet = _ratchet()
-    updated = ratchet.update(_document(), Decimal("94.2"))
-    assert updated is not None
-    record = updated["coverage"]["python"]
-    assert record["measured"] == Decimal("94.2")
-    assert record["floor"] == Decimal("92.7")
-    assert updated["schema_version"] == 1
-    assert updated["coverage"]["javascript"] == {
-        "measured": Decimal("50.0"),
-        "floor": Decimal("48.5"),
-    }
-
-
-def test_raise_beyond_hysteresis_javascript():
-    ratchet = _ratchet()
-    updated = ratchet.update(_document(), Decimal("52.0"),
-                             language="javascript")
-    assert updated is not None
-    record = updated["coverage"]["javascript"]
-    assert record["measured"] == Decimal("52.0")
-    assert record["floor"] == Decimal("50.5")
-    assert updated["coverage"]["python"] == {
-        "measured": Decimal("92.6"),
-        "floor": Decimal("91.1"),
-    }
-
-
-def test_no_raise_within_hysteresis_javascript():
-    ratchet = _ratchet()
-    measured = Decimal("51.5")  # recorded 50.0 + hysteresis 1.5, not over
-    assert ratchet.update(
-        _document(), measured, language="javascript") is None
-
-
-def test_measured_below_recorded_never_lowers():
-    ratchet = _ratchet()
-    for language in ("python", "javascript"):
-        assert ratchet.update(
-            _document(), Decimal("0.0"), language) is None
-
-
-def test_measurement_at_the_recorded_value_never_raises():
-    ratchet = _ratchet()
-    for measured in (Decimal("91.1"), Decimal("92.6"), Decimal("94.1")):
-        assert ratchet.update(_document(), measured) is None
-
-
-def test_measured_with_two_decimals_rejected():
-    ratchet = _ratchet()
-    with pytest.raises(ValueError, match="exactly one decimal place"):
-        ratchet.update(_document(), Decimal("94.25"))
-
-
-def test_floor_for_is_measured_minus_gap():
-    ratchet = _ratchet()
-    assert ratchet.floor_for(Decimal("92.6")) == Decimal("91.1")
-
-
-def test_main_no_raise_leaves_file_untouched(tmp_path, capsys):
-    ratchet = _ratchet()
-    target = _written(tmp_path)
-    before = target.read_text(encoding="utf-8")
-    assert ratchet.main(
-        ["--measured", "94.1", "--thresholds", str(target)]) == 0
-    assert target.read_text(encoding="utf-8") == before
-    assert "justifies no raise" in capsys.readouterr().out
-
-
-def test_main_raise_rewrites_the_file(tmp_path, capsys):
-    thresholds = _thresholds()
-    ratchet = _ratchet()
-    target = _written(tmp_path)
-    assert ratchet.main(
-        ["--measured", "95.0", "--thresholds", str(target)]) == 0
-    doc = thresholds.load(target)
-    assert doc["coverage"]["python"]["measured"] == Decimal("95.0")
-    assert doc["coverage"]["python"]["floor"] == Decimal("93.5")
-    out = capsys.readouterr().out
-    assert "raised" in out
-    assert "91.1 -> 93.5" in out
-
-
-def test_main_raise_javascript_rewrites_the_file(tmp_path, capsys):
-    thresholds = _thresholds()
-    ratchet = _ratchet()
-    target = _written(tmp_path)
-    assert ratchet.main(
-        ["--language", "javascript", "--measured", "52.0",
-         "--thresholds", str(target)]) == 0
-    doc = thresholds.load(target)
-    assert doc["coverage"]["javascript"]["measured"] == Decimal("52.0")
-    assert doc["coverage"]["javascript"]["floor"] == Decimal("50.5")
-    assert doc["coverage"]["python"]["measured"] == Decimal("92.6")
-    out = capsys.readouterr().out
-    assert "raised" in out
-    assert "48.5 -> 50.5" in out
-
-
-def test_main_invalid_measurement_fails(tmp_path, capsys):
-    ratchet = _ratchet()
-    target = _written(tmp_path)
-    assert ratchet.main(
-        ["--measured", "abc", "--thresholds", str(target)]) == 1
-    assert capsys.readouterr().err
-
-
-def test_main_unreadable_thresholds_fails(tmp_path):
-    ratchet = _ratchet()
-    missing = tmp_path / "absent.json"
-    assert ratchet.main(
-        ["--measured", "92.6", "--thresholds", str(missing)]) == 1
-
-
-# --- the guard: direct function cases --------------------------------------
-
-
-def _base_head():
-    base = _document()
-    head = _document()
-    return base, head
-
-
-def test_guard_identical_documents_are_clean():
-    guard = _guard()
-    base = _document()
-    # round-trip the way the guard itself reads a document: JSON text
-    # parsed back with numbers as Decimals
-    round_trip = json.loads(
-        json.dumps(base, default=float), parse_float=Decimal,
-        parse_int=Decimal)
-    assert guard.coverage_relaxations(base, round_trip) == []
-
-
-def test_guard_deleted_document_is_a_finding():
-    guard = _guard()
-    findings = guard.coverage_relaxations({"schema_version": 1}, None)
-    assert findings == [
-        '.github/ci-thresholds.json: (document): reference "present", '
-        'head absent — the document was deleted'
-    ]
-
-
-def test_guard_key_removed_is_a_finding():
-    guard = _guard()
-    base, head = _base_head()
-    del head["coverage"]["javascript"]
-    findings = guard.coverage_relaxations(base, head)
-    assert len(findings) == 2  # the language's measured and floor leaves
-    assert all("key removed" in line for line in findings)
-    assert all("coverage.javascript" in line for line in findings)
-
-
-def test_guard_key_added_is_a_finding():
-    guard = _guard()
-    base, head = _base_head()
-    head["coverage"]["ruby"] = {}
-    findings = guard.coverage_relaxations(base, head)
-    assert len(findings) == 1
-    assert "key added" in findings[0]
-
-
-def test_guard_schema_version_change_is_a_finding():
-    guard = _guard()
-    base, head = _base_head()
-    head["schema_version"] = 2
-    findings = guard.coverage_relaxations(base, head)
-    assert len(findings) == 1
-    assert "schema_version changed" in findings[0]
-
-
-def test_guard_lowered_values_are_findings():
-    guard = _guard()
-    base, head = _base_head()
-    head["coverage"]["python"]["measured"] = Decimal("90.0")
-    head["coverage"]["python"]["floor"] = Decimal("88.5")
-    findings = guard.coverage_relaxations(base, head)
-    assert len(findings) == 2
-    assert "lowered; it may only rise" in findings[0]
-    assert "lowered; it may only rise" in findings[1]
-
-
-def test_guard_lowered_floor_alone_is_a_finding():
-    guard = _guard()
-    base, head = _base_head()
-    head["coverage"]["python"]["floor"] = Decimal("89.0")
-    findings = guard.coverage_relaxations(base, head)
-    assert len(findings) == 1
-    assert "lowered; it may only rise" in findings[0]
-
-
-def test_guard_raise_carrying_the_implied_floor_is_clean():
-    guard = _guard()
-    base, head = _base_head()
-    head["coverage"]["python"]["measured"] = Decimal("94.2")
-    head["coverage"]["python"]["floor"] = Decimal("92.7")
-    assert guard.coverage_relaxations(base, head) == []
-
-
-def test_guard_changed_measurement_without_implied_floor_is_a_finding():
-    guard = _guard()
-    base, head = _base_head()
-    head["coverage"]["python"]["measured"] = Decimal("94.2")
-    # the floor stays at the old implied value: not a document the ratchet
-    # would have written
-    findings = guard.coverage_relaxations(base, head)
-    assert len(findings) == 1
-    assert "must carry floor = measured - 1.5" in findings[0]
-
-
-def test_guard_string_value_is_not_a_finite_number():
-    guard = _guard()
-    base, head = _base_head()
-    head["coverage"]["python"]["measured"] = "94.2"
-    findings = guard.coverage_relaxations(base, head)
-    assert len(findings) == 1
-    assert "not a finite number" in findings[0]
-
-
-def test_guard_boolean_value_is_not_a_finite_number():
-    guard = _guard()
-    base, head = _base_head()
-    head["coverage"]["python"]["measured"] = True
-    findings = guard.coverage_relaxations(base, head)
-    assert len(findings) == 1
-    assert "not a finite number" in findings[0]
-
-
-def test_guard_absent_at_merge_base_is_clean():
-    guard = _guard()
-    assert guard.coverage_relaxations(None, {"schema_version": 1}) == []
 
 
 # --- the guard: end-to-end git cases ----------------------------------------
@@ -333,12 +52,11 @@ def _git(repo, *args):
                           capture_output=True, text=True)
 
 
-def _seed_repo(tmp_path, document, budgets=None, instruction_budgets=None):
-    """Seed a repo with the thresholds document and, optionally, the
-    committed budgets and instruction-budgets documents."""
+def _seed_repo(tmp_path, budgets=None, instruction_budgets=None):
+    """Seed a repo with the committed budgets and/or instruction-budgets
+    documents."""
     repo = Path(tmp_path) / "repo"
     (repo / ".github").mkdir(parents=True)
-    _thresholds().write(repo / ".github" / "ci-thresholds.json", document)
     if budgets is not None:
         _budgets_written(repo, budgets)
     if instruction_budgets is not None:
@@ -346,7 +64,6 @@ def _seed_repo(tmp_path, document, budgets=None, instruction_budgets=None):
     _git(repo, "init", "-q", "-b", "main")
     _git(repo, "config", "user.email", "tests@example.invalid")
     _git(repo, "config", "user.name", "Tests")
-    _git(repo, "add", ".github/ci-thresholds.json")
     if budgets is not None:
         _git(repo, "add", ".github/perf-budgets.json")
     if instruction_budgets is not None:
@@ -388,65 +105,23 @@ def _commit_budgets_on_branch(repo, document, message, extra_path=None,
     return _git(repo, "rev-parse", "HEAD").stdout.strip()
 
 
-def _commit_here(repo, document, message):
-    """Commit the document on whatever branch is checked out."""
-    (repo / ".github").mkdir(exist_ok=True)
-    _thresholds().write(repo / ".github" / "ci-thresholds.json", document)
-    _git(repo, "add", ".github/ci-thresholds.json")
-    _git(repo, "commit", "-qm", message)
-    return _git(repo, "rev-parse", "HEAD").stdout.strip()
-
-
-def _commit_on_branch(repo, document, message):
-    """Commit on a `pr` branch forked from main, as a pull request does.
-
-    Main stays at the fork so either route compares with the parent.
-    """
-    _git(repo, "checkout", "-q", "-b", "pr")
-    return _commit_here(repo, document, message)
-
-
-def test_end_to_end_clean_raise_is_ok(tmp_path, monkeypatch):
-    repo = _seed_repo(tmp_path, _document())
-    head = _commit_on_branch(repo, _document(measured="94.2", floor="92.7"),
-                             "raise")
-    guard = _guard()
-    fork, findings = guard.check_ratchets(repo, "main", head)
-    assert findings == []
-    assert fork == _git(repo, "rev-parse", "main").stdout.strip()
-    monkeypatch.chdir(repo)
-    assert guard.main(["main", head]) == 0
-
-
-def test_end_to_end_relaxed_head_fails_with_findings(tmp_path, capsys,
-                                                     monkeypatch):
-    repo = _seed_repo(tmp_path, _document())
-    head = _commit_on_branch(repo, _document(measured="90.0", floor="88.5"),
-                             "lower the calibration by hand")
-    guard = _guard()
-    _fork, findings = guard.check_ratchets(repo, "main", head)
-    assert len(findings) == 2
-    assert all("lowered" in line for line in findings)
-    monkeypatch.chdir(repo)
-    assert guard.main(["main", head]) == 1
-    assert "relaxation(s)" in capsys.readouterr().out
-
-
 def test_end_to_end_main_advancing_after_the_fork_is_not_a_relaxation(
         tmp_path, monkeypatch, capsys):
     """On the PR route the merge base, not main's tip, is the reference.
 
-    Main records a higher measured after the branch forked — a raise the
+    Main tightens a budget after the branch forked — a tightening the
     stale branch must not be penalised for missing. Comparing against
     main's tip instead of the merge base would read the branch's older
-    values as a lowering; the guard compares against the fork, so the
-    stale branch is clean.
+    value as a raise; the guard compares against the fork, so the stale
+    branch is clean.
     """
-    repo = _seed_repo(tmp_path, _document())
+    repo = _seed_repo(tmp_path, budgets=_budgets_document())
     _git(repo, "checkout", "-q", "-b", "pr")
     _git(repo, "checkout", "-q", "main")
-    tip = _commit_here(repo, _document(measured="94.2", floor="92.7"),
-                       "raise on main after the branch forked")
+    tightened = _budgets_document()
+    tightened["bytes"]["code_bytes"] = 71000
+    tip = _commit_budgets_here(repo, tightened,
+                               "tighten on main after the branch forked")
     guard = _guard()
     fork, findings = guard.check_ratchets(repo, "main", "pr", route="pr")
     assert findings == []
@@ -454,27 +129,30 @@ def test_end_to_end_main_advancing_after_the_fork_is_not_a_relaxation(
     assert fork != tip
     monkeypatch.chdir(repo)
     assert guard.main(["--route", "pr", "main", "pr"]) == 0
-    assert capsys.readouterr().out.count(f"against merge base {fork} — ok") == 3
+    assert capsys.readouterr().out.count(f"against merge base {fork} — ok") == 2
 
 
-def test_end_to_end_branch_lowering_while_main_advanced_is_flagged(tmp_path):
-    """Main's raise does not make the branch's own lowering acceptable."""
-    repo = _seed_repo(tmp_path, _document())
+def test_end_to_end_branch_raise_while_main_advanced_is_flagged(tmp_path):
+    """Main's tightening does not make the branch's own raise acceptable."""
+    repo = _seed_repo(tmp_path, budgets=_budgets_document())
     _git(repo, "checkout", "-q", "-b", "pr")
     _git(repo, "checkout", "-q", "main")
-    _commit_here(repo, _document(measured="94.2", floor="92.7"),
-                 "raise on main after the branch forked")
+    tightened = _budgets_document()
+    tightened["bytes"]["code_bytes"] = 71000
+    _commit_budgets_here(repo, tightened,
+                         "tighten on main after the branch forked")
     _git(repo, "checkout", "-q", "pr")
-    head = _commit_here(repo, _document(measured="90.0", floor="88.5"),
-                        "lower the calibration on the branch")
+    raised = _budgets_document()
+    raised["bytes"]["code_bytes"] = 72000
+    head = _commit_budgets_here(repo, raised, "raise on the branch")
     guard = _guard()
     _fork, findings = guard.check_ratchets(repo, "main", head, route="pr")
-    assert len(findings) == 2
-    assert all("lowered" in line for line in findings)
+    assert len(findings) == 1
+    assert "raised; it may only fall" in findings[0]
 
 
 def test_end_to_end_shallow_repository_is_refused(tmp_path):
-    repo = _seed_repo(tmp_path, _document())
+    repo = _seed_repo(tmp_path, budgets=_budgets_document())
     clone = Path(tmp_path) / "shallow"
     subprocess.run(
         ["git", "clone", "-q", "--depth", "1", f"file://{repo}", str(clone)],
@@ -485,29 +163,30 @@ def test_end_to_end_shallow_repository_is_refused(tmp_path):
 
 
 def test_end_to_end_document_absent_at_merge_base_is_clean(tmp_path):
-    repo = _seed_repo(tmp_path, _document())
-    _git(repo, "rm", "-q", ".github/ci-thresholds.json")
+    repo = _seed_repo(tmp_path, budgets=_budgets_document())
+    _git(repo, "rm", "-q", ".github/perf-budgets.json")
     _git(repo, "commit", "-qm", "remove the document")
     # the branch reintroduces the document against a merge base that
     # lacks it — nothing there to relax
-    head = _commit_on_branch(repo, _document(), "reintroduce the document")
+    head = _commit_budgets_on_branch(repo, _budgets_document(),
+                                     "reintroduce the document")
     guard = _guard()
     _fork, findings = guard.check_ratchets(repo, "main", head)
     assert findings == []
 
 
 def test_end_to_end_symlink_head_entry_is_a_finding(tmp_path, monkeypatch):
-    repo = _seed_repo(tmp_path, _document())
+    repo = _seed_repo(tmp_path, budgets=_budgets_document())
     _git(repo, "checkout", "-q", "-b", "pr")
-    target = repo / ".github" / "ci-thresholds.json"
+    target = repo / ".github" / "perf-budgets.json"
     target.unlink()
     target.symlink_to("elsewhere.json")
-    _git(repo, "add", ".github/ci-thresholds.json")
+    _git(repo, "add", ".github/perf-budgets.json")
     _git(repo, "commit", "-qm", "swap the document for a symlink")
     guard = _guard()
     _fork, findings = guard.check_ratchets(repo, "main", "pr")
     assert findings == [
-        '.github/ci-thresholds.json: (document): reference "100644 blob", '
+        '.github/perf-budgets.json: (document): reference "100644 blob", '
         'head "120000 blob" — not a regular file'
     ]
     monkeypatch.chdir(repo)
@@ -515,11 +194,11 @@ def test_end_to_end_symlink_head_entry_is_a_finding(tmp_path, monkeypatch):
 
 
 def test_end_to_end_invalid_json_at_head_is_a_git_error(tmp_path):
-    repo = _seed_repo(tmp_path, _document())
+    repo = _seed_repo(tmp_path, budgets=_budgets_document())
     _git(repo, "checkout", "-q", "-b", "pr")
-    (repo / ".github" / "ci-thresholds.json").write_text(
+    (repo / ".github" / "perf-budgets.json").write_text(
         "{not json", encoding="utf-8")
-    _git(repo, "add", ".github/ci-thresholds.json")
+    _git(repo, "add", ".github/perf-budgets.json")
     _git(repo, "commit", "-qm", "break the document")
     guard = _guard()
     with pytest.raises(ValueError, match="not valid JSON"):
@@ -527,41 +206,39 @@ def test_end_to_end_invalid_json_at_head_is_a_git_error(tmp_path):
 
 
 def test_end_to_end_unknown_revision_is_exit_2(tmp_path):
-    _seed_repo(tmp_path, _document())
+    _seed_repo(tmp_path, budgets=_budgets_document())
     guard = _guard()
     assert guard.main(["main", "no-such-revision"]) == 2
 
 
-def test_end_to_end_push_lowering_on_main_is_flagged(tmp_path, capsys,
-                                                     monkeypatch):
+def test_end_to_end_push_raise_on_main_is_flagged(tmp_path, capsys,
+                                                  monkeypatch):
     """The push path's shape: AI_RESEARCHER_BEFORE..HEAD, both tips of main.
 
     The workflow passes main's previous and new tips to the guard; a
-    direct-push lowering must be flagged like a branch's lowering.
+    direct-push raise must be flagged like a branch's raise.
     main() runs in-process so coverage.py can trace the guard's lines.
     """
-    repo = _seed_repo(tmp_path, _document())
+    repo = _seed_repo(tmp_path, budgets=_budgets_document())
     before = _git(repo, "rev-parse", "main").stdout.strip()
-    head = _commit_here(repo, _document(measured="90.0", floor="88.5"),
-                        "lower the calibration by direct push")
+    raised = _budgets_document()
+    raised["bytes"]["code_bytes"] = 72000
+    head = _commit_budgets_here(repo, raised, "raise a budget by direct push")
     guard = _guard()
     monkeypatch.chdir(repo)
     assert guard.main([before, head]) == 1
     assert "relaxation(s)" in capsys.readouterr().out
 
 
-def test_end_to_end_push_raise_on_main_is_clean(tmp_path, capsys,
-                                                monkeypatch):
-    """The automated raise's own push run must stay green.
-
-    The raise commit only lifts values, so against its parent it relaxes
-    nothing — the push branch of the guard step cannot break the very
-    commits the ratchet itself produces.
-    """
-    repo = _seed_repo(tmp_path, _document())
+def test_end_to_end_push_tighten_on_main_is_clean(tmp_path, capsys,
+                                                  monkeypatch):
+    """A tightening push only lowers values, so against its parent it
+    relaxes nothing."""
+    repo = _seed_repo(tmp_path, budgets=_budgets_document())
     before = _git(repo, "rev-parse", "main").stdout.strip()
-    head = _commit_here(repo, _document(measured="94.2", floor="92.7"),
-                        "raise (automated)")
+    tightened = _budgets_document()
+    tightened["bytes"]["code_bytes"] = 71000
+    head = _commit_budgets_here(repo, tightened, "tighten a budget")
     guard = _guard()
     monkeypatch.chdir(repo)
     assert guard.main([before, head]) == 0
@@ -654,8 +331,7 @@ def test_budgets_guard_key_added_is_a_finding():
     guard = _guard()
     base, head = _budgets_document(), _budgets_document()
     # a PR adding a journey budget is a change -- it must not be able to
-    # mask a raise elsewhere, so additions are refused, matching the
-    # coverage document's shape
+    # mask a raise elsewhere, so additions are refused
     head["journeys"]["scroll"] = {"dom_nodes_mutated": 1,
                                   "long_task_count": 0}
     findings = guard.budgets_relaxations(base, head)
@@ -701,7 +377,7 @@ def test_budgets_guard_absent_at_merge_base_is_clean():
 
 def test_end_to_end_budgets_raise_is_flagged(tmp_path, capsys, monkeypatch):
     """Raising a perf budget relaxes the ratchet: one finding, exit 1."""
-    repo = _seed_repo(tmp_path, _document(), budgets=_budgets_document())
+    repo = _seed_repo(tmp_path, budgets=_budgets_document())
     raised = _budgets_document()
     raised["bytes"]["code_bytes"] = 71628
     head = _commit_budgets_on_branch(repo, raised, "raise a budget")
@@ -716,9 +392,9 @@ def test_end_to_end_budgets_raise_is_flagged(tmp_path, capsys, monkeypatch):
 
 
 def test_end_to_end_budgets_tighten_is_clean(tmp_path, capsys, monkeypatch):
-    """Lowering budgets tightens: clean, and ALL THREE documents report ok
-    in one run — the guard checks all three in the same pass."""
-    repo = _seed_repo(tmp_path, _document(), budgets=_budgets_document())
+    """Lowering budgets tightens: clean, and BOTH documents report ok in
+    one run — the guard checks both in the same pass."""
+    repo = _seed_repo(tmp_path, budgets=_budgets_document())
     tightened = _budgets_document()
     tightened["journeys"]["load"]["long_task_count"] = 1
     tightened["bytes"]["code_bytes"] = 71000
@@ -729,11 +405,11 @@ def test_end_to_end_budgets_tighten_is_clean(tmp_path, capsys, monkeypatch):
     monkeypatch.chdir(repo)
     assert guard.main(["main", head]) == 0
     out = capsys.readouterr().out
-    assert out.count("not relaxed") == 3
+    assert out.count("not relaxed") == 2
 
 
 def test_end_to_end_budgets_schema_version_is_fixed(tmp_path):
-    repo = _seed_repo(tmp_path, _document(), budgets=_budgets_document())
+    repo = _seed_repo(tmp_path, budgets=_budgets_document())
     head = _commit_budgets_on_branch(
         repo, _budgets_document(schema=2), "bump the schema version")
     guard = _guard()
@@ -743,7 +419,7 @@ def test_end_to_end_budgets_schema_version_is_fixed(tmp_path):
 
 
 def test_end_to_end_budgets_key_add_and_remove_are_findings(tmp_path):
-    repo = _seed_repo(tmp_path, _document(), budgets=_budgets_document())
+    repo = _seed_repo(tmp_path, budgets=_budgets_document())
     reshaped = _budgets_document()
     del reshaped["journeys"]["hover"]
     reshaped["journeys"]["scroll"] = {"dom_nodes_mutated": 1,
@@ -758,33 +434,11 @@ def test_end_to_end_budgets_key_add_and_remove_are_findings(tmp_path):
     assert all("key added" in f for f in findings[2:])
 
 
-def test_end_to_end_both_documents_are_guarded_in_one_run(tmp_path):
-    """One branch lowers the calibration AND raises a budget: the guard
-    reports both documents' findings in the same pass."""
-    repo = _seed_repo(tmp_path, _document(), budgets=_budgets_document())
-    _git(repo, "checkout", "-q", "-b", "pr")
-    _thresholds().write(repo / ".github" / "ci-thresholds.json",
-                        _document(measured="90.0", floor="88.5"))
-    _git(repo, "add", ".github/ci-thresholds.json")
-    _git(repo, "commit", "-qm", "lower the calibration")
-    raised = _budgets_document()
-    raised["bytes"]["code_bytes"] += 100
-    _budgets_written(repo, raised)
-    _git(repo, "add", ".github/perf-budgets.json")
-    _git(repo, "commit", "-qm", "raise a budget")
-    head = _git(repo, "rev-parse", "HEAD").stdout.strip()
-    guard = _guard()
-    _fork, findings = guard.check_ratchets(repo, "main", head)
-    assert any(".github/ci-thresholds.json" in f and "lowered" in f
-               for f in findings)
-    assert any(".github/perf-budgets.json" in f and "raised; it may only "
-               "fall" in f for f in findings)
-
-
 def test_end_to_end_budgets_absent_from_history_is_clean(tmp_path):
     """A repo (or an old tag) predating the budgets document: absent on
     both sides relaxes nothing."""
-    repo = _seed_repo(tmp_path, _document())
+    repo = _seed_repo(tmp_path,
+                      instruction_budgets=_instruction_budgets_document())
     head = _commit_budgets_on_branch(repo, _budgets_document(),
                                      "introduce the budgets document")
     guard = _guard()
@@ -903,8 +557,8 @@ def test_instruction_budgets_guard_non_finite_leaf_fails_closed():
 def test_end_to_end_instruction_budgets_raise_is_flagged(tmp_path, capsys,
                                                          monkeypatch):
     """Raising an instruction budget relaxes the ratchet: one finding,
-    exit 1, named against the third document."""
-    repo = _seed_repo(tmp_path, _document(),
+    exit 1, named against the second document."""
+    repo = _seed_repo(tmp_path,
                       instruction_budgets=_instruction_budgets_document())
     raised = _instruction_budgets_document()
     raised["scripts"]["build"] += 100
@@ -926,8 +580,8 @@ def test_end_to_end_instruction_budgets_raise_is_flagged(tmp_path, capsys,
 def test_end_to_end_instruction_budgets_tighten_is_clean(tmp_path, capsys,
                                                          monkeypatch):
     """Lowering an instruction budget tightens: clean, and the guard's
-    clean run reports all three documents ok in one pass."""
-    repo = _seed_repo(tmp_path, _document(),
+    clean run reports both documents ok in one pass."""
+    repo = _seed_repo(tmp_path,
                       instruction_budgets=_instruction_budgets_document())
     tightened = _instruction_budgets_document()
     tightened["scripts"]["build"] -= 1_000_000
@@ -941,13 +595,13 @@ def test_end_to_end_instruction_budgets_tighten_is_clean(tmp_path, capsys,
     assert findings == []
     monkeypatch.chdir(repo)
     assert guard.main(["main", head]) == 0
-    assert capsys.readouterr().out.count("not relaxed") == 3
+    assert capsys.readouterr().out.count("not relaxed") == 2
 
 
 def test_end_to_end_instruction_budgets_absent_from_history_is_clean(tmp_path):
-    """A repo predating the third document: absent at the merge base,
+    """A repo predating the second document: absent at the merge base,
     the branch's new document relaxes nothing."""
-    repo = _seed_repo(tmp_path, _document())
+    repo = _seed_repo(tmp_path, budgets=_budgets_document())
     _git(repo, "checkout", "-q", "-b", "pr")
     _instruction_budgets_written(repo, _instruction_budgets_document())
     _git(repo, "add", ".github/instruction-budgets.json")
@@ -958,17 +612,12 @@ def test_end_to_end_instruction_budgets_absent_from_history_is_clean(tmp_path):
     assert findings == []
 
 
-def test_end_to_end_all_three_documents_guarded_in_one_run(tmp_path):
-    """One branch lowers the calibration, raises a perf budget AND raises
-    an instruction budget: the guard reports all three documents'
-    findings in the same pass."""
-    repo = _seed_repo(tmp_path, _document(), budgets=_budgets_document(),
+def test_end_to_end_both_documents_guarded_in_one_run(tmp_path):
+    """One branch raises a perf budget AND an instruction budget: the
+    guard reports both documents' findings in the same pass."""
+    repo = _seed_repo(tmp_path, budgets=_budgets_document(),
                       instruction_budgets=_instruction_budgets_document())
     _git(repo, "checkout", "-q", "-b", "pr")
-    _thresholds().write(repo / ".github" / "ci-thresholds.json",
-                        _document(measured="90.0", floor="88.5"))
-    _git(repo, "add", ".github/ci-thresholds.json")
-    _git(repo, "commit", "-qm", "lower the calibration")
     raised = _budgets_document()
     raised["bytes"]["code_bytes"] += 100
     _budgets_written(repo, raised)
@@ -982,8 +631,6 @@ def test_end_to_end_all_three_documents_guarded_in_one_run(tmp_path):
     head = _git(repo, "rev-parse", "HEAD").stdout.strip()
     guard = _guard()
     _fork, findings = guard.check_ratchets(repo, "main", head)
-    assert any(".github/ci-thresholds.json" in f and "lowered" in f
-               for f in findings)
     assert any(".github/perf-budgets.json" in f and "raised; it may only "
                "fall" in f for f in findings)
     assert any(".github/instruction-budgets.json" in f and "raised; it may "
@@ -1006,15 +653,15 @@ def test_guard_nan_and_infinity_leaves_fail_closed_in_both_walks():
     """
     guard = _guard()
 
-    def poison_javascript_measured(doc, value):
-        doc["coverage"]["javascript"]["measured"] = value
+    def poison_build_instructions(doc, value):
+        doc["scripts"]["build"] = value
 
     def poison_bytes_raw(doc, value):
         doc["bytes"]["code_bytes"] = value
 
     cases = (
-        (guard.coverage_relaxations, _document,
-         poison_javascript_measured, "coverage.javascript.measured"),
+        (guard.instruction_budgets_relaxations, _instruction_budgets_document,
+         poison_build_instructions, "scripts.build"),
         (guard.budgets_relaxations, _budgets_document,
          poison_bytes_raw, "bytes.code_bytes"),
     )
@@ -1032,7 +679,7 @@ def test_end_to_end_non_finite_budget_head_fails_closed(tmp_path, capsys,
                                                         monkeypatch):
     """A head budgets document carrying a NaN literal: exit 1 through the
     normal findings path — never a crash, never a silent pass."""
-    repo = _seed_repo(tmp_path, _document(), budgets=_budgets_document())
+    repo = _seed_repo(tmp_path, budgets=_budgets_document())
     _git(repo, "checkout", "-q", "-b", "pr")
     poisoned = _budgets_document()
     poisoned["bytes"]["code_bytes"] = float("nan")
@@ -1057,7 +704,8 @@ def test_guard_finite_unchanged_leaves_stay_clean():
     """The poison tests' control: finite unchanged inputs produce zero
     findings in both walks."""
     guard = _guard()
-    for relaxations, build_doc in ((guard.coverage_relaxations, _document),
+    for relaxations, build_doc in ((guard.instruction_budgets_relaxations,
+                                    _instruction_budgets_document),
                                    (guard.budgets_relaxations,
                                     _budgets_document)):
         base, head = build_doc(), build_doc()
@@ -1071,25 +719,11 @@ def test_guard_unit_helpers_pin_their_contract():
     # white-box: these rendering helpers are the contract under test
     # pylint: disable=protected-access
     guard = _guard()
-    assert guard._decimal(94.2) == Decimal("94.2")
     # an unserializable value falls back to its repr, never a crash
     assert guard._show(object()).startswith("<")
     assert guard._key_path([]) == "(document)"
     # a key part that is not a plain identifier renders as JSON text
     assert guard._key_path(["a b"]) == '["a b"]'
-
-
-def test_guard_changed_leaf_without_a_direction_is_a_finding():
-    # a coverage leaf outside the direction map must not slip through
-    # unjudged when it changes: no direction means any change is a
-    # finding
-    guard = _guard()
-    base, head = _document(), _document()
-    base["coverage"]["ruby"] = {"measured": Decimal("1.0")}
-    head["coverage"]["ruby"] = {"measured": Decimal("2.0")}
-    findings = guard.coverage_relaxations(base, head)
-    assert len(findings) == 1
-    assert "changed, and has no tightening direction" in findings[0]
 
 
 def test_guard_reference_non_number_is_a_finding():
@@ -1110,11 +744,11 @@ def test_guard_git_failure_outside_a_repository_is_refused(tmp_path):
 
 def test_end_to_end_unrelated_histories_are_refused(tmp_path):
     """The PR route refuses orphan histories with no merge base."""
-    repo = _seed_repo(tmp_path, _document(), budgets=_budgets_document())
+    repo = _seed_repo(tmp_path, budgets=_budgets_document())
     _git(repo, "checkout", "-q", "--orphan", "isolated")
-    (repo / ".github" / "ci-thresholds.json").write_text(
+    (repo / ".github" / "perf-budgets.json").write_text(
         json.dumps({"schema_version": 1}), encoding="utf-8")
-    _git(repo, "add", ".github/ci-thresholds.json")
+    _git(repo, "add", ".github/perf-budgets.json")
     _git(repo, "commit", "-qm", "an unrelated history")
     head = _git(repo, "rev-parse", "HEAD").stdout.strip()
     guard = _guard()
@@ -1124,7 +758,7 @@ def test_end_to_end_unrelated_histories_are_refused(tmp_path):
 
 def test_end_to_end_push_with_unrelated_identical_documents_is_clean(
         tmp_path, monkeypatch):
-    repo = _seed_repo(tmp_path, _document(), budgets=_budgets_document())
+    repo = _seed_repo(tmp_path, budgets=_budgets_document())
     _git(repo, "checkout", "-q", "--orphan", "rewritten")
     _git(repo, "commit", "-qm", "Rewrite the root with the same tree")
     head = _git(repo, "rev-parse", "HEAD").stdout.strip()
@@ -1138,23 +772,23 @@ def test_end_to_end_push_with_unrelated_identical_documents_is_clean(
 
 
 def test_entry_kind_refuses_an_unreadable_object(tmp_path):
-    repo = _seed_repo(tmp_path, _document(), budgets=_budgets_document())
+    repo = _seed_repo(tmp_path, budgets=_budgets_document())
     guard = _guard()
     with pytest.raises(ValueError, match="cannot list"):
-        guard.entry_kind(repo, "f" * 40, ".github/ci-thresholds.json")
+        guard.entry_kind(repo, "f" * 40, ".github/perf-budgets.json")
 
 
 def test_read_document_refuses_a_non_regular_entry(tmp_path):
-    repo = _seed_repo(tmp_path, _document(), budgets=_budgets_document())
+    repo = _seed_repo(tmp_path, budgets=_budgets_document())
     _git(repo, "checkout", "-q", "-b", "pr")
-    target = repo / ".github" / "ci-thresholds.json"
+    target = repo / ".github" / "perf-budgets.json"
     target.unlink()
     target.symlink_to("elsewhere.json")
-    _git(repo, "add", ".github/ci-thresholds.json")
+    _git(repo, "add", ".github/perf-budgets.json")
     _git(repo, "commit", "-qm", "swap the document for a symlink")
     guard = _guard()
     with pytest.raises(ValueError, match="not a regular file"):
-        guard.read_document(repo, "HEAD", ".github/ci-thresholds.json")
+        guard.read_document(repo, "HEAD", ".github/perf-budgets.json")
 
 
 # --- declared budget raises: the push route -----------------------------------
@@ -1200,7 +834,7 @@ def _rewrite_commits(repo, fork, commits):
 
 
 def _rewritten_budget_push(tmp_path):
-    repo = _seed_repo(tmp_path, _document(), budgets=_budgets_document(),
+    repo = _seed_repo(tmp_path, budgets=_budgets_document(),
                       instruction_budgets=_instruction_budgets_document())
     fork = _git(repo, "rev-parse", "HEAD").stdout.strip()
     raised = _budgets_document()
@@ -1228,7 +862,7 @@ def _assert_non_fast_forward(repo, before, head):
 def test_end_to_end_rewritten_push_with_identical_ratchets_is_clean(tmp_path):
     repo, before, head = _rewritten_budget_push(tmp_path)
     _assert_non_fast_forward(repo, before, head)
-    for document in (".github/ci-thresholds.json", ".github/perf-budgets.json",
+    for document in (".github/perf-budgets.json",
                      ".github/instruction-budgets.json"):
         blobs = [subprocess.run(
             ["git", "show", f"{rev}:{document}"], cwd=repo, check=True,
@@ -1236,7 +870,7 @@ def test_end_to_end_rewritten_push_with_identical_ratchets_is_clean(tmp_path):
         assert blobs[0] == blobs[1]
     result = _workflow_push_check(repo, before, head)
     assert result.returncode == 0, result.stdout + result.stderr
-    assert result.stdout.count(f"against base revision {before} — ok") == 3
+    assert result.stdout.count(f"against base revision {before} — ok") == 2
 
 
 def test_end_to_end_rewritten_push_cannot_declare_an_additional_raise(tmp_path):
@@ -1256,29 +890,6 @@ def test_end_to_end_rewritten_push_cannot_declare_an_additional_raise(tmp_path):
     assert f"against base revision {before};" in result.stdout
 
 
-def test_end_to_end_rewritten_push_dropping_coverage_raise_is_flagged(tmp_path):
-    repo = _seed_repo(tmp_path, _document(), budgets=_budgets_document())
-    fork = _git(repo, "rev-parse", "HEAD").stdout.strip()
-    _commit_here(repo, _document(measured="94.2", floor="92.7"),
-                 "Raise coverage on main")
-    _git(repo, "commit", "-q", "--allow-empty", "-m", "Further work")
-    before = _git(repo, "rev-parse", "HEAD").stdout.strip()
-    head = _rewrite_commits(repo, fork, (fork, fork))
-    _assert_non_fast_forward(repo, before, head)
-    result = _workflow_push_check(repo, before, head)
-    assert result.returncode == 1, result.stdout + result.stderr
-    assert (".github/ci-thresholds.json: coverage.python.measured: "
-            "reference 94.2, head 92.6 — lowered; it may only rise"
-            in result.stdout)
-    assert (".github/ci-thresholds.json: coverage.python.floor: "
-            "reference 92.7, head 91.1 — lowered; it may only rise"
-            in result.stdout)
-    assert f"against base revision {before};" in result.stdout
-    reference, findings = _guard().check_ratchets(repo, before, head)
-    assert reference == before
-    assert len(findings) == 2
-
-
 def test_end_to_end_push_declared_raise_is_clean(tmp_path, capsys,
                                                  monkeypatch):
     """The push route: a deliberate raise lands on main as its own commit,
@@ -1286,7 +897,7 @@ def test_end_to_end_push_declared_raise_is_clean(tmp_path, capsys,
     exact values the diff carries. The push invocation
     (--allow-declared-raises) passes it; the clean run prints no route
     hint."""
-    repo = _seed_repo(tmp_path, _document(), budgets=_budgets_document())
+    repo = _seed_repo(tmp_path, budgets=_budgets_document())
     was = _budgets_document()["bytes"]["code_bytes"]
     raised = _budgets_document()
     raised["bytes"]["code_bytes"] = 79700
@@ -1301,7 +912,7 @@ def test_end_to_end_push_declared_raise_is_clean(tmp_path, capsys,
     monkeypatch.chdir(repo)
     assert guard.main([before, head, "--allow-declared-raises"]) == 0
     out = capsys.readouterr().out
-    assert out.count("not relaxed") == 3
+    assert out.count("not relaxed") == 2
     assert "Budget-Raise: <document>" not in out
 
 
@@ -1309,7 +920,7 @@ def test_end_to_end_push_undeclared_raise_refuses_with_the_route_hint(
         tmp_path, capsys, monkeypatch):
     """The brief's non-negotiable: a raise with no declaration refuses
     even on the push path, and the refusal teaches the route."""
-    repo = _seed_repo(tmp_path, _document(), budgets=_budgets_document())
+    repo = _seed_repo(tmp_path, budgets=_budgets_document())
     raised = _budgets_document()
     raised["bytes"]["code_bytes"] = 79700
     before = _git(repo, "rev-parse", "main").stdout.strip()
@@ -1334,7 +945,7 @@ def test_end_to_end_push_declared_raise_requires_feat(
         tmp_path, capsys, monkeypatch, document, build_doc, write_doc,
         section, key, to, feat_sibling):
     """An exact push declaration needs a feat subject inside base..head."""
-    repo = _seed_repo(tmp_path, _document(), budgets=_budgets_document(),
+    repo = _seed_repo(tmp_path, budgets=_budgets_document(),
                       instruction_budgets=_instruction_budgets_document())
     _git(repo, "commit", "-q", "--allow-empty", "-m", "feat: earlier work")
     before = _git(repo, "rev-parse", "HEAD").stdout.strip()
@@ -1355,7 +966,7 @@ def test_end_to_end_push_declared_raise_requires_feat(
         0 if feat_sibling else 1)
     out = capsys.readouterr().out
     if feat_sibling:
-        assert out.count("not relaxed") == 3
+        assert out.count("not relaxed") == 2
     else:
         assert "feat:" in out
         assert "feat(<scope>):" in out
@@ -1372,7 +983,7 @@ def test_end_to_end_pull_request_declared_raise_is_clean(tmp_path, capsys,
     raise commit carrying perfectly formed declaration lines passes with
     a feat sibling: --allow-declared-raises --route pr is the invocation
     the workflow's PR branch makes."""
-    repo = _seed_repo(tmp_path, _document(), budgets=_budgets_document())
+    repo = _seed_repo(tmp_path, budgets=_budgets_document())
     was = _budgets_document()["bytes"]["code_bytes"]
     raised = _budgets_document()
     raised["bytes"]["code_bytes"] = 79700
@@ -1387,7 +998,7 @@ def test_end_to_end_pull_request_declared_raise_is_clean(tmp_path, capsys,
     assert guard.main(["main", head, "--allow-declared-raises",
                        "--route", "pr"]) == 0
     out = capsys.readouterr().out
-    assert out.count("not relaxed") == 3
+    assert out.count("not relaxed") == 2
     assert "cannot ride a pull request" not in out
 
 
@@ -1399,7 +1010,7 @@ def test_end_to_end_pull_request_declared_raise_is_clean(tmp_path, capsys,
 def test_end_to_end_pull_request_declared_raise_without_feat_refuses(
         tmp_path, capsys, monkeypatch, subject):
     """A pure, exact declaration needs a feat subject in this PR's window."""
-    repo = _seed_repo(tmp_path, _document(), budgets=_budgets_document())
+    repo = _seed_repo(tmp_path, budgets=_budgets_document())
     # A feature on the base is outside the window and cannot qualify it.
     _git(repo, "commit", "-q", "--allow-empty", "-m", "feat: earlier work")
     raised = _budgets_document()
@@ -1423,7 +1034,7 @@ def test_end_to_end_pull_request_declared_raise_without_feat_refuses(
 def test_end_to_end_pull_request_without_declarations_needs_no_feat(
         tmp_path, capsys, monkeypatch):
     """Ordinary fix PRs stay clean when no declaration lines exist."""
-    repo = _seed_repo(tmp_path, _document(), budgets=_budgets_document())
+    repo = _seed_repo(tmp_path, budgets=_budgets_document())
     tightened = _budgets_document()
     tightened["bytes"]["code_bytes"] = 71000
     head = _commit_budgets_on_branch(repo, tightened, "fix: trim page code")
@@ -1431,7 +1042,7 @@ def test_end_to_end_pull_request_without_declarations_needs_no_feat(
     monkeypatch.chdir(repo)
     assert guard.main(["main", head, "--allow-declared-raises",
                        "--route", "pr"]) == 0
-    assert capsys.readouterr().out.count("not relaxed") == 3
+    assert capsys.readouterr().out.count("not relaxed") == 2
 
 
 def test_end_to_end_pull_request_route_survives_a_moved_base(
@@ -1440,7 +1051,7 @@ def test_end_to_end_pull_request_route_survives_a_moved_base(
     fork point, so `main` is NOT an ancestor of the PR head. Requiring
     ancestry on the PR declaration route would refuse this pure declared
     raise after main advances; the PR route must still accept it."""
-    repo = _seed_repo(tmp_path, _document(), budgets=_budgets_document())
+    repo = _seed_repo(tmp_path, budgets=_budgets_document())
     was = _budgets_document()["bytes"]["code_bytes"]
     raised = _budgets_document()
     raised["bytes"]["code_bytes"] = 79700
@@ -1459,7 +1070,7 @@ def test_end_to_end_pull_request_route_survives_a_moved_base(
     assert guard.main(["main", head, "--allow-declared-raises",
                        "--route", "pr"]) == 0
     out = capsys.readouterr().out
-    assert out.count("not relaxed") == 3
+    assert out.count("not relaxed") == 2
 
 
 def test_end_to_end_pull_request_impure_carrier_refuses(tmp_path, capsys,
@@ -1470,7 +1081,7 @@ def test_end_to_end_pull_request_impure_carrier_refuses(tmp_path, capsys,
     documents. The raise commit itself carries the code edit here, so
     the finding names the foreign path; a separate sibling code commit
     with no lines is the push route's own allowed shape."""
-    repo = _seed_repo(tmp_path, _document(), budgets=_budgets_document())
+    repo = _seed_repo(tmp_path, budgets=_budgets_document())
     was = _budgets_document()["bytes"]["code_bytes"]
     raised = _budgets_document()
     raised["bytes"]["code_bytes"] = 79700
@@ -1493,7 +1104,7 @@ def test_end_to_end_pull_request_undeclared_raise_refuses(tmp_path, capsys,
                                                           monkeypatch):
     """Undeclared raises refuse on the PR route exactly as on the push
     route, and the refusal teaches the route."""
-    repo = _seed_repo(tmp_path, _document(), budgets=_budgets_document())
+    repo = _seed_repo(tmp_path, budgets=_budgets_document())
     raised = _budgets_document()
     raised["bytes"]["code_bytes"] = 79700
     _commit_budgets_on_branch(repo, raised, "Raise code_bytes, no line")
@@ -1511,7 +1122,7 @@ def test_end_to_end_mismatched_declaration_refuses(tmp_path, capsys,
                                                    monkeypatch):
     """A declaration is only as good as its values: a to that differs
     from the diff's to refuses both the raise and the declaration."""
-    repo = _seed_repo(tmp_path, _document(), budgets=_budgets_document())
+    repo = _seed_repo(tmp_path, budgets=_budgets_document())
     was = _budgets_document()["bytes"]["code_bytes"]
     raised = _budgets_document()
     raised["bytes"]["code_bytes"] = 73000
@@ -1533,7 +1144,7 @@ def test_end_to_end_declaration_without_a_raise_refuses(tmp_path, capsys,
                                                         monkeypatch):
     """An orphan declaration — well formed, on a pure commit, but the
     diff carries no raise for it — is itself a finding."""
-    repo = _seed_repo(tmp_path, _document(), budgets=_budgets_document())
+    repo = _seed_repo(tmp_path, budgets=_budgets_document())
     before = _git(repo, "rev-parse", "main").stdout.strip()
     head = _commit_budgets_here(
         repo, _budgets_document(),
@@ -1551,7 +1162,7 @@ def test_end_to_end_duplicate_declaration_refuses(tmp_path, capsys,
                                                   monkeypatch):
     """Two identical lines for one raise: the raise passes on the
     first, the duplicate is a leftover and a finding."""
-    repo = _seed_repo(tmp_path, _document(), budgets=_budgets_document())
+    repo = _seed_repo(tmp_path, budgets=_budgets_document())
     was = _budgets_document()["bytes"]["code_bytes"]
     raised = _budgets_document()
     raised["bytes"]["code_bytes"] = 79700
@@ -1572,7 +1183,7 @@ def test_end_to_end_non_fast_forward_push_cannot_declare(
     """The declaration route rides a fast-forward push: with the base
     not an ancestor of the head there is no push window to collect
     from, and the raise refuses."""
-    repo = _seed_repo(tmp_path, _document(), budgets=_budgets_document())
+    repo = _seed_repo(tmp_path, budgets=_budgets_document())
     was = _budgets_document()["bytes"]["code_bytes"]
     raised = _budgets_document()
     raised["bytes"]["code_bytes"] = 79700
@@ -1601,7 +1212,7 @@ def test_end_to_end_push_declared_raises_across_both_documents(
         tmp_path, capsys, monkeypatch):
     """One push raises a leaf in each budget document, two declaration
     lines: both consumed, clean."""
-    repo = _seed_repo(tmp_path, _document(), budgets=_budgets_document(),
+    repo = _seed_repo(tmp_path, budgets=_budgets_document(),
                       instruction_budgets=_instruction_budgets_document())
     budgets_was = _budgets_document()["bytes"]["code_bytes"]
     instructions_was = _instruction_budgets_document()["scripts"]["build"]
@@ -1624,14 +1235,14 @@ def test_end_to_end_push_declared_raises_across_both_documents(
     guard = _guard()
     monkeypatch.chdir(repo)
     assert guard.main([before, head, "--allow-declared-raises"]) == 0
-    assert capsys.readouterr().out.count("not relaxed") == 3
+    assert capsys.readouterr().out.count("not relaxed") == 2
 
 
 def test_end_to_end_partially_declared_raises_refuse_the_rest(
         tmp_path, capsys, monkeypatch):
     """Exactness is per leaf: a declared raise passes while an
     undeclared sibling raise in the same push still refuses."""
-    repo = _seed_repo(tmp_path, _document(), budgets=_budgets_document())
+    repo = _seed_repo(tmp_path, budgets=_budgets_document())
     was = _budgets_document()["bytes"]["code_bytes"]
     raised = _budgets_document()
     raised["bytes"]["code_bytes"] = 79700
@@ -1655,9 +1266,9 @@ def test_end_to_end_partially_declared_raises_refuse_the_rest(
 def test_end_to_end_declaration_naming_the_coverage_document_refuses(
         tmp_path, capsys, monkeypatch):
     """Only the two budget documents' raises are declarable: the
-    coverage document's values are the ratchet's own act, and a
+    coverage document's values are test-ratchet's report job's, and a
     declaration naming it is a finding of its own."""
-    repo = _seed_repo(tmp_path, _document(), budgets=_budgets_document())
+    repo = _seed_repo(tmp_path, budgets=_budgets_document())
     before = _git(repo, "rev-parse", "main").stdout.strip()
     head = _commit_budgets_here(
         repo, _budgets_document(),
@@ -1702,7 +1313,7 @@ def test_declaration_collector_reads_the_push_window(tmp_path):
     walk answers the same commit with its touched files."""
     # white-box: the collector is the window's contract
     # pylint: disable=protected-access
-    repo = _seed_repo(tmp_path, _document(), budgets=_budgets_document())
+    repo = _seed_repo(tmp_path, budgets=_budgets_document())
     was = _budgets_document()["bytes"]["code_bytes"]
     raised = _budgets_document()
     raised["bytes"]["code_bytes"] = 79700
@@ -1744,7 +1355,7 @@ def test_end_to_end_snan_declaration_cannot_crash_the_guard(
         tmp_path, capsys, monkeypatch):
     """A declaration line carrying sNaN must be a finding, never an
     uncaught decimal.InvalidOperation from the consumption's comparisons."""
-    repo = _seed_repo(tmp_path, _document(), budgets=_budgets_document())
+    repo = _seed_repo(tmp_path, budgets=_budgets_document())
     raised = _budgets_document()
     raised["bytes"]["code_bytes"] = 79700
     before = _git(repo, "rev-parse", "main").stdout.strip()
@@ -1766,7 +1377,7 @@ def test_end_to_end_impure_commit_cannot_declare(tmp_path, capsys,
     declaration lines and also touches anything outside the two budget
     documents is inert and a finding, so a raise cannot ride feature
     work onto main through a squash merge."""
-    repo = _seed_repo(tmp_path, _document(), budgets=_budgets_document())
+    repo = _seed_repo(tmp_path, budgets=_budgets_document())
     was = _budgets_document()["bytes"]["code_bytes"]
     raised = _budgets_document()
     raised["bytes"]["code_bytes"] = 79700
@@ -1792,7 +1403,7 @@ def test_end_to_end_declaration_cannot_rescue_schema_version(
     """Pin the exemption predicate: schema_version may not change at
     all, and a declaration naming it cannot turn the change into a
     raise."""
-    repo = _seed_repo(tmp_path, _document(), budgets=_budgets_document())
+    repo = _seed_repo(tmp_path, budgets=_budgets_document())
     raised = _budgets_document(schema=2)
     before = _git(repo, "rev-parse", "main").stdout.strip()
     head = _commit_budgets_here(
@@ -1811,7 +1422,7 @@ def test_end_to_end_declaration_cannot_rescue_a_key_add(
         tmp_path, capsys, monkeypatch):
     """Pin the exemption predicate: a key added is a finding a
     declaration cannot rescue."""
-    repo = _seed_repo(tmp_path, _document(), budgets=_budgets_document())
+    repo = _seed_repo(tmp_path, budgets=_budgets_document())
     widened = _budgets_document()
     widened["bytes"]["css_bytes"] = 1000
     before = _git(repo, "rev-parse", "main").stdout.strip()

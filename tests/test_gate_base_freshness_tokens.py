@@ -28,8 +28,8 @@ def test_a_bare_word_naming_a_root_file_still_resolves():
     assert resolve('requirements-dev.txt', FILES) == ('requirements-dev.txt',)
 
 
-def _suites_workflow(run):
-    return ('name: tests\non: push\njobs:\n  suites:\n    steps:\n'
+def _test_workflow(run):
+    return ('name: tests\non: push\njobs:\n  test:\n    steps:\n'
             '      - run: |\n' + ''.join(f'          {line}\n' for line in run))
 
 
@@ -53,7 +53,7 @@ def test_gate_paths_expand_a_directory_only_where_a_run_names_it_as_a_path(tmp_p
     module = _load()
     repo = _fixture_repo(tmp_path, {
         'assets/x.json': '{}\n',
-        '.github/workflows/tests.yml': _suites_workflow(
+        '.github/workflows/tests.yml': _test_workflow(
             ['# this REPLACES the assets the outer run read', 'python run_tests.py']),
     })
     derived = module.gate_paths(repo)
@@ -61,7 +61,7 @@ def test_gate_paths_expand_a_directory_only_where_a_run_names_it_as_a_path(tmp_p
     assert 'assets/x.json' not in derived, derived
 
     _commit(repo, 'ci: the suite reads assets/', {
-        '.github/workflows/tests.yml': _suites_workflow(
+        '.github/workflows/tests.yml': _test_workflow(
             ['python run_tests.py assets/']),
     })
     assert 'assets/x.json' in module.gate_paths(repo)
@@ -72,7 +72,7 @@ def test_listed_directories_stay_in_whatever_the_comments_say(tmp_path):
     repo = _fixture_repo(tmp_path, {
         'data/x.json': '{}\n',
         'out/page.html': '<p>page</p>\n',
-        '.github/workflows/tests.yml': _suites_workflow(
+        '.github/workflows/tests.yml': _test_workflow(
             ['# coverage combine REPLACES the data',
              "grep -q 'read timed out' log || python run_tests.py"]),
     })
@@ -80,7 +80,7 @@ def test_listed_directories_stay_in_whatever_the_comments_say(tmp_path):
     assert {'data/x.json', 'out/page.html', 'run_tests.py'} <= set(derived), derived
 
     _commit(repo, 'ci: reword the comment and the pattern', {
-        '.github/workflows/tests.yml': _suites_workflow(
+        '.github/workflows/tests.yml': _test_workflow(
             ['# coverage combine REPLACES the coverage file',
              "grep -q 'read timeout' log || python run_tests.py"]),
     })

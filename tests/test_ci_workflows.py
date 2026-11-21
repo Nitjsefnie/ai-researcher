@@ -7,7 +7,6 @@ from __future__ import annotations
 
 import re
 import sys
-import unittest
 from pathlib import Path
 
 import yaml
@@ -150,28 +149,6 @@ def test_hash_pinned_requirements_name_each_version_only_once():
                 "--require-hashes install fails")
 
 
-class WorkflowRunArtifactTests(unittest.TestCase):
-    """Cross-run downloads read artifacts from the triggering run."""
-
-    def test_downloads_use_the_triggering_run_id(self):
-        downloads = []
-        for path in WORKFLOWS:
-            workflow = yaml.load(path.read_text(encoding="utf-8"),
-                                 Loader=yaml.BaseLoader)
-            if "workflow_run" not in workflow.get("on", {}):
-                continue
-            for name, job in workflow["jobs"].items():
-                with self.subTest(workflow=path.name, job=name):
-                    for entry in job.get("steps", []):
-                        if entry.get("uses", "").split("@", 1)[0] != "actions/download-artifact":
-                            continue
-                        downloads.append(entry)
-                        self.assertEqual(
-                            "".join(entry.get("with", {}).get("run-id", "").split()),
-                            "${{github.event.workflow_run.id}}")
-        self.assertTrue(downloads, "no workflow_run artifact downloads found")
-
-
 def test_every_job_declares_timeout_minutes():
     # Issue #52: a hung job fails in its declared ceiling instead of holding
     # GitHub's 6-hour default. The invariant rides on the whole catalogue —
@@ -192,18 +169,18 @@ def test_every_job_declares_timeout_minutes():
             )
 
 
-def test_coverage_job_installs_chromium_through_the_digest_gate():
+def test_test_job_installs_chromium_through_the_digest_gate():
     # Issue #51: reverting this step to a bare `playwright install` unwires the digest gate.
     workflow = yaml.safe_load(TESTS_WORKFLOW.read_text(encoding="utf-8"))
-    [chromium] = [s for s in workflow["jobs"]["coverage"]["steps"]
+    [chromium] = [s for s in workflow["jobs"]["test"]["steps"]
                   if s.get("name") == "Install Chromium for playwright"]
     assert chromium["run"] == "python3 scripts/ci/install_chromium.py"
 
 
-def test_chromium_debs_cache_is_restore_only_in_coverage_and_shared():
+def test_chromium_debs_cache_is_restore_only_in_the_test_job_and_shared():
     tests = yaml.safe_load(TESTS_WORKFLOW.read_text(encoding="utf-8"))
     refresh = yaml.safe_load((REPO_ROOT / ".github/workflows/refresh.yml").read_text(encoding="utf-8"))
-    steps = tests["jobs"]["coverage"]["steps"]
+    steps = tests["jobs"]["test"]["steps"]
     [cache] = [entry for entry in steps
                if entry.get("name") == "Cache Chromium dependency debs"]
     assert cache["uses"].split("@", 1)[0] == "actions/cache/restore"
@@ -215,28 +192,24 @@ def test_chromium_debs_cache_is_restore_only_in_coverage_and_shared():
     chromium = next(entry for entry in steps
                     if entry.get("name") == "Install Chromium for playwright")
     assert steps.index(cache) < steps.index(chromium)
-    assert "if" not in cache
+    assert cache["if"] == chromium["if"]
 
 
-def test_instruction_budgets_gate_runs_only_in_the_coverage_job():
+def test_instruction_budgets_gate_runs_only_in_the_budgets_job():
     # Issue #110: the instruction-count gate needs valgrind and four
     # callgrind runs, so it must never appear in a matrix cell (three
-    # OSes would triple the install and the cells' 20-minute ceiling is
-    # standing). Its only CI surface is the coverage job, conditional on
-    # the pytest step like every gate there, invoking the gate script.
+    # OSes would triple the install). Its only CI surface is the budgets
+    # job, invoking the gate script.
     workflow = yaml.safe_load(TESTS_WORKFLOW.read_text(encoding="utf-8"))
     for name, job in workflow["jobs"].items():
         named = [s for s in job.get("steps", [])
                  if s.get("name") == "Instruction budgets gate"]
-        if name != "coverage":
+        if name != "budgets":
             assert not named, (
                 f"{name} must not run the instruction budgets gate")
             continue
         [gate] = named
         assert "instruction_budgets.py" in gate["run"], gate["run"]
-        assert gate.get("if") is not None and "pytest" in gate["if"], (
-            "the gate is conditional on the pytest step, like every gate "
-            "in this job")
 
 
 def test_page_job_runs_the_committed_page_check():
@@ -252,11 +225,11 @@ def test_page_job_runs_the_committed_page_check():
 
 
 def test_no_job_in_tests_workflow_holds_contents_write():
-    # Issues #134 and #133 part 2b: the coverage job runs the suite,
-    # installs unhashed third-party dependencies and downloads a browser,
-    # so nothing here may hold contents: write. The raise leaves `coverage`
-    # as the ratchet-data artifact for the top-level ratchet-push workflow,
-    # whose own job is the writer; this workflow declares no writer at all.
+    # Issues #134 and #133 part 2b: the test jobs run the suite, install
+    # unhashed third-party dependencies and download a browser, so nothing
+    # here may hold contents: write. The raised records land through
+    # ci-gate's report job with the deploy key; this workflow declares no
+    # writer at all.
     workflow = yaml.safe_load(TESTS_WORKFLOW.read_text(encoding="utf-8"))
     assert workflow.get("permissions") == {"contents": "read"}, (
         "the workflow-level floor must stay contents: read — a job "
@@ -266,29 +239,16 @@ def test_no_job_in_tests_workflow_holds_contents_write():
     for name, job in jobs.items():
         contents = (job.get("permissions") or {}).get("contents")
         assert contents != "write", (
-            f"{name} holds contents: write; the ratchet raise lands "
-            "through the top-level ratchet-push workflow")
-
-
-def test_diff_coverage_job_is_pull_request_only_and_read_only():
-    # Issue #126: the patch-coverage job runs the diff against the exact
-    # tree coverage measured, on pull requests only, and holds read-only
-    # credentials — the rendered comment travels as an artifact to the
-    # trusted workflow_run poster, so this job never needs conversation
-    # write.
-    workflow = yaml.safe_load(TESTS_WORKFLOW.read_text(encoding="utf-8"))
-    job = workflow["jobs"]["diff-coverage"]
-    assert "pull_request" in job["if"], job["if"]
-    assert "needs.coverage.result == 'success'" in job["if"], job["if"]
-    # YAML reads the scalar `needs: coverage` as a string, not a list.
-    assert job["needs"] in ("coverage", ["coverage"]), job["needs"]
-    assert job["permissions"] == {"contents": "read"}
+            f"{name} holds contents: write; the raised records land "
+            "through ci-gate's report job")
 
 
 def test_no_job_that_checks_out_the_tree_holds_conversation_write():
     # Issue #126: a job that checks out the tree never carries a
-    # conversation-write token. The only writers are the coverage poster,
-    # claim (issue #161; Nitjsefnie-Actions/claim#153 — a /claim on a pull
+    # conversation-write token. A workflow_run job's checkout with no `ref`
+    # or `repository` is the default branch, not the tree under test. The
+    # only writers are the test-ratchet comment poster (a workflow_run job
+    # that checks out only the default branch), claim (issue #161; Nitjsefnie-Actions/claim#153 — a /claim on a pull
     # request 403s without the grant), pin-guard (issue #367 — comments
     # through the API; no checkout) and pr-gate (issue #166 — comments on
     # pull requests through the API and reads the template at the base
@@ -296,15 +256,19 @@ def test_no_job_that_checks_out_the_tree_holds_conversation_write():
     # Every job with an actions/checkout step is scanned, so a future job
     # cannot quietly grow the grant.
     allowed_writers = {
-        "claim.yml", "coverage-comment.yml", "pin-guard.yml", "pr-gate.yml",
+        "claim.yml", "pin-guard.yml", "pr-gate.yml", "test-ratchet-comment.yml",
     }
     writers = set()
     for path in WORKFLOWS:
         workflow = yaml.safe_load(path.read_text(encoding="utf-8"))
+        # PyYAML reads the bare key `on` as True.
+        default_branch_only = list(workflow[True]) == ["workflow_run"]
         for name, job in (workflow.get("jobs") or {}).items():
             checks_out = any(
                 "uses" in step and step["uses"].startswith("actions/checkout@")
-                and not _workflowrun.is_helper_checkout(step) for step in job.get("steps", []))
+                and not _workflowrun.is_helper_checkout(step)
+                and not (default_branch_only and not {"ref", "repository"} & set(step.get("with") or {}))
+                for step in job.get("steps", []))
             requested = (job.get("permissions")
                          or workflow.get("permissions") or {})
             pull_write = requested.get("pull-requests") == "write"
@@ -316,100 +280,15 @@ def test_no_job_that_checks_out_the_tree_holds_conversation_write():
                 writers.add(path.name)
                 assert path.name in allowed_writers, (
                     f"{path.name}: job {name!r} holds pull-requests: write "
-                    "but only the coverage poster, claim, pin-guard and "
-                    "pr-gate actions may")
+                    "but only the test-ratchet comment poster, claim, "
+                    "pin-guard and pr-gate actions may")
     assert writers == allowed_writers, (
         f"missing conversation-write workflows: {sorted(allowed_writers - writers)}")
 
 
-def test_coverage_comment_workflow_never_executes_the_tree():
-    workflow = yaml.safe_load(
-        (REPO_ROOT / ".github" / "workflows" / "coverage-comment.yml")
-        .read_text(encoding="utf-8"))
-    # The trusted half: triggered only by the ci-gate workflow completing
-    # (tests.yml is a workflow_call callee since #133 and produces no run
-    # of its own on a pull request; the run carrying the
-    # diff-coverage-comment artifact is ci-gate's), filtered to its
-    # pull_request runs, and it checks out only the helper — the only thing
-    # crossing from the pull request is the TEXT of a comment.
-    assert list(workflow[True]) == ["workflow_run"], workflow.get("on")
-    assert workflow[True]["workflow_run"]["workflows"] == ["ci gate"]
-    [job] = workflow["jobs"].values()
-    assert "github.event.workflow_run.event == 'pull_request'" in job["if"]
-    # The write lives at workflow level: the single job inherits it.
-    assert workflow["permissions"] == {
-        "pull-requests": "write", "actions": "read", "checks": "write", "contents": "read"}
-    _workflowrun.assert_helper_only_checkout(job, "Download the comment artifact")
-
-
-def test_coverage_job_is_unconditional_in_tests_workflow():
-    # The comment workflow keys its missing-artifact verdict on the RUN
-    # conclusion plus the tests leg's own conclusion (the mark-missing
-    # step reads the run's jobs list): a successful run whose tests leg
-    # skipped is ci-gate's narrowing and goes neutral; every other
-    # missing-artifact shape stays a failure. The coverage JOB itself
-    # stays unconditional inside its callee — the narrowing lives on the
-    # caller's leg conditions — and this pin fails if a skip condition
-    # ever lands on the coverage job itself, which would move the
-    # decision the mark-missing step cannot see.
-    workflow = yaml.safe_load(TESTS_WORKFLOW.read_text(encoding="utf-8"))
-    assert "if" not in workflow["jobs"]["coverage"], (
-        "the coverage job grew a skip condition; the comment workflow's "
-        "mark-missing step reads the tests leg's conclusion, not this "
-        "job's")
-
-
-def test_the_comment_artifact_name_spans_both_workflows():
-    # One artifact carries the rendered comment from the producer to the
-    # poster; the two sides name it independently, so the shared literal is
-    # pinned across the pair rather than per file.
-    tests = yaml.safe_load(TESTS_WORKFLOW.read_text(encoding="utf-8"))
-    comment = yaml.safe_load(
-        (REPO_ROOT / ".github" / "workflows" / "coverage-comment.yml")
-        .read_text(encoding="utf-8"))
-    [upload] = [s for s in tests["jobs"]["diff-coverage"]["steps"]
-                if s.get("name") == "Upload the comment for the trusted "
-                                    "commenter"]
-    [download] = [s for s in comment["jobs"]["comment"]["steps"]
-                  if s.get("name") == "Download the comment artifact"]
-    assert upload["with"]["name"] == download["with"]["name"]
-
-
-def test_coverage_job_collects_its_measured_subprocesses():
-    # The patch-coverage reporter's CLI contract tests run the script as a
-    # real child interpreter, which the outer collector cannot trace. The
-    # job must therefore start child collectors (COVERAGE_PROCESS_START
-    # naming the committed children config), keep one absolute data file
-    # (children parallel-suffix it in place), and combine the sidecars
-    # before any report reads a total — dropping any leg shrinks the
-    # measured CLI and the ratchet reads a false regression.
-    workflow = yaml.safe_load(TESTS_WORKFLOW.read_text(encoding="utf-8"))
-    coverage = workflow["jobs"]["coverage"]
-    assert coverage["env"]["COVERAGE_FILE"] == (
-        "${{ github.workspace }}/.coverage")
-    [run_tests] = [s for s in coverage["steps"]
-                   if s.get("name") == "Run tests"]
-    assert run_tests["env"]["AI_RESEARCHER_COVERAGE_MEASURE_CHILDREN_RC"] == (
-        "${{ github.workspace }}/.github/coverage-children.rc")
-    [summary] = [s for s in coverage["steps"]
-                 if s.get("name") == "Coverage summary"]
-    combine_first = summary["run"].splitlines()
-    # The combine line precedes the first report in the same step.
-    combine_at = next(i for i, line in enumerate(combine_first)
-                      if "coverage combine" in line)
-    report_at = next(i for i, line in enumerate(combine_first)
-                     if "coverage report" in line)
-    assert combine_at < report_at
-    # The children config bounds what a child records to the reporter.
-    rc = (REPO_ROOT / ".github" / "coverage-children.rc").read_text(
-        encoding="utf-8")
-    assert "[run]" in rc and "include = */scripts/ci/diff_coverage.py" in rc
-    assert "parallel = True" in rc
-
-
 def test_valgrind_cache_is_restore_only_before_the_instruction_gate():
     workflow = yaml.safe_load(TESTS_WORKFLOW.read_text(encoding="utf-8"))
-    steps = workflow["jobs"]["coverage"]["steps"]
+    steps = workflow["jobs"]["budgets"]["steps"]
     [cache] = [entry for entry in steps
                if entry.get("name") == "Cache valgrind dependency debs"]
     assert cache["uses"].split("@", 1)[0] == "actions/cache/restore"
@@ -417,7 +296,7 @@ def test_valgrind_cache_is_restore_only_before_the_instruction_gate():
                 if entry.get("uses", "").split("@", 1)[0] == "actions/cache/save"]
     [gate] = [entry for entry in steps if entry.get("name") == "Instruction budgets gate"]
     assert steps.index(cache) < steps.index(gate)
-    assert cache["if"] == gate["if"]
+    assert cache.get("if") == gate.get("if")
     lines = gate["run"].splitlines()
     assert lines == ["python3 scripts/ci/install_valgrind.py", "set -o pipefail",
                      'python3 scripts/ci/instruction_budgets.py | tee -a "$GITHUB_STEP_SUMMARY"']

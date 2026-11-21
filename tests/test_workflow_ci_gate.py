@@ -19,12 +19,12 @@ here:
 - the classifier's NON_LEG_JOBS and this file's LEG_IDS must together
   name every ci-gate job;
 - every leg grants its callee read-only (`contents: read`): the callee
-  runs no writer — the ratchet raise leaves tests.yml as an artifact for
-  the top-level ratchet-push workflow — and the codeql leg forwards the
-  `security-events: write` its callee needs;
-- coverage-comment relays on the ci-gate run, the run that carries the
-  diff-coverage-comment artifact once tests.yml is a workflow_call
-  callee.
+  runs no writer — ci-gate's own report job commits the raised records —
+  and the codeql leg forwards the `security-events: write` its callee
+  needs;
+- the test-ratchet comment relays on the ci-gate run, the run that
+  carries the tests leg's test-ratchet artifacts once tests.yml is a
+  workflow_call callee;
 - the size-baseline leg also accepts standalone pull requests and pushes.
 """
 from __future__ import annotations
@@ -39,14 +39,15 @@ import yaml
 ROOT = Path(__file__).resolve().parents[1]
 WORKFLOWS = ROOT / ".github" / "workflows"
 CI_GATE = WORKFLOWS / "ci-gate.yml"
-COVERAGE_COMMENT = WORKFLOWS / "coverage-comment.yml"
-TESTS_WORKFLOW = WORKFLOWS / "tests.yml"
+TEST_RATCHET_COMMENT = WORKFLOWS / "test-ratchet-comment.yml"
 SIZE_BASELINE = WORKFLOWS / "size-baseline.yml"
 
-# The seven gate workflows ci-gate calls, plus the classifier job.
+# The seven gate workflows ci-gate calls; the legs are their jobs plus
+# report, the test-ratchet job ci-gate runs itself.
 LEG_WORKFLOWS = ("tests.yml", "lint.yml", "types.yml", "audit.yml",
                  "actionlint.yml", "size-baseline.yml", "codeql.yml")
-LEG_IDS = tuple(Path(name).stem for name in LEG_WORKFLOWS)
+LEG_IDS = ("tests", "report",
+           *(Path(name).stem for name in LEG_WORKFLOWS[1:]))
 
 
 def _load(path):
@@ -58,10 +59,6 @@ def _load(path):
 
 def _ci_gate():
     return _load(CI_GATE)
-
-
-def _coverage_comment():
-    return _load(COVERAGE_COMMENT)
 
 
 def _aggregate_module():
@@ -166,6 +163,12 @@ def test_legs_are_conditioned_on_the_narrowing_outputs():
         if leg in cheap:
             assert gate == (
                 "needs.classify.outputs.docs_only != 'true'"), leg
+        elif leg == "report":
+            # It runs after a failed test job too, so it carries a status
+            # function beside the narrowing.
+            assert gate == (
+                "${{ !cancelled() && needs.classify.outputs.docs_only != 'true' "
+                "&& needs.classify.outputs.data_only != 'true' }}"), leg
         else:
             assert gate == (
                 "needs.classify.outputs.docs_only != 'true' "
@@ -221,9 +224,8 @@ def test_classify_job_reads_actions_for_the_verified_base_walk():
 
 
 def test_every_leg_grants_read_only():
-    # The callee runs no writer (the raise leaves as an artifact for the
-    # top-level ratchet-push workflow), so every leg's grant stays at the
-    # workflow floor. The codeql leg forwards the security-events write
+    # The callee runs no writer (ci-gate's report job commits the raised
+    # records), so every callee leg's grant stays at the workflow floor. The codeql leg forwards the security-events write
     # its callee's job requests — the one non-contents elevation.
     doc = _ci_gate()
     for leg in ("tests", "lint", "types", "audit", "actionlint",
@@ -249,20 +251,10 @@ def test_callee_triggers_allow_the_size_install_block():
         assert "workflow_call" in triggers, name
 
 
-def test_coverage_comment_relays_on_the_ci_gate_run():
+def test_the_test_ratchet_comment_relays_on_the_ci_gate_run():
     # tests.yml is a workflow_call callee and produces no run of its own
-    # on a pull request — the run carrying the diff-coverage-comment
-    # artifact is ci-gate's, so the relay keys on that workflow's name.
-    wr = (_coverage_comment().get("on") or {}).get("workflow_run") or {}
-    assert wr.get("workflows") == ["ci gate"]
+    # on a pull request — the run carrying the test-ratchet artifacts is
+    # ci-gate's, so the relay keys on that workflow's name.
+    wr = (_load(TEST_RATCHET_COMMENT).get("on") or {}).get("workflow_run") or {}
+    assert wr.get("workflows") == [_ci_gate()["name"]]
     assert wr.get("types") == ["completed"]
-
-
-def test_the_diff_coverage_job_still_runs_on_pull_request_events():
-    # The caller's event flows through the workflow_call: the callee's
-    # diff-coverage job gates on `github.event_name == 'pull_request'`
-    # and must keep doing so — it is what computes and uploads the
-    # artifact the coverage-comment relay posts.
-    jobs = _load(TESTS_WORKFLOW)["jobs"]
-    condition = str(jobs["diff-coverage"].get("if") or "")
-    assert "github.event_name == 'pull_request'" in condition

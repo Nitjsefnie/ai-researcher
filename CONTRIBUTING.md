@@ -136,12 +136,12 @@ reachable through those tests, so a change to the emitted JavaScript needs one.
 
 ## CI
 
-Seventeen workflows run. Five of them you can run locally:
+Sixteen workflows run. Five of them you can run locally:
 
 ```sh
 python3 -m pytest -q                                             # tests
-python3 -m coverage run --source=. --omit='tests/*' \
-  -m pytest -q && python3 -m coverage report                     # coverage
+python3 -m coverage run --source=. -m pytest -q \
+  && python3 -m coverage report                                  # coverage
 git ls-files '*.py' | xargs python3 -m pylint                    # lint
 git ls-files '*.py' | xargs python3 -m pycodestyle               # lint
 python3 -m pyright                                               # types
@@ -150,25 +150,29 @@ actionlint .github/workflows/*.yml && zizmor .github/workflows/  # actionlint
 ```
 
 `python3 -m pip install -r requirements-dev.txt -r requirements-test.txt` gets
-the pinned toolchain. Coverage is gated by a **ratchet**, not a fixed target:
-the floors live in `.github/ci-thresholds.json`, each seeded 1.5 points under
-the coverage of the run that recorded it. CI never lowers them: the automated
-raise is the only writer on main, and it lands through the top-level
-`ratchet-push` workflow's write deploy key (the `main-push` environment) —
-a workflow_call callee cannot read an environment secret, which is why the
-push is not a job in tests.yml. There are two floors: Python statement
-coverage from the pytest run,
-and JavaScript physical code-line coverage of the page's inline script,
-measured through the browser suite (`tests/test_browser.py` records V8
-coverage when `AI_RESEARCHER_JS_COVERAGE_OUT` is set, and `scripts/ci/js_coverage.py` folds
-the dump). A push to `main` whose coverage climbs more than 1.5 points past
-the recorded measurement raises the floor automatically; nothing can relax
-the file — a guard step compares it against the merge base on a pull request
-and against AI_RESEARCHER_BEFORE (the previous tip) on a push to `main`, including a
-non-fast-forward push, and refuses any change that lowers a value.
-`thresholds.py --check` refuses a working-tree copy below the committed one.
-Scripts are counted deliberately — `--omit` leaves out only `tests/*` —
-because they run unattended in CI. Note what the numbers can and cannot speak
+the pinned toolchain. The suite runs through
+[test-ratchet](https://github.com/Nitjsefnie-Actions/test-ratchet): tests.yml's
+`plan` job splits the test files into shards balanced by the run times in
+`.github/test-times.json`, each `test` job runs one shard with coverage
+measured, and ci-gate.yml's `report` job merges the shards' coverage of the
+ubuntu-latest / Python 3.15 cell and gates it against the floors in
+`.github/ci-thresholds.json`, a **ratchet**, not a fixed target. On a push to
+`main` whose gate passed, `report` raises a record whose coverage rose more
+than 1.5 points above its recorded `measured` (`floor` becomes the figure minus
+1.5) and commits it as `chore(ratchet): update the test-ratchet records` with
+the `main-push` environment's deploy key; a workflow_call callee cannot read an
+environment secret, which is why `report` is a job of ci-gate.yml. Its
+`records-only-rise` refuses a change that lowers or removes a record. On a pull
+request `report` comments the totals and the diff coverage of the added lines;
+its job checks out the tree and holds no conversation write, so
+test-ratchet-comment.yml writes that comment once the ci gate run completes.
+There are two floors: Python statement coverage of `--cov=.` (setup.cfg omits
+`tests/*`), and JavaScript code-line coverage of the page's inline script,
+measured through the browser suite: `tests/test_browser.py` writes each
+class's V8 coverage into `TEST_RATCHET_V8_DIR` when it is set, naming the
+committed `out/frontier-models.html`, and the run step counts only lines holding
+code and places the fixture pages, which differ only in data lines. Scripts are
+counted deliberately because they run unattended in CI. Note what the numbers can and cannot speak
 to: what coverage counts as statements in `build.py` is a small fraction of
 its size, because most of its lines are HTML, CSS and JavaScript in string
 literals. The browser tests are what cover those.
@@ -229,7 +233,7 @@ touching nothing outside the two budget documents, with both routes
 requiring a `feat: ` or `feat(<scope>): ` commit subject in
 `base..head`. Budgets are pinned to
 the CI cell that runs the gate —
-the coverage job's ubuntu-latest runner, CPython 3.15.1 / valgrind
+the budgets job's ubuntu-latest runner, CPython 3.15.1 / valgrind
 3.26.0 — and were seeded from that cell's measured counts
 (build 215,934,993, capture_gate 316,217,922, diff_aa 282,204,262
 startup-subtracted Ir), each plus 3% rounded up to the next million.
@@ -321,15 +325,7 @@ an HTTP 429 or 5xx, Go's transport error (`Get "<url>": ...`), a DNS failure,
 a dropped body (`unexpected EOF`) or an HTML error page read through `--jq`,
 each measured from gh 2.98.0; a 404, 401, 403 or 422 fails at once. It keeps
 only the last attempt's stdout, where gh prints an error body. The change
-classifier's reads, the ratchet push's artifact listing and coverage comment's
-reads pass `--timeout 60`, since gh sets no timeout. A write never reruns
-alone: coverage comment runs each list-then-write sequence, for its comment and
-its check run, as an exported shell function under `--gh`, so a POST that
-landed is listed again and PATCHed. A listing that lags a landed POST posts a
-second marker comment that no later run updates, since each PATCHes only the
-first, so its stale percentage stays visible. A second check run heals: every
-run PATCHes each one it lists. Coverage comment checks out only the same helper at
-`github.sha` and downloads its artifact into `runner.temp`.
+classifier's reads pass `--timeout 60`, since gh sets no timeout.
 
 Both hub jobs' live-page checks and the refresh job's republish check fetch
 the page with `download.py URL DEST`. A fetch that still fails after the window
@@ -589,7 +585,7 @@ left to the pr gate.
 The commits this repository's automation writes follow the same format: the
 refresh workflow's scheduled commit leads with `chore(capture)`,
 `chore(trending)`, `chore(openrouter)`, `chore(github-stars)`, `chore(page)` or
-`chore(rankings)`, the ratchet push with `chore(ratchet)`, and Dependabot's
+`chore(rankings)`, test-ratchet's records commit with `chore(ratchet)`, and Dependabot's
 pull requests with `build(deps)`, `build(deps-dev)` or `ci(deps)` (its
 `commit-message` setting in `.github/dependabot.yml`).
 

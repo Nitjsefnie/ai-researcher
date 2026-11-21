@@ -4,45 +4,31 @@ name: tests
 # tests/test_browser.py, drives the built HTML in a real headless Chromium
 # through playwright.
 #
-# FIVE JOBS, split on purpose. `suites` is a 3-OS x 2-Python matrix running the
-# non-browser suite on every cell — that is what buys portability coverage of
-# the tooling itself. `coverage` is the dedicated Linux job: the full suite
-# (browser included) under the coverage ratchet, and it holds a read-only
-# token: it installs unhashed third-party dependencies and downloads a
-# browser, so the automated raise leaves the job as an artifact instead of
-# riding a write token. The browser suite stays OUT
-# of the matrix because (a) playwright's --with-deps browser install is
-# Ubuntu-only, so cross-OS browser steps would need per-OS install recipes for
-# near-zero signal, and (b) the page under test is OS-independent text (HTML/
-# JS built by build.py), so a second OS adds no behavioral coverage the matrix
-# misses. The coverage job installs playwright and Chromium; the matrix job
-# does not. That asymmetry is deliberate. The raise's push half lives in the
-# top-level `ratchet-push` workflow: a workflow_call callee cannot read an
-# environment secret, and the deploy key the push authenticates with lives in
-# one. The coverage job still stages the raise as the `ratchet-data` artifact
-# for that workflow. `page` is the committed-page check: the source-commit
+# The suite runs through Nitjsefnie-Actions/test-ratchet: `plan` splits the
+# test files into shards balanced by recorded run time, and `test` runs one
+# shard per job with coverage measured, over a 3-OS x 2-Python matrix that
+# buys portability coverage of the tooling itself. The `report` job that
+# merges the shards' coverage, gates it against .github/ci-thresholds.json
+# and commits the raised records is a job of ci-gate.yml, the caller: a
+# workflow_call callee cannot read an environment secret, and the push key
+# lives in the main-push environment.
+#
+# The ubuntu-latest / Python 3.15 cell is the one report gates, and the only
+# one that runs tests/test_browser.py: it installs playwright's Chromium, and
+# the browser harness writes the V8 coverage of the page's inline script into
+# the directory the action names, so that cell measures the JavaScript floor
+# beside the Python one. The browser suite stays OUT of the other cells
+# because (a) playwright's --with-deps browser install is Ubuntu-only, so
+# cross-OS browser steps would need per-OS install recipes for near-zero
+# signal, and (b) the page under test is OS-independent text (HTML/JS built
+# by build.py), so a second OS adds no behavioral coverage. `budgets` runs
+# the instruction budgets and the ratchet-document guard, which the action
+# does not cover. `page` is the committed-page check: the source-commit
 # stamp is set only on the refresh path, so a page committed by hand could go
 # out stamp-less and the republish run would publish it — that job refuses a
 # committed page lacking the stamp or differing from its own stamp-less
 # rebuild. `page-rankings` refuses a committed rankings page that differs from
 # its rebuild of HEAD's history.
-#
-# A FOURTH job rides along on pull requests only. `diff-coverage` reports the
-# coverage of the change's OWN added lines — informational, never a gate —
-# and hands the rendered report to the `coverage comment` workflow, which holds
-# `pull-requests: write` beside the claim action's job: no job that executes
-# this tree ever carries a conversation-write token, and the two writers never
-# check the tree out.
-#
-# THE RUNNER IS ALWAYS THE `-m` FORM — `python -m pytest`, which the coverage
-# job spells `python3 -m pytest` — NOT `pytest`, AND
-# NOT `unittest discover`. tests/ has no __init__.py and the tests `import
-# build` from the repo root, so the root has to be on sys.path. Only the `-m`
-# form puts the cwd there — the bare `pytest` binary collects the same files
-# and every test errors on the import. `unittest discover -t .` refuses
-# outright ("start directory is not importable"). pytest is the runner here
-# purely because it tolerates that layout; nothing in the suite is written
-# against pytest.
 
 on:
   workflow_call:
@@ -74,16 +60,29 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # --- The portability matrix -------------------------------------------
-  # The non-browser suite across ubuntu-latest, windows-latest and
-  # macos-latest x Python 3.14/3.15. No playwright, no Chromium, no
-  # coverage — those live in the `coverage` job below.
-  suites:
-    name: pytest (${{ matrix.os }}, ${{ matrix.python }})
+  plan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      matrix: ${{ steps.plan.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - id: plan
+        uses: Nitjsefnie-Actions/test-ratchet/plan@7845a0154a83a454ec9045536a067c61fc3db4cb # v2.2.0
+        with:
+          tests: tests/test_*.py
+          times: .github/test-times.json
+          shards: 2
+
+  test:
+    name: pytest (${{ matrix.os }}, ${{ matrix.python }}, ${{ matrix.shard }})
+    needs: plan
     runs-on: ${{ matrix.os }}
-    # Per-cell ceiling, matching the catalogue's tests.yml: a hung cell fails
-    # in 20 minutes instead of holding GitHub's 6-hour default.
-    timeout-minutes: 20
+    # Per-job ceiling: a hung shard fails in 30 minutes instead of holding
+    # GitHub's 6-hour default.
+    timeout-minutes: 30
     defaults:
       run:
         # One shell on every OS keeps the run blocks identical syntax, and it
@@ -96,11 +95,11 @@ jobs:
     strategy:
       fail-fast: false
       # 3.14 is the floor: the pinned test tools (pytest, playwright,
-      # coverage, pyyaml) all declare requires_python at or below it. The
-      # matrix runs Python 3.14 and 3.15.
+      # coverage, pyyaml) all declare requires_python at or below it.
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
         python: ["3.14", "3.15"]
+        shard: ${{ fromJSON(needs.plan.outputs.matrix).shard }}
 
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -126,73 +125,9 @@ jobs:
         run: |
           python scripts/ci/download.py --run python -m pip install -r requirements-test.txt
 
-      - name: Run tests
-        # --ignore=tests/test_browser.py: the browser suite stays OUT of the
-        # matrix and lives only in the `coverage` job below — --with-deps is
-        # Ubuntu-only and the page under test is OS-independent text, so a
-        # second OS adds nothing (see the header for the full reasoning).
-        run: python -m pytest -q -ra --ignore=tests/test_browser.py
-
-  # --- The dedicated Linux job for the browser suite ---------------------
-  # The full suite (browser included) under the coverage ratchet. It
-  # installs playwright and Chromium; the matrix job above does not — that
-  # asymmetry is deliberate, see the header and the matrix job's --ignore
-  # comment. One pytest run produces BOTH measurements: coverage.py counts
-  # the Python statements, and the browser harness writes the V8 block
-  # coverage of the page's inline script to AI_RESEARCHER_JS_COVERAGE_OUT for
-  # scripts/ci/js_coverage.py to fold into code-line coverage.
-  coverage:
-    runs-on: ubuntu-latest
-
-    # Per-job ceiling, like the matrix cells' 20 above, sized up for what
-    # this job carries that they do not: the Chromium install and the FULL
-    # suite under coverage. A hung job fails in 30 minutes instead of
-    # holding GitHub's 6-hour default.
-    timeout-minutes: 30
-
-    # Read-only, like every job here that runs code. This job installs
-    # unhashed third-party dependencies and downloads a browser, so nothing
-    # in it may hold a write token: the ratchet raise leaves the job as an
-    # artifact for the top-level `ratchet-push` workflow, whose own gates
-    # decide whether it lands.
-    permissions:
-      contents: read
-
-    env:
-      # One absolute coverage data file for the outer run AND every measured
-      # subprocess: a child collector parallel-suffixes it in place, so
-      # concurrent children cannot clobber one another or the outer data.
-      # Every coverage step below reads the same path, and the Coverage
-      # summary step combines the sidecars before any report reads a total.
-      COVERAGE_FILE: ${{ github.workspace }}/.coverage
-
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          # Nothing in this job pushes. Leaving the job token in
-          # .git/config lets any later step — or anything a dependency pulls
-          # in — reuse it.
-          persist-credentials: false
-
-      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
-        with:
-          python-version: "3.15"
-          cache: pip
-          # There is no requirements.txt here (the runtime is pure stdlib), so
-          # the cache must be keyed off the pins that do exist or setup-python
-          # fails the job looking for one.
-          cache-dependency-path: requirements-*.txt
-
-      - name: Install the test toolchain
-        id: install
-        # There is deliberately no `pip install --upgrade pip` here: the
-        # runner's stock pip installs the pinned manifest, so the unreviewed
-        # upgrade would be the one unpinned install in the job.
-        run: |
-          python3 scripts/ci/download.py --run python3 -m pip install -r requirements-test.txt
-
-      # PR coverage restores main's debs; it never saves PR-authored caches.
+      # PR runs restore main's debs; they never save PR-authored caches.
       - name: Cache Chromium dependency debs
+        if: matrix.os == 'ubuntu-latest' && matrix.python == '3.15'
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ~/.cache/ai-researcher-playwright-debs
@@ -200,6 +135,7 @@ jobs:
           restore-keys: chromium-debs-${{ runner.os }}-
 
       - name: Install Chromium for playwright
+        if: matrix.os == 'ubuntu-latest' && matrix.python == '3.15'
         # The browser binary is not a pip package, and playwright's own
         # installer performs no integrity check: browsers.json publishes no
         # digest and the installer never hashes a byte, so a bare install
@@ -208,120 +144,69 @@ jobs:
         # the browsers directory so playwright's install has nothing left to
         # download, and fails the run if anything was re-downloaded anyway.
         # The verification matters because the browser produces the V8
-        # coverage dump that sets the JavaScript floor, and that floor crosses
-        # into the privileged ratchet-push job inside the staged thresholds
-        # file.
+        # coverage dump that sets the JavaScript floor.
         # The --with-deps step inside the script still apt-installs the
         # shared libraries headless Chromium needs on a bare runner; without
         # them the launch fails with a missing-library error that reads
         # like a test failure.
         run: python3 scripts/ci/install_chromium.py
 
-      - name: Run tests
-        id: pytest
-        # Under coverage, and with the repo root as cwd — see the header.
-        # AI_RESEARCHER_JS_COVERAGE_OUT makes tests/test_browser.py record every page's V8
-        # coverage and dump it on teardown; unset, the suite neither records
-        # nor dumps it and otherwise behaves exactly the same.
-        env:
-          AI_RESEARCHER_JS_COVERAGE_OUT: ${{ runner.temp }}/js-coverage.json
-          # Measured subprocesses: the CLI contract tests launch the
-          # patch-coverage reporter as a real child interpreter, which this
-          # run's collector cannot trace, and the IMPLICIT .pth hook cannot
-          # trace it either — the reporter constructs a second Coverage
-          # object of its own (the statement analyzer), and a second
-          # construction suppresses the hook's save. The CLI tests read
-          # this variable and run the child under an explicit `coverage
-          # run`, whose save survives; .github/coverage-children.rc bounds
-          # what such a child records.
-          AI_RESEARCHER_COVERAGE_MEASURE_CHILDREN_RC: ${{ github.workspace }}/.github/coverage-children.rc
-        run: |
-          # --parallel-mode: the outer run writes a sidecar like every
-          # measured child, because `coverage combine` REPLACES the data
-          # file with the combined sidecars — it does not merge into an
-          # existing one. A non-parallel outer run would be thrown away.
-          python3 -m coverage run --parallel-mode --source=. \
-            --omit='tests/*' -m pytest -q -ra
-
-      - name: Coverage summary
-        # Renders whether or not the gates below pass — a coverage regression
-        # is only actionable if you can see WHICH file lost lines, and
-        # re-reading a scrolled CI log to find that is exactly the friction
-        # that gets a gate disabled. Python statement coverage and JavaScript
-        # physical code-line coverage are separate metrics.
-        if: ${{ !cancelled() && steps.pytest.conclusion != 'skipped' }}
-        env:
-          AI_RESEARCHER_JS_COVERAGE_OUT: ${{ runner.temp }}/js-coverage.json
-        run: |
-          # Fold the measured subprocess sidecars into the outer run's data
-          # FIRST, so every report and gate below reads one complete
-          # measurement. A run that launched no measured child has no
-          # sidecars, and `coverage combine` treats that as an error, so
-          # the guard is load-bearing rather than cosmetic.
-          ls .coverage.* >/dev/null 2>&1 && python3 -m coverage combine
-          {
-            echo '### Coverage'
-            echo
-            python3 -m coverage report --format=markdown --precision=1
-            echo
-            echo '### JavaScript coverage'
-            echo
-            python3 scripts/ci/js_coverage.py "$AI_RESEARCHER_JS_COVERAGE_OUT"
-          } >> "$GITHUB_STEP_SUMMARY"
-          python3 -m coverage xml -o coverage.xml
-
-      - name: Upload coverage.xml
-        if: ${{ !cancelled() && steps.pytest.conclusion != 'skipped' }}
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+      # Both run steps measure `source: .`; setup.cfg omits tests/*. They run
+      # serially (`-n 0`), as the suite always has, since its browser and
+      # flock tests share state across one process.
+      - name: Run the gated cell's tests
+        if: matrix.os == 'ubuntu-latest' && matrix.python == '3.15'
+        uses: Nitjsefnie-Actions/test-ratchet/run@7845a0154a83a454ec9045536a067c61fc3db4cb # v2.2.0
         with:
-          name: coverage-xml
-          path: coverage.xml
-          if-no-files-found: error
+          runner: pytest
+          tests: tests/test_*.py
+          times: .github/test-times.json
+          cell: ${{ matrix.os }}-py${{ matrix.python }}
+          shard: ${{ matrix.shard }}
+          source: .
+          args: -n 0
+          # The JavaScript floor counts the code lines of the page's inline
+          # script. The fixture builds differ from the committed page only in
+          # the `const DATA = ...;` line and the lines carrying the capture date.
+          javascript: out/frontier-models.html
+          javascript-code-only: 'true'
+          javascript-data-lines: 'const DATA = .*;|.*captured[ :"]+\d{4}-\d\d-\d\d.*'
 
-      - name: Coverage gate
-        if: ${{ !cancelled() && steps.pytest.conclusion != 'skipped' }}
-        # A RATCHET, not a target. The floor is committed data in
-        # .github/ci-thresholds.json: seeded 1.5 points under the measured
-        # coverage of the run that recorded it, so ordinary churn stays green
-        # and a real regression goes red. On a push to main this workflow
-        # raises the floor itself once coverage climbs more than the
-        # hysteresis (1.5) above the recorded measured. CI never lowers the
-        # floor: the automated raise is the only writer on main, and the
-        # Ratchet documents step below refuses a pull request that relaxes
-        # the document.
-        #
-        # SCRIPTS ARE COUNTED. diff_aa.py writes the commit messages
-        # refresh.yml produces and publish_docs.py talks to the hub with a
-        # credential, and nobody watches either at 01:11 UTC. Omitting scripts
-        # would measure only the half that a person checks anyway.
-        #
-        # Note what the number can and cannot speak to: what coverage counts
-        # as statements in build.py is a small fraction of its size, because
-        # most of its lines are HTML/JS/SVG string literals no line-coverage
-        # number reaches. The browser tests are what actually exercise those.
-        run: |
-          floor="$(python3 scripts/ci/thresholds.py --coverage-floor python)"
-          python3 -m coverage report "--fail-under=${floor}" --precision=1
+      - name: Run the portability cells' tests
+        # Every test file but tests/test_browser.py.
+        if: matrix.os != 'ubuntu-latest' || matrix.python != '3.15'
+        uses: Nitjsefnie-Actions/test-ratchet/run@7845a0154a83a454ec9045536a067c61fc3db4cb # v2.2.0
+        with:
+          runner: pytest
+          tests: |
+            tests/test_[!b]*.py
+            tests/test_b[!r]*.py
+            tests/test_browser_*.py
+          times: .github/test-times.json
+          cell: ${{ matrix.os }}-py${{ matrix.python }}
+          shard: ${{ matrix.shard }}
+          source: .
+          args: -n 0
 
-      - name: JavaScript coverage gate
-        id: jscov
-        if: ${{ !cancelled() && steps.pytest.conclusion != 'skipped' }}
-        # The front-end half of the same ratchet. The browser harness wrote
-        # the V8 block coverage Chromium collected for the built page to
-        # AI_RESEARCHER_JS_COVERAGE_OUT; js_coverage.py attributes a record only when its
-        # source is the page's single inline <script> and folds the rest of
-        # what the browser compiled into an unattributed count that is never
-        # scored. The floor is the committed javascript record, same rules
-        # as python: seeded 1.5 under measured, never lowered, raised on
-        # main by ratchet.py --language javascript.
-        env:
-          AI_RESEARCHER_JS_COVERAGE_OUT: ${{ runner.temp }}/js-coverage.json
-        run: |
-          js_floor="$(python3 scripts/ci/thresholds.py --coverage-floor javascript)"
-          python3 scripts/ci/js_coverage.py "$AI_RESEARCHER_JS_COVERAGE_OUT" "--fail-under=${js_floor}" --format=total
+  # --- The ratchets test-ratchet does not cover ---------------------------
+  budgets:
+    runs-on: ubuntu-latest
+    # The four callgrind runs run 20-50x slower than the targets alone.
+    timeout-minutes: 30
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.15"
+          # Pure stdlib: nothing to install or cache.
 
       - name: Cache valgrind dependency debs
-        if: ${{ !cancelled() && steps.pytest.conclusion != 'skipped' }}
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ~/.cache/ai-researcher-valgrind-debs
@@ -329,7 +214,6 @@ jobs:
           restore-keys: valgrind-debs-${{ runner.os }}-
 
       - name: Instruction budgets gate
-        if: ${{ !cancelled() && steps.pytest.conclusion != 'skipped' }}
         # The pipeline's CPU ratchet (issue #110): build.py, capture_gate.py
         # and diff_aa.py are measured under valgrind callgrind on the
         # COMMITTED fixture capture (tests/fixtures/pipeline/) and held
@@ -339,12 +223,9 @@ jobs:
         # the "Ratchet documents" step below refuses a PR that raises a
         # budget, and there is no automated raise.
         #
-        # COVERAGE JOB ONLY. The measurement needs valgrind (installed
-        # below when the runner lacks it) and four callgrind runs, which
-        # run 20-50x slower than the targets alone; the 3x2 matrix neither
-        # installs valgrind nor has the minutes to spare, and its cells'
-        # 20-minute ceiling is standing. This job already carries the
-        # dedicated tooling and the 30-minute ceiling.
+        # ONE JOB ONLY. The measurement needs valgrind (installed below
+        # when the runner lacks it) and four callgrind runs, which the test
+        # matrix neither installs nor has the minutes to spare for.
         #
         # The gate ALWAYS prints its measured counts: the step summary is
         # where the next tighten-only PR reads the numbers to calibrate
@@ -356,15 +237,11 @@ jobs:
 
       - name: Ratchet documents
         if: ${{ github.event_name == 'pull_request' || github.event_name == 'push' }}
-        # Nobody may relax the ratchet data: the recorded measured values
-        # and their floors may only rise. The guard used to run on pull
-        # requests only, and a direct push to main could ship a lowered
-        # document that keeps the 1.5 calibration gap — self-consistent,
-        # so thresholds --check alone accepted it (issue #53). The guard
-        # now runs on push too. The automated raise is unaffected: a raise
-        # only lifts values, so its own push run is clean, and this step
-        # runs before "Ratchet the thresholds", so a lowered document
-        # fails the job before any raise could paper over it.
+        # Nobody may relax the budget documents (.github/perf-budgets.json
+        # and .github/instruction-budgets.json): every budget may only fall.
+        # The guard runs on pull requests and on pushes, so a direct push to
+        # main cannot ship a raised budget either (issue #53). The coverage
+        # records are guarded by the report job's records-only-rise.
         #
         # On a pull request the merge ref merges the head into the base,
         # so HEAD^1 is the base tip and HEAD^2 the head, and the check
@@ -425,152 +302,6 @@ jobs:
             fetch_history origin main "${AI_RESEARCHER_BEFORE}"
             python3 scripts/ci/check_ratchets.py --allow-declared-raises "${AI_RESEARCHER_BEFORE}" HEAD
           fi
-
-      - name: Ratchet the thresholds
-        # Only measurements from a main push may move the recorded
-        # calibration — a pull request runs untrusted code and must not be
-        # able to write it. The ratchet raises either coverage floor when
-        # this run justifies it; a lower measurement, or one within the
-        # hysteresis, leaves the document untouched. The raise never leaves
-        # this job as a push: it is staged with the measured base commit as
-        # an artifact for the top-level ratchet-push workflow (issues #134
-        # and #133 part 2b) — this job holds no write token, and the push
-        # authenticates with the deploy key in that workflow's own job.
-        id: ratchet
-        if: ${{ !cancelled() && steps.pytest.outcome == 'success' && steps.jscov.outcome == 'success'
-                && github.event_name == 'push' && github.ref == 'refs/heads/main' }}
-        env:
-          AI_RESEARCHER_JS_COVERAGE_OUT: ${{ runner.temp }}/js-coverage.json
-        run: |
-          measured="$(python3 -m coverage report --format=total --precision=1)"
-          js_measured="$(python3 scripts/ci/js_coverage.py "$AI_RESEARCHER_JS_COVERAGE_OUT" --format=total)"
-          python3 scripts/ci/ratchet.py --measured "${measured}"
-          python3 scripts/ci/ratchet.py --language javascript --measured "${js_measured}"
-          python3 scripts/ci/thresholds.py --check
-          if [ -n "$(git status --porcelain .github/ci-thresholds.json)" ]; then
-            echo "changed=true" >> "$GITHUB_OUTPUT"
-            {
-              echo '### Recorded by this run'
-              echo
-              echo '```diff'
-              git diff -- .github/ci-thresholds.json
-              echo '```'
-            } >> "$GITHUB_STEP_SUMMARY"
-          else
-            echo "changed=false" >> "$GITHUB_OUTPUT"
-            echo "Python coverage ${measured}% and JavaScript coverage ${js_measured}% justify no raise." >> "$GITHUB_STEP_SUMMARY"
-          fi
-
-      - name: Stage the raise for the push job
-        # Runs only when the step above computed a raise. The staged pair
-        # is everything the push job needs: the validated thresholds
-        # document and the commit it was measured against, which is how
-        # the race handling moves with the data — the push job drops the
-        # raise when main no longer stands at the staged base.
-        if: ${{ !cancelled() && steps.ratchet.outputs.changed == 'true' }}
-        env:
-          AI_RESEARCHER_BASE: ${{ github.sha }}
-        run: |
-          mkdir -p "${RUNNER_TEMP}/ratchet-stage"
-          cp .github/ci-thresholds.json "${RUNNER_TEMP}/ratchet-stage/"
-          printf '%s\n' "${AI_RESEARCHER_BASE}" > "${RUNNER_TEMP}/ratchet-stage/base.txt"
-
-      - name: Upload the ratchet artifact
-        if: ${{ !cancelled() && steps.ratchet.outputs.changed == 'true' }}
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: ratchet-data
-          path: ${{ runner.temp }}/ratchet-stage
-          if-no-files-found: error
-
-  # --- The patch-coverage report ------------------------------------------
-  # INFORMATIONAL, never a gate — which is why no gate reads its result. A
-  # comment that failed to post must not be able to block a merge, and the
-  # number it reports is one a reviewer judges: a refactor that only moves
-  # code, and a fix whose test lives behind an optional dependency, both read
-  # low for reasons a threshold cannot tell apart. The ratchet in `coverage`
-  # is the gate.
-  #
-  # Pull requests only, and only when coverage produced the artifact this job
-  # consumes. A skipped ancestor must not hide that successful result. The
-  # rendered report travels to the pull request as an artifact, and the
-  # trusted `coverage comment` workflow posts it — see its header for why
-  # the poster must be a workflow_run and not this job.
-  diff-coverage:
-    if: ${{ !cancelled() && needs.coverage.result == 'success'
-            && github.event_name == 'pull_request' }}
-    needs: coverage
-    runs-on: ubuntu-latest
-
-    # Per-job ceiling, like every other job's: a hung check fails in 10
-    # minutes instead of holding GitHub's 6-hour default.
-    timeout-minutes: 10
-
-    permissions:
-      # This job reads the proposed tree, so it must not carry a token that
-      # can write conversation. The trusted workflow_run commenter owns that
-      # token.
-      contents: read
-
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          # The merge commit the event named, and the exact SHA `coverage`
-          # measured. Resolving `refs/pull/N/merge` here instead would let
-          # GitHub hand this job a different tree than the one the coverage
-          # report describes.
-          ref: ${{ github.sha }}
-          # Both parents of that merge commit, which the diff below needs.
-          fetch-depth: 0
-          persist-credentials: false
-
-      # actions/download-artifact v8.0.2
-      - uses: >-
-          actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
-        with:
-          name: coverage-xml
-
-      - name: Install the pinned statement analyzer
-        # diff_coverage.py borrows coverage.py's statement analyzer — the
-        # same pinned copy requirements-test.txt gave the measuring run, so
-        # the two can never disagree about which lines are executable.
-        run: python3 scripts/ci/download.py --run python3 -m pip install --requirement requirements-test.txt
-
-      - name: Measure the coverage of this change
-        # HEAD is the merge tree checked out above and HEAD^1 is, by
-        # construction, the base tip that was merged into it. The event
-        # payload's `base.sha` is NOT that: the base branch can advance
-        # between the event and the checkout, and every base commit merged in
-        # since would then be reported as a line this pull request added.
-        #
-        # --text is load-bearing, not decoration: the pull request controls
-        # .gitattributes on its own tree, so an attribute could render a
-        # changed source file binary and cost the whole report. --text and
-        # --no-ext-diff --no-textconv force the bytes through.
-        run: |
-          git diff --text --no-ext-diff --no-textconv --unified=0 \
-            HEAD^1 HEAD > patch.diff
-          python3 scripts/ci/diff_coverage.py \
-            --coverage coverage.xml \
-            --diff patch.diff > body.md
-          cat body.md >> "$GITHUB_STEP_SUMMARY"
-
-      - name: Package the comment for the trusted commenter
-        env:
-          AI_RESEARCHER_PR_NUMBER: ${{ github.event.pull_request.number }}
-        run: |
-          printf '%s\n' "$AI_RESEARCHER_PR_NUMBER" > pr-number.txt
-
-      - name: Upload the comment for the trusted commenter
-        # actions/upload-artifact v7.0.2
-        uses: >-
-          actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
-        with:
-          name: diff-coverage-comment
-          path: |
-            body.md
-            pr-number.txt
-          if-no-files-found: error
 
   # --- The committed-page check -------------------------------------------
   # out/frontier-models.html gets its "Source commit <code>…
