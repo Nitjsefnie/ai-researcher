@@ -5,13 +5,13 @@
       "id": "thinkingmachines/Inkling-2-Mini"
     },
     {
+      "id": "Sentinel7/h3"
+    },
+    {
       "id": "higurashi-ai/Haru-4B"
     },
     {
       "id": "harness-hub/Qwen3.8-27B-pi-adapted"
-    },
-    {
-      "id": "Sentinel7/h3"
     },
     {
       "id": "unsloth/Inkling-2-Mini-GGUF"
@@ -29,7 +29,7 @@
       "id": "sensenova/SenseNova-Loop-9B"
     },
     {
-      "id": "MiniMaxAI/MiniMax-H3-Image"
+      "id": "inworld/voice-isolator"
     }
   ]
 }
