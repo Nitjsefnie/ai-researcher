@@ -14,9 +14,6 @@
       "id": "inworld/voice-isolator"
     },
     {
-      "id": "Lightricks/LTX-2.5"
-    },
-    {
       "id": "apple/FastFrames-L"
     },
     {
@@ -26,10 +23,13 @@
       "id": "higurashi-ai/Haru-4B"
     },
     {
-      "id": "maxwell-model/Maxwell-V1-Flash"
+      "id": "Qwen/Qwen3.8-27B"
     },
     {
-      "id": "Qwen/Qwen3.8-27B"
+      "id": "sensenova/SenseNova-Loop-9B"
+    },
+    {
+      "id": "Lightricks/LTX-2.5"
     }
   ]
 }
