@@ -22,6 +22,6 @@
 #   pyyaml — tests/test_refresh_workflow.py parses the publish workflow with
 #   it, pinning the gating contracts between steps structurally.
 coverage==7.17.3
-playwright==1.65.1
+playwright==1.65.2
 pyyaml==6.0.3
 pytest==9.2.0
