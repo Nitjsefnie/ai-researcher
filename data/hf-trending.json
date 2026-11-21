@@ -2,9 +2,6 @@
   "source": "https://huggingface.co/api/models?sort=trendingScore&limit=10",
   "models": [
     {
-      "id": "thinkingmachines/Inkling-2-Mini"
-    },
-    {
       "id": "higurashi-ai/Haru-4B"
     },
     {
@@ -14,22 +11,25 @@
       "id": "Qwen/Qwen3.8-27B"
     },
     {
-      "id": "Lightricks/LTX-2.5"
+      "id": "thinkingmachines/Inkling-2-Mini"
     },
     {
       "id": "Sentinel7/h3"
     },
     {
+      "id": "Lightricks/LTX-2.5"
+    },
+    {
       "id": "tencent/Hy4-flash"
     },
     {
-      "id": "MiniMaxAI/MiniMax-H3-Image"
+      "id": "unsloth/Inkling-2-Mini-GGUF"
     },
     {
       "id": "sensenova/SenseNova-Loop-9B"
     },
     {
-      "id": "inworld/voice-isolator"
+      "id": "MiniMaxAI/MiniMax-H3-Image"
     }
   ]
 }
