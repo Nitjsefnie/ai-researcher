@@ -818,11 +818,11 @@ class WindowMarkerStagingTests(unittest.TestCase):
     data/)."""
 
     def test_the_corner_holds_through_the_gate(self):
-        # The corner state pinned at the gate: HEAD healthy, the fresh capture
-        # in the three-generation corner, the hour's marker recorded -- the
-        # build holds the page, the gate answers false (unchanged) with the
-        # hold's reason on stderr, and the gate exits zero rather than
-        # refusing: the last good page stays live and nothing commits.
+        # Pinned at the gate: HEAD healthy, the fresh capture in the
+        # three-generation corner, the hour's marker recorded -- the build
+        # holds the page, the gate answers false (unchanged) with the hold's
+        # reason on stderr, and exits zero rather than refusing: the last
+        # good page stays live, AA's capture neither commits nor publishes.
         err = io.StringIO()
         out = io.StringIO()
         with head_serving(FIXTURE_MODELS, FIXTURE_AGENTS), \

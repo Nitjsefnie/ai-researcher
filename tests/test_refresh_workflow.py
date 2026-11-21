@@ -388,9 +388,8 @@ class GateTests(unittest.TestCase):  # pylint: disable=too-many-public-methods
         # The artifact is the exact commit payload the old single job staged:
         # the fixed add list and the differ's message when one ran. The
         # disagreement-era files are gone with the disagreement state (issue
-        # #200), so the list is the five payload paths, the route evidence
-        # behind its own presence guard (issue #227), and nothing that
-        # varies by hour.
+        # #200), so the list is the six payload paths, the route evidence
+        # among them (issue #441), and nothing that varies by hour.
         run = flattened(step(self.wf, "Stage the publish payload")["run"])
 
         for piece in ("data/aa-raw-models.json", "data/aa-raw-coding-agents.json",
@@ -398,13 +397,8 @@ class GateTests(unittest.TestCase):  # pylint: disable=too-many-public-methods
                       "out/frontier-models.html", "data/cost-breakdown-window.txt",
                       "commit-msg.txt"):
             self.assertIn(piece, run)
-        # The guard copies the evidence whenever data/ holds it.
-        self.assertIn(
-            "[ ! -f data/cost-breakdown-window.txt ] || "
-            "cp --parents data/cost-breakdown-window.txt", run)
         # No disagreement-era file and no retirement switch survives on this
-        # path; the route evidence is the one conditional payload file, and
-        # the guard above is its whole conditional.
+        # path.
         for gone in ("data/aa-disagreement-snapshot.json", "data/aa-route-disagreement.txt",
                      "data/aa-last-agreeing-capture.json",
                      "$RETIRE"):
@@ -414,28 +408,6 @@ class GateTests(unittest.TestCase):  # pylint: disable=too-many-public-methods
         artifact = step(self.wf, "Upload the capture on failure")
         self.assertIn("failure()", artifact["if"])
         self.assertIn("steps.fetch.outputs.captured == 'true'", artifact["if"])
-
-    def test_the_write_job_stages_the_window_marker_both_ways(self):
-        # Issue #227: the gate's HEAD-side rebuild reads the route evidence
-        # from GIT at HEAD, so an AA-payload commit must carry it. The add
-        # keys on the PAYLOAD, never on the worktree file -- the checkout at
-        # main's tip materializes the tracked file and `cp -a` never
-        # deletes, so a worktree probe would fire the add on an hour whose
-        # payload lacks it (the defect this condition fixes). The removal
-        # is the elif's `git rm`, for a payload lacking the file;
-        # fetch_aa.py writes it every hour (issue #441), so the add fires
-        # on each commit that carries an AA payload.
-        run = flattened(step_in(self.wf, "publish", "Commit the refresh")["run"])
-
-        self.assertIn('if [ -f "${PAYLOAD}/tree/data/cost-breakdown-window.txt" ]; then', run)
-        self.assertIn("git add data/cost-breakdown-window.txt", run)
-        self.assertIn("git cat-file -e HEAD:data/cost-breakdown-window.txt", run)
-        self.assertIn("git rm -q data/cost-breakdown-window.txt", run)
-        # Presence stages before absence is considered, and the rm is the
-        # elif -- never an unconditional removal.
-        self.assertLess(
-            run.index("git add data/cost-breakdown-window.txt"),
-            run.index("git rm -q data/cost-breakdown-window.txt"))
 
     def test_the_unchanged_path_checks_whether_the_live_page_is_current(self):
         # Issue 42 taught the unchanged path to check; issue #206 changed
@@ -704,9 +676,10 @@ class ExecutedHoldProbeTests(unittest.TestCase):
     on this file) disposes of: the step is executable code, so the contract
     is pinned by running the real run block. python3 is stubbed (the only
     tool the step reaches beyond git, the hub fetch included), the gate and the probe
-    answer from fixtures, and every executed case asserts the exit code,
-    the proceed output, the data/ state and -- where the case's meaning
-    needs it -- the summary and the hub fetch.
+    answer from fixtures, the held summary's `-c` count read runs the real
+    interpreter, and every executed case asserts the exit code, the
+    proceed output, the data/ state and -- where the case's meaning needs
+    it -- the summary and the hub fetch.
 
     Two layers pin the failure paths. THIS class is the workflow layer:
     a gate or probe exit 1 must turn the STEP red before any verdict can
@@ -724,7 +697,8 @@ class ExecutedHoldProbeTests(unittest.TestCase):
         "data/cost-breakdown-window.txt": "in-run generations: 1\n",
         "out/frontier-models.html": "page\n",
     }
-    FRESH, FRESH_EVIDENCE = "fresh\n", "in-run generations: 3\n"
+    FRESH, FRESH_EVIDENCE = "fresh\n", ("in-run generations: 3\ndetail fills withheld: yes\n"
+                                        "evaluation costs withheld: no\n")
     # The republish hour's two cause lines (issue #239), byte-equal to the
     # workflow's summary echoes: the cause that set hub_stale is named, so
     # a failed fetch never reports a comparison result it did not make.
@@ -743,7 +717,7 @@ class ExecutedHoldProbeTests(unittest.TestCase):
                 "the step is a POSIX script; the Windows cells skip its "
                 "execution")
 
-    def _run_hour(self, tmp: pathlib.Path, *, gate, probe, force, hub):
+    def _run_hour(self, tmp: pathlib.Path, *, gate, probe, force, hub, evidence: str | None = FRESH_EVIDENCE):
         """Seed one scratch repo at HEAD, dirty it with the fresh capture
         and the fresh route evidence, install the python3 double,
         and run the real run block.
@@ -782,7 +756,11 @@ class ExecutedHoldProbeTests(unittest.TestCase):
         # route evidence, both dirty against HEAD, which tracks both, so
         # `git checkout -- data/` restores the evidence with the capture.
         (repo / "data" / "aa-raw-models.json").write_text(self.FRESH, encoding="utf-8")
-        (repo / "data" / "cost-breakdown-window.txt").write_text(self.FRESH_EVIDENCE, encoding="utf-8")
+        marker = repo / "data" / "cost-breakdown-window.txt"
+        if evidence is None:
+            marker.unlink()
+        else:
+            marker.write_text(evidence, encoding="utf-8")
 
         stub = tmp / "bin"
         stub.mkdir()
@@ -809,6 +787,7 @@ class ExecutedHoldProbeTests(unittest.TestCase):
             "HELD_RC": str(held_rc),
             "HUB_SAME": {"same": "1", "stale": "0", "fail": "fail"}[hub],
             "STUB_CALLS": str(tmp / "hub-calls.txt"),
+            "REAL_PYTHON3": sys.executable, "PYTHONPATH": str(ROOT),
         }
         done = _workflowrun.run_step(repo, dict(step_, run=script), env)
 
@@ -882,22 +861,22 @@ class ExecutedHoldProbeTests(unittest.TestCase):
         # held branch exits after its write, so no verdict write can
         # follow it -- the harness reads only the first proceed= line,
         # which is why the count, not the first-line value, is the pin.
-        for gate in ("true", "false"):
+        # Counts 2 and 3 ride the gate axis: a hardcoded summary count fails one.
+        for gate, count in (("true", 2), ("false", 3)):
             for force in (False, True):
                 for hub in ("same", "stale"):
-                    with self.subTest(gate=gate, force=force, hub=hub):
-                        with tempfile.TemporaryDirectory(
-                                prefix=".hold-probe-") as raw:
+                    with self.subTest(gate=gate, count=count, force=force, hub=hub):
+                        with tempfile.TemporaryDirectory(prefix=".hold-probe-") as raw:
                             hour = self._run_hour(
-                                pathlib.Path(raw), gate=gate, probe="yes",
-                                force=force, hub=hub)
+                                pathlib.Path(raw), gate=gate, probe="yes", force=force, hub=hub,
+                                evidence=self.FRESH_EVIDENCE.replace("3", str(count)))
                         self.assertEqual(hour["rc"], 0, hour["stderr"])
                         self.assertEqual(hour["proceed"], "false")
-                        self.assertEqual(hour["outputs"].count("proceed="),
-                                         1)
+                        self.assertEqual(hour["outputs"].count("proceed="), 1)
                         self.assertEqual(hour["capture"], "head\n")
                         self.assertEqual(hour["marker"], self.HEAD_FILES["data/cost-breakdown-window.txt"])
-                        self.assertIn("### Held", hour["summary"])
+                        self.assertIn(f"### Held: AA window, {count} generations in-run", hour["summary"])
+                        self.assertIn(f"holds the hour on {count} in-run generations", hour["summary"])
                         if force:
                             self.assertIn("Force was requested",
                                           hour["summary"])
@@ -909,6 +888,19 @@ class ExecutedHoldProbeTests(unittest.TestCase):
                         self.assertEqual(hour["stdout"].count("hold probe:"),
                                          1)
                         self.assertEqual(hour["hub_fetches"], 0)
+
+    def test_a_held_hour_whose_evidence_does_not_read_is_red(self):
+        # The held summary's count comes from build.read_route_evidence; a
+        # held answer beside evidence that reader refuses (unparseable or
+        # missing) is a broken hour: red, no proceed, data/ left as fetched.
+        for evidence in ("in-run generations: 3\n", None):
+            with self.subTest(evidence=evidence), tempfile.TemporaryDirectory(prefix=".hold-probe-") as raw:
+                hour = self._run_hour(pathlib.Path(raw), gate="false", probe="yes", force=False,
+                                      hub="same", evidence=evidence)
+                self.assertNotEqual(hour["rc"], 0, hour["stderr"])
+                self.assertNotIn("proceed=", hour["outputs"])
+                self.assertIn("missing or unparseable", hour["stderr"])
+                self.assertEqual(hour["capture"], self.FRESH)
 
     def test_a_not_held_probe_leaves_the_hour_to_its_verdict(self):
         # probe=no on a healthy capture: the hour's answer is the verdict's
@@ -1006,7 +998,9 @@ STUB_PYTHON3 = """\
 # gate leaves the step's command substitution empty exactly as the real
 # script does. download.py's live-page fetch writes HEAD's page when
 # HUB_SAME=1, a stale page when HUB_SAME=0, and fails when HUB_SAME=fail --
-# the step's else hub_stale=true arm; every fetch is recorded.
+# the step's else hub_stale=true arm; every fetch is recorded. The held
+# summary's `-c` count read runs the real interpreter on the scratch data/.
+[ "$1" = -c ] && exec "$REAL_PYTHON3" "$@"
 if [ "$1" = scripts/ci/download.py ]; then
   printf '%s\\n' "$3" >> "$STUB_CALLS"
   [ "$HUB_SAME" = fail ] && exit 1
@@ -1128,6 +1122,7 @@ class ExecutedCommitMessageTests(_SeededOrigin, unittest.TestCase):
         "data/aa-raw-models.json": '{"models": []}\n',
         "data/aa-raw-coding-agents.json": "[]\n",
         "data/captured-at.txt": "2026-10-04\n",
+        "data/cost-breakdown-window.txt": "in-run generations: 1\n",
         "out/frontier-models.html": "<p>base</p>\n",
     }
     MOVED_FILES = {
@@ -1135,6 +1130,7 @@ class ExecutedCommitMessageTests(_SeededOrigin, unittest.TestCase):
         "data/aa-raw-coding-agents.json": "[1]\n",
         "data/aa-generation-state.json": '{"held": null}\n',
         "data/captured-at.txt": "2026-10-04T11\n",
+        "data/cost-breakdown-window.txt": "in-run generations: 2\n",
         "out/frontier-models.html": "<p>moved</p>\n",
     }
 
@@ -1572,23 +1568,8 @@ class DeployKeyPushTests(unittest.TestCase):
 
 
 # ---------------------------------------------------------------------------
-# issue #227: the evidence conditional's operator semantics
+# the write half's job conditions and AA staging, executed
 # ---------------------------------------------------------------------------
-
-
-def _commit_capture_step():
-    return step_in(load(), "publish", "Commit the refresh")
-
-
-def _marker_conditional() -> str:
-    """The if/elif block extracted verbatim from the commit step's run."""
-    lines = _commit_capture_step()["run"].splitlines()
-    start = next(i for i, line in enumerate(lines)
-                 if 'if [ -f "${PAYLOAD}/tree/data/'
-                 'cost-breakdown-window.txt" ]; then' in line)
-    end = next(i for i in range(start, len(lines))
-               if lines[i].strip() == "fi")
-    return "\n".join(lines[start:end + 1])
 
 
 @pytest.mark.parametrize('states,expected', [
@@ -1678,95 +1659,6 @@ def test_aa_payload_mode_and_republish_bytes(tmp_path, changed, force, mode, pag
     assert (payload / 'commit-msg.txt').read_bytes() == (tmp_path / 'commit-msg.txt').read_bytes()
     assert sorted(str(path.relative_to(payload / 'tree')) for path in
                   (payload / 'tree').rglob('*') if path.is_file()) == sorted(files)
-
-
-def test_the_marker_conditional_behaves_on_the_four_hours(tmp_path):
-    # The operator semantics behind the source-text pin above, because the
-    # text alone cannot carry them -- the first draft pinned the text and
-    # was green over a dead elif whose add branch fired on the checkout's
-    # own materialized copy. The block is extracted from refresh.yml
-    # VERBATIM and run in a scratch repo shaped like the write job's --
-    # sitting at the tip being committed onto, the payload tree copied
-    # over it -- across the four hours of the file's add/remove lifecycle.
-    if os.name == "nt":
-        pytest.skip(
-            "the block under test is GitHub-runner bash against a "
-            "POSIX payload path, and the write job itself runs on "
-            "ubuntu; the same skip shape as the stub-gh classifier "
-            "tests")
-    block = _marker_conditional()
-    payload_data = tmp_path / "payload" / "tree" / "data"
-    payload_data.mkdir(parents=True)
-    env = {**os.environ, "PAYLOAD": str(tmp_path / "payload")}
-
-    def scratch(hour: str, tracked: bool) -> pathlib.Path:
-        # One FRESH repo per hour: a reused path would carry the previous
-        # hour's staged state into the next commit and pollute the case.
-        repo = tmp_path / f"scratch-{hour}"
-        (repo / "data").mkdir(parents=True)
-        git = ["git", "-C", str(repo)]
-        subprocess.run([*git, "init", "-q", "-b", "main"], check=True,
-                       capture_output=True)
-        # A runner carries no global git identity (the commit-scopes hook
-        # governs OUR commits, not a fixture's throwaway repo); the scratch
-        # gets the same local identity the write job's own scratch uses.
-        subprocess.run([*git, "config", "user.name", "github-actions[bot]"],
-                       check=True, capture_output=True)
-        subprocess.run([*git, "config", "user.email",
-                        "41898282+github-actions[bot]@users.noreply.github.com"],
-                       check=True, capture_output=True)
-        (repo / "data" / "captured-at.txt").write_text("2026-10-08\n")
-        if tracked:
-            (repo / "data" / "cost-breakdown-window.txt").write_text("w\n")
-            subprocess.run([*git, "add", "data/"], check=True,
-                           capture_output=True)
-        else:
-            subprocess.run([*git, "add", "data/captured-at.txt"], check=True,
-                           capture_output=True)
-        subprocess.run([*git, "commit", "-qm", "tip"], check=True,
-                       capture_output=True)
-        return repo
-
-    def status(repo: pathlib.Path) -> str:
-        return subprocess.run(
-            ["git", "-C", str(repo), "status", "--porcelain"],
-            check=True, capture_output=True, text=True).stdout
-
-    def run_block(repo: pathlib.Path) -> None:
-        # The write job's sequence: the payload tree overlays the checkout
-        # (`cp -a` -- copies over, never deletes), THEN the conditional.
-        shutil.copytree(tmp_path / "payload" / "tree", repo,
-                        dirs_exist_ok=True)
-        # check stays off on purpose: the nonzero case is asserted below,
-        # with the block's own stderr in the message.
-        proc = subprocess.run(["bash", "-c", block], cwd=repo, env=env,
-                              check=False, capture_output=True, text=True)
-        assert proc.returncode == 0, (
-            f"marker conditional rc={proc.returncode}: {proc.stderr}")
-
-    # Removal state: tracked at the tip, absent from the payload -- the
-    # checkout's own materialized copy must not fire the add branch; the
-    # removal stages.
-    repo = scratch("heal", tracked=True)
-    run_block(repo)
-    assert "D  data/cost-breakdown-window.txt" in status(repo)
-
-    # Add state: the payload carries it -- staged in, tracked or not.
-    (payload_data / "cost-breakdown-window.txt").write_text("w\n")
-    repo = scratch("window", tracked=False)
-    run_block(repo)
-    assert "A  data/cost-breakdown-window.txt" in status(repo)
-
-    # Unchanged state: tracked and unchanged in the payload -- a no-op.
-    repo = scratch("persist", tracked=True)
-    run_block(repo)
-    assert status(repo) == ""
-
-    # Absent state: absent from both -- a no-op.
-    (payload_data / "cost-breakdown-window.txt").unlink()
-    repo = scratch("quiet", tracked=False)
-    run_block(repo)
-    assert status(repo) == ""
 
 
 class HFTrackerStructureTests(unittest.TestCase):
