@@ -19,10 +19,6 @@
     3174,
     4114
   ],
-  ".github/workflows/coverage-comment.yml": [
-    4547,
-    13754
-  ],
   ".github/workflows/lint.yml": [
     1047,
     1824
@@ -30,10 +26,6 @@
   ".github/workflows/pr-gate.yml": [
     427,
     1095
-  ],
-  ".github/workflows/ratchet-push.yml": [
-    4432,
-    11135
   ],
   ".github/workflows/refresh.yml": [
     21208,
@@ -48,8 +40,8 @@
     3869
   ],
   ".github/workflows/tests.yml": [
-    17016,
-    24718
+    8934,
+    13507
   ],
   ".github/workflows/types.yml": [
     1021,
@@ -80,8 +72,8 @@
     5198
   ],
   "scripts/ci/check_ratchets.py": [
-    8755,
-    21494
+    7730,
+    19121
   ],
   "scripts/ci/classify_changes.py": [
     6433,
@@ -90,10 +82,6 @@
   "scripts/ci/commit_scopes.py": [
     6375,
     12040
-  ],
-  "scripts/ci/diff_coverage.py": [
-    4731,
-    11949
   ],
   "scripts/ci/gate_base_freshness.py": [
     13156,
@@ -107,21 +95,9 @@
     6219,
     13299
   ],
-  "scripts/ci/js_coverage.py": [
-    2486,
-    8141
-  ],
   "scripts/ci/perf_budgets.py": [
     9934,
     22197
-  ],
-  "scripts/ci/ratchet.py": [
-    555,
-    2856
-  ],
-  "scripts/ci/thresholds.py": [
-    2045,
-    8670
   ],
   "scripts/diff_aa.py": [
     13089,
@@ -148,8 +124,8 @@
     7346
   ],
   "tests/test_browser.py": [
-    29175,
-    93286
+    28990,
+    93157
   ],
   "tests/test_build.py": [
     26966,
@@ -184,8 +160,8 @@
     14508
   ],
   "tests/test_ci_instruction_budgets.py": [
-    3805,
-    15765
+    3804,
+    15764
   ],
   "tests/test_ci_perf_budgets.py": [
     4898,
@@ -195,21 +171,13 @@
     10411,
     61882
   ],
-  "tests/test_ci_thresholds.py": [
-    3286,
-    18648
-  ],
   "tests/test_ci_workflows.py": [
-    4054,
-    15794
+    2282,
+    10990
   ],
   "tests/test_diff_aa.py": [
     10693,
     42894
-  ],
-  "tests/test_diff_coverage.py": [
-    3651,
-    23139
   ],
   "tests/test_fetch_aa.py": [
     28402,
@@ -218,10 +186,6 @@
   "tests/test_gitignore.py": [
     3509,
     7004
-  ],
-  "tests/test_js_coverage.py": [
-    1840,
-    11040
   ],
   "tests/test_publish_docs.py": [
     2178,
@@ -232,7 +196,7 @@
     107920
   ],
   "tests/test_workflow_ci_gate.py": [
-    3391,
-    8501
+    3351,
+    8608
   ]
 }
