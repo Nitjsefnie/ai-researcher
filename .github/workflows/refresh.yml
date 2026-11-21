@@ -309,25 +309,30 @@ jobs:
           changed="$(python3 scripts/capture_gate.py)"
           echo "changed=$changed" >> "$GITHUB_OUTPUT"
           # THE HOLD PROBE (issue #236). A forced or hub-stale run is held by
-          # a three-generation window hour exactly as an ordinary one, so the
-          # hold is decided here, before the verdict below could set
-          # proceed=true and while the fresh captures are on disk. The probe
-          # answers from build.WindowHold, raised only on the #232 predicate
-          # (>= 3 generations in-run, parameters the only emptied axis), so a
-          # held hour drops proceed on EVERY path. `case` makes any undefined
-          # token (an empty answer, a typo) a broken probe: red, never a fall
-          # through. The converged hour with an emptied axis is the GATE's to
-          # refuse above (exit 1 under bash -e, which keeps a forced dispatch
-          # on a refused capture off the write half); the probe's own exit 1
-          # (a missing fresh capture, anything unexpected) is red the same way.
+          # a window hour exactly as an ordinary one, so the hold is decided
+          # here, before the verdict below could set proceed=true and while
+          # the fresh captures are on disk. The probe answers from
+          # build.WindowHold, raised only when the route evidence records >= 2
+          # generations in-run and every emptied axis traces to a withheld
+          # route (parameters to the detail route, agentic to the evaluation
+          # route), so a held hour drops proceed on EVERY path. `case` makes
+          # any undefined token (an empty answer, a typo) a broken probe: red,
+          # never a fall through. An emptied axis the hold does not explain is
+          # the GATE's to refuse above (exit 1 under bash -e, which keeps a
+          # forced dispatch on a refused capture off the write half); the
+          # probe's own exit 1 (a missing fresh capture, anything unexpected)
+          # is red the same way. The summary's count is read from the same
+          # evidence by build's own reader, before data/ is restored; evidence
+          # it cannot read beside a held answer is a broken hour, red.
           held="$(python3 scripts/capture_gate.py --fresh-held)"
           case "$held" in
             yes)
               echo "hold probe: the fresh capture holds the page -- dropping the hour"
+              generations="$(python3 -c 'import pathlib, sys, build; e = build.read_route_evidence(pathlib.Path("data")); print(e[0]) if e else sys.exit("hold probe: held, but data/cost-breakdown-window.txt is missing or unparseable")')"
               {
-                echo '### Held: three-generation AA window'
+                echo "### Held: AA window, ${generations} generations in-run"
                 echo
-                echo 'The three-generation AA window holds the hour: the last good page stays live, nothing commits or publishes.'
+                echo "The AA window holds the hour on ${generations} in-run generations: the last good page stays live, and AA's capture neither commits nor publishes this hour."
                 # A forced dispatch gets its own line, or it would read as if
                 # it had rebuilt. One line on purpose: the held branch exits
                 # before the live-page check, so no second cause exists here.
@@ -493,17 +498,16 @@ jobs:
           fi
           # The fixed add list the old commit stage staged: unchanged files
           # copy fine -- the write job's `git add` stages only what differs
-          # from main.
+          # from main. The route evidence is on it: build.py's empty-axis
+          # guard reads it beside the capture and the capture gate's HEAD-side
+          # rebuild reads it from GIT at HEAD, so every AA commit carries it.
+          # fetch_aa.py writes it every hour and main tracks it (issue #441),
+          # so it is always here and needs no presence guard.
           for p in data/aa-raw-models.json data/aa-raw-coding-agents.json \
-                   data/aa-generation-state.json data/captured-at.txt out/frontier-models.html; do
+                   data/aa-generation-state.json data/captured-at.txt out/frontier-models.html \
+                   data/cost-breakdown-window.txt; do
             cp --parents "$p" "${PAYLOAD}/tree/"
           done
-          # The window marker (issue #227): build.py's empty-axis guard reads
-          # it from the data dir beside the capture, and the capture gate's
-          # HEAD-side rebuild reads it from GIT at HEAD -- so a window hour's
-          # commit must carry it, and the first healthy hour's commit removes
-          # it again. Absent is the normal state and copies nothing.
-          [ ! -f data/cost-breakdown-window.txt ] || cp --parents data/cost-breakdown-window.txt "${PAYLOAD}/tree/"
           # The differ's message travels when the hour ran it (AI_RESEARCHER_CHANGED=true);
           # the write job includes the full message as AA's block.
           [ ! -f commit-msg.txt ] || cp commit-msg.txt "${PAYLOAD}/commit-msg.txt"
@@ -694,27 +698,14 @@ jobs:
           git -C "${scratch}" config user.name 'github-actions[bot]'
           git -C "${scratch}" config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           cd "${scratch}"
-          # Every payload contributes only its fixed paths. AA's marker
-          # guard handles both the opening and closing window hours.
+          # Every payload contributes only its fixed paths. AA's include the
+          # route evidence, which the staging step copies into every AA
+          # payload (issue #441).
           if [ -d "${PAYLOAD}/tree" ]; then
             cp -a "${PAYLOAD}/tree/." ./
             git add data/aa-raw-models.json data/aa-raw-coding-agents.json \
-                    data/aa-generation-state.json data/captured-at.txt out/frontier-models.html
-            # The window marker rides the commit both ways (issue #227): a
-            # window hour's payload carries it in, and the first healthy
-            # hour's payload leaves it out, which stages its removal with
-            # `git rm`. The add keys on the PAYLOAD, never on the worktree
-            # file: the checkout at main's tip materializes a tracked marker
-            # into the tree and `cp -a` never deletes, so a worktree probe
-            # would fire the add branch on exactly the heal hour this elif
-            # exists for and the marker would never leave main. Neither
-            # branch fires in a normal hour: absent from both payload and
-            # main.
-            if [ -f "${PAYLOAD}/tree/data/cost-breakdown-window.txt" ]; then
-              git add data/cost-breakdown-window.txt
-            elif git cat-file -e HEAD:data/cost-breakdown-window.txt 2>/dev/null; then
-              git rm -q data/cost-breakdown-window.txt
-            fi
+                    data/aa-generation-state.json data/captured-at.txt out/frontier-models.html \
+                    data/cost-breakdown-window.txt
           fi
           if [ -f "${RUNNER_TEMP}/hf-payload/data/hf-trending.json" ]; then
             mkdir -p data

@@ -75,10 +75,11 @@ def test_bot_signature_names_every_file_the_refresh_committers_add():
                     workflow["jobs"]["publish"]["steps"])
     fixed = "git add data/aa-raw-models.json data/aa-raw-coding-agents.json \\\n" \
             "        data/aa-generation-state.json " \
-            "data/captured-at.txt out/frontier-models.html"
+            "data/captured-at.txt out/frontier-models.html \\\n" \
+            "        data/cost-breakdown-window.txt"
     assert " ".join(fixed.split()) in " ".join(raw.split())
     adds = re.findall(r"^\s*git add(?:[^\n\\]|\\\n)*", raw, re.MULTILINE)
-    assert len(adds) == 6, adds
+    assert len(adds) == 5, adds
     staged = {path for add in adds for path in add.replace("\\\n", " ").split()
               if path.startswith(("data/", "out/"))}
     assert staged == set(classify.BOT_SIGNATURE)
@@ -86,11 +87,9 @@ def test_bot_signature_names_every_file_the_refresh_committers_add():
                   if any(re.search(r'^\s*git commit\b', step.get('run', ''), re.MULTILINE)
                          for step in job['steps'])}
     assert committers == {'publish'}
-    # And the evidence's removal stays conditional: never an unconditional
-    # `git rm` of a data path.
-    rms = re.findall(r"^\s*git rm(?:[^\n\\]|\\\n)*", raw, re.MULTILINE)
-    assert [rm.lstrip() for rm in rms] == \
-        ["git rm -q data/cost-breakdown-window.txt"], rms
+    # And no committer removes a data path: the evidence is tracked for good.
+    rms = re.findall(r"\bgit rm\b.*", raw)
+    assert not rms, rms
 
 
 def test_data_only_accepts_the_signature_and_only_its_subsets():
