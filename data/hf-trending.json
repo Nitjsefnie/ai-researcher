@@ -5,31 +5,31 @@
       "id": "thinkingmachines/Inkling-2-Mini"
     },
     {
+      "id": "higurashi-ai/Haru-4B"
+    },
+    {
       "id": "harness-hub/Qwen3.8-27B-pi-adapted"
     },
     {
       "id": "Sentinel7/h3"
     },
     {
-      "id": "Lightricks/LTX-2.5"
-    },
-    {
       "id": "tencent/Hy4-flash"
     },
     {
-      "id": "higurashi-ai/Haru-4B"
+      "id": "Lightricks/LTX-2.5"
+    },
+    {
+      "id": "inworld/voice-isolator"
     },
     {
       "id": "unsloth/Inkling-2-Mini-GGUF"
     },
     {
+      "id": "meituan-longcat/LongCat-Video-Avatar-1.6"
+    },
+    {
       "id": "Qwen/Qwen3.8-27B"
-    },
-    {
-      "id": "sensenova/SenseNova-Loop-9B"
-    },
-    {
-      "id": "inworld/voice-isolator"
     }
   ]
 }
