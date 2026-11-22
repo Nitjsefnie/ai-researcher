@@ -14,22 +14,22 @@
       "slug": "z-ai/glm-5.3-flash"
     },
     {
-      "slug": "tencent/hy4"
+      "slug": "openai/gpt-6-luna"
     },
     {
-      "slug": "openai/gpt-6-luna"
+      "slug": "tencent/hy4"
     },
     {
       "slug": "anthropic/claude-opus-5.5"
     },
     {
-      "slug": "stepfun/step-5-preview"
-    },
-    {
       "slug": "minimax/minimax-m3.1-flash"
     },
     {
-      "slug": "xiaomi/mimo-v2.6-flash"
+      "slug": "moonshotai/kimi-k3.1-pro"
+    },
+    {
+      "slug": "stepfun/step-5-preview"
     }
   ]
 }
