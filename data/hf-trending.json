@@ -26,10 +26,10 @@
       "id": "Qwen/Qwen3.8-27B"
     },
     {
-      "id": "sensenova/SenseNova-Loop-9B"
+      "id": "AtomicChat/Inkling-2-Mini-Uncensored-GGUF"
     },
     {
-      "id": "AtomicChat/Inkling-2-Mini-Uncensored-GGUF"
+      "id": "sensenova/SenseNova-Loop-9B"
     }
   ]
 }
