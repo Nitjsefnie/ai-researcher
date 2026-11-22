@@ -11,12 +11,6 @@
       "id": "inworld/voice-isolator"
     },
     {
-      "id": "tencent/Hy4-flash"
-    },
-    {
-      "id": "apple/FastFrames-L"
-    },
-    {
       "id": "harness-hub/Qwen3.8-27B-pi-adapted"
     },
     {
@@ -29,7 +23,13 @@
       "id": "apple/DepthPro2"
     },
     {
+      "id": "tencent/Hy4-flash"
+    },
+    {
       "id": "Qwen/Qwen3.8-27B"
+    },
+    {
+      "id": "sensenova/SenseNova-Loop-9B"
     }
   ]
 }
