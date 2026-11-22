@@ -8,10 +8,10 @@
       "id": "unsloth/Inkling-2-Mini-GGUF"
     },
     {
-      "id": "tencent/Hy4-flash"
+      "id": "inworld/voice-isolator"
     },
     {
-      "id": "inworld/voice-isolator"
+      "id": "tencent/Hy4-flash"
     },
     {
       "id": "apple/FastFrames-L"
@@ -29,7 +29,7 @@
       "id": "AtomicChat/Inkling-2-Mini-Uncensored-GGUF"
     },
     {
-      "id": "sensenova/SenseNova-Loop-9B"
+      "id": "apple/DepthPro2"
     }
   ]
 }
