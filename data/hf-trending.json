@@ -11,25 +11,25 @@
       "id": "inworld/voice-isolator"
     },
     {
-      "id": "tencent/Hy4-flash"
+      "id": "AtomicChat/Inkling-2-Mini-Uncensored-GGUF"
     },
     {
       "id": "harness-hub/Qwen3.8-27B-pi-adapted"
     },
     {
-      "id": "AtomicChat/Inkling-2-Mini-Uncensored-GGUF"
-    },
-    {
-      "id": "apple/DepthPro2"
-    },
-    {
       "id": "higurashi-ai/Haru-4B"
+    },
+    {
+      "id": "tencent/Hy4-flash"
+    },
+    {
+      "id": "sensenova/SenseNova-Loop-9B"
     },
     {
       "id": "Qwen/Qwen3.8-27B"
     },
     {
-      "id": "sensenova/SenseNova-Loop-9B"
+      "id": "SulphurAI/Sulphur-3"
     }
   ]
 }
