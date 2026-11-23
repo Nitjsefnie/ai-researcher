@@ -17,10 +17,10 @@
       "slug": "openai/gpt-6-luna"
     },
     {
-      "slug": "tencent/hy4"
+      "slug": "anthropic/claude-opus-5.5"
     },
     {
-      "slug": "anthropic/claude-opus-5.5"
+      "slug": "tencent/hy4"
     },
     {
       "slug": "minimax/minimax-m3.1-flash"
