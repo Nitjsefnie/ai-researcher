@@ -16,7 +16,8 @@
       ],
       "tests/test_build_rankings.py": [
         7.83,
-        11.55
+        11.55,
+        16.35
       ],
       "tests/test_build_rankings_identity.py": [
         3.22,
@@ -26,10 +27,12 @@
         0.05
       ],
       "tests/test_capture_gate.py": [
-        1.69
+        1.69,
+        3.05
       ],
       "tests/test_check_committed_page.py": [
-        2.45
+        2.45,
+        1.26
       ],
       "tests/test_check_committed_rankings_page.py": [
         27.67
@@ -83,7 +86,8 @@
       ],
       "tests/test_commit_scopes.py": [
         2.88,
-        4.38
+        4.38,
+        5.7
       ],
       "tests/test_diff_aa.py": [
         1.19
@@ -125,7 +129,8 @@
         0.01
       ],
       "tests/test_gate_base_freshness.py": [
-        10.06
+        10.06,
+        19.18
       ],
       "tests/test_gate_base_freshness_imports.py": [
         5.83,
@@ -141,7 +146,8 @@
         0.04
       ],
       "tests/test_refresh_capture_overlap.py": [
-        4.38
+        4.38,
+        5.54
       ],
       "tests/test_refresh_github_fetch.py": [
         6.3
@@ -152,7 +158,8 @@
       ],
       "tests/test_refresh_workflow.py": [
         68.72,
-        88.52
+        88.52,
+        113.89
       ],
       "tests/test_workflow_ci_gate.py": [
         0.61
@@ -248,10 +255,12 @@
       ],
       "tests/test_fetch_aa.py": [
         9.41,
-        5.06
+        5.06,
+        14.7
       ],
       "tests/test_fetch_aa_detail_fills.py": [
-        0.42
+        0.42,
+        1.49
       ],
       "tests/test_fetch_aa_membership.py": [
         0.38
@@ -285,7 +294,8 @@
         15.83
       ],
       "tests/test_gate_base_freshness_imports.py": [
-        9.66
+        9.66,
+        15.09
       ],
       "tests/test_gate_base_freshness_tokens.py": [
         0.83
@@ -327,7 +337,8 @@
         1.54
       ],
       "tests/test_build_rankings.py": [
-        29.15
+        29.15,
+        15.28
       ],
       "tests/test_build_rankings_identity.py": [
         1.79
@@ -387,7 +398,8 @@
         0.02
       ],
       "tests/test_ci_workflows.py": [
-        2.19
+        2.19,
+        3.23
       ],
       "tests/test_commit_scopes.py": [
         2.11
@@ -450,7 +462,8 @@
         8.21
       ],
       "tests/test_refresh_github_fetch.py": [
-        4.17
+        4.17,
+        5.66
       ],
       "tests/test_refresh_hub_upload.py": [
         4.42
@@ -471,7 +484,8 @@
       ],
       "tests/test_browser.py": [
         81.9,
-        118.0
+        118.0,
+        156.96
       ],
       "tests/test_browser_temp.py": [
         1.07
@@ -642,7 +656,8 @@
         2.31
       ],
       "tests/test_build_rankings.py": [
-        33.94
+        33.94,
+        44.32
       ],
       "tests/test_build_rankings_identity.py": [
         14.81
@@ -705,7 +720,8 @@
         2.73
       ],
       "tests/test_commit_scopes.py": [
-        13.48
+        13.48,
+        17.42
       ],
       "tests/test_diff_aa.py": [
         1.52
@@ -714,7 +730,8 @@
         3.02
       ],
       "tests/test_fetch_aa.py": [
-        11.54
+        11.54,
+        15.19
       ],
       "tests/test_fetch_aa_detail_fills.py": [
         0.5
