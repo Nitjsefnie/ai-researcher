@@ -118,9 +118,9 @@ FETCH_TIMEOUT_SECONDS = 25
 # page, two spaced leaderboard looks, the detail page, the coding agents, and
 # the GDPval-AA page and data, fetch_gdpval.AUTH_ATTEMPTS times), 810 s, plus
 # the dispute-look spacing wait and AUTH_REREAD_SECONDS (180 s each): 1170 s,
-# if every fetch succeeds slowly; transport exhaustion exits in one page bound.
-# These are per-attempt BOUNDS, not a promise: a slow-drip body can outlast a
-# single socket timeout.
+# if every fetch succeeds slowly; transport exhaustion exits in one page bound,
+# GDPval-AA's after a re-read. These are per-attempt BOUNDS: a slow-drip body
+# can exceed a timeout.
 PAGE_ATTEMPTS, PAGE_BACKOFF_SECONDS = 3, download.BACKOFF_SECONDS
 PAGE_WINDOW_SECONDS = (PAGE_ATTEMPTS - 1) * FETCH_TIMEOUT_SECONDS + sum(PAGE_BACKOFF_SECONDS * 2 ** k for k in range(PAGE_ATTEMPTS - 1))
 

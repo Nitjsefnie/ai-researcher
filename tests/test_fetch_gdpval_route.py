@@ -253,8 +253,8 @@ def test_failed_authentication_re_reads_page_and_data_together(monkeypatch, caps
     assert calls == [fetch_gdpval.GDPVAL_URL, DATA_HOST + "/data/attempt1.txt",
                      fetch_gdpval.GDPVAL_URL, DATA_HOST + "/data/attempt2.txt"]
     assert waits == [fetch_gdpval.AUTH_REREAD_SECONDS]
-    assert (f"/data/attempt1.txt: authentication attempt 1 of {fetch_gdpval.AUTH_ATTEMPTS} failed "
-            "(GCM tag mismatch); re-reading page and data in "
+    assert (f"GDPval-AA attempt 1 of {fetch_gdpval.AUTH_ATTEMPTS} failed (/data/attempt1.txt: data "
+            "authentication or decryption failed: GCM tag mismatch); re-reading page and data in "
             f"{fetch_gdpval.AUTH_REREAD_SECONDS}s") in capsys.readouterr().err
 
 
@@ -304,19 +304,19 @@ def test_failed_authentication_with_a_cached_input_refuses_without_a_re_read(
     assert len(calls) == (not cached_page) + (not cached_data)
 
 
-@pytest.mark.parametrize("failure", ["gzip", "title", "forbidden"])
-def test_non_authentication_failures_refuse_at_once_without_a_re_read(monkeypatch, failure):
-    key = os.urandom(32)
-    path, page, body = _pair(1, key, key, content=b"not gzip")
-    if failure == "title":
-        page = _page({"path": path, "key": key.hex()}, title="GDPval-AA v2.2").encode("utf-8")
-    if failure == "forbidden":
-        body = urllib.error.HTTPError(DATA_HOST + path, 403, "challenge",
-                                      email.message.Message(), None)
-    calls = _serve(monkeypatch, {fetch_gdpval.GDPVAL_URL: [page] * 2, DATA_HOST + path: [body] * 2})
-    waits = []
-    with pytest.raises(SystemExit):
+@pytest.mark.parametrize("failure", ["page 403", "title", "manifest", "data 403", "data 404"])
+def test_a_failed_page_or_data_read_re_reads_both_together(monkeypatch, failure):
+    (bad_path, bad_page, _), (path, page, body) = _attempts(1)
+    error = urllib.error.HTTPError("", int(failure[-3:]) if failure[-1].isdigit() else 0, "answer", email.message.Message(), None)
+    bad_page = {"page 403": error, "title": _page({}, "Other").encode(), "manifest": _page({}).encode()}.get(failure, bad_page)
+    calls, waits = _serve(monkeypatch, {fetch_gdpval.GDPVAL_URL: [bad_page, page], DATA_HOST + bad_path: [error], DATA_HOST + path: [body]}), []
+    assert _live_fetch(waits).path == path
+    assert (waits, calls.count(DATA_HOST + bad_path)) == ([fetch_gdpval.AUTH_REREAD_SECONDS], failure.startswith("data"))
+
+
+def test_authenticated_content_that_does_not_decode_refuses_without_a_re_read(monkeypatch):
+    key, waits = os.urandom(32), []
+    _serve(monkeypatch, _responses([_pair(1, key, key, content=b"not gzip")] * 2))
+    with pytest.raises(SystemExit, match="/data/attempt1.txt: gzip"):
         _live_fetch(waits)
     assert not waits
-    assert calls.count(fetch_gdpval.GDPVAL_URL) == 1
-    assert calls.count(DATA_HOST + path) == (0 if failure == "title" else 1)
