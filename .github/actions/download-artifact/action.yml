@@ -1,0 +1,75 @@
+name: Download an artifact, retried
+description: >-
+  Runs actions/download-artifact up to five times, waiting out download.py's backoff in
+  between. The action retries an HTTP 429, 500, 502, 503 or 504 itself, but not an empty
+  artifact list, which can answer for an artifact uploaded moments before.
+inputs:
+  name:
+    description: The artifact to download.
+    required: true
+  path:
+    description: The directory to download it to.
+    required: true
+runs:
+  using: composite
+  steps:
+    - id: first
+      continue-on-error: true
+      uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+      with:
+        name: ${{ inputs.name }}
+        path: ${{ inputs.path }}
+
+    - if: steps.first.outcome == 'failure'
+      shell: bash
+      env:
+        AI_RESEARCHER_ARTIFACT: ${{ inputs.name }}
+      run: python3 "$GITHUB_WORKSPACE/scripts/ci/download.py" --pause 1 "artifact $AI_RESEARCHER_ARTIFACT"
+
+    - id: second
+      if: steps.first.outcome == 'failure'
+      continue-on-error: true
+      uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+      with:
+        name: ${{ inputs.name }}
+        path: ${{ inputs.path }}
+
+    - if: steps.second.outcome == 'failure'
+      shell: bash
+      env:
+        AI_RESEARCHER_ARTIFACT: ${{ inputs.name }}
+      run: python3 "$GITHUB_WORKSPACE/scripts/ci/download.py" --pause 2 "artifact $AI_RESEARCHER_ARTIFACT"
+
+    - id: third
+      if: steps.second.outcome == 'failure'
+      continue-on-error: true
+      uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+      with:
+        name: ${{ inputs.name }}
+        path: ${{ inputs.path }}
+
+    - if: steps.third.outcome == 'failure'
+      shell: bash
+      env:
+        AI_RESEARCHER_ARTIFACT: ${{ inputs.name }}
+      run: python3 "$GITHUB_WORKSPACE/scripts/ci/download.py" --pause 3 "artifact $AI_RESEARCHER_ARTIFACT"
+
+    - id: fourth
+      if: steps.third.outcome == 'failure'
+      continue-on-error: true
+      uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+      with:
+        name: ${{ inputs.name }}
+        path: ${{ inputs.path }}
+
+    - if: steps.fourth.outcome == 'failure'
+      shell: bash
+      env:
+        AI_RESEARCHER_ARTIFACT: ${{ inputs.name }}
+      run: python3 "$GITHUB_WORKSPACE/scripts/ci/download.py" --pause 4 "artifact $AI_RESEARCHER_ARTIFACT"
+
+    - if: steps.fourth.outcome == 'failure'
+      uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+      with:
+        name: ${{ inputs.name }}
+        path: ${{ inputs.path }}

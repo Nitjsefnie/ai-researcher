@@ -252,6 +252,12 @@ def test_a_failing_command_is_rerun_and_its_last_status_returned(
     assert (err.count(b"flaky %s\r\nlone %s\r\xff\r\n" % ((str(code).encode(),) * 2)), b"no attempt left" in err) == (min(failures, attempts), False)
 
 
+@pytest.mark.parametrize("attempt, delay", [(1, 5), (4, 40), (5, 60)])
+def test_a_pause_waits_one_backoff_step(sleeps, capsys, attempt, delay):
+    assert download.main(["--pause", str(attempt), "artifact x"]) == 0
+    assert (sleeps, capsys.readouterr().err) == ([delay], f"artifact x: attempt {attempt} failed (its error is above); retrying in {delay}s\n")
+
+
 # Its first run prints "body 0" and argv[3] on stderr and exits argv[2]; later runs print "body N", exit 0.
 GH = ("import pathlib, sys; p = pathlib.Path(sys.argv[1]); n = len(p.read_bytes()) if p.exists() else 0; "
       "p.write_bytes(b'x' * (n + 1)); sys.stdout.buffer.write(b'body %d\\n' % n); "

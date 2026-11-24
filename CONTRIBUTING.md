@@ -146,7 +146,8 @@ git ls-files '*.py' | xargs python3 -m pylint                    # lint
 git ls-files '*.py' | xargs python3 -m pycodestyle               # lint
 python3 -m pyright                                               # types
 pip-audit -r requirements-dev.txt -r requirements-test.txt       # audit
-actionlint .github/workflows/*.yml && zizmor .github/workflows/  # actionlint
+actionlint .github/workflows/*.yml \
+  && zizmor .github/workflows/ .github/actions/                  # actionlint
 ```
 
 `python3 -m pip install -r requirements-dev.txt -r requirements-test.txt` gets
@@ -314,10 +315,23 @@ before every attempt whether the history is still shallow, because
 that the kill would not reach, so a stalled attempt waits for the job's
 `timeout-minutes`.
 
-The two push jobs and the refresh committer execute no artifact byte. Their
-only repository code is `scripts/ci/download.py` and `scripts/fetch_http.py`,
-sparse-checked-out at `github.sha` (the commit the workflow text itself came
-from) with `persist-credentials: false`, before any step loads the deploy key.
+The refresh workflow's push job and committer execute no artifact byte. Their
+only repository code is `scripts/ci/download.py`, `scripts/fetch_http.py` and
+`.github/actions/download-artifact/action.yml`, sparse-checked-out at
+`github.sha` (the commit the workflow text itself came from) with
+`persist-credentials: false`, before any step loads the deploy key.
+
+Every artifact-download step this repository's workflows define runs
+`.github/actions/download-artifact`, which wraps `actions/download-artifact` in
+five attempts; a test refuses a direct use of it in a workflow or a local
+action. A download inside an external action, such as test-ratchet's report, is
+outside this retry. Any failed attempt is retried, because an empty
+artifact list is an answer, not an HTTP error, and the wrapped action fails on
+it at once. Between attempts `download.py --pause ATTEMPT LABEL` waits one
+backoff step and logs it as the other retries do: 5, 10, 20 and 40 s, 75 s in
+all. The wrapped action's own time comes on top, including its own retries of a
+429, 500, 502, 503 or 504. The fifth failure is the step's, so an artifact that
+was never uploaded fails the run after those 75 s.
 
 `download.py --run --gh` is for `gh api` (issue #426). gh exits 1 for every
 failure and retries none, so `--gh` reruns an exit 1 only when a stderr line is

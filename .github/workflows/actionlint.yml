@@ -187,4 +187,4 @@ jobs:
           # known-vulnerable action versions). Read-only, and this workflow
           # declares contents: read.
           GH_TOKEN: ${{ github.token }}
-        run: python3 scripts/ci/download.py --run --retry-on 1 --timeout 60 zizmor --no-progress .github/workflows/
+        run: python3 scripts/ci/download.py --run --retry-on 1 --timeout 60 zizmor --no-progress .github/workflows/ .github/actions/

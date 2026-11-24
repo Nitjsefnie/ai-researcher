@@ -27,13 +27,16 @@ updates:
     labels:
       - dependencies
 
-  # The workflows pin every action to a commit SHA with the version in a
-  # trailing comment. A SHA pin does not move at all — which is the point,
+  # The workflows and local actions pin every action to a commit SHA with the
+  # version in a trailing comment. A SHA pin does not move at all — which is the point,
   # since these jobs run with a repository token — and it is also why this
   # entry is not optional: without Dependabot a SHA pin is frozen forever. It
   # rewrites both the SHA and the comment.
   - package-ecosystem: github-actions
-    directory: "/"
+    directories:
+      - "/"
+      # "/" reads .github/workflows and a root action.yml only.
+      - "/.github/actions/*"
     schedule:
       interval: weekly
       day: wednesday

@@ -122,11 +122,13 @@ def write_git_stub(bin_dir, fault, log, verb="fetch"):
     (Path(bin_dir) / "git").chmod(0o755)
 
 
-HELPER = ["scripts/ci/download.py", "scripts/fetch_http.py"]
+ARTIFACT_ACTION = Path(__file__).resolve().parents[1] / ".github/actions/download-artifact/action.yml"
+DOWNLOAD_ARTIFACT = "./.github/actions/download-artifact"
+HELPER = ["scripts/ci/download.py", "scripts/fetch_http.py", ".github/actions/download-artifact/action.yml"]
 
 
 def is_helper_checkout(step):
-    """A checkout of github.sha carrying no credential and only the retry helper's two files."""
+    """A checkout of github.sha carrying no credential and only HELPER's files."""
     with_ = step.get("with") or {}
     return (step.get("uses", "").startswith("actions/checkout@") and "env" not in step
             and set(with_) == {"ref", "persist-credentials", "sparse-checkout", "sparse-checkout-cone-mode"}
@@ -137,15 +139,15 @@ def is_helper_checkout(step):
 
 def assert_helper_only_checkout(job, key_step):
     """One helper checkout precedes `key_step`, every artifact lands under runner.temp, and no interpreter or
-    shell runs a file: python3 only as `download.py --run`, a shell only as `-c <function>`, no `.`, source or eval of a file."""
+    shell runs a file, in the download action too: python3 only as `download.py --run` or `--pause`, a shell only as `-c <function>`, no `.`, source or eval of a file."""
     steps, names = job["steps"], [step.get("name") for step in job["steps"]]
     [at] = [i for i, step in enumerate(steps) if step.get("uses", "").startswith("actions/checkout@")]
     assert is_helper_checkout(steps[at]) and at < names.index(key_step), (steps[at], names)
-    for step in steps:
-        if step.get("uses", "").startswith("actions/download-artifact@"):
-            assert step["with"]["path"].startswith("${{ runner.temp }}/"), step
+    paths = [step["with"]["path"] for step in steps if step.get("uses") == DOWNLOAD_ARTIFACT]
+    assert paths and all(path.startswith("${{ runner.temp }}/") for path in paths), paths
+    for step in steps + yaml.safe_load(ARTIFACT_ACTION.read_text(encoding="utf-8"))["runs"]["steps"]:
         run = "\n".join(line for line in step.get("run", "").splitlines() if not line.lstrip().startswith("#"))
-        assert not re.search(r'(?<![\w.-])(?:(?:pip|python)[\d.]*\s(?!"\$GITHUB_WORKSPACE/scripts/ci/download\.py" --run )'
+        assert not re.search(r'(?<![\w.-])(?:(?:pip|python)[\d.]*\s(?!"\$GITHUB_WORKSPACE/scripts/ci/download\.py" --(?:run|pause) )'
                              r"|(?:ba|da|z)?sh\s+(?!-c [A-Za-z_]\w*\b)|source\s|eval\s+[\"']?\$\((?:cat\s|<))"
                              r"|(?:^|[;&|({]|\b(?:then|do|else|if|elif|while|until))[ \t]*\.\s+\S", run, re.M), run
 
