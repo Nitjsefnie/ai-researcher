@@ -269,8 +269,8 @@ def confirm_composition(captured: Capture, recorded: tuple[str | None, list] | N
     Every breakdown this run fetched has exactly its slugs (records carried
     from the previous capture were judged when captured). The payload carries
     no weights, so beyond that a composition is confirmed by having the
-    recorded slugs and weights, by replacing recorded slugs one for one at
-    their weights, or else by the one version every page names.
+    recorded slugs and weights or, given such a breakdown, by replacing recorded
+    slugs one for one at their weights or by the one version every page names.
     """
     weights = {slug: weight for slug, weight, _ in captured.composition}
     breakdowns = []
@@ -877,8 +877,8 @@ class Capture(typing.NamedTuple):
     `host` and `version` are what the capture log names: which model detail
     page filled the gaps, and which Intelligence Index the costs belong to.
     `version` is None when the methodology page named no index version at
-    all -- it passed on absence (issue #220), and the log says so
-    rather than interpolating a version where none was found.
+    all (issue #220), and the log says so rather than interpolating a
+    version where none was found.
     `generations` counts distinct generation fingerprints observed in-run
     across the leaderboard and detail reads, plus a disputed run's
     evaluation read that matches neither look. `disputed` says the written
