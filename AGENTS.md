@@ -45,7 +45,7 @@ reasoning model costs more than its sticker price — the point of using it.
 | axis | y | source | unit |
 |---|---|---|---|
 | coding | Coding Agent Index v2.0 | `/agents/coding-agents` | agent + model |
-| intelligence | Intelligence Index v5.0 | leaderboard + model detail | model |
+| intelligence | Intelligence Index | leaderboard + model detail | model |
 | agentic | GDPval-AA v2.1 (Elo) | Elo: leaderboard + model detail; cost: `/evaluations/gdpval-aa` + the data file it loads | model |
 | parameters | Intelligence Index vs parameters | leaderboard + model detail | model |
 
@@ -53,10 +53,9 @@ reasoning model costs more than its sticker price — the point of using it.
   SWE-Atlas-QnA-AA at equal weight. `indexScore` and `mean.costUsd` sit on ONE
   record, so nothing is reweighted. The unit is agent+model+harness (Claude Code
   on Opus 5 (xhigh) ≠ Codex on the same model): AA measured the harness too.
-- **Intelligence Index v5.0**: AA-Briefcase v1.1, AutomationBench-AA, GDP.pdf,
-  FrontierCode 2.0, Terminal-Bench 4.1, Terminal-Bench-Science 0.1, CritPt v2
-  (Hard Subset), AA-Omniscience v1.1, HLE-Diamond, in four categories at 25%
-  each. Cost is AA's `cost.total`.
+- **Intelligence Index**: the composition (evaluations, weights, version) is
+  read each run from AA's `/methodology/intelligence-benchmarking` page, never
+  pinned in code (Pipeline). Cost is AA's `cost.total`.
 - **GDPval-AA v2.1**: one evaluation, outside the Intelligence Index; the
   score is its Elo, unbounded and possibly negative. Cost is
   `gdpvalCostPerTask`: the model's own GDPval token counts (input, cacheable
@@ -158,11 +157,12 @@ since" or the run prints the 7-day hold warning. In short:
 
 **Disputed hours** are ordinary: the run never exits red for the mix of
 generations AA's routes serve (an axis a withheld route empties holds the last
-good page), the page renders both values red in canonical pair order, and the
-scheduled commit's body carries the differ's Disputes section. The capture is
-merged and dispute-bearing (three routes, every held generation), so the
-page's raw-byte provenance digest is a sha256 over that merged content, never
-over AA's raw payload.
+good page), unless it leaves the index composition unconfirmed (Pipeline); the
+page renders both values red in canonical pair order, and the scheduled
+commit's body carries the differ's Disputes section. The capture is merged and
+dispute-bearing (three routes, every held generation), so the page's raw-byte
+provenance digest is a sha256 over that merged content, never over AA's raw
+payload.
 
 ### Rows
 
@@ -209,15 +209,25 @@ workstation use the canonical CLI.
 `fetch_aa.py` exits nonzero — the signal to re-read AA by hand, never to retry
 or hand-fix JSON — when:
 - the flight payload or model schema changes shape, or the transport fails;
-- **AA bumps the Intelligence Index version** past `build.py`'s `INDEX_VERSION`
-  pin. This matters most: AA publishes per-evaluation weights only on its
-  methodology page, so a rebalance leaves every payload field well-formed (v4.2
-  silently shipped costs wrong by 2–3×); the pin is the only catch;
-- a cost breakdown this run fetched has a slug set other than exactly
-  `build.py`'s `INDEX_EVAL_WEIGHTS` keys (records the look-back carries in from
-  the previous capture were judged when captured), or per-evaluation costs stop
-  summing to the published total — except an all-dropped window hour, which is
-  reported and returned;
+- the methodology page's index composition cannot be read (`index_composition`):
+  it needs an index-flagged catalog entry, one name, slug and positive
+  percentage per evaluation, no duplicate slug or name, and weights summing to
+  100%. A slug is the index-flagged catalog entry's for the evaluation's name; a
+  name no catalog entry carries takes its table row's key, so a display-name
+  mismatch refuses unless that key is the breakdown's slug;
+- **this run's reads do not confirm that composition** (`confirm_composition`).
+  This matters most: AA publishes the weights only on its methodology page, so a
+  rebalance leaves every payload field well-formed. Every cost breakdown this
+  run fetched and the merge kept must have exactly the composition's slugs
+  (records the look-back carries in from the previous capture were judged when
+  captured). Slugs or weights other than the recorded ones (route evidence,
+  below) also need at least one such breakdown, and must either replace recorded
+  evaluations one for one at their weights or come with one version named by the
+  methodology page, both leaderboard looks and the detail page. Only that
+  agreement confirms a rebalance, and one on the already-recorded version
+  counts: a weight-only change under it passes, a known limitation;
+- per-evaluation costs stop summing to the published total — except an
+  all-dropped window hour, which is reported and returned;
 - the GDPval-AA evaluation page's title stops naming `fetch_gdpval.py`'s
   pinned `GDPVAL_VERSION` (2.1). The cost divides by the pinned
   `GDPVAL_TASK_COUNT` (220), which is never read from the page: a task-count
@@ -230,16 +240,18 @@ or hand-fix JSON — when:
   the leaderboard — each message naming the page URL or the data file's path;
 - the Coding Agent Index falls below `CODING_ROW_FLOOR` paired rows.
 
-A route disagreement is never one of these: precedence resolves it, silently and
-always.
+A model value the leaderboard and detail routes disagree on is never one of
+these: precedence resolves it, silently and always.
 
 `build.py` refuses to write a page where a rendered axis has no rows (a build
 failure, not a published blank), except an AA update-window hour. Every hour
 `fetch_aa.py` writes the route evidence `data/cost-breakdown-window.txt`: the
-in-run generation count and whether the detail route's fills and the GDPval-AA
-evaluation's costs were withheld (a disputed run's read matched neither look).
-`build.py` decides from that content alone, in `guard_empty_axes`, never
-inferring a mismatch from an empty axis. When the evidence records ≥ 2
+in-run generation count, whether the detail route's fills and the GDPval-AA
+evaluation's costs were withheld (a disputed run's read matched neither look),
+and the confirmed index composition, whose version and evaluations the page's
+footer names and which the next run's confirmation compares with. `build.py`
+decides from the count and the withheld routes alone, in `guard_empty_axes`,
+never inferring a mismatch from an empty axis. When the evidence records ≥ 2
 generations and every empty axis traces to a withheld route (parameters to the
 detail route, agentic to the evaluation route), the page HOLDS, naming the
 generation count: the gate reports unchanged, the last good page stays live.
@@ -346,8 +358,8 @@ hand carries one.
 Deliberate failures: a nonzero `fetch_aa.py` exit turns the scheduled run red
 instead of committing a mangled capture; the suite runs before the commit, so a
 capture that breaks the page leaves the last good capture committed and the
-last good page live. A cross-route disagreement is never a failure: that hour's
-only scheduled commit is `chore(capture): …`, with nothing estimated or
+last good page live. A cross-route value disagreement is never a failure: that
+hour's only scheduled commit is `chore(capture): …`, with nothing estimated or
 interpolated.
 
 ## Commit / co-author trailer
