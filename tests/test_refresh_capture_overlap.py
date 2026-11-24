@@ -15,6 +15,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import _workflowrun  # noqa: E402  # pylint: disable=wrong-import-position
 
 WORKFLOW = Path(__file__).resolve().parent.parent / '.github/workflows/refresh.yml'
+_COLUMNS = ('pid', 'ppid', 'pgid', 'stat', 'args')
 pytestmark = pytest.mark.skipif(os.name == 'nt', reason='workflow shell runs on Ubuntu')
 
 
@@ -42,26 +43,29 @@ def _pid_exists(pid):
     return True
 
 
-def _pid_running(pid):
-    result = subprocess.run(['ps', '-o', 'stat=', '-p', str(pid)], check=False,
-                            capture_output=True, text=True, encoding='utf-8', timeout=10)
-    assert result.returncode in (0, 1), result.stderr
-    state = result.stdout.strip()
-    return bool(state) and not state.startswith('Z')
+def _running(capture):
+    found = {}
+    for member, pid in capture.items():
+        result = subprocess.run(['ps', '-ww', *(f'-o{name}=' for name in _COLUMNS), '-p', str(pid)], check=False,
+                                capture_output=True, text=True, encoding='utf-8', errors='replace', timeout=10)
+        assert result.returncode in (0, 1), result.stderr
+        fields = result.stdout.strip().split(None, len(_COLUMNS) - 1)
+        if fields and not fields[_COLUMNS.index('stat')].startswith('Z'):
+            found[member] = dict(zip(_COLUMNS, fields))
+    return found
 
 
-def _release_capture(repo, pids):
+def _release_capture(repo, capture):
     (repo / 'release').touch()
     deadline = time.monotonic() + 10
-    while any(_pid_running(pid) for pid in pids):
+    while running := _running(capture):
         if time.monotonic() >= deadline:
-            pytest.fail(f'capture processes {pids} did not exit after release')
+            pytest.fail(f'capture processes did not exit after release: {running}')
         time.sleep(0.01)
 
 
 def _start(tmp_path, status):
-    repo = tmp_path / 'repo'
-    runner = tmp_path / 'runner'
+    repo, runner = tmp_path / 'repo', tmp_path / 'runner'
     scripts = repo / 'scripts'
     scripts.mkdir(parents=True)
     runner.mkdir()
@@ -161,13 +165,8 @@ def test_failed_pid_write_stops_and_reaps_the_capture(tmp_path):
         assert not (tmp_path / 'output').exists()
     finally:
         child_file = repo / 'child.pid'
-        if child_file.exists() and _pid_exists(int(child_file.read_text(encoding='utf-8'))):
-            (repo / 'release').touch()
-            deadline = time.monotonic() + 10
-            while _pid_exists(int(child_file.read_text(encoding='utf-8'))):
-                if time.monotonic() >= deadline:
-                    pytest.fail('capture fixture did not exit after release')
-                time.sleep(0.01)
+        if child_file.exists():
+            _release_capture(repo, {'child': int(child_file.read_text(encoding='utf-8'))})
 
 
 def test_capture_success_reports_stdout_and_cleans_files(tmp_path):
@@ -219,15 +218,16 @@ def test_collection_waits_for_the_live_capture(tmp_path):
 def test_dead_capture_without_status_fails_without_hanging(tmp_path):
     repo, runner, env = _start(tmp_path, 0)
     pid = int((runner / 'aa-capture.pid').read_text(encoding='utf-8'))
-    capture = [int((repo / name).read_text(encoding='utf-8'))
-               for name in ('child.pid', 'worker.pid')]
-    assert all(_pid_running(member) for member in capture)
+    capture = {member: int((repo / f'{member}.pid').read_text(encoding='utf-8'))
+               for member in ('child', 'worker')}
+    assert _running(capture).keys() == capture.keys()
     os.kill(pid, signal.SIGKILL)
     try:
         done = _run(repo, 'Capture the leaderboard', env)
         # Observe the capture and its descendant before releasing the fixture.
-        running = [member for member in capture if _pid_running(member)]
-        assert not running, f'capture processes {running} still running'
+        running = _running(capture)
+        assert not running, (f'capture processes still running after the step exited {done.returncode} '
+                             f'with stderr {done.stderr!r}: {running}')
     finally:
         _release_capture(repo, capture)
     assert done.returncode != 0
