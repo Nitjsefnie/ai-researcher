@@ -49,8 +49,7 @@ def load():
 
 
 def step_in(wf, job, name):
-    matches = [s for s in wf["jobs"][job]["steps"]
-               if s.get("name") == name]
+    matches = [s for s in wf["jobs"][job]["steps"] if s.get("name") == name]
     if len(matches) != 1:
         raise AssertionError(
             f"expected exactly one step named {name!r} in job {job!r}, "
@@ -142,12 +141,10 @@ class GateTests(unittest.TestCase):  # pylint: disable=too-many-public-methods
         pending = {}
         for name, job in jobs.items():
             dependencies = job.get("needs", [])
-            pending[name] = set([dependencies] if isinstance(dependencies, str)
-                                else dependencies)
+            pending[name] = set([dependencies] if isinstance(dependencies, str) else dependencies)
         scheduled = set()
         while pending:
-            ready = {name for name, dependencies in pending.items()
-                     if dependencies <= scheduled}
+            ready = {name for name, dependencies in pending.items() if dependencies <= scheduled}
             if not ready:
                 break
             scheduled.update(ready)
@@ -166,8 +163,7 @@ class GateTests(unittest.TestCase):  # pylint: disable=too-many-public-methods
 
     def test_step_context_references_resolve_within_the_job(self):
         for name, job in self.wf["jobs"].items():
-            defined = {entry["id"] for entry in job.get("steps", [])
-                       if "id" in entry}
+            defined = {entry["id"] for entry in job.get("steps", []) if "id" in entry}
             referenced = set(re.findall(r"\bsteps\.([\w-]+)\.", json.dumps(job)))
             with self.subTest(job=name):
                 self.assertLessEqual(referenced, defined)
@@ -203,8 +199,7 @@ class GateTests(unittest.TestCase):  # pylint: disable=too-many-public-methods
                     if dependency not in ancestors:
                         ancestors.add(dependency)
                         pending.append(dependency)
-            available = {artifact for ancestor in ancestors
-                         for artifact in uploads[ancestor]}
+            available = {artifact for ancestor in ancestors for artifact in uploads[ancestor]}
             for download in downloads:
                 with self.subTest(job=name, step=download.get("name")):
                     self.assertIn(download["with"]["name"], available)
@@ -878,15 +873,12 @@ class ExecutedHoldProbeTests(unittest.TestCase):
                         self.assertIn(f"### Held: AA window, {count} generations in-run", hour["summary"])
                         self.assertIn(f"holds the hour on {count} in-run generations", hour["summary"])
                         if force:
-                            self.assertIn("Force was requested",
-                                          hour["summary"])
+                            self.assertIn("Force was requested", hour["summary"])
                         else:
                             self.assertNotIn("forced", hour["summary"])
-                            self.assertNotIn("Force was requested",
-                                             hour["summary"])
+                            self.assertNotIn("Force was requested", hour["summary"])
                             self.assertNotIn("stale", hour["summary"])
-                        self.assertEqual(hour["stdout"].count("hold probe:"),
-                                         1)
+                        self.assertEqual(hour["stdout"].count("hold probe:"), 1)
                         self.assertEqual(hour["hub_fetches"], 0)
 
     def test_a_held_hour_whose_evidence_does_not_read_is_red(self):
@@ -937,8 +929,7 @@ class ExecutedHoldProbeTests(unittest.TestCase):
                         # takes the FIRST proceed= line, so a stray second
                         # write behind a correct first one passes the value
                         # assertion and must fail the count instead.
-                        self.assertEqual(
-                            hour["outputs"].count("proceed="), 1)
+                        self.assertEqual(hour["outputs"].count("proceed="), 1)
                         # The republish hour names its cause (issue #239):
                         # a stale page and a failed fetch print different
                         # summary lines -- a failed fetch compared no page,
@@ -949,15 +940,11 @@ class ExecutedHoldProbeTests(unittest.TestCase):
                         # forced dispatch) or found the hub current, neither
                         # line may appear.
                         if gate == "false" and not force and hub == "stale":
-                            self.assertIn(self.HUB_DIVERGED_LINE,
-                                          hour["summary"])
-                            self.assertNotIn(self.HUB_FETCH_FAILED_LINE,
-                                             hour["summary"])
+                            self.assertIn(self.HUB_DIVERGED_LINE, hour["summary"])
+                            self.assertNotIn(self.HUB_FETCH_FAILED_LINE, hour["summary"])
                         elif gate == "false" and not force and hub == "fail":
-                            self.assertIn(self.HUB_FETCH_FAILED_LINE,
-                                          hour["summary"])
-                            self.assertNotIn(self.HUB_DIVERGED_LINE,
-                                             hour["summary"])
+                            self.assertIn(self.HUB_FETCH_FAILED_LINE, hour["summary"])
+                            self.assertNotIn(self.HUB_DIVERGED_LINE, hour["summary"])
                         else:
                             self.assertNotIn("republishing", hour["summary"])
 
@@ -984,8 +971,7 @@ class ExecutedHoldProbeTests(unittest.TestCase):
                     # the same rc, the same missing output, the same fresh
                     # capture left on disk (the arm exits before any
                     # restore) -- fails on this pin alone.
-                    self.assertIn("hold probe: undefined answer 'maybe'",
-                                  hour["stderr"])
+                    self.assertIn("hold probe: undefined answer 'maybe'", hour["stderr"])
 
 
 STUB_PYTHON3 = """\
@@ -1039,8 +1025,7 @@ class CaptureStepTests(unittest.TestCase):
         # then every other rc is the designed red, re-raised unchanged so
         # the run's own colour is fetch_aa.py's. Issue #200 removed the
         # exit-3 dispute branch: nothing between the two.
-        self.assertLess(self.block.index('[ "$rc" -eq 0 ]'),
-                        self.block.index('exit "$rc"'))
+        self.assertLess(self.block.index('[ "$rc" -eq 0 ]'), self.block.index('exit "$rc"'))
         self.assertLess(self.block.index('[ "$rc" -eq 0 ]'),
                         self.block.index('echo "captured=true"'))
         self.assertNotIn('[ "$rc" -eq 3 ]', self.block)
@@ -1093,8 +1078,7 @@ class _SeededOrigin:
             path.write_text(text, encoding="utf-8")
         self._git("add", "-A", cwd=str(seed), env=env)
         self._git("commit", "-q", "-m", "seed", cwd=str(seed), env=env)
-        self._git("push", "-q", str(origin), "HEAD:main",
-                  cwd=str(seed), env=env)
+        self._git("push", "-q", str(origin), "HEAD:main", cwd=str(seed), env=env)
         base = self._git("rev-parse", "HEAD", cwd=str(seed)).stdout.strip()
         return str(config), base, origin, seed, env
 
@@ -1136,8 +1120,7 @@ class ExecutedCommitMessageTests(_SeededOrigin, unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        cls.step = _workflowrun.step_by_name(
-            WORKFLOW, "publish", "Commit the refresh")
+        cls.step = _workflowrun.step_by_name(WORKFLOW, "publish", "Commit the refresh")
 
     def _stage_payload(self, tmp: pathlib.Path, differ_msg):
         payload = tmp / "publish-payload"
@@ -1149,8 +1132,7 @@ class ExecutedCommitMessageTests(_SeededOrigin, unittest.TestCase):
         (payload / "aa-mode.txt").write_text(
             "moved\n" if differ_msg else "rebuild\n", encoding="utf-8")
         if differ_msg:
-            (payload / "commit-msg.txt").write_text(differ_msg,
-                                                    encoding="utf-8", newline="\n")
+            (payload / "commit-msg.txt").write_text(differ_msg, encoding="utf-8", newline="\n")
 
     def _run_hour(self, tmp: pathlib.Path, differ_msg, fault=None):
         """Stage one hour's payload and run the real commit step."""
@@ -1165,8 +1147,7 @@ class ExecutedCommitMessageTests(_SeededOrigin, unittest.TestCase):
             _hubfake.install(tmp / "bin")
             env["PATH"] = f"{tmp / 'bin'}{os.pathsep}{env['PATH']}"
         proc = _workflowrun.run_step(tmp, self.step, env)
-        self.assertEqual(proc.returncode, 0,
-                         f"step failed: {proc.stderr}")
+        self.assertEqual(proc.returncode, 0, f"step failed: {proc.stderr}")
         if fault:
             self.assertEqual(len((tmp / "git.log").read_text(encoding="utf-8").splitlines()), 2)
         scratch = tmp / "scratch"
@@ -1198,10 +1179,8 @@ class ExecutedCommitMessageTests(_SeededOrigin, unittest.TestCase):
         # The explicit rebuild mode supplies the forced subject even when
         # the unchanged capture produced no differ message.
         with tempfile.TemporaryDirectory(prefix=".commit-msg-") as raw:
-            message, names, log = self._run_hour(
-                pathlib.Path(raw), differ_msg=None)
-        self.assertIn(
-            "chore(page): forced run, AA capture unchanged", message)
+            message, names, log = self._run_hour(pathlib.Path(raw), differ_msg=None)
+        self.assertIn("chore(page): forced run, AA capture unchanged", message)
         self.assertNotIn("chore(capture)", message)
         self.assertIn("M\tout/frontier-models.html", names)
         self.assertEqual(log.count("\n"), 2, log)
@@ -1272,8 +1251,7 @@ class ExecutedCommitMessageTests(_SeededOrigin, unittest.TestCase):
                 self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
                 scratch = tmp / 'scratch'
                 message = self._git('log', '-1', '--format=%B', cwd=scratch).stdout.strip()
-                expected = '\n\n'.join(
-                    blocks + ['Captured by .github/workflows/refresh.yml.'])
+                expected = '\n\n'.join(blocks + ['Captured by .github/workflows/refresh.yml.'])
                 self.assertEqual(message, expected)
                 self.assertEqual(self._git('rev-list', '--count', base + '..HEAD',
                                            cwd=scratch).stdout.strip(), '1')
@@ -1306,8 +1284,7 @@ class ExecutedCommitMessageTests(_SeededOrigin, unittest.TestCase):
                             'chore(trending): fresh HF\n\nMOVE model rank 2 -> 1\n\n'
                             'chore(openrouter): fresh OR\n\nMOVE model rank 2 -> 1\n\n'
                             'Captured by .github/workflows/refresh.yml.\n')
-                self.assertEqual((tmp / 'commit-msg.txt').read_text(encoding='utf-8'),
-                                 expected)
+                self.assertEqual((tmp / 'commit-msg.txt').read_text(encoding='utf-8'), expected)
                 self.assertEqual(self._git('log', '-1', '--format=%B', cwd=tmp / 'scratch')
                                  .stdout.strip(), expected.strip())
 
@@ -1333,8 +1310,7 @@ class ExecutedCommitMessageTests(_SeededOrigin, unittest.TestCase):
                     (payload / f'data/{filename}-trending.json').write_text(
                         'fresh list\n', encoding='utf-8')
                     (payload / 'message.txt').write_text(block, encoding='utf-8', newline='\n')
-                    result = _workflowrun.run_step(tmp, self.step,
-                                                   self._env(tmp, config, base))
+                    result = _workflowrun.run_step(tmp, self.step, self._env(tmp, config, base))
                     self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
                     scratch = tmp / 'scratch'
                     self.assertEqual(self._git('log', '-1', '--format=%s', cwd=scratch)
@@ -1382,8 +1358,7 @@ class ExecutedGenerationTieTests(_SeededOrigin, unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        cls.step = _workflowrun.step_by_name(
-            WORKFLOW, "publish", "Commit the refresh")
+        cls.step = _workflowrun.step_by_name(WORKFLOW, "publish", "Commit the refresh")
         cls.base_files = {
             "data/aa-raw-models.json": '{"models": []}\n',
             "data/aa-raw-coding-agents.json": "[]\n",
@@ -1435,24 +1410,19 @@ class ExecutedGenerationTieTests(_SeededOrigin, unittest.TestCase):
             "*\n!/data/\n/data/*\n!/data/aa-raw-models.json\n"
             "!/data/aa-raw-coding-agents.json\n!/data/captured-at.txt\n"
             "!/out/\n/out/*\n!/out/frontier-models.html\n", encoding="utf-8")
-        self._git("rm", "-q", "data/aa-disagreement-snapshot.json",
-                  cwd=str(seed), env=env)
-        self._git("commit", "-q", "-m", "retire the window files (#200)",
-                  cwd=str(seed), env=env)
-        self._git("push", "-q", str(origin), "HEAD:main", cwd=str(seed),
-                  env=env)
+        self._git("rm", "-q", "data/aa-disagreement-snapshot.json", cwd=str(seed), env=env)
+        self._git("commit", "-q", "-m", "retire the window files (#200)", cwd=str(seed), env=env)
+        self._git("push", "-q", str(origin), "HEAD:main", cwd=str(seed), env=env)
         return self._git("rev-parse", "HEAD", cwd=str(seed)).stdout.strip()
 
     def test_a_payload_older_than_main_concedes_the_hour_instead_of_staging_it(self):
         with tempfile.TemporaryDirectory(prefix=".generation-tie-") as raw:
             tmp = pathlib.Path(raw)
-            config, base, origin, seed, git_env = self._seed_origin(
-                tmp, self.base_files)
+            config, base, origin, seed, git_env = self._seed_origin(tmp, self.base_files)
             self._payload(tmp)
             newer = self._land_newer_generation(seed, origin, git_env)
             self.assertNotEqual(base, newer)
-            proc = _workflowrun.run_step(
-                tmp, self.step, self._env(tmp, config, base))
+            proc = _workflowrun.run_step(tmp, self.step, self._env(tmp, config, base))
             # Green, and nothing committed: the deliberate outcome.
             self.assertEqual(proc.returncode, 0, proc.stderr)
             # The EXACT outputs, not substrings: a step that wrote
@@ -1465,8 +1435,7 @@ class ExecutedGenerationTieTests(_SeededOrigin, unittest.TestCase):
             # and no payload byte was ever copied over it.
             self.assertFalse(self._has_commit(tmp / "scratch"))
             summary = (tmp / "summary.txt").read_text(encoding="utf-8")
-            self.assertIn("Dropped: the payload's workflow generation",
-                          summary)
+            self.assertIn("Dropped: the payload's workflow generation", summary)
             self.assertIn(base, summary)
             self.assertIn(newer, summary)
 
@@ -1480,8 +1449,7 @@ class ExecutedGenerationTieTests(_SeededOrigin, unittest.TestCase):
                 with tempfile.TemporaryDirectory(
                         prefix=".generation-tie-") as raw:
                     tmp = pathlib.Path(raw)
-                    config, _, _, _, _ = self._seed_origin(
-                        tmp, self.base_files)
+                    config, _, _, _, _ = self._seed_origin(tmp, self.base_files)
                     self._payload(tmp)
                     env = self._env(tmp, config, "")
                     if absent:
@@ -1509,8 +1477,7 @@ class DeployKeyPushTests(unittest.TestCase):
         self.wf = load()
 
     def test_the_deploy_key_fails_closed_when_the_environment_misses_it(self):
-        run = flattened(
-            step_in(self.wf, "push", "Push the tested tree to main")["run"])
+        run = flattened(step_in(self.wf, "push", "Push the tested tree to main")["run"])
         self.assertIn(
             "AI_RESEARCHER_MASTER_PUSH_DEPLOY_KEY is empty: the main-push environment is "
             "missing its secret", run)
@@ -1518,12 +1485,9 @@ class DeployKeyPushTests(unittest.TestCase):
         self.assertNotIn("github.token", run)
 
     def test_the_agent_never_outlives_the_step_that_loaded_it(self):
-        run = flattened(
-            step_in(self.wf, "push", "Push the tested tree to main")["run"])
-        self.assertIn('trap \'kill "$SSH_AGENT_PID" 2>/dev/null || true\' EXIT',
-                      run)
-        self.assertIn("ssh-add <(printf '%s\\n' \"$AI_RESEARCHER_MASTER_PUSH_DEPLOY_KEY\")",
-                      run)
+        run = flattened(step_in(self.wf, "push", "Push the tested tree to main")["run"])
+        self.assertIn('trap \'kill "$SSH_AGENT_PID" 2>/dev/null || true\' EXIT', run)
+        self.assertIn("ssh-add <(printf '%s\\n' \"$AI_RESEARCHER_MASTER_PUSH_DEPLOY_KEY\")", run)
 
     def test_no_step_before_the_hub_job_holds_a_credential(self):
         # #143 and #133: the capture step pushes nothing, and the commit
@@ -1538,13 +1502,11 @@ class DeployKeyPushTests(unittest.TestCase):
         self.assertNotIn("GH_TOKEN", capture.get("env", {}))
         self.assertNotIn("GH_TOKEN", commit.get("env", {}))
         self.assertNotIn("AI_RESEARCHER_MASTER_PUSH_DEPLOY_KEY", commit.get("env", {}))
-        self.assertEqual(self.wf["jobs"]["push"].get("environment"),
-                         "main-push")
+        self.assertEqual(self.wf["jobs"]["push"].get("environment"), "main-push")
         self.assertEqual(push_step["env"]["AI_RESEARCHER_MASTER_PUSH_DEPLOY_KEY"],
                          "${{ secrets.MASTER_PUSH_DEPLOY_KEY }}")
         self.assertNotIn("GH_TOKEN", push_step.get("env", {}))
-        self.assertEqual(hub["env"]["DOCS_HUB_API_KEY"],
-                         "${{ secrets.DOCS_HUB_API_KEY }}")
+        self.assertEqual(hub["env"]["DOCS_HUB_API_KEY"], "${{ secrets.DOCS_HUB_API_KEY }}")
         # The job token is mapped nowhere since #206: the refs-API call
         # that held GH_TOKEN is retired with the ref.
         self.assertNotIn("GH_TOKEN", hub.get("env", {}))
@@ -1673,8 +1635,7 @@ class HFTrackerStructureTests(unittest.TestCase):
     def test_triggers_concurrency_and_main_only(self):
         workflow = load()
         job = workflow['jobs'][f'{self.tracker}-fetch']
-        self.assertEqual(workflow['concurrency'], {
-            'group': 'refresh', 'cancel-in-progress': False})
+        self.assertEqual(workflow['concurrency'], {'group': 'refresh', 'cancel-in-progress': False})
         self.assertEqual(job['if'], "github.ref == 'refs/heads/main'")
         self.assertNotIn('needs', job)
 
@@ -1684,8 +1645,7 @@ class HFTrackerStructureTests(unittest.TestCase):
         self.assertEqual(job['timeout-minutes'], 10)
         self.assertNotIn('environment', job)
         self.assertNotIn('secrets.', str(job))
-        self.assertEqual(job['outputs'], {
-            'changed': '${{ steps.stage.outputs.changed }}'})
+        self.assertEqual(job['outputs'], {'changed': '${{ steps.stage.outputs.changed }}'})
 
     def test_capture_and_payload_are_keyless_and_never_commit(self):
         self.assertEqual(self.tracker_step('fetch', 'Fetch the top 10')['run'],
@@ -1773,8 +1733,7 @@ class RankingsStructureTests(unittest.TestCase):
             self.assertNotIn('env', job)
         self.assertNotIn('secrets.', str(self.wf['jobs']['rankings']))
         upload = step_in(self.wf, 'rankings-hub', 'Publish to docs-hub')
-        self.assertEqual(upload['env'], {
-            'DOCS_HUB_API_KEY': '${{ secrets.DOCS_HUB_API_KEY }}'})
+        self.assertEqual(upload['env'], {'DOCS_HUB_API_KEY': '${{ secrets.DOCS_HUB_API_KEY }}'})
         key_jobs = {name for name, job in self.wf['jobs'].items()
                     if 'secrets.DOCS_HUB_API_KEY' in str(job)}
         self.assertEqual(key_jobs, {'hub', 'rankings-hub'})
