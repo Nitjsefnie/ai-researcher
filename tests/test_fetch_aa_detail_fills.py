@@ -178,8 +178,7 @@ def test_synthetic_fields_are_never_carried_or_overwritten():
 
 def test_only_a_matching_string_slug_can_receive_fills():
     current = [{"slug": "new"}, {"slug": None}, {"slug": 3}, {}]
-    previous = [{"slug": "old", "parameters": 27},
-                {"slug": None, "parameters": 27}, {"parameters": 27}]
+    previous = [{"slug": "old", "parameters": 27}, {"slug": None, "parameters": 27}, {"parameters": 27}]
     assert fetch_aa.carry_detail_fills(current, previous, {"slug"}) == current
     assert fetch_aa.carry_detail_fills(current, [], {"slug"}) == current
 
@@ -192,8 +191,7 @@ def test_marker_is_outside_generation_universe_variants_and_held_fields():
     assert "carriedDetailFills" not in universe
     # Even an explicitly supplied field universe cannot fingerprint the marker.
     explicit = universe | {"carriedDetailFills"}
-    assert fetch_aa.generation_key(marked, explicit) == fetch_aa.generation_key(
-        ordinary, explicit)
+    assert fetch_aa.generation_key(marked, explicit) == fetch_aa.generation_key(ordinary, explicit)
     assert fetch_aa.revisit_key(marked) == fetch_aa.revisit_key(ordinary)
     assert fetch_aa.variant_fields(marked[1]) == fetch_aa.variant_fields(ordinary[1])
     assert fetch_aa.held_records(marked) == fetch_aa.held_records(ordinary)
@@ -207,8 +205,7 @@ def test_current_detail_wins_and_no_lookback_remains_unchanged(tmp_path, monkeyp
     previous = previous_capture()
     detail = dict(rich_detail(), parameters=72, intelligenceIndexTimePerTask=20)
     without = capture_pages(tmp_path, monkeypatch, leaderboard(), leaderboard(), [detail])
-    captured = capture_pages(tmp_path, monkeypatch, leaderboard(), leaderboard(),
-                             [detail], previous)
+    captured = capture_pages(tmp_path, monkeypatch, leaderboard(), leaderboard(), [detail], previous)
     assert json.dumps(captured.models) == json.dumps(without.models)
     assert captured.models[1]["parameters"] == 72
     assert all("carriedDetailFills" not in r for r in captured.models)
@@ -307,8 +304,7 @@ class CarriedBreakdownSlugTests(unittest.TestCase):
         # and this fetch no longer serves it: the presence layer merges it
         # back with that version's breakdown. The slug check judges only
         # what this run fetched, so the carried record cannot red the hour.
-        host = {"slug": "detail-host-model",
-                "intelligenceIndexCostPerTask": "$undefined"}
+        host = {"slug": "detail-host-model", "intelligenceIndexCostPerTask": "$undefined"}
         departed = {"slug": "departed-model", "intelligenceIndex": 40,
                     "intelligenceIndexCostPerTask": {
                         "cost": {"total": 1.0}, "evaluations": [

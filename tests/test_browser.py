@@ -430,11 +430,9 @@ class BrowserInteractionTests(unittest.TestCase):
             output = root / "frontier-models.html"
             raw.write_text(json.dumps(models), encoding="utf-8")
             agents_raw.write_text(json.dumps(_PROBE_AGENTS), encoding="utf-8")
-            old_raw, old_agents, old_out = (
-                build.RAW, build.AGENTS_RAW, build.OUT)
+            old_raw, old_agents, old_out = (build.RAW, build.AGENTS_RAW, build.OUT)
             try:
-                build.RAW, build.AGENTS_RAW, build.OUT = (
-                    raw, agents_raw, output)
+                build.RAW, build.AGENTS_RAW, build.OUT = (raw, agents_raw, output)
                 with contextlib.redirect_stdout(io.StringIO()):
                     build.main()
                 page.goto(output.as_uri())
@@ -541,8 +539,7 @@ class BrowserInteractionTests(unittest.TestCase):
                     # frontier points keep their weights fill -- the gray is
                     # a superseded verdict, not a repainting of the whole
                     # chart
-                    on_frontier = page.locator(
-                        f"#svg-{chart} circle.pt[r='6']")
+                    on_frontier = page.locator(f"#svg-{chart} circle.pt[r='6']")
                     self.assertGreater(on_frontier.count(), 0)
                     self.assertNotIn(
                         "var(--muted)",
@@ -557,8 +554,7 @@ class BrowserInteractionTests(unittest.TestCase):
                     legend = page.locator(f"#{chart} .legend .item").filter(
                         has_text="Superseded")
                     self.assertEqual(legend.count(), 1)
-                    style = legend.locator(".swatch").first.get_attribute(
-                        "style")
+                    style = legend.locator(".swatch").first.get_attribute("style")
                     assert style is not None, \
                         "Superseded swatch has no style attribute"
                     self.assertIn("var(--muted)", style)
@@ -781,11 +777,9 @@ class BrowserInteractionTests(unittest.TestCase):
             output = root / "frontier-models.html"
             raw.write_text(json.dumps(models), encoding="utf-8")
             agents_raw.write_text(json.dumps(agents), encoding="utf-8")
-            old_raw, old_agents, old_out = (
-                build.RAW, build.AGENTS_RAW, build.OUT)
+            old_raw, old_agents, old_out = (build.RAW, build.AGENTS_RAW, build.OUT)
             try:
-                build.RAW, build.AGENTS_RAW, build.OUT = (
-                    raw, agents_raw, output)
+                build.RAW, build.AGENTS_RAW, build.OUT = (raw, agents_raw, output)
                 with contextlib.redirect_stdout(io.StringIO()):
                     build.main()
                 page.goto(output.as_uri())
@@ -958,11 +952,9 @@ class BrowserInteractionTests(unittest.TestCase):
             output = root / "frontier-models.html"
             raw.write_text(json.dumps(models), encoding="utf-8")
             agents_raw.write_text(json.dumps(agents), encoding="utf-8")
-            old_raw, old_agents, old_out = (
-                build.RAW, build.AGENTS_RAW, build.OUT)
+            old_raw, old_agents, old_out = (build.RAW, build.AGENTS_RAW, build.OUT)
             try:
-                build.RAW, build.AGENTS_RAW, build.OUT = (
-                    raw, agents_raw, output)
+                build.RAW, build.AGENTS_RAW, build.OUT = (raw, agents_raw, output)
                 with contextlib.redirect_stdout(io.StringIO()):
                     build.main()
                 page.goto(output.as_uri())
@@ -981,16 +973,14 @@ class BrowserInteractionTests(unittest.TestCase):
                     lab_row = page.locator("#tip-coding .trow").filter(
                         has_text="Lab")
                     self.assertEqual(lab_row.count(), 1)
-                    self.assertEqual(
-                        lab_row.first.locator(".tv").inner_text(), "—")
+                    self.assertEqual(lab_row.first.locator(".tv").inner_text(), "—")
 
                 with self.subTest("full table"):
                     rows = page.locator("#tbl tbody tr").filter(
                         has_text="Devin Fusion CLI")
                     self.assertEqual(rows.count(), devin_count)
                     for row in rows.all():
-                        self.assertEqual(
-                            row.locator("td").nth(1).inner_text(), "—")
+                        self.assertEqual(row.locator("td").nth(1).inner_text(), "—")
 
                 stub = """() => {
                   window.__copied = null;
@@ -1097,8 +1087,7 @@ class BrowserInteractionTests(unittest.TestCase):
                     for key in secondary:
                         self.assertIn(key, rows)
             for key in secondary:
-                values = {snapshots[c][key]
-                          for c in ("intelligence", "parameters")}
+                values = {snapshots[c][key] for c in ("intelligence", "parameters")}
                 self.assertEqual(len(values), 1,
                                  f"{key} differs across charts: {values}")
 
@@ -1328,8 +1317,7 @@ class BrowserInteractionTests(unittest.TestCase):
             # value the table and tooltips show; the rawness this pin holds
             # the export to applies to every value the page carries.
             expected = build.display_name(self.HOSTILE_NAME)
-            rows = [m for m in exported["models"]
-                    if m["name"] == expected]
+            rows = [m for m in exported["models"] if m["name"] == expected]
             self.assertEqual(len(rows), 1)
             self.assertEqual(rows[0]["name"], expected)
             self.assertEqual(rows[0]["creator"], "Hostile Lab")
@@ -1359,8 +1347,7 @@ class BrowserInteractionTests(unittest.TestCase):
         page.locator("#fQ").fill("zzqq-no-model-matches-this")
         self.assertTrue(empty.is_visible())
         self.assertEqual(empty.get_attribute("aria-live"), "polite")
-        self.assertEqual(empty.inner_text(),
-                         "No models match the current filters")
+        self.assertEqual(empty.inner_text(), "No models match the current filters")
         self.assertEqual(page.locator("#tbl tbody tr").count(), 0)
 
         page.locator("#fQ").fill("")
@@ -1545,8 +1532,7 @@ class BrowserInteractionTests(unittest.TestCase):
                     # a broken page must fail here, saying so -- both sides
                     # of the comparison below are vacuously equal on an
                     # empty chart
-                    self.assertGreater(res["n_pts"], 0,
-                                       f"{chart} rendered empty")
+                    self.assertGreater(res["n_pts"], 0, f"{chart} rendered empty")
                     self.assertTrue(res["dom"], f"{chart} has no labels")
                     unmatched = []
                     for want in res["replay"]:
@@ -1578,11 +1564,9 @@ class BrowserInteractionTests(unittest.TestCase):
         page.goto(build.OUT.as_uri())
         for chart in ("coding", "intelligence", "parameters"):
             with self.subTest(chart=chart):
-                labels = page.locator(
-                    f"#svg-{chart} text.lbl").all_text_contents()
+                labels = page.locator(f"#svg-{chart} text.lbl").all_text_contents()
                 self.assertTrue(labels, f"{chart} rendered no labels")
-                duplicates = sorted(
-                    t for t in set(labels) if labels.count(t) > 1)
+                duplicates = sorted(t for t in set(labels) if labels.count(t) > 1)
                 self.assertEqual(
                     duplicates, [],
                     f"duplicate chart labels on {chart}")
@@ -1626,8 +1610,7 @@ class BrowserInteractionTests(unittest.TestCase):
         page = self.browser.new_page(viewport={"width": 1280, "height": 900})
         page.goto(build.OUT.as_uri())
         cells = page.locator("#tbl td.name")
-        self.assertGreater(cells.count(), 0,
-                           "the table rendered no name cells")
+        self.assertGreater(cells.count(), 0, "the table rendered no name cells")
         for cell in cells.all_text_contents():
             self.assertNotIn("reasoning_effort", cell)
         page.close()
@@ -1699,8 +1682,7 @@ class BrowserInteractionTests(unittest.TestCase):
         # render()'s most visible act is the filter count line, which the
         # static HTML ships as an em dash -- so a non-em-dash counter proves
         # the initial render() has settled.
-        on.wait_for_function(
-            "document.getElementById('count').textContent !== '—'")
+        on.wait_for_function("document.getElementById('count').textContent !== '—'")
         for table in ("fTable", "tbl"):
             with self.subTest(table=table):
                 self.assertEqual(
@@ -1789,8 +1771,7 @@ class BrowserInteractionTests(unittest.TestCase):
 
         def token_hexes(token):
             values = re.findall(rf"--{token}:#([0-9a-f]{{6}})", css)
-            self.assertTrue(
-                values, f"--{token} carries no hex in the stylesheet")
+            self.assertTrue(values, f"--{token} carries no hex in the stylesheet")
             return values
 
         surface = token_hexes("surface-1")
@@ -1834,8 +1815,7 @@ class BrowserInteractionTests(unittest.TestCase):
         self.assertEqual(round(text_dark, 2), 4.92)
 
         self.assertIn("td.n.dispute{color:var(--dispute-text)}", css)
-        self.assertIn(".tip .trow .tv.dispute{color:var(--dispute-text)}",
-                      css)
+        self.assertIn(".tip .trow .tv.dispute{color:var(--dispute-text)}", css)
 
 
 def _load_perf_budgets():
@@ -1947,8 +1927,7 @@ class PerfBudgetTests(unittest.TestCase):
     def test_every_journey_meets_its_committed_budget(self):
         budgets = perf_budgets.load_budgets(
             build.ROOT / ".github" / "perf-budgets.json")
-        journeys = perf_budgets.measure_journeys(
-            self.browser, build.OUT.as_uri())
+        journeys = perf_budgets.measure_journeys(self.browser, build.OUT.as_uri())
         raw = build.OUT.read_bytes()
         measurement = {
             "bytes": {
@@ -1973,8 +1952,7 @@ class PerfBudgetTests(unittest.TestCase):
         page = root / "frontier-models.html"
         raw.write_text(json.dumps(models), encoding="utf-8")
         agents_raw.write_text(json.dumps(agents), encoding="utf-8")
-        old_raw, old_agents, old_out = (
-            build.RAW, build.AGENTS_RAW, build.OUT)
+        old_raw, old_agents, old_out = (build.RAW, build.AGENTS_RAW, build.OUT)
         build.RAW, build.AGENTS_RAW, build.OUT = raw, agents_raw, page
         try:
             stamp_env = "AI_RESEARCHER_AA_SOURCE_COMMIT"
@@ -1987,10 +1965,8 @@ class PerfBudgetTests(unittest.TestCase):
             finally:
                 os.environ.update(saved_stamp)
         finally:
-            build.RAW, build.AGENTS_RAW, build.OUT = (
-                old_raw, old_agents, old_out)
-        journeys = perf_budgets.measure_journeys(
-            self.browser, page.as_uri())
+            build.RAW, build.AGENTS_RAW, build.OUT = (old_raw, old_agents, old_out)
+        journeys = perf_budgets.measure_journeys(self.browser, page.as_uri())
         gated = {"bytes": perf_budgets.code_bytes(page.read_bytes())}
         for journey, metrics in perf_budgets.GATED_JOURNEY_METRICS.items():
             for metric in metrics:
@@ -2179,8 +2155,7 @@ class ZeroScoreBrowserTests(unittest.TestCase):
             encoding="utf-8")
         (data / "aa-raw-coding-agents.json").write_text(
             json.dumps([test_build.agent_fixture()]), encoding="utf-8")
-        (data / "captured-at.txt").write_text("2026-10-04\n",
-                                              encoding="utf-8")
+        (data / "captured-at.txt").write_text("2026-10-04\n", encoding="utf-8")
         build.RAW = data / "aa-raw-models.json"
         build.AGENTS_RAW = data / "aa-raw-coding-agents.json"
         build.OUT = pathlib.Path(cls._dir.name) / "frontier-models.html"
@@ -2346,8 +2321,7 @@ def _in_run_disputed_models(total=14):
     models[5] = _variant_probe_model(models[5], [carried[5], {}])
     # Agreeing generations: genVariants present, nothing disputed -- every
     # field renders today's single value and the charts draw no marks.
-    models[6] = _variant_probe_model(models[6],
-                                     [carried[6], dict(carried[6])])
+    models[6] = _variant_probe_model(models[6], [carried[6], dict(carried[6])])
     # Canonical-first fill: the canonical generation lacks pout and ctx;
     # the next carrying generation's values fill them. A missing marker is
     # a fill, never a dispute -- single values, never red.

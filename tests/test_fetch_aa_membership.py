@@ -17,8 +17,7 @@ from test_build import route_evidence, v5_evaluations  # noqa: E402  # pylint: d
 @pytest.mark.parametrize("rich_key", ["initialModels", "models"])
 def test_initial_models_competes_with_models_by_richness_not_length(rich_key):
     rich = detail_record()
-    index = [{"slug": f"m{i}", "name": f"M{i}", "releaseSlug": f"m{i}"}
-             for i in range(5)]
+    index = [{"slug": f"m{i}", "name": f"M{i}", "releaseSlug": f"m{i}"} for i in range(5)]
     payload = json.dumps([{rich_key: [rich]}, {"models": index}], separators=(",", ":"))
     assert fetch_aa.richest_models_array(payload) == [rich]
 
@@ -98,8 +97,7 @@ def with_gdpval(records, elo=900.0, cost=2.0):
 def page(records, rich_name):
     index = [{"slug": r["slug"], "name": r.get("name", r["slug"]),
               "releaseSlug": r["slug"]} for r in records]
-    payload = json.dumps([{rich_name: records}, {"models": index}],
-                         separators=(",", ":"))
+    payload = json.dumps([{rich_name: records}, {"models": index}], separators=(",", ":"))
     return f"<p>{CITED}</p><script>self.__next_f.push([1,{json.dumps(payload)}])</script>"
 
 
@@ -129,8 +127,7 @@ def test_detail_only_additions_preserve_existing_records_and_in_run_decision(
     baseline = capture_pages(tmp_path, monkeypatch, first, second, shared_detail)
     retired = detail_record("retired")
     older = detail_record("older")
-    captured = capture_pages(tmp_path, monkeypatch, first, second,
-                             shared_detail + [retired, older])
+    captured = capture_pages(tmp_path, monkeypatch, first, second, shared_detail + [retired, older])
     assert {r["slug"] for r in captured.models} == {"host", "current", "retired", "older"}
     existing = [r for r in captured.models if r["slug"] in {"host", "current"}]
     assert json.dumps(existing) == json.dumps(baseline.models)
@@ -170,8 +167,7 @@ def test_cross_run_presence_sees_union_as_served_evidence(tmp_path, monkeypatch)
     previous = build.merge_captures(leaderboard(), [detail_record()]) + [retired]
     previous.append({"slug": "gone", "intelligenceIndex": 30})
     detail = [detail_record(), retired, detail_record("new", 30)]
-    captured = capture_pages(tmp_path, monkeypatch, leaderboard(), leaderboard(),
-                             detail, previous)
+    captured = capture_pages(tmp_path, monkeypatch, leaderboard(), leaderboard(), detail, previous)
     assert captured.cross_run.dropped == ["gone"]
     assert captured.cross_run.readded == ["new"]
     retired_now = next(r for r in captured.models if r["slug"] == "retired")
