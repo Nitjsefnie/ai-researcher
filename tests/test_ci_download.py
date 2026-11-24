@@ -93,8 +93,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
         if fault == "midstall":
             self.server.release.wait(10)
         elif fault == "midreset":
-            self.connection.setsockopt(socket.SOL_SOCKET, socket.SO_LINGER,
-                                       struct.pack("ii", 1, 0))
+            self.connection.setsockopt(socket.SOL_SOCKET, socket.SO_LINGER, struct.pack("ii", 1, 0))
             self.connection.close()
 
 
@@ -129,16 +128,14 @@ def test_a_transient_fault_is_retried_with_backoff(serve, sleeps, tmp_path,
     assert (digest, size) == (hashlib.sha256(BODY).hexdigest(), len(BODY))
 
 
-def test_exhaustion_names_the_url_and_leaves_no_partial_file(serve, sleeps,
-                                                             tmp_path):
+def test_exhaustion_names_the_url_and_leaves_no_partial_file(serve, sleeps, tmp_path):
     server = serve(*["drop"] * 9)
     out = tmp_path / "out"
     with pytest.raises(download.DownloadError) as caught:
         download.download_to(server.url, out, 5)
     assert server.hits == 8
     assert sleeps == [5, 10, 20, 40, 60, 60, 60]
-    assert str(caught.value).startswith(
-        f"{server.url}: download failed after 8 attempts in 255s: ")
+    assert str(caught.value).startswith(f"{server.url}: download failed after 8 attempts in 255s: ")
     assert not out.exists()
 
 
@@ -189,8 +186,7 @@ class TrickleResponse(io.BytesIO):
     (110, 7, 1, []),   # dropped past the window: no new attempt starts
     (90, 7, 2, [5]),   # dropped inside it: one more attempt starts
 ])
-def test_the_window_gates_only_the_next_attempt(monkeypatch, tmp_path, step,
-                                                owed, attempts, schedule):
+def test_the_window_gates_only_the_next_attempt(monkeypatch, tmp_path, step, owed, attempts, schedule):
     clock = FakeClock()
     calls = []
 
@@ -202,21 +198,18 @@ def test_the_window_gates_only_the_next_attempt(monkeypatch, tmp_path, step,
     out = tmp_path / "out"
     out.write_bytes(b"a stale file is replaced, never appended to")
     if not owed:
-        download.download_to("https://example.test/a", out, 30,
-                             sleep=clock.sleep, clock=clock)
+        download.download_to("https://example.test/a", out, 30, sleep=clock.sleep, clock=clock)
         assert out.read_bytes() == b"abc"
     else:
         with pytest.raises(download.DownloadError,
                            match=f"after {attempts} attempts"):
-            download.download_to("https://example.test/a", out, 30,
-                                 sleep=clock.sleep, clock=clock)
+            download.download_to("https://example.test/a", out, 30, sleep=clock.sleep, clock=clock)
         assert not out.exists()
     assert len(calls) == attempts
     assert clock.sleeps == schedule
 
 
-def test_progress_prints_one_line_per_interval(serve, sleeps, tmp_path,
-                                               monkeypatch, capsys):
+def test_progress_prints_one_line_per_interval(serve, sleeps, tmp_path, monkeypatch, capsys):
     monkeypatch.setattr(download, "CHUNK", 10000)
     monkeypatch.setattr(download, "PROGRESS_INTERVAL", 40000)
     download.download_to(serve().url, tmp_path / "out", 5, label="chromium")
@@ -280,8 +273,7 @@ def test_gh_reruns_only_a_transient_failure_and_keeps_the_last_stdout(sleeps, tm
         (0, b"xx", b"body 1\n", [5]) if rerun else (code, b"x", b"body 0\n", []))
 
 
-def test_the_cli_retries_and_exits_nonzero_on_exhaustion(serve, sleeps,
-                                                         tmp_path, capsys):
+def test_the_cli_retries_and_exits_nonzero_on_exhaustion(serve, sleeps, tmp_path, capsys):
     good = serve(503)
     assert download.main([good.url, str(tmp_path / "good")]) == 0
     assert (tmp_path / "good").read_bytes() == BODY
@@ -299,8 +291,7 @@ RELEASE_URL = "https://github.com/o/r/releases/download/v1/tool.tar.gz"
 # the plain URL, exactly as given, at the CLI's 30 s socket timeout.
 @pytest.mark.parametrize("token, url", [
     (None, RELEASE_URL), ("", RELEASE_URL), (TOKEN, "https://cdn.test/a.zip")])
-def test_the_cli_fetches_the_plain_url_at_30_seconds(monkeypatch, tmp_path,
-                                                     token, url):
+def test_the_cli_fetches_the_plain_url_at_30_seconds(monkeypatch, tmp_path, token, url):
     monkeypatch.delenv("AI_RESEARCHER_DOWNLOAD_TOKEN", raising=False)
     if token is not None:
         monkeypatch.setenv("AI_RESEARCHER_DOWNLOAD_TOKEN", token)
@@ -318,14 +309,12 @@ class FullDisk(io.BytesIO):
 
 @pytest.mark.parametrize("where, hits", [("404", 1), ("missing directory", 0),
                                          ("full disk", 1)])
-def test_a_404_or_a_destination_error_fails_at_once(serve, sleeps, tmp_path,
-                                                    monkeypatch, where, hits):
+def test_a_404_or_a_destination_error_fails_at_once(serve, sleeps, tmp_path, monkeypatch, where, hits):
     server = serve(404) if where == "404" else serve()
     out = tmp_path / ("out" if where == "404" else "missing/out")
     if where == "full disk":
         out = tmp_path / "out"
-        monkeypatch.setattr(download, "open", lambda *args: FullDisk(),
-                            raising=False)
+        monkeypatch.setattr(download, "open", lambda *args: FullDisk(), raising=False)
     with pytest.raises(download.DownloadError) as caught:
         download.download_to(server.url, out, 5)
     assert str(caught.value).startswith(f"{server.url}: download failed: ")
@@ -410,8 +399,7 @@ def fixture_api(monkeypatch):
         server = Api(routes)
         threading.Thread(target=server.serve_forever, daemon=True).start()
         servers.append(server)
-        monkeypatch.setattr(download, "API",
-                            f"http://127.0.0.1:{server.server_address[1]}")
+        monkeypatch.setattr(download, "API", f"http://127.0.0.1:{server.server_address[1]}")
         return server
 
     yield start
@@ -421,8 +409,7 @@ def fixture_api(monkeypatch):
 
 
 TAGS, ASSET = "/repos/o/r/releases/tags/v1", "/repos/o/r/releases/assets/7"
-RELEASE = json.dumps({"assets": [{"name": "other", "id": 6},
-                                 {"name": "tool.tar.gz", "id": 7}]}).encode()
+RELEASE = json.dumps({"assets": [{"name": "other", "id": 6}, {"name": "tool.tar.gz", "id": 7}]}).encode()
 JSON, OCTETS = "application/vnd.github+json", "application/octet-stream"
 
 

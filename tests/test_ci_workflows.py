@@ -120,9 +120,7 @@ def test_dependabot_groups_action_updates_into_one_pr():
     text = DEPENDABOT.read_text(encoding="utf-8")
     entries = text.split("package-ecosystem:")
     actions = [e for e in entries if e.lstrip().startswith("github-actions")]
-    assert len(actions) == 1, (
-        "expected exactly one github-actions update entry"
-    )
+    assert len(actions) == 1, "expected exactly one github-actions update entry"
     assert re.search(r"^ {4}groups:", actions[0], re.M), (
         "the github-actions entry must group its updates — ungrouped, "
         "Dependabot files one half-bump PR per codeql-action pin"
@@ -159,8 +157,7 @@ def test_hash_pinned_requirements_name_each_version_only_once():
             rf"^[ \t]*{declaration}[ \t]*\\\r?\n[ \t]*--hash=",
             text, re.MULTILINE))
         assert pinned, f"{path.name}: no hash-carrying declaration found"
-        names = [match.group("name").lower()
-                 for match in re.finditer(declaration, text)]
+        names = [match.group("name").lower() for match in re.finditer(declaration, text)]
         for match in pinned:
             name = match.group("name").lower()
             assert names.count(name) == 1, (
@@ -203,8 +200,7 @@ def test_chromium_debs_cache_is_restore_only_in_the_test_job_and_shared():
     tests = yaml.safe_load(TESTS_WORKFLOW.read_text(encoding="utf-8"))
     refresh = yaml.safe_load((REPO_ROOT / ".github/workflows/refresh.yml").read_text(encoding="utf-8"))
     steps = tests["jobs"]["test"]["steps"]
-    [cache] = [entry for entry in steps
-               if entry.get("name") == "Cache Chromium dependency debs"]
+    [cache] = [entry for entry in steps if entry.get("name") == "Cache Chromium dependency debs"]
     assert cache["uses"].split("@", 1)[0] == "actions/cache/restore"
     assert not [entry for entry in steps
                 if entry.get("uses", "").split("@", 1)[0] == "actions/cache/save"]
@@ -224,11 +220,9 @@ def test_instruction_budgets_gate_runs_only_in_the_budgets_job():
     # job, invoking the gate script.
     workflow = yaml.safe_load(TESTS_WORKFLOW.read_text(encoding="utf-8"))
     for name, job in workflow["jobs"].items():
-        named = [s for s in job.get("steps", [])
-                 if s.get("name") == "Instruction budgets gate"]
+        named = [s for s in job.get("steps", []) if s.get("name") == "Instruction budgets gate"]
         if name != "budgets":
-            assert not named, (
-                f"{name} must not run the instruction budgets gate")
+            assert not named, f"{name} must not run the instruction budgets gate"
             continue
         [gate] = named
         assert "instruction_budgets.py" in gate["run"], gate["run"]
@@ -240,8 +234,7 @@ def test_page_job_runs_the_committed_page_check():
     # and the job's declared permissions at this CI surface.
     workflow = yaml.safe_load(TESTS_WORKFLOW.read_text(encoding="utf-8"))
     job = workflow["jobs"]["page"]
-    [check] = [s for s in job["steps"]
-               if s.get("name") == "Check the committed page"]
+    [check] = [s for s in job["steps"] if s.get("name") == "Check the committed page"]
     assert check["run"] == "python3 scripts/ci/check_committed_page.py"
     assert job["permissions"] == {"contents": "read"}
 
@@ -277,9 +270,7 @@ def test_no_job_that_checks_out_the_tree_holds_conversation_write():
     # SHA; no checkout).
     # Every job with an actions/checkout step is scanned, so a future job
     # cannot quietly grow the grant.
-    allowed_writers = {
-        "claim.yml", "pin-guard.yml", "pr-gate.yml", "test-ratchet-comment.yml",
-    }
+    allowed_writers = {"claim.yml", "pin-guard.yml", "pr-gate.yml", "test-ratchet-comment.yml"}
     writers = set()
     for path in WORKFLOWS:
         workflow = yaml.safe_load(path.read_text(encoding="utf-8"))
@@ -291,8 +282,7 @@ def test_no_job_that_checks_out_the_tree_holds_conversation_write():
                 and not _workflowrun.is_helper_checkout(step)
                 and not (default_branch_only and not {"ref", "repository"} & set(step.get("with") or {}))
                 for step in job.get("steps", []))
-            requested = (job.get("permissions")
-                         or workflow.get("permissions") or {})
+            requested = job.get("permissions") or workflow.get("permissions") or {}
             pull_write = requested.get("pull-requests") == "write"
             if checks_out:
                 assert not pull_write, (
@@ -311,8 +301,7 @@ def test_no_job_that_checks_out_the_tree_holds_conversation_write():
 def test_valgrind_cache_is_restore_only_before_the_instruction_gate():
     workflow = yaml.safe_load(TESTS_WORKFLOW.read_text(encoding="utf-8"))
     steps = workflow["jobs"]["budgets"]["steps"]
-    [cache] = [entry for entry in steps
-               if entry.get("name") == "Cache valgrind dependency debs"]
+    [cache] = [entry for entry in steps if entry.get("name") == "Cache valgrind dependency debs"]
     assert cache["uses"].split("@", 1)[0] == "actions/cache/restore"
     assert not [entry for entry in steps
                 if entry.get("uses", "").split("@", 1)[0] == "actions/cache/save"]

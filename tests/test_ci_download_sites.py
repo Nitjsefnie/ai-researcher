@@ -84,8 +84,7 @@ def checkout_copy(tmp_path, boundary, fallback=None):
     return workspace, stub
 
 
-def run_site(tmp_path, workflow, job, step_name, tool, faults, run_edit=None,
-             env_edit=None, token=""):
+def run_site(tmp_path, workflow, job, step_name, tool, faults, run_edit=None, env_edit=None, token=""):
     """Run one download step in a checkout copy; return (result, requests, ws)."""
     workspace, stub = checkout_copy(tmp_path, BOUNDARY)
     body = tmp_path / "fake.tar.gz"
@@ -99,8 +98,7 @@ def run_site(tmp_path, workflow, job, step_name, tool, faults, run_edit=None,
            "DOWNLOAD_STUB_LOG": str(log), "DOWNLOAD_STUB_BODY": str(body),
            "DOWNLOAD_STUB_FAULTS": " ".join(map(str, faults)),
            "AI_RESEARCHER_DOWNLOAD_TOKEN": token}
-    env.update(env_edit(yaml.safe_load(path.read_text(encoding="utf-8")),
-                        digest) if env_edit else {})
+    env.update(env_edit(yaml.safe_load(path.read_text(encoding="utf-8")), digest) if env_edit else {})
     result = _workflowrun.run_step(workspace, step, env)
     lines = log.read_text(encoding="utf-8").splitlines() if log.exists() else []
     return result, [json.loads(line) for line in lines], workspace
@@ -113,8 +111,7 @@ def gitleaks_digest(run, digest):
 
 
 def actionlint_env(workflow, digest):
-    return {**workflow["jobs"]["actionlint"]["env"],
-            "AI_RESEARCHER_ACTIONLINT_SHA256": digest}
+    return {**workflow["jobs"]["actionlint"]["env"], "AI_RESEARCHER_ACTIONLINT_SHA256": digest}
 
 
 SITES = [
@@ -124,10 +121,8 @@ SITES = [
      {"env_edit": actionlint_env}),
 ]
 # The step after the download that executes the tool by its workspace path.
-CONSUMERS = {"gitleaks": "Scan the tree and the history",
-             "actionlint": "actionlint"}
-LINUX = pytest.mark.skipif(sys.platform != "linux",
-                           reason="the workflow step runs on Ubuntu")
+CONSUMERS = {"gitleaks": "Scan the tree and the history", "actionlint": "actionlint"}
+LINUX = pytest.mark.skipif(sys.platform != "linux", reason="the workflow step runs on Ubuntu")
 TOKEN = "token-value-for-tests"
 
 
@@ -165,10 +160,8 @@ def test_a_site_retries_a_gateway_error_then_its_consumer_runs_the_tool(
 @LINUX
 @pytest.mark.parametrize("token", ["", TOKEN])
 @pytest.mark.parametrize("workflow, job, name, tool, edits", SITES)
-def test_a_site_fails_at_once_on_a_404(tmp_path, workflow, job, name, tool,
-                                       edits, token):
-    result, requests, _ = run_site(tmp_path, workflow, job, name, tool, [404],
-                                   token=token, **edits)
+def test_a_site_fails_at_once_on_a_404(tmp_path, workflow, job, name, tool, edits, token):
+    result, requests, _ = run_site(tmp_path, workflow, job, name, tool, [404], token=token, **edits)
     assert result.returncode != 0
     assert len(requests) == 1
     assert f"fake {tool}" not in result.stdout
@@ -176,8 +169,7 @@ def test_a_site_fails_at_once_on_a_404(tmp_path, workflow, job, name, tool,
 
 
 @pytest.mark.parametrize("workflow, job, name, tool, edits", SITES)
-def test_the_download_token_reaches_only_the_download_step(workflow, job, name,
-                                                           tool, edits):
+def test_the_download_token_reaches_only_the_download_step(workflow, job, name, tool, edits):
     document = yaml.safe_load(
         (REPO_ROOT / ".github" / "workflows" / workflow).read_text(encoding="utf-8"))
     steps = document["jobs"][job]["steps"]
@@ -231,8 +223,7 @@ def test_the_pip_install_sites_are_found():
 
 @SH
 @pytest.mark.parametrize("workflow, job, name", PIP_STEPS)
-def test_every_pip_install_is_rerun_after_a_failure(tmp_path, workflow, job,
-                                                    name):
+def test_every_pip_install_is_rerun_after_a_failure(tmp_path, workflow, job, name):
     result, calls = run_stubbed(tmp_path, workflow, job, name, "1 0 1")
     assert result.returncode == 0, result.stderr  # types.yml then reruns pyright's first start too (issue #426)
     assert calls == [calls[0]] * 2 + [["-m", "pyright", "--version"]] * 2 * (workflow == "types.yml")
@@ -247,8 +238,7 @@ def test_every_pip_install_is_rerun_after_a_failure(tmp_path, workflow, job,
 @SH
 @pytest.mark.parametrize("exits, status, runs", [
     ("1 1", 0, 3), ("13", 13, 1), ("1 14", 14, 2), ("11", 11, 1), ("hang", 0, 2)])
-def test_the_zizmor_step_reruns_an_error_and_fails_a_finding_at_once(
-        tmp_path, exits, status, runs):
+def test_the_zizmor_step_reruns_an_error_and_fails_a_finding_at_once(tmp_path, exits, status, runs):
     result, calls = run_stubbed(tmp_path, "actionlint.yml", "actionlint", "zizmor", exits)
     assert result.returncode == status, result.stderr
     assert calls == [["--no-progress", ".github/workflows/", ".github/actions/"]] * runs
