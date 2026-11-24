@@ -66,11 +66,9 @@ def test_evaluation_cost_joins_only_matching_in_run_generations(
     assert captured.disputed == baseline.disputed
     current = next(row for row in captured.models if row["slug"] == "current")
     without_cost = next(row for row in baseline.models if row["slug"] == "current")
-    assert [v["ii"] for v in current["genVariants"]] == [
-        v["ii"] for v in without_cost["genVariants"]]
+    assert [v["ii"] for v in current["genVariants"]] == [v["ii"] for v in without_cost["genVariants"]]
     assert {v["ii"] for v in current["genVariants"]} == {51, 52}
-    assert {v["ii"]: v["gdpvalCost"] for v in current["genVariants"]
-            if "gdpvalCost" in v} == expected
+    assert {v["ii"]: v["gdpvalCost"] for v in current["genVariants"] if "gdpvalCost" in v} == expected
     assert ("gdpvalCostPerTask" in current) == bool(expected)
 
 
@@ -81,16 +79,14 @@ def test_evaluation_cost_does_not_change_canonical_generation_order(tmp_path, mo
     baseline = _capture(tmp_path, monkeypatch, first, second, detail, {}, evaluated=observed)
     captured = _capture(tmp_path, monkeypatch, first, second, detail,
                         {"current": 0.01}, evaluated=observed)
-    rows = [next(r for r in result.models if r["slug"] == "current")
-            for result in (baseline, captured)]
+    rows = [next(r for r in result.models if r["slug"] == "current") for result in (baseline, captured)]
     assert [[v["ii"] for v in row["genVariants"]] for row in rows] == [[52, 51], [52, 51]]
 
 
 def test_evaluation_does_not_assign_a_cost_to_an_absent_model_variant(tmp_path, monkeypatch):
     first = leaderboard(51)
     second = [first[0], dict(first[1], slug="other")]
-    evaluated = [{"slug": "current", "intelligenceIndex": 51},
-                 {"slug": "other", "intelligenceIndex": 51}]
+    evaluated = [{"slug": "current", "intelligenceIndex": 51}, {"slug": "other", "intelligenceIndex": 51}]
     captured = _capture(tmp_path, monkeypatch, first, second, [detail_record(ii=51)],
                         {"current": 1.25, "other": 2.5}, evaluated=evaluated)
     current = next(row for row in captured.models if row["slug"] == "current")
@@ -106,8 +102,7 @@ def test_comparison_fields_include_fields_found_only_in_later_evaluation_records
     captured = _capture(tmp_path, monkeypatch, first, second, [detail_record(ii=51)],
                         {"current": 1.25}, evaluated=evaluated)
     current = next(row for row in captured.models if row["slug"] == "current")
-    assert {v["ii"]: v["gdpvalCost"] for v in current["genVariants"]
-            if "gdpvalCost" in v} == {51: 1.25}
+    assert {v["ii"]: v["gdpvalCost"] for v in current["genVariants"] if "gdpvalCost" in v} == {51: 1.25}
 
 
 @pytest.mark.parametrize("observed,expected", [(51, 2.5), (53, None)])
@@ -183,8 +178,7 @@ def test_real_record_shape_noise_outside_dispute_fields_still_matches(tmp_path, 
     captured = _capture(tmp_path, monkeypatch, first, second, [detail_record(ii=51)],
                         {"current": 1.25}, evaluated=evaluated)
     current = next(row for row in captured.models if row["slug"] == "current")
-    assert {v["ii"]: v["gdpvalCost"] for v in current["genVariants"]
-            if "gdpvalCost" in v} == {51: 1.25}
+    assert {v["ii"]: v["gdpvalCost"] for v in current["genVariants"] if "gdpvalCost" in v} == {51: 1.25}
 
 
 def test_comparable_field_absent_from_both_looks_does_not_block_the_match(tmp_path, monkeypatch):
@@ -196,8 +190,7 @@ def test_comparable_field_absent_from_both_looks_does_not_block_the_match(tmp_pa
     captured = _capture(tmp_path, monkeypatch, first, second, [detail_record(ii=51)],
                         {"current": 1.25}, evaluated=evaluated)
     current = next(row for row in captured.models if row["slug"] == "current")
-    assert {v["ii"]: v["gdpvalCost"] for v in current["genVariants"]
-            if "gdpvalCost" in v} == {51: 1.25}
+    assert {v["ii"]: v["gdpvalCost"] for v in current["genVariants"] if "gdpvalCost" in v} == {51: 1.25}
 
 
 @pytest.mark.parametrize("observed,generations", [(51, 2), (52, 2), (53, 3)])
@@ -211,8 +204,7 @@ def test_unmatched_evaluation_counts_as_an_in_run_generation(
 
 def test_missing_current_cost_is_not_carried_from_previous_capture(tmp_path, monkeypatch):
     first = leaderboard()
-    previous = [dict(row, gdpvalCostPerTask=1.25) if row["slug"] == "current" else row
-                for row in first]
+    previous = [dict(row, gdpvalCostPerTask=1.25) if row["slug"] == "current" else row for row in first]
     captured = _capture(tmp_path, monkeypatch, first, first, [detail_record()], {}, previous)
     current = next(row for row in captured.models if row["slug"] == "current")
     assert "gdpvalCostPerTask" not in current
@@ -220,8 +212,7 @@ def test_missing_current_cost_is_not_carried_from_previous_capture(tmp_path, mon
 
 def test_presence_merge_keeps_a_departed_models_cost_as_a_variant(tmp_path, monkeypatch):
     first = leaderboard()
-    previous = first + [{"slug": "departed", "intelligenceIndex": 40,
-                         "gdpvalCostPerTask": 2.5}]
+    previous = first + [{"slug": "departed", "intelligenceIndex": 40, "gdpvalCostPerTask": 2.5}]
     captured = _capture(tmp_path, monkeypatch, first, first, [detail_record()], {}, previous)
     departed = next(row for row in captured.models if row["slug"] == "departed")
     assert departed["crossRunMerged"]

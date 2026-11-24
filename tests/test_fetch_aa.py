@@ -45,9 +45,7 @@ def flight_html(*payloads: str) -> str:
     """A page carrying the RSC chunks the extractor reassembles. Each chunk is
     a JSON string literal in a self.__next_f.push call, exactly as Next.js
     emits it."""
-    return "".join(
-        f"<script>self.__next_f.push([1,{json.dumps(p)}])</script>"
-        for p in payloads)
+    return "".join(f"<script>self.__next_f.push([1,{json.dumps(p)}])</script>" for p in payloads)
 
 
 @contextlib.contextmanager
@@ -204,8 +202,7 @@ class CostBreakdownTests(unittest.TestCase):
         # route's breakdown is another generation's (issue #200). The validator
         # reads that as a dropped model and NAMES it -- a count alone would
         # not say which model the routes disagree on.
-        models = [costed("A"),
-                  {"slug": "b-dropped", "intelligenceIndexCostPerTask": 1.5}]
+        models = [costed("A"), {"slug": "b-dropped", "intelligenceIndexCostPerTask": 1.5}]
 
         priced, dropped = fetch_aa.check_cost_breakdown(models)
 
@@ -220,8 +217,7 @@ class CostBreakdownTests(unittest.TestCase):
         # #217). The report still names the models it is talking about and
         # still refuses to blame the schema for a window that closes on its
         # own.
-        models = [{"slug": f"dropped-{i}", "intelligenceIndexCostPerTask": 1.5}
-                  for i in range(3)]
+        models = [{"slug": f"dropped-{i}", "intelligenceIndexCostPerTask": 1.5} for i in range(3)]
         stdout = io.StringIO()
 
         with contextlib.redirect_stdout(stdout):
@@ -250,8 +246,7 @@ class CostBreakdownTests(unittest.TestCase):
                     fetch_aa.record_route_evidence(fetch_aa.Capture(
                         [], "host", None, generations, False, fetch_aa.CrossRun([], []), None,
                         detail, evaluation))
-                    self.assertEqual(build.read_route_evidence(evidence.parent),
-                                     (generations, withheld))
+                    self.assertEqual(build.read_route_evidence(evidence.parent), (generations, withheld))
             self.assertEqual(evidence.read_text(encoding="utf-8"),
                              "in-run generations: 1\ndetail fills withheld: no\n"
                              "evaluation costs withheld: no\n")
@@ -278,8 +273,7 @@ class CostBreakdownTests(unittest.TestCase):
         # These messages fire exactly when AA's schema moved, and `name` is a
         # field it has already deleted once -- which reduced a real diagnostic
         # to "None: cost breakdown lost its evaluations".
-        models = [{"slug": "a-model",
-                   "intelligenceIndexCostPerTask": {"evaluations": []}}]
+        models = [{"slug": "a-model", "intelligenceIndexCostPerTask": {"evaluations": []}}]
 
         with self.assertRaises(SystemExit) as caught:
             fetch_aa.check_cost_breakdown(models)
@@ -344,15 +338,13 @@ class WindowMarkerSpanTests(unittest.TestCase):
         # Passes as written against the shipped code -- the pin exists so a
         # future rename on any leg fails, not to drive a change.
         self.assertEqual(build.ROUTE_EVIDENCE_NAME, "cost-breakdown-window.txt")
-        gitignore = (pathlib.Path(fetch_aa.ROOT) / ".gitignore").read_text(
-            encoding="utf-8")
+        gitignore = (pathlib.Path(fetch_aa.ROOT) / ".gitignore").read_text(encoding="utf-8")
         self.assertIn(f"!/data/{build.ROUTE_EVIDENCE_NAME}", gitignore)
 
 
 def agent_row(label: str, score: float | None = 0.64,
               cost: float | None = 1.5) -> dict:
-    row: dict = {"id": label, "displayLabel": label,
-                 "agentName": label.split(" - ")[0]}
+    row: dict = {"id": label, "displayLabel": label, "agentName": label.split(" - ")[0]}
     if score is not None:
         row["indexScore"] = score
     row["mean"] = {} if cost is None else {"costUsd": cost}
@@ -370,8 +362,7 @@ def agent_payload(rows: list[dict], key: str = "rows") -> str:
 class MergeCapturesTests(unittest.TestCase):
     def test_detail_only_fields_fill_gaps_without_touching_the_leaderboard(self):
         base = [{"slug": "a", "intelligenceIndex": 50, "modelCreatorName": "Lab"}]
-        detail = [{"slug": "a", "intelligenceIndex": 50, "name": "A (high)",
-                   "parameters": 27}]
+        detail = [{"slug": "a", "intelligenceIndex": 50, "name": "A (high)", "parameters": 27}]
 
         got = fetch_aa.merge_captures(base, detail)
 
@@ -386,8 +377,7 @@ class MergeCapturesTests(unittest.TestCase):
         # breakdown is lost. The breakdown here sums to the
         # leaderboard's total, which is what AA publishes -- so it survives
         # this arm's sum check as well as the one-level-deep fill.
-        base = [{"slug": "a",
-                 "intelligenceIndexCostPerTask": {"cost": {"total": 1.0}}}]
+        base = [{"slug": "a", "intelligenceIndexCostPerTask": {"cost": {"total": 1.0}}}]
         detail = [{"slug": "a", "intelligenceIndexCostPerTask": {
             "cost": {"total": 1.0}, "evaluations": v5_evaluations(1.0)}}]
 
@@ -395,8 +385,7 @@ class MergeCapturesTests(unittest.TestCase):
 
         cost = got[0]["intelligenceIndexCostPerTask"]
         self.assertEqual(cost["cost"]["total"], 1.0)
-        self.assertEqual(
-            [e["slug"] for e in cost["evaluations"]], list(WEIGHTS))
+        self.assertEqual([e["slug"] for e in cost["evaluations"]], list(WEIGHTS))
 
     def test_a_nested_stub_whose_breakdown_will_not_sum_is_dropped_too(self):
         # The same shape, where the detail breakdown does NOT decompose the
@@ -405,8 +394,7 @@ class MergeCapturesTests(unittest.TestCase):
         # total shipped unnoticed -- the flattened-scalar arm's guard is
         # hoisted so both arms share it. The leaderboard's own number is what
         # is left.
-        base = [{"slug": "a",
-                 "intelligenceIndexCostPerTask": {"cost": {"total": 1.0}}}]
+        base = [{"slug": "a", "intelligenceIndexCostPerTask": {"cost": {"total": 1.0}}}]
         detail = [{"slug": "a", "intelligenceIndexCostPerTask": {
             "cost": {"total": 1.0}, "evaluations": v5_evaluations(0.85)}}]
 
@@ -430,8 +418,7 @@ class MergeCapturesTests(unittest.TestCase):
 
                 got = fetch_aa.merge_captures(base, detail)
 
-                self.assertEqual(
-                    got[0]["intelligenceIndexCostPerTask"], unpriced)
+                self.assertEqual(got[0]["intelligenceIndexCostPerTask"], unpriced)
                 # And the cost axis reads it as absent rather than raising.
                 self.assertIsNone(build.cost_per_task(got[0]))
 
@@ -473,8 +460,7 @@ class MergeCapturesTests(unittest.TestCase):
         # with different values -- two generations of AA's data mixed into one
         # capture is what made the page oscillate -- the detail route's value
         # simply loses, while a field only it ships still fills.
-        base = [{"slug": "a", "intelligenceIndex": 51, "name": "Fresh",
-                 "modelCreatorName": "Lab"}]
+        base = [{"slug": "a", "intelligenceIndex": 51, "name": "Fresh", "modelCreatorName": "Lab"}]
         detail = [{"slug": "a", "intelligenceIndex": 52, "name": "Stale",
                    "modelCreatorName": "Other Lab", "parameters": 27}]
 
@@ -520,8 +506,7 @@ class DetailHostSlugTests(unittest.TestCase):
     def test_a_bare_numeric_cost_counts_as_priced(self):
         # The leaderboard's flattened shape. Treating it as unpriced would
         # make a costed model the detail host and strip its breakdown.
-        models = [{"slug": "priced", "intelligenceIndexCostPerTask": 1.5},
-                  {"slug": "free"}]
+        models = [{"slug": "priced", "intelligenceIndexCostPerTask": 1.5}, {"slug": "free"}]
 
         self.assertEqual(fetch_aa.detail_host_slug(models), "free")
 
@@ -532,8 +517,7 @@ class DetailHostSlugTests(unittest.TestCase):
         self.assertEqual(fetch_aa.detail_host_slug(models), "a")
 
     def test_no_free_host_exits_rather_than_silently_dropping_a_model(self):
-        models = [{"slug": "a",
-                   "intelligenceIndexCostPerTask": {"cost": {"total": 1.0}}}]
+        models = [{"slug": "a", "intelligenceIndexCostPerTask": {"cost": {"total": 1.0}}}]
 
         with self.assertRaises(SystemExit):
             fetch_aa.detail_host_slug(models)
@@ -547,13 +531,10 @@ class FetchHtmlTests(unittest.TestCase):
         path = pathlib.Path(__file__).resolve().parent / "_cached.html"
         path.write_text("<html>cached</html>", encoding="utf-8")
         try:
-            self.assertEqual(fetch_aa.fetch_html(str(path)),
-                             "<html>cached</html>")
+            self.assertEqual(fetch_aa.fetch_html(str(path)), "<html>cached</html>")
             # The other two routes read their own cache through the same
             # helper, which the URL argument only names.
-            self.assertEqual(
-                fetch_aa.fetch_html(str(path), fetch_aa.AGENTS_URL),
-                "<html>cached</html>")
+            self.assertEqual(fetch_aa.fetch_html(str(path), fetch_aa.AGENTS_URL), "<html>cached</html>")
         finally:
             path.unlink()
 
@@ -582,12 +563,8 @@ def leaderboard_payload() -> str:
     """A leaderboard flight payload: the index version and the model
     array, one unpriced detail host plus the shared model. Compact JSON --
     the extractor anchors on that shape."""
-    host = {"slug": "detail-host-model",
-            "intelligenceIndexCostPerTask": "$undefined"}
-    return json.dumps({
-        "intro": CITED,
-        "models": [host, leaderboard_record()],
-    }, separators=(",", ":"))
+    host = {"slug": "detail-host-model", "intelligenceIndexCostPerTask": "$undefined"}
+    return json.dumps({"intro": CITED, "models": [host, leaderboard_record()]}, separators=(",", ":"))
 
 
 def detail_payload(**record_overrides: object) -> str:
@@ -622,8 +599,7 @@ class CaptureGapFillWiringTests(unittest.TestCase):
             detail = root / "detail.html"
             methodology = root / "methodology.html"
             base.write_text(flight_html(leaderboard_payload()), encoding="utf-8")
-            detail.write_text(flight_html(detail_payload(**record_overrides)),
-                              encoding="utf-8")
+            detail.write_text(flight_html(detail_payload(**record_overrides)), encoding="utf-8")
             methodology.write_text(methodology_html(), encoding="utf-8")
             with unittest.mock.patch.object(fetch_aa, "_sleep",
                                             side_effect=lambda s: None):
@@ -639,8 +615,7 @@ class CaptureGapFillWiringTests(unittest.TestCase):
 
         self.assertEqual(captured.host, "detail-host-model")
         self.assertEqual(captured.version, VERSION)
-        self.assertEqual([m["slug"] for m in captured.models],
-                         ["detail-host-model", "fixture-model"])
+        self.assertEqual([m["slug"] for m in captured.models], ["detail-host-model", "fixture-model"])
 
     def test_a_divergent_detail_value_never_reaches_the_captured_corpus(self):
         # The end of the old agreement machinery: the two routes disagreeing
@@ -753,9 +728,7 @@ class AtomicCaptureWritesTests(unittest.TestCase):
             with self.assertRaises(OSError):
                 run()
 
-            self.assertEqual(
-                (root / "aa-raw-models.json").read_bytes(),
-                b"PREVIOUS MODELS CAPTURE")
+            self.assertEqual((root / "aa-raw-models.json").read_bytes(), b"PREVIOUS MODELS CAPTURE")
             self.assertEqual(
                 (root / "aa-raw-coding-agents.json").read_bytes(),
                 b"PREVIOUS AGENTS CAPTURE")
@@ -814,11 +787,8 @@ class AtomicCaptureWritesTests(unittest.TestCase):
             stdout = run()
 
             self.assertIn("wrote aa-raw-models.json", stdout)
-            models = json.loads(
-                (root / "aa-raw-models.json").read_text(encoding="utf-8"))
-            self.assertEqual(
-                [m["slug"] for m in models],
-                ["detail-host-model", "fixture-model"])
+            models = json.loads((root / "aa-raw-models.json").read_text(encoding="utf-8"))
+            self.assertEqual([m["slug"] for m in models], ["detail-host-model", "fixture-model"])
             self.assertEqual(
                 len(json.loads(
                     (root / "aa-raw-coding-agents.json").read_text(encoding="utf-8"))),
@@ -858,8 +828,7 @@ class LoudUrlopenStub:
         self.calls: list[str] = []
 
     def __call__(self, request, timeout=None):
-        url = (request.full_url if isinstance(request, urllib.request.Request)
-               else str(request))
+        url = (request.full_url if isinstance(request, urllib.request.Request) else str(request))
         self.calls.append(url)
         handler = self.routes.get(url)
         if handler is None:
@@ -892,8 +861,7 @@ class TransportErrorTests(unittest.TestCase):
             return stub, buffer.getvalue()
 
     def healthy_routes(self) -> dict:
-        agents = flight_html(agent_payload(
-            [agent_row(f"Agent - Model {i}") for i in range(5)]))
+        agents = flight_html(agent_payload([agent_row(f"Agent - Model {i}") for i in range(5)]))
         return {
             fetch_aa.METHODOLOGY_URL: lambda: _FakeResponse(methodology_html()),
             fetch_aa.URL: lambda: _FakeResponse(flight_html(leaderboard_payload())),
@@ -1013,8 +981,7 @@ class PageFetchRetryTests(unittest.TestCase):
     DETAIL_URL = fetch_aa.MODEL_DETAIL_URL.format(slug="detail-host-model")
     LEADERBOARD = flight_html(leaderboard_payload())
     DETAIL = flight_html(detail_payload())
-    AGENTS = flight_html(agent_payload(
-        [agent_row(f"Agent - Model {i}") for i in range(5)]))
+    AGENTS = flight_html(agent_payload([agent_row(f"Agent - Model {i}") for i in range(5)]))
 
     @contextlib.contextmanager
     def capture_over_boundary(self, routes: dict, *, seed: bool = False):
@@ -1089,8 +1056,7 @@ class PageFetchRetryTests(unittest.TestCase):
             self.assertIn("Service Unavailable", message)
             self.assertEqual(sleeps, FAST_FAIL_WAITS)
             self.assertEqual(stub.calls, [fetch_aa.METHODOLOGY_URL] + [fetch_aa.URL] * (len(FAST_FAIL_WAITS) + 1))
-            self.assertEqual((root / "aa-raw-models.json").read_bytes(),
-                             b"SENTINEL MODELS CAPTURE")
+            self.assertEqual((root / "aa-raw-models.json").read_bytes(), b"SENTINEL MODELS CAPTURE")
             self.assertEqual((root / "aa-raw-coding-agents.json").read_bytes(),
                              b"SENTINEL AGENTS CAPTURE")
             self.assertEqual(
@@ -1102,8 +1068,7 @@ class PageFetchRetryTests(unittest.TestCase):
         # capture exits -- no backoff sleep, no retry line, nothing
         # written.
         def not_found():
-            raise urllib.error.HTTPError(fetch_aa.URL, 404, "Not Found",
-                                         email.message.Message(), None)
+            raise urllib.error.HTTPError(fetch_aa.URL, 404, "Not Found", email.message.Message(), None)
 
         routes = {fetch_aa.METHODOLOGY_URL: lambda: _FakeResponse(methodology_html()), fetch_aa.URL: not_found}
         with self.capture_over_boundary(routes, seed=True) as (root, stub, sleeps, run, captured):
@@ -1115,13 +1080,10 @@ class PageFetchRetryTests(unittest.TestCase):
             self.assertIn("fetch failed", message)
             self.assertIn("404", message)
             self.assertEqual(sleeps, [], "the 404 was retried")
-            self.assertEqual(stub.calls,
-                             [fetch_aa.METHODOLOGY_URL, fetch_aa.URL],
-                             "the 404 was retried")
+            self.assertEqual(stub.calls, [fetch_aa.METHODOLOGY_URL, fetch_aa.URL], "the 404 was retried")
             self.assertNotIn("retrying", captured["stderr"])
             self.assertNotIn("wrote", captured["stdout"])
-            self.assertEqual((root / "aa-raw-models.json").read_bytes(),
-                             b"SENTINEL MODELS CAPTURE")
+            self.assertEqual((root / "aa-raw-models.json").read_bytes(), b"SENTINEL MODELS CAPTURE")
 
     def test_a_detail_route_divergence_is_merged_not_re_read(self):
         # The nesting pin, restated against the issue #200 rule. The detail
@@ -1149,14 +1111,10 @@ class PageFetchRetryTests(unittest.TestCase):
             self.assertEqual(sleeps,
                              [fetch_aa.PAGE_BACKOFF_SECONDS,
                               fetch_aa.DISPUTE_LOOK_SPACING_SECONDS])
-            self.assertIn(
-                f"retrying in {fetch_aa.PAGE_BACKOFF_SECONDS}s", stderr)
+            self.assertIn(f"retrying in {fetch_aa.PAGE_BACKOFF_SECONDS}s", stderr)
             self.assertIn("wrote aa-raw-models.json", stdout)
-            models = json.loads(
-                (root / "aa-raw-models.json").read_text(encoding="utf-8"))
-            self.assertEqual(
-                {m["slug"]: m for m in models}["fixture-model"]["intelligenceIndex"],
-                51)
+            models = json.loads((root / "aa-raw-models.json").read_text(encoding="utf-8"))
+            self.assertEqual({m["slug"]: m for m in models}["fixture-model"]["intelligenceIndex"], 51)
 
 
 class TransportErrorClassifierTests(unittest.TestCase):
@@ -1194,16 +1152,14 @@ class TransportErrorClassifierTests(unittest.TestCase):
                               (400, False), (403, False), (404, False),
                               (409, False), (451, False)):
             with self.subTest(code=code, retried=retried):
-                error = urllib.error.HTTPError(fetch_aa.URL, code, "nope",
-                                               email.message.Message(), None)
+                error = urllib.error.HTTPError(fetch_aa.URL, code, "nope", email.message.Message(), None)
 
                 def raise_it(e=error):
                     raise e
 
                 calls, sleeps = self.attempts_through_boundary(raise_it)
 
-                self.assertEqual(calls,
-                                 len(FAST_FAIL_WAITS) + 1 if retried else 1)
+                self.assertEqual(calls, len(FAST_FAIL_WAITS) + 1 if retried else 1)
                 self.assertEqual(sleeps, FAST_FAIL_WAITS[:calls - 1])
 
     def test_transport_shapes_are_all_retryable(self):
@@ -1284,8 +1240,7 @@ def look_payload(ii: float, **overrides: object) -> str:
     """A leaderboard flight payload whose fixture model carries `ii` plus
     any record overrides; the unpriced detail host is unchanged, so the
     host pick never churns."""
-    host = {"slug": "detail-host-model",
-            "intelligenceIndexCostPerTask": "$undefined"}
+    host = {"slug": "detail-host-model", "intelligenceIndexCostPerTask": "$undefined"}
     return json.dumps({
         "intro": CITED,
         "models": [host, leaderboard_record(intelligenceIndex=ii, **overrides)],
@@ -1318,8 +1273,7 @@ def priced_look(slug, total, **extra):
     """A look whose cost carries the per-evaluation breakdown shape; its
     parts sum to the total."""
     rec = _look(slug, **extra)
-    rec["intelligenceIndexCostPerTask"] = {
-        "cost": {"total": total}, "evaluations": v5_evaluations(total)}
+    rec["intelligenceIndexCostPerTask"] = {"cost": {"total": total}, "evaluations": v5_evaluations(total)}
     return rec
 
 
@@ -1335,8 +1289,7 @@ class TestCrossGenerationMerge(unittest.TestCase):
         self.assertTrue(all("genVariants" not in r for r in out))
 
     def test_speed_only_difference_is_not_a_generation(self):
-        out = fetch_aa.cross_generation_merge(
-            [[_look("a")], [_look("a", speed=999.0)]])
+        out = fetch_aa.cross_generation_merge([[_look("a")], [_look("a", speed=999.0)]])
         self.assertTrue(all("genVariants" not in r for r in out))
 
     def test_disagreement_writes_variants_canonical_order(self):
@@ -1348,19 +1301,15 @@ class TestCrossGenerationMerge(unittest.TestCase):
         canonical = sorted(looks, key=lambda c: fetch_aa.generation_key(c, universe))
         self.assertEqual([v["ii"] for v in r["genVariants"]],
                          [c[0]["intelligenceIndex"] for c in canonical])
-        self.assertEqual(r["intelligenceIndex"],
-                         r["genVariants"][0]["ii"])
+        self.assertEqual(r["intelligenceIndex"], r["genVariants"][0]["ii"])
 
     def test_reversed_look_order_identical_bytes(self):
-        x = fetch_aa.cross_generation_merge(
-            [[_look("a", ii=41.0)], [_look("a", ii=40.5)]])
-        y = fetch_aa.cross_generation_merge(
-            [[_look("a", ii=40.5)], [_look("a", ii=41.0)]])
+        x = fetch_aa.cross_generation_merge([[_look("a", ii=41.0)], [_look("a", ii=40.5)]])
+        y = fetch_aa.cross_generation_merge([[_look("a", ii=40.5)], [_look("a", ii=41.0)]])
         self.assertEqual(json.dumps(x), json.dumps(y))
 
     def test_union_of_models(self):
-        out = fetch_aa.cross_generation_merge(
-            [[_look("a"), _look("b")], [_look("a"), _look("c")]])
+        out = fetch_aa.cross_generation_merge([[_look("a"), _look("b")], [_look("a"), _look("c")]])
         self.assertEqual(sorted(m["slug"] for m in out), ["a", "b", "c"])
 
     def test_a_model_in_one_corpus_only_is_a_presence_dispute(self):
@@ -1372,9 +1321,7 @@ class TestCrossGenerationMerge(unittest.TestCase):
         # carry the record.
         corpora = [[_look("a")], [_look("a"), _look("b")]]
         universe = fetch_aa.leaderboard_universe(corpora)
-        ranked = sorted(range(len(corpora)),
-                        key=lambda i: fetch_aa.generation_key(corpora[i],
-                                                              universe))
+        ranked = sorted(range(len(corpora)), key=lambda i: fetch_aa.generation_key(corpora[i], universe))
         carrier_at = ranked.index(1)
 
         out = fetch_aa.cross_generation_merge(corpora)
@@ -1382,23 +1329,19 @@ class TestCrossGenerationMerge(unittest.TestCase):
         self.assertTrue(all("genVariants" in r for r in out))
         b = next(r for r in out if r["slug"] == "b")
         self.assertEqual(len(b["genVariants"]), 2)
-        self.assertEqual(b["genVariants"][carrier_at],
-                         fetch_aa.variant_fields(_look("b")))
+        self.assertEqual(b["genVariants"][carrier_at], fetch_aa.variant_fields(_look("b")))
         self.assertEqual(b["genVariants"][1 - carrier_at], {})
         # The carried variant is never `{}`: variant_fields emits at least
         # one field for any record the leaderboard writes.
         self.assertTrue(b["genVariants"][carrier_at])
         # The plain fields are the carrier's own values.
-        self.assertEqual(b["intelligenceIndex"],
-                         _look("b")["intelligenceIndex"])
+        self.assertEqual(b["intelligenceIndex"], _look("b")["intelligenceIndex"])
 
     def test_presence_dispute_reversed_corpora_identical_bytes(self):
         # Canonical order is ascending generation_key, so the padded corpus
         # does not depend on which corpus the caller listed first.
-        x = fetch_aa.cross_generation_merge(
-            [[_look("a")], [_look("a"), _look("b")]])
-        y = fetch_aa.cross_generation_merge(
-            [[_look("a"), _look("b")], [_look("a")]])
+        x = fetch_aa.cross_generation_merge([[_look("a")], [_look("a"), _look("b")]])
+        y = fetch_aa.cross_generation_merge([[_look("a"), _look("b")], [_look("a")]])
         self.assertEqual(json.dumps(x), json.dumps(y))
 
     def test_undefined_folds_to_missing_not_a_dispute(self):
@@ -1420,8 +1363,7 @@ class CarriedVariantNeverEmptyTests(unittest.TestCase):
     silent lie."""
 
     def test_every_committed_record_yields_a_non_empty_variant_map(self):
-        capture_path = (pathlib.Path(__file__).resolve().parent.parent
-                        / "data" / "aa-raw-models.json")
+        capture_path = pathlib.Path(__file__).resolve().parent.parent / "data" / "aa-raw-models.json"
         records = json.loads(capture_path.read_text(encoding="utf-8"))
 
         self.assertTrue(all(fetch_aa.variant_fields(m) for m in records))
@@ -1461,8 +1403,7 @@ class MultiLookCaptureTests(unittest.TestCase):
         # generation, the wiring is exactly today's (L1, D, L2, agents
         # never), the one wait is the spacing, and the corpus is byte-what
         # today's writer produces -- no genVariants key anywhere.
-        captured, sleeps, stub = self.capture_two_looks(
-            [flight_html(look_payload(51))])
+        captured, sleeps, stub = self.capture_two_looks([flight_html(look_payload(51))])
 
         self.assertEqual(stub.calls, [fetch_aa.METHODOLOGY_URL, fetch_aa.URL,
                                       self.DETAIL_URL, fetch_aa.URL])
@@ -1470,8 +1411,7 @@ class MultiLookCaptureTests(unittest.TestCase):
         self.assertFalse(captured.disputed)
         self.assertEqual(captured.generations, 1)
         self.assertTrue(all("genVariants" not in m for m in captured.models))
-        host = {"slug": "detail-host-model",
-                "intelligenceIndexCostPerTask": "$undefined"}
+        host = {"slug": "detail-host-model", "intelligenceIndexCostPerTask": "$undefined"}
         self.assertEqual(captured.models,
                          build.merge_captures(
                              [host, leaderboard_record()],
@@ -1500,12 +1440,10 @@ class MultiLookCaptureTests(unittest.TestCase):
         # leaderboard's bare total rather than another generation's parts.
         pages = [flight_html(look_payload(51)), flight_html(look_payload(52))]
         for detail_ii, filled in ((51, True), (52, False)):
-            captured, _sleeps, _stub = self.capture_two_looks(
-                pages, intelligenceIndex=detail_ii)
+            captured, _sleeps, _stub = self.capture_two_looks(pages, intelligenceIndex=detail_ii)
             record = {m["slug"]: m for m in captured.models}["fixture-model"]
             self.assertEqual(record["intelligenceIndex"], 51)
-            self.assertEqual(
-                isinstance(record["intelligenceIndexCostPerTask"], dict), filled)
+            self.assertEqual(isinstance(record["intelligenceIndexCostPerTask"], dict), filled)
 
     def test_a_speed_only_difference_between_looks_is_not_a_generation(self):
         # Review Focus 2's capture-level pin: the speed family re-samples
@@ -1515,10 +1453,8 @@ class MultiLookCaptureTests(unittest.TestCase):
         # no look's mutated key, strip its detail fills). Both looks here
         # differ ONLY on medianOutputTokensPerSecond; the capture must
         # hold the quiet shape end to end.
-        host = {"slug": "detail-host-model",
-                "intelligenceIndexCostPerTask": "$undefined"}
-        look1 = [host, leaderboard_record(intelligenceIndex=51,
-                                          medianOutputTokensPerSecond=120.0)]
+        host = {"slug": "detail-host-model", "intelligenceIndexCostPerTask": "$undefined"}
+        look1 = [host, leaderboard_record(intelligenceIndex=51, medianOutputTokensPerSecond=120.0)]
         captured, sleeps, stub = self.capture_two_looks(
             [flight_html(look_payload(51, medianOutputTokensPerSecond=120.0)),
              flight_html(look_payload(51, medianOutputTokensPerSecond=999.0))])
@@ -1529,8 +1465,7 @@ class MultiLookCaptureTests(unittest.TestCase):
         self.assertFalse(captured.disputed)
         self.assertEqual(captured.generations, 1)
         self.assertTrue(all("genVariants" not in m for m in captured.models))
-        self.assertEqual(captured.models,
-                         build.merge_captures(look1, [detail_record()]))
+        self.assertEqual(captured.models, build.merge_captures(look1, [detail_record()]))
 
     def test_a_detail_generation_matching_neither_look_fills_no_shared_model(self):
         # D a third generation: it widens no shared model that hour -- the
@@ -1558,12 +1493,9 @@ class MultiLookCaptureTests(unittest.TestCase):
         re-samples -- while the slug sets differ by exactly one model:
         solar-pro-2 present in the first look only."""
         def page(records):
-            return flight_html(json.dumps(
-                {"intro": CITED,
-                 "models": records}, separators=(",", ":")))
+            return flight_html(json.dumps({"intro": CITED, "models": records}, separators=(",", ":")))
 
-        host = {"slug": "detail-host-model",
-                "intelligenceIndexCostPerTask": "$undefined"}
+        host = {"slug": "detail-host-model", "intelligenceIndexCostPerTask": "$undefined"}
         solar = {"slug": "solar-pro-2", "name": "Solar Pro 2",
                  "intelligenceIndex": 48.5,
                  "intelligenceIndexCostPerTask": None,
@@ -1591,8 +1523,7 @@ class MultiLookCaptureTests(unittest.TestCase):
         page1, page2 = self.presence_flip_pages()
         # The detail route shows the same churned shape as the looks (its
         # own cache generation), so its fill lands on both corpora.
-        captured, sleeps, stub = self.capture_two_looks(
-            [page1, page2], intelligenceIndexCostPerTask=None)
+        captured, sleeps, stub = self.capture_two_looks([page1, page2], intelligenceIndexCostPerTask=None)
 
         self.assertEqual(stub.calls, [fetch_aa.METHODOLOGY_URL, fetch_aa.URL,
                                       self.DETAIL_URL, fetch_aa.URL])
@@ -1615,10 +1546,8 @@ class MultiLookCaptureTests(unittest.TestCase):
         # disagreement is two different slug sets, so the keys differ and
         # the corpus does not depend on which look a run read first.
         page1, page2 = self.presence_flip_pages()
-        one, _, _ = self.capture_two_looks(
-            [page1, page2], intelligenceIndexCostPerTask=None)
-        two, _, _ = self.capture_two_looks(
-            [page2, page1], intelligenceIndexCostPerTask=None)
+        one, _, _ = self.capture_two_looks([page1, page2], intelligenceIndexCostPerTask=None)
+        two, _, _ = self.capture_two_looks([page2, page1], intelligenceIndexCostPerTask=None)
 
         self.assertEqual(json.dumps(one.models), json.dumps(two.models))
 
@@ -1640,8 +1569,7 @@ class MultiLookCaptureTests(unittest.TestCase):
         # detail route omits, and exactly one generation priced it.
         host_variants = by_slug["detail-host-model"]["genVariants"]
         self.assertEqual(sorted(v["ii"] for v in host_variants), [30, 31])
-        self.assertEqual(sorted(v["cost"] for v in host_variants
-                                if "cost" in v), [1.25])
+        self.assertEqual(sorted(v["cost"] for v in host_variants if "cost" in v), [1.25])
         # Both corpora were widened by the same detail snapshot, so the
         # canonical fixture-model record carries its breakdown.
         fixture_variants = by_slug["fixture-model"]["genVariants"]
@@ -1658,21 +1586,18 @@ class GenVariantsSeamTests(unittest.TestCase):
     this is a seam pin, not a behavior re-test."""
 
     def test_a_disputed_merge_feeds_build_rows_as_gv(self):
-        disputed = fetch_aa.cross_generation_merge(
-            [[_look("a", ii=41.0)], [_look("a", ii=40.5)]])
+        disputed = fetch_aa.cross_generation_merge([[_look("a", ii=41.0)], [_look("a", ii=40.5)]])
 
         rows = build.build_rows(disputed)
 
         self.assertEqual(len(rows), 1)
-        self.assertEqual(
-            sorted(v["ii"] for v in rows[0]["gv"]), [40.5, 41.0])
+        self.assertEqual(sorted(v["ii"] for v in rows[0]["gv"]), [40.5, 41.0])
         # Canonical-first: the row's plain values are the first variant's.
         self.assertEqual(rows[0]["ii"], rows[0]["gv"][0]["ii"])
 
     def test_diff_aa_files_exactly_the_key_the_producer_writes(self):
         quiet = fetch_aa.cross_generation_merge([[_look("a")], [_look("a")]])
-        disputed = fetch_aa.cross_generation_merge(
-            [[_look("a", ii=41.0)], [_look("a", ii=40.5)]])
+        disputed = fetch_aa.cross_generation_merge([[_look("a", ii=41.0)], [_look("a", ii=40.5)]])
 
         added = {k for record in disputed for k in record} \
             - {k for record in quiet for k in record}
@@ -1773,8 +1698,7 @@ class CrossRunPresenceMergeTests(unittest.TestCase):
         b = out[1]
         corpora = [[_look("b", ii=48.5)], [_look("a")]]
         universe = fetch_aa.leaderboard_universe(corpora)
-        ranked = sorted(range(2), key=lambda i: fetch_aa.generation_key(
-            corpora[i], universe))
+        ranked = sorted(range(2), key=lambda i: fetch_aa.generation_key(corpora[i], universe))
         prev_at = ranked.index(0)
 
         carried_at = next(i for i, v in enumerate(b["genVariants"]) if v)
@@ -1797,8 +1721,7 @@ class CrossRunPresenceMergeTests(unittest.TestCase):
         # neither merges nor disputes again -- the model settles out and
         # every record is clean. THIS is what keeps a stable retirement
         # from being pinned disputed forever.
-        prev = [_look("a"), dict(_look("b", ii=48.5),
-                                 **{fetch_aa.CROSS_RUN_KEY: True})]
+        prev = [_look("a"), dict(_look("b", ii=48.5), **{fetch_aa.CROSS_RUN_KEY: True})]
         out, cross_run = self.merge([_look("a")], prev)
 
         self.assertEqual((cross_run.dropped, cross_run.readded), ([], []))
@@ -1826,8 +1749,7 @@ class CrossRunPresenceMergeTests(unittest.TestCase):
         c2 = [_look("a", ii=41.0)]
         models = fetch_aa.cross_generation_merge([c1, c2])
 
-        out, cross_run = self.merge(models, [_look("a"), _look("b", ii=48.5)],
-                                    run_corpora=[c1, c2])
+        out, cross_run = self.merge(models, [_look("a"), _look("b", ii=48.5)], run_corpora=[c1, c2])
 
         self.assertEqual(cross_run.dropped, ["b"])
         b = next(m for m in out if m["slug"] == "b")
@@ -1856,8 +1778,7 @@ class CrossRunPresenceMergeTests(unittest.TestCase):
         # AA serves it again. The hour of the return is one red readd
         # (no marker -- the fresh fetch is serving evidence), and the
         # hour after is clean.
-        marked = dict(_look("b", ii=48.5),
-                      **{fetch_aa.CROSS_RUN_KEY: True})
+        marked = dict(_look("b", ii=48.5), **{fetch_aa.CROSS_RUN_KEY: True})
         current = [_look("a"), _look("b", ii=48.5)]
 
         out, cross_run = self.merge(current, [_look("a"), marked])
@@ -1877,8 +1798,7 @@ class CrossRunPresenceMergeTests(unittest.TestCase):
         out, cross_run = self.merge([_look("a"), _look("b")], [{"x": 1}])
 
         self.assertEqual((cross_run.dropped, cross_run.readded), ([], []))
-        self.assertEqual(json.dumps(out),
-                         json.dumps([_look("a"), _look("b")]))
+        self.assertEqual(json.dumps(out), json.dumps([_look("a"), _look("b")]))
 
     def test_a_disputed_previous_capture_is_read_canonically(self):
         # The previous run disputed b's own value (two in-run variants);
@@ -1915,8 +1835,7 @@ class CrossRunPresenceMergeTests(unittest.TestCase):
         b_gv = by_slug["b"]["genVariants"]
         self.assertEqual(len(b_gv), 3)
         self.assertEqual(sum(1 for v in b_gv if not v), 1)
-        self.assertEqual(sorted(v["ii"] for v in b_gv if v),
-                         [48.5, 48.5])
+        self.assertEqual(sorted(v["ii"] for v in b_gv if v), [48.5, 48.5])
         self.assertEqual(len(by_slug["a"]["genVariants"]), 2)
 
     def test_the_layer_adds_exactly_two_synthetic_keys(self):
@@ -1931,10 +1850,8 @@ class CrossRunPresenceMergeTests(unittest.TestCase):
         added = {k for record in marked for k in record} \
             - {k for record in quiet for k in record}
 
-        self.assertEqual(added,
-                         {diff_aa.DISPUTES_KEY, fetch_aa.CROSS_RUN_KEY})
-        self.assertEqual(diff_aa.classify(fetch_aa.CROSS_RUN_KEY),
-                         diff_aa.DISPUTES_CLASS)
+        self.assertEqual(added, {diff_aa.DISPUTES_KEY, fetch_aa.CROSS_RUN_KEY})
+        self.assertEqual(diff_aa.classify(fetch_aa.CROSS_RUN_KEY), diff_aa.DISPUTES_CLASS)
 
     def test_the_marker_never_reaches_the_page_rows(self):
         # build_rows reads named fields; the dispute marker is capture-side
@@ -1980,12 +1897,9 @@ class CrossRunCaptureTests(unittest.TestCase):
         capture's corpus lacks it. Same churned-value shape as
         MultiLookCaptureTests.presence_flip_pages."""
         def page(records):
-            return flight_html(json.dumps(
-                {"intro": CITED,
-                 "models": records}, separators=(",", ":")))
+            return flight_html(json.dumps({"intro": CITED, "models": records}, separators=(",", ":")))
 
-        host = {"slug": "detail-host-model",
-                "intelligenceIndexCostPerTask": "$undefined"}
+        host = {"slug": "detail-host-model", "intelligenceIndexCostPerTask": "$undefined"}
         solar = {"slug": "solar-pro-2", "name": "Solar Pro 2",
                  "intelligenceIndex": 48.5,
                  "intelligenceIndexCostPerTask": None,
@@ -2011,11 +1925,9 @@ class CrossRunCaptureTests(unittest.TestCase):
         without = self.capture_with_prev(pages, None)
         with_prev = self.capture_with_prev(pages, prev)
 
-        self.assertEqual(json.dumps(with_prev.models),
-                         json.dumps(without.models))
+        self.assertEqual(json.dumps(with_prev.models), json.dumps(without.models))
         self.assertFalse(with_prev.disputed)
-        self.assertEqual((with_prev.cross_run.dropped,
-                          with_prev.cross_run.readded), ([], []))
+        self.assertEqual((with_prev.cross_run.dropped, with_prev.cross_run.readded), ([], []))
 
     def test_the_live_flip_is_caught_against_the_previous_capture(self):
         prev = [{"slug": "detail-host-model",
@@ -2026,9 +1938,7 @@ class CrossRunCaptureTests(unittest.TestCase):
         captured = self.capture_with_prev(self.flip_pages(), prev)
 
         self.assertTrue(captured.disputed)
-        self.assertEqual((captured.cross_run.dropped,
-                          captured.cross_run.readded),
-                         ([], ["solar-pro-2"]))
+        self.assertEqual((captured.cross_run.dropped, captured.cross_run.readded), ([], ["solar-pro-2"]))
         by_slug = {m["slug"]: m for m in captured.models}
         solar = by_slug["solar-pro-2"]
         self.assertEqual(len(solar["genVariants"]), 2)
@@ -2055,8 +1965,7 @@ class CrossRunLookbackFlagTests(unittest.TestCase):
         """fetch_aa.main() over a stubbed urlopen, with an optional
         previous capture staged at OUT. -> (stdout, OUT text after the
         run, the SystemExit or None)."""
-        agents = flight_html(agent_payload(
-            [agent_row(f"Agent - Model {i}") for i in range(5)]))
+        agents = flight_html(agent_payload([agent_row(f"Agent - Model {i}") for i in range(5)]))
         stub = LoudUrlopenStub({
             fetch_aa.METHODOLOGY_URL: lambda: _FakeResponse(methodology_html()),
             fetch_aa.URL: lambda: _FakeResponse(
@@ -2081,8 +1990,7 @@ class CrossRunLookbackFlagTests(unittest.TestCase):
             return buffer.getvalue(), fetch_aa.OUT.read_text(encoding="utf-8"), exit_exc
 
     def prev_without_fixture(self):
-        host = {"slug": "detail-host-model",
-                "intelligenceIndexCostPerTask": "$undefined"}
+        host = {"slug": "detail-host-model", "intelligenceIndexCostPerTask": "$undefined"}
         return json.dumps([host], indent=1)
 
     def test_without_the_flag_a_presence_diff_is_not_a_dispute(self):
@@ -2090,8 +1998,7 @@ class CrossRunLookbackFlagTests(unittest.TestCase):
         # fixture-model, the fresh fetch serves it, and -- with no flag --
         # the corpus stays byte-clean. Drift checks and manual runs must
         # not start disputing against a stale tree.
-        stdout, out_text, _exit = self.run_main(
-            ["fetch_aa.py"], prev_text=self.prev_without_fixture())
+        stdout, out_text, _exit = self.run_main(["fetch_aa.py"], prev_text=self.prev_without_fixture())
         models = json.loads(out_text)
 
         self.assertNotIn("cross-run presence", stdout)
@@ -2109,14 +2016,12 @@ class CrossRunLookbackFlagTests(unittest.TestCase):
         self.assertIn("cross-run presence", stdout)
         self.assertIn("fixture-model", stdout)
         self.assertEqual(len(models), 2)
-        fixture = next(m for m in models
-                       if m["slug"] == "fixture-model")
+        fixture = next(m for m in models if m["slug"] == "fixture-model")
         self.assertEqual(len(fixture["genVariants"]), 2)
         self.assertEqual(sum(1 for v in fixture["genVariants"] if not v), 1)
 
     def test_a_missing_previous_capture_is_no_lookback(self):
-        stdout, out_text, _exit = self.run_main(
-            ["fetch_aa.py", "--cross-run-lookback"])
+        stdout, out_text, _exit = self.run_main(["fetch_aa.py", "--cross-run-lookback"])
         models = json.loads(out_text)
 
         self.assertNotIn("cross-run presence", stdout)
@@ -2185,8 +2090,7 @@ class TestGenerationRevisit(unittest.TestCase):
         agents = self.root / "agents.html"
         payload = json.loads(look_payload(ii, **extra))
         payload["models"].extend(extra_rows)
-        base.write_text(flight_html(json.dumps(payload, separators=(",", ":"))),
-                        encoding="utf-8")
+        base.write_text(flight_html(json.dumps(payload, separators=(",", ":"))), encoding="utf-8")
         detail.write_text(flight_html(detail_payload(
             intelligenceIndex=ii, **(detail_fields or {}))),
                           encoding="utf-8")
@@ -2200,8 +2104,7 @@ class TestGenerationRevisit(unittest.TestCase):
 
         def between_looks(_seconds):
             if second is not None:
-                base.write_text(flight_html(look_payload(second, **extra)),
-                                encoding="utf-8")
+                base.write_text(flight_html(look_payload(second, **extra)), encoding="utf-8")
         stdout = io.StringIO()
         with unittest.mock.patch.object(sys, "argv", argv), \
                 unittest.mock.patch.object(fetch_aa, "_today", create=True,
@@ -2377,8 +2280,7 @@ class TestGenerationRevisit(unittest.TestCase):
         self.run_hour(50, extra_rows=[extra])
         self.run_hour(50, extra_rows=[extra])
         models, _ = self.run_hour(40)
-        self.assertTrue(next(m for m in models if m["slug"] == "extra-model")
-                        ["crossRunMerged"])
+        self.assertTrue(next(m for m in models if m["slug"] == "extra-model")["crossRunMerged"])
         self.run_hour(40)
         models, _ = self.run_hour(50, extra_rows=[extra])
         self.assertIsNotNone(self.state()["held"])
