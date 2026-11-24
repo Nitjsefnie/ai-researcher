@@ -1,28 +1,28 @@
 {
   "trees": {
-    "tests/": 29254
+    "tests/": 29220
   },
   "schema_version": 1,
   "baseline": {
     ".github/workflows/refresh.yml": 1301,
-    "build.py": 2626,
+    "build.py": 2625,
     "scripts/ci/check_ratchets.py": 618,
     "scripts/ci/gate_base_freshness.py": 700,
     "scripts/ci/install_chromium.py": 636,
     "scripts/ci/perf_budgets.py": 723,
     "scripts/diff_aa.py": 799,
-    "scripts/fetch_aa.py": 1247,
-    "tests/test_browser.py": 2755,
+    "scripts/fetch_aa.py": 1243,
+    "tests/test_browser.py": 2742,
     "tests/test_build.py": 2361,
     "tests/test_build_rankings.py": 567,
-    "tests/test_capture_gate.py": 1172,
+    "tests/test_capture_gate.py": 1154,
     "tests/test_ci_gate_modules.py": 583,
     "tests/test_ci_install_chromium.py": 1077,
     "tests/test_ci_instruction_budgets.py": 503,
     "tests/test_ci_perf_budgets.py": 778,
     "tests/test_ci_ratchets.py": 1454,
-    "tests/test_diff_aa.py": 1246,
-    "tests/test_fetch_aa.py": 2676,
+    "tests/test_diff_aa.py": 1212,
+    "tests/test_fetch_aa.py": 2334,
     "tests/test_gate_base_freshness.py": 866,
     "tests/test_refresh_workflow.py": 2568
   }
