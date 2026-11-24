@@ -29,7 +29,7 @@ pair is a score and a cost AA measured on the same run:
 | chart | y | AA source | one row is |
 |---|---|---|---|
 | Coding agents | Coding Agent Index v2.0 | `/agents/coding-agents` | an agent + a model |
-| Intelligence | Intelligence Index v5.0 | leaderboard + model detail | a model |
+| Intelligence | Intelligence Index | leaderboard + model detail | a model |
 | GDPval-AA | GDPval-AA v2.1 (Elo) | Elo: leaderboard + model detail; cost: `/evaluations/gdpval-aa` and its data file | a model |
 | Parameter efficiency | Intelligence Index vs parameters | leaderboard + model detail | a model |
 
@@ -76,13 +76,13 @@ python3 ~/.agent-bundle/scripts/docs_hub.py publish ./out/frontier-models.html \
 ```
 
 `fetch_aa.py` exits nonzero when the flight payload or the model schema changes
-shape, when AA bumps the Intelligence Index version `build.py` is pinned to,
-when a fetched cost breakdown's slugs stop matching that version's exactly or its
-costs stop summing to the published total — except an all-dropped window hour,
-which is reported and returned — when the GDPval-AA evaluation
-page stops naming v2.1, or its data file is missing, undecryptable on every
-read it is given (a live run reads page and data up to twice, a cached input
-once), or changes schema (the message names the file) — or when the Coding
+shape, when AA's methodology page stops giving a readable Intelligence Index
+composition or the run's reads do not confirm it (the rules are in `AGENTS.md`),
+when a cost breakdown's costs stop summing to the published total — except an
+all-dropped window hour, which is reported and returned — when the GDPval-AA
+evaluation page stops naming v2.1, or its data file is missing, undecryptable on
+every read it is given (a live run reads page and data up to twice, a cached
+input once), or changes schema (the message names the file) — or when the Coding
 Agent Index table collapses. `build.py` refuses to write a page with an empty
 chart on it — except an AA update-window hour whose every empty chart traces to
 a route the capture recorded as withheld, which holds the last good page

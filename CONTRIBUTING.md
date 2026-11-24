@@ -368,9 +368,9 @@ cells showed both routes' values. It no longer reacts at all, because there is
 nothing to react to: the leaderboard route is the fresh one and is published,
 the detail route fills fields a shared leaderboard record omits. A disagreement
 is resolved by fixed precedence rather than by a state. So the only scheduled
-commit is `chore(capture): N models, …`, there is no disagreement that turns a
-run red, and the published document only moves forward. The two rules that
-matter when you touch the capture are in AGENTS.md — the leaderboard-wins
+commit is `chore(capture): N models, …`, there is no value disagreement that
+turns a run red, and the published document only moves forward. The two rules
+that matter when you touch the capture are in AGENTS.md — the leaderboard-wins
 precedence and the breakdown-drop guard at the cost shape split. The dispute-layer
 detail is in "Capture dispute layers" below.
 Membership is the union of both routes (issue #266): detail-only retired models
@@ -379,12 +379,16 @@ values can lag a generation.
 
 Every hour `fetch_aa.py` writes the route evidence
 `data/cost-breakdown-window.txt` beside the capture (issue #441): the in-run
-generation count and whether the detail and GDPval-AA evaluation reads were
-withheld. Its content is the evidence, not its presence:
-`build.read_route_evidence` is its one parser, and `guard_empty_axes` decides
-from the result. With ≥ 2 generations and every empty axis traced to a withheld
-route (parameters: detail, agentic: evaluation), the last good page holds and
-the message names the count. Detail-only rows that
+generation count, whether the detail and GDPval-AA evaluation reads were
+withheld, and the confirmed index composition (its version, then each
+evaluation's slug, weight and name). Its content is the evidence, not its
+presence: `build.match_route_evidence` is its one parser, and a text other than
+an exact rendering records nothing; the three lines alone record no composition.
+`read_index_composition` reads the composition for the page's footer and for
+the next run's `confirm_composition`; `guard_empty_axes` decides from what
+`read_route_evidence` returns. With ≥ 2 generations and every empty axis traced
+to a withheld route (parameters: detail, agentic: evaluation), the last good
+page holds and the message names the count. Detail-only rows that
 rescue parameters publish fully; unplottable extras leave the hold intact.
 Other empty axes refuse, naming the count when there are several; only absent,
 unparseable or one-generation evidence reads as a shape change. The capture
