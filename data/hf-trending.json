@@ -11,9 +11,6 @@
       "id": "inworld/voice-isolator"
     },
     {
-      "id": "tencent/Hy4-flash"
-    },
-    {
       "id": "AtomicChat/Inkling-2-Mini-Uncensored-GGUF"
     },
     {
@@ -21,6 +18,9 @@
     },
     {
       "id": "higurashi-ai/Haru-4B"
+    },
+    {
+      "id": "tencent/Hy4-flash"
     },
     {
       "id": "SulphurAI/Sulphur-3"
