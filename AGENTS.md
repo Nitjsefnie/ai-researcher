@@ -54,7 +54,7 @@ reasoning model costs more than its sticker price — the point of using it.
   record, so nothing is reweighted. The unit is agent+model+harness (Claude Code
   on Opus 5 (xhigh) ≠ Codex on the same model): AA measured the harness too.
 - **Intelligence Index v5.0**: AA-Briefcase v1.1, AutomationBench-AA, GDP.pdf,
-  FrontierCode 2.0, Terminal-Bench 4.0, Terminal-Bench-Science 0.1, CritPt v2
+  FrontierCode 2.0, Terminal-Bench 4.1, Terminal-Bench-Science 0.1, CritPt v2
   (Hard Subset), AA-Omniscience v1.1, HLE-Diamond, in four categories at 25%
   each. Cost is AA's `cost.total`.
 - **GDPval-AA v2.1**: one evaluation, outside the Intelligence Index; the

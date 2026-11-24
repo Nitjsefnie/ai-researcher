@@ -271,7 +271,7 @@ def test_historical_parameter_time_and_frontier_loss_is_restored():
                         {"slug": "aa-briefcase", "weightedCostPerTask": 0.14759783137736707},
                         {"slug": "gdpval-aa", "weightedCostPerTask": 0.0335808784225709},
                         {"slug": "automationbench-aa", "weightedCostPerTask": 0.0016171765955884324},
-                        {"slug": "terminalbench-4-0", "weightedCostPerTask": 0.08891509918482425},
+                        {"slug": "terminalbench-4-1", "weightedCostPerTask": 0.08891509918482425},
                         {"slug": "scicode", "weightedCostPerTask": 0.0013985710069444445},
                         {"slug": "humanitys-last-exam", "weightedCostPerTask": 0.002165517108433735},
                         {"slug": "gdp-pdf", "weightedCostPerTask": 0.0031873035500000002},
