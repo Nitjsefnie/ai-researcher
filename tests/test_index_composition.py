@@ -148,13 +148,15 @@ def test_a_fetched_breakdown_off_the_composition_exits_even_when_it_is_the_recor
 @pytest.mark.parametrize("arguments", [
     given(recorded=COMPOSITION), given(recorded=COMPOSITION, slugs=None), given(recorded=COMPOSITION[::-1], slugs=None),
     given(recorded=recomposed(**SWAP)), given(recorded=recomposed(**SWAP), versions=("5.0.1", "5.0", None, "5.0.2")),
+    given(recorded=recomposed(**SWAP), before=None), given(recorded=[(f"old-{slug}", *rest) for slug, *rest in COMPOSITION]),
     given(recorded=recomposed(hle_diamond=None, gdp_pdf=None, a=10, b=5)),
     given(recorded=recomposed(**REBALANCE), versions=(VERSION,) * 4, before="5.0"),
     given(recorded=recomposed(**REBALANCE), versions=(VERSION,) * 4),
     given(recorded=recomposed(scicode=5, aa_briefcase=10), versions=(VERSION,) * 4),
     given(recorded=recomposed(gdp_pdf=None, aa_briefcase=20), versions=(VERSION,) * 4),
     given(versions=(VERSION,) * 4)],
-    ids=["unchanged", "unchanged-no-breakdown", "reordered", "swap-unnamed", "swap-versions-differ", "two-swaps",
+    ids=["unchanged", "unchanged-no-breakdown", "reordered", "swap-unnamed", "swap-versions-differ",
+         "swap-unnamed-record", "every-slug-swapped", "two-swaps",
          "rebalance", "rebalance-same-version", "dropped", "added", "none-recorded"])
 def test_a_confirmed_composition_passes(arguments):
     confirm(**arguments)

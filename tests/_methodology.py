@@ -46,7 +46,7 @@ def methodology_payload(suite=SUITE, catalog=None):
     for row in rows[2:3]:
         cells = row[3]["children"]
         outlined = {f"{0x58 + i:x}": cell for i, cell in enumerate(cells)}
-        row[3]["children"] = [f"$L{0x58 + i:x}" for i in range(len(cells))]
+        row[3]["children"] = [f"${'L' * (i != 2)}{0x58 + i:x}" for i in range(len(cells))]
     outlined.update({f"{0x5e + i:x}": row for i, row in enumerate(rows[3:])})
     header = ["$", "tr", None, {"children": [["$", "th", key, {"children": text}] for key, text in (
         ("evaluation", "Evaluation"), ("intelligence-index-weighting", ["Intelligence ", ["$", "br", "br0", {}], " Index"]))]}]

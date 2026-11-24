@@ -321,7 +321,7 @@ class CarriedBreakdownSlugTests(unittest.TestCase):
         self.assertEqual(carried["intelligenceIndexCostPerTask"],
                          departed["intelligenceIndexCostPerTask"])
 
-    def test_a_fetched_breakdown_off_the_pinned_slugs_still_exits(self):
+    def test_a_fetched_breakdown_off_the_composition_still_exits(self):
         stale = {"cost": {"total": 0.75}, "evaluations": [
             {"slug": "scicode", "weightedCostPerTask": 0.75}]}
 
@@ -337,7 +337,7 @@ class CarriedBreakdownSlugTests(unittest.TestCase):
         self.assertIn("fixture-model: cost breakdown slugs left", str(exit_exc))
         self.assertEqual(out_text, prev)
 
-    def test_a_detail_only_breakdown_off_the_pinned_slugs_still_exits(self):
+    def test_a_detail_only_breakdown_off_the_composition_still_exits(self):
         # A model only the detail route lists is part of this run's fetch.
         stale = {"slug": "detail-only-model", "intelligenceIndex": 40,
                  "intelligenceIndexCostPerTask": {"cost": {"total": 0.75}, "evaluations": [
