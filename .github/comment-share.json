@@ -192,8 +192,8 @@
     10113
   ],
   "tests/test_refresh_workflow.py": [
-    21636,
-    107920
+    21632,
+    107971
   ],
   "tests/test_workflow_ci_gate.py": [
     3351,
