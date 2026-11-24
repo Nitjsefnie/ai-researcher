@@ -1,3 +1,13 @@
 in-run generations: 2
 detail fills withheld: no
 evaluation costs withheld: no
+index version: 5.0.2
+index evaluation: aa-briefcase 15% AA-Briefcase v1.1
+index evaluation: automationbench-aa 5% AutomationBench-AA
+index evaluation: gdp-pdf 5% GDP.pdf
+index evaluation: frontiercode-2-0 15% FrontierCode-AA 2.0
+index evaluation: terminalbench-4-1 10% Terminal-Bench 4.1
+index evaluation: terminal-bench-science 15% Terminal-Bench-Science 0.1
+index evaluation: critpt-v2-hard 10% CritPt v2 (Hard Subset)
+index evaluation: omniscience 15% AA-Omniscience v1.1
+index evaluation: hle-diamond 10% HLE-Diamond
