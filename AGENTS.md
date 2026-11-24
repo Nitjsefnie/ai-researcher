@@ -213,19 +213,23 @@ or hand-fix JSON — when:
   it needs an index-flagged catalog entry, one name, slug and positive
   percentage per evaluation, no duplicate slug or name, and weights summing to
   100%. A slug is the index-flagged catalog entry's for the evaluation's name; a
-  name no catalog entry carries takes its table row's key, so a display-name
-  mismatch refuses unless that key is the breakdown's slug;
+  name no catalog entry carries takes its table row's key;
 - **this run's reads do not confirm that composition** (`confirm_composition`).
   This matters most: AA publishes the weights only on its methodology page, so a
   rebalance leaves every payload field well-formed. Every cost breakdown this
   run fetched and the merge kept must have exactly the composition's slugs
   (records the look-back carries in from the previous capture were judged when
-  captured). Slugs or weights other than the recorded ones (route evidence,
-  below) also need at least one such breakdown, and must either replace recorded
-  evaluations one for one at their weights or come with one version named by the
-  methodology page, both leaderboard looks and the detail page. Only that
-  agreement confirms a rebalance, and one on the already-recorded version
-  counts: a weight-only change under it passes, a known limitation;
+  captured), so a display name that resolves to another slug (one the catalog
+  lacks, on a row with a different key) refuses here. Slugs or weights other than
+  the recorded ones (route evidence, below) also need at least one such
+  breakdown, and must either replace recorded evaluations one for one at their
+  weights or come with one version named by the methodology page, both
+  leaderboard looks and the detail page. Only that agreement confirms a
+  rebalance, and one on the already-recorded version counts; it does not date the
+  leaderboard's numbers. Known limitations: a weight-only change under that
+  version passes; and evaluation names are taken from the methodology page
+  unconfirmed, so an evaluation replaced under an unchanged slug shows its new
+  name over the old costs until they catch up (the costs are unaffected);
 - per-evaluation costs stop summing to the published total — except an
   all-dropped window hour, which is reported and returned;
 - the GDPval-AA evaluation page's title stops naming `fetch_gdpval.py`'s
