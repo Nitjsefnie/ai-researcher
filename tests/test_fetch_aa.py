@@ -49,6 +49,28 @@ def flight_html(*payloads: str) -> str:
         for p in payloads)
 
 
+@contextlib.contextmanager
+def capture_into(root: pathlib.Path, *argv: str, sleep=lambda _seconds: None):
+    """fetch_aa.main()'s outputs under `root` and its flags, with the sleep
+    seam (the dispute-look spacing wait, issue #208) stubbed."""
+    with unittest.mock.patch.multiple(
+            fetch_aa, ROOT=root, OUT=root / "aa-raw-models.json", AGENTS_OUT=root / "aa-raw-coding-agents.json",
+            STAMP=root / "captured-at.txt", _sleep=sleep), \
+            unittest.mock.patch.object(sys, "argv", ["fetch_aa.py", *argv]):
+        yield
+
+
+def cached_pages(root: pathlib.Path, methodology: str) -> list[str]:
+    """Every page main() reads cached under `root`, as its flags: with all of
+    them passed, no test can reach the real network."""
+    pages = {"html": flight_html(leaderboard_payload()), "detail-html": flight_html(detail_payload()),
+             "agents-html": flight_html(agent_payload([agent_row(f"Agent - Model {i}") for i in range(5)])),
+             "methodology-html": methodology}
+    for flag, html in pages.items():
+        (root / flag).write_text(html, encoding="utf-8")
+    return [text for flag in pages for text in (f"--{flag}", str(root / flag))]
+
+
 def model(fields: int, tag: str) -> dict:
     return {f"f{i}": f"{tag}{i}" for i in range(fields)}
 
@@ -757,44 +779,13 @@ class CaptureGapFillWiringTests(unittest.TestCase):
         # gaps, and it states the rule the capture ran under.
         with tempfile.TemporaryDirectory(prefix=".issue-200-log-") as tmp:
             root = pathlib.Path(tmp)
-            pages = [root / name for name in
-                     ("leaderboard.html", "detail.html", "agents.html",
-                      "methodology.html")]
-            payloads = (leaderboard_payload(), detail_payload(),
-                        agent_payload([agent_row(f"Agent - Model {i}")
-                                       for i in range(5)]))
-            for path, payload in zip(pages, payloads):
-                path.write_text(flight_html(payload), encoding="utf-8")
-            # The methodology page is plain HTML -- the pin reads the page
-            # text directly, no flight wrapper (issue #220).
-            pages[3].write_text(methodology_html(), encoding="utf-8")
             # A window hour's evidence left beside the previous capture.
             (root / build.ROUTE_EVIDENCE_NAME).write_text(
                 build.render_route_evidence(4, True, True), encoding="utf-8")
-            old = (fetch_aa.ROOT, fetch_aa.OUT, fetch_aa.AGENTS_OUT,
-                   fetch_aa.STAMP)
-            argv = sys.argv
-            try:
-                fetch_aa.ROOT = root
-                fetch_aa.OUT = root / "aa-raw-models.json"
-                fetch_aa.AGENTS_OUT = root / "aa-raw-coding-agents.json"
-                fetch_aa.STAMP = root / "captured-at.txt"
-                sys.argv = ["fetch_aa.py", "--html", str(pages[0]),
-                            "--detail-html", str(pages[1]),
-                            "--agents-html", str(pages[2]),
-                            "--methodology-html", str(pages[3])]
-                buffer = io.StringIO()
-                # The dispute-look spacing wait (issue #208) is real in
-                # production and stubbed at the seam like every other wait.
-                with contextlib.redirect_stdout(buffer), \
-                        unittest.mock.patch.object(fetch_aa, "_sleep",
-                                                   side_effect=lambda s: None):
-                    legacy_main()
-                evidence = (root / build.ROUTE_EVIDENCE_NAME).read_text(encoding="utf-8")
-            finally:
-                sys.argv = argv
-                (fetch_aa.ROOT, fetch_aa.OUT, fetch_aa.AGENTS_OUT,
-                 fetch_aa.STAMP) = old
+            buffer = io.StringIO()
+            with contextlib.redirect_stdout(buffer), capture_into(root, *cached_pages(root, methodology_html())):
+                legacy_main()
+            evidence = (root / build.ROUTE_EVIDENCE_NAME).read_text(encoding="utf-8")
 
         stdout = buffer.getvalue()
         self.assertIn("/models/detail-host-model", stdout)
@@ -816,38 +807,10 @@ class CaptureGapFillWiringTests(unittest.TestCase):
         # named for the operator who reads the log.
         with tempfile.TemporaryDirectory(prefix=".issue-220-log-") as tmp:
             root = pathlib.Path(tmp)
-            pages = [root / name for name in
-                     ("leaderboard.html", "detail.html", "agents.html",
-                      "methodology.html")]
-            payloads = (leaderboard_payload(), detail_payload(),
-                        agent_payload([agent_row(f"Agent - Model {i}")
-                                       for i in range(5)]))
-            for path, payload in zip(pages, payloads):
-                path.write_text(flight_html(payload), encoding="utf-8")
-            pages[3].write_text(methodology_html(None), encoding="utf-8")
-            old = (fetch_aa.ROOT, fetch_aa.OUT, fetch_aa.AGENTS_OUT,
-                   fetch_aa.STAMP)
-            argv = sys.argv
-            stderr = io.StringIO()
-            try:
-                fetch_aa.ROOT = root
-                fetch_aa.OUT = root / "aa-raw-models.json"
-                fetch_aa.AGENTS_OUT = root / "aa-raw-coding-agents.json"
-                fetch_aa.STAMP = root / "captured-at.txt"
-                sys.argv = ["fetch_aa.py", "--html", str(pages[0]),
-                            "--detail-html", str(pages[1]),
-                            "--agents-html", str(pages[2]),
-                            "--methodology-html", str(pages[3])]
-                buffer = io.StringIO()
-                with contextlib.redirect_stdout(buffer), \
-                        contextlib.redirect_stderr(stderr), \
-                        unittest.mock.patch.object(fetch_aa, "_sleep",
-                                                   side_effect=lambda s: None):
-                    legacy_main()
-            finally:
-                sys.argv = argv
-                (fetch_aa.ROOT, fetch_aa.OUT, fetch_aa.AGENTS_OUT,
-                 fetch_aa.STAMP) = old
+            buffer, stderr = io.StringIO(), io.StringIO()
+            with contextlib.redirect_stdout(buffer), contextlib.redirect_stderr(stderr), \
+                    capture_into(root, *cached_pages(root, methodology_html(None))):
+                legacy_main()
 
         stdout = buffer.getvalue()
         self.assertIn("wrote aa-raw-models.json", stdout)
@@ -877,65 +840,24 @@ class AtomicCaptureWritesTests(unittest.TestCase):
         returns the capture's stdout."""
         with tempfile.TemporaryDirectory(prefix=".issue-66-atomic-") as tmp:
             root = pathlib.Path(tmp)
-            pages = [root / name for name in
-                     ("leaderboard.html", "detail.html", "agents.html",
-                      "methodology.html")]
-            payloads = (leaderboard_payload(), detail_payload(),
-                        agent_payload([agent_row(f"Agent - Model {i}")
-                                       for i in range(5)]))
-            for path, payload in zip(pages, payloads):
-                path.write_text(flight_html(payload), encoding="utf-8")
-            # The methodology page is plain HTML, no flight wrapper (issue
-            # #220), and it must be cached for these tests: with every page
-            # flag passed, no test here can reach the real network.
-            pages[3].write_text(methodology_html(), encoding="utf-8")
-            old = (fetch_aa.ROOT, fetch_aa.OUT, fetch_aa.AGENTS_OUT,
-                   fetch_aa.STAMP)
-            argv = sys.argv
-            patcher = None
-            if replace_raiser is not None:
-                # The real os module: the boundary the fix writes through,
-                # patched where it lives rather than through fetch_aa's
-                # attribute, so the pin cannot be defeated by an import
-                # reshuffle.
-                patcher = unittest.mock.patch.object(
-                    os, "replace", side_effect=replace_raiser)
-            try:
-                fetch_aa.ROOT = root
-                fetch_aa.OUT = root / "aa-raw-models.json"
-                fetch_aa.AGENTS_OUT = root / "aa-raw-coding-agents.json"
-                fetch_aa.STAMP = root / "captured-at.txt"
+            # The real os module: the boundary the fix writes through,
+            # patched where it lives rather than through fetch_aa's
+            # attribute, so the pin cannot be defeated by an import reshuffle.
+            injected = (contextlib.nullcontext() if replace_raiser is None
+                        else unittest.mock.patch.object(os, "replace", side_effect=replace_raiser))
+            with capture_into(root, *cached_pages(root, methodology_html())), injected:
                 # The previous capture, as a crashed run would have left it.
                 fetch_aa.OUT.write_bytes(b"PREVIOUS MODELS CAPTURE")
                 fetch_aa.AGENTS_OUT.write_bytes(b"PREVIOUS AGENTS CAPTURE")
                 fetch_aa.STAMP.write_text("2020-01-01\n", encoding="utf-8")
-                sys.argv = ["fetch_aa.py", "--html", str(pages[0]),
-                            "--detail-html", str(pages[1]),
-                            "--agents-html", str(pages[2]),
-                            "--methodology-html", str(pages[3])]
-                if patcher is not None:
-                    patcher.start()
 
                 def run() -> str:
                     buffer = io.StringIO()
-                    # The dispute-look spacing wait (issue #208) is real in
-                    # production and stubbed at the seam like every other
-                    # wait; a recorder here would only restate that the
-                    # healthy path waits once.
-                    with contextlib.redirect_stdout(buffer), \
-                            unittest.mock.patch.object(
-                                fetch_aa, "_sleep",
-                                side_effect=lambda s: None):
+                    with contextlib.redirect_stdout(buffer):
                         legacy_main()
                     return buffer.getvalue()
 
                 yield root, run
-            finally:
-                if patcher is not None:
-                    patcher.stop()
-                sys.argv = argv
-                (fetch_aa.ROOT, fetch_aa.OUT, fetch_aa.AGENTS_OUT,
-                 fetch_aa.STAMP) = old
 
     def test_a_failed_replace_leaves_the_previous_capture_byte_identical(self):
         # The write boundary fails after the staging file is written: the
@@ -1079,30 +1001,12 @@ class TransportErrorTests(unittest.TestCase):
         """fetch_aa.main() over the stubbed urlopen, no cache flags: every
         page comes through the stub. -> (stub, SystemExit-free stdout)."""
         stub = LoudUrlopenStub(routes)
-        with tempfile.TemporaryDirectory(prefix=".issue-66-transport-") as tmp:
-            root = pathlib.Path(tmp)
-            old = (fetch_aa.ROOT, fetch_aa.OUT, fetch_aa.AGENTS_OUT,
-                   fetch_aa.STAMP)
-            argv = sys.argv
-            try:
-                fetch_aa.ROOT = root
-                fetch_aa.OUT = root / "aa-raw-models.json"
-                fetch_aa.AGENTS_OUT = root / "aa-raw-coding-agents.json"
-                fetch_aa.STAMP = root / "captured-at.txt"
-                sys.argv = ["fetch_aa.py"]
-                with unittest.mock.patch.object(
-                        urllib.request, "urlopen", stub), \
-                        unittest.mock.patch.object(
-                            fetch_aa, "_sleep",
-                            side_effect=lambda s: None):
-                    buffer = io.StringIO()
-                    with contextlib.redirect_stdout(buffer):
-                        legacy_main()
-                    return stub, buffer.getvalue()
-            finally:
-                sys.argv = argv
-                (fetch_aa.ROOT, fetch_aa.OUT, fetch_aa.AGENTS_OUT,
-                 fetch_aa.STAMP) = old
+        with tempfile.TemporaryDirectory(prefix=".issue-66-transport-") as tmp, \
+                unittest.mock.patch.object(urllib.request, "urlopen", stub), capture_into(pathlib.Path(tmp)):
+            buffer = io.StringIO()
+            with contextlib.redirect_stdout(buffer):
+                legacy_main()
+            return stub, buffer.getvalue()
 
     def healthy_routes(self) -> dict:
         agents = flight_html(agent_payload(
@@ -1236,39 +1140,27 @@ class PageFetchRetryTests(unittest.TestCase):
         holds both buffers even when run() raises."""
         stub = LoudUrlopenStub(routes)
         sleeps: list = []
-        with tempfile.TemporaryDirectory(prefix=".issue-154-page-retry-") as tmp:
-            root = pathlib.Path(tmp)
-            old = (fetch_aa.ROOT, fetch_aa.OUT, fetch_aa.AGENTS_OUT, fetch_aa.STAMP)
-            argv = sys.argv
-            try:
-                fetch_aa.ROOT = root
-                fetch_aa.OUT = root / "aa-raw-models.json"
-                fetch_aa.AGENTS_OUT = root / "aa-raw-coding-agents.json"
-                fetch_aa.STAMP = root / "captured-at.txt"
-                if seed:
-                    # The previous capture, as a refused run must leave it.
-                    fetch_aa.OUT.write_bytes(b"SENTINEL MODELS CAPTURE")
-                    fetch_aa.AGENTS_OUT.write_bytes(b"SENTINEL AGENTS CAPTURE")
-                    fetch_aa.STAMP.write_text("2020-01-01\n", encoding="utf-8")
-                sys.argv = ["fetch_aa.py"]
-                with unittest.mock.patch.object(urllib.request, "urlopen", stub), \
-                        unittest.mock.patch.object(fetch_aa, "_sleep", side_effect=sleeps.append, create=True):
-                    def run() -> tuple[str, str]:
-                        out, err = io.StringIO(), io.StringIO()
-                        with contextlib.redirect_stdout(out), \
-                                contextlib.redirect_stderr(err):
-                            try:
-                                legacy_main()
-                            finally:
-                                captured["stdout"] = out.getvalue()
-                                captured["stderr"] = err.getvalue()
-                        return captured["stdout"], captured["stderr"]
+        with tempfile.TemporaryDirectory(prefix=".issue-154-page-retry-") as tmp, \
+                unittest.mock.patch.object(urllib.request, "urlopen", stub), \
+                capture_into(pathlib.Path(tmp), sleep=sleeps.append):
+            if seed:
+                # The previous capture, as a refused run must leave it.
+                fetch_aa.OUT.write_bytes(b"SENTINEL MODELS CAPTURE")
+                fetch_aa.AGENTS_OUT.write_bytes(b"SENTINEL AGENTS CAPTURE")
+                fetch_aa.STAMP.write_text("2020-01-01\n", encoding="utf-8")
 
-                    captured: dict = {"stdout": "", "stderr": ""}
-                    yield root, stub, sleeps, run, captured
-            finally:
-                sys.argv = argv
-                (fetch_aa.ROOT, fetch_aa.OUT, fetch_aa.AGENTS_OUT, fetch_aa.STAMP) = old
+            def run() -> tuple[str, str]:
+                out, err = io.StringIO(), io.StringIO()
+                with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
+                    try:
+                        legacy_main()
+                    finally:
+                        captured["stdout"] = out.getvalue()
+                        captured["stderr"] = err.getvalue()
+                return captured["stdout"], captured["stderr"]
+
+            captured: dict = {"stdout": "", "stderr": ""}
+            yield pathlib.Path(tmp), stub, sleeps, run, captured
 
     def test_a_transient_500_on_the_leaderboard_is_retried_and_captured(self):
         # The incident shape: attempt 1 refuses with 500, attempt 2 reads
@@ -2291,38 +2183,19 @@ class CrossRunLookbackFlagTests(unittest.TestCase):
                                                    *detail_extra]}, separators=(",", ":")))),
             fetch_aa.AGENTS_URL: lambda: _FakeResponse(agents),
         })
-        old = (fetch_aa.ROOT, fetch_aa.OUT, fetch_aa.AGENTS_OUT,
-               fetch_aa.STAMP)
-        argv_saved = sys.argv
-        try:
-            with tempfile.TemporaryDirectory(prefix=".issue-211b-") as tmp:
-                root = pathlib.Path(tmp)
-                fetch_aa.ROOT = root
-                fetch_aa.OUT = root / "aa-raw-models.json"
-                fetch_aa.AGENTS_OUT = root / "aa-raw-coding-agents.json"
-                fetch_aa.STAMP = root / "captured-at.txt"
-                if prev_text is not None:
-                    fetch_aa.OUT.write_text(prev_text, encoding="utf-8")
-                sys.argv = argv
-                with unittest.mock.patch.object(
-                        urllib.request, "urlopen", stub), \
-                        unittest.mock.patch.object(
-                            fetch_aa, "_sleep",
-                            side_effect=lambda s: None):
-                    buffer = io.StringIO()
-                    exit_exc = None
-                    with contextlib.redirect_stdout(buffer):
-                        try:
-                            legacy_main()
-                        except SystemExit as exc:
-                            exit_exc = exc
-                    return (buffer.getvalue(),
-                            fetch_aa.OUT.read_text(encoding="utf-8"),
-                            exit_exc)
-        finally:
-            sys.argv = argv_saved
-            (fetch_aa.ROOT, fetch_aa.OUT, fetch_aa.AGENTS_OUT,
-             fetch_aa.STAMP) = old
+        with tempfile.TemporaryDirectory(prefix=".issue-211b-") as tmp, \
+                unittest.mock.patch.object(urllib.request, "urlopen", stub), \
+                capture_into(pathlib.Path(tmp), *argv[1:]):
+            if prev_text is not None:
+                fetch_aa.OUT.write_text(prev_text, encoding="utf-8")
+            buffer = io.StringIO()
+            exit_exc = None
+            with contextlib.redirect_stdout(buffer):
+                try:
+                    legacy_main()
+                except SystemExit as exc:
+                    exit_exc = exc
+            return buffer.getvalue(), fetch_aa.OUT.read_text(encoding="utf-8"), exit_exc
 
     def prev_without_fixture(self):
         host = {"slug": "detail-host-model",
