@@ -56,8 +56,8 @@
     2986
   ],
   "scripts/capture_gate.py": [
-    9688,
-    16570
+    9669,
+    16551
   ],
   "scripts/ci/aggregate_gate.py": [
     3257,
@@ -104,8 +104,8 @@
     27599
   ],
   "scripts/fetch_aa.py": [
-    22359,
-    46619
+    21459,
+    46236
   ],
   "scripts/fetch_hf_trending.py": [
     661,
