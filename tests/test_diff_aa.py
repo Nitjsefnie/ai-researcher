@@ -231,19 +231,15 @@ class ClassifyTests(unittest.TestCase):
         # A jitter field the page renders gets a threshold; one it never shows
         # cannot change the artifact, so it is dropped outright.
         self.assertEqual(diff_aa.classify("medianOutputTokensPerSecond"), "jitter")
-        self.assertEqual(diff_aa.classify("percentile95OutputTokensPerSecond"),
-                         "jitter-unused")
-        self.assertEqual(diff_aa.classify("medianTimeToFirstTokenSeconds"),
-                         "jitter-unused")
+        self.assertEqual(diff_aa.classify("percentile95OutputTokensPerSecond"), "jitter-unused")
+        self.assertEqual(diff_aa.classify("medianTimeToFirstTokenSeconds"), "jitter-unused")
 
     def test_per_evaluation_leaves_are_never_significant(self):
         # The array element's slug is part of the path, the leaf still decides.
         self.assertEqual(
             diff_aa.classify("intelligenceIndexEvaluations[scicode].timePerTask"),
             "jitter-unused")
-        self.assertEqual(
-            diff_aa.classify("intelligenceIndexEvaluations[scicode].score"),
-            "derived")
+        self.assertEqual(diff_aa.classify("intelligenceIndexEvaluations[scicode].score"), "derived")
         self.assertEqual(
             diff_aa.classify("intelligenceIndexEvaluations[aa-briefcase].costPerTask"),
             "derived")
@@ -255,14 +251,11 @@ class ClassifyTests(unittest.TestCase):
         self.assertEqual(diff_aa.classify("evalTokenCounts.hle-diamond"), "derived")
         self.assertEqual(diff_aa.classify("intelligenceIndexCostInput"), "derived")
         self.assertEqual(diff_aa.classify("price1mBlended3to1"), "derived")
-        self.assertEqual(
-            diff_aa.classify("intelligenceIndexCostPerTask.cost.input"), "derived")
+        self.assertEqual(diff_aa.classify("intelligenceIndexCostPerTask.cost.input"), "derived")
 
     def test_the_headline_itself_is_significant(self):
         self.assertEqual(diff_aa.classify("intelligenceIndex"), "significant")
-        self.assertEqual(
-            diff_aa.classify("intelligenceIndexCostPerTask.cost.total"),
-            "significant")
+        self.assertEqual(diff_aa.classify("intelligenceIndexCostPerTask.cost.total"), "significant")
 
 
 class FormattingTests(unittest.TestCase):
@@ -306,8 +299,7 @@ class SanitizeTests(unittest.TestCase):
         out = diff_aa.one_line(crafted)
 
         self.assertNotIn("\n", out)
-        self.assertFalse(any(line.startswith("Co-Authored-By")
-                             for line in out.splitlines()))
+        self.assertFalse(any(line.startswith("Co-Authored-By") for line in out.splitlines()))
 
     def test_every_control_and_unicode_line_break_collapses_to_a_space(self):
         self.assertEqual(
@@ -339,8 +331,7 @@ class SanitizeTests(unittest.TestCase):
         # The report delimits name/metric fields with a double space and
         # frontier_moves() parses on it, so a captured name must never carry
         # a whitespace run of its own.
-        self.assertEqual(diff_aa.one_line("Model\t1   (xhigh)\n\nName"),
-                         "Model 1 (xhigh) Name")
+        self.assertEqual(diff_aa.one_line("Model\t1   (xhigh)\n\nName"), "Model 1 (xhigh) Name")
 
     def test_non_string_values_render_through_str(self):
         self.assertEqual(diff_aa.one_line(42), "42")
@@ -353,8 +344,7 @@ class SanitizeTests(unittest.TestCase):
         lines = ["== efficient frontier (expanded): 1 -> 1 of 2 -> 2 plotted",
                  f"  + {name}  II 55.0  $0.20/task"]
 
-        self.assertEqual(diff_aa.frontier_moves(lines),
-                         [("intelligence", ["Swap In Up Now"], [])])
+        self.assertEqual(diff_aa.frontier_moves(lines), [("intelligence", ["Swap In Up Now"], [])])
 
     def test_parameter_sizes_read_in_billions_then_trillions(self):
         self.assertEqual(diff_aa.fmt_params(27), "27B")
@@ -437,8 +427,7 @@ class ReportTests(unittest.TestCase):
         self.addCleanup(shutil.rmtree, self.tmp)
 
     def test_carried_detail_fills_are_one_summary_clause_not_field_news(self):
-        old = [capture("A", intelligence=50, cost=1.0),
-               capture("B", intelligence=40, cost=2.0)]
+        old = [capture("A", intelligence=50, cost=1.0), capture("B", intelligence=40, cost=2.0)]
         new = [dict(old[0], carriedDetailFills=["parameters", "releaseDate"]),
                dict(old[1], carriedDetailFills=["licenseName"])]
         self.render(old, new)
@@ -498,10 +487,8 @@ class ReportTests(unittest.TestCase):
         self.assertIn("RETIRED", report)
 
     def test_a_headline_move_is_significant_and_jitter_is_not(self):
-        old = [capture("Mover", intelligence=50, cost=1.0,
-                       medianOutputTokensPerSecond=100.0)]
-        new = [capture("Mover", intelligence=58, cost=1.0,
-                       medianOutputTokensPerSecond=180.0)]
+        old = [capture("Mover", intelligence=50, cost=1.0, medianOutputTokensPerSecond=100.0)]
+        new = [capture("Mover", intelligence=58, cost=1.0, medianOutputTokensPerSecond=180.0)]
 
         report = self.render(old, new)
 
@@ -593,11 +580,9 @@ class ReportTests(unittest.TestCase):
         report = self.render(old, new)
         message = diff_aa.as_commit_message(report)
 
-        self.assertFalse(any(line.startswith("Co-Authored-By")
-                             for line in message.splitlines()))
+        self.assertFalse(any(line.startswith("Co-Authored-By") for line in message.splitlines()))
         # The name still reads as one model on one physical line.
-        self.assertIn("+ X Co-Authored-By: crafted <crafted@example.invalid>  ",
-                      report)
+        self.assertIn("+ X Co-Authored-By: crafted <crafted@example.invalid>  ", report)
 
     def test_a_crafted_name_cannot_break_the_summary_fence(self):
         # The workflow wraps diff.txt in ``` fences in GITHUB_STEP_SUMMARY.
@@ -609,8 +594,7 @@ class ReportTests(unittest.TestCase):
         message = diff_aa.as_commit_message(report)
 
         for text in (report, message):
-            self.assertFalse(any(line.lstrip().startswith("```")
-                                 for line in text.splitlines()))
+            self.assertFalse(any(line.lstrip().startswith("```") for line in text.splitlines()))
 
 
 class DisputeSectionTests(unittest.TestCase):
@@ -779,23 +763,17 @@ class DisputeSectionTests(unittest.TestCase):
         old = [capture("Incumbent", intelligence=50)]
         new = [dict(capture("Incumbent", intelligence=50), genVariants=gv)]
 
-        subject = diff_aa.as_commit_message(
-            self.render(old, new)).splitlines()[0]
-        self.assertEqual(
-            subject, "chore(capture): 1 models, 1 disputed value")
+        subject = diff_aa.as_commit_message(self.render(old, new)).splitlines()[0]
+        self.assertEqual(subject, "chore(capture): 1 models, 1 disputed value")
 
         carrier = dict(capture("Carrier", ident="carrier", intelligence=49),
                        genVariants=[{"ii": 49.0, "cost": 0.75},
                                     {"ii": 48.5, "cost": 0.80}])
         old = [capture("Incumbent", intelligence=50), carrier]
-        new = [dict(capture("Incumbent", intelligence=50), genVariants=gv),
-               dict(carrier)]
+        new = [dict(capture("Incumbent", intelligence=50), genVariants=gv), dict(carrier)]
 
-        subject = diff_aa.as_commit_message(
-            self.render(old, new)).splitlines()[0]
-        self.assertEqual(
-            subject,
-            "chore(capture): 2 models, 1 disputed value across 2 models")
+        subject = diff_aa.as_commit_message(self.render(old, new)).splitlines()[0]
+        self.assertEqual(subject, "chore(capture): 2 models, 1 disputed value across 2 models")
 
     def test_disputes_and_frontier_moves_coexist_in_the_subject(self):
         # Both clauses present: the frontier phrase names the move, the
@@ -810,8 +788,7 @@ class DisputeSectionTests(unittest.TestCase):
         new = [dict(capture("Alpha", intelligence=50, params=5), genVariants=gv),
                capture("Ex", ident="ex", intelligence=49, params=10)]
 
-        subject = diff_aa.as_commit_message(
-            self.render(old, new)).splitlines()[0]
+        subject = diff_aa.as_commit_message(self.render(old, new)).splitlines()[0]
 
         self.assertEqual(
             subject,
@@ -845,11 +822,9 @@ class DisputeSectionTests(unittest.TestCase):
         old = [capture("Incumbent", intelligence=50)]
         new = [capture("Incumbent", intelligence=50)]
 
-        subject = diff_aa.as_commit_message(
-            self.render(old, new)).splitlines()[0]
+        subject = diff_aa.as_commit_message(self.render(old, new)).splitlines()[0]
 
-        self.assertEqual(
-            subject, "chore(capture): 1 models, nothing the page renders")
+        self.assertEqual(subject, "chore(capture): 1 models, nothing the page renders")
 
 
 class CostShapeSwitchTests(unittest.TestCase):
@@ -907,8 +882,7 @@ class CostShapeSwitchTests(unittest.TestCase):
         # A total that really moved is still news, once, on the headline's
         # own path -- not a bare-path appearance beside a cost.total
         # disappearance.
-        self.assertIn(
-            "intelligenceIndexCostPerTask.cost.total: 0.9 -> 1", report)
+        self.assertIn("intelligenceIndexCostPerTask.cost.total: 0.9 -> 1", report)
         self.assertEqual(report.count("intelligenceIndexCostPerTask"), 1)
 
 
@@ -963,22 +937,16 @@ class DisplayNameTests(unittest.TestCase):
         report = self.render(old, new, old_agents, new_agents)
 
         self.assertNotIn("reasoning_effort", report)
-        self.assertIn(
-            "  + Newcomer (max)  [Fixture Lab]  II 62.0  cost/task $0.50",
-            report)
-        self.assertIn("== coding agent frontier: 1 -> 1 of 1 -> 2 plotted",
-                      report)
-        self.assertIn("  + Codex - GPT-6 Luna (xhigh)  65.0  $1.50/task",
-                      report)
+        self.assertIn("  + Newcomer (max)  [Fixture Lab]  II 62.0  cost/task $0.50", report)
+        self.assertIn("== coding agent frontier: 1 -> 1 of 1 -> 2 plotted", report)
+        self.assertIn("  + Codex - GPT-6 Luna (xhigh)  65.0  $1.50/task", report)
         self.assertIn("  - Codex - GPT-6 Luna (max)  50.0  $4.00/task", report)
 
     def test_the_field_changes_header_carries_the_cleaned_name(self):
         # A sink the issue text does not name: the per-model header of the
         # field-changes section prints the raw capture name directly.
-        old = [capture("Steady ({'reasoning_effort': 'high'})",
-                       intelligence=50)]
-        new = [capture("Steady ({'reasoning_effort': 'high'})",
-                       intelligence=58)]
+        old = [capture("Steady ({'reasoning_effort': 'high'})", intelligence=50)]
+        new = [capture("Steady ({'reasoning_effort': 'high'})", intelligence=58)]
 
         report = self.render(old, new)
 
@@ -1017,8 +985,7 @@ class DisplayNameTests(unittest.TestCase):
                     [], [capture("Anchor", intelligence=50)],
                     [], [agent_capture(raw, score=0.6, cost=2.0)])
 
-                self.assertIn(
-                    f"  + {build.display_name(raw)}  60.0  $2.00/task", report)
+                self.assertIn(f"  + {build.display_name(raw)}  60.0  $2.00/task", report)
                 self.assertNotIn("reasoning_effort", report)
                 self.assertEqual(build.display_name(raw), cleaned)
 
@@ -1082,8 +1049,7 @@ class RealCaptureTests(unittest.TestCase):
         self.assertRegex(message, r"^chore\(capture\): \d+ models")
         # DERIVED, never pinned. A test over live data asserting a live VALUE is
         # a scheduled failure, not a check. Tie it to the capture instead.
-        self.assertIn(f"{len(json.loads(build.RAW.read_text(encoding='utf-8')))} models",
-                      message)
+        self.assertIn(f"{len(json.loads(build.RAW.read_text(encoding='utf-8')))} models", message)
 
 
 class ClassifierStructureTests(unittest.TestCase):

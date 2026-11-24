@@ -54,8 +54,7 @@ def head_serving(*captures: bytes):
                 ("read_fresh_window_marker", None),
                 ("read_head_generation_state", None),
                 ("read_fresh_generation_state", None)):
-            stack.enter_context(mock.patch.object(capture_gate, reader,
-                                                  return_value=value))
+            stack.enter_context(mock.patch.object(capture_gate, reader, return_value=value))
         yield
 
 
@@ -85,8 +84,7 @@ def disputed_capture(models: bytes) -> bytes:
             break
         ii = m.get("intelligenceIndex")
         outer = m.get("intelligenceIndexCostPerTask")
-        total = (outer.get("cost", {}).get("total")
-                 if isinstance(outer, dict) else None)
+        total = outer.get("cost", {}).get("total") if isinstance(outer, dict) else None
         if not isinstance(ii, (int, float)) or isinstance(ii, bool):
             continue
         if not isinstance(total, (int, float)) or isinstance(total, bool):
@@ -252,8 +250,7 @@ class CaptureGateTests(unittest.TestCase):
                 (FIXTURE_MODELS, FIXTURE_AGENTS))
 
         self.assertNotEqual(old_page, new_page)
-        self.assertEqual(capture_gate.mask_digest(old_page),
-                         capture_gate.mask_digest(new_page))
+        self.assertEqual(capture_gate.mask_digest(old_page), capture_gate.mask_digest(new_page))
         for page in (old_page, new_page):
             self.assertEqual(len(capture_gate.DIGEST_RE.findall(page)), 1)
 
@@ -270,8 +267,7 @@ class CaptureGateTests(unittest.TestCase):
                 (disputed, FIXTURE_AGENTS))
 
         self.assertNotEqual(old_page, new_page)
-        self.assertEqual(capture_gate.mask_digest(old_page),
-                         capture_gate.mask_digest(new_page))
+        self.assertEqual(capture_gate.mask_digest(old_page), capture_gate.mask_digest(new_page))
         for page in (old_page, new_page):
             self.assertEqual(len(capture_gate.DIGEST_RE.findall(page)), 1)
 
@@ -329,8 +325,7 @@ class CaptureGateTests(unittest.TestCase):
 
         for page in (old_page, new_page):
             self.assertIn("2000-01-01", page)
-        self.assertEqual(capture_gate.mask_digest(old_page),
-                         capture_gate.mask_digest(new_page))
+        self.assertEqual(capture_gate.mask_digest(old_page), capture_gate.mask_digest(new_page))
         with head_serving(FIXTURE_MODELS, FIXTURE_AGENTS):
             code, out = run_gate()
         self.assertEqual((code, out), (0, "false\n"))
@@ -403,8 +398,7 @@ class GenerationStateStagingTests(unittest.TestCase):
         (self.repo / "data").mkdir(parents=True)
         self.git("init", "-q")
         self.git("config", "user.name", "github-actions[bot]")
-        self.git("config", "user.email",
-                 "41898282+github-actions[bot]@users.noreply.github.com")
+        self.git("config", "user.email", "41898282+github-actions[bot]@users.noreply.github.com")
         self.harness.stack.enter_context(mock.patch.object(capture_gate, "ROOT", self.repo))
         self.harness.stack.enter_context(mock.patch.object(build, "ROOT", self.repo))
 
@@ -425,8 +419,7 @@ class GenerationStateStagingTests(unittest.TestCase):
                 ("agents.json", "aa-raw-coding-agents.json"),
                 ("captured-at.txt", "captured-at.txt"),
                 ("aa-generation-state.json", "aa-generation-state.json")):
-            (self.repo / "data" / dest).write_bytes(
-                (self.harness.root / source).read_bytes())
+            (self.repo / "data" / dest).write_bytes((self.harness.root / source).read_bytes())
 
     def commit_hour(self):
         self.git("add", "data/aa-raw-models.json", "data/aa-raw-coding-agents.json",
@@ -600,19 +593,15 @@ class ReconcileSpeedTests(unittest.TestCase):
 
     def test_non_numbers_and_a_zero_committed_value_pass_through(self):
         for value in (None, 0, 0.0, -3.5, True, False, "fast"):
-            self.assertIs(
-                capture_gate.within_tolerance(value, 100.0), value)
+            self.assertIs(capture_gate.within_tolerance(value, 100.0), value)
         # No committed value to compare against: nothing to reconcile, the
         # fresh value stands (and the structural or from-zero move commits).
         for head_value in (None, 0, 0.0, True, "fast"):
-            self.assertIs(
-                capture_gate.within_tolerance(50.0, head_value), 50.0)
+            self.assertIs(capture_gate.within_tolerance(50.0, head_value), 50.0)
 
     def test_sub_threshold_moves_carry_the_committed_value(self):
-        self.assertEqual(
-            capture_gate.within_tolerance(110.0, 100.0), 100.0)
-        self.assertEqual(
-            capture_gate.within_tolerance(90.0, 100.0), 100.0)
+        self.assertEqual(capture_gate.within_tolerance(110.0, 100.0), 100.0)
+        self.assertEqual(capture_gate.within_tolerance(90.0, 100.0), 100.0)
 
     def test_exactly_at_the_threshold_is_jitter_just_past_is_news(self):
         # |fresh/committed - 1| <= SPEED_TOL, from the formula: 100 * 1.25
@@ -633,8 +622,7 @@ class ReconcileSpeedTests(unittest.TestCase):
         fresh = {"a": [{"medianOutputTokensPerSecond": 110.0}],
                  "intelligenceIndexTimePerTask": 41.0,
                  "b": {"agentWallTimeSec": 901.0, "cost": 1.2}}
-        out = capture_gate.reconcile_tree(
-            head, fresh, capture_gate.SPEED_KEYS_MODELS)
+        out = capture_gate.reconcile_tree(head, fresh, capture_gate.SPEED_KEYS_MODELS)
 
         # Sub-threshold cells carry HEAD's value, wherever they sit.
         self.assertEqual(out["a"][0]["medianOutputTokensPerSecond"], 100.0)
@@ -662,9 +650,7 @@ class ReconcileSpeedTests(unittest.TestCase):
                                         {}, keys),
             {})
         # Type-mismatched positions: fresh stands (commits).
-        self.assertEqual(
-            capture_gate.reconcile_tree({"a": {"b": 1}}, {"a": [1]}, keys),
-            {"a": [1]})
+        self.assertEqual(capture_gate.reconcile_tree({"a": {"b": 1}}, {"a": [1]}, keys), {"a": [1]})
 
 
 class OscillationTests(unittest.TestCase):
@@ -683,8 +669,7 @@ class OscillationTests(unittest.TestCase):
                                    return_value=(fresh, FIXTURE_AGENTS)):
                 code, out = run_gate()
 
-            self.assertEqual((code, out), (0, "false\n"),
-                             f"{head_value} -> {fresh_value}")
+            self.assertEqual((code, out), (0, "false\n"), f"{head_value} -> {fresh_value}")
 
     def test_a_sustained_crawl_crosses_the_threshold_and_commits(self):
         # The same jitter, one step further: 101 committed, 127 measured is
@@ -946,8 +931,7 @@ class WindowMarkerStagingTests(unittest.TestCase):
              mock.patch.object(capture_gate, "read_fresh_window_marker",
                                return_value=None), \
              self.assertRaises(build.WindowHold):
-            capture_gate.build_page_pair((head, FIXTURE_AGENTS),
-                                         (FIXTURE_MODELS, FIXTURE_AGENTS))
+            capture_gate.build_page_pair((head, FIXTURE_AGENTS), (FIXTURE_MODELS, FIXTURE_AGENTS))
 
     def test_an_unchanged_window_hour_stays_silent(self):
         # The same state with no movement: two window captures, both sides
@@ -994,11 +978,9 @@ class WindowMarkerStagingTests(unittest.TestCase):
             (root / "data").mkdir()
             with mock.patch.object(capture_gate, "ROOT", root):
                 self.assertIsNone(capture_gate.read_fresh_window_marker())
-            (root / "data" / capture_gate.WINDOW_MARKER_NAME).write_bytes(
-                b"w\n")
+            (root / "data" / capture_gate.WINDOW_MARKER_NAME).write_bytes(b"w\n")
             with mock.patch.object(capture_gate, "ROOT", root):
-                self.assertEqual(
-                    capture_gate.read_fresh_window_marker(), b"w\n")
+                self.assertEqual(capture_gate.read_fresh_window_marker(), b"w\n")
 
     def test_the_head_marker_reader_converts_git_failure_to_none(self):
         # Same pin for the HEAD side: ROOT pointed at a non-repo makes the
