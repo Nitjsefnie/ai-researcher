@@ -45,18 +45,18 @@ download = importlib.import_module("download")
 CODING_ROW_FLOOR = fetch_aa_parse.CODING_ROW_FLOOR
 balanced_array = fetch_aa_parse.balanced_array
 coding_agent_rows = fetch_aa_parse.coding_agent_rows
+named_version = fetch_aa_parse.named_version
 richest_models_array = fetch_aa_parse.richest_models_array
 
 ROOT_FOR_IMPORT = pathlib.Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT_FOR_IMPORT))
 
 from build import (  # noqa: E402  # pylint: disable=wrong-import-position
-    INDEX_EVAL_WEIGHTS,
-    INDEX_VERSION,
     ROUTE_EVIDENCE_NAME,
     SUM_TOLERANCE,
     gdpval_elo,
     merge_captures,
+    read_index_composition,
     render_route_evidence,
 )
 
@@ -79,13 +79,10 @@ MODEL_DETAIL_URL = "https://artificialanalysis.ai/models/{slug}"
 # benchmark; the other six are marketing comparison pages with no index
 # and no cost.
 AGENTS_URL = "https://artificialanalysis.ai/agents/coding-agents"
-# The Intelligence Index version pin reads THIS page (issue #220): the version
-# string left the leaderboard payload, and the methodology page headlines its
-# live version ("Artificial Analysis Intelligence Index v5.0"). The pin
-# compares at MAJOR.MINOR granularity -- AA ships point releases within a
-# generation without rebalancing the weights.
-METHODOLOGY_URL = (
-    "https://artificialanalysis.ai/methodology/intelligence-benchmarking")
+# The Intelligence Index composition -- the evaluations, their weights and
+# cost-breakdown slugs -- and its live version are read from THIS page (issues
+# #220 and #455); no other page carries the weights.
+METHODOLOGY_URL = "https://artificialanalysis.ai/methodology/intelligence-benchmarking"
 UA = (
     "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
     "(KHTML, like Gecko) Chrome/126 Safari/537.36"
@@ -117,8 +114,8 @@ FETCH_TIMEOUT_SECONDS = 25
 # Against refresh.yml's timeout-minutes: 30 (1800 s), sized for a FULL run:
 # checkout, installs, browser suite, build, commit, publish. A page fetch ends
 # by 65 + 25 = 90 s (the last attempt may start at 65 s and stall 25 s). The
-# capture's worst case is nine fetches at that bound (the methodology version
-# pin, two spaced leaderboard looks, the detail page, the coding agents, and
+# capture's worst case is nine fetches at that bound (the methodology
+# page, two spaced leaderboard looks, the detail page, the coding agents, and
 # the GDPval-AA page and data, fetch_gdpval.AUTH_ATTEMPTS times), 810 s, plus
 # the dispute-look spacing wait and AUTH_REREAD_SECONDS (180 s each): 1170 s,
 # if every fetch succeeds slowly; transport exhaustion exits in one page bound.
@@ -190,22 +187,11 @@ def _sleep(seconds: float) -> None:
     time.sleep(seconds)
 
 
-# The methodology page stamps the live index version in its headline, and its
-# historical prose cites older generations WITHOUT the "Artificial Analysis"
-# prefix -- so the regex anchors on the full brand prefix and the version-
-# sorted MAXIMUM match is the live one. Never a plain string compare over the
-# version: "4.10" would sort below "4.3".
-VERSION_RE = re.compile(
-    r"Artificial Analysis Intelligence Index v(\d+(?:\.\d+)*)")
-# The pin compares at MAJOR.MINOR granularity: the pinned generation, not a
-# point release within it.
-PINNED_VERSION = tuple(int(p) for p in INDEX_VERSION.split("."))
+# The pages whose own citations Capture.cited holds, in the order read.
+CITING_PAGES = ("first leaderboard look", "model detail page", "second leaderboard look")
 
 # The per-evaluation costs are the index weights already applied, so they sum
-# to the published total. A drift past build.py's SUM_TOLERANCE -- the same
-# constant merge_captures uses to drop another generation's breakdown -- means
-# AA changed what the breakdown contains, which is exactly the move that
-# silently emptied two charts at v4.3.
+# to the published total within SUM_TOLERANCE, merge_captures' own constant.
 
 
 def fetch_html(cached: str | None, url: str = URL) -> str:
@@ -222,51 +208,44 @@ def fetch_html(cached: str | None, url: str = URL) -> str:
     return body.decode("utf-8", errors="replace")
 
 
-def flight_payload(html: str) -> str:
+def flight_payload(html: str, page: str = "page") -> str:
     chunks = CHUNK_RE.findall(html)
     if not chunks:
-        sys.exit("no flight chunks found -- page structure changed")
+        sys.exit(f"no flight chunks found -- {page} structure changed")
     return "".join(json.loads(c) for c in chunks)
 
 
-def check_index_version(methodology_text: str) -> str | None:
-    """Refuse a capture from an index version build.py was not written for.
-
-    AA publishes the per-evaluation weights on its methodology page and NEVER
-    in the payload, so a rebalance is undetectable from the data alone: the
-    numbers stay well-formed and the page silently ships wrong costs. v4.2 did
-    exactly that. Pinning the version is the only place this can be caught.
-
-    The version string left the leaderboard payload (issue #220), so the pin
-    reads the methodology page's own live version: the version-sorted MAXIMUM
-    of the page's full-prefix citations. Its MAJOR.MINOR must equal
-    INDEX_VERSION -- AA ships point releases (v4.3.2) within a generation
-    without rebalancing. A page that names no version at all proves nothing
-    and must NOT fail: the capture passes on absence, and says so on stderr.
-    """
-    versions = [tuple(int(p) for p in m.group(1).split("."))
-                for m in VERSION_RE.finditer(methodology_text)]
-    if not versions:
-        # The absence note goes to BOTH streams: the refresh's capture step
-        # tees only stdout into its log on a green run (stderr is cat'd on
-        # the failure branch alone), and an operator must never mistake an
-        # absence-passed capture for a pinned one.
-        note = ("the methodology page named no Intelligence Index version; "
-                "the pin check passed on absence and proves nothing -- if AA "
-                f"moved the version, re-read {METHODOLOGY_URL} by hand")
+def methodology_version(page: str) -> str | None:
+    """The version the methodology page names, or None with a note: absence
+    proves nothing, and confirm_composition decides what it leaves unconfirmed."""
+    version = named_version(page)
+    if version is None:
+        # BOTH streams: the refresh's capture step tees only stdout into its
+        # log on a green run, stderr on the failure branch alone.
+        note = ("the methodology page named no Intelligence Index version, which proves "
+                f"nothing -- if AA moved the version, re-read {METHODOLOGY_URL} by hand")
         print(note, file=sys.stderr)
         print(note)
-        return None
-    found = max(versions)
-    if found[:2] != PINNED_VERSION:
-        found_text = ".".join(str(p) for p in found)
-        sys.exit(
-            f"AA is now on Intelligence Index v{found_text}, but build.py is "
-            f"written against v{INDEX_VERSION}. Re-read {METHODOLOGY_URL} "
-            "-- a version bump can rename a cost slug or rebalance the weights, "
-            "and neither shows up in the data."
-        )
-    return ".".join(str(p) for p in found)
+    return version
+
+
+class IndexPage(typing.NamedTuple):
+    version: str | None
+    composition: list
+
+
+def read_index(cached: str | None) -> IndexPage:
+    """The methodology page's version and suite."""
+    page = fetch_html(cached, METHODOLOGY_URL)
+    return IndexPage(methodology_version(page),
+                     fetch_aa_parse.index_composition(flight_payload(page, METHODOLOGY_URL), METHODOLOGY_URL))
+
+
+def read_models(cited: list, cached: str | None, url: str = URL) -> list[dict]:
+    """A page's model records; the index version it names joins `cited`."""
+    page = fetch_html(cached, url)
+    cited.append(named_version(page))
+    return richest_models_array(flight_payload(page))
 
 
 def label(m: dict) -> str:
@@ -284,22 +263,44 @@ def label(m: dict) -> str:
     return "<unidentifiable model>"
 
 
-def check_breakdown_slugs(fetched: list[dict]) -> None:
-    """Refuse a breakdown this run fetched whose slugs are not exactly build.py's:
-    a rebalance or rename the version pin exists to catch. Records carried from
-    the previous capture were judged when captured, under their own version."""
-    expected = set(INDEX_EVAL_WEIGHTS)
-    for m in fetched:
+def confirm_composition(captured: Capture, recorded: tuple[str | None, list] | None) -> None:
+    """Refuse a methodology composition this run's own reads do not confirm.
+
+    Every breakdown this run fetched has exactly its slugs (records carried
+    from the previous capture were judged when captured). The payload carries
+    no weights, so beyond that a composition is confirmed by having the
+    recorded slugs and weights, by replacing recorded slugs one for one at
+    their weights, or else by the one version every page names.
+    """
+    weights = {slug: weight for slug, weight, _ in captured.composition}
+    breakdowns = []
+    for m in captured.fetched:
         outer = m.get("intelligenceIndexCostPerTask")
         evaluations = outer.get("evaluations") if isinstance(outer, dict) else None
-        slugs = ({e.get("slug") for e in evaluations if isinstance(e, dict)}
-                 if isinstance(evaluations, list) else expected)
-        if slugs != expected:
+        if isinstance(evaluations, list):
+            breakdowns.append((label(m), {e.get("slug") for e in evaluations if isinstance(e, dict)}))
+    for name, slugs in breakdowns:
+        if slugs != weights.keys():
             sys.exit(
-                f"{label(m)}: cost breakdown slugs left v{INDEX_VERSION}'s -- missing "
-                f"{sorted(expected - slugs)}, unexpected {sorted(slugs - expected, key=str)}. "
-                "A dropped, renamed or added slug is a rebalance build.py was not "
-                f"written against: re-read {METHODOLOGY_URL}.")
+                f"{name}: cost breakdown slugs left the methodology page's -- missing "
+                f"{sorted(weights.keys() - slugs)}, unexpected {sorted(slugs - weights.keys(), key=str)}. "
+                f"The costs and the composition name different evaluations: re-read {METHODOLOGY_URL}.")
+    old = {slug: weight for slug, weight, _ in recorded[1]} if recorded else {}
+    if weights == old:
+        return
+    if not breakdowns:
+        sys.exit("the Intelligence Index composition is not the recorded one and no fetched cost breakdown "
+                 f"confirms its evaluations: re-read {METHODOLOGY_URL}.")
+    kept = weights.keys() & old.keys()
+    if all(weights[slug] == old[slug] for slug in kept) and sorted(weights.values()) == sorted(old.values()):
+        return
+    named = dict(zip(("methodology page", *CITING_PAGES), (captured.version, *captured.cited)))
+    if captured.version is None or set(named.values()) != {captured.version}:
+        sys.exit(
+            "the Intelligence Index composition is not the recorded one, nor a one-for-one replacement in it, and "
+            "the pages do not all name one index version: "
+            + ", ".join(f"{page} {f'v{version}' if version else 'no version'}" for page, version in named.items())
+            + f". Costs of another composition would publish under this one: re-read {METHODOLOGY_URL}.")
 
 
 def check_cost_breakdown(models: list[dict]) -> tuple[int, list[str]]:
@@ -876,7 +877,7 @@ class Capture(typing.NamedTuple):
     `host` and `version` are what the capture log names: which model detail
     page filled the gaps, and which Intelligence Index the costs belong to.
     `version` is None when the methodology page named no index version at
-    all -- the pin passed on absence (issue #220), and the log says so
+    all -- it passed on absence (issue #220), and the log says so
     rather than interpolating a version where none was found.
     `generations` counts distinct generation fingerprints observed in-run
     across the leaderboard and detail reads, plus a disputed run's
@@ -886,7 +887,9 @@ class Capture(typing.NamedTuple):
     `detail_withheld` and `evaluation_withheld` say a disputed run's detail
     or evaluation read matched neither look, so no generation took its
     fills or costs; main() records them, with `generations`, as the route
-    evidence the build's hold reads (issue #441).
+    evidence the build's hold reads (issue #441). `composition` is the
+    methodology page's index suite and `cited` the version each of
+    CITING_PAGES names, None for none: what confirm_composition judges.
     """
 
     models: list
@@ -901,6 +904,8 @@ class Capture(typing.NamedTuple):
     detail_withheld: bool = False
     evaluation_withheld: bool = False
     fetched: tuple = ()  # this run's reads, before any cross-run layer
+    composition: tuple = ()
+    cited: tuple = (None,) * len(CITING_PAGES)
 
 
 def capture(cached_base: str | None, cached_detail: str | None,
@@ -910,8 +915,8 @@ def capture(cached_base: str | None, cached_detail: str | None,
             gdpval_loader: typing.Callable[[], fetch_gdpval.Evaluation | None] | None = None) -> Capture:
     """Fetch the routes fresh, parse each from its own bytes, and merge.
 
-    The methodology page is read FIRST and the version pin runs before the
-    GDPval route or leaderboard reads (issue #220).
+    The methodology page is read FIRST, so an unreadable composition fails
+    before the GDPval route or leaderboard reads (issue #220).
 
     detail_host_slug is computed from THIS leaderboard's own rows: the detail
     page is chosen for what its page excludes, so the corpus must never be
@@ -960,17 +965,15 @@ def capture(cached_base: str | None, cached_detail: str | None,
     flags and the count as the route evidence build.py's hold reads; the
     carry pass above can still refill parameters, never a GDPval-AA cost.
     """
-    version = check_index_version(
-        fetch_html(cached_methodology, METHODOLOGY_URL))
+    index = read_index(cached_methodology)
     evaluation = gdpval_loader() if gdpval_loader is not None else None
-    look1 = richest_models_array(flight_payload(fetch_html(cached_base)))
-
+    cited: list = []
+    look1 = read_models(cited, cached_base)
     host = detail_host_slug(look1)
-    detail = richest_models_array(
-        flight_payload(fetch_html(cached_detail, MODEL_DETAIL_URL.format(slug=host))))
+    detail = read_models(cited, cached_detail, MODEL_DETAIL_URL.format(slug=host))
 
     _sleep(DISPUTE_LOOK_SPACING_SECONDS)
-    look2 = richest_models_array(flight_payload(fetch_html(cached_base)))
+    look2 = read_models(cited, cached_base)
 
     universe = leaderboard_universe([look1, look2])
     slugs = [
@@ -1066,10 +1069,9 @@ def capture(cached_base: str | None, cached_detail: str | None,
     # records AFTER comparing the leaderboard looks, so their presence cannot
     # change the in-run dispute or its canonical order. They are serving
     # evidence for the cross-run layers, which must see the union too.
-    listed = slugs[0] | slugs[1]
     detail_only = sorted(
         (dict(rec) for rec in detail if isinstance(rec.get("slug"), str)
-         and rec["slug"] not in listed), key=lambda rec: rec["slug"])
+         and not any(rec["slug"] in look for look in slugs)), key=lambda rec: rec["slug"])
     for rec in detail_only:
         creator = rec.get("creator")
         if ("modelCreatorName" not in rec and isinstance(creator, dict)
@@ -1108,31 +1110,28 @@ def capture(cached_base: str | None, cached_detail: str | None,
         models = carry_detail_fills(
             models, prev_records,
             universe | HELD_SPEED_FIELDS if rendering_hold else universe)
-    return Capture(models, host, version, generations, disputed, cross_run,
+    return Capture(models, host, index.version, generations, disputed, cross_run,
                    revisit_action,
                    detail_withheld=withheld[0],
                    evaluation_withheld=withheld[1],
-                   fetched=fetched)
+                   fetched=fetched, composition=tuple(index.composition), cited=tuple(cited))
 
 
 def record_route_evidence(captured: Capture) -> None:
     """Write this run's route evidence beside the capture, every hour.
 
     The text (build.render_route_evidence) records the in-run generation
-    count and Capture's two withheld flags; build.py decides hold-or-refuse
-    from it alone (issue #441). main() writes it after the captures, so a
-    run that refuses earlier leaves the previous hour's evidence beside the
-    previous hour's capture. A quiet run records neither flag, its joins
-    being unconditional. Main tracks the file, so an unchanged hour's
-    `git checkout -- data/` restores it and a republish stages no evidence change.
+    count and Capture's two withheld flags, from which alone build.py decides
+    hold-or-refuse (issue #441), and the confirmed index composition. main()
+    writes it after the captures, so a run that refuses earlier leaves the
+    previous hour's evidence beside the previous hour's capture. A quiet run
+    records neither flag, its joins being unconditional. Main tracks the file,
+    so an unchanged hour's `git checkout -- data/` restores it and a republish
+    stages no evidence change.
     """
-    text = render_route_evidence(
-        captured.generations,
-        captured.detail_withheld,
-        captured.evaluation_withheld,
-    )
-    path = OUT.with_name(ROUTE_EVIDENCE_NAME)
-    write_atomic(path, text)
+    text = render_route_evidence(captured.generations, captured.detail_withheld, captured.evaluation_withheld,
+                                 captured.version, captured.composition)
+    write_atomic(OUT.with_name(ROUTE_EVIDENCE_NAME), text)
 
 
 def load_previous_capture() -> list | None:
@@ -1186,7 +1185,7 @@ def main() -> None:
                                                                 UA, FETCH_TIMEOUT_SECONDS, _sleep, PAGE_WINDOW_SECONDS))
     models = captured.models
     priced, dropped = check_cost_breakdown(models)
-    check_breakdown_slugs(list(captured.fetched))
+    confirm_composition(captured, read_index_composition(OUT.parent))
     agents_text = fetch_html(args.agents_html, AGENTS_URL)
     agents = coding_agent_rows(flight_payload(agents_text))
 
@@ -1204,11 +1203,8 @@ def main() -> None:
         print(f"cross-run revisit: {prefix}{captured.revisit_action}")
 
     scored = sum(1 for m in models if isinstance(m.get("intelligenceIndex"), (int, float)))
-    if captured.version is not None:
-        version_phrase = f"a v{captured.version} cost breakdown"
-    else:
-        version_phrase = ("a cost breakdown whose index version the "
-                          "methodology page did not name")
+    version_phrase = (f"a v{captured.version} cost breakdown" if captured.version is not None else
+                      "a cost breakdown whose index version the methodology page did not name")
     print(f"wrote {OUT.relative_to(ROOT)}: {len(models)} models, {scored} with an "
           f"intelligence index, {priced} with {version_phrase} "
           f"(gaps filled from /models/{captured.host}; the leaderboard's own "

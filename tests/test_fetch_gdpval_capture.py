@@ -8,9 +8,9 @@ import pytest
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent / "scripts"))
 import fetch_aa  # noqa: E402  # pylint: disable=wrong-import-position
+from _methodology import methodology_html  # noqa: E402  # pylint: disable=wrong-import-position
 from test_fetch_aa import (  # noqa: E402  # pylint: disable=wrong-import-position
     agent_payload, agent_row, detail_payload, flight_html, leaderboard_payload,
-    methodology_html,
 )
 from test_fetch_aa_membership import (  # noqa: E402  # pylint: disable=wrong-import-position
     detail_record, leaderboard, page,
@@ -309,18 +309,18 @@ def test_empty_evaluation_field_set_leaves_existing_outputs_unchanged(tmp_path, 
     assert all(path.read_bytes() == b"previous output" for path in outputs)
 
 
-def test_version_mismatch_refuses_before_evaluation_fetch(monkeypatch):
+def test_an_unreadable_composition_refuses_before_any_other_fetch(monkeypatch):
     events = []
 
     def fetch_page(_cached, url=fetch_aa.URL):
         events.append(url)
         assert url == fetch_aa.METHODOLOGY_URL
-        return methodology_html("99.0")
+        return methodology_html(suite=())
 
     monkeypatch.setattr(sys, "argv", ["fetch_aa.py"])
     monkeypatch.setattr(fetch_aa, "fetch_html", fetch_page)
     monkeypatch.setattr(fetch_aa.fetch_gdpval, "fetch", lambda *_args: events.append("evaluation"))
-    with pytest.raises(SystemExit, match="Intelligence Index v99.0"):
+    with pytest.raises(SystemExit, match=fetch_aa.METHODOLOGY_URL):
         fetch_aa.main()
     assert events == [fetch_aa.METHODOLOGY_URL]
 

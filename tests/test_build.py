@@ -10,6 +10,7 @@ import tempfile
 import time
 import unittest
 from html.parser import HTMLParser
+from _methodology import WEIGHTS
 import build
 import page_format
 
@@ -90,10 +91,10 @@ def with_gdpval(records, elo=None, cost=1.0):
 
 
 def v5_evaluations(total):
-    """A cost breakdown in v5.0's exact slug set, each part its index weight
+    """A cost breakdown in the exact index slug set, each part its weight
     applied to `total`, so the parts sum to it."""
     return [{"slug": slug, "weightedCostPerTask": total * weight}
-            for slug, weight in build.INDEX_EVAL_WEIGHTS.items()]
+            for slug, weight in WEIGHTS.items()]
 
 
 def model_fixture(
@@ -1159,7 +1160,7 @@ class WindowHoldTests(unittest.TestCase):
                               "observed in-run", str(raised.exception))
                 self.assertFalse(output.exists(), "hold still wrote the page")
 
-    def test_the_evidence_never_reaches_the_page(self):
+    def test_the_hold_evidence_never_reaches_the_page(self):
         # fetch_aa.py rewrites the evidence every hour and the capture gate
         # compares rendered pages, so evidence that reached the page would
         # make every hour whose count moved look like news and commit it.
@@ -1298,8 +1299,7 @@ class MergeCapturesTests(unittest.TestCase):
         self.assertEqual(pair["cost"]["total"], 0.75)
         # ...and the breakdown rides along, since it still decomposes that
         # number -- the shape this key really ships.
-        self.assertEqual(
-            [e["slug"] for e in pair["evaluations"]], list(build.INDEX_EVAL_WEIGHTS))
+        self.assertEqual([e["slug"] for e in pair["evaluations"]], list(WEIGHTS))
 
     def test_a_breakdown_that_does_not_sum_drops_whole_and_leaves_the_scalar(self):
         # The detail route is the STALE one, so its breakdown can belong to the

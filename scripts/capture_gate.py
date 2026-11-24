@@ -252,13 +252,12 @@ def read_head_window_marker() -> bytes | None:
 
     fetch_aa.py writes the evidence every hour and main tracks it beside
     the captures, so its CONTENT is the evidence; None (a tree without a
-    committed copy) reads as no recorded mismatch. The old side
-    stages it because build.py reads it beside the capture; a committed
-    capture plots every axis, so it decides only a refusal on a broken
-    HEAD. Any _git_show failure reads as None -- the captures were already
-    read from the same tree by the time this runs, so a plumbing failure
-    here is unheard-of rather than a state to distinguish, and it too
-    refuses an emptied axis.
+    committed copy) reads as no recorded mismatch or composition. The old
+    side stages it because build.py reads it beside the capture: it names
+    the page's index composition and, on a broken HEAD, decides a refusal.
+    Any _git_show failure reads as None -- the captures were already read
+    from the same tree by the time this runs, so a plumbing failure here
+    is unheard-of rather than a state to distinguish.
     """
     try:
         return _git_show(f"data/{WINDOW_MARKER_NAME}")
