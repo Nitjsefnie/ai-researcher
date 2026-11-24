@@ -74,11 +74,11 @@ name: refresh
 # its creation-time GITHUB_SHA and correctly concedes as a moved-base run.
 #
 # fetch_aa.py exits nonzero when the flight payload or the model schema changes
-# shape, when AA bumps the Intelligence Index version build.py is written
-# against, when the cost breakdown drops a slug build.py reads, or when the
-# per-evaluation costs stop summing to the published total. Those are the
-# designed signals to go re-read the leaderboard and the methodology page by
-# hand; a red run here means read them, not retry.
+# shape, when the methodology page's Intelligence Index composition cannot be
+# read or this run's reads do not confirm it, or when the per-evaluation costs
+# stop summing to the published total. Those are the designed signals to go
+# re-read the leaderboard and the methodology page by hand; a red run here
+# means read them, not retry.
 #
 # THERE IS NO ROUTE-DISAGREEMENT STATE (issue #200). AA's two routes are
 # independently cached and a capture can straddle an update, but the detail
