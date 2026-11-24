@@ -251,7 +251,49 @@ def test_the_zizmor_step_reruns_an_error_and_fails_a_finding_at_once(
         tmp_path, exits, status, runs):
     result, calls = run_stubbed(tmp_path, "actionlint.yml", "actionlint", "zizmor", exits)
     assert result.returncode == status, result.stderr
-    assert calls == [["--no-progress", ".github/workflows/"]] * runs
+    assert calls == [["--no-progress", ".github/workflows/", ".github/actions/"]] * runs
+
+
+# download.py's clock stands still; each sleep is one line in $PAUSES.
+PAUSE_BOUNDARY = ("import importlib, os, sys, types; sys.path.insert(0, 'scripts/ci'); d = importlib.import_module('download')\n"
+                  "log = open(os.environ['PAUSES'], 'a', encoding='utf-8')\n"
+                  "d.time = types.SimpleNamespace(monotonic=lambda: 1000.0, sleep=lambda s: print(s, file=log)); sys.exit(d.main(sys.argv[2:]))\n")
+
+
+def run_download_action(tmp_path, inputs, failures):
+    """Run the download action's steps as the runner does: file order, each `if` under the implicit success(), a
+    continue-on-error failure leaving it true. The wrapped download fails its first `failures` calls; the pauses run."""
+    workspace, stub = checkout_copy(tmp_path, PAUSE_BOUNDARY)
+    env = {**os.environ, "PATH": f"{stub}{os.pathsep}{os.environ['PATH']}", "GITHUB_WORKSPACE": str(workspace), "PAUSES": str(tmp_path / "pauses")}
+    outcomes, calls, stderr, succeeded = {}, [], "", True
+    for step in yaml.safe_load(_workflowrun.ARTIFACT_ACTION.read_text(encoding="utf-8"))["runs"]["steps"]:
+        wanted = re.fullmatch(r"steps\.(\w+)\.outcome == 'failure'", step["if"]) if "if" in step else None
+        assert wanted or "if" not in step, step
+        if not succeeded or wanted and outcomes.get(wanted[1]) != "failure":
+            continue
+        given = {key: re.sub(r"\$\{\{ inputs\.(\w+) \}\}", lambda m: inputs[m[1]], value)
+                 for key, value in step["with" if "uses" in step else "env"].items()}
+        if "uses" in step:
+            assert step["uses"].startswith("actions/download-artifact@"), step
+            calls.append(given)
+            failed = len(calls) <= failures
+        else:
+            assert step["shell"] == "bash", step
+            done = _workflowrun.run_step(workspace, {**step, "shell": "bash --noprofile --norc -eo pipefail {0}"}, {**env, **given})
+            failed, stderr = done.returncode != 0, stderr + done.stderr
+        outcomes[step.get("id")] = "failure" if failed else "success"
+        succeeded = not failed or step.get("continue-on-error") is True
+    return succeeded, calls, stderr, [int(line) for line in (tmp_path / "pauses").read_text(encoding="utf-8").split()] if stderr else []
+
+
+# An empty artifact list fails the wrapped action like any other error: each of five attempts gets the same inputs,
+# 75 s of pauses lie between them, and a fifth failure is the step's.
+@SH
+@pytest.mark.parametrize("failures", range(6))
+def test_the_download_action_retries_a_failed_download_and_fails_after_the_fifth(tmp_path, failures):
+    inputs, pauses = {"name": "push  data", "path": "/runner/temp/push data"}, [5, 10, 20, 40][:failures]
+    assert run_download_action(tmp_path, inputs, failures) == (failures < 5, [inputs] * min(failures + 1, 5), "".join(
+        f"artifact push  data: attempt {n} failed (its error is above); retrying in {s}s\n" for n, s in enumerate(pauses, 1)), pauses)
 
 
 # audit.yml's pip-audit: its first $FAILURES runs print $OUT and $ERR and exit 1, later runs are clean. Only

@@ -124,6 +124,8 @@ def test_each_hub_checks_out_the_client_and_outlasts_its_retry(job):
     names = [s.get("name") for s in steps]
     checkouts = [i for i, s in enumerate(steps) if s.get("uses", "").startswith("actions/checkout@")]
     assert len(checkouts) == 1 and checkouts[0] < names.index("Publish to docs-hub")
-    # The ref fetch's window, then the upload's, whose last attempt may wait its whole timeout.
-    assert WORKFLOW["jobs"][job]["timeout-minutes"] * 60 > (
-        2 * download.WINDOW_SECONDS + publish_docs.UPLOAD_TIMEOUT)
+    # Each artifact's 75 s of pauses, then the ref fetch's window, the live page's and the upload's, whose last
+    # attempt may wait its whole timeout.
+    artifacts = sum(s.get("uses") == _workflowrun.DOWNLOAD_ARTIFACT for s in steps)
+    assert artifacts and WORKFLOW["jobs"][job]["timeout-minutes"] * 60 > (
+        75 * artifacts + 3 * download.WINDOW_SECONDS + publish_docs.UPLOAD_TIMEOUT)

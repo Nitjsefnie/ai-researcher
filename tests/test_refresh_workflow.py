@@ -187,10 +187,10 @@ class GateTests(unittest.TestCase):  # pylint: disable=too-many-public-methods
             uploads[name] = {
                 entry["with"]["name"] for entry in job.get("steps", [])
                 if entry.get("uses", "").split("@", 1)[0] == "actions/upload-artifact"}
-        for name, job in jobs.items():
-            downloads = [entry for entry in job.get("steps", [])
-                         if entry.get("uses", "").split("@", 1)[0]
-                         == "actions/download-artifact"]
+        found = {name: [entry for entry in job.get("steps", []) if entry.get("uses") == _workflowrun.DOWNLOAD_ARTIFACT]
+                 for name, job in jobs.items()}
+        self.assertTrue(any(found.values()))
+        for name, downloads in found.items():
             if not downloads:
                 continue
             ancestors = set()
@@ -290,8 +290,8 @@ class GateTests(unittest.TestCase):  # pylint: disable=too-many-public-methods
 
     def test_the_committer_and_push_jobs_run_only_the_retry_helper(self):
         # No artifact byte executes in the writer or the push job: their only tree code is the retry
-        # helper at github.sha, checked out before the key loads. The hub job runs only
-        # publish_docs.py and its imports, and download.py around its fetches.
+        # helper and the download action, at github.sha, checked out before the key loads. The hub job
+        # runs only those, publish_docs.py and its imports.
         for job, key_step in (("publish", "Commit the refresh"), ("push", "Push the tested tree to main")):
             _workflowrun.assert_helper_only_checkout(self.wf["jobs"][job], key_step)
         for s in self.wf["jobs"]["hub"]["steps"]:

@@ -3,10 +3,12 @@
 backoff window (issue #395): on any nonzero exit by default, narrowed by each
 of --retry-on (statuses) and --retry-stderr (multiline regex) given, and
 always after a --timeout kill (issue #426); --gh: for gh, last stdout only.
+--pause only waits the backoff due after ATTEMPT.
 
-    python3 scripts/ci/download.py URL DESTINATION
-    python3 scripts/ci/download.py --run [--gh] [--retry-on STATUS,...] [--retry-stderr REGEX]
+    download.py URL DESTINATION
+    download.py --run [--gh] [--retry-on STATUS,...] [--retry-stderr REGEX]
         [--timeout SECONDS] [--window SECONDS] COMMAND...
+    download.py --pause ATTEMPT LABEL
 
 With AI_RESEARCHER_DOWNLOAD_TOKEN set, a github.com release download goes
 through the authenticated release-asset API instead.
@@ -224,6 +226,9 @@ def main(argv: list[str] | None = None) -> int:
             retry_stderr=None if pattern is None else re.compile(pattern, re.MULTILINE),
             retry_on=None if statuses is None
             else frozenset(int(status) for status in statuses.split(",")))
+    if args[:1] == ["--pause"]:
+        _another_attempt(int(args[1]), time.monotonic(), args[2], "its error is above", None, None, None)
+        return 0
     url, destination = args
     try:
         download_to(url, Path(destination), CLI_TIMEOUT,

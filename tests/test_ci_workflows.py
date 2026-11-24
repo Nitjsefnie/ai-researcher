@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import re
 import sys
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 import yaml
 
@@ -20,6 +20,7 @@ DEPENDABOT = REPO_ROOT / ".github" / "dependabot.yml"
 PR_GATE_WORKFLOW = REPO_ROOT / ".github" / "workflows" / "pr-gate.yml"
 TESTS_WORKFLOW = REPO_ROOT / ".github" / "workflows" / "tests.yml"
 WORKFLOWS = sorted((REPO_ROOT / ".github" / "workflows").glob("*.yml"))
+ACTIONS = sorted((REPO_ROOT / ".github" / "actions").glob("**/action.y*ml"))
 
 # `uses: github/codeql-action/<step>@<40-hex sha>  # vX.Y.Z`
 _PIN = re.compile(
@@ -71,7 +72,7 @@ def test_action_revisions_agree_across_workflows():
         return pairs
 
     references: dict[str, list[tuple[str, str]]] = {}
-    for path in WORKFLOWS:
+    for path in WORKFLOWS + ACTIONS:
         workflow = path.read_text(encoding="utf-8")
         pairs = _uses_references(workflow)
         assert set(pairs) == composed_references(yaml.compose(workflow)), (
@@ -83,6 +84,22 @@ def test_action_revisions_agree_across_workflows():
         for path, actual in occurrences[1:]:
             assert actual == expected, (
                 f"{action}: {path} uses {actual}, but {first_path} uses {expected}")
+
+
+def test_artifacts_are_downloaded_only_through_the_retrying_action():
+    assert _workflowrun.ARTIFACT_ACTION in ACTIONS
+    for path in WORKFLOWS + ACTIONS:
+        text = path.read_text(encoding="utf-8")
+        direct = [action for action, _ in _uses_references(text) if action.lower().startswith("actions/download-artifact")]
+        assert bool(direct) == (path == _workflowrun.ARTIFACT_ACTION), f"{path}: {direct}"
+        # No step tolerates a failed local action, and each checkout before one puts the action and its helper in the workspace.
+        for job in (yaml.safe_load(text).get("jobs") or {}).values():
+            steps = job.get("steps", [])
+            for at, step in [(at, step) for at, step in enumerate(steps) if step.get("uses", "").startswith("./")]:
+                before = [s.get("with") or {} for s in steps[:at] if s.get("uses", "").startswith("actions/checkout@")]
+                assert "continue-on-error" not in step and before and all(not {"path", "repository"} & set(w) and (
+                    "sparse-checkout" not in w or str(w.get("sparse-checkout-cone-mode")).lower() == "false"
+                    and set(_workflowrun.HELPER) <= set(w["sparse-checkout"].split())) for w in before), (path.name, step, before)
 
 
 def test_codeql_action_pins_share_one_sha():
@@ -118,6 +135,11 @@ def test_dependabot_groups_action_updates_into_one_pr():
     assert re.search(r'^\s+- "\*"$', actions[0], re.M), (
         "the group must match every action so init and analyze move together"
     )
+    # `/` reaches .github/workflows and a root action.yml alone; a glob's `*` crosses no `/`.
+    [entry] = [update for update in yaml.safe_load(text)["updates"] if update["package-ecosystem"] == "github-actions"]
+    for path in [REPO_ROOT / "action.yml", *ACTIONS]:
+        directory = PurePosixPath("/", path.parent.relative_to(REPO_ROOT).as_posix())
+        assert any(directory.match(pattern) for pattern in entry["directories"]), f"Dependabot reads no {directory}"
 
 
 def test_hash_pinned_requirements_name_each_version_only_once():

@@ -149,7 +149,7 @@ def test_required_jobs_name_the_merge_gate_contexts(tmp_path):
 
 # Directories a gate job names with a `/` or SCRIPT_READS lists (#378);
 # each expands to every tracked file beneath it, so a new file there needs no pin edit (#376).
-GATE_DIRECTORIES = ('.github/workflows', 'data', 'out', 'tests')
+GATE_DIRECTORIES = ('.github/actions', '.github/workflows', 'data', 'out', 'tests')
 
 # The files outside GATE_DIRECTORIES a gate job names, a followed script imports or runs (#401) or SCRIPT_READS lists; another moves the pin.
 CORE_PIN = (

@@ -8,7 +8,7 @@ name: refresh
 #
 # Producers run repository code with read-only tokens. Keyless `publish` joins
 # with git plumbing; `push` loads the main-push key and starts CI (issue #133).
-# Neither runs an artifact byte; their only tree code is the retry helper.
+# Neither runs an artifact byte; their only tree code is the retry helper and download action.
 # Both hub publications verify against main and skip identical pages (issue #206).
 #
 # The rendered gate (issue #94) compares builds from HEAD's captures and the
@@ -120,10 +120,8 @@ concurrency:
 
 # Least-privilege floor (issue #52 review): every job declares its own block,
 # and since issue #206 every block is read: the push authenticates with the
-# deploy key and the docs-hub upload with its own API key. The last
-# contents:write holder was the published-ref move; the live page's stamp is
-# the publish record now. A job added later WITHOUT its own block inherits
-# read, not the repository default.
+# deploy key and the docs-hub upload with its own API key. A job added later
+# WITHOUT its own block inherits read, not the repository default.
 permissions:
   contents: read
 
@@ -472,8 +470,7 @@ jobs:
         # The hour's write side, packed: the staging step is what turns a
         # verified tree into the artifact the publish job consumes. It runs
         # on `proceed` -- a republish run packs too (the hub may be behind
-        # even when the capture is quiet) -- and its stamp-churn guard is the
-        # old commit step's, moved wholesale.
+        # even when the capture is quiet).
         if: steps.capture.outputs.proceed == 'true'
         env:
           AI_RESEARCHER_CHANGED: ${{ steps.capture.outputs.changed }}
@@ -488,17 +485,15 @@ jobs:
           else
             echo none > "${PAYLOAD}/aa-mode.txt"
           fi
-          # Issue #94's stamp-churn guard, moved from the old commit step: on
-          # a republish run the rebuilt page is stamped with THIS run's sha --
-          # the only thing that differs from HEAD's page -- so restore HEAD's
-          # page before it ships; a forced run may commit stamp churn, accepted
-          # because force is manual and rare.
+          # Issue #94's stamp-churn guard: on a republish run the rebuilt page
+          # is stamped with THIS run's sha -- the only thing that differs from
+          # HEAD's page -- so restore HEAD's page before it ships; a forced run
+          # may commit stamp churn, accepted because force is manual and rare.
           if [ "$AI_RESEARCHER_CHANGED" != "true" ] && [ "$AI_RESEARCHER_FORCE" != "true" ]; then
             git show HEAD:out/frontier-models.html > out/frontier-models.html
           fi
-          # The fixed add list the old commit stage staged: unchanged files
-          # copy fine -- the write job's `git add` stages only what differs
-          # from main. The route evidence is on it: build.py's empty-axis
+          # The fixed add list: unchanged files copy fine -- the write job's
+          # `git add` stages only what differs from main. The route evidence is on it: build.py's empty-axis
           # guard reads it beside the capture and the capture gate's HEAD-side
           # rebuild reads it from GIT at HEAD, so every AA commit carries it.
           # fetch_aa.py writes it every hour and main tracks it (issue #441),
@@ -543,8 +538,9 @@ jobs:
   # joins only successful sources with changes. One deploy-key delivery
   # starts CI on main, then each hub verifies its own publishable bytes
   # (issue #206). Failed producers stay red without blocking survivors.
-  # The committer and push jobs execute no artifact byte; their only tree code is
-  # the retry helper at github.sha. Each hub job runs publish_docs.py and its imports.
+  # The committer and push jobs execute no artifact byte; their only tree code is the retry
+  # helper and the download action at github.sha, this workflow text's own commit. Each hub job
+  # runs both, publish_docs.py and its imports. `./` because actionlint rejects `$/`.
   #
   # The push race and its outcomes are in the header; the committer concedes
   # the one race no base check sees, main landing a newer workflow
@@ -586,7 +582,7 @@ jobs:
       publish: ${{ steps.commit.outputs.publish }}
 
     steps:
-      # Only the retry helper's two files, at github.sha: this workflow text's own commit.
+      # Only the retry helper and the download action.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.sha }}
@@ -594,39 +590,40 @@ jobs:
           sparse-checkout: |
             scripts/ci/download.py
             scripts/fetch_http.py
+            .github/actions/download-artifact/action.yml
           sparse-checkout-cone-mode: false
 
       - name: Download the publish payload
         if: needs.refresh.result == 'success' && needs.refresh.outputs.proceed == 'true'
-        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        uses: ./.github/actions/download-artifact  # zizmor: ignore[self-repository]
         with:
           name: publish-payload
           path: ${{ runner.temp }}/publish-payload
 
       - name: Download the Hugging Face payload
         if: needs.hf-fetch.result == 'success' && needs.hf-fetch.outputs.changed == 'true'
-        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        uses: ./.github/actions/download-artifact  # zizmor: ignore[self-repository]
         with:
           name: hf-payload
           path: ${{ runner.temp }}/hf-payload
 
       - name: Download the OpenRouter payload
         if: needs.or-fetch.result == 'success' && needs.or-fetch.outputs.changed == 'true'
-        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        uses: ./.github/actions/download-artifact  # zizmor: ignore[self-repository]
         with:
           name: or-payload
           path: ${{ runner.temp }}/or-payload
 
       - name: Download the GitHub payload
         if: needs.github-fetch.result == 'success' && needs.github-fetch.outputs.changed == 'true'
-        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        uses: ./.github/actions/download-artifact  # zizmor: ignore[self-repository]
         with:
           name: github-payload
           path: ${{ runner.temp }}/github-payload
 
       - name: Download the rankings page
         if: needs.rankings.result == 'success' && needs.rankings.outputs.changed == 'true'
-        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        uses: ./.github/actions/download-artifact  # zizmor: ignore[self-repository]
         with:
           name: rankings-page
           path: ${{ runner.temp }}/rankings-page
@@ -815,7 +812,7 @@ jobs:
       contents: read
 
     steps:
-      # Only the retry helper's two files, at github.sha: this workflow text's own commit.
+      # Only the retry helper and the download action.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.sha }}
@@ -823,12 +820,13 @@ jobs:
           sparse-checkout: |
             scripts/ci/download.py
             scripts/fetch_http.py
+            .github/actions/download-artifact/action.yml
           sparse-checkout-cone-mode: false
 
       - name: Download the push bundle
         # Both actions run before the key is loaded, and no artifact byte
         # executes in this job, before or while the key is in memory.
-        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        uses: ./.github/actions/download-artifact  # zizmor: ignore[self-repository]
         with:
           name: push-data
           path: ${{ runner.temp }}/push-data
@@ -904,8 +902,8 @@ jobs:
     name: Publish the page to docs-hub
     runs-on: ubuntu-latest
 
-    # Per-job ceiling: three download.py 300 s windows, the ref fetch's, the live
-    # page's and the upload's (30 s and 60 s per socket operation; DNS has none).
+    # Per-job ceiling: two artifacts, 75 s of pauses each; three download.py 300 s windows, the ref
+    # fetch's, the live page's and the upload's (30 s and 60 s per socket operation; DNS has none).
     timeout-minutes: 20
 
     needs: [publish, push, refresh]
@@ -931,13 +929,13 @@ jobs:
 
       - name: Download the publish payload
         if: needs.refresh.result == 'success' && needs.refresh.outputs.proceed == 'true'
-        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        uses: ./.github/actions/download-artifact  # zizmor: ignore[self-repository]
         with:
           name: publish-payload
           path: ${{ runner.temp }}/publish-payload
 
       - name: Download the push data
-        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        uses: ./.github/actions/download-artifact  # zizmor: ignore[self-repository]
         with:
           name: push-data
           path: ${{ runner.temp }}/push-data
@@ -965,9 +963,8 @@ jobs:
           # `tip` (the bundle tip when the hour committed, its base when
           # not), and uploads only while that commit IS main's tip. When main
           # has moved past it, the newer run's hub job publishes; this one
-          # uploads nothing and exits 0. It retired the published ref's
-          # compare-API gate (issue #206) without losing its guarantee (see
-          # the header's upload-order paragraph).
+          # uploads nothing and exits 0 (see the header's upload-order
+          # paragraph).
           mine="$(cat "${RUNNER_TEMP}/push-data/tip.txt")"
           if [ "$mine" != "$target" ]; then
             echo "Lost the race: main's tip moved past this run's page, and the newer run's hub job publishes it." >> "$GITHUB_STEP_SUMMARY"
@@ -1008,9 +1005,7 @@ jobs:
             --project ai-researcher --from ai-researcher
           # No ref move follows (issue #206): the upload response above is
           # the hub's receipt, and the page it stored carries the stamp --
-          # the record the next run's republish gate reads. The published
-          # branch and its refs-API move are retired; there is nothing
-          # left in this workflow that writes to GitHub.
+          # the record the next run's republish gate reads.
 
   hf-fetch:
     name: Fetch and stage the Hugging Face top 10
@@ -1075,21 +1070,21 @@ jobs:
 
       - name: Download the Hugging Face payload
         if: needs.hf-fetch.result == 'success' && needs.hf-fetch.outputs.changed == 'true'
-        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        uses: ./.github/actions/download-artifact  # zizmor: ignore[self-repository]
         with:
           name: hf-payload
           path: ${{ runner.temp }}/hf-payload
 
       - name: Download the OpenRouter payload
         if: needs.or-fetch.result == 'success' && needs.or-fetch.outputs.changed == 'true'
-        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        uses: ./.github/actions/download-artifact  # zizmor: ignore[self-repository]
         with:
           name: or-payload
           path: ${{ runner.temp }}/or-payload
 
       - name: Download the GitHub payload
         if: needs.github-fetch.result == 'success' && needs.github-fetch.outputs.changed == 'true'
-        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        uses: ./.github/actions/download-artifact  # zizmor: ignore[self-repository]
         with:
           name: github-payload
           path: ${{ runner.temp }}/github-payload
@@ -1148,14 +1143,14 @@ jobs:
       (needs.publish.result == 'skipped' || needs.publish.result == 'success') &&
       (needs.push.result == 'skipped' || needs.push.result == 'success')
     runs-on: ubuntu-latest
-    timeout-minutes: 20  # the hub job's ceiling and windows
+    timeout-minutes: 20  # the hub job's ceiling, with one artifact
     permissions:
       contents: read
     # A successful build can recover a failed upload during an unchanged hour,
     # when the committer and push both skip. Failed commit or delivery jobs
     # suppress publication. Main's committed page must match the artifact
     # before HTTP; identical live bytes skip the upload. The only repository code
-    # this job runs, from its own checkout: download.py, publish_docs.py and its imports.
+    # this job runs, from its own checkout: the download action, download.py, publish_docs.py and its imports.
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -1163,7 +1158,7 @@ jobs:
 
       - name: Download the rankings page
         if: needs.rankings.result == 'success'
-        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        uses: ./.github/actions/download-artifact  # zizmor: ignore[self-repository]
         with:
           name: rankings-page
           path: ${{ runner.temp }}/rankings-page

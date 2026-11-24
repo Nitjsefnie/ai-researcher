@@ -38,7 +38,7 @@
 !/requirements-zizmor.txt
 !/setup.cfg
 
-# ---- .github/ — CI workflows, dependabot, issue and PR templates ----------
+# ---- .github/ — CI workflows and actions, dependabot, issue and PR templates ----------
 !/.github/
 /.github/*
 !/.github/dependabot.yml
@@ -52,6 +52,11 @@
 !/.github/ISSUE_TEMPLATE/
 /.github/ISSUE_TEMPLATE/*
 !/.github/ISSUE_TEMPLATE/*.md
+!/.github/actions/
+/.github/actions/*
+!/.github/actions/*/
+/.github/actions/*/*
+!/.github/actions/*/action.yml
 !/.github/workflows/
 /.github/workflows/*
 !/.github/workflows/*.yml
