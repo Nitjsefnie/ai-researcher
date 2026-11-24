@@ -35,18 +35,18 @@ OUT = ROOT / "out" / "frontier-models.html"
 # Terminal-Bench-Science and HLE-Diamond, swapped CritPt for CritPt v2 (Hard
 # Subset), cut GDP.pdf to 5% and removed GDPval-AA, SciCode, AA-LCR and
 # Humanity's Last Exam -- so fetch_aa.py refuses any other MAJOR.MINOR on that
-# page's live headline; point releases (v4.3.2) do not rebalance
-# and pass.
+# page's live headline; point releases (v4.3.2, v5.0.2) do not rebalance
+# and pass, though one may swap a slug (v5.0.2: Terminal-Bench 4.1 for 4.0).
 INDEX_VERSION = "5.0"
 
 # v5.0's evaluations as AA names them, then each cost-breakdown slug's index
 # weight; fetch_aa.py refuses a breakdown whose slugs are not exactly these.
 INDEX_EVALS = [
-    "AA-Briefcase v1.1", "AutomationBench-AA", "GDP.pdf", "FrontierCode 2.0", "Terminal-Bench 4.0",
+    "AA-Briefcase v1.1", "AutomationBench-AA", "GDP.pdf", "FrontierCode 2.0", "Terminal-Bench 4.1",
     "AA-Omniscience v1.1", "HLE-Diamond", "CritPt v2 (Hard Subset)", "Terminal-Bench-Science 0.1"]
 INDEX_EVAL_WEIGHTS = {
     "aa-briefcase": 0.15, "automationbench-aa": 0.05, "gdp-pdf": 0.05, "frontiercode-2-0": 0.15,
-    "terminalbench-4-0": 0.10, "terminal-bench-science": 0.15, "critpt-v2-hard": 0.10,
+    "terminalbench-4-1": 0.10, "terminal-bench-science": 0.15, "critpt-v2-hard": 0.10,
     "omniscience": 0.15, "hle-diamond": 0.10}
 
 METRIC_ORDER = ("coding", "intelligence", "agentic")
