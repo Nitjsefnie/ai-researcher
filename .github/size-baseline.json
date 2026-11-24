@@ -1,10 +1,10 @@
 {
   "trees": {
-    "tests/": 29255
+    "tests/": 29254
   },
   "schema_version": 1,
   "baseline": {
-    ".github/workflows/refresh.yml": 1306,
+    ".github/workflows/refresh.yml": 1301,
     "build.py": 2626,
     "scripts/ci/check_ratchets.py": 618,
     "scripts/ci/gate_base_freshness.py": 700,
@@ -24,6 +24,6 @@
     "tests/test_diff_aa.py": 1246,
     "tests/test_fetch_aa.py": 2676,
     "tests/test_gate_base_freshness.py": 866,
-    "tests/test_refresh_workflow.py": 2609
+    "tests/test_refresh_workflow.py": 2568
   }
 }
