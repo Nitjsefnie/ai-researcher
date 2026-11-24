@@ -22,6 +22,7 @@ import fetch_aa  # noqa: E402  # pylint: disable=wrong-import-position
 import diff_aa  # noqa: E402  # pylint: disable=wrong-import-position
 import build  # noqa: E402  # pylint: disable=wrong-import-position
 import test_fetch_aa_membership as membership  # noqa: E402  # pylint: disable=wrong-import-position,wrong-import-order
+from _methodology import CITED, RECORDED, VERSION, WEIGHTS, methodology_html  # noqa: E402  # pylint: disable=wrong-import-position,wrong-import-order
 from test_build import v5_evaluations  # noqa: E402  # pylint: disable=wrong-import-position,wrong-import-order
 # Instant failures inside the 65 s page window: waits double from 5 s until the next (40 s) would pass it.
 FAST_FAIL_WAITS = [5, 10, 20]
@@ -166,87 +167,30 @@ def costed(name="M", *, total=1.0, evaluations=None):
 
 
 class IndexVersionTests(unittest.TestCase):
-    """Issue #220: the version string left the leaderboard payload, so the pin
-    reads AA's methodology page. The contract has two halves: a genuinely
-    bumped major.minor still refuses the capture (the v4.2 rebalance shipped
-    well-formed data with wrong costs, which is the whole point of the pin),
-    and an ABSENT version string proves nothing and must NOT fail."""
+    """Issue #220: the version string left the leaderboard payload, so it is
+    read from AA's methodology page, whose ABSENT version string proves
+    nothing and must NOT fail by itself."""
 
-    def test_a_point_release_within_the_pinned_generation_passes(self):
-        # AA ships point releases (v4.3.2) inside a generation without
-        # rebalancing, so the pin compares at MAJOR.MINOR granularity -- and
-        # the FULL found version is what the capture log reports.
-        text = (f"Artificial Analysis Intelligence Index "
-                f"v{fetch_aa.INDEX_VERSION}.2 incorporates 9 evaluations")
-
-        self.assertEqual(fetch_aa.check_index_version(text),
-                         f"{fetch_aa.INDEX_VERSION}.2")
-
-    def test_a_historical_citation_alone_names_no_version(self):
+    def test_no_full_prefix_citation_passes_on_absence_with_a_note_on_both_streams(self):
         # The page's prose cites superseded generations WITHOUT the brand
-        # prefix ("Superseded by Terminal-Bench 4.0 in Intelligence Index
-        # v4.3"); only the full prefix identifies the live version, so such a
-        # citation alone is absence -- and absence passes (contract b).
-        stderr, stdout = io.StringIO(), io.StringIO()
-
-        with contextlib.redirect_stderr(stderr), \
-                contextlib.redirect_stdout(stdout):
-            got = fetch_aa.check_index_version(
-                "Superseded by Terminal-Bench 4.0 in Intelligence Index v4.3")
-
-        self.assertIsNone(got)
-        # The absence note reaches BOTH streams, and both are pinned: the
-        # refresh's capture step tees only stdout into its log on a green
-        # run (stderr is cat'd on the failure branch alone), so a stdout-
-        # only note would leave the green hour silent about the pass.
-        for stream in (stderr, stdout):
-            self.assertIn("methodology", stream.getvalue())
-            self.assertIn("proves nothing", stream.getvalue())
-
-    def test_unrelated_text_passes_on_absence_with_a_note_on_both_streams(self):
-        stderr, stdout = io.StringIO(), io.StringIO()
-
-        with contextlib.redirect_stderr(stderr), \
-                contextlib.redirect_stdout(stdout):
-            got = fetch_aa.check_index_version("nothing here")
-
-        self.assertIsNone(got)
-        for stream in (stderr, stdout):
-            self.assertIn("methodology", stream.getvalue())
-            self.assertIn("proves nothing", stream.getvalue())
-
-    def test_a_bumped_version_exits_naming_both_versions(self):
-        # v4.2 rebalanced the weights without changing a single field name --
-        # undetectable from the data, which is the whole reason for the pin.
-        with self.assertRaises(SystemExit) as caught:
-            fetch_aa.check_index_version(
-                "Artificial Analysis Intelligence Index v9.9")
-
-        message = str(caught.exception)
-        self.assertIn("v9.9", message)
-        self.assertIn(f"v{fetch_aa.INDEX_VERSION}", message)
-        self.assertIn("methodology", message)
-
-    def test_a_multi_part_minor_bump_exits_against_the_string_compare(self):
-        # "4.10" sorts below "4.3" as a plain string; the pin, patched to
-        # 4.3, compares the integer parts, so a v4.10 page still refuses.
-        with unittest.mock.patch.object(fetch_aa, "PINNED_VERSION", (4, 3)), self.assertRaises(SystemExit) as caught:
-            fetch_aa.check_index_version(
-                "Artificial Analysis Intelligence Index v4.10")
-
-        message = str(caught.exception)
-        self.assertIn("v4.10", message)
-        self.assertIn(f"v{fetch_aa.INDEX_VERSION}", message)
+        # prefix; only the full prefix identifies the live version. The note
+        # reaches BOTH streams: the refresh's capture step tees only stdout
+        # into its log on a green run.
+        for text in ("Superseded by Terminal-Bench 4.0 in Intelligence Index v4.3", "nothing here"):
+            stderr, stdout = io.StringIO(), io.StringIO()
+            with self.subTest(text=text), contextlib.redirect_stderr(stderr), contextlib.redirect_stdout(stdout):
+                self.assertIsNone(fetch_aa.methodology_version(text))
+            for stream in (stderr, stdout):
+                self.assertIn("methodology", stream.getvalue())
+                self.assertIn("proves nothing", stream.getvalue())
 
     def test_the_live_version_is_the_maximum_full_prefix_citation(self):
         # The page's prose can quote an older generation's full name verbatim;
         # the live version is the version-sorted MAXIMUM of every full-prefix
-        # match, never the first.
-        text = ("Earlier the Artificial Analysis Intelligence Index v4.1 ran "
-                "three evals. Today the Artificial Analysis Intelligence "
-                f"Index v{fetch_aa.INDEX_VERSION}.2 incorporates 9 evaluations")
-
-        self.assertEqual(fetch_aa.check_index_version(text), f"{fetch_aa.INDEX_VERSION}.2")
+        # match, never the first and never a string compare ("4.10" < "4.3").
+        for versions, live in ((("4.1", "5.0.2"), "5.0.2"), (("4.10", "4.3"), "4.10")):
+            text = " then ".join(f"the Artificial Analysis Intelligence Index v{v} ran" for v in versions)
+            self.assertEqual(fetch_aa.methodology_version(text), live)
 
 
 class CostBreakdownTests(unittest.TestCase):
@@ -313,55 +257,6 @@ class CostBreakdownTests(unittest.TestCase):
                              "evaluation costs withheld: no\n")
             self.assertEqual(sorted(p.name for p in evidence.parent.iterdir()),
                              ["cost-breakdown-window.txt"], "a temp file outlived the write")
-
-    def refused_breakdown(self, evaluations):
-        """The slug check's refusal message for one model whose parts still
-        sum to its total, so the breakdown is otherwise well-formed."""
-        self.assertAlmostEqual(sum(e["weightedCostPerTask"] for e in evaluations), 1.0)
-        with self.assertRaises(SystemExit) as caught:
-            fetch_aa.check_breakdown_slugs([costed("slug-model", evaluations=evaluations)])
-        message = str(caught.exception)
-        self.assertIn("slug-model", message)
-        return message
-
-    def test_the_pinned_slug_set_passes(self):
-        self.assertIsNone(fetch_aa.check_breakdown_slugs(
-            [costed("A"), {"slug": "bare", "intelligenceIndexCostPerTask": 1.5}]))
-
-    def test_an_entry_without_a_slug_exits(self):
-        parts = v5_evaluations(1.0) + [{"weightedCostPerTask": 0.0}]
-
-        message = self.refused_breakdown(parts)
-
-        self.assertIn("missing []", message)
-        self.assertIn("unexpected [None]", message)
-
-    def test_a_dropped_slug_exits(self):
-        # Exactly what v4.3 did to terminalbench-v2-1 and tau3-banking.
-        parts = [e for e in v5_evaluations(1.0) if e["slug"] != "hle-diamond"]
-        parts[0] = {**parts[0], "weightedCostPerTask": parts[0]["weightedCostPerTask"] + 0.10}
-
-        message = self.refused_breakdown(parts)
-
-        self.assertIn("missing ['hle-diamond']", message)
-        self.assertIn("unexpected []", message)
-
-    def test_an_added_slug_exits(self):
-        parts = v5_evaluations(1.0) + [{"slug": "scicode", "weightedCostPerTask": 0.0}]
-
-        message = self.refused_breakdown(parts)
-
-        self.assertIn("missing []", message)
-        self.assertIn("unexpected ['scicode']", message)
-
-    def test_a_renamed_slug_exits(self):
-        parts = [dict(e, slug="critpt") if e["slug"] == "critpt-v2-hard" else e
-                 for e in v5_evaluations(1.0)]
-
-        message = self.refused_breakdown(parts)
-
-        self.assertIn("missing ['critpt-v2-hard']", message)
-        self.assertIn("unexpected ['critpt']", message)
 
     def test_components_that_stop_summing_to_the_total_exit(self):
         # Parts that no longer make up the published whole mean AA changed
@@ -501,7 +396,7 @@ class MergeCapturesTests(unittest.TestCase):
         cost = got[0]["intelligenceIndexCostPerTask"]
         self.assertEqual(cost["cost"]["total"], 1.0)
         self.assertEqual(
-            [e["slug"] for e in cost["evaluations"]], list(build.INDEX_EVAL_WEIGHTS))
+            [e["slug"] for e in cost["evaluations"]], list(WEIGHTS))
 
     def test_a_nested_stub_whose_breakdown_will_not_sum_is_dropped_too(self):
         # The same shape, where the detail breakdown does NOT decompose the
@@ -558,7 +453,7 @@ class MergeCapturesTests(unittest.TestCase):
 
         cost = got[0]["intelligenceIndexCostPerTask"]
         self.assertEqual(cost["cost"]["total"], 1.5)
-        self.assertEqual(len(cost["evaluations"]), len(build.INDEX_EVAL_WEIGHTS))
+        self.assertEqual(len(cost["evaluations"]), len(WEIGHTS))
 
     def test_a_breakdown_that_will_not_sum_to_the_leaderboards_total_is_dropped(self):
         # The same shape-split pair, where the detail route's breakdown does
@@ -684,33 +579,20 @@ def detail_record(**overrides: object) -> dict:
 
 
 def leaderboard_payload() -> str:
-    """A leaderboard flight payload: the pinned index version and the model
+    """A leaderboard flight payload: the index version and the model
     array, one unpriced detail host plus the shared model. Compact JSON --
     the extractor anchors on that shape."""
     host = {"slug": "detail-host-model",
             "intelligenceIndexCostPerTask": "$undefined"}
     return json.dumps({
-        "intro": f"Intelligence Index v{fetch_aa.INDEX_VERSION}",
+        "intro": CITED,
         "models": [host, leaderboard_record()],
     }, separators=(",", ":"))
 
 
 def detail_payload(**record_overrides: object) -> str:
-    return json.dumps({"models": [detail_record(**record_overrides)]},
+    return json.dumps({"intro": CITED, "models": [detail_record(**record_overrides)]},
                       separators=(",", ":"))
-
-
-def methodology_html(version: str | None = fetch_aa.INDEX_VERSION) -> str:
-    """The methodology page as a plain HTML document -- no flight wrapper,
-    the version pin reads the page text directly (issue #220). The default
-    version is exactly the pin, so fixtures that expect a pass need no
-    argument; None writes a page that names no index version at all."""
-    if version is None:
-        return ("<html><body>The methodology page describes the benchmark "
-                "suite.</body></html>")
-    return (f"<html><body><h1>Artificial Analysis Intelligence Index "
-            f"v{version}</h1><p>incorporates 9 evaluations</p></body>"
-            "</html>")
 
 
 class CaptureGapFillWiringTests(unittest.TestCase):
@@ -751,14 +633,12 @@ class CaptureGapFillWiringTests(unittest.TestCase):
         # detail_host_slug is computed from THIS leaderboard's rows: the
         # detail page is chosen for what its page excludes, so the corpus
         # must never be paired with a host picked from a different read.
-        # capture() pins the version from the methodology page before the
-        # leaderboard fetches, so a bumped index fails the capture without
-        # spending the other page reads (issue #220).
+        # The version is the methodology page's (issue #220).
         with self.cached_routes() as (base, detail, methodology):
             captured = fetch_aa.capture(base, detail, methodology)
 
         self.assertEqual(captured.host, "detail-host-model")
-        self.assertEqual(captured.version, fetch_aa.INDEX_VERSION)
+        self.assertEqual(captured.version, VERSION)
         self.assertEqual([m["slug"] for m in captured.models],
                          ["detail-host-model", "fixture-model"])
 
@@ -791,14 +671,14 @@ class CaptureGapFillWiringTests(unittest.TestCase):
         self.assertIn("/models/detail-host-model", stdout)
         self.assertIn("the leaderboard's own value wins wherever both routes "
                       "carry the field", stdout)
-        self.assertIn(f"v{fetch_aa.INDEX_VERSION} cost breakdown", stdout)
+        self.assertIn(f"v{VERSION} cost breakdown", stdout)
         # Issue #208: the run's one-line generation summary, quiet shape.
         self.assertIn("1 generation(s) observed in-run; 0 models carry "
                       "disputed values", stdout)
         # Issue #441: the quiet hour records its own evidence too, so the
         # previous window hour's cannot outlive its hour.
         self.assertEqual(evidence, "in-run generations: 1\ndetail fills withheld: no\n"
-                                   "evaluation costs withheld: no\n")
+                                   "evaluation costs withheld: no\n" + RECORDED)
 
     def test_the_capture_log_stays_honest_when_the_page_names_no_version(self):
         # Contract b, end to end: a methodology page with no version string
@@ -807,6 +687,9 @@ class CaptureGapFillWiringTests(unittest.TestCase):
         # named for the operator who reads the log.
         with tempfile.TemporaryDirectory(prefix=".issue-220-log-") as tmp:
             root = pathlib.Path(tmp)
+            # The recorded composition confirms the unchanged one without a version.
+            (root / build.ROUTE_EVIDENCE_NAME).write_text(
+                build.render_route_evidence(1, False, False) + RECORDED, encoding="utf-8")
             buffer, stderr = io.StringIO(), io.StringIO()
             with contextlib.redirect_stdout(buffer), contextlib.redirect_stderr(stderr), \
                     capture_into(root, *cached_pages(root, methodology_html(None))):
@@ -1027,7 +910,7 @@ class TransportErrorTests(unittest.TestCase):
 
         # Issue #208: the leaderboard route is read TWICE (the dispute
         # looks), so the healthy capture is five pages in this order -- the
-        # methodology version pin FIRST (issue #220: fail fast before
+        # methodology page FIRST (issue #220: fail fast before
         # spending the other fetches), the first look, the detail page, the
         # spaced second look, the coding agents.
         self.assertEqual(stub.calls,
@@ -1053,7 +936,7 @@ class TransportErrorTests(unittest.TestCase):
                 def raiser(e=error):
                     raise e
 
-                # The methodology pin passes (fail fast lives before the
+                # The methodology page passes (fail fast lives before the
                 # leaderboard only when the page itself is healthy), then the
                 # leaderboard fetch exercises the transport failure.
                 with self.assertRaises(SystemExit) as caught:
@@ -1363,7 +1246,7 @@ class RetryBoundArithmeticTests(unittest.TestCase):
     PAGE_BOUND = (fetch_aa.PAGE_ATTEMPTS * fetch_aa.FETCH_TIMEOUT_SECONDS
                   + sum(k * fetch_aa.PAGE_BACKOFF_SECONDS
                         for k in range(1, fetch_aa.PAGE_ATTEMPTS)))
-    # The capture fetches exactly five pages (the methodology version pin,
+    # The capture fetches exactly five pages (the methodology page,
     # two spaced leaderboard looks, the detail page, the coding agents),
     # each at that bound, plus one dispute-look spacing wait (issue #208)
     # and the GDPval-AA route (issue #406): AUTH_ATTEMPTS attempts of a page
@@ -1404,7 +1287,7 @@ def look_payload(ii: float, **overrides: object) -> str:
     host = {"slug": "detail-host-model",
             "intelligenceIndexCostPerTask": "$undefined"}
     return json.dumps({
-        "intro": f"Intelligence Index v{fetch_aa.INDEX_VERSION}",
+        "intro": CITED,
         "models": [host, leaderboard_record(intelligenceIndex=ii, **overrides)],
     }, separators=(",", ":"))
 
@@ -1417,7 +1300,7 @@ def host_priced_payload(host_ii: float, host_cost: object,
     host = {"slug": "detail-host-model", "intelligenceIndex": host_ii,
             "intelligenceIndexCostPerTask": host_cost}
     return json.dumps({
-        "intro": f"Intelligence Index v{fetch_aa.INDEX_VERSION}",
+        "intro": CITED,
         "models": [host, leaderboard_record(intelligenceIndex=fixture_ii)],
     }, separators=(",", ":"))
 
@@ -1556,7 +1439,7 @@ class MultiLookCaptureTests(unittest.TestCase):
     def capture_two_looks(self, leaderboard_pages, **detail_overrides):
         """capture(None, None, None) over a stubbed urlopen that answers the
         leaderboard route with `leaderboard_pages` in sequence (the two
-        looks read that route twice), the methodology route with the pinned
+        looks read that route twice), the methodology route with the fixture
         generation's page, and the detail route with the standard detail
         page, record-overridden by `detail_overrides`.
         -> (Capture, recorded sleeps, stub)."""
@@ -1676,7 +1559,7 @@ class MultiLookCaptureTests(unittest.TestCase):
         solar-pro-2 present in the first look only."""
         def page(records):
             return flight_html(json.dumps(
-                {"intro": f"Intelligence Index v{fetch_aa.INDEX_VERSION}",
+                {"intro": CITED,
                  "models": records}, separators=(",", ":")))
 
         host = {"slug": "detail-host-model",
@@ -2098,7 +1981,7 @@ class CrossRunCaptureTests(unittest.TestCase):
         MultiLookCaptureTests.presence_flip_pages."""
         def page(records):
             return flight_html(json.dumps(
-                {"intro": f"Intelligence Index v{fetch_aa.INDEX_VERSION}",
+                {"intro": CITED,
                  "models": records}, separators=(",", ":")))
 
         host = {"slug": "detail-host-model",
@@ -2179,8 +2062,8 @@ class CrossRunLookbackFlagTests(unittest.TestCase):
             fetch_aa.URL: lambda: _FakeResponse(
                 flight_html(leaderboard_payload())),
             self.DETAIL_URL: lambda: _FakeResponse(
-                flight_html(json.dumps({"models": [detail_record(**(detail_overrides or {})),
-                                                   *detail_extra]}, separators=(",", ":")))),
+                flight_html(json.dumps({"intro": CITED, "models": [
+                    detail_record(**(detail_overrides or {})), *detail_extra]}, separators=(",", ":")))),
             fetch_aa.AGENTS_URL: lambda: _FakeResponse(agents),
         })
         with tempfile.TemporaryDirectory(prefix=".issue-211b-") as tmp, \

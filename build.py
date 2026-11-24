@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import argparse
 import datetime as dt
+import decimal
 import hashlib
 import html
 import json
@@ -28,26 +29,6 @@ ROOT = pathlib.Path(__file__).resolve().parent
 RAW = ROOT / "data" / "aa-raw-models.json"
 AGENTS_RAW = ROOT / "data" / "aa-raw-coding-agents.json"
 OUT = ROOT / "out" / "frontier-models.html"
-
-# The AA Intelligence Index version this file is written against. A bump can
-# rename, add or drop cost-breakdown slugs and rebalance weights that live on
-# AA's methodology page, never in the payload -- v5.0 added FrontierCode 2.0,
-# Terminal-Bench-Science and HLE-Diamond, swapped CritPt for CritPt v2 (Hard
-# Subset), cut GDP.pdf to 5% and removed GDPval-AA, SciCode, AA-LCR and
-# Humanity's Last Exam -- so fetch_aa.py refuses any other MAJOR.MINOR on that
-# page's live headline; point releases (v4.3.2, v5.0.2) do not rebalance
-# and pass, though one may swap a slug (v5.0.2: Terminal-Bench 4.1 for 4.0).
-INDEX_VERSION = "5.0"
-
-# v5.0's evaluations as AA names them, then each cost-breakdown slug's index
-# weight; fetch_aa.py refuses a breakdown whose slugs are not exactly these.
-INDEX_EVALS = [
-    "AA-Briefcase v1.1", "AutomationBench-AA", "GDP.pdf", "FrontierCode 2.0", "Terminal-Bench 4.1",
-    "AA-Omniscience v1.1", "HLE-Diamond", "CritPt v2 (Hard Subset)", "Terminal-Bench-Science 0.1"]
-INDEX_EVAL_WEIGHTS = {
-    "aa-briefcase": 0.15, "automationbench-aa": 0.05, "gdp-pdf": 0.05, "frontiercode-2-0": 0.15,
-    "terminalbench-4-1": 0.10, "terminal-bench-science": 0.15, "critpt-v2-hard": 0.10,
-    "omniscience": 0.15, "hle-diamond": 0.10}
 
 METRIC_ORDER = ("coding", "intelligence", "agentic")
 
@@ -817,39 +798,56 @@ def generation_hold_note(data_dir: pathlib.Path, raw: bytes | None | EllipsisTyp
 ROUTE_EVIDENCE_NAME = "cost-breakdown-window.txt"
 ROUTE_EVIDENCE_RE = re.compile(r"in-run generations: ([1-9][0-9]*)\n"
                                r"detail fills withheld: (yes|no)\n"
-                               r"evaluation costs withheld: (yes|no)\n")
+                               r"evaluation costs withheld: (yes|no)\n"
+                               r"(?:index version: (?:—|([0-9]+(?:\.[0-9]+)*))\n"
+                               r"((?:index evaluation: [A-Za-z0-9._-]+ [0-9]+(?:\.[0-9]+)?% [^\n]+\n)+))?")
 # The route whose withheld join alone empties an axis; intelligence and coding
 # ride routes no generation evidence covers, so their emptying never holds.
 AXIS_ROUTE = {"parameters": "detail", "agentic": "evaluation"}
 
 
-def render_route_evidence(generations: int, detail_withheld: bool,
-                          evaluation_withheld: bool) -> str:
-    """The evidence text: the in-run generation count, and whether the
-    detail route's fills and the GDPval-AA evaluation's costs were withheld
-    because the route matched none of the run's leaderboard looks."""
+def render_route_evidence(generations: int, detail_withheld: bool, evaluation_withheld: bool,
+                          version: str | None = None, composition=()) -> str:
+    """The evidence text: the in-run generation count, whether each route was
+    withheld because it matched none of the run's leaderboard looks, then the
+    confirmed index composition, (slug, weight percent, name) each."""
+    block = f"index version: {version or EM_DASH}\n" if composition else ""
     return (f"in-run generations: {generations}\n"
             f"detail fills withheld: {'yes' if detail_withheld else 'no'}\n"
-            f"evaluation costs withheld: {'yes' if evaluation_withheld else 'no'}\n")
+            f"evaluation costs withheld: {'yes' if evaluation_withheld else 'no'}\n" + block
+            + "".join(f"index evaluation: {slug} {weight:f}% {name}\n" for slug, weight, name in composition))
 
 
-def read_route_evidence(data_dir: pathlib.Path) -> tuple[int, set[str]] | None:
-    """(in-run generations, withheld routes) as fetch_aa.py recorded them.
-
-    None for an absent file and for any text other than an exact rendering:
-    unparseable evidence records no mismatch, so an emptied axis refuses.
-    Text-mode reading folds a checkout's CRLF line ends back to LF. Nothing
-    here reaches the page; it decides the guard and its message.
-    """
+def match_route_evidence(data_dir: pathlib.Path) -> re.Match[str] | None:
+    """The evidence beside the capture, None unless it is an exact rendering;
+    text-mode reading folds a checkout's CRLF line ends back to LF."""
     try:
         text = (data_dir / ROUTE_EVIDENCE_NAME).read_text(encoding="utf-8")
     except (OSError, UnicodeDecodeError):
         return None
-    match = ROUTE_EVIDENCE_RE.fullmatch(text)
+    return ROUTE_EVIDENCE_RE.fullmatch(text)
+
+
+def read_route_evidence(data_dir: pathlib.Path) -> tuple[int, set[str]] | None:
+    """(in-run generations, withheld routes) as fetch_aa.py recorded them, or
+    None: unparseable evidence records no mismatch, so an emptied axis refuses.
+    Neither reaches the page; they decide the guard and its message."""
+    match = match_route_evidence(data_dir)
     if match is None:
         return None
     flags = zip(("detail", "evaluation"), match.group(2, 3))
     return int(match.group(1)), {route for route, flag in flags if flag == "yes"}
+
+
+def read_index_composition(data_dir: pathlib.Path) -> tuple[str | None, list[tuple[str, decimal.Decimal, str]]] | None:
+    """(index version, [(slug, weight percent, name)]) as fetch_aa.py recorded
+    them, for the page's footer and the next capture's confirmation; None when
+    the evidence records no composition or is not an exact rendering."""
+    match = match_route_evidence(data_dir)
+    if match is None or match[5] is None:
+        return None
+    lines = [line.split(" ", 4) for line in match[5].removesuffix("\n").split("\n")]
+    return match[4], [(slug, decimal.Decimal(weight[:-1]), name) for _, _, slug, weight, name in lines]
 
 
 class WindowHold(Exception):
@@ -857,11 +855,10 @@ class WindowHold(Exception):
 
     guard_empty_axes raises it when the run observed >= 2 generations
     in-run and every empty axis traces to a route the evidence records as
-    withheld. main() raises
-    instead of writing: the capture gate catches it on the fresh side and
-    reports the hour unchanged, so the last good page stays live and
-    AA's capture neither commits nor publishes. Never caught inside build.py's own main()
-    -- the CLI wrapper below translates it to a printed report and exit 0.
+    withheld. main() raises instead of writing: the capture gate catches it
+    on the fresh side and reports the hour unchanged, so the last good page
+    stays live and AA's capture neither commits nor publishes. Only the CLI
+    wrapper below translates it, to a printed report and exit 0.
     """
 
 
@@ -1157,6 +1154,8 @@ def main(*, generation_state: bytes | None | EllipsisType = ...):
     # read validates the format because the stamp is interpolated unescaped
     # downstream.
     captured = read_capture_stamp(RAW.parent / "captured-at.txt")
+    index_version, evaluations = read_index_composition(RAW.parent) or (None, [])
+    names = ", ".join(name for _, _, name in evaluations) or EM_DASH
     stats = {
         "total": len(models),
         "plotted": len(intelligence_rows),
@@ -1164,7 +1163,7 @@ def main(*, generation_state: bytes | None | EllipsisType = ...):
         "open": sum(1 for r in intelligence_rows if r["open"]),
         "prop": sum(1 for r in intelligence_rows if not r["open"]),
         "captured": captured,
-        "evals": INDEX_EVALS,
+        "evals": (f" v{index_version}" if index_version else "") + f" comprises {names}",
         "bases": len(ceiling),
         "sibBeaten": sib_beaten,
         "frontFull": len(front),
@@ -1378,7 +1377,7 @@ TEMPLATE = r"""<!DOCTYPE html>
 
   <section id="intelligence">
     <h2>2 &middot; Intelligence Index</h2>
-    <p class="sub">AA's broad v5.0 synthesis across knowledge work, coding, science and general capability.</p>
+    <p class="sub">AA's broad synthesis across its Intelligence Index evaluations.</p>
     <div class="card">
       <div class="cap">Intelligence Index vs cost per task &middot; log cost axis &middot; up-and-left is better
         &middot; click any point to pin its name</div>
@@ -1488,10 +1487,10 @@ TEMPLATE = r"""<!DOCTYPE html>
   </section>
 
   <div class="foot">
-    <p>Sourced entirely from Artificial Analysis. Intelligence Index v5.0 comprises
-      <span id="evals"></span>. The Coding Agent Index carries its own measured cost per task, and the
-      Intelligence Index cost is AA's own total. Model rows combine the leaderboard and detail corpus;
-      shared models use leaderboard values, with detail fills. Detail-only models can lag a generation
+    <p>Sourced entirely from Artificial Analysis. Intelligence Index<span id="evals"></span>.
+      The Coding Agent Index carries its own measured cost per task, and the Intelligence Index
+      cost is AA's own total. Model rows combine the leaderboard and detail corpus; shared models
+      use leaderboard values, with detail fills. Detail-only models can lag a generation
       and lack leaderboard-only speed measurements. No score, token price or task measurement is
       estimated, and nothing is filled in from another source. Rebuild with
       <code>python3 scripts/fetch_aa.py &amp;&amp; python3 build.py</code>.</p>
@@ -1537,7 +1536,7 @@ const DATA = __DATA__;
   $("cCoding").textContent = S.metricCounts.coding;
   $("cAgentic").textContent = S.metricCounts.agentic;
   $("cParams").textContent = S.parameterCount;
-  $("evals").textContent  = S.evals.join(", ");
+  $("evals").textContent  = S.evals;
 
   // An empty lab (some coding-agent runs do not name one) is not a category:
   // skip it here so no blank entry reaches the dropdown, and show() renders

@@ -10,7 +10,8 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent / "scripts
 
 import fetch_aa  # noqa: E402  # pylint: disable=wrong-import-position
 import build  # noqa: E402  # pylint: disable=wrong-import-position
-from test_build import v5_evaluations  # noqa: E402  # pylint: disable=wrong-import-position,wrong-import-order
+from _methodology import CITED, RECORDED, methodology_html  # noqa: E402  # pylint: disable=wrong-import-position,wrong-import-order
+from test_build import route_evidence, v5_evaluations  # noqa: E402  # pylint: disable=wrong-import-position,wrong-import-order
 
 
 @pytest.mark.parametrize("rich_key", ["initialModels", "models"])
@@ -99,7 +100,7 @@ def page(records, rich_name):
               "releaseSlug": r["slug"]} for r in records]
     payload = json.dumps([{rich_name: records}, {"models": index}],
                          separators=(",", ":"))
-    return f"<script>self.__next_f.push([1,{json.dumps(payload)}])</script>"
+    return f"<p>{CITED}</p><script>self.__next_f.push([1,{json.dumps(payload)}])</script>"
 
 
 def capture_pages(tmp_path, monkeypatch, first, second, detail, prev=None, state=None):
@@ -108,9 +109,7 @@ def capture_pages(tmp_path, monkeypatch, first, second, detail, prev=None, state
     methodology = tmp_path / "methodology.html"
     base.write_text(page(first, "initialModels"), encoding="utf-8")
     detail_path.write_text(page(detail, "models"), encoding="utf-8")
-    methodology.write_text(
-        f"Artificial Analysis Intelligence Index v{fetch_aa.INDEX_VERSION}",
-        encoding="utf-8")
+    methodology.write_text(methodology_html(), encoding="utf-8")
 
     def next_look(_seconds):
         base.write_text(page(second, "initialModels"), encoding="utf-8")
@@ -332,8 +331,7 @@ def test_each_route_window_holds_or_refuses_by_its_recorded_evidence(tmp_path, m
         record["scores"] = {"gdpval-aa-normalized": 900.0}
     base.write_text(page(looks[0], "initialModels"), encoding="utf-8")
     detail.write_text(page(detail_rows, "models"), encoding="utf-8")
-    methodology.write_text(f"Artificial Analysis Intelligence Index v{fetch_aa.INDEX_VERSION}",
-                           encoding="utf-8")
+    methodology.write_text(methodology_html(), encoding="utf-8")
     agents_payload = json.dumps({"rows": [
         {"id": str(i), "displayLabel": f"Agent {i}", "hostModelSlug": "current",
          "indexScore": 0.5, "mean": {"costUsd": 1}} for i in range(5)]})
@@ -355,11 +353,13 @@ def test_each_route_window_holds_or_refuses_by_its_recorded_evidence(tmp_path, m
     monkeypatch.setattr(fetch_aa.fetch_gdpval, "fetch", lambda *_args: fetch_aa.fetch_gdpval.Evaluation(
         [{"slug": "current", "intelligenceIndex": eval_ii}], {} if eval_cost is None else {"current": eval_cost},
         "/data/gdpval.txt"))
+    # The previous hour's evidence: a window hour's unchanged composition is confirmed by it.
+    (data / build.ROUTE_EVIDENCE_NAME).write_text(route_evidence(7) + RECORDED, encoding="utf-8")
     fetch_aa.main()
     assert f"{evidence[0]} generation(s) observed in-run" in capsys.readouterr().out
     assert (data / build.ROUTE_EVIDENCE_NAME).read_text(encoding="utf-8") == (
         f"in-run generations: {evidence[0]}\ndetail fills withheld: {evidence[1]}\n"
-        f"evaluation costs withheld: {evidence[2]}\n")
+        f"evaluation costs withheld: {evidence[2]}\n{RECORDED}")
     if outcome == "publish":
         build.main(generation_state=None)
         assert output.exists()

@@ -16,6 +16,7 @@ from playwright.sync_api import (
     sync_playwright)
 
 import test_build
+from _methodology import COMPOSITION, RECORDED, VERSION
 
 import build
 from scripts.browser_temp import chromium_browser
@@ -225,8 +226,8 @@ class BrowserInteractionTests(unittest.TestCase):
             json.dumps(_in_run_disputed_models()), encoding="utf-8")
         (data / "aa-raw-coding-agents.json").write_text(
             json.dumps(DISPUTED_FIXTURE_AGENTS), encoding="utf-8")
-        (data / "captured-at.txt").write_text("2026-10-07\n",
-                                              encoding="utf-8")
+        (data / "captured-at.txt").write_text("2026-10-07\n", encoding="utf-8")
+        (data / build.ROUTE_EVIDENCE_NAME).write_text(test_build.route_evidence(2) + RECORDED, encoding="utf-8")
         ambient_out = build.OUT
         old_raw, old_agents = build.RAW, build.AGENTS_RAW
         try:
@@ -314,6 +315,13 @@ class BrowserInteractionTests(unittest.TestCase):
         self.fail(
             f"no point at {selector!r} was hoverable in {attempts} candidates "
             f"(last error: {last})")
+
+    def test_the_footer_names_the_recorded_composition(self):
+        names = ", ".join(name for _, _, name in COMPOSITION)
+        page = self._capture_page("disputed")
+        self.assertIn(f"Intelligence Index v{VERSION} comprises {names}. The",
+                      page.locator("p:has(#evals)").inner_text())
+        page.close()
 
     def test_non_frontier_points_pin_a_visible_name_on_capability_charts(self):
         for metric in ("coding", "parameters"):
@@ -2419,6 +2427,11 @@ class DisputeBrowserTests(unittest.TestCase):
     # td, row order preserved -- the module's TBODY_DOM expression, the same
     # one the #97 drift test reads, so every drift contract is one comparison.
     _TBODY_DOM = TBODY_DOM
+
+    def test_the_footer_without_a_recorded_composition_names_no_version(self):
+        page = self._loaded_page()
+        self.assertIn("Intelligence Index comprises —. The", page.locator("p:has(#evals)").inner_text())
+        page.close()
 
     def test_disputed_points_and_connector_render_per_chart(self):
         for key in ("intelligence", "agentic"):
