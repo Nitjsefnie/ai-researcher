@@ -20,8 +20,8 @@ GDPVAL_VERSION = "2.1"
 # AA's GDPval-AA taskCount from its evaluation-config chunk.
 GDPVAL_TASK_COUNT = 220
 COST_FIELD = "gdpvalCostPerTask"
-# A live page/data pair failing GCM authentication is re-read, page and data together,
-# AUTH_ATTEMPTS times IN TOTAL with AUTH_REREAD_SECONDS between attempts (issue #406);
+# A live page/data pair that fails to read or authenticate is re-read, page and data together,
+# AUTH_ATTEMPTS times IN TOTAL with AUTH_REREAD_SECONDS between attempts (issues #406, #463);
 # a cached input is read once.
 # Worst case, each fetch bounded at fetch_aa's 65 s window + 25 s = 90 s: 2 * (90 + 90) + 180 = 540 s,
 # which fetch_aa's RetryBoundArithmeticTests add to the capture's other worst-case terms.
@@ -176,35 +176,41 @@ def _manifest(page: str, flight_payload) -> dict:
         sys.exit(f"{GDPVAL_URL}: missing or invalid flight manifest ({exc})")
 
 
+def _pair(cached_page, cached_data, fetch_html, flight_payload, user_agent, timeout, sleep, window):
+    """One read of the page and its data file: the data path and its decrypted bytes."""
+    try:
+        page = fetch_html(cached_page, GDPVAL_URL)
+    except OSError as exc:
+        sys.exit(f"{GDPVAL_URL}: page read failed: {exc}")
+    manifest = _manifest(page, flight_payload)
+    path = manifest["path"]
+    try:
+        body = (pathlib.Path(cached_data).read_bytes() if cached_data else
+                fetch_http.fetch_bytes("https://artificialanalysis.ai" + path,
+                                       {"User-Agent": user_agent}, timeout, sleep=sleep, window=window))
+    except OSError as exc:
+        sys.exit(f"{path}: data read failed: {exc}")
+    key = bytes.fromhex(manifest["key"])
+    nonce = hashlib.sha256(key).digest()[:12]
+    try:
+        return path, aa_aes_gcm.decrypt(key, nonce, body)
+    except ValueError as exc:
+        sys.exit(f"{path}: data authentication or decryption failed: {exc}")
+
+
 def _authenticated(cached_page, cached_data, fetch_html, flight_payload, user_agent, timeout,
                    sleep, window):
-    """The data path and its decrypted bytes; a live pair that fails authentication is re-read together."""
+    """The data path and its decrypted bytes; a live pair that fails in any way is re-read together."""
+    read = (cached_page, cached_data, fetch_html, flight_payload, user_agent, timeout, sleep, window)
     attempts = 1 if cached_page or cached_data else AUTH_ATTEMPTS
-    for attempt in range(1, attempts + 1):
+    for attempt in range(1, attempts):
         try:
-            page = fetch_html(cached_page, GDPVAL_URL)
-        except OSError as exc:
-            sys.exit(f"{GDPVAL_URL}: page read failed: {exc}")
-        manifest = _manifest(page, flight_payload)
-        path = manifest["path"]
-        try:
-            body = (pathlib.Path(cached_data).read_bytes() if cached_data else
-                    fetch_http.fetch_bytes("https://artificialanalysis.ai" + path,
-                                           {"User-Agent": user_agent}, timeout, sleep=sleep, window=window))
-        except OSError as exc:
-            sys.exit(f"{path}: data read failed: {exc}")
-        key = bytes.fromhex(manifest["key"])
-        nonce = hashlib.sha256(key).digest()[:12]
-        try:
-            return path, aa_aes_gcm.decrypt(key, nonce, body)
-        except ValueError as exc:
-            if attempt == attempts:
-                sys.exit(f"{path}: data authentication or decryption failed: {exc}")
-            print(f"{path}: authentication attempt {attempt} of {attempts} failed "
-                  f"({exc}); re-reading page and data in {AUTH_REREAD_SECONDS}s",
-                  file=sys.stderr)
+            return _pair(*read)
+        except SystemExit as exc:
+            print(f"GDPval-AA attempt {attempt} of {attempts} failed ({exc}); "
+                  f"re-reading page and data in {AUTH_REREAD_SECONDS}s", file=sys.stderr)
             sleep(AUTH_REREAD_SECONDS)
-    raise AssertionError("_authenticated ran out of attempts without a verdict")
+    return _pair(*read)
 
 
 def fetch(cached_page, cached_data, fetch_html, flight_payload, user_agent, timeout, sleep, window=None):
