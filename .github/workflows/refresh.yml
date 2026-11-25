@@ -699,7 +699,7 @@ jobs:
           # route evidence, which the staging step copies into every AA
           # payload (issue #441).
           if [ -d "${PAYLOAD}/tree" ]; then
-            cp -a "${PAYLOAD}/tree/." ./
+            cp -R "${PAYLOAD}/tree/." ./
             git add data/aa-raw-models.json data/aa-raw-coding-agents.json \
                     data/aa-generation-state.json data/captured-at.txt out/frontier-models.html \
                     data/cost-breakdown-window.txt
