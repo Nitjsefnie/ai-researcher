@@ -63,7 +63,8 @@
         0.07
       ],
       "tests/test_ci_gate_output_wiring.py": [
-        15.91
+        15.91,
+        23.95
       ],
       "tests/test_ci_install_chromium.py": [
         0.62,
@@ -77,7 +78,8 @@
         0.08
       ],
       "tests/test_ci_perf_budgets.py": [
-        0.37
+        0.37,
+        2.14
       ],
       "tests/test_ci_ratchets.py": [
         9.53,
@@ -152,6 +154,9 @@
       "tests/test_gitignore.py": [
         0.29
       ],
+      "tests/test_index_composition.py": [
+        0.28
+      ],
       "tests/test_publish_docs.py": [
         0.04
       ],
@@ -161,7 +166,8 @@
         7.1
       ],
       "tests/test_refresh_github_fetch.py": [
-        6.3
+        6.3,
+        8.19
       ],
       "tests/test_refresh_hub_upload.py": [
         3.52,
@@ -254,14 +260,16 @@
       ],
       "tests/test_ci_ratchets.py": [
         16.9,
-        10.42
+        10.42,
+        27.23
       ],
       "tests/test_ci_update_chromium_digests.py": [
         0.07
       ],
       "tests/test_ci_workflows.py": [
         2.44,
-        1.43
+        1.43,
+        3.95
       ],
       "tests/test_commit_scopes.py": [
         5.36,
@@ -319,7 +327,8 @@
       "tests/test_gate_base_freshness_imports.py": [
         9.66,
         15.09,
-        5.58
+        5.58,
+        18.87
       ],
       "tests/test_gate_base_freshness_tokens.py": [
         0.83
@@ -327,11 +336,15 @@
       "tests/test_gitignore.py": [
         0.56
       ],
+      "tests/test_index_composition.py": [
+        0.51
+      ],
       "tests/test_publish_docs.py": [
         0.07
       ],
       "tests/test_refresh_capture_overlap.py": [
-        6.36
+        6.36,
+        9.18
       ],
       "tests/test_refresh_github_fetch.py": [
         12.42,
@@ -396,7 +409,8 @@
         19.34
       ],
       "tests/test_ci_download_sites.py": [
-        11.46
+        11.46,
+        16.34
       ],
       "tests/test_ci_gate_botdata.py": [
         0.27
@@ -427,7 +441,8 @@
       ],
       "tests/test_ci_workflows.py": [
         2.19,
-        3.23
+        3.23,
+        4.47
       ],
       "tests/test_commit_scopes.py": [
         2.11
@@ -483,6 +498,9 @@
       ],
       "tests/test_gitignore.py": [
         0.55
+      ],
+      "tests/test_index_composition.py": [
+        0.67
       ],
       "tests/test_publish_docs.py": [
         0.08
@@ -606,7 +624,8 @@
       ],
       "tests/test_fetch_aa.py": [
         6.36,
-        8.66
+        8.66,
+        11.94
       ],
       "tests/test_fetch_aa_detail_fills.py": [
         0.21
@@ -652,6 +671,9 @@
       "tests/test_gitignore.py": [
         0.34
       ],
+      "tests/test_index_composition.py": [
+        0.58
+      ],
       "tests/test_publish_docs.py": [
         0.05
       ],
@@ -683,7 +705,8 @@
         0.16
       ],
       "tests/test_browser_temp.py": [
-        0.72
+        0.72,
+        1.75
       ],
       "tests/test_build.py": [
         2.31
@@ -811,6 +834,9 @@
       "tests/test_gitignore.py": [
         1.1
       ],
+      "tests/test_index_composition.py": [
+        0.63
+      ],
       "tests/test_publish_docs.py": [
         0.11
       ],
@@ -858,10 +884,12 @@
         7.18
       ],
       "tests/test_check_committed_page.py": [
-        3.07
+        3.07,
+        1.99
       ],
       "tests/test_check_committed_rankings_page.py": [
-        63.74
+        63.74,
+        42.34
       ],
       "tests/test_ci_apt_deb_cache.py": [
         0.09
@@ -888,7 +916,8 @@
         0.21
       ],
       "tests/test_ci_install_chromium.py": [
-        1.77
+        1.77,
+        2.95
       ],
       "tests/test_ci_install_valgrind.py": [
         1.09
@@ -921,7 +950,8 @@
         3.08
       ],
       "tests/test_fetch_aa.py": [
-        13.41
+        13.41,
+        9.37
       ],
       "tests/test_fetch_aa_detail_fills.py": [
         0.6
@@ -967,6 +997,9 @@
       "tests/test_gitignore.py": [
         0.77
       ],
+      "tests/test_index_composition.py": [
+        0.4
+      ],
       "tests/test_publish_docs.py": [
         0.08
       ],
@@ -974,7 +1007,8 @@
         0.0
       ],
       "tests/test_refresh_github_fetch.py": [
-        9.83
+        9.83,
+        6.66
       ],
       "tests/test_refresh_hub_upload.py": [
         0.0
