@@ -55,13 +55,17 @@ def _running(capture):
     return found
 
 
-def _release_capture(repo, capture):
-    (repo / 'release').touch()
-    deadline = time.monotonic() + 10
+def _wait_for_exit(capture, seconds, event):
+    deadline = time.monotonic() + seconds
     while running := _running(capture):
         if time.monotonic() >= deadline:
-            pytest.fail(f'capture processes did not exit after release: {running}')
+            pytest.fail(f'capture processes still running {seconds} s after {event}: {running}')
         time.sleep(0.01)
+
+
+def _release_capture(repo, capture):
+    (repo / 'release').touch()
+    _wait_for_exit(capture, 10, 'release')
 
 
 def _start(tmp_path, status):
@@ -218,16 +222,13 @@ def test_collection_waits_for_the_live_capture(tmp_path):
 def test_dead_capture_without_status_fails_without_hanging(tmp_path):
     repo, runner, env = _start(tmp_path, 0)
     pid = int((runner / 'aa-capture.pid').read_text(encoding='utf-8'))
-    capture = {member: int((repo / f'{member}.pid').read_text(encoding='utf-8'))
-               for member in ('child', 'worker')}
+    capture = {name: int((repo / f'{name}.pid').read_text(encoding='utf-8')) for name in ('child', 'worker')}
     assert _running(capture).keys() == capture.keys()
     os.kill(pid, signal.SIGKILL)
     try:
         done = _run(repo, 'Capture the leaderboard', env)
-        # Observe the capture and its descendant before releasing the fixture.
-        running = _running(capture)
-        assert not running, (f'capture processes still running after the step exited {done.returncode} '
-                             f'with stderr {done.stderr!r}: {running}')
+        # Before the release: a killed process may still be exiting, and 5 s stays inside the fixture's 30 s.
+        _wait_for_exit(capture, 5, f'the step exited {done.returncode} with stderr {done.stderr!r}')
     finally:
         _release_capture(repo, capture)
     assert done.returncode != 0
@@ -242,9 +243,8 @@ def test_status_arrives_during_liveness_check(tmp_path):
     (runner / 'aa-capture.stdout').write_text('capture stdout\n', encoding='utf-8')
     (runner / 'aa-capture.stderr').write_text('capture diagnostic\n', encoding='utf-8')
     shell_env = tmp_path / 'race-env.sh'
-    shell_env.write_text(
-        'kill() { printf "7\\n" > "$RUNNER_TEMP/aa-capture.status"; return 1; }\n',
-        encoding='utf-8')
+    shell_env.write_text('kill() { printf "7\\n" > "$RUNNER_TEMP/aa-capture.status"; return 1; }\n',
+                         encoding='utf-8')
     env = {'PATH': os.environ['PATH'], 'RUNNER_TEMP': str(runner),
            'GITHUB_OUTPUT': str(tmp_path / 'output'), 'BASH_ENV': str(shell_env)}
     done = _run(tmp_path, 'Capture the leaderboard', env)
