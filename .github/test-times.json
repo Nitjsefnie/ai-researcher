@@ -29,7 +29,8 @@
       ],
       "tests/test_capture_gate.py": [
         1.69,
-        3.05
+        3.05,
+        4.06
       ],
       "tests/test_check_committed_page.py": [
         2.45,
@@ -37,7 +38,8 @@
       ],
       "tests/test_check_committed_rankings_page.py": [
         27.67,
-        19.05
+        19.05,
+        35.58
       ],
       "tests/test_ci_apt_deb_cache.py": [
         0.02
@@ -103,10 +105,12 @@
         1.19
       ],
       "tests/test_environment_prefix.py": [
-        1.64
+        1.64,
+        3.3
       ],
       "tests/test_fetch_aa.py": [
-        5.93
+        5.93,
+        12.28
       ],
       "tests/test_fetch_aa_detail_fills.py": [
         0.3
@@ -172,7 +176,8 @@
       "tests/test_refresh_hub_upload.py": [
         3.52,
         5.03,
-        6.58
+        6.58,
+        8.54
       ],
       "tests/test_refresh_workflow.py": [
         68.72,
@@ -199,7 +204,8 @@
       ],
       "tests/test_build_rankings.py": [
         14.77,
-        9.45
+        9.45,
+        21.71
       ],
       "tests/test_build_rankings_identity.py": [
         12.61,
@@ -234,7 +240,8 @@
         55.11
       ],
       "tests/test_ci_download_sites.py": [
-        15.05
+        15.05,
+        20.44
       ],
       "tests/test_ci_gate_botdata.py": [
         0.12
@@ -394,7 +401,8 @@
         0.94
       ],
       "tests/test_check_committed_rankings_page.py": [
-        8.41
+        8.41,
+        5.53
       ],
       "tests/test_ci_apt_deb_cache.py": [
         0.05
@@ -434,7 +442,8 @@
         0.71
       ],
       "tests/test_ci_ratchets.py": [
-        4.01
+        4.01,
+        2.32
       ],
       "tests/test_ci_update_chromium_digests.py": [
         0.02
@@ -488,10 +497,12 @@
         0.03
       ],
       "tests/test_gate_base_freshness.py": [
-        6.02
+        6.02,
+        4.14
       ],
       "tests/test_gate_base_freshness_imports.py": [
-        2.82
+        2.82,
+        1.6
       ],
       "tests/test_gate_base_freshness_tokens.py": [
         0.22
@@ -728,7 +739,8 @@
         3.3
       ],
       "tests/test_check_committed_rankings_page.py": [
-        62.31
+        62.31,
+        80.61
       ],
       "tests/test_ci_apt_deb_cache.py": [
         0.11
@@ -767,7 +779,8 @@
         1.64
       ],
       "tests/test_ci_ratchets.py": [
-        51.11
+        51.11,
+        68.15
       ],
       "tests/test_ci_update_chromium_digests.py": [
         0.04
@@ -788,7 +801,8 @@
       ],
       "tests/test_fetch_aa.py": [
         11.54,
-        15.19
+        15.19,
+        19.96
       ],
       "tests/test_fetch_aa_detail_fills.py": [
         0.5
