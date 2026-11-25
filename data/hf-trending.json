@@ -23,13 +23,13 @@
       "id": "apple/DepthPro2"
     },
     {
-      "id": "harness-hub/Qwen3.8-27B-pi-adapted"
-    },
-    {
       "id": "llamaindex/OCRia-nano-1"
     },
     {
-      "id": "higurashi-ai/Haru-4B"
+      "id": "harness-hub/Qwen3.8-27B-pi-adapted"
+    },
+    {
+      "id": "inclusionAI/Ling-3.2-air"
     }
   ]
 }
