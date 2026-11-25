@@ -20,16 +20,16 @@
       "id": "prism-ml/Ternary-Bonsai-2.5-27B-GGUF"
     },
     {
-      "id": "harness-hub/Qwen3.8-27B-pi-adapted"
-    },
-    {
       "id": "apple/DepthPro2"
     },
     {
-      "id": "higurashi-ai/Haru-4B"
+      "id": "harness-hub/Qwen3.8-27B-pi-adapted"
     },
     {
       "id": "llamaindex/OCRia-nano-1"
+    },
+    {
+      "id": "higurashi-ai/Haru-4B"
     }
   ]
 }
