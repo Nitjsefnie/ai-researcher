@@ -243,7 +243,8 @@
       ],
       "tests/test_ci_download_sites.py": [
         15.05,
-        20.44
+        20.44,
+        10.61
       ],
       "tests/test_ci_gate_botdata.py": [
         0.12
@@ -446,7 +447,8 @@
       ],
       "tests/test_ci_ratchets.py": [
         4.01,
-        2.32
+        2.32,
+        6.09
       ],
       "tests/test_ci_update_chromium_digests.py": [
         0.02
@@ -467,7 +469,8 @@
       ],
       "tests/test_fetch_aa.py": [
         9.66,
-        6.1
+        6.1,
+        12.45
       ],
       "tests/test_fetch_aa_detail_fills.py": [
         0.29
@@ -738,7 +741,8 @@
         0.17
       ],
       "tests/test_capture_gate.py": [
-        7.0
+        7.0,
+        4.13
       ],
       "tests/test_check_committed_page.py": [
         3.3,
@@ -806,7 +810,8 @@
         1.52
       ],
       "tests/test_environment_prefix.py": [
-        3.02
+        3.02,
+        1.96
       ],
       "tests/test_fetch_aa.py": [
         11.54,
@@ -979,13 +984,15 @@
       ],
       "tests/test_fetch_aa.py": [
         13.41,
-        9.37
+        9.37,
+        16.85
       ],
       "tests/test_fetch_aa_detail_fills.py": [
         0.6
       ],
       "tests/test_fetch_aa_membership.py": [
-        0.59
+        0.59,
+        6.2
       ],
       "tests/test_fetch_aa_parse.py": [
         0.02
