@@ -540,7 +540,7 @@ jobs:
   # (issue #206). Failed producers stay red without blocking survivors.
   # The committer and push jobs execute no artifact byte; their only tree code is the retry
   # helper and the download action at github.sha, this workflow text's own commit. Each hub job
-  # runs both, publish_docs.py and its imports. `./` because actionlint rejects `$/`.
+  # runs both, publish_docs.py and its imports.
   #
   # The push race and its outcomes are in the header; the committer concedes
   # the one race no base check sees, main landing a newer workflow
