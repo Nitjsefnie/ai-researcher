@@ -69,15 +69,15 @@ jobs:
       #
       # The fork, not rhysd's own release: stock 1.7.12 does not know the
       # `queue:` key in a concurrency group and rejects claim.yml's
-      # reference block with `unexpected key "queue"`.
-      # v1.7.12-queue.1 carries upstream rhysd/actionlint#654; the same pin
-      # runs in the claim, pr-gate and daedalus repositories. Return to
-      # rhysd's own release once it ships the key.
-      AI_RESEARCHER_ACTIONLINT_VERSION: 1.7.12-queue.1
+      # reference block with `unexpected key "queue"`. The fork adds
+      # rhysd/actionlint#654 (`queue`), #732 (`$/` uses) and #707
+      # (`job.workflow_ref`); the claim, pr-gate and daedalus repositories
+      # run this fork too. Return to rhysd's own release once it ships them.
+      AI_RESEARCHER_ACTIONLINT_VERSION: 1.7.12-queue.3
       AI_RESEARCHER_ACTIONLINT_REPO: Nitjsefnie-OSC/actionlint
-      # sha256 of actionlint_1.7.12-queue.1_linux_amd64.tar.gz, from the
-      # release's own checksums file. Bump all three together.
-      AI_RESEARCHER_ACTIONLINT_SHA256: dcc2c42a7caaa197dfe63584a3851f62ef260f80b2cf221baaf05479661e1521
+      # sha256 of actionlint_1.7.12-queue.3_linux_amd64.tar.gz. Bump all
+      # three together.
+      AI_RESEARCHER_ACTIONLINT_SHA256: 56693f8e7182360d8ecb67cbfc39cc674cde5d1b510507fff562b158bb4fc7bc
 
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
