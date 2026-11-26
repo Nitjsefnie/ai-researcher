@@ -1,11 +1,11 @@
 {
   ".github/dependabot.yml": [
-    1607,
-    2119
+    1587,
+    2097
   ],
   ".github/workflows/actionlint.yml": [
-    5443,
-    7509
+    5436,
+    7518
   ],
   ".github/workflows/audit.yml": [
     4193,
@@ -16,12 +16,12 @@
     7246
   ],
   ".github/workflows/codeql.yml": [
-    3174,
-    4114
+    3005,
+    3934
   ],
   ".github/workflows/lint.yml": [
-    1047,
-    1824
+    1045,
+    1822
   ],
   ".github/workflows/pr-gate.yml": [
     427,
