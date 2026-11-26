@@ -24,8 +24,6 @@ updates:
     commit-message:
       prefix: "build"
       include: scope
-    labels:
-      - dependencies
 
   # The workflows and local actions pin every action to a commit SHA with the
   # version in a trailing comment. A SHA pin does not move at all — which is the point,
@@ -46,8 +44,6 @@ updates:
     commit-message:
       prefix: "ci"
       include: scope
-    labels:
-      - dependencies
     # github/codeql-action/init and .../analyze are separate dependencies to
     # Dependabot, so ungrouped it files ONE HALF-BUMP PR PER PIN — and a tree
     # whose init and analyze pins disagree fails every CodeQL run at SARIF
@@ -59,14 +55,12 @@ updates:
     # updates are enabled on this repository, so the mirror group below is what
     # keeps a security bump to codeql-action in one PR. Without it, each `uses:`
     # line arrives as its own PR, splitting init from analyze across SHAs.
-    # Shaped like the security group in Nitjsefnie-Actions/claim and
-    # Nitjsefnie-Actions/pr-gate.
     groups:
-      actions:
+      github-actions:
         applies-to: version-updates
         patterns:
           - "*"
-      actions-security:
+      github-actions-security:
         applies-to: security-updates
         patterns:
           - "*"
