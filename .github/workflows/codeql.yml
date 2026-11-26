@@ -1,23 +1,21 @@
 name: codeql
 
 # Static security analysis (advanced setup, not the repo-settings "default
-# setup" — the config lives here so it is reviewable in a diff like every
-# other gate). Findings land in the Security tab rather than turning the build
-# red, so a new query shipping upstream cannot block an unrelated push.
+# setup": the config lives here, reviewable in a diff like every other gate).
+# Findings land in the Security tab rather than turning the build red, so a
+# new query shipping upstream cannot block an unrelated push.
 #
 # THE JOB IS GATED ON VISIBILITY. Code scanning is free on public repositories
 # and needs GitHub Code Security on private ones: without it the upload fails
-# with "Code scanning is not enabled for this repository". A gate that is red on
-# every push for a reason no commit can fix is one people learn to ignore, so
-# the job skips itself instead of failing. It runs today because the repository
-# is public; a private fork gets a skip rather than a red X, and enabling Code
-# Security there is what turns it back on.
+# with "Code scanning is not enabled for this repository". A gate red on every
+# push for a reason no commit can fix is one people learn to ignore, so the
+# job skips itself instead: a private fork gets a skip rather than a red X,
+# and enabling Code Security there turns it back on.
 #
-# The weekly cron is not redundant with push: CodeQL's query packs are updated
-# continuously, and a new query only ever runs against code that has changed
-# since it shipped. Without the cron, a rule published today would never be
-# applied to a file last touched last year — which, in a repo that goes weeks
-# between pushes, is most of it.
+# The weekly cron is not redundant with push: CodeQL's query packs update
+# continuously, and a new query only ever runs against code changed since it
+# shipped, so without the cron a rule published today never reaches a file
+# last touched a year ago.
 
 on:
   workflow_call:
@@ -29,26 +27,25 @@ on:
     # Standalone dispatch runs (no ci-gate classification) run every job
     # unconditionally.
 
-# The push and pull_request triggers, and their paths-ignore deny-list
-# (`**/*.md` / LICENSE / .gitignore), live in ci-gate.yml: a trigger filter
-# cannot report, so a required-check ruleset could never go green on a
-# documentation-only change. The weekly cron stays here: CodeQL's
-# query packs update continuously, and a new query must still reach code
-# that has changed since it shipped.
+# This file is a ci-gate.yml callee: it keeps `workflow_call`, the weekly
+# cron and `workflow_dispatch`, while ci-gate owns `push` and `pull_request`,
+# unfiltered, since a trigger filter starts no run and the required check
+# goes missing; its classification narrows the legs instead.
 #
 # PR heads still run untrusted code under the caller's pull_request run
 # (the callee executes the caller's merge ref), so this job's only write is
 # the `security-events: write` upload of its OWN analysis results, and the
 # scheduled publish path (refresh.yml) stays off PR events entirely.
 
-# The workflow-level floor. A workflow with no permissions block at all hands
-# every job the repository's default token scopes — potentially read/write —
-# so the read-only baseline is declared here even though the single job below
-# overrides it wholesale with its own block.
-permissions:
-  contents: read
+# Deny by default: a workflow with no permissions block hands every job the
+# repository's default token scopes, so this empty block denies them and each
+# job declares the grant it uses.
+permissions: {}
 
 concurrency:
+  # The caller's convention, not a standalone `codeql-<ref>` group: one group
+  # per pull request or per pushed SHA, so a later push's legs never cancel
+  # an earlier push's.
   group: codeql-${{ github.event.pull_request.number || (github.event_name == 'push' && github.sha) || github.ref }}
   cancel-in-progress: true
 
@@ -58,9 +55,9 @@ jobs:
     runs-on: ubuntu-latest
     # See the header: private repositories cannot upload the results.
     if: ${{ github.repository_visibility == 'public' }}
-    # A hung analysis fails in 30 minutes instead of holding GitHub's 6-hour
+    # A hung analysis fails in 15 minutes instead of holding GitHub's 6-hour
     # default.
-    timeout-minutes: 30
+    timeout-minutes: 15
 
     permissions:
       # Writing the analysis results is the whole point; everything else stays
