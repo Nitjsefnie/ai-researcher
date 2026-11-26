@@ -68,9 +68,10 @@ def checkout_copy(tmp_path, boundary, fallback=None):
     """A workspace holding the real helper, and a bin dir whose `python`,
     `python3` and `zizmor` run `boundary` (or `fallback` for any other script)."""
     workspace = tmp_path / "ws"
-    for relative in ("scripts/ci/download.py", "scripts/fetch_http.py"):
+    for relative in ("scripts/ci/download.py", "scripts/fetch_http.py",
+                     ".github/scripts/gitleaks_scan.sh", ".github/scripts/retry.sh"):
         (workspace / relative).parent.mkdir(parents=True, exist_ok=True)
-        shutil.copyfile(REPO_ROOT / relative, workspace / relative)
+        shutil.copy(REPO_ROOT / relative, workspace / relative)
     stub = tmp_path / "bin"
     stub.mkdir()
     (stub / "boundary.py").write_text(boundary, encoding="utf-8")
@@ -152,7 +153,12 @@ def test_a_site_retries_a_gateway_error_then_its_consumer_runs_the_tool(
     assert f"fake {tool} " in result.stdout
     consumer = _workflowrun.step_by_name(
         REPO_ROOT / ".github" / "workflows" / workflow, job, CONSUMERS[tool])
-    consumed = _workflowrun.run_step(workspace, consumer, dict(os.environ))
+    # The scan reads the base branch's config from origin; the workspace serves as its own.
+    for args in (["init", "-q", "-b", "main"], ["commit", "-q", "--allow-empty", "-m", "base"],
+                 ["remote", "add", "origin", str(workspace)]):
+        subprocess.run(["git", "-c", "user.name=t", "-c", "user.email=t@example.com", *args],
+                       cwd=workspace, check=True)
+    consumed = _workflowrun.run_step(workspace, consumer, {**os.environ, "AI_RESEARCHER_BASE_REF": "main"})
     assert consumed.returncode == 0, consumed.stderr
     assert consumed.stdout.startswith(f"fake {tool} ")
 
