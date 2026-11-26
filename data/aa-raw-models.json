@@ -30429,8 +30429,8 @@
   "briefcaseBreakdown": {
    "overall": {
     "elo": 1671.96,
-    "lower95ci": 1661.91,
-    "upper95ci": 1682.06
+    "lower95ci": 1662.59,
+    "upper95ci": 1682.53
    },
    "rubricPassRate": 0.5040404040404041,
    "analyticalQuality": {
@@ -32522,10 +32522,10 @@
   "modelCreatorColor": "#34A853",
   "modelCreatorLogo": "/img/logos/google.svg",
   "contextWindowTokens": 256000,
-  "intelligenceIndex": null,
+  "intelligenceIndex": 3.97138310569178,
   "omniscience": -52.03333333333333,
   "scores": {
-   "aa-briefcase": 318.08,
+   "aa-briefcase": 318.8,
    "omniscience-accuracy": 0.184,
    "omniscience-non-hallucination": 0.13684640522875813,
    "automationbench-aa": 0.019430215909597492,
@@ -32534,6 +32534,7 @@
    "hle-diamond": 0.062,
    "gdp-pdf": 0.026,
    "terminalbench-4-1": 0,
+   "critpt-v2-hard": 0.06,
    "gdpval-aa-normalized": 572.57,
    "itbench-aa": 0.236346516007533,
    "mmmu-pro": 0.692485549132948,
@@ -32549,6 +32550,8 @@
    "ifbench": 0.724489795918367,
    "tau3-banking": 0.119587628865979
   },
+  "intelligenceIndexCostPerTask": 0.19269450548704561,
+  "intelligenceIndexTimePerTask": 1257.3950463636465,
   "price1mInputTokens": 0.095,
   "price1mOutputTokens": 0.32,
   "cacheHitPrice": 0.05,
