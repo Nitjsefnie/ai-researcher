@@ -168,7 +168,7 @@ request `report` comments the totals and the diff coverage of the added lines;
 its job checks out the tree and holds no conversation write, so
 test-ratchet-comment.yml writes that comment once the ci gate run completes.
 There are two floors: Python statement coverage of `--cov=.` (setup.cfg omits
-`*/tests/*`), and JavaScript code-line coverage of the page's inline script,
+`tests/*`), and JavaScript code-line coverage of the page's inline script,
 measured through the browser suite: `tests/test_browser.py` writes each
 class's V8 coverage into `TEST_RATCHET_V8_DIR` when it is set, naming the
 committed `out/frontier-models.html`, and the run step counts only lines holding
