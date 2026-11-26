@@ -32,6 +32,10 @@ name: audit
 # it on. This repo goes weeks between pushes — a push-only audit would report
 # clean the whole time.
 #
+# WHY NOT THE SIBLINGS' PATH-FILTERED SHAPE. ci-gate.yml calls this gate, so
+# its verdict folds into the one required aggregate, and it retries through
+# scripts/ci/download.py, the retry helper this repository's workflows share.
+#
 # This gate FAILS the build rather than filing an advisory, the same stance as
 # lint and types: a red gate a human must look at beats a notification that
 # accumulates unread. When a fix genuinely is not available yet, add the
@@ -49,9 +53,7 @@ on:
 # The push and pull_request triggers, and their paths-ignore deny-list
 # (`**/*.md` / LICENSE / .gitignore), live in ci-gate.yml: a trigger filter
 # cannot report, so a required-check ruleset could never go green on a
-# documentation-only change. The daily cron stays here: this gate answers "is
-# a version we froze months ago still safe", and that answer changes when a
-# stranger publishes an advisory, with no commit here to hang it on.
+# documentation-only change. The daily cron stays here, for the reason above.
 
 permissions:
   contents: read
