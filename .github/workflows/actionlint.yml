@@ -71,7 +71,7 @@ jobs:
       # `queue:` key in a concurrency group and rejects claim.yml's
       # reference block with `unexpected key "queue"`. The fork adds
       # rhysd/actionlint#654 (`queue`), #732 (`$/` uses) and #707
-      # (`job.workflow_ref`); the claim, pr-gate and daedalus repositories
+      # (`job.workflow_*`); the claim, pr-gate and daedalus repositories
       # run this fork too. Return to rhysd's own release once it ships them.
       AI_RESEARCHER_ACTIONLINT_VERSION: 1.7.12-queue.3
       AI_RESEARCHER_ACTIONLINT_REPO: Nitjsefnie-OSC/actionlint
