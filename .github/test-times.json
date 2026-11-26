@@ -30,7 +30,8 @@
       "tests/test_capture_gate.py": [
         1.69,
         3.05,
-        4.06
+        4.06,
+        5.28
       ],
       "tests/test_check_committed_page.py": [
         2.45,
@@ -172,7 +173,8 @@
       "tests/test_refresh_github_fetch.py": [
         6.3,
         8.19,
-        4.69
+        4.69,
+        11.55
       ],
       "tests/test_refresh_hub_upload.py": [
         3.52,
@@ -409,7 +411,8 @@
       ],
       "tests/test_check_committed_rankings_page.py": [
         8.41,
-        5.53
+        5.53,
+        11.31
       ],
       "tests/test_ci_apt_deb_cache.py": [
         0.05
@@ -581,7 +584,8 @@
       ],
       "tests/test_check_committed_rankings_page.py": [
         6.55,
-        9.05
+        9.05,
+        13.63
       ],
       "tests/test_ci_apt_deb_cache.py": [
         0.03
