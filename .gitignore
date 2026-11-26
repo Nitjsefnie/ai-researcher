@@ -60,6 +60,11 @@
 !/.github/workflows/
 /.github/workflows/*
 !/.github/workflows/*.yml
+# The secret scan's helper and the retry it calls, named back one by one.
+!/.github/scripts/
+/.github/scripts/*
+!/.github/scripts/gitleaks_scan.sh
+!/.github/scripts/retry.sh
 
 # ---- data/ — AA captures and separate tracked outputs ---------------------
 !/data/
