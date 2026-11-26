@@ -1,7 +1,7 @@
 name: test-ratchet comment
 
 on:
-  workflow_run:  # zizmor: ignore[dangerous-triggers] nothing from the pull request is checked out or run
+  workflow_run:  # zizmor: ignore[dangerous-triggers] no pull-request code is checked out or run
     workflows: [ci gate]
     types: [completed]
 
@@ -13,9 +13,10 @@ concurrency:
 
 jobs:
   comment:
+    # Every PR: the gate's report job cannot comment
     if: github.event.workflow_run.event == 'pull_request'
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 10
     permissions:
       contents: read
       pull-requests: write
