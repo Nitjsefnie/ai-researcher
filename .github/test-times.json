@@ -201,7 +201,8 @@
         0.07
       ],
       "tests/test_browser_temp.py": [
-        1.67
+        1.67,
+        2.89
       ],
       "tests/test_build.py": [
         1.88
@@ -369,7 +370,8 @@
       "tests/test_refresh_hub_upload.py": [
         6.22,
         4.65,
-        3.42
+        3.42,
+        11.27
       ],
       "tests/test_refresh_workflow.py": [
         118.79,
@@ -785,7 +787,8 @@
         0.18
       ],
       "tests/test_ci_install_chromium.py": [
-        2.05
+        2.05,
+        5.6
       ],
       "tests/test_ci_install_valgrind.py": [
         0.98
@@ -987,7 +990,8 @@
         1.6
       ],
       "tests/test_environment_prefix.py": [
-        3.08
+        3.08,
+        2.02
       ],
       "tests/test_fetch_aa.py": [
         13.41,
@@ -1034,7 +1038,8 @@
         30.83
       ],
       "tests/test_gate_base_freshness_tokens.py": [
-        2.25
+        2.25,
+        1.15
       ],
       "tests/test_gitignore.py": [
         0.77
