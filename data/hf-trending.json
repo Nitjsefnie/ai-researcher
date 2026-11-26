@@ -20,6 +20,9 @@
       "id": "prism-ml/Ternary-Bonsai-2.5-27B-GGUF"
     },
     {
+      "id": "Lightricks/LTX-2.5"
+    },
+    {
       "id": "apple/DepthPro2"
     },
     {
@@ -27,9 +30,6 @@
     },
     {
       "id": "inclusionAI/Ling-3.2-air"
-    },
-    {
-      "id": "harness-hub/Qwen3.8-27B-pi-adapted"
     }
   ]
 }
