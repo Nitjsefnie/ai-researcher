@@ -11,10 +11,10 @@
       "id": "AtomicChat/Inkling-2-Mini-Uncensored-GGUF"
     },
     {
-      "id": "inworld/voice-isolator"
+      "id": "SulphurAI/Sulphur-3"
     },
     {
-      "id": "SulphurAI/Sulphur-3"
+      "id": "inworld/voice-isolator"
     },
     {
       "id": "prism-ml/Ternary-Bonsai-2.5-27B-GGUF"
@@ -23,10 +23,10 @@
       "id": "Lightricks/LTX-2.5"
     },
     {
-      "id": "llamaindex/OCRia-nano-1"
+      "id": "nvidia/Nemotron-Labs-Image-30B-A3B"
     },
     {
-      "id": "nvidia/Nemotron-Labs-Image-30B-A3B"
+      "id": "llamaindex/OCRia-nano-1"
     },
     {
       "id": "apple/DepthPro2"
