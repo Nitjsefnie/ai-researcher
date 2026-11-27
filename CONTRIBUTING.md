@@ -593,7 +593,7 @@ or `test`. The pr gate workflow refuses a human-authored pull request carrying
 any other subject (merge commits are not checked); older history predates
 the rule.
 One more rule is enforced on every pull request by the `actionlint` job's
-`Nitjsefnie-Actions/pr-gate/commit-scopes` step, which fails a commit in
+`Nitjsefnie-Actions/commit-scopes` step, which fails a commit in
 `origin/main..HEAD` whose scope names a workflow while its type is not `ci`.
 The type disambiguates shared names: `ci(refresh)` changes the refresh
 workflow, while `fix(refresh)` would be a change no reader can place.
