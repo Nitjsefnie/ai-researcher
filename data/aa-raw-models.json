@@ -3055,12 +3055,12 @@
    "apex-agents-aa": 0.379793510324484
   },
   "intelligenceIndexCostPerTask": 3.9375867636287922,
-  "intelligenceIndexTimePerTask": 1495.0351745237158,
+  "intelligenceIndexTimePerTask": 1495.0351745237176,
   "price1mInputTokens": 1,
   "price1mOutputTokens": 2.7,
   "cacheHitPrice": 0.1,
   "cacheWritePrice": null,
-  "outputSpeed": 75.8998046704339,
+  "outputSpeed": 75.8998046704338,
   "timeToFirstToken": 21.8277162337733,
   "timeToFirstAnswerToken": 55.158848039833,
   "slug": "step-5-preview"
@@ -8841,6 +8841,60 @@
    "timescaleData",
    "vialsScore",
    "workloads"
+  ]
+ },
+ {
+  "id": "178d9aca-b55a-441d-89f7-aec7f9ad3fda",
+  "release": {
+   "slug": "quasar-1-2-358b",
+   "name": "Quasar 1.2 358B"
+  },
+  "name": "Quasar 1.2 358B (Max, Based on GLM-5.3)",
+  "shortName": "Quasar 1.2 358B (max)",
+  "suffix": "Max, Based on GLM-5.3",
+  "deprecated": false,
+  "isReasoning": true,
+  "isOpenWeights": false,
+  "paramClass": "large",
+  "priceClass": "low",
+  "modelCreatorName": "Multiverse Computing",
+  "modelCreatorColor": "#f11338",
+  "modelCreatorLogo": "/img/logos/multiversecomputing.svg",
+  "contextWindowTokens": 1000000,
+  "intelligenceIndex": 23.0788933047591,
+  "omniscience": -28.966666666666665,
+  "scores": {
+   "aa-briefcase": 1316.31,
+   "omniscience-accuracy": 0.237,
+   "omniscience-non-hallucination": 0.3097422455220621,
+   "automationbench-aa": 0.5401154125437463,
+   "terminal-bench-science": 0.0619047619047619,
+   "frontiercode-2-0": 0.139938383838384,
+   "hle-diamond": 0.131,
+   "gdp-pdf": 0.104,
+   "terminalbench-4-1": 0.282828282828283,
+   "critpt-v2-hard": 0.265,
+   "terminalbench-4-0": 0.287878787878788
+  },
+  "intelligenceIndexCostPerTask": 0.13104090127418705,
+  "intelligenceIndexTimePerTask": 1061.8343374463911,
+  "price1mInputTokens": 0.11,
+  "price1mOutputTokens": 0.33,
+  "cacheHitPrice": 0.006,
+  "cacheWritePrice": null,
+  "outputSpeed": 130.877230493704,
+  "timeToFirstToken": 1.86158306527776,
+  "timeToFirstAnswerToken": 65.4851438934593,
+  "slug": "quasar-1-2-358b",
+  "genVariants": [
+   {},
+   {
+    "ii": 23.0788933047591,
+    "cost": 0.13104090127418705,
+    "ctx": 1000000,
+    "pin": 0.11,
+    "pout": 0.33
+   }
   ]
  },
  {
@@ -15048,12 +15102,12 @@
    "tau3-banking": 0.088659793814433
   },
   "intelligenceIndexCostPerTask": 0.2377236614653212,
-  "intelligenceIndexTimePerTask": 210.56785816248296,
+  "intelligenceIndexTimePerTask": 210.5678581624826,
   "price1mInputTokens": 0.06,
   "price1mOutputTokens": 0.2,
   "cacheHitPrice": 0.035,
   "cacheWritePrice": null,
-  "outputSpeed": 308.8133644764625,
+  "outputSpeed": 308.813364476463,
   "timeToFirstToken": 0.7608775915733005,
   "timeToFirstAnswerToken": 11.4188522922812,
   "slug": "nemotron-3-5-lightning",
@@ -51033,10 +51087,10 @@
   "mlcrOverall": 0.172222222222222,
   "harveyLab": 0.0027777777777777775,
   "gdpPdfAllPass": 0.112,
-  "gdpval": 1654.2,
+  "gdpval": 1654.49,
   "gdpvalInterval": {
-   "lower": 1636.41,
-   "upper": 1671.98
+   "lower": 1636.78,
+   "upper": 1672.2
   },
   "itBenchSre": 0.460828625235405,
   "tau2": null,
@@ -51105,9 +51159,9 @@
   },
   "briefcaseBreakdown": {
    "overall": {
-    "elo": 1498.35,
-    "lower95ci": 1490.86,
-    "upper95ci": 1505.88
+    "elo": 1497.81,
+    "lower95ci": 1490.44,
+    "upper95ci": 1505.02
    },
    "rubricPassRate": 0.5134854771784232,
    "analyticalQuality": {
@@ -61950,7 +62004,7 @@
   "price1mBlended0To1To1": 1.85,
   "price1mBlended100To1To1": 0.13431372549019607,
   "price1mBlended0To100To1": 1.0168316831683168,
-  "intelligenceIndexTimePerTask": 1495.0351745237158,
+  "intelligenceIndexTimePerTask": 1495.0351745237176,
   "intelligenceIndexCost": {
    "total": 2624.41420352761,
    "input": 2276.90134532761,
@@ -62159,7 +62213,7 @@
    "endsWithQuestion": 0.0177777777777778
   },
   "headline": {
-   "outputSpeed": 75.8998046704339,
+   "outputSpeed": 75.8998046704338,
    "timeToFirstToken": 21.8277162337733,
    "timeToFirstAnswerToken": 55.158848039833
   },
