@@ -373,7 +373,8 @@
         43.93
       ],
       "tests/test_build_rankings_identity.py": [
-        1.79
+        1.79,
+        3.66
       ],
       "tests/test_build_writes.py": [
         0.09
@@ -448,7 +449,8 @@
       "tests/test_fetch_aa.py": [
         9.66,
         6.1,
-        12.45
+        12.45,
+        21.61
       ],
       "tests/test_fetch_aa_detail_fills.py": [
         0.29
@@ -660,7 +662,8 @@
       ],
       "tests/test_refresh_github_fetch.py": [
         4.36,
-        6.1
+        6.1,
+        2.24
       ],
       "tests/test_refresh_hub_upload.py": [
         3.07,
@@ -702,11 +705,13 @@
       ],
       "tests/test_capture_gate.py": [
         7.0,
-        4.13
+        4.13,
+        11.85
       ],
       "tests/test_check_committed_page.py": [
         3.3,
-        2.01
+        2.01,
+        4.37
       ],
       "tests/test_check_committed_rankings_page.py": [
         62.31,
@@ -896,13 +901,15 @@
       ],
       "tests/test_ci_install_chromium.py": [
         1.77,
-        2.95
+        2.95,
+        6.55
       ],
       "tests/test_ci_install_valgrind.py": [
         1.09
       ],
       "tests/test_ci_instruction_budgets.py": [
-        0.58
+        0.58,
+        4.16
       ],
       "tests/test_ci_perf_budgets.py": [
         0.92
