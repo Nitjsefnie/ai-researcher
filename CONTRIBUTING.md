@@ -304,9 +304,8 @@ exit, and it is how a refused, dropped or timed-out connection or an HTTP 5xx
 ends a fetch, an `ls-remote` or a push, while a rejected push exits 1 and is
 never retried.
 128 also ends a fetch of a ref the remote lacks and a refused credential; those
-fail red only once the window is spent. The freshness and commit-scope gates
-call `run_retrying` in process; every other call is wrapped alone, so a push's
-`if` still sends a rejection to its race branch and an `ls-remote` command
+fail red only once the window is spent. Every call is wrapped alone, so a
+push's `if` still sends a rejection to its race branch and an `ls-remote` command
 substitution keeps its value. A push that lands but loses its reply reruns as
 "Everything up-to-date" and exits 0. A fetch that may add `--unshallow` asks
 before every attempt whether the history is still shallow, because
@@ -593,12 +592,11 @@ Every commit a pull request adds follows
 or `test`. The pr gate workflow refuses a human-authored pull request carrying
 any other subject (merge commits are not checked); older history predates
 the rule.
-One more rule is enforced on every pull request by
-`scripts/ci/commit_scopes.py`: a workflow's `name:` is allowed as a scope
-only with the `ci` type. The type disambiguates shared names: `ci(refresh)`
-changes the refresh workflow, while `fix(refresh)` would be a change no
-reader can place. A subject that check cannot parse is listed by it, and
-left to the pr gate.
+One more rule is enforced on every pull request by the `actionlint` job's
+`Nitjsefnie-Actions/pr-gate/commit-scopes` step, which fails a commit in
+`origin/main..HEAD` whose scope names a workflow while its type is not `ci`.
+The type disambiguates shared names: `ci(refresh)` changes the refresh
+workflow, while `fix(refresh)` would be a change no reader can place.
 
 The commits this repository's automation writes follow the same format: the
 refresh workflow's scheduled commit leads with `chore(capture)`,

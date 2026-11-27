@@ -7,7 +7,6 @@
     ".github/workflows/refresh.yml": 1301,
     "build.py": 2625,
     "scripts/ci/check_ratchets.py": 618,
-    "scripts/ci/gate_base_freshness.py": 700,
     "scripts/ci/install_chromium.py": 636,
     "scripts/ci/perf_budgets.py": 723,
     "scripts/diff_aa.py": 799,
@@ -23,7 +22,6 @@
     "tests/test_ci_ratchets.py": 1454,
     "tests/test_diff_aa.py": 1212,
     "tests/test_fetch_aa.py": 2334,
-    "tests/test_gate_base_freshness.py": 866,
     "tests/test_refresh_workflow.py": 2568
   }
 }
