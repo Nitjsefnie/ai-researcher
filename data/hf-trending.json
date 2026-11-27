@@ -17,6 +17,9 @@
       "id": "prism-ml/Ternary-Bonsai-2.5-27B-GGUF"
     },
     {
+      "id": "inworld/voice-isolator"
+    },
+    {
       "id": "Lightricks/LTX-2.5"
     },
     {
@@ -24,9 +27,6 @@
     },
     {
       "id": "nvidia/Nemotron-Labs-Image-30B-A3B"
-    },
-    {
-      "id": "inworld/voice-isolator"
     },
     {
       "id": "strata-engine/Inkling-2-Mini-Strata"
