@@ -79,14 +79,6 @@
     6433,
     11342
   ],
-  "scripts/ci/commit_scopes.py": [
-    6375,
-    12040
-  ],
-  "scripts/ci/gate_base_freshness.py": [
-    13156,
-    24155
-  ],
   "scripts/ci/install_chromium.py": [
     7290,
     21083

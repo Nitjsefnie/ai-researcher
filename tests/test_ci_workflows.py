@@ -17,7 +17,6 @@ import _workflowrun  # noqa: E402  # pylint: disable=wrong-import-position
 
 CODEQL_WORKFLOW = REPO_ROOT / ".github" / "workflows" / "codeql.yml"
 DEPENDABOT = REPO_ROOT / ".github" / "dependabot.yml"
-PR_GATE_WORKFLOW = REPO_ROOT / ".github" / "workflows" / "pr-gate.yml"
 TESTS_WORKFLOW = REPO_ROOT / ".github" / "workflows" / "tests.yml"
 WORKFLOWS = sorted((REPO_ROOT / ".github" / "workflows").glob("*.yml"))
 ACTIONS = sorted((REPO_ROOT / ".github" / "actions").glob("**/action.y*ml"))

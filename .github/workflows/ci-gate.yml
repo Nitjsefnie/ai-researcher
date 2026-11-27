@@ -116,9 +116,7 @@ jobs:
   # empty output reads as not-docs and leaves every leg skipped —
   # fail-closed, visibly red). actionlint carries no narrowing
   # condition at all: it is the gate on the gates, its merge-marker
-  # step and freshness check must read a documentation-only head too,
-  # and it is what keeps the two gate scripts themselves watched on the
-  # hourly bot push.
+  # step and freshness check must read a documentation-only head too.
 
   tests:
     needs: classify

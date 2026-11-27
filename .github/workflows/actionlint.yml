@@ -36,10 +36,8 @@ on:
 # The push and pull_request triggers live in ci-gate.yml. This leg is
 # DELIBERATELY UNCONDITIONAL in ci-gate — no narrowing output may skip it —
 # so a conflict marker committed into a Markdown file is still read (the
-# merge-marker step below), the freshness and scope gates still read every
-# head, not only code heads, and the two gate scripts stay watched on the
-# hourly refresh bot's push, where both are trivially green (main carries
-# itself).
+# merge-marker step below), and the freshness and scope gates still read
+# every head, not only code heads.
 
 permissions:
   contents: read
@@ -112,32 +110,14 @@ jobs:
             exit 1
           fi
 
-      - name: Require this head to carry main's gate-defining commits
-        # This repository carries no merge ruleset, so a green head vouches
-        # only for the tree this run checked out — and main moves hourly (the
-        # refresh workflow's capture commits), so a commit that lands on main
-        # touching a file a merge-gate job reads is never applied to a pull
-        # request before it merges, and the merge then publishes a tree no
-        # green run ever saw. This is the only check that compares the two.
-        #
-        # In this job rather than a new one: this workflow is the gate on the
-        # gates, its triggers are unfiltered so every head is judged, and a
-        # `paths:` filter on a workflow hosting a merge-gate step would stop
-        # the step reporting at all on the heads that need it.
-        #
-        # Before setup-python and every install: work done against a base
-        # main has already moved on from is work whose verdict does not
-        # carry, and a head that fails here never pays for what follows.
-        run: python3 scripts/ci/gate_base_freshness.py
-
-      - name: Refuse a commit whose scope names a workflow outside the ci type
-        # CONTRIBUTING's scope rule allows a workflow's `name:` as a scope
-        # only with the `ci` type, and prose no gate reads is a convention —
-        # a rule that exists only in prose is one nobody has to obey. In this
-        # job rather than a new one, for the reason the freshness step names.
-        # After the freshness step: both compare the head against freshly
-        # fetched main, and both must read the rebased head.
-        run: python3 scripts/ci/commit_scopes.py
+      # pr-gate's branch checks, in this job rather than a new one: this
+      # workflow is the gate on the gates, its triggers are unfiltered so every
+      # head is judged, and a `paths:` filter on a workflow hosting a
+      # merge-gate step would stop the step reporting at all on the heads that
+      # need it. Before setup-python and every install: a head that fails here
+      # never pays for what follows.
+      - uses: Nitjsefnie-Actions/pr-gate/freshness@eb4991d7f92be7d2e55bb8b47aaaa24f09e98ca2 # v3.3.0
+      - uses: Nitjsefnie-Actions/pr-gate/commit-scopes@eb4991d7f92be7d2e55bb8b47aaaa24f09e98ca2 # v3.3.0
 
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
