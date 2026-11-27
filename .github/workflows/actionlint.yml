@@ -110,14 +110,15 @@ jobs:
             exit 1
           fi
 
-      # pr-gate's branch checks, in this job rather than a new one: this
+      # The branch checks, in this job rather than a new one: this
       # workflow is the gate on the gates, its triggers are unfiltered so every
       # head is judged, and a `paths:` filter on a workflow hosting a
       # merge-gate step would stop the step reporting at all on the heads that
       # need it. Before setup-python and every install: a head that fails here
       # never pays for what follows.
-      - uses: Nitjsefnie-Actions/pr-gate/freshness@eb4991d7f92be7d2e55bb8b47aaaa24f09e98ca2 # v3.3.0
-      - uses: Nitjsefnie-Actions/pr-gate/commit-scopes@eb4991d7f92be7d2e55bb8b47aaaa24f09e98ca2 # v3.3.0
+      - if: github.event_name == 'pull_request' || github.ref_name == github.event.repository.default_branch
+        uses: Nitjsefnie-Actions/freshness@5edc2a45ff894cf49c5cc8d293bbae0af33507d4 # v1.0.0
+      - uses: Nitjsefnie-Actions/commit-scopes@645ca8f43b00199cebeed7a5d305b4224e902a60 # v1.0.0
 
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
