@@ -142,9 +142,6 @@
       "tests/test_gitignore.py": [
         0.29
       ],
-      "tests/test_gitleaks_scan.py": [
-        0.01
-      ],
       "tests/test_index_composition.py": [
         0.28,
         1.32
@@ -320,9 +317,6 @@
       "tests/test_gitignore.py": [
         0.56
       ],
-      "tests/test_gitleaks_scan.py": [
-        0.01
-      ],
       "tests/test_index_composition.py": [
         0.51
       ],
@@ -485,9 +479,6 @@
       "tests/test_gitignore.py": [
         0.55
       ],
-      "tests/test_gitleaks_scan.py": [
-        0.68
-      ],
       "tests/test_index_composition.py": [
         0.67
       ],
@@ -646,9 +637,6 @@
       ],
       "tests/test_gitignore.py": [
         0.34
-      ],
-      "tests/test_gitleaks_scan.py": [
-        0.72
       ],
       "tests/test_index_composition.py": [
         0.58
@@ -813,9 +801,6 @@
       "tests/test_gitignore.py": [
         1.1
       ],
-      "tests/test_gitleaks_scan.py": [
-        0.01
-      ],
       "tests/test_index_composition.py": [
         0.63
       ],
@@ -971,9 +956,6 @@
       ],
       "tests/test_gitignore.py": [
         0.77
-      ],
-      "tests/test_gitleaks_scan.py": [
-        0.0
       ],
       "tests/test_index_composition.py": [
         0.4

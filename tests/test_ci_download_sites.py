@@ -68,8 +68,7 @@ def checkout_copy(tmp_path, boundary, fallback=None):
     """A workspace holding the real helper, and a bin dir whose `python`,
     `python3` and `zizmor` run `boundary` (or `fallback` for any other script)."""
     workspace = tmp_path / "ws"
-    for relative in ("scripts/ci/download.py", "scripts/fetch_http.py",
-                     ".github/scripts/gitleaks_scan.sh", ".github/scripts/retry.sh"):
+    for relative in ("scripts/ci/download.py", "scripts/fetch_http.py"):
         (workspace / relative).parent.mkdir(parents=True, exist_ok=True)
         shutil.copy(REPO_ROOT / relative, workspace / relative)
     stub = tmp_path / "bin"
@@ -121,8 +120,8 @@ SITES = [
     ("actionlint.yml", "actionlint", "Install actionlint", "actionlint",
      {"env_edit": actionlint_env}),
 ]
-# The step after the download that executes the tool by its workspace path.
-CONSUMERS = {"gitleaks": "Scan the tree and the history", "actionlint": "actionlint"}
+# The step running the downloaded tool, and its exit on the fake (a control refusing no finding).
+CONSUMERS = {"gitleaks": ("Positive control - prove the scanner detects", 1), "actionlint": ("actionlint", 0)}
 LINUX = pytest.mark.skipif(sys.platform != "linux", reason="the workflow step runs on Ubuntu")
 TOKEN = "token-value-for-tests"
 
@@ -151,16 +150,12 @@ def test_a_site_retries_a_gateway_error_then_its_consumer_runs_the_tool(
     assert requests == expected_requests(requests, token)
     assert TOKEN not in result.stdout + result.stderr
     assert f"fake {tool} " in result.stdout
+    consumer_name, status = CONSUMERS[tool]
     consumer = _workflowrun.step_by_name(
-        REPO_ROOT / ".github" / "workflows" / workflow, job, CONSUMERS[tool])
-    # The scan reads the base branch's config from origin; the workspace serves as its own.
-    for args in (["init", "-q", "-b", "main"], ["commit", "-q", "--allow-empty", "-m", "base"],
-                 ["remote", "add", "origin", str(workspace)]):
-        subprocess.run(["git", "-c", "user.name=t", "-c", "user.email=t@example.com", *args],
-                       cwd=workspace, check=True)
-    consumed = _workflowrun.run_step(workspace, consumer, {**os.environ, "AI_RESEARCHER_BASE_REF": "main"})
-    assert consumed.returncode == 0, consumed.stderr
-    assert consumed.stdout.startswith(f"fake {tool} ")
+        REPO_ROOT / ".github" / "workflows" / workflow, job, consumer_name)
+    consumed = _workflowrun.run_step(workspace, consumer, dict(os.environ))
+    assert consumed.returncode == status, consumed.stderr
+    assert f"fake {tool} " in consumed.stdout
 
 
 @LINUX
