@@ -17,9 +17,6 @@
       "id": "prism-ml/Ternary-Bonsai-2.5-27B-GGUF"
     },
     {
-      "id": "inworld/voice-isolator"
-    },
-    {
       "id": "Lightricks/LTX-2.5"
     },
     {
@@ -27,6 +24,9 @@
     },
     {
       "id": "llamaindex/OCRia-nano-1"
+    },
+    {
+      "id": "inworld/voice-isolator"
     },
     {
       "id": "apple/DepthPro2"
