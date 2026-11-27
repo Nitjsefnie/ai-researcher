@@ -211,7 +211,8 @@
         2.89
       ],
       "tests/test_build.py": [
-        1.88
+        1.88,
+        3.46
       ],
       "tests/test_build_rankings.py": [
         14.77,
@@ -1057,7 +1058,8 @@
       ],
       "tests/test_gate_base_freshness_imports.py": [
         23.96,
-        30.83
+        30.83,
+        39.76
       ],
       "tests/test_gate_base_freshness_tokens.py": [
         2.25,
