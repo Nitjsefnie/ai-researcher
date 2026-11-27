@@ -4,8 +4,8 @@
     2097
   ],
   ".github/workflows/actionlint.yml": [
-    4633,
-    6690
+    4627,
+    6761
   ],
   ".github/workflows/audit.yml": [
     4193,
@@ -36,8 +36,8 @@
     1587
   ],
   ".github/workflows/secrets.yml": [
-    2492,
-    3869
+    2389,
+    3754
   ],
   ".github/workflows/tests.yml": [
     8934,
