@@ -70,7 +70,7 @@ jobs:
         with:
           persist-credentials: false
       - id: plan
-        uses: Nitjsefnie-Actions/test-ratchet/plan@96562a47e9b7fe74b55cc70a4636d1b5d7b542e2 # v2.4.2
+        uses: Nitjsefnie-Actions/test-ratchet/plan@caf72ff77921794d9573c8b8aabe008946dcca45 # v2.5.0
         with:
           tests: tests/**/test_*.py
           times: .github/test-times.json
@@ -156,7 +156,7 @@ jobs:
       # flock tests share state across one process.
       - name: Run the gated cell's tests
         if: matrix.os == 'ubuntu-latest' && matrix.python == '3.15'
-        uses: Nitjsefnie-Actions/test-ratchet/run@96562a47e9b7fe74b55cc70a4636d1b5d7b542e2 # v2.4.2
+        uses: Nitjsefnie-Actions/test-ratchet/run@caf72ff77921794d9573c8b8aabe008946dcca45 # v2.5.0
         with:
           runner: pytest
           tests: tests/**/test_*.py
@@ -175,7 +175,7 @@ jobs:
       - name: Run the portability cells' tests
         # Every test file but tests/test_browser.py.
         if: matrix.os != 'ubuntu-latest' || matrix.python != '3.15'
-        uses: Nitjsefnie-Actions/test-ratchet/run@96562a47e9b7fe74b55cc70a4636d1b5d7b542e2 # v2.4.2
+        uses: Nitjsefnie-Actions/test-ratchet/run@caf72ff77921794d9573c8b8aabe008946dcca45 # v2.5.0
         with:
           runner: pytest
           tests: |
