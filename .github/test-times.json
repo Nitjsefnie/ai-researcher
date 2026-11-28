@@ -530,13 +530,15 @@
         30.6
       ],
       "tests/test_build_rankings_identity.py": [
-        1.16
+        1.16,
+        2.35
       ],
       "tests/test_build_writes.py": [
         0.09
       ],
       "tests/test_capture_gate.py": [
-        2.0
+        2.0,
+        3.23
       ],
       "tests/test_check_committed_page.py": [
         1.12
@@ -600,7 +602,8 @@
         0.94
       ],
       "tests/test_environment_prefix.py": [
-        1.85
+        1.85,
+        2.96
       ],
       "tests/test_fetch_aa.py": [
         6.36,
